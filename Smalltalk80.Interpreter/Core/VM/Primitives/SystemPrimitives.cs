@@ -41,269 +41,314 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// </remarks>
 public static class SystemPrimitives
 {
-    /// <summary>
-    /// Primitive 112: coreLeft - Free memory available.
-    /// Returns estimate of available heap memory in bytes.
-    /// </summary>
+    // <summary>
+    // Primitive 112: coreLeft - Free memory available.
+    // Returns estimate of available heap memory in bytes.
+    // </summary>
     public static SmalltalkOOP CoreLeft(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book: primitiveCoreLeft
+        // Returns available heap memory estimate in bytes
+
+        // No arguments expected
         if (args.Length != 0)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Get GC statistics for memory usage
+        // Query garbage collector for memory statistics
         var stats = ctx.HeapManager.GetGCStatistics();
 
-        // Calculate available memory: Total allocated minus objects in use
-        // Each object table entry is approximately 24 bytes (managed storage overhead)
+        // Calculate available slots in object table
         int totalSlots = ctx.HeapManager.GetObjectTableSize();
-        int usedSlots = stats.TotalObjects; // After GC, this is reachable objects
+        int usedSlots = stats.TotalObjects; // Reachable objects after last GC
         int freeSlots = totalSlots - usedSlots;
 
-        // Estimate: each free slot can hold ~1KB on average
+        // Estimate memory: assume ~1KB average object size
+        // This is a rough estimate for Smalltalk's memory reporting
         int estimatedFreeBytes = freeSlots * 1024;
 
-        // Clamp to SmallInteger range (positive 31-bit)
+        // Clamp to positive SmallInteger range (30 bits)
         if (estimatedFreeBytes < 0)
             estimatedFreeBytes = 0;
-        if (estimatedFreeBytes > 0x3FFFFFFF) // Max positive SmallInteger
+        if (estimatedFreeBytes > 0x3FFFFFFF)
             estimatedFreeBytes = 0x3FFFFFFF;
 
+        // Return memory estimate as SmallInteger
         return SmalltalkOOP.FromSmallInteger(estimatedFreeBytes);
     }
 
-    /// <summary>
-    /// Primitive 113: quit - Exit the VM.
-    /// Uses IPlatformBridge if available for graceful shutdown, falls back to Environment.Exit.
-    /// </summary>
+    // <summary>
+    // Primitive 113: quit - Exit the VM.
+    // Uses IPlatformBridge if available for graceful shutdown, falls back to Environment.Exit.
+    // </summary>
     public static SmalltalkOOP Quit(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book: primitiveQuit
+        // Terminates the VM and returns to operating system
+
+        // No arguments expected
         if (args.Length != 0)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Use platform bridge for graceful shutdown if available
+        // Platform-specific: Use bridge for clean shutdown
+        // Bridge can save image, close files, release resources
         if (ctx.PlatformBridge != null)
         {
-            ctx.PlatformBridge.Quit(0);
+            ctx.PlatformBridge.Quit(0); // Exit code 0 = success
         }
         else
         {
-            // Fallback: direct exit (headless mode)
+            // Fallback: Immediate termination in headless mode
             Environment.Exit(0);
         }
 
+        // Never reached (VM terminates)
         return receiver;
     }
 
-    /// <summary>
-    /// Primitive 114: exitToDebugger - Break to debugger.
-    /// Triggers a breakpoint for attached debuggers, or fails silently if no debugger attached.
-    /// </summary>
+    // <summary>
+    // Primitive 114: exitToDebugger - Break to debugger.
+    // Triggers a breakpoint for attached debuggers, or fails silently if no debugger attached.
+    // </summary>
     public static SmalltalkOOP ExitToDebugger(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book: primitiveExitToDebugger
+        // Breaks into native debugger if attached
+
+        // No arguments expected
         if (args.Length != 0)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Trigger debugger breakpoint if one is attached
+        // Check if .NET debugger is attached to process
         if (System.Diagnostics.Debugger.IsAttached)
         {
+            // Trigger breakpoint for debugging VM internals
             System.Diagnostics.Debugger.Break();
             return receiver;
         }
         else
         {
-            // No debugger attached - fail primitive
-            // Smalltalk code can handle this by opening a debugger window
+            // No debugger - fail primitive
+            // Smalltalk can open its own debugger window instead
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
     }
 
-    /// <summary>
-    /// Primitive 115: oopsLeft - Available object pointer slots.
-    /// Returns number of available OOP slots in the object table.
-    /// </summary>
+    // <summary>
+    // Primitive 115: oopsLeft - Available object pointer slots.
+    // Returns number of available OOP slots in the object table.
+    // </summary>
     public static SmalltalkOOP OopsLeft(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book: primitiveOopsLeft
+        // Returns count of free object table entries
+
+        // No arguments expected
         if (args.Length != 0)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Query object table for actual free slots
+        // Query object table statistics
         int totalSlots = ctx.HeapManager.GetObjectTableSize();
         int activeObjects = ctx.HeapManager.GetActiveObjectCount();
         int freeSlots = totalSlots - activeObjects;
 
-        // Clamp to positive SmallInteger range
+        // Ensure positive SmallInteger range
         if (freeSlots < 0)
             freeSlots = 0;
-        if (freeSlots > 0x3FFFFFFF) // Max positive SmallInteger
+        if (freeSlots > 0x3FFFFFFF)
             freeSlots = 0x3FFFFFFF;
 
+        // Return available OOP count
         return SmalltalkOOP.FromSmallInteger(freeSlots);
     }
 
-    /// <summary>
-    /// Primitive 116: signalAtOopsLeftWordsLeft - Set low memory threshold
-    /// Blue Book: Page 587, Chapter 29
-    /// </summary>
-    /// <remarks>
-    /// <para><b>Blue Book Specification:</b></para>
-    /// <para>Sets up monitoring for low-memory conditions. When available memory drops below
-    /// the specified thresholds, the receiver Semaphore is signaled to allow graceful handling
-    /// of low-memory situations.</para>
-    ///
-    /// <para><b>Arguments:</b></para>
-    /// <list type="bullet">
-    /// <item>Receiver: Semaphore to signal (or nil to disable monitoring)</item>
-    /// <item>args[0]: Minimum OOPs threshold (SmallInteger)</item>
-    /// <item>args[1]: Minimum words threshold (SmallInteger)</item>
-    /// </list>
-    ///
-    /// <para><b>Implementation Status:</b></para>
-    /// <para>⚠️ STUB IMPLEMENTATION - Accepts arguments but does not implement monitoring.
-    /// Full implementation would require GC integration to check thresholds during allocation
-    /// and collection cycles, signaling the semaphore when either threshold is crossed.</para>
-    ///
-    /// <para><b>Conformance:</b> STUB - Interface correct, monitoring not implemented</para>
-    /// </remarks>
+    // <summary>
+    // Primitive 116: signalAtOopsLeftWordsLeft - Set low memory threshold
+    // Blue Book: Page 587, Chapter 29
+    // </summary>
+    // <remarks>
+    // <para><b>Blue Book Specification:</b></para>
+    // <para>Sets up monitoring for low-memory conditions. When available memory drops below
+    // the specified thresholds, the receiver Semaphore is signaled to allow graceful handling
+    // of low-memory situations.</para>
+    //
+    // <para><b>Arguments:</b></para>
+    // <list type="bullet">
+    // <item>Receiver: Semaphore to signal (or nil to disable monitoring)</item>
+    // <item>args[0]: Minimum OOPs threshold (SmallInteger)</item>
+    // <item>args[1]: Minimum words threshold (SmallInteger)</item>
+    // </list>
+    //
+    // <para><b>Implementation Status:</b></para>
+    // <para>⚠️ STUB IMPLEMENTATION - Accepts arguments but does not implement monitoring.
+    // Full implementation would require GC integration to check thresholds during allocation
+    // and collection cycles, signaling the semaphore when either threshold is crossed.</para>
+    //
+    // <para><b>Conformance:</b> STUB - Interface correct, monitoring not implemented</para>
+    // </remarks>
     public static SmalltalkOOP SignalAtOopsLeftWordsLeft(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book: primitiveSignalAtOopsLeftWordsLeft
+        // Sets up low-memory monitoring with thresholds
+
+        // Expect 2 arguments: oopsThreshold, wordsThreshold
         if (args.Length != 2)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Receiver must be a Semaphore (or nil to disable)
+        // Receiver must be Semaphore object (or nil to disable)
         if (!receiver.IsSmallInteger && receiver != SpecialObjectsArray.Instance.Nil)
         {
-            // Validate args are SmallIntegers
+            // Both thresholds must be SmallIntegers
             if (!args[0].IsSmallInteger || !args[1].IsSmallInteger)
             {
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
 
+            // Extract threshold values
             int oopsThreshold = args[0].AsSmallInteger();
             int wordsThreshold = args[1].AsSmallInteger();
 
-            // Validate thresholds are positive
+            // Thresholds must be non-negative
             if (oopsThreshold < 0 || wordsThreshold < 0)
             {
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
 
-            // Store the semaphore and thresholds for GC to monitor
-            // In a full implementation, this would:
+            // STUB IMPLEMENTATION
+            // Full implementation would:
             // 1. Store receiver semaphore in VM state
             // 2. Store oopsThreshold and wordsThreshold
             // 3. GC would check during collection and signal if below threshold
-            // For now, we just succeed without actually implementing the monitoring
+            // For now, accept parameters but don't implement monitoring
         }
 
+        // Return receiver (the semaphore)
         return receiver;
     }
 
-    /// <summary>
-    /// Primitive 128: someInstance - Get an instance of a class.
-    /// Blue Book: Returns an arbitrary instance of the receiver class, or nil if none exists.
-    /// </summary>
+    // <summary>
+    // Primitive 128: someInstance - Get an instance of a class.
+    // Blue Book: Returns an arbitrary instance of the receiver class, or nil if none exists.
+    // </summary>
     public static SmalltalkOOP SomeInstance(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book extension: primitiveSomeInstance
+        // Returns first instance of receiver class found in heap
+
+        // No arguments expected
         if (args.Length != 0)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Receiver must be a Class (not SmallInteger)
+        // Receiver must be a Class object
         if (receiver.IsSmallInteger)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Search heap for first instance of this class
+        // Walk entire heap searching for instances
         foreach (SmalltalkOOP oop in ctx.GetAllObjects())
         {
+            // Check if object's class matches receiver
             SmalltalkOOP objClassOOP = ctx.HeapManager.GetClassOOP(oop);
             if (objClassOOP == receiver)
             {
+                // Found an instance - return it
                 return oop;
             }
         }
 
-        // No instances found
+        // No instances of this class exist
         return SpecialObjectsArray.Instance.Nil;
     }
 
-    /// <summary>
-    /// Primitive 129: nextInstance - Get next instance of same class.
-    /// Blue Book: Returns the next instance of the same class after receiver, or nil if none.
-    /// </summary>
+    // <summary>
+    // Primitive 129: nextInstance - Get next instance of same class.
+    // Blue Book: Returns the next instance of the same class after receiver, or nil if none.
+    // </summary>
     public static SmalltalkOOP NextInstance(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book extension: primitiveNextInstance
+        // Returns next instance of same class after receiver
+
+        // No arguments expected
         if (args.Length != 0)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Receiver must be an instance (not SmallInteger)
+        // Receiver must be an object instance
         if (receiver.IsSmallInteger)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
+        // Get receiver's class
         SmalltalkOOP receiverClassOOP = ctx.HeapManager.GetClassOOP(receiver);
 
-        // Search for next instance of same class after receiver
+        // Walk heap looking for next instance of same class
         bool foundReceiver = false;
         foreach (SmalltalkOOP oop in ctx.GetAllObjects())
         {
+            // After finding receiver, look for next instance
             if (foundReceiver)
             {
                 SmalltalkOOP objClassOOP = ctx.HeapManager.GetClassOOP(oop);
                 if (objClassOOP == receiverClassOOP)
                 {
+                    // Found next instance of same class
                     return oop;
                 }
             }
 
+            // Mark when we've found the receiver
             if (oop == receiver)
                 foundReceiver = true;
         }
 
-        // No more instances found
+        // No more instances of this class
         return SpecialObjectsArray.Instance.Nil;
     }
 
-    /// <summary>
-    /// Primitive 130: becomeForward: - One-way become operation.
-    /// Blue Book: All references to receiver become references to argument.
-    /// </summary>
+    // <summary>
+    // Primitive 130: becomeForward: - One-way become operation.
+    // Blue Book: All references to receiver become references to argument.
+    // </summary>
     public static SmalltalkOOP BecomeForward(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book extension: primitiveBecomeForward
+        // One-way identity mutation - receiver becomes argument
+
+        // Expect single argument (target object)
         if (args.Length != 1)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Neither receiver nor argument can be SmallIntegers
+        // Cannot mutate SmallIntegers (immediate values)
         if (receiver.IsSmallInteger || args[0].IsSmallInteger)
         {
             ctx.PrimitiveSuccess = false;
@@ -312,30 +357,38 @@ public static class SystemPrimitives
 
         try
         {
-            // Forward all references from receiver to argument
+            // Perform one-way become operation
+            // All references to receiver now point to argument
             ctx.BecomeOneWay(receiver, args[0]);
-            return args[0]; // Return the argument (new identity)
+
+            // Return the target object (new identity)
+            return args[0];
         }
         catch
         {
+            // Become failed (possibly critical objects)
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
     }
 
-    /// <summary>
-    /// Primitive 131: instanceCount - Count instances of a class.
-    /// Blue Book: Returns the number of instances of the receiver class.
-    /// </summary>
+    // <summary>
+    // Primitive 131: instanceCount - Count instances of a class.
+    // Blue Book: Returns the number of instances of the receiver class.
+    // </summary>
     public static SmalltalkOOP InstanceCount(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book extension: primitiveInstanceCount
+        // Counts all instances of receiver class in heap
+
+        // No arguments expected
         if (args.Length != 0)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Receiver must be a Class (not SmallInteger)
+        // Receiver must be a Class object
         if (receiver.IsSmallInteger)
         {
             ctx.PrimitiveSuccess = false;
@@ -344,9 +397,10 @@ public static class SystemPrimitives
 
         int count = 0;
 
-        // Count instances of this class
+        // Walk entire heap counting instances
         foreach (SmalltalkOOP oop in ctx.GetAllObjects())
         {
+            // Check if object's class matches receiver
             SmalltalkOOP objClassOOP = ctx.HeapManager.GetClassOOP(oop);
             if (objClassOOP == receiver)
             {
@@ -354,60 +408,73 @@ public static class SystemPrimitives
             }
         }
 
+        // Return count as SmallInteger
         return SmalltalkOOP.FromSmallInteger(count);
     }
 
-    /// <summary>
-    /// Primitive 133: forceGC - Force garbage collection.
-    /// </summary>
+    // <summary>
+    // Primitive 133: forceGC - Force garbage collection.
+    // </summary>
     public static SmalltalkOOP ForceGC(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book extension: primitiveForceGC
+        // Forces immediate garbage collection
+
+        // No arguments expected
         if (args.Length != 0)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Trigger .NET GC (Smalltalk GC would be triggered here in full implementation)
+        // Trigger .NET garbage collection
+        // In full VM, would trigger Smalltalk GC as well
         GC.Collect();
         GC.WaitForPendingFinalizers();
 
+        // Return receiver
         return receiver;
     }
 
-    /// <summary>
-    /// Primitive 139: nextObject - Enumerate all objects.
-    /// Blue Book: Returns the next object in memory after receiver, or nil if none.
-    /// </summary>
+    // <summary>
+    // Primitive 139: nextObject - Enumerate all objects.
+    // Blue Book: Returns the next object in memory after receiver, or nil if none.
+    // </summary>
     public static SmalltalkOOP NextObject(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Blue Book extension: primitiveNextObject
+        // Returns next object in heap enumeration
+
+        // No arguments expected
         if (args.Length != 0)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Receiver must be an object (not SmallInteger)
+        // Receiver must be an object
         if (receiver.IsSmallInteger)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Find next object after receiver
+        // Find next object in heap enumeration
         bool foundReceiver = false;
         foreach (SmalltalkOOP oop in ctx.GetAllObjects())
         {
+            // Return first object after receiver
             if (foundReceiver)
             {
                 return oop;
             }
 
+            // Mark when we've found receiver
             if (oop == receiver)
                 foundReceiver = true;
         }
 
-        // No more objects
+        // No more objects - end of heap
         return SpecialObjectsArray.Instance.Nil;
     }
 }

@@ -1,0 +1,18 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Smalltalk80.Validator.Core -> D:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\Smalltalk80.Validator.Core.dll
+  Smalltalk80.Interpreter.Core -> D:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\Smalltalk80.Interpreter.Core.dll
+  Smalltalk80.Validator.Engine -> d:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\Smalltalk80.Validator.Engine.dll
+  Smalltalk80.Interpreter.Engine -> d:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\Smalltalk80.Interpreter.Engine.dll
+  Smalltalk80.Validator -> D:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\Smalltalk80.Validator.dll
+  Smalltalk80.Validator.Tests -> D:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\Smalltalk80.Validator.Tests.dll
+  Smalltalk80.Compiler -> D:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\Smalltalk80.Compiler.dll
+  Smalltalk80.Interpreter -> D:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\Smalltalk80.Interpreter.dll
+  coldstart.json found: D:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\coldstart.json
+  Smalltalk80.Interpreter.Tests -> D:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\Smalltalk80.Interpreter.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.03

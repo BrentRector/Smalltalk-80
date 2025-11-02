@@ -59,16 +59,20 @@ public static class BlockClosurePrimitives
         // This primitive is called from BOTH:
         // 1. value/value:/value:value: - args are passed DIRECTLY (not wrapped in array)
         // 2. valueWithArguments: - single arg is an Array
+        // We must distinguish between these two cases to properly extract arguments
 
         SmalltalkOOP[] blockArgs;
 
         if (args.Length == 0)
         {
-            // value with no arguments
+            // BlockClosure>>value with no arguments
+            // Block expects no parameters
             blockArgs = new SmalltalkOOP[0];
         }
         else if (args.Length == 1 && !args[0].IsSmallInteger)
         {
+            // Single argument that's not a SmallInteger
+            // Could be either value: (direct arg) or valueWithArguments: (array arg)
             // Distinguish between value: (direct arg) and valueWithArguments: (array arg)
             // by checking if argument has indexed size (is array-like)
             // GetIndexedSize returns 0 for objects without indexed slots
@@ -77,37 +81,51 @@ public static class BlockClosurePrimitives
             if (indexedSize > 0)
             {
                 // valueWithArguments: - arg is an Array, extract elements
+                // This handles arbitrary argument counts via Array
                 blockArgs = ExtractArrayElements(ctx, args[0]);
             }
             else
             {
-                // value: - arg is a direct parameter
+                // value: - arg is a direct parameter (not an array)
+                // Pass the single argument directly to the block
                 blockArgs = args;
             }
         }
         else
         {
             // Multiple arguments (from value:, value:value:, etc.) - use directly
+            // These are direct arguments, not wrapped in an array
             blockArgs = args;
         }
 
+        // BlockClosure has 4 instance variables:
+        // - method: CompiledMethod containing block's bytecode
+        // - homeContext: MethodContext where block was defined (lexical scope)
+        // - returnContext: Context to return to (usually same as homeContext)
+        // - numArgs: Expected argument count
+
         // Extract block method from BlockClosure instance variable 'method'
+        // This CompiledMethod contains the block's bytecode to execute
         var methodIndex = ctx.GetFieldIndex("class:BlockClosure", "method");
         // Console.WriteLine($"[DEBUG Primitive207] receiver={receiver}, methodIndex={methodIndex}");
         var blockMethodOOP = ctx.GetInstanceVariable(receiver, methodIndex);
 
         // Extract homeContext from BlockClosure instance variable 'homeContext'
+        // This is the MethodContext where the block was DEFINED (not where it's called)
+        // Critical for lexical scoping - block accesses variables from defining context
         var homeContextIndex = ctx.GetFieldIndex("class:BlockClosure", "homeContext");
         // Console.WriteLine($"[DEBUG Primitive207] homeContextIndex={homeContextIndex}");
         var homeContextOOP = ctx.GetInstanceVariable(receiver, homeContextIndex);
 
         // Extract numArgs from BlockClosure to validate argument count
+        // Blocks are strict about argument count - must match exactly
         var numArgsIndex = ctx.GetFieldIndex("class:BlockClosure", "numArgs");
         // Console.WriteLine($"[DEBUG Primitive207] numArgsIndex={numArgsIndex}");
         var numArgsOOP = ctx.GetInstanceVariable(receiver, numArgsIndex);
         int expectedArgCount = numArgsOOP.IsSmallInteger ? numArgsOOP.AsSmallInteger() : 0;
 
         // Validate argument count matches BlockClosure's numArgs
+        // Unlike methods, blocks don't have optional parameters
         if (blockArgs.Length != expectedArgCount)
         {
             ctx.PrimitiveSuccess = false;
@@ -117,6 +135,7 @@ public static class BlockClosurePrimitives
         // Invoke the block using the VM method
         // Pass the BlockClosure instance (receiver) as the 4th parameter for nested-block
         // support and proper lexical scoping
+        // The VM will create a new context, copy arguments, and execute block bytecode
         var result = ctx.InvokeBlock(blockMethodOOP, blockArgs, homeContextOOP, receiver);
 
         return result;
@@ -127,12 +146,16 @@ public static class BlockClosurePrimitives
     /// </summary>
     private static SmalltalkOOP[] ExtractArrayElements(IPrimitiveContext ctx, SmalltalkOOP arrayOOP)
     {
-        // Get the array size
+        // Get the array size - number of indexed slots
+        // Arrays in Smalltalk use PointerIndexed format
         var indexedSize = ctx.GetIndexedSize(arrayOOP);
 
+        // Create array to hold extracted OOPs
         var elements = new SmalltalkOOP[indexedSize];
         for (int i = 0; i < indexedSize; i++)
         {
+            // Extract each OOP from the Array's indexed slots
+            // These can be SmallIntegers or object pointers
             elements[i] = ctx.GetIndexedOOP(arrayOOP, i);
         }
 
