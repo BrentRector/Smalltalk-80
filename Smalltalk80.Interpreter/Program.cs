@@ -207,27 +207,36 @@ public static class Program
                 // Skip phase reordering when in test mode
                 if (!onlyRunTests)
                 {
-                    // EXPERIMENT: Reorder to test call stack unwinding
-                    // Run fundamental infrastructure first: Float, Character, then WindowsFileSystem
-                    // Character must run early because String/Symbol operations need CharacterTable
+                    // CRITICAL: Reorder to run fundamental infrastructure FIRST
+                    // SmallInteger MUST run first - creates Digitbuffer needed by error handling
+                    // If any init expression triggers an error before Digitbuffer exists, infinite recursion occurs
+                    var smallIntegerInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "SmallInteger initialize");
                     var floatInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Float initialize");
                     var characterInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Character initialize");
                     var windowsInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "WindowsFileSystem initialize");
 
-                    if (floatInitIndex > 0 && characterInitIndex > 0 && windowsInitIndex > 0)
+                    if (smallIntegerInitIndex > 0 && floatInitIndex > 0 && characterInitIndex > 0 && windowsInitIndex > 0)
                     {
+                        phase1Indices.Remove(smallIntegerInitIndex);
                         phase1Indices.Remove(floatInitIndex);
                         phase1Indices.Remove(characterInitIndex);
                         phase1Indices.Remove(windowsInitIndex);
 
-                        // Insert at beginning: Float, Character, WindowsFileSystem, then rest
+                        // Insert at beginning: SmallInteger, Float, Character, WindowsFileSystem, then rest
+                        // ORDER IS CRITICAL:
+                        // 1. SmallInteger - Creates Digitbuffer (required for error message formatting)
+                        // 2. Float - Creates numeric constants
+                        // 3. Character - Creates CharacterTable (required for String/Symbol operations)
+                        // 4. WindowsFileSystem - File system infrastructure
                         phase1Indices.Insert(0, windowsInitIndex);
                         phase1Indices.Insert(0, characterInitIndex);
                         phase1Indices.Insert(0, floatInitIndex);
+                        phase1Indices.Insert(0, smallIntegerInitIndex);
 
                         Console.WriteLine($"\n=== Reordered init expressions for infrastructure ===");
-                        Console.WriteLine($"  Running: Float → Character → WindowsFileSystem");
-                        Console.WriteLine($"  Character must run early (CharacterTable needed by String/Symbol)");
+                        Console.WriteLine($"  Running: SmallInteger → Float → Character → WindowsFileSystem");
+                        Console.WriteLine($"  SmallInteger FIRST (Digitbuffer prevents infinite recursion in error handling)");
+                        Console.WriteLine($"  Character early (CharacterTable needed by String/Symbol)");
                         Console.WriteLine();
                     }
 
@@ -284,84 +293,20 @@ public static class Program
                     return;
                 }
 
-                // Use hardcoded list of known successful init expressions (from previous test runs)
-                // This avoids running all expressions just to discover which ones work
-                var knownSuccessfulExpressions = new HashSet<string>
-                {
-                    "Float initialize",
-                    "Character initialize",
-                    "WindowsFileDirectory initialize",
-                    "BinaryChoiceView initialize",
-                    "CompiledMethod initialize",
-                    "Cursor initialize",
-                    "Date initialize",
-                    "Debugger initialize",
-                    "Decompiler initialize",
-                    "FileDirectory initialize",
-                    "InputState initialize",
-                    "MessageNode initialize",
-                    "Paragraph initialize",
-                    "ParseNode initialize",
-                    "ProcessorScheduler initialize",
-                    "Project initialize",
-                    "SmallInteger initialize",
-                    "StringHolder initialize",
-                    "SystemDictionary initialize",
-                    "SystemTracer initialize"
-                };
+                // EXPERIMENT: Try ALL initialize! expressions to see if any new ones succeed
+                // Previously we used a hardcoded "known successful" list - now try everything
+                Console.WriteLine($"\n=== Executing ALL Initialize Expressions ===");
+                Console.WriteLine($"  Total initialize! expressions: {phase1Indices.Count}");
+                Console.WriteLine($"  Will attempt to execute all of them");
+                Console.WriteLine();
 
-                // Build list of successful expression indices
-                var successIndices = new List<int>();
-                for (int i = 0; i < phase1Indices.Count; i++)
-                {
-                    int index = phase1Indices[i];
-                    var expr = bundle.InitExpressions[index];
-                    if (expr.Source != null && knownSuccessfulExpressions.Contains(expr.Source))
-                    {
-                        successIndices.Add(index);
-                    }
-                }
-
-                Console.WriteLine($"\n=== Executing Known Successful Expressions + Large Integer Classes ===");
-                Console.WriteLine($"  {successIndices.Count} known successful expressions");
-
-                // Find LargeNegativeInteger and LargePositiveInteger initialize indices
-                int largeNegativeIndex = -1;
-                int largePositiveIndex = -1;
-
-                for (int i = 0; i < totalExpressions; i++)
-                {
-                    var expr = bundle.InitExpressions[i];
-                    if (expr.Source == "LargeNegativeInteger initialize")
-                        largeNegativeIndex = i;
-                    else if (expr.Source == "LargePositiveInteger initialize")
-                        largePositiveIndex = i;
-                }
-
-                // Build execution list: successful + large integer classes
+                // Use all phase1 indices (all initialize! expressions)
                 var reorderedIndices = new List<int>();
-                reorderedIndices.AddRange(successIndices);
-
-                // Add large integer initializers if found and not already successful
-                if (largeNegativeIndex >= 0 && !successIndices.Contains(largeNegativeIndex))
-                {
-                    reorderedIndices.Add(largeNegativeIndex);
-                    Console.WriteLine($"  Adding LargeNegativeInteger initialize (index {largeNegativeIndex})");
-                }
-                if (largePositiveIndex >= 0 && !successIndices.Contains(largePositiveIndex))
-                {
-                    reorderedIndices.Add(largePositiveIndex);
-                    Console.WriteLine($"  Adding LargePositiveInteger initialize (index {largePositiveIndex})");
-                }
-
-                Console.WriteLine($"  Total expressions to execute: {reorderedIndices.Count}");
-                Console.WriteLine();
-
-                // DO NOT add any failed expressions - only run successful + large integer classes
-                Console.WriteLine();
+                reorderedIndices.AddRange(phase1Indices);
 
                 succeeded = 0;
                 failed = 0;
+                var successfulExpressions = new List<(int index, string source)>();
 
                 // Phase 1: Execute with reordered list
                 foreach (int index in reorderedIndices)
@@ -379,6 +324,7 @@ public static class Program
                     {
                         Console.WriteLine($"  ✓ Completed successfully");
                         succeeded++;
+                        successfulExpressions.Add((index, expr.Source ?? ""));
                     }
                     else
                     {
@@ -396,18 +342,28 @@ public static class Program
                         //     Console.WriteLine($"   {result.Diagnostic.StackTrace}");
                         // }
 
-                        Console.WriteLine($"\n=== Execution Failed ===");
-                        Console.WriteLine($"  Phase 1: {succeeded} succeeded, {failed} failed");
-                        Console.WriteLine($"  Fast-fail: Stopping execution");
-                        return;
+                        // EXPERIMENT: Continue executing other init expressions instead of fast-fail
+                        // This lets us see which expressions succeed and which fail
+                        Console.WriteLine($"  Continuing with next expression...");
                     }
                 }
 
-                Console.WriteLine($"\n✓ Execution Complete: {succeeded} initialize! expression(s) executed successfully");
-                Console.WriteLine($"\n=== Summary ===");
-                Console.WriteLine($"  Executed: {reorderedIndices.Count} init expressions (known successful + Large Integer classes)");
-                Console.WriteLine($"  Skipped: {phase1Indices.Count - successIndices.Count} untested/failing init expressions");
-                Console.WriteLine($"  Skipped: {phase2Indices.Count} comment expressions");
+                Console.WriteLine($"\n=== Init Expression Execution Complete ===");
+                Console.WriteLine($"  Total attempted: {reorderedIndices.Count} initialize! expressions");
+                Console.WriteLine($"  Succeeded: {succeeded}");
+                Console.WriteLine($"  Failed: {failed}");
+                Console.WriteLine($"  Skipped: {skippedIndices.Count} (require runtime features)");
+                Console.WriteLine($"  Comment expressions: {phase2Indices.Count} (not executed)");
+
+                if (successfulExpressions.Count > 0)
+                {
+                    Console.WriteLine($"\n✓ Successfully executed expressions:");
+                    foreach (var (index, source) in successfulExpressions)
+                    {
+                        Console.WriteLine($"    [{index}] {source}");
+                    }
+                }
+
                 return;
 
                 #if false  // Phase 2 disabled - unreachable code preserved for reference

@@ -136,6 +136,10 @@ public static class BlockClosurePrimitives
         // Pass the BlockClosure instance (receiver) as the 4th parameter for nested-block
         // support and proper lexical scoping
         // The VM will create a new context, copy arguments, and execute block bytecode
+
+        // DEBUG: Log BlockClosure details
+        // Console.WriteLine($"[Primitive207] Executing BlockClosure receiver={receiver}, homeContext={homeContextOOP}, blockMethod={blockMethodOOP}");
+
         var result = ctx.InvokeBlock(blockMethodOOP, blockArgs, homeContextOOP, receiver);
 
         return result;

@@ -5,6 +5,7 @@ using System.IO;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Compiler.Generated;
+using Smalltalk80.Compiler.Analysis;
 using Smalltalk80.Core.Bytecodes;
 
 namespace Smalltalk80.Compiler
@@ -683,10 +684,74 @@ namespace Smalltalk80.Compiler
             Emit(Bytecode.RETURN_TOP_POP); // 0x7E - block return
         }
 
-        // NOTE: Jump operations have been removed.
-        // With Blue Book block compilation, blocks are separate CompiledMethod objects.
-        // Control flow (ifTrue:, whileTrue:, etc.) is implemented via message sends,
-        // NOT via jump bytecodes. The compiler generates zero jump instructions.
+        // Jump operations - Used for tail recursion optimization
+
+        /// <summary>
+        /// Marks the current bytecode position as the method entry point.
+        /// Returns a label (bytecode offset) that can be used with EmitJumpBackward().
+        /// </summary>
+        /// <returns>Bytecode offset of method start position</returns>
+        public int MarkMethodStart()
+        {
+            return CurrentIP;
+        }
+
+        /// <summary>
+        /// Emits a backward jump bytecode to the specified target offset.
+        /// Used for tail recursion optimization to jump back to method start.
+        /// </summary>
+        /// <param name="targetOffset">Target bytecode offset (from MarkMethodStart)</param>
+        /// <exception cref="InvalidOperationException">Thrown if jump offset exceeds 255 bytes</exception>
+        public void EmitJumpBackward(int targetOffset)
+        {
+            // Calculate backward jump offset
+            int currentOffset = CurrentIP;
+            int jumpDistance = currentOffset - targetOffset + 2; // +2 for the jump instruction size
+
+            if (jumpDistance > 255)
+            {
+                throw new InvalidOperationException(
+                    $"Tail recursion jump offset {jumpDistance} exceeds 255-byte limit. " +
+                    "Method too large for tail recursion optimization.");
+            }
+
+            // Blue Book bytecode: 0xA8-0xAF are long unconditional backward jumps
+            // 0xA8 = jump back (offset in next byte)
+            Emit(0xA8);
+            Emit((byte)jumpDistance);
+        }
+
+        /// <summary>
+        /// Emits bytecode for a tail-recursive call, jumping back to method start
+        /// instead of creating a new MethodContext via SEND.
+        /// </summary>
+        /// <param name="methodStartOffset">Offset from MarkMethodStart()</param>
+        /// <param name="argumentCount">Number of arguments to update</param>
+        /// <remarks>
+        /// Transformation:
+        /// BEFORE (creates new context):
+        ///   PUSH_ARG_0        ; Evaluate new argument value
+        ///   SEND selector, 1  ; Recursive call (creates MethodContext)
+        ///   RETURN_TOP
+        ///
+        /// AFTER (reuses context):
+        ///   PUSH_ARG_0        ; Evaluate new argument value
+        ///   STORE_TEMP 0      ; Update method's argument slot
+        ///   JUMP @START       ; Jump to method entry point
+        ///   (no RETURN needed - unconditional jump)
+        /// </remarks>
+        public void EmitTailRecursiveJump(int methodStartOffset, int argumentCount)
+        {
+            // Arguments are already on stack (evaluated by CompileKeywordMessage/CompileUnaryExpr)
+            // Store them to temp slots (arguments are temps 0..N-1) in REVERSE order (stack is LIFO)
+            for (int i = argumentCount - 1; i >= 0; i--)
+            {
+                StoreTemporary(i);
+            }
+
+            // Emit unconditional backward jump to method start
+            EmitJumpBackward(methodStartOffset);
+        }
 
         // Send operations - Following Blue Book specification
         
@@ -873,6 +938,8 @@ namespace Smalltalk80.Compiler
         private int primitiveNumber = 0;
         private bool hasPrimitive = false;
         private string currentMethodIdentifier = "";  // For tracking undeclared variables
+        private Dictionary<IParseTree, TailCallInfo>? tailCalls = null;  // Tail call analysis results
+        private int methodStartLabel = -1;  // Bytecode offset of method entry point for tail recursion
 
         /// <summary>
         /// Static registry of undeclared variables (global name -> list of methods that reference it).
@@ -972,8 +1039,12 @@ namespace Smalltalk80.Compiler
             Smalltalk80Parser.MethodDefContext methodDef,
             List<string> instanceVars,
             Dictionary<string, object>? classVars = null,
-            Dictionary<string, object>? poolVars = null)
+            Dictionary<string, object>? poolVars = null,
+            CompilerOptions? options = null)
         {
+            // Use default options if not specified
+            options ??= CompilerOptions.Default;
+
             // Initialize compilation state
             environment = new CompilationEnvironment();
             emitter = new BytecodeEmitter();
@@ -982,6 +1053,8 @@ namespace Smalltalk80.Compiler
             hasPrimitive = false;
             argumentNames.Clear();
             temporaryNames.Clear();
+            tailCalls = null;
+            methodStartLabel = -1;
             
             // Set up instance variables with correct offsets
             for (int i = 0; i < instanceVars.Count; i++)
@@ -1020,17 +1093,49 @@ namespace Smalltalk80.Compiler
                 {
                     ProcessTemporaries(methodDef.temporaries());
                 }
-                
+
                 // Process primitive declaration
                 if (methodDef.primitiveDecl() != null)
                 {
                     ProcessPrimitive(methodDef.primitiveDecl());
                 }
-                
+
+                // Perform tail recursion analysis if enabled
+                if (options.OptimizeTailRecursion)
+                {
+                    var analyzer = new TailRecursionAnalyzer();
+                    if (options.EmitOptimizationComments)
+                    {
+                        analyzer.EnableDiagnostics();
+                    }
+
+                    tailCalls = analyzer.Analyze(methodDef.methodBody(), selector);
+
+                    if (options.EmitOptimizationComments && tailCalls.Count > 0)
+                    {
+                        Console.WriteLine($"[TailOpt] {selector}: {tailCalls.Count} tail call(s) detected");
+                        foreach (var diagnostic in analyzer.GetDiagnosticMessages())
+                        {
+                            Console.WriteLine($"[TailOpt]   {diagnostic}");
+                        }
+                    }
+                }
+
                 // Collect literals from method body first
                 // This walks the entire AST to find all literals
                 CollectLiterals(methodDef.methodBody());
-                
+
+                // Mark method entry point BEFORE generating bytecode (if tail recursion enabled)
+                if (options.OptimizeTailRecursion && tailCalls != null && tailCalls.Count > 0)
+                {
+                    methodStartLabel = emitter.MarkMethodStart();
+
+                    if (options.EmitOptimizationComments)
+                    {
+                        Console.WriteLine($"[TailOpt] Method entry marked at offset {methodStartLabel}");
+                    }
+                }
+
                 // Generate bytecode
 //Console.WriteLine($"[BYTECODE] About to compile method body");
                 CompileMethodBody(methodDef.methodBody());
@@ -1574,6 +1679,25 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     var msg = unaryMessages[i];
                     var selector = msg.unarySelector().GetText();
 
+                    // Check if this unary message is a tail-recursive call
+                    if (tailCalls != null && tailCalls.TryGetValue(msg, out var tailCallInfo))
+                    {
+                        if (tailCallInfo.IsSafeToOptimize && methodStartLabel >= 0)
+                        {
+                            // Emit tail-recursive jump instead of SEND
+                            // No arguments for unary messages
+                            emitter.EmitTailRecursiveJump(methodStartLabel, 0);
+
+                            if (emitter is BytecodeEmitter e && e.GetType().GetField("_emitOptimizationComments") != null)
+                            {
+                                Console.WriteLine($"[TailOpt] Emitted jump for unary tail call: {selector}");
+                            }
+
+                            continue; // Skip normal send emission
+                        }
+                    }
+
+                    // Normal (non-tail-recursive) send
                     if (i == 0 && receiverIsSuper)
                     {
                         emitter.EmitSuperSend(selector, 0);
@@ -1618,7 +1742,7 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
 //Console.WriteLine($"[BYTECODE] CompileKeywordMessage called, isSuper={isSuper}");
             var keywordParts = msg.keywordPart();
             var keywords = new List<string>();
-            
+
             // Build selector first to check for conditional patterns
             foreach (var part in keywordParts)
             {
@@ -1627,7 +1751,7 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             }
             var selector = string.Join("", keywords);
 //Console.WriteLine($"[BYTECODE] CompileKeywordMessage: selector='{selector}'");
-            
+
             // Check if this is a conditional message that can be inlined
             if (!isSuper && TryInlineConditional(selector, keywordParts))
             {
@@ -1635,8 +1759,19 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 return; // Successfully inlined
             }
 //Console.WriteLine($"[BYTECODE] CompileKeywordMessage: Not inlined, compiling normally");
-            
-            // Not a conditional or couldn't inline - compile arguments normally
+
+            // Check if this keyword message is a tail-recursive call BEFORE compiling arguments
+            bool isTailRecursive = false;
+            TailCallInfo? tailCallInfo = null;
+            if (tailCalls != null && tailCalls.TryGetValue(msg, out tailCallInfo))
+            {
+                if (tailCallInfo.IsSafeToOptimize && methodStartLabel >= 0)
+                {
+                    isTailRecursive = true;
+                }
+            }
+
+            // Compile arguments (push onto stack)
             foreach (var part in keywordParts)
             {
                 // New grammar: keywordPart uses binaryExpr directly
@@ -1646,15 +1781,26 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     CompileBinaryExpr(argExpr, false); // Arguments are never super sends
                 }
             }
-            
-            // Send the message
-            if (isSuper)
+
+            // Emit tail-recursive jump or normal send
+            if (isTailRecursive)
             {
-                emitter.EmitSuperSend(selector, keywordParts.Length);
+                // Emit tail-recursive jump instead of SEND
+                emitter.EmitTailRecursiveJump(methodStartLabel, keywordParts.Length);
+
+                Console.WriteLine($"[TailOpt] Emitted jump for keyword tail call: {selector}");
             }
             else
             {
-                emitter.EmitSend(selector, keywordParts.Length);
+                // Send the message (normal non-tail-recursive case)
+                if (isSuper)
+                {
+                    emitter.EmitSuperSend(selector, keywordParts.Length);
+                }
+                else
+                {
+                    emitter.EmitSend(selector, keywordParts.Length);
+                }
             }
         }
         
