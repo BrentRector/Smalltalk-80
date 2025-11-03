@@ -61,4 +61,45 @@ public static class VMConstants
     public const int BLOCKCLOSURE_HOMECONTEXT_INDEX = 1;
     public const int BLOCKCLOSURE_RETURNCONTEXT_INDEX = 2;
     public const int BLOCKCLOSURE_NUMARGS_INDEX = 3;
+
+    // ========================================================================
+    // Blue Book: Association field indices
+    // ========================================================================
+    // Association is a fundamental class used for global bindings, class pools, etc.
+    // These indices are fixed by the Smalltalk-80 specification.
+
+    public const int ASSOCIATION_KEY_INDEX = 0;    // First instance variable: key
+    public const int ASSOCIATION_VALUE_INDEX = 1;  // Second instance variable: value
+
+    // ========================================================================
+    // Dictionary and Set field indices
+    // ========================================================================
+    // Set instanceVariableNames: 'tally'
+    // Dictionary is a variableSubclass of Set with no additional instance variables
+    // Dictionary stores Association objects in its indexed slots (PointerIndexed)
+
+    public const int SET_TALLY_INDEX = 0;           // SmallInteger count of entries
+    public const int DICTIONARY_TALLY_INDEX = 0;    // Same as SET_TALLY_INDEX (inherited from Set)
+
+    // ========================================================================
+    // Metaclass field indices
+    // ========================================================================
+    // Metaclass instanceVariableNames: 'thisClass' (plus inherited from Class/ClassDescription/Behavior)
+    // This field is critical for resolving class variables in metaclass methods
+
+    public const int METACLASS_THISCLASS_INDEX = 6;  // Slot 6: thisClass (points to the regular class)
+
+    // ========================================================================
+    // Process and ProcessorScheduler field indices
+    // ========================================================================
+    // These are fixed by the Smalltalk-80 class definitions and won't change at runtime.
+
+    // Process instanceVariableNames: 'suspendedContext priority myList'
+    public const int PROCESS_SUSPENDEDCONTEXT_INDEX = 0;
+    public const int PROCESS_PRIORITY_INDEX = 1;
+    public const int PROCESS_MYLIST_INDEX = 2;
+
+    // ProcessorScheduler instanceVariableNames: 'quiescentProcessLists activeProcess'
+    public const int PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX = 0;
+    public const int PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX = 1;
 }

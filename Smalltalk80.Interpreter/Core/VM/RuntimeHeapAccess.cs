@@ -15,13 +15,11 @@ public class RuntimeHeapAccess
 
     // Caching layer (invalidated by primitive 89)
     private readonly RuntimeClassCache _classCache;
-    private readonly RuntimeFieldLayoutCache _fieldLayoutCache;
 
     public RuntimeHeapAccess(ISmalltalkHeapManager heapManager)
     {
         _heapManager = heapManager;
         _classCache = new RuntimeClassCache(this, heapManager);
-        _fieldLayoutCache = new RuntimeFieldLayoutCache(this, heapManager);
     }
 
     /// <summary>
@@ -30,7 +28,6 @@ public class RuntimeHeapAccess
     public void InvalidateAllCaches()
     {
         _classCache.InvalidateCache();
-        _fieldLayoutCache.InvalidateCache();
         RuntimeSpecialObjects.Instance.InvalidateCache();
     }
 
@@ -40,22 +37,6 @@ public class RuntimeHeapAccess
     public SmalltalkOOP GetClass(string className)
     {
         return _classCache.GetClass(className);
-    }
-
-    /// <summary>
-    /// Gets the field index for a named instance variable in a class.
-    /// </summary>
-    public int GetFieldIndex(SmalltalkOOP classOOP, string fieldName)
-    {
-        return _fieldLayoutCache.GetFieldIndex(classOOP, fieldName);
-    }
-
-    /// <summary>
-    /// Gets the total instance variable count for a class (including inherited).
-    /// </summary>
-    public int GetInstanceVariableCount(SmalltalkOOP classOOP)
-    {
-        return _fieldLayoutCache.GetInstanceVariableCount(classOOP);
     }
 
     /// <summary>
@@ -194,25 +175,34 @@ public class RuntimeHeapAccess
 
     /// <summary>
     /// Looks up a key in a Smalltalk Dictionary object.
+    /// Dictionary is a PointerIndexed subclass of Set with no additional instance variables.
+    /// It stores Association objects directly in indexed slots (NOT in separate keys/values arrays).
     /// </summary>
     private SmalltalkOOP DictionaryLookup(SmalltalkOOP dictOOP, SmalltalkOOP keyOOP)
     {
-        // Dictionary layout (from ClassDescription):
-        // Fixed slots: 0=class, 1=tally
-        // Indexed slots: 0=keys array, 1=values array
+        // Dictionary structure:
+        //   Instance variable 0: tally (SmallInteger count of entries, inherited from Set)
+        //   Indexed slots 0..N: Association objects (PointerIndexed)
 
-        // Get the keys and values arrays
-        var keysArrayOOP = _heapManager.GetIndexedOOP(dictOOP, 0);
-        var valuesArrayOOP = _heapManager.GetIndexedOOP(dictOOP, 1);
+        // Search through Dictionary's indexed slots for matching key
+        int size = _heapManager.GetIndexedSize(dictOOP);
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // Linear search through keys (Dictionary uses Set's hashing internally)
-        int size = _heapManager.GetIndexedSize(keysArrayOOP);
         for (int i = 0; i < size; i++)
         {
-            var key = _heapManager.GetIndexedOOP(keysArrayOOP, i);
-            if (key == keyOOP)  // Identity comparison for Symbols
+            var associationOOP = _heapManager.GetIndexedOOP(dictOOP, i);
+
+            // Skip nil slots (empty hash table slots)
+            if (associationOOP == nilOOP || associationOOP.IsSmallInteger)
+                continue;
+
+            // Get the key from the Association (instance variable 0)
+            var assocKeyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+
+            if (assocKeyOOP == keyOOP)  // Identity comparison for Symbols
             {
-                return _heapManager.GetIndexedOOP(valuesArrayOOP, i);
+                // Return the value from the Association (instance variable 1)
+                return _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
             }
         }
 
@@ -247,6 +237,141 @@ public class RuntimeHeapAccess
         result.AddRange(parts);
 
         return result;
+    }
+
+    /// <summary>
+    /// Builds complete field layout map for all classes by walking the Smalltalk heap.
+    /// Reads ClassDescription.instanceVariables (slot 4) Array-of-Strings for each class,
+    /// walks superclass chain to accumulate inherited fields, and returns complete layouts.
+    ///
+    /// This enables full runtime reflection and supports runtime class modification.
+    /// Equivalent to Smalltalk's allInstVarNames method.
+    /// </summary>
+    public Dictionary<string, List<string>> BuildFieldMap()
+    {
+        var fieldMap = new Dictionary<string, List<string>>();
+
+        // Get Smalltalk dictionary from SpecialObjectsArray
+        var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+
+        // Iterate through all global bindings (Associations in SystemDictionary)
+        int dictSize = _heapManager.GetIndexedSize(smalltalkDictOOP);
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        for (int i = 0; i < dictSize; i++)
+        {
+            var associationOOP = _heapManager.GetIndexedOOP(smalltalkDictOOP, i);
+            if (associationOOP == nilOOP || associationOOP.IsSmallInteger)
+                continue;
+
+            // Get the value from Association (slot 1)
+            var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+            if (valueOOP == nilOOP || valueOOP.IsSmallInteger)
+                continue;
+
+            // Check if it's a class object (has ClassDescription as ancestor)
+            // Classes have methodDict field (slot 1), which is typically a Dictionary
+            try
+            {
+                var methodDictOOP = _heapManager.GetInstanceVariable(valueOOP, 1);
+                if (methodDictOOP == nilOOP || methodDictOOP.IsSmallInteger)
+                    continue;  // Not a class
+
+                // Get class name from Association key (slot 0 - a Symbol)
+                var keySymbolOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                string className = ReadSymbolName(keySymbolOOP);
+
+                // Build complete field layout by walking inheritance chain
+                var fields = AccumulateInstanceVariableNames(valueOOP);
+
+                // Store in map using "class:ClassName" format
+                fieldMap[$"class:{className}"] = fields;
+            }
+            catch
+            {
+                // Not a class object, skip
+                continue;
+            }
+        }
+
+        return fieldMap;
+    }
+
+    /// <summary>
+    /// Accumulates instance variable names by walking the superclass chain from root to leaf.
+    /// Reads ClassDescription.instanceVariables (slot 4) for each class in the hierarchy.
+    /// </summary>
+    private List<string> AccumulateInstanceVariableNames(SmalltalkOOP classOOP)
+    {
+        var fields = new List<string>();
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Walk superclass chain from current class to root (Object), pushing onto stack
+        var superclassChain = new Stack<SmalltalkOOP>();
+        var currentOOP = classOOP;
+
+        while (currentOOP != nilOOP && !currentOOP.IsSmallInteger)
+        {
+            superclassChain.Push(currentOOP);
+            // Read superclass field (slot 0 from Behavior)
+            currentOOP = _heapManager.GetInstanceVariable(currentOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
+        }
+
+        // Process from root to leaf, accumulating instance variables
+        while (superclassChain.Count > 0)
+        {
+            var oop = superclassChain.Pop();
+
+            // Read ClassDescription.instanceVariables field (slot 4)
+            // This is an Array of String objects containing the class's own instance variables
+            var instVarsArrayOOP = _heapManager.GetInstanceVariable(oop, 4);
+
+            if (instVarsArrayOOP == nilOOP || instVarsArrayOOP.IsSmallInteger)
+                continue;  // No instance variables for this class
+
+            // instVarsArrayOOP is an Array - read its indexed slots
+            int arraySize = _heapManager.GetIndexedSize(instVarsArrayOOP);
+            for (int i = 0; i < arraySize; i++)
+            {
+                var stringOOP = _heapManager.GetIndexedOOP(instVarsArrayOOP, i);
+                if (stringOOP == nilOOP || stringOOP.IsSmallInteger)
+                    continue;
+
+                // Convert String object to C# string
+                string fieldName = ReadStringValue(stringOOP);
+                fields.Add(fieldName);
+            }
+        }
+
+        return fields;
+    }
+
+    /// <summary>
+    /// Reads a Symbol object and returns its name as a C# string.
+    /// </summary>
+    private string ReadSymbolName(SmalltalkOOP symbolOOP)
+    {
+        int length = _heapManager.GetIndexedSize(symbolOOP);
+        var bytes = new byte[length];
+        for (int i = 0; i < length; i++)
+        {
+            bytes[i] = _heapManager.GetIndexedByte(symbolOOP, i);
+        }
+        return Encoding.Latin1.GetString(bytes);
+    }
+
+    /// <summary>
+    /// Reads a String object and returns its value as a C# string.
+    /// </summary>
+    private string ReadStringValue(SmalltalkOOP stringOOP)
+    {
+        int length = _heapManager.GetIndexedSize(stringOOP);
+        var bytes = new byte[length];
+        for (int i = 0; i < length; i++)
+        {
+            bytes[i] = _heapManager.GetIndexedByte(stringOOP, i);
+        }
+        return Encoding.Latin1.GetString(bytes);
     }
 }
 
@@ -284,104 +409,6 @@ public class RuntimeClassCache
     }
 }
 
-/// <summary>
-/// Cache for runtime field layout lookups with invalidation support.
-/// </summary>
-public class RuntimeFieldLayoutCache
-{
-    private readonly RuntimeHeapAccess _heapAccess;
-    private readonly ISmalltalkHeapManager _heapManager;
-    private Dictionary<SmalltalkOOP, Dictionary<string, int>> _layoutCache = new();
-    private Dictionary<SmalltalkOOP, int> _instanceVarCountCache = new();
-    private bool _cacheValid = true;
-
-    public RuntimeFieldLayoutCache(RuntimeHeapAccess heapAccess, ISmalltalkHeapManager heapManager)
-    {
-        _heapAccess = heapAccess;
-        _heapManager = heapManager;
-    }
-
-    public int GetFieldIndex(SmalltalkOOP classOOP, string fieldName)
-    {
-        if (!_cacheValid)
-        {
-            _layoutCache.Clear();
-            _instanceVarCountCache.Clear();
-            _cacheValid = true;
-        }
-
-        if (!_layoutCache.TryGetValue(classOOP, out var fieldMap))
-        {
-            fieldMap = BuildFieldMap(classOOP);
-            _layoutCache[classOOP] = fieldMap;
-        }
-
-        if (!fieldMap.TryGetValue(fieldName, out int index))
-        {
-            throw new InvalidOperationException($"Field {fieldName} not found in class");
-        }
-
-        return index;
-    }
-
-    public int GetInstanceVariableCount(SmalltalkOOP classOOP)
-    {
-        if (!_cacheValid)
-        {
-            _layoutCache.Clear();
-            _instanceVarCountCache.Clear();
-            _cacheValid = true;
-        }
-
-        if (!_instanceVarCountCache.TryGetValue(classOOP, out int count))
-        {
-            // Build field map which also counts instance variables
-            var fieldMap = BuildFieldMap(classOOP);
-            count = fieldMap.Count;
-            _instanceVarCountCache[classOOP] = count;
-            _layoutCache[classOOP] = fieldMap;
-        }
-
-        return count;
-    }
-
-    private Dictionary<string, int> BuildFieldMap(SmalltalkOOP classOOP)
-    {
-        var fieldMap = new Dictionary<string, int>();
-        var fieldNames = new List<string>();
-        var currentClass = classOOP;
-
-        // Walk up the inheritance chain collecting all instance variable names
-        while (currentClass != SpecialObjectsArray.Instance.Nil)
-        {
-            // Get instanceVariables from the class (slot 4 in ClassDescription)
-            // ClassDescription layout: superclass, methodDict, format, subclasses, instanceVariables, organization
-            var instVarsOOP = _heapManager.GetInstanceVariable(currentClass, 4);
-
-            // Parse the instance variable names
-            var instVarNames = _heapAccess.ParseInstanceVariableString(instVarsOOP);
-
-            // Prepend to maintain inheritance order (superclass fields first)
-            fieldNames.InsertRange(0, instVarNames);
-
-            // Move to superclass (slot 0 in Behavior)
-            currentClass = _heapManager.GetInstanceVariable(currentClass, 0);
-        }
-
-        // Build the field name to index map
-        for (int i = 0; i < fieldNames.Count; i++)
-        {
-            fieldMap[fieldNames[i]] = i;
-        }
-
-        return fieldMap;
-    }
-
-    public void InvalidateCache()
-    {
-        _cacheValid = false;
-    }
-}
 
 /// <summary>
 /// Singleton for frequently-accessed runtime classes with cache invalidation.

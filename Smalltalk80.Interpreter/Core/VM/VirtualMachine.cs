@@ -20,6 +20,7 @@ public partial class VirtualMachine : IPrimitiveContext
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly RuntimeHeapAccess _runtimeHeapAccess;
+    private readonly LayoutResolver _layoutResolver;
     private readonly VMMetadata _metadata;
     private readonly IPlatformBridge? _platformBridge;
     private readonly DebugOptions _debugOptions;
@@ -108,9 +109,10 @@ public partial class VirtualMachine : IPrimitiveContext
     private int _callDepth = 0;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager, VMMetadata metadata, IPlatformBridge? platformBridge = null, DebugOptions? debugOptions = null)
+    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, DebugOptions? debugOptions = null)
     {
         _heapManager = heapManager;
+        _layoutResolver = layoutResolver;
         _runtimeHeapAccess = new RuntimeHeapAccess(heapManager);
         RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
         _metadata = metadata;
@@ -308,7 +310,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Step 4: Try to reuse a pooled context with matching size, otherwise allocate new
         SmalltalkOOP contextOOP;
-        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(methodContextClassOOP);
+        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
 
         // Check size-specific pool for matching context
         if (_contextPools.TryGetValue(stackSize, out var pool) && pool.Count > 0)
@@ -1262,9 +1264,9 @@ public partial class VirtualMachine : IPrimitiveContext
                 return true;
             }
 
-            var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
-            int valueIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "value");
-            var valueOOP = _heapManager.GetInstanceVariable(associationOOP, valueIndex);
+            // Association has a fixed layout per Smalltalk-80 specification:
+            // slot 0 = key, slot 1 = value
+            var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
 
             Push(valueOOP);
             return true;
@@ -1954,20 +1956,16 @@ public partial class VirtualMachine : IPrimitiveContext
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
-                    var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
-
                     // DIAGNOSTIC: Log Association key for debugging
                     if (_createContextCallCount <= 20)
                     {
-                        int keyIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "key");
-                        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
+                        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
                         string? keyName = GetSymbolName(keyOOP);
                         string? methodLocalId = GetLocalId(methodOOP);
                         Console.WriteLine($"[PUSH_LITERAL_VAR] Reading Association key='{keyName}', method={methodLocalId}");
                     }
 
-                    int valueIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "value");
-                    var valueOOP = _heapManager.GetInstanceVariable(associationOOP, valueIndex);
+                    var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
                     Push(valueOOP);
                     return true;
                 }
@@ -1978,9 +1976,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-                    var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
-            int valueIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "value");
-                    _heapManager.SetInstanceVariable(associationOOP, valueIndex, valueOOP);
+                    _heapManager.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
                     Push(valueOOP); // Leave value on stack
                     return true;
                 }
@@ -2020,9 +2016,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     if (_createContextCallCount <= 20)
                     {
                         string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"{valueOOP}";
-                        var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
-                        int keyIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "key");
-                        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
+                        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
                         string? keyName = GetSymbolName(keyOOP);
                         string? methodLocalId = GetLocalId(methodOOP);
                         Console.WriteLine($"[POP_STORE_LITERAL_VAR] Storing to Association key='{keyName}', value={valStr}, method={methodLocalId}");
@@ -3049,9 +3043,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
         if (className == "Association")
         {
-            var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
-            int keyIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "key");
-            var keyOOP = _heapManager.GetInstanceVariable(oop, keyIndex);
+            var keyOOP = _heapManager.GetInstanceVariable(oop, VMConstants.ASSOCIATION_KEY_INDEX);
             string? keyName = GetSymbolName(keyOOP);
             return $"Association(#{keyName})";
         }
@@ -3161,7 +3153,7 @@ public partial class VirtualMachine : IPrimitiveContext
         var blockContextClassOOP = RuntimeSpecialObjects.Instance.BlockContextClass;
 
         // Allocate BlockContext
-        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(blockContextClassOOP);
+        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:BlockContext");
         var blockContextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, argCount + tempCount);
         _heapManager.SetSlot(blockContextOOP, 0, blockContextClassOOP); // Set class reference
         
@@ -3258,7 +3250,7 @@ public partial class VirtualMachine : IPrimitiveContext
         var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
 
         // Allocate MethodContext
-        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(methodContextClassOOP);
+        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
         var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
         _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
 
@@ -3850,7 +3842,8 @@ public partial class VirtualMachine : IPrimitiveContext
                 Console.WriteLine($"  Checking class instance variables:");
                 try
                 {
-                    int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(currentClassOOP);
+                    string? className = GetClassName(currentClassOOP);
+                    int instanceVarCount = className != null ? _layoutResolver.GetInstanceVariableCount(className) : 0;
                     Console.WriteLine($"    Instance variable count: {instanceVarCount}");
                     for (int slot = 0; slot < instanceVarCount; slot++)
                     {
@@ -4006,19 +3999,17 @@ public partial class VirtualMachine : IPrimitiveContext
 
     SmalltalkOOP IPrimitiveContext.GetFieldValue(SmalltalkOOP oop, string className, string fieldName)
     {
-        // Get the class OOP from the object
-        var classOOP = _heapManager.GetSlot(oop, 0);
-
-        int fieldIndex = _runtimeHeapAccess.GetFieldIndex(classOOP, fieldName);
+        // Use LayoutResolver to get field index from precomputed layouts (not stale!)
+        string classLocalId = className.StartsWith("class:") ? className : $"class:{className}";
+        int fieldIndex = _layoutResolver.GetFieldIndex(classLocalId, fieldName);
         return _heapManager.GetInstanceVariable(oop, fieldIndex);
     }
 
     void IPrimitiveContext.SetFieldValue(SmalltalkOOP oop, string className, string fieldName, SmalltalkOOP value)
     {
-        // Get the class OOP from the object
-        var classOOP = _heapManager.GetSlot(oop, 0);
-
-        int fieldIndex = _runtimeHeapAccess.GetFieldIndex(classOOP, fieldName);
+        // Use LayoutResolver to get field index from precomputed layouts (not stale!)
+        string classLocalId = className.StartsWith("class:") ? className : $"class:{className}";
+        int fieldIndex = _layoutResolver.GetFieldIndex(classLocalId, fieldName);
         _heapManager.SetInstanceVariable(oop, fieldIndex, value);
     }
 
@@ -4224,35 +4215,15 @@ public partial class VirtualMachine : IPrimitiveContext
             if (classOfClassOOP == metaclassOOP)
             {
                 // This is a metaclass - get the regular class it's a metaclass of
-                // Metaclass has instance variable 'thisClass' pointing to the regular class
-                try
-                {
-                    int thisClassIndex = _runtimeHeapAccess.GetFieldIndex(metaclassOOP, "thisClass");
-                    actualClassOOP = _heapManager.GetInstanceVariable(classOOP, thisClassIndex);
-                    
-                    // Check actualClassOOP's instance variable count
-                    var actualFormat = _heapManager.GetObjectFormat(actualClassOOP);
-                }
-                catch (Exception)
-                {
-                    return;
-                }
+                // Metaclass has instance variable 'thisClass' at fixed index 6
+                actualClassOOP = _heapManager.GetInstanceVariable(classOOP, VMConstants.METACLASS_THISCLASS_INDEX);
             }
         }
         
         // Now try to find classPool instance variable (only Class objects have it)
-        // Try to get the classPool - if it fails, this might be a global variable access
-        int classPoolIndex;
-        try
-        {
-            var classClassOOP = _runtimeHeapAccess.GetClass("Class");
-            classPoolIndex = _runtimeHeapAccess.GetFieldIndex(classClassOOP, "classPool");
-        }
-        catch (Exception)
-        {
-            // Not a Class object - skip (likely a global variable)
-            return;
-        }
+        // Class instanceVariableNames: 'name classPool sharedPools' (plus inherited from ClassDescription/Behavior)
+        // classPool is at index 7 (0-5 from Behavior/ClassDescription, 6=name, 7=classPool)
+        int classPoolIndex = _layoutResolver.GetFieldIndex("class:Class", "classPool");
         
         // Verify actualClassOOP has enough instance variables for classPool
         var format = _heapManager.GetObjectFormat(actualClassOOP);
@@ -4282,9 +4253,7 @@ public partial class VirtualMachine : IPrimitiveContext
         }
         
         // Get the Association's key (variable name Symbol)
-        var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
-        int keyIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "key");
-        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, keyIndex);
+        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
         
         // Use atomic insert-if-absent to add Association to classPool
         // This handles both first-time insertion and idempotent re-insertion
@@ -4327,18 +4296,15 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private void SetAssociationValue(SmalltalkOOP associationOOP, SmalltalkOOP valueOOP, bool loaderMode)
     {
-        var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
-        int valueSlotIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "value");
-        
         if (loaderMode)
         {
             // Loader-only: single-threaded, no GC active, can skip barrier
-            _heapManager.SetInstanceVariableNoBarrier(associationOOP, valueSlotIndex, valueOOP);
+            _heapManager.SetInstanceVariableNoBarrier(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
         }
         else
         {
             // Runtime: GC may be active, must use write barrier
-            _heapManager.SetInstanceVariableWithBarrier(associationOOP, valueSlotIndex, valueOOP);
+            _heapManager.SetInstanceVariableWithBarrier(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
         }
     }
     
@@ -4350,28 +4316,26 @@ public partial class VirtualMachine : IPrimitiveContext
     private SmalltalkOOP AllocateEmptyClassPoolDictionary()
     {
         const int initialSize = 8;
-        
+
         var dictClassOOP = _runtimeHeapAccess.GetClass("Dictionary");
         if (dictClassOOP == SpecialObjectsArray.Instance.Nil)
         {
             throw new InvalidOperationException("Dictionary class not found - needed for classPool lazy initialization");
         }
 
-        int instVarCount = _runtimeHeapAccess.GetInstanceVariableCount(dictClassOOP);
-        
+        // Dictionary inherits from Set, which has 1 instance variable: tally
+        int instVarCount = _layoutResolver.GetInstanceVariableCount("class:Dictionary");
+
         var dictOOP = _heapManager.AllocateObject(
             Smalltalk80.Interpreter.Core.Objects.ObjectFormat.PointerIndexed,
             instVarCount,
             initialSize
         );
-        
+
         _heapManager.SetSlot(dictOOP, 0, dictClassOOP);
 
-        int tallyIndex = _runtimeHeapAccess.GetFieldIndex(dictClassOOP, "tally");
-        if (tallyIndex >= 0)
-        {
-            _heapManager.SetInstanceVariable(dictOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
-        }
+        // Set tally to 0 (Dictionary inherits tally from Set at index 0)
+        _heapManager.SetInstanceVariable(dictOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(0));
         
         var nilOOP = SpecialObjectsArray.Instance.Nil;
         for (int i = 0; i < initialSize; i++)
@@ -4399,28 +4363,26 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP DictionaryAtomicInsertIfAbsent(SmalltalkOOP dictionaryOOP, SmalltalkOOP keyOOP, SmalltalkOOP associationOOP)
     {
-        var associationClassOOP = RuntimeSpecialObjects.Instance.AssociationClass;
-        int keyIndex = _runtimeHeapAccess.GetFieldIndex(associationClassOOP, "key");
         int size = _heapManager.GetIndexedSize(dictionaryOOP);
-        
+
         // NOTE: Smalltalk-80 VM is single-threaded, so we don't need actual atomics.
         // However, this API provides the correct semantics for future concurrent VMs.
-        
+
         // PHASE 1: Check if key already exists
         for (int i = 0; i < size; i++)
         {
             var existingAssocOOP = _heapManager.GetIndexedOOP(dictionaryOOP, i);
             if (existingAssocOOP == SpecialObjectsArray.Instance.Nil)
                 continue;
-                
-            var existingKeyOOP = _heapManager.GetInstanceVariable(existingAssocOOP, keyIndex);
+
+            var existingKeyOOP = _heapManager.GetInstanceVariable(existingAssocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
             if (existingKeyOOP == keyOOP)
             {
                 // Key exists - return existing Association (winner)
                 return existingAssocOOP;
             }
         }
-        
+
         // PHASE 2: Key doesn't exist - insert new Association
         for (int i = 0; i < size; i++)
         {
@@ -4429,14 +4391,12 @@ public partial class VirtualMachine : IPrimitiveContext
             {
                 // Found empty slot - insert here
                 _heapManager.SetIndexedOOP(dictionaryOOP, i, associationOOP);
-                
-                // Increment tally
-                var dictClassOOP = _heapManager.GetSlot(dictionaryOOP, 0);
-                int tallyIndex = _runtimeHeapAccess.GetFieldIndex(dictClassOOP, "tally");
-                var tallyOOP = _heapManager.GetInstanceVariable(dictionaryOOP, tallyIndex);
+
+                // Increment tally (Dictionary inherits tally from Set at index 0)
+                var tallyOOP = _heapManager.GetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX);
                 int tally = tallyOOP.AsSmallInteger();
-                _heapManager.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(tally + 1));
-                
+                _heapManager.SetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(tally + 1));
+
                 // Return the newly inserted Association (winner)
                 return associationOOP;
             }
@@ -4479,9 +4439,9 @@ public partial class VirtualMachine : IPrimitiveContext
         int numArgs = GetBlockArgCount(blockMethodOOP);
 
         // Allocate BlockClosure instance with instance variable count from layout
-        // IMPORTANT: Do NOT hardcode instance variable count - query from RuntimeHeapAccess
+        // IMPORTANT: Do NOT hardcode instance variable count - query from LayoutResolver
         // to match the actual layout in the heap
-        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(blockClosureClassOOP);
+        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:BlockClosure");
         var closureOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, instanceVarCount, 0);
         _heapManager.SetSlot(closureOOP, 0, blockClosureClassOOP);
 
@@ -4596,14 +4556,9 @@ public partial class VirtualMachine : IPrimitiveContext
 
     int IPrimitiveContext.GetFieldIndex(string className, string fieldName)
     {
-        // Get the class OOP from the heap
-        string classNameClean = className.StartsWith("class:") ? className.Substring(6) : className;
-        var classOOP = _runtimeHeapAccess.GetClass(classNameClean);
-        if (classOOP == SpecialObjectsArray.Instance.Nil)
-        {
-            throw new InvalidOperationException($"Class {classNameClean} not found in heap");
-        }
-        return _runtimeHeapAccess.GetFieldIndex(classOOP, fieldName);
+        // Use LayoutResolver to get field index from precomputed layouts (not stale!)
+        string classLocalId = className.StartsWith("class:") ? className : $"class:{className}";
+        return _layoutResolver.GetFieldIndex(classLocalId, fieldName);
     }
 
     SmalltalkOOP IPrimitiveContext.GetInstanceVariable(SmalltalkOOP objectOOP, int index)
@@ -4722,42 +4677,34 @@ public partial class VirtualMachine : IPrimitiveContext
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // SystemDictionary is a Dictionary with an Association array stored in instance variable
-        // Dictionary instance variables (from Smalltalk-80 spec):
-        //   0: tally (SmallInteger count of entries)
-        //   1: array (PointerIndexed Array of Association objects)
+        // SystemDictionary is a Dictionary (PointerIndexed subclass of Set)
+        // Dictionary structure:
+        //   Instance variable 0: tally (SmallInteger count of entries, inherited from Set)
+        //   Indexed slots 0..N: Association objects (PointerIndexed)
+        //
+        // Dictionary does NOT have an "array" instance variable - it stores Associations
+        // directly in indexed slots!
 
-        var dictClassOOP = _heapManager.GetSlot(smalltalkOOP, 0);
-        int arrayIndex = _runtimeHeapAccess.GetFieldIndex(dictClassOOP, "array");
-        var associationArrayOOP = _heapManager.GetInstanceVariable(smalltalkOOP, arrayIndex);
-
-        if (associationArrayOOP == SpecialObjectsArray.Instance.Nil)
-        {
-            return SpecialObjectsArray.Instance.Nil;
-        }
-
-        // Search the association array for matching key
-        int arraySize = _heapManager.GetIndexedSize(associationArrayOOP);
+        // Search through SystemDictionary's indexed slots
+        int dictionarySize = _heapManager.GetIndexedSize(smalltalkOOP);
         var nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        for (int i = 0; i < arraySize; i++)
+        for (int i = 0; i < dictionarySize; i++)
         {
-            var associationOOP = _heapManager.GetIndexedOOP(associationArrayOOP, i);
+            var associationOOP = _heapManager.GetIndexedOOP(smalltalkOOP, i);
 
             // Skip nil slots (empty hash table slots)
             if (associationOOP == nilOOP || associationOOP.IsSmallInteger)
                 continue;
 
-            // Association has two instance variables: key and value
-            // Instance variable 0: key (Symbol)
-            // Instance variable 1: value (Object)
-            var assocKeyOOP = _heapManager.GetInstanceVariable(associationOOP, 0);
+            // Association has two instance variables: key (Symbol) and value (Object)
+            var assocKeyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
 
             // Check if key matches
             if (assocKeyOOP == keySymbolOOP)
             {
                 // Found it! Return the value
-                var valueOOP = _heapManager.GetInstanceVariable(associationOOP, 1);
+                var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
                 return valueOOP;
             }
         }

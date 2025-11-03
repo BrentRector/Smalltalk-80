@@ -8,7 +8,6 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.Engine.LoaderPhases;
 
 namespace Smalltalk80.Interpreter.Engine.InitExecution;
 
@@ -27,7 +26,6 @@ public class InitExpressionExecutor
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly VirtualMachine _vm;
-    private readonly RuntimeHeapAccess _runtimeHeapAccess;
     private readonly ProcessPrimitives _processPrimitives;
     private readonly InitPolicy _policy;
     private readonly int _defaultTimeoutMs;
@@ -40,10 +38,9 @@ public class InitExpressionExecutor
     {
         _heapManager = heapManager;
         _vm = vm;
-        _runtimeHeapAccess = new RuntimeHeapAccess(heapManager);
         _policy = policy;
         _defaultTimeoutMs = defaultTimeoutMs;
-        _processPrimitives = new ProcessPrimitives(heapManager, _runtimeHeapAccess, vm);
+        _processPrimitives = new ProcessPrimitives(heapManager, vm);
     }
 
 
@@ -213,11 +210,13 @@ public class InitExpressionExecutor
             throw new InvalidOperationException("MethodContext class not found in Smalltalk dictionary");
         }
 
-        // Get instance variable count from class
-        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(methodContextClassOOP);
+        // MethodContext has a fixed layout per Smalltalk-80 specification:
+        // 6 instance variables (sender, pc, stackp, method, receiverMap, receiver)
+        // Starting at METHODCONTEXT_TEMP_FRAME_START=6 for indexed slots
+        const int METHODCONTEXT_INSTANCE_VAR_COUNT = 6;
 
         // Allocate MethodContext with indexed slots for stack (use 12 for small frame)
-        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, indexedSize: 12);
+        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, indexedSize: 12);
         _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
 
         // Set instance variables using LayoutResolver indices
@@ -236,7 +235,7 @@ public class InitExpressionExecutor
         _heapManager.SetSlot(contextOOP, receiverIndex + 1, receiverOOP);
 
         // Initialize indexed portion (stack) with nil
-        int indexedBase = instanceVarCount + 1; // +1 for class slot
+        int indexedBase = METHODCONTEXT_INSTANCE_VAR_COUNT + 1; // +1 for class slot
         for (int i = 0; i < 12; i++)
         {
             _heapManager.SetSlot(contextOOP, indexedBase + i, SpecialObjectsArray.Instance.Nil);
@@ -326,21 +325,18 @@ public class InitExpressionExecutor
             throw new InvalidOperationException("Process class not found in Smalltalk dictionary");
         }
 
-        // Get instance variable count from class
-        int instanceVarCount = _runtimeHeapAccess.GetInstanceVariableCount(processClassOOP);
+        // Process has a fixed layout per Smalltalk-80 specification:
+        // 3 instance variables (suspendedContext, priority, myList)
+        const int PROCESS_INSTANCE_VAR_COUNT = 3;
 
         // Allocate Process object
-        var processOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, indexedSize: 0);
+        var processOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
         _heapManager.SetSlot(processOOP, 0, processClassOOP);
 
-        // Set instance variables using RuntimeHeapAccess indices
-        int suspendedContextIndex = _runtimeHeapAccess.GetFieldIndex(processClassOOP, "suspendedContext");
-        int priorityIndex = _runtimeHeapAccess.GetFieldIndex(processClassOOP, "priority");
-        int myListIndex = _runtimeHeapAccess.GetFieldIndex(processClassOOP, "myList");
-
-        _heapManager.SetSlot(processOOP, suspendedContextIndex + 1, suspendedContextOOP);
-        _heapManager.SetSlot(processOOP, priorityIndex + 1, SmalltalkOOP.FromSmallInteger(priority));
-        _heapManager.SetSlot(processOOP, myListIndex + 1, SpecialObjectsArray.Instance.Nil);
+        // Set instance variables using fixed indices from VMConstants
+        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX + 1, suspendedContextOOP);
+        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_PRIORITY_INDEX + 1, SmalltalkOOP.FromSmallInteger(priority));
+        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_MYLIST_INDEX + 1, SpecialObjectsArray.Instance.Nil);
 
         return processOOP;
     }

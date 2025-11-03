@@ -1,6 +1,5 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
-using Smalltalk80.Interpreter.Core.Objects;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -31,16 +30,13 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 public class ProcessPrimitives
 {
     private readonly ISmalltalkHeapManager _heapManager;
-    private readonly RuntimeHeapAccess _runtimeHeapAccess;
     private readonly VirtualMachine _vm;
 
     public ProcessPrimitives(
         ISmalltalkHeapManager heapManager,
-        RuntimeHeapAccess runtimeHeapAccess,
         VirtualMachine vm)
     {
         _heapManager = heapManager;
-        _runtimeHeapAccess = runtimeHeapAccess;
         _vm = vm;
     }
     
@@ -72,12 +68,37 @@ public class ProcessPrimitives
     {
         // Get ProcessorScheduler from SpecialObjectsArray (heap-only access)
         var schedulerOOP = SpecialObjectsArray.Instance.ProcessorScheduler;
-        if (schedulerOOP == SpecialObjectsArray.Instance.Nil)
-            throw new InvalidOperationException("ProcessorScheduler not found in SpecialObjectsArray");
 
+        // SPECIAL CASE: During init expression execution, ProcessorScheduler doesn't exist yet!
+        // It will be created by one of the init expressions (ProcessorScheduler class initialize).
+        // In this case, bypass the scheduler and just execute the process directly.
+        bool hasScheduler = schedulerOOP != SmalltalkOOP.Null &&
+                           schedulerOOP.RawValue != 0 &&
+                           schedulerOOP != SpecialObjectsArray.Instance.Nil;
+
+        if (!hasScheduler)
+        {
+            // Direct execution without scheduler (init expression bootstrap mode)
+            // Process has fixed field layout: suspendedContext at slot 0
+            var suspendedContextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+
+            return _vm.ExecuteExistingContext(suspendedContextOOP);
+        }
+
+        // Normal execution path: Use ProcessorScheduler
+        // Additional safety check: Verify scheduler has a valid class
         var schedulerClassOOP = _heapManager.GetSlot(schedulerOOP, 0);
-        int activeProcessIndex = _runtimeHeapAccess.GetFieldIndex(schedulerClassOOP, "activeProcess");
-        var currentActiveOOP = _heapManager.GetInstanceVariable(schedulerOOP, activeProcessIndex);
+        if (schedulerClassOOP.RawValue == 0 || schedulerClassOOP == SmalltalkOOP.Null)
+        {
+            // Scheduler exists but class slot is invalid - fall back to direct execution
+            // Process has fixed field layout: suspendedContext at slot 0
+            var suspendedContextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+
+            return _vm.ExecuteExistingContext(suspendedContextOOP);
+        }
+
+        // ProcessorScheduler has fixed field layout: activeProcess at slot 1
+        var currentActiveOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
 
         if (currentActiveOOP != SpecialObjectsArray.Instance.Nil)
         {
@@ -86,15 +107,14 @@ public class ProcessPrimitives
 
         _heapManager.SetInstanceVariable(
             schedulerOOP,
-            activeProcessIndex,
+            VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX,
             processOOP
         );
 
         try
         {
-            var processClassOOP = _heapManager.GetSlot(processOOP, 0);
-            int suspendedContextIndex = _runtimeHeapAccess.GetFieldIndex(processClassOOP, "suspendedContext");
-            var suspendedContextOOP = _heapManager.GetInstanceVariable(processOOP, suspendedContextIndex);
+            // Process has fixed field layout: suspendedContext at slot 0
+            var suspendedContextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
 
             var resultOOP = _vm.ExecuteExistingContext(suspendedContextOOP);
 
@@ -106,7 +126,7 @@ public class ProcessPrimitives
             // This ensures subsequent test expressions can run
             _heapManager.SetInstanceVariable(
                 schedulerOOP,
-                activeProcessIndex,
+                VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX,
                 SpecialObjectsArray.Instance.Nil
             );
         }

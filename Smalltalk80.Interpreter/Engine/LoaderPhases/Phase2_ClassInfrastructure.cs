@@ -58,6 +58,10 @@ public class Phase2_ClassInfrastructure
         // Step 4: Resolve class metadata - name, format, superclass (from Phase4)
         ResolveClassMetadata();
 
+        // Step 4b: Populate ClassDescription.instanceVariables field with Array-of-Strings
+        PopulateInstanceVariablesField();
+        _report.AddValidation("Phase 2", "ClassDescription.instanceVariables populated", true);
+
         // Step 5: Load precomputed layouts (from Loader Phase 5)
         LoadPrecomputedLayouts();
     }
@@ -581,6 +585,95 @@ public class Phase2_ClassInfrastructure
         if (value <= 64) return 64;
         if (value <= 128) return 128;
         return 256;
+    }
+
+    /// <summary>
+    /// Populates ClassDescription.instanceVariables field (slot 4) with Array-of-Strings
+    /// containing the class's own instance variable names (not inherited ones).
+    /// This enables runtime reflection via RuntimeHeapAccess.BuildFieldMap().
+    ///
+    /// ClassDescription field layout:
+    ///   Inherited from Behavior: superclass(0), methodDict(1), format(2), subclasses(3)
+    ///   Own fields: instanceVariables(4), organization(5)
+    /// </summary>
+    private void PopulateInstanceVariablesField()
+    {
+        Console.WriteLine("  Populating ClassDescription.instanceVariables fields...");
+
+        int stringCount = 0;
+        int arrayCount = 0;
+        int classCount = 0;
+
+        // Get Array class OOP for allocating instance variable Arrays
+        if (!_localIdToObjectId.TryGetValue("class:Array", out SmalltalkOOP arrayClassOOP))
+        {
+            throw new InvalidOperationException("Array class not found - needed for instanceVariables field");
+        }
+
+        // Get String class OOP for allocating instance variable name Strings
+        if (!_localIdToObjectId.TryGetValue("class:String", out SmalltalkOOP stringClassOOP))
+        {
+            throw new InvalidOperationException("String class not found - needed for instanceVariables field");
+        }
+
+        // Process all non-metaclass classes (metaclasses don't have instanceVariables field populated)
+        foreach (var cls in _bundle.Classes.Where(c => !c.IsMetaclass))
+        {
+            SmalltalkOOP classOOP = _localIdToObjectId[cls.LocalId];
+
+            // Skip if class has no instance variables of its own
+            if (cls.InstVarNames.Length == 0)
+            {
+                // Set instanceVariables to empty Array (not nil)
+                var emptyArrayOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 0, 0);
+                _heapManager.SetSlot(emptyArrayOOP, 0, arrayClassOOP);
+                SetAndTrackInstanceVariable(classOOP, 4, emptyArrayOOP);
+                continue;
+            }
+
+            // Allocate String objects for each instance variable name
+            var instVarStringOOPs = new SmalltalkOOP[cls.InstVarNames.Length];
+
+            for (int i = 0; i < cls.InstVarNames.Length; i++)
+            {
+                int symbolIndex = cls.InstVarNames[i];
+                string varName = _bundle.Symbols[symbolIndex];
+                byte[] varNameBytes = System.Text.Encoding.Latin1.GetBytes(varName);
+
+                // Allocate ByteIndexed String object
+                var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, varNameBytes.Length);
+                _heapManager.SetSlot(stringOOP, 0, stringClassOOP);  // Set class reference
+
+                // Copy bytes into String object
+                for (int b = 0; b < varNameBytes.Length; b++)
+                {
+                    _heapManager.SetIndexedByte(stringOOP, b, varNameBytes[b]);
+                }
+
+                instVarStringOOPs[i] = stringOOP;
+                stringCount++;
+            }
+
+            // Allocate Array object to hold the String objects
+            var instVarsArrayOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 0, cls.InstVarNames.Length);
+            _heapManager.SetSlot(instVarsArrayOOP, 0, arrayClassOOP);  // Set class reference
+
+            // Populate Array with String OOPs
+            for (int i = 0; i < instVarStringOOPs.Length; i++)
+            {
+                _heapManager.SetIndexedOOP(instVarsArrayOOP, i, instVarStringOOPs[i]);
+            }
+
+            arrayCount++;
+
+            // Set ClassDescription.instanceVariables field (slot 4)
+            SetAndTrackInstanceVariable(classOOP, 4, instVarsArrayOOP);
+            classCount++;
+        }
+
+        Console.WriteLine($"    Populated instanceVariables for {classCount} classes");
+        Console.WriteLine($"    Allocated {stringCount} String objects for field names");
+        Console.WriteLine($"    Allocated {arrayCount} Array objects");
     }
 
     #endregion
