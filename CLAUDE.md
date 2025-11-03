@@ -1,12 +1,42 @@
 # Claude Development Guidelines
 
 **Last Updated**: 2025-11-03
-**Status**: ✅ Tail Recursion Optimization Complete - Compiler & VM Ready
+**Status**: ✅ CRITICAL BUG FIXED - BlockClosure homeContext regression resolved
 **Compiler Status**: ✅ Tail recursion detection & bytecode generation implemented
 **Validator Status**: ✅ 100% validation passing (10,182 methods validate correctly)
-**Interpreter Status**: ✅ JUMP bytecode (0xA8-0xAF) implemented for tail recursion
+**Interpreter Status**: ✅ JUMP bytecode (0xA8-0xAF) implemented + BlockClosure homeContext fix
 **Test Status**: ✅ 23/23 TailRecursionAnalyzer unit tests passing
-**Init Execution Status**: ✅ 21/45 init expressions succeed, whileTrue: loops complete, no infinite loops
+**Init Execution Status**: ✅ 23/45 init expressions passing (BinaryChoiceView, Cursor now working!)
+
+## Recent Bug Fix (2025-11-03)
+
+### 🔧 CRITICAL: BlockClosure homeContext Regression - FIXED
+
+**Problem**: BinaryChoiceView initialize and other init expressions failed with "Instance variable index 1 out of range [0, -1] for object oop=12462 (True singleton)" error.
+
+**Root Cause**: When pushing block literals during nested method calls, `FindMethodContext(_activeContextOOP)` walked up the sender chain and found the CALLING method's context instead of the method where the block literal was DEFINED. This caused BlockClosures to capture the wrong homeContext.
+
+Example failure:
+```
+BinaryChoiceView>>initialize pushes block literal (should capture BinaryChoiceView context)
+→ Literal pushed while executing inside True>>ifTrue: (nested call)
+→ FindMethodContext finds True>>ifTrue: context (WRONG!)
+→ BlockClosure created with homeContext = True method context
+→ Later, accessing instance variables uses True as receiver
+→ True has no instance variables → ERROR
+```
+
+**Solution**: Changed `pushLiteral` bytecode handler to use `FindMethodContextForMethod(methodOOP)` instead of `FindMethodContext(_activeContextOOP)`. This searches the context chain for the specific MethodContext executing the CompiledMethod that contains the literal being pushed.
+
+**Impact**:
+- ✅ BinaryChoiceView initialize: NOW PASSES
+- ✅ Cursor initialize: NOW PASSES
+- ✅ Total successful: 21/45 → 23/45 (+2 expressions)
+- ✅ Cache key fixed: Uses `(homeContextOOP, index)` instead of `(methodContextOOP, index)` to prevent stale BlockClosure reuse
+
+**Files Modified**:
+- `VirtualMachine.cs`: Added `FindMethodContextForMethod()`, fixed pushLiteral homeContext lookup, fixed cache key
+- `BlockClosurePrimitives.cs`: Removed debug output
 
 ## Recent Accomplishments (2025-11-03)
 
