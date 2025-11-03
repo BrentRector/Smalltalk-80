@@ -63,7 +63,10 @@ public class Phase3_ObjectAllocation
         SetClassReferencesForAllObjects();
         LogClassReferenceCheckpoint();
 
-        // Section 3: Nil Initialization
+        // Section 3: Populate Behavior.subclasses field
+        PopulateSubclassesField();
+
+        // Section 4: Nil Initialization
         InitializeUnsetInstanceVariables();
         LogInitializationCheckpoint();
 
@@ -798,6 +801,129 @@ public class Phase3_ObjectAllocation
             bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
         }
         return bytes;
+    }
+
+    #endregion
+
+    #region Behavior.subclasses Field Population
+
+    /// <summary>
+    /// Populates Behavior.subclasses field (slot 3) with Set containing class OOP references
+    /// for all direct subclasses of each class. This enables runtime reflection and supports
+    /// class hierarchy queries.
+    ///
+    /// Behavior field layout:
+    ///   superclass(0), methodDict(1), format(2), subclasses(3)
+    ///
+    /// Blue Book specification:
+    ///   subclasses is a Set containing direct subclass objects (not strings, not names)
+    ///   Populated by addSubclass: method at runtime, but we build it during cold-start
+    ///
+    /// This runs in Phase 3 after nil singleton is created (Section 1) so we can set nil
+    /// for classes without subclasses.
+    /// </summary>
+    private void PopulateSubclassesField()
+    {
+        Console.WriteLine("  Populating Behavior.subclasses fields...");
+
+        int setCount = 0;
+        int totalSubclassRefs = 0;
+
+        // Get Set class OOP for allocating subclass Sets
+        if (!_localIdToObjectId.TryGetValue("class:Set", out SmalltalkOOP setClassOOP))
+        {
+            throw new InvalidOperationException("Set class not found - needed for subclasses field");
+        }
+
+        // Get nil singleton (created in Section 1: AllocateSentinelObjects)
+        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Build subclass map: className -> list of direct subclass OOPs
+        var subclassMap = new Dictionary<string, List<SmalltalkOOP>>();
+
+        // Initialize map with empty lists for all classes
+        foreach (var cls in _bundle.Classes)
+        {
+            string className = _symbols[cls.NameIndex];
+            subclassMap[className] = new List<SmalltalkOOP>();
+        }
+
+        // Populate map by examining each class's superclass
+        // IMPORTANT: Only process regular classes, NOT metaclasses
+        // Metaclasses should not appear in the subclasses Set
+        foreach (var cls in _bundle.Classes.Where(c => !c.IsMetaclass))
+        {
+            // Skip if class has no superclass (e.g., Object in some hierarchies)
+            if (cls.SuperNameIndex == null)
+            {
+                continue;
+            }
+
+            string superclassName = _symbols[cls.SuperNameIndex.Value];
+            string thisClassName = cls.LocalId; // Use LocalId for OOP lookup
+
+            // Add this class OOP to its superclass's subclass list
+            if (!_localIdToObjectId.TryGetValue(thisClassName, out SmalltalkOOP classOOP))
+            {
+                throw new InvalidOperationException($"Class OOP not found for {thisClassName}");
+            }
+
+            subclassMap[superclassName].Add(classOOP);
+            totalSubclassRefs++;
+        }
+
+        // Now populate slot 3 for each class with its Set of subclasses
+        foreach (var cls in _bundle.Classes)
+        {
+            string className = _symbols[cls.NameIndex];
+            SmalltalkOOP classOOP = _localIdToObjectId[cls.LocalId];
+
+            var subclasses = subclassMap[className];
+
+            if (subclasses.Count == 0)
+            {
+                // No subclasses - set subclasses to nil (not empty Set)
+                // This matches Blue Book behavior: subclasses is nil until first subclass added
+                SetAndTrackInstanceVariable(classOOP, 3, nilOOP);
+            }
+            else
+            {
+                // Allocate Set object to hold subclass OOPs
+                // Set is PointerIndexed with 1 instance variable (tally) + indexed slots for elements
+                // For simplicity during cold-start, we'll use a direct Array-based representation
+                // Real Set uses open-addressing hash table, but we'll use a simple Array for now
+                var setOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 1, subclasses.Count);
+                _heapManager.SetSlot(setOOP, 0, setClassOOP);  // Set class reference
+
+                // Set tally (instance variable 0) to SmallInteger with subclass count
+                var tallyOOP = SmalltalkOOP.FromSmallInteger(subclasses.Count);
+                _heapManager.SetInstanceVariable(setOOP, 0, tallyOOP);
+
+                // Populate indexed slots with subclass OOPs
+                for (int i = 0; i < subclasses.Count; i++)
+                {
+                    _heapManager.SetIndexedOOP(setOOP, i, subclasses[i]);
+                }
+
+                // Set Behavior.subclasses field (slot 3)
+                SetAndTrackInstanceVariable(classOOP, 3, setOOP);
+                setCount++;
+            }
+        }
+
+        Console.WriteLine($"    Populated subclasses for {setCount} classes with children");
+        Console.WriteLine($"    Total subclass references: {totalSubclassRefs}");
+        _report.AddValidation("Phase 3", "Behavior.subclasses populated", true);
+    }
+
+    /// <summary>
+    /// Helper method to set an instance variable and track it as initialized.
+    /// This prevents Phase Y (InitializeUnsetInstanceVariables) from overwriting with nil.
+    /// </summary>
+    private void SetAndTrackInstanceVariable(SmalltalkOOP oop, int slot, SmalltalkOOP value)
+    {
+        _allocator.SetInstanceVariable(oop, slot, value);
+        _initializedFields.Add((oop, slot));
     }
 
     #endregion

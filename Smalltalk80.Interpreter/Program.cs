@@ -92,6 +92,14 @@ public static class Program
 
             Console.WriteLine("Cold start completed successfully!");
 
+            // DIAGNOSTIC: Inspect ClassDescription.instanceVariables field (slot 4)
+            Console.WriteLine("\n=== DIAGNOSTIC: Checking ClassDescription.instanceVariables ===");
+            InspectClassDescriptionInstanceVariables(heapManager, bundle);
+
+            // DIAGNOSTIC: Test RuntimeHeapAccess.BuildFieldMap()
+            Console.WriteLine("\n=== DIAGNOSTIC: Testing RuntimeHeapAccess.BuildFieldMap() ===");
+            TestBuildFieldMap(heapManager);
+
             // Execute init expressions - ONLY BlockContextTest for nested block context testing
             bool executeInitExpressions = true; // Run only the test expression
             bool onlyRunTests = false; // DISABLED - Debug Character initialization only
@@ -116,7 +124,7 @@ public static class Program
                     ShouldDebugMethodLookup = debugOptions.ShouldDebugMessages // Method lookup is part of message debugging
                 };
 
-                var vm = new VirtualMachine(heapManager, vmMetadata, debugOptions: vmDebugOptions);
+                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions: vmDebugOptions);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;
@@ -1318,6 +1326,218 @@ public static class Program
         {
             Console.WriteLine($"  ⚠️  Error diagnosing Cursor class variables: {ex.Message}");
             Console.WriteLine($"     {ex.StackTrace}");
+        }
+    }
+
+    /// <summary>
+    /// DIAGNOSTIC: Inspects ClassDescription.instanceVariables (slot 4) for several classes
+    /// to determine if instance variable names are stored in the heap.
+    /// </summary>
+    private static void InspectClassDescriptionInstanceVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    {
+        try
+        {
+            // Test classes: Array, Point, Process (various inheritance depths)
+            string[] testClasses = { "Array", "Point", "Process", "Dictionary" };
+            var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+            foreach (var className in testClasses)
+            {
+                Console.WriteLine($"\n{className}:");
+
+                // Look up the class OOP
+                if (!GlobalRegistry.TryGet($"class:{className}", out SmalltalkOOP classOOP))
+                {
+                    Console.WriteLine($"  ⚠️  Class not found in GlobalRegistry");
+                    continue;
+                }
+
+                // ClassDescription has: 'instanceVariables' at slot 4 (inherited from ClassDescription)
+                // Behavior: superclass(0), methodDict(1), format(2)
+                // ClassDescription adds: instanceVariables(3), organization(4)
+                // CORRECTION: Behavior has 3 fields, ClassDescription adds 2 more
+                // So instanceVariables should be at slot 3 (0-based indexing)
+
+                // Let's check both slot 3 and slot 4 to be sure
+                for (int slotIndex = 3; slotIndex <= 4; slotIndex++)
+                {
+                    var fieldValueOOP = heapManager.GetInstanceVariable(classOOP, slotIndex);
+
+                    Console.WriteLine($"  Slot {slotIndex}: {FormatOOPValue(heapManager, fieldValueOOP, nilOOP)}");
+
+                    // If it's an Array, inspect its contents
+                    if (fieldValueOOP != nilOOP && !fieldValueOOP.IsSmallInteger)
+                    {
+                        try
+                        {
+                            int arraySize = heapManager.GetIndexedSize(fieldValueOOP);
+                            if (arraySize > 0 && arraySize < 50) // Reasonable size check
+                            {
+                                Console.WriteLine($"    Array size: {arraySize}");
+                                for (int i = 0; i < Math.Min(arraySize, 10); i++) // Show first 10 elements
+                                {
+                                    var elementOOP = heapManager.GetIndexedOOP(fieldValueOOP, i);
+                                    string elementStr = FormatOOPValue(heapManager, elementOOP, nilOOP);
+
+                                    // If it's a String, try to read it
+                                    if (elementOOP != nilOOP && !elementOOP.IsSmallInteger)
+                                    {
+                                        try
+                                        {
+                                            int strLen = heapManager.GetIndexedSize(elementOOP);
+                                            if (strLen > 0 && strLen < 100)
+                                            {
+                                                var bytes = new byte[strLen];
+                                                for (int b = 0; b < strLen; b++)
+                                                {
+                                                    bytes[b] = heapManager.GetIndexedByte(elementOOP, b);
+                                                }
+                                                string text = System.Text.Encoding.Latin1.GetString(bytes);
+                                                elementStr = $"\"{text}\"";
+                                            }
+                                        }
+                                        catch
+                                        {
+                                            // Not a String, keep generic format
+                                        }
+                                    }
+
+                                    Console.WriteLine($"      [{i}] = {elementStr}");
+                                }
+                                if (arraySize > 10)
+                                {
+                                    Console.WriteLine($"      ... ({arraySize - 10} more elements)");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"    ⚠️  Error inspecting array: {ex.Message}");
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️  Error during diagnostic: {ex.Message}");
+            Console.WriteLine($"   Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    /// <summary>
+    /// Formats an OOP value for display in diagnostics.
+    /// </summary>
+    private static string FormatOOPValue(ISmalltalkHeapManager heapManager, SmalltalkOOP oop, SmalltalkOOP nilOOP)
+    {
+        if (oop == nilOOP)
+            return "nil";
+        if (oop.IsSmallInteger)
+            return $"SmallInteger({oop.AsSmallInteger()})";
+
+        // Try to get object class for better display
+        try
+        {
+            var classOOP = heapManager.GetSlot(oop, 0);
+            if (classOOP != nilOOP && !classOOP.IsSmallInteger)
+            {
+                // STRATEGY 1: Check if THIS object is a Class object itself
+                // Class objects have their name at slot 6 (field: name)
+                // Try to read slot 6 of THIS object first
+                var nameOOP = heapManager.GetInstanceVariable(oop, 6);
+                if (nameOOP != nilOOP && !nameOOP.IsSmallInteger)
+                {
+                    int nameLen = heapManager.GetIndexedSize(nameOOP);
+                    if (nameLen > 0 && nameLen < 100)
+                    {
+                        var bytes = new byte[nameLen];
+                        for (int i = 0; i < nameLen; i++)
+                        {
+                            bytes[i] = heapManager.GetIndexedByte(nameOOP, i);
+                        }
+                        string className = System.Text.Encoding.Latin1.GetString(bytes);
+                        return $"{className}(oop={oop.RawValue})";
+                    }
+                }
+
+                // STRATEGY 2: Get class name from the class object's name field
+                // This works for instances of classes
+                var classNameOOP = heapManager.GetInstanceVariable(classOOP, 6);
+                if (classNameOOP != nilOOP && !classNameOOP.IsSmallInteger)
+                {
+                    int nameLen = heapManager.GetIndexedSize(classNameOOP);
+                    if (nameLen > 0 && nameLen < 100)
+                    {
+                        var bytes = new byte[nameLen];
+                        for (int i = 0; i < nameLen; i++)
+                        {
+                            bytes[i] = heapManager.GetIndexedByte(classNameOOP, i);
+                        }
+                        string className = System.Text.Encoding.Latin1.GetString(bytes);
+                        return $"{className}(oop={oop.RawValue})";
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Fall through to generic display
+        }
+
+        return $"OOP({oop.RawValue})";
+    }
+
+    /// <summary>
+    /// DIAGNOSTIC: Tests RuntimeHeapAccess.BuildFieldMap() to verify it can read
+    /// instance variable names from the heap and build complete field layouts.
+    /// </summary>
+    private static void TestBuildFieldMap(ISmalltalkHeapManager heapManager)
+    {
+        try
+        {
+            var runtimeHeapAccess = new RuntimeHeapAccess(heapManager);
+            Console.WriteLine("Building field map from heap...");
+
+            var startTime = System.Diagnostics.Stopwatch.StartNew();
+            var fieldMap = runtimeHeapAccess.BuildFieldMap();
+            startTime.Stop();
+
+            Console.WriteLine($"Built field map in {startTime.ElapsedMilliseconds}ms");
+            Console.WriteLine($"Found {fieldMap.Count} classes");
+            Console.WriteLine();
+
+            // Test specific classes
+            string[] testClasses = { "class:Array", "class:Point", "class:Process", "class:Dictionary", "class:MethodContext" };
+
+            foreach (var className in testClasses)
+            {
+                if (fieldMap.TryGetValue(className, out var fields))
+                {
+                    Console.WriteLine($"{className}:");
+                    if (fields.Count == 0)
+                    {
+                        Console.WriteLine("  (no instance variables)");
+                    }
+                    else
+                    {
+                        for (int i = 0; i < fields.Count; i++)
+                        {
+                            Console.WriteLine($"  [{i}] {fields[i]}");
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"{className}: NOT FOUND");
+                }
+            }
+
+            Console.WriteLine($"\n✓ BuildFieldMap() successfully read {fieldMap.Count} class layouts from heap");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ BuildFieldMap() failed: {ex.Message}");
+            Console.WriteLine($"   Stack trace: {ex.StackTrace}");
         }
     }
 }
