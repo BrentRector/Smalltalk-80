@@ -98,8 +98,16 @@ public static class ObjectPrimitives
         int size = ctx.HeapManager.GetIndexedSize(receiver);
         if (index > size)
         {
-            ctx.PrimitiveSuccess = false;
-            return SpecialObjectsArray.Instance.Nil;
+            // FAST-FAIL for debugging: Throw exception immediately to avoid infinite recursion
+            // TODO: Remove this after init expressions are working - should use normal error handling
+            var receiverClassName = ctx.GetClassNameForObject(receiver);
+            throw new InvalidOperationException(
+                $"SUBSCRIPT BOUNDS ERROR: {receiverClassName}>>at: {index} (size={size})\n" +
+                $"  receiver={receiver}, index={index}, size={size}");
+
+            // Normal behavior (commented out for fast-fail debugging):
+            // ctx.PrimitiveSuccess = false;
+            // return SpecialObjectsArray.Instance.Nil;
         }
 
         // Blue Book: result ← self subscript: array with: index

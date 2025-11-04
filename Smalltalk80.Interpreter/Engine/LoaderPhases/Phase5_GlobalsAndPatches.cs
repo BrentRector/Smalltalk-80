@@ -384,6 +384,10 @@ public class Phase5_GlobalsAndPatches
         // Pre-populate with 128 single-character symbols so Symbol initialize works correctly
         InitializeSingleCharSymbols();
 
+        // Initialize FilePool shared pool dictionary
+        // File class and related classes (FileDirectory, FilePage, FileStream) use this pool
+        InitializeFilePool();
+
         // Install Processor -> ProcessorScheduler singleton
         if (GlobalRegistry.TryGet("ProcessorScheduler", out SmalltalkOOP processorSchedulerOOP))
         {
@@ -590,6 +594,61 @@ public class Phase5_GlobalsAndPatches
             installed = true;
             Console.WriteLine($"  [Phase5] Initialized SingleCharSymbols class variable in Symbol classPool at slot {emptySlotIndex} (128 nil elements)");
         }
+    }
+
+    /// <summary>
+    /// Initializes the "FilePool" shared pool dictionary.
+    /// FilePool is a pool dictionary used by File, FileDirectory, FilePage, and FileStream classes.
+    /// Pre-creates an empty Dictionary so File initialize can populate it with constants:
+    ///   FilePool at: #Read put: 1.
+    ///   FilePool at: #Write put: 2.
+    ///   FilePool at: #Shorten put: 3.
+    /// </summary>
+    private void InitializeFilePool()
+    {
+        // Look up Dictionary class
+        if (!GlobalRegistry.TryGet("class:Dictionary", out SmalltalkOOP dictionaryClassOOP))
+        {
+            throw new InvalidOperationException("Dictionary class not found during FilePool initialization");
+        }
+
+        // Create an empty Dictionary with capacity for the 3 constants File initialize will add
+        // Dictionary layout: instance variables + indexed array slots
+        // Use initial size of 8 slots (3 constants with ~75% load factor)
+        int initialSize = 8;
+
+        // Allocate Dictionary as PointerIndexed object
+        var dictionaryOOP = _allocator.AllocateObject("Dictionary", ObjectFormat.PointerIndexed, initialSize);
+
+        // Set class reference
+        _allocator.SetObjectClass(dictionaryOOP, dictionaryClassOOP);
+
+        // Initialize tally to SmallInteger 0
+        // Find 'tally' instance variable index in Dictionary hierarchy (inherited from Set)
+        int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
+        if (tallyIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
+        }
+
+        // Initialize all indexed array elements to nil
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        for (int i = 0; i < initialSize; i++)
+        {
+            _allocator.SetIndexedOOP(dictionaryOOP, i, nilOOP);
+        }
+
+        // Create Association for FilePool
+        var associationOOP = GetOrCreateCanonicalAssociation("FilePool");
+        _allocator.SetInstanceVariable(associationOOP, 1, dictionaryOOP);
+
+        // Install FilePool as a global in Smalltalk dictionary
+        InstallAssociationInSystemDictionary(associationOOP, "FilePool");
+
+        // Register in GlobalRegistry for runtime access
+        GlobalRegistry.Register("FilePool", dictionaryOOP);
+
+        Console.WriteLine($"  [Phase5] Initialized FilePool global as empty Dictionary");
     }
 
     /// <summary>
