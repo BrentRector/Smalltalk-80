@@ -648,7 +648,108 @@ public class Phase5_GlobalsAndPatches
         // Register in GlobalRegistry for runtime access
         GlobalRegistry.Register("FilePool", dictionaryOOP);
 
-        Console.WriteLine($"  [Phase5] Initialized FilePool global as empty Dictionary");
+        // Install FilePool reference in each declaring class's sharedPools array
+        // Classes that declare poolDictionaries: 'FilePool' should have FilePool in their sharedPools field
+        InstallPoolDictionaryInClasses(dictionaryOOP, "FilePool", new[] { "File", "FileDirectory", "FilePage", "FileStream" });
+
+        Console.WriteLine($"  [Phase5] Initialized FilePool global as empty Dictionary and installed in 4 classes");
+    }
+
+    /// <summary>
+    /// Installs a pool dictionary reference in the sharedPools field of each declaring class.
+    /// Full Smalltalk-80 semantics: pool dictionaries are both global variables AND stored in
+    /// each class's sharedPools array (slot 8 in Class objects).
+    /// </summary>
+    /// <param name="poolDictionaryOOP">The pool dictionary OOP to install</param>
+    /// <param name="poolName">Name of the pool (for diagnostics)</param>
+    /// <param name="classNames">Array of class names that declare this pool dictionary</param>
+    private void InstallPoolDictionaryInClasses(SmalltalkOOP poolDictionaryOOP, string poolName, string[] classNames)
+    {
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Find the sharedPools field index in Class
+        // Class hierarchy: Class (name, classPool, sharedPools) → ClassDescription → Behavior → Object
+        int sharedPoolsIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "sharedPools", _bundle);
+        if (sharedPoolsIndex < 0)
+        {
+            Console.WriteLine($"  [Phase5] WARNING: sharedPools field not found in Class - skipping pool installation");
+            return;
+        }
+
+        foreach (var className in classNames)
+        {
+            // Look up the class
+            if (!GlobalRegistry.TryGet($"class:{className}", out SmalltalkOOP classOOP))
+            {
+                Console.WriteLine($"  [Phase5] WARNING: Class {className} not found - skipping pool installation");
+                continue;
+            }
+
+            // Get the current sharedPools value (could be nil or an Array)
+            var sharedPoolsOOP = _allocator.GetInstanceVariable(classOOP, sharedPoolsIndex);
+
+            if (sharedPoolsOOP == nilOOP)
+            {
+                // sharedPools is nil - create new Array with just this pool dictionary
+                if (!GlobalRegistry.TryGet("class:Array", out SmalltalkOOP arrayClassOOP))
+                {
+                    throw new InvalidOperationException("Array class not found during pool installation");
+                }
+
+                var arrayOOP = _allocator.AllocateArray(arrayClassOOP, 1);
+                _allocator.SetIndexedOOP(arrayOOP, 0, poolDictionaryOOP);
+                _allocator.SetInstanceVariable(classOOP, sharedPoolsIndex, arrayOOP);
+
+                Console.WriteLine($"    Installed {poolName} in {className}.sharedPools (created new array)");
+            }
+            else
+            {
+                // sharedPools already exists - append to the array
+                int currentSize = _allocator.GetIndexedSize(sharedPoolsOOP);
+
+                // Check if pool is already in the array
+                bool alreadyInstalled = false;
+                for (int i = 0; i < currentSize; i++)
+                {
+                    var entryOOP = _allocator.GetIndexedOOP(sharedPoolsOOP, i);
+                    if (entryOOP == poolDictionaryOOP)
+                    {
+                        alreadyInstalled = true;
+                        break;
+                    }
+                }
+
+                if (!alreadyInstalled)
+                {
+                    // Create new larger array and copy existing entries plus new pool
+                    if (!GlobalRegistry.TryGet("class:Array", out SmalltalkOOP arrayClassOOP))
+                    {
+                        throw new InvalidOperationException("Array class not found during pool installation");
+                    }
+
+                    var newArrayOOP = _allocator.AllocateArray(arrayClassOOP, currentSize + 1);
+
+                    // Copy existing entries
+                    for (int i = 0; i < currentSize; i++)
+                    {
+                        var entryOOP = _allocator.GetIndexedOOP(sharedPoolsOOP, i);
+                        _allocator.SetIndexedOOP(newArrayOOP, i, entryOOP);
+                    }
+
+                    // Add new pool dictionary at the end
+                    _allocator.SetIndexedOOP(newArrayOOP, currentSize, poolDictionaryOOP);
+
+                    // Install new array
+                    _allocator.SetInstanceVariable(classOOP, sharedPoolsIndex, newArrayOOP);
+
+                    Console.WriteLine($"    Installed {poolName} in {className}.sharedPools (appended to existing array)");
+                }
+                else
+                {
+                    Console.WriteLine($"    {poolName} already in {className}.sharedPools (skipped)");
+                }
+            }
+        }
     }
 
     /// <summary>
