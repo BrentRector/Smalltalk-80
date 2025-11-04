@@ -329,25 +329,11 @@ public static class Program
                     var expr = bundle.InitExpressions[index];
                     var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
 
-                    // Enable selector trace for Symbol initialize
-                    if (expr.Source == "Symbol initialize")
-                    {
-                        Console.WriteLine("\n========== ENABLING SELECTOR TRACE ==========\n");
-                        vm.EnableSelectorTrace();
-                    }
-
                     Console.WriteLine();
                     Console.WriteLine("******************************************");
                     Console.WriteLine($"[{index}] {expr.Source}");
                     Console.WriteLine("******************************************");
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
-
-                    // Disable selector trace after Symbol initialize
-                    if (expr.Source == "Symbol initialize")
-                    {
-                        vm.DisableSelectorTrace();
-                        Console.WriteLine("\n========== SELECTOR TRACE DISABLED ==========\n");
-                    }
 
                     if (result.Status == InitStatus.Success)
                     {
