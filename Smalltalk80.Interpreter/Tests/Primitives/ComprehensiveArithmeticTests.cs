@@ -509,7 +509,7 @@ public class ComprehensiveArithmeticTests
         if (_ctx.PrimitiveSuccess)
         {
             // Result is 2^31 which overflows - primitive should have failed
-            Assert.True(false, "Shift by 30 causing overflow should fail");
+            Assert.Fail("Shift by 30 causing overflow should fail");
         }
     }
 

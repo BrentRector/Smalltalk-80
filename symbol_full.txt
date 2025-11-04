@@ -1,0 +1,500 @@
+Smalltalk-80 Interpreter
+========================
+
+Loading cold start bundle: D:\Users\brent\OneDrive\Src\Smalltalk-80\bin\Debug\net9.0\coldstart.json
+Bundle loaded: 1.0.7
+  Symbols: 4722
+  Classes: 474
+  Objects: 2
+  Methods: 10100
+
+Initializing heap manager...
+Starting cold start loader (6-phase)...
+[Loader] BUILD TIMESTAMP: 2025-10-28 13:45 UTC - SpecialObjectsArray.Initialize() called
+
+=== Cold Start Loader (New 6-Phase Architecture) ===
+
+Configured heap manager: Class.name field index = 6
+Phase 1: Preflight + Symbol Interning...   Validated 1658 patches
+[SymbolRegistry] Frozen with 4722 symbols
+[SymbolRegistry] Frozen with 4722 symbols
+û (187ms)
+Phase 2: Class Infrastructure...   Setting thisClass: index=6, meta=oop=9450, inst=oop=9448
+  Wiring fundamental metaclass hierarchy (superclass index: 0):
+    meta:Object.superclass = class:Class
+    class:Class.superclass = class:ClassDescription
+    class:ClassDescription.superclass = class:Behavior
+    class:Behavior.superclass = class:Object
+  Wired 236 metaclass superclass relationships (1 skipped - meta:Object already wired in fundamental hierarchy)
+[Phase2] Setting Number.superclass = Magnitude
+  Populating ClassDescription.instanceVariables fields...
+    Populated instanceVariables for 158 classes
+    Allocated 558 String objects for field names
+    Allocated 158 Array objects
+û (27ms)
+Phase 3: Object Allocation... Phase 3: Object Allocation and Initialization
+[SpecialObjectsArray.SetNil] Setting nil to oop=12460 (was oop=0)
+[SpecialObjectsArray.SetNil] VERIFY: _instance.Nil is now oop=12460
+  Allocated sentinel objects: nil=oop=12460, true=oop=12462, false=oop=12464
+  Created Undeclared dictionary (capacity=706, undeclared count=353)
+  Allocated 2 special objects from bundle
+  û Allocation checkpoint: 480 objects allocated
+    Set class:ActionMenu.class = meta:ActionMenu (classOOP=oop=9448, metaclassOOP=oop=9450)
+    Set class:FileSystem.class = meta:FileSystem (classOOP=oop=9452, metaclassOOP=oop=9454)
+    Set class:WindowsFileSystem.class = meta:WindowsFileSystem (classOOP=oop=9456, metaclassOOP=oop=9458)
+    Set class:MethodDictionary.class = meta:MethodDictionary (classOOP=oop=10044, metaclassOOP=oop=10046)
+    Set class:Point.class = meta:Point (classOOP=oop=10136, metaclassOOP=oop=10138)
+  Set 479 class references
+  û Class reference checkpoint: 5673 class references set
+  Populating Behavior.subclasses fields...
+    Populated subclasses for 160 classes with children
+    Total subclass references: 236
+    Initialized class:Object.superclass = nil (field index 0)
+  Initialized 1425 instance variables to nil
+  û Initialization checkpoint: All unset fields initialized to nil
+  Phase 3 complete: All objects allocated and initialized
+û (15ms)
+Phase 4: Method Compilation... [Phase4] Built blockOwnerMap with 5439 block ownership entries
+[Phase4] Association canonicalization validation PASSED:
+  Total Association literals in methods: 8597
+  Canonical Associations created: 1588
+  Duplicate Associations avoided: 7009
+  Canonicalization ratio: 18.5%
+  Memory reduction: 81.5%
+  Associations with non-nil values: 0
+[Phase4] Association reachability validation PASSED:
+  All 8597 Association literals are reachable from canonical sources.
+[Phase4] Creating 280 init expression methods in bundle order
+û (566ms)
+Phase 5: Globals + Patches...   Applying 1658 patches...
+  [Phase5] Creating USTable: 4722 symbols, table size 9444
+  [Phase5] Created USTable bucket oop=68364 (index 2285, size 0)
+  [Phase5] Inserting symbol "ActionMenu" (oop=122) into bucket 3240 position 0
+[Phase5] Populating Undeclared dictionary with 353 variables...
+  û Added 353 Associations to Undeclared dictionary
+  Sample undeclared variables:
+    - ActionMenu (22 reference(s))
+    - AlwaysAcceptCodeController (2 reference(s))
+    - Arc (3 reference(s))
+    - Array (198 reference(s))
+    - ArrayedCollection (1 reference(s))
+  [Phase5] Created new USTable association at index 0
+    Association OOP: oop=61474
+    USTable array OOP: oop=63792, size: 9444
+    Verification: key=USTable, value OOP=oop=63792, value size=9444
+  û Created DefaultTextStyle (oop=82694) with stub StrikeFont
+    Updated existing Association (oop=58096)
+[AssociationRegistry] Frozen with 1635 associations
+û (76ms)
+Phase 6: Validation + GC Verification... Step 1: Comprehensive Heap Validation...
+  Validating classes...
+  Validating methods...
+  Validating special objects...
+  Validating init expressions...
+  Validating cross-references...
+  Validating SpecialObjectsArray...
+    Validated 5 special object slots
+  Validating method dictionaries...
+    Validated 474 method dictionaries
+    Found 4661/4661 methods in dictionaries
+  Validating Association canonicalization...
+    Validated 1635 canonical Associations
+  û Validation Summary:
+    Classes: 474 validated
+    Methods: 10100 validated
+    Special objects: 5 validated
+    Init expressions: 280 validated
+    Cross-references: 10857 objects checked
+    û All heap objects match JSON definitions
+û
+Step 2: GC Root Setup...
+  GC Roots (5 objects):
+    nil (oop=12460, class=UndefinedObject)
+    false (oop=12464, class=False)
+    true (oop=12462, class=True)
+    Smalltalk (oop=9446, class=SystemDictionary)
+    InitExpressionMethods (oop=63790, class=Array)
+û
+Step 3: GC Verification...
+  GC Results: 0/41347 objects collected (0.0% efficiency) in 4.49ms (Mark: 3.51ms, Sweep: 0.23ms), 0 bytes freed
+  Object table size: 41347
+  Active objects: 41347
+  û GC Verification passed: All 41347 objects are reachable
+û
+û (115ms)
+[GlobalRegistry] Frozen with 244 global entries, 2 object entries
+
+=== Cold Start Complete ===
+
+Cold start completed successfully!
+
+=== DIAGNOSTIC: Checking ClassDescription.instanceVariables ===
+
+Array:
+  Slot 3: nil
+  Slot 4: OOP(10974)
+
+Point:
+  Slot 3: nil
+  Slot 4: OOP(12004)
+    Array size: 2
+      [0] = "x"
+      [1] = "y"
+
+Process:
+  Slot 3: nil
+  Slot 4: OOP(12036)
+    Array size: 3
+      [0] = "suspendedContext"
+      [1] = "priority"
+      [2] = "myList"
+
+Dictionary:
+  Slot 3: OOP(12580)
+    Array size: 3
+      [0] = IdentityDictionary(oop=9892)
+      [1] = LiteralDictionary(oop=9980)
+      [2] = SystemDictionary(oop=10308)
+  Slot 4: OOP(11414)
+
+=== DIAGNOSTIC: Testing RuntimeHeapAccess.BuildFieldMap() ===
+Building field map from heap...
+Built field map in 1ms
+Found 237 classes
+
+class:Array:
+  (no instance variables)
+class:Point:
+  [0] x
+  [1] y
+class:Process:
+  [0] nextLink
+  [1] suspendedContext
+  [2] priority
+  [3] myList
+class:Dictionary:
+  [0] tally
+class:MethodContext:
+  [0] sender
+  [1] pc
+  [2] stackp
+  [3] method
+  [4] receiverMap
+  [5] receiver
+
+û BuildFieldMap() successfully read 237 class layouts from heap
+
+=== Init Expression Execution ===
+  Found 280 init expression(s) in bundle (DISABLED)
+
+=== Reordered init expressions for infrastructure ===
+  Running: SmallInteger  Float  Character  WindowsFileSystem
+  SmallInteger FIRST (Digitbuffer prevents infinite recursion in error handling)
+  Character early (CharacterTable needed by String/Symbol)
+
+
+=== Executing ALL Initialize Expressions ===
+  Total initialize! expressions: 35
+  Will attempt to execute all of them
+
+
+******************************************
+[235] SmallInteger initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=82696
+[CreateMethodContext #1] method=method:SmallInteger_class>>initialize, receiver=oop=10244
+[POP_STORE_LITERAL_VAR] Storing to Association key='Digitbuffer', value=oop=82702, method=method:SmallInteger_class>>initialize
+[CreateMethodContext #2] method=method:BlockClosure>>whileTrue:, receiver=oop=82704
+[CreateMethodContext #3] method=method:Object>>notNil, receiver=SmallInteger(-2)
+[CreateMethodContext #4] method=method:True>>ifTrue:, receiver=oop=12462
+[CreateMethodContext #5] method=method:BlockClosure>>whileTrue:, receiver=oop=82704
+[CreateMethodContext #6] method=method:Object>>notNil, receiver=SmallInteger(-3)
+[CreateMethodContext #7] method=method:True>>ifTrue:, receiver=oop=12462
+[CreateMethodContext #8] method=method:BlockClosure>>whileTrue:, receiver=oop=82704
+[CreateMethodContext #9] method=method:Object>>notNil, receiver=SmallInteger(-5)
+[CreateMethodContext #10] method=method:True>>ifTrue:, receiver=oop=12462
+[CreateMethodContext #11] method=method:BlockClosure>>whileTrue:, receiver=oop=82704
+[CreateMethodContext #12] method=method:Object>>notNil, receiver=SmallInteger(-9)
+[CreateMethodContext #13] method=method:True>>ifTrue:, receiver=oop=12462
+[CreateMethodContext #14] method=method:BlockClosure>>whileTrue:, receiver=oop=82704
+[CreateMethodContext #15] method=method:Object>>notNil, receiver=SmallInteger(-17)
+[CreateMethodContext #16] method=method:True>>ifTrue:, receiver=oop=12462
+[CreateMethodContext #17] method=method:BlockClosure>>whileTrue:, receiver=oop=82704
+[CreateMethodContext #18] method=method:Object>>notNil, receiver=SmallInteger(-33)
+[CreateMethodContext #19] method=method:True>>ifTrue:, receiver=oop=12462
+[CreateMethodContext #20] method=method:BlockClosure>>whileTrue:, receiver=oop=82704
+[ExecuteExistingContext] Finished with result oop=10244
+  û Completed successfully
+
+******************************************
+[118] Float initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=83324
+[ExecuteExistingContext] Finished with result oop=9856
+  û Completed successfully
+
+******************************************
+[52] Character initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=83338
+[ExecuteExistingContext] Finished with result oop=9636
+  û Completed successfully
+
+******************************************
+[2] WindowsFileSystem initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=90020
+[ExecuteExistingContext] Finished with result oop=9456
+  û Completed successfully
+
+******************************************
+[7] WindowsFileDirectory initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=90026
+[ExecuteExistingContext] Finished with result oop=9472
+  û Completed successfully
+
+******************************************
+[30] BinaryChoiceView initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=90032
+[ExecuteExistingContext] Finished with result oop=9560
+  û Completed successfully
+
+******************************************
+[65] ClassOrganizer initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=90898
+  Found method: method:String>>stringhash, primitiveNumber=0
+  Found method: method:String>>hash, primitiveNumber=0
+
+[RETURN from method:String>>hash] value=SmallInteger(3240), class=SmallInteger, isSmallInt=True
+
+[RETURN from method:String>>stringhash] value=SmallInteger(3240), class=SmallInteger, isSmallInt=True
+
+? METHOD NOT FOUND ERROR
+   Selector: print:
+   Receiver: OOP(91290)
+   Receiver class: MethodContext OOP(10032)
+   Arguments: 1
+
+Smalltalk Context Chain:
+  SENDER CHAIN (showing up to 10 contexts):
+    [0] MethodContext>>print: (context=OOP(91580), method=block:f944d58860d94e3e88a7901400275591 OOP(26378))
+    [1] MethodContext>>valueWithArguments: (context=OOP(91572), method=method:BlockClosure>>value: OOP(54938))
+    [2] MethodContext>>basicAt: (context=OOP(91570), method=block:98320dfd2f6e40e1894a0921bfbb7edc OOP(41822))
+    [3] MethodContext>>whileTrue: (context=OOP(91566), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [4] MethodContext>><block> (context=OOP(91562), method=method:True>>ifTrue: OOP(53710))
+    [5] MethodContext>>ifTrue: (context=OOP(91554), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [6] MethodContext>>whileTrue: (context=OOP(91548), method=method:OrderedCollection>>do: OOP(41814))
+    [7] MethodContext>>on: (context=OOP(91292), method=method:ContextPart>>shortStack OOP(26374))
+    [8] MethodContext>>openContext:label:contents: (context=OOP(91290), method=method:Object>>error: OOP(41166))
+    [9] MethodContext>>error: (context=OOP(91040), method=method:Object>>errorSubscriptBounds: OOP(41258))
+    ... (truncated, chain continues)
+
+? FAILED: ClassOrganizer initialize
+   Status: FatalError
+   Error: InvalidOperationException: Method not found: print: in class MethodContext OOP(10032)
+
+Stack trace:
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2756
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecode(Byte bytecode, SmalltalkOOP methodOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 1847
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecodeStep() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 538
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.InterpreterLoop() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 442
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteExistingContext(SmalltalkOOP contextOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 275
+   at Smalltalk80.Interpreter.Core.VM.Primitives.ProcessPrimitives.Resume(SmalltalkOOP processOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\Primitives\ProcessPrimitives.cs:line 97
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 350
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 135
+  Continuing with next expression...
+
+******************************************
+[72] CompiledMethod initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=91582
+[ExecuteExistingContext] Finished with result oop=9708
+  û Completed successfully
+
+******************************************
+[81] Cursor initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=91596
+[ExecuteExistingContext] Finished with result oop=9740
+  û Completed successfully
+
+******************************************
+[84] Date initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=96846
+[ExecuteExistingContext] Finished with result oop=9748
+  û Completed successfully
+
+******************************************
+[86] Debugger initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=96852
+[ExecuteExistingContext] Finished with result oop=9752
+  û Completed successfully
+
+******************************************
+[88] Decompiler initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=96858
+[ExecuteExistingContext] Finished with result oop=9756
+  û Completed successfully
+
+******************************************
+[103] Explainer initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=96864
+[ExecuteExistingContext] Finished with result oop=9808
+  û Completed successfully
+
+******************************************
+[107] File initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=96878
+
+? METHOD NOT FOUND ERROR
+   Selector: print:
+   Receiver: OOP(96978)
+   Receiver class: MethodContext OOP(10032)
+   Arguments: 1
+
+Smalltalk Context Chain:
+  SENDER CHAIN (showing up to 10 contexts):
+    [0] MethodContext>>print: (context=OOP(97268), method=block:f944d58860d94e3e88a7901400275591 OOP(26378))
+    [1] MethodContext>>valueWithArguments: (context=OOP(97260), method=method:BlockClosure>>value: OOP(54938))
+    [2] MethodContext>>basicAt: (context=OOP(97258), method=block:98320dfd2f6e40e1894a0921bfbb7edc OOP(41822))
+    [3] MethodContext>>whileTrue: (context=OOP(97254), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [4] MethodContext>><block> (context=OOP(97250), method=method:True>>ifTrue: OOP(53710))
+    [5] MethodContext>>ifTrue: (context=OOP(97242), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [6] MethodContext>>whileTrue: (context=OOP(97236), method=method:OrderedCollection>>do: OOP(41814))
+    [7] MethodContext>>on: (context=OOP(96980), method=method:ContextPart>>shortStack OOP(26374))
+    [8] MethodContext>>openContext:label:contents: (context=OOP(96978), method=method:Object>>error: OOP(41166))
+    [9] MethodContext>>error: (context=OOP(96976), method=method:Object>>errorNonIntegerIndex OOP(41254))
+    ... (truncated, chain continues)
+
+? FAILED: File initialize
+   Status: FatalError
+   Error: InvalidOperationException: Method not found: print: in class MethodContext OOP(10032)
+
+Stack trace:
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2756
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecode(Byte bytecode, SmalltalkOOP methodOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 1847
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecodeStep() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 538
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.InterpreterLoop() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 442
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteExistingContext(SmalltalkOOP contextOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 275
+   at Smalltalk80.Interpreter.Core.VM.Primitives.ProcessPrimitives.Resume(SmalltalkOOP processOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\Primitives\ProcessPrimitives.cs:line 97
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 350
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 135
+  Continuing with next expression...
+
+******************************************
+[109] FileDirectory initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=97270
+[ExecuteExistingContext] Finished with result oop=9824
+  û Completed successfully
+
+******************************************
+[120] Form initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=97310
+
+[CONTEXT DEPTH EXCEEDED] Depth: 5002, Limit: 5000
+Current receiver: oop=98724, method: oop=54958
+  SENDER CHAIN (showing up to 30 contexts):
+    [0] MethodContext>>whileTrue: (context=OOP(135348), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [1] MethodContext>><block> (context=OOP(135344), method=method:True>>ifTrue: OOP(53710))
+    [2] MethodContext>>ifTrue: (context=OOP(135336), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [3] MethodContext>>whileTrue: (context=OOP(135326), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [4] MethodContext>><block> (context=OOP(135322), method=method:True>>ifTrue: OOP(53710))
+    [5] MethodContext>>ifTrue: (context=OOP(135314), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [6] MethodContext>>whileTrue: (context=OOP(135304), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [7] MethodContext>><block> (context=OOP(135300), method=method:True>>ifTrue: OOP(53710))
+    [8] MethodContext>>ifTrue: (context=OOP(135292), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [9] MethodContext>>whileTrue: (context=OOP(135282), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [10] MethodContext>><block> (context=OOP(135278), method=method:True>>ifTrue: OOP(53710))
+    [11] MethodContext>>ifTrue: (context=OOP(135270), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [12] MethodContext>>whileTrue: (context=OOP(135260), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [13] MethodContext>><block> (context=OOP(135256), method=method:True>>ifTrue: OOP(53710))
+    [14] MethodContext>>ifTrue: (context=OOP(135248), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [15] MethodContext>>whileTrue: (context=OOP(135238), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [16] MethodContext>><block> (context=OOP(135234), method=method:True>>ifTrue: OOP(53710))
+    [17] MethodContext>>ifTrue: (context=OOP(135226), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [18] MethodContext>>whileTrue: (context=OOP(135216), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [19] MethodContext>><block> (context=OOP(135212), method=method:True>>ifTrue: OOP(53710))
+    [20] MethodContext>>ifTrue: (context=OOP(135204), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [21] MethodContext>>whileTrue: (context=OOP(135194), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [22] MethodContext>><block> (context=OOP(135190), method=method:True>>ifTrue: OOP(53710))
+    [23] MethodContext>>ifTrue: (context=OOP(135182), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [24] MethodContext>>whileTrue: (context=OOP(135172), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [25] MethodContext>><block> (context=OOP(135168), method=method:True>>ifTrue: OOP(53710))
+    [26] MethodContext>>ifTrue: (context=OOP(135160), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [27] MethodContext>>whileTrue: (context=OOP(135150), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [28] MethodContext>><block> (context=OOP(135146), method=method:True>>ifTrue: OOP(53710))
+    [29] MethodContext>>ifTrue: (context=OOP(135138), method=method:BlockClosure>>whileTrue: OOP(54958))
+    ... (truncated, chain continues)
+
+? FAILED: Form initialize
+   Status: FatalError
+   Error: InvalidOperationException: Context depth limit exceeded: 5002 contexts (limit: 5000). This typically indicates infinite recursion or primitive failure causing excessive message sends.
+
+Stack trace:
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 367
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2824
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecode(Byte bytecode, SmalltalkOOP methodOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 1847
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecodeStep() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 538
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.InterpreterLoop() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 442
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteExistingContext(SmalltalkOOP contextOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 275
+   at Smalltalk80.Interpreter.Core.VM.Primitives.ProcessPrimitives.Resume(SmalltalkOOP processOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\Primitives\ProcessPrimitives.cs:line 97
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 350
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 135
+  Continuing with next expression...
+
+******************************************
+[135] InputSensor initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=135360
+
+? METHOD NOT FOUND ERROR
+   Selector: value:
+   Receiver: OOP(12460)
+   Receiver class: UndefinedObject OOP(10364)
+   Arguments: 1
+
+Smalltalk Context Chain:
+  SENDER CHAIN (showing up to 10 contexts):
+    [0] MethodContext>>asCharacter (context=OOP(135394), method=block:acf151f5cd6d4b50a0625d5ca05ed1fb OOP(35346))
+    [1] MethodContext>><block> (context=OOP(135390), method=block:1920dccd01c140b88a308320332f6c68 OOP(40682))
+    [2] MethodContext>>whileTrue: (context=OOP(135386), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+    [3] MethodContext>><block> (context=OOP(135382), method=method:True>>ifTrue: OOP(53710))
+    [4] MethodContext>>ifTrue: (context=OOP(135374), method=method:BlockClosure>>whileTrue: OOP(54958))
+    [5] MethodContext>>whileTrue: (context=OOP(135368), method=method:Number>>to:do: OOP(40674))
+    [6] MethodContext>>to:do: (context=OOP(135364), method=method:InputSensor_class>>initialize OOP(35342))
+    [7] MethodContext>>initialize (context=OOP(135360), method=OOP(62936))
+
+? FAILED: InputSensor initialize
+   Status: FatalError
+   Error: InvalidOperationException: Method not found: value: in class UndefinedObject OOP(10364)
+
+Stack trace:
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2756
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteSendSpecial(Byte bytecode) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2519
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecode(Byte bytecode, SmalltalkOOP methodOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 1754
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecodeStep() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 538
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.InterpreterLoop() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 442
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteExistingContext(SmalltalkOOP contextOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 275
+   at Smalltalk80.Interpreter.Core.VM.Primitives.ProcessPrimitives.Resume(SmalltalkOOP processOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\Primitives\ProcessPrimitives.cs:line 97
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 350
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 135
+  Continuing with next expression...
+
+******************************************
+[137] InputState initialize
+******************************************
+[ExecuteExistingContext] Starting execution of context oop=135396
+[ExecuteExistingContext] Finished with result oop=9912
+  û Completed successfully
+
+******************************************

@@ -115,6 +115,11 @@ public partial class VirtualMachine : IPrimitiveContext
     private int _callDepth = 0;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
+    // Selector trace mechanism - shows nested method calls and returns
+    private bool _selectorTraceEnabled = false;
+    private int _selectorTraceDepth = 0;
+    private readonly Stack<(string className, string selector, int depth)> _selectorTraceStack = new();
+
     public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, DebugOptions? debugOptions = null)
     {
         _heapManager = heapManager;
@@ -233,6 +238,38 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         _verboseDebugMode = enabled;
         _heapManager.VerboseDebugMode = enabled;
+    }
+
+    /// <summary>
+    /// Enables selector trace for debugging - shows all method calls and returns with nesting.
+    /// </summary>
+    public void EnableSelectorTrace()
+    {
+        _selectorTraceEnabled = true;
+        _selectorTraceDepth = 0;
+        _selectorTraceStack.Clear();
+    }
+
+    /// <summary>
+    /// Disables selector trace.
+    /// </summary>
+    public void DisableSelectorTrace()
+    {
+        _selectorTraceEnabled = false;
+        _selectorTraceDepth = 0;
+        _selectorTraceStack.Clear();
+    }
+
+    /// <summary>
+    /// Prints a trace message with proper indentation based on call depth.
+    /// </summary>
+    private void TraceMessage(string message)
+    {
+        if (_selectorTraceEnabled)
+        {
+            string indent = new string(' ', _selectorTraceDepth * 2);
+            Console.WriteLine($"{indent}{message}");
+        }
     }
 
     /// <summary>
@@ -748,6 +785,17 @@ public partial class VirtualMachine : IPrimitiveContext
             Console.WriteLine($"  Was a block context");
         }
 
+        // Selector trace: log method return
+        if (_selectorTraceEnabled && _selectorTraceStack.Count > 0)
+        {
+            var (className, selector, depth) = _selectorTraceStack.Pop();
+            _selectorTraceDepth = depth;  // Restore depth before decrement
+            string returnValueStr = returnValue.IsSmallInteger
+                ? returnValue.AsSmallInteger().ToString()
+                : $"OOP({returnValue.RawValue})";
+            TraceMessage($"← {className}>>{selector} => {returnValueStr}");
+        }
+
         // Add context to size-specific pool for reuse
         AddContextToPool(_activeContextOOP);
 
@@ -1003,11 +1051,14 @@ public partial class VirtualMachine : IPrimitiveContext
                         {
                             // Current context is a MethodContext - use it directly
                             contextToReadFrom = currentContext;
-                            actualIndex = index;
+                            // CRITICAL FIX: Subtract blockLocalCount to get the actual parent index
+                            // The compiler adds blockLocalCount to signal home context access,
+                            // but the actual index in the parent is the original value
+                            actualIndex = index - blockLocalCount;
 
                             if (_debugOptions.ShouldDebugBytecode)
                             {
-                                Console.WriteLine($"[DEBUG pushTemp] Reached MethodContext: {contextToReadFrom}, index: {actualIndex}");
+                                Console.WriteLine($"[DEBUG pushTemp] Reached MethodContext: {contextToReadFrom}, adjusted index: {actualIndex} (was {index})");
                             }
                             break;
                         }
@@ -1047,15 +1098,16 @@ public partial class VirtualMachine : IPrimitiveContext
                             var homeHeader = ParseMethodHeader(homeBlockMethodOOP);
                             int homeLocalCount = homeHeader.NumArgs + homeHeader.NumTemps;
 
-                            if (index < homeLocalCount)
+                            if (index - blockLocalCount < homeLocalCount)
                             {
-                                // Home block has this index - use it
+                                // Home block has this index - use it with adjustment
                                 contextToReadFrom = homeContext;
-                                actualIndex = index;
+                                // The index needs to be adjusted relative to the current block's locals
+                                actualIndex = index - blockLocalCount;
 
                                 if (_debugOptions.ShouldDebugBytecode)
                                 {
-                                    Console.WriteLine($"[DEBUG pushTemp] Found in block homeContext: {contextToReadFrom}, index: {actualIndex}");
+                                    Console.WriteLine($"[DEBUG pushTemp] Found in block homeContext: {contextToReadFrom}, adjusted index: {actualIndex} (was {index})");
                                 }
                                 break;
                             }
@@ -1065,13 +1117,14 @@ public partial class VirtualMachine : IPrimitiveContext
                         }
                         else
                         {
-                            // HomeContext is a MethodContext - use it
+                            // HomeContext is a MethodContext - use it with adjustment
                             contextToReadFrom = homeContext;
-                            actualIndex = index;
+                            // CRITICAL FIX: Subtract blockLocalCount to get the actual parent index
+                            actualIndex = index - blockLocalCount;
 
                             if (_debugOptions.ShouldDebugBytecode)
                             {
-                                Console.WriteLine($"[DEBUG pushTemp] Found in method homeContext: {contextToReadFrom}, index: {actualIndex}");
+                                Console.WriteLine($"[DEBUG pushTemp] Found in method homeContext: {contextToReadFrom}, adjusted index: {actualIndex} (was {index})");
                             }
                             break;
                         }
@@ -1196,6 +1249,18 @@ public partial class VirtualMachine : IPrimitiveContext
                     }
                 }
             }
+
+            // DIAGNOSTIC: Log temp pushes during Symbol initialize
+            // DISABLED: Too verbose for selector trace output
+            /*
+            if (_selectorTraceEnabled)
+            {
+                string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"OOP({valueOOP.RawValue})";
+                string valClass = valueOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(valueOOP)) ?? "?";
+                bool readFromHome = (contextToReadFrom != _activeContextOOP);
+                Console.WriteLine($"  [PUSH_TEMP] → Pushed {valStr} (class={valClass}), readFromHome={readFromHome}");
+            }
+            */
 
             Push(valueOOP);
             return true;
@@ -1888,6 +1953,17 @@ public partial class VirtualMachine : IPrimitiveContext
             var arg2OOP = Pop();
             var arg1OOP = Pop();
             var receiverOOP2 = Pop();
+
+            // DIAGNOSTIC: Show at:put: sends to diagnose Symbol initialize failure
+            string selName = GetSymbolName(selectorOOP) ?? "";
+            if (selName == "at:put:")
+            {
+                string recvClass = receiverOOP2.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(receiverOOP2)) ?? "?";
+                string arg1Str = arg1OOP.IsSmallInteger ? arg1OOP.AsSmallInteger().ToString() : $"OOP({arg1OOP.RawValue})";
+                string arg2Str = arg2OOP.IsSmallInteger ? arg2OOP.AsSmallInteger().ToString() : $"OOP({arg2OOP.RawValue})";
+                Console.WriteLine($"[at:put:] receiver={receiverOOP2} (class={recvClass}), arg1={arg1Str}, arg2={arg2Str}");
+            }
+
             // Console.WriteLine($"[SEND2 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
             var outcome2 = SendMessage(receiverOOP2, selectorOOP, new[] { arg1OOP, arg2OOP });
             // Console.WriteLine($"[SEND2 AFTER] Message outcome.Kind={outcome2.Kind}, context={_activeContextOOP}");
@@ -2500,6 +2576,47 @@ public partial class VirtualMachine : IPrimitiveContext
 
         var receiverOOP = Pop();
 
+        // DIAGNOSTIC: Show at:put: arguments to diagnose Symbol initialize failure
+        if (selectorIndex == 1) // at:put:
+        {
+            string recvClass = receiverOOP.IsSmallInteger ? $"SmallInteger({receiverOOP.AsSmallInteger()})" : $"{GetClassName(GetClass(receiverOOP)) ?? "?"}";
+            string arg1Str = args[0].IsSmallInteger ? args[0].AsSmallInteger().ToString() : $"OOP({args[0].RawValue})";
+            string arg2Str = args[1].IsSmallInteger ? args[1].AsSmallInteger().ToString() : $"OOP({args[1].RawValue})";
+
+            // Only log if receiver is SmallInteger (error case)
+            if (receiverOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"\n[at:put: ERROR!] receiver={receiverOOP} ({recvClass}), index={arg1Str}, value={arg2Str}");
+                Console.WriteLine($"  Stack was: ... value={arg2Str}, index={arg1Str}, receiver={recvClass} <-- WRONG! Should be String!");
+
+                // Disassemble the current method to see what bytecode was generated
+                int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+                string methodLocalId = GetLocalId(methodOOP) ?? "unknown";
+                Console.WriteLine($"\n  Current method: {methodLocalId}");
+
+                // Get bytecodes and literals
+                byte[] bytecodes = GetMethodBytecodes(methodOOP);
+                var literalCount = _heapManager.GetIndexedSize(methodOOP) - 1; // -1 for bytecode array slot
+                var literalOOPs = new SmalltalkOOP[literalCount];
+                for (int i = 0; i < literalCount; i++)
+                {
+                    literalOOPs[i] = _heapManager.GetIndexedOOP(methodOOP, i);
+                }
+
+                // Disassemble
+                Func<SmalltalkOOP, string> getLiteralDisplay = (oop) => {
+                    if (oop.IsSmallInteger) return oop.AsSmallInteger().ToString();
+                    string? symbolName = GetSymbolName(oop);
+                    if (symbolName != null) return $"#{symbolName}";
+                    return $"OOP({oop.RawValue})";
+                };
+                string[] optimizedSelectors = new[] { "+", "-", "<", ">", "<=", ">=", "=", "~=", "*", "/", "\\", "@", "bitShift:", "//", "bitAnd:", "bitOr:" };
+                string disasm = BytecodeDisassembler.Disassemble(bytecodes, literalOOPs, getLiteralDisplay, optimizedSelectors);
+                Console.WriteLine($"  Bytecode disassembly:\n{disasm}\n");
+            }
+        }
+
         // Handle special cases
         if (selectorIndex == 6) // ==
         {
@@ -2822,6 +2939,15 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Create new context with current context as sender
         _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _activeContextOOP);
+
+        // Selector trace: log method entry
+        if (_selectorTraceEnabled)
+        {
+            string className = GetClassName(classOOP) ?? "?";
+            TraceMessage($"→ {className}>>{selectorName}");
+            _selectorTraceStack.Push((className, selectorName!, _selectorTraceDepth));
+            _selectorTraceDepth++;
+        }
 
         // Verbose debug: log method entry
         if (VerboseDebug)

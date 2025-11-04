@@ -61,17 +61,31 @@ public class RuntimeHeapAccess
     /// </summary>
     public SmalltalkOOP InternSymbol(string symbolName)
     {
-        // Get USTable from Smalltalk dictionary (it's stored under 'USTable' global)
-        var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+        // CRITICAL: USTable is a CLASS VARIABLE of Symbol, not a global!
+        // Symbol class definition: classVariableNames: 'SingleCharSymbols USTable'
+        // We need to look up USTable from Symbol's classPool
 
-        // We need USTable, but it's stored as a global variable
-        // For now, do a simple global lookup by walking the dictionary
-        // (This is a bootstrap issue - USTable is needed to intern symbols, but we need symbols to look up USTable!)
-        // Solution: Use direct byte comparison for the hardcoded "USTable" string
-        var ustableOOP = LookupGlobalByName(smalltalkDictOOP, "USTable");
+        // CRITICAL: To avoid infinite recursion (InternSymbol → GetClass("Symbol") → InternSymbol),
+        // we must look up Symbol class using direct byte comparison, not through InternSymbol
+        var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var symbolClassOOP = LookupGlobalByName(smalltalkDictOOP, "Symbol");
+        if (symbolClassOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            throw new InvalidOperationException("Symbol class not found during InternSymbol");
+        }
+
+        // Get Symbol's classPool (instance variable index 7 for Class)
+        var classPoolOOP = _heapManager.GetInstanceVariable(symbolClassOOP, 7);
+        if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            throw new InvalidOperationException("Symbol classPool is nil during InternSymbol");
+        }
+
+        // Search classPool for USTable association
+        var ustableOOP = LookupGlobalByName(classPoolOOP, "USTable");
         if (ustableOOP == SpecialObjectsArray.Instance.Nil)
         {
-            throw new InvalidOperationException("USTable not found in Smalltalk globals");
+            throw new InvalidOperationException("USTable not found in Symbol classPool");
         }
 
         // USTable is an Array in the Smalltalk heap containing Symbol OOPs

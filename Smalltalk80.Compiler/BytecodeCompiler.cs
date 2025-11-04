@@ -83,14 +83,17 @@ namespace Smalltalk80.Compiler
                 return hiddenIndex;
 
             // Check parent scopes (for block closures accessing outer temporaries)
-            if (Parent != null)
+            if (Parent != null && ScopeDepth > 0)
             {
                 var parentIndex = Parent.GetVariableIndex(name);
                 if (parentIndex.HasValue)
                 {
                     // Variable found in parent scope
-                    // Return the index from the parent (will be used with home context)
-                    return parentIndex.Value;
+                    // For blocks, we need to adjust the index so the VM knows to look in homeContext
+                    // The VM checks: if (index >= blockLocalCount) then look in homeContext
+                    // and then subtracts blockLocalCount to get the actual parent index
+                    int blockLocalCount = ArgumentCount + TemporaryCount;
+                    return parentIndex.Value + blockLocalCount;
                 }
             }
 
@@ -2503,24 +2506,31 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     // Check parent's arguments
                     if (parentEnv.Arguments.TryGetValue(name, out var parentArgIndex))
                     {
-                        // Found in parent scope - generate pushTemp with parent's index
-                        // The VM will resolve this through the homeContext chain at runtime
-                        emitter.PushTemporary(parentArgIndex);
+                        // Found in parent scope - need to adjust index for VM's homeContext lookup
+                        // The VM checks: if (index >= blockLocalCount) then look in homeContext
+                        // and then subtracts blockLocalCount to get the actual parent index
+                        int blockLocalCount = environment.ArgumentCount + environment.TemporaryCount;
+                        int adjustedIndex = parentArgIndex + blockLocalCount;
+                        emitter.PushTemporary(adjustedIndex);
                         return;
                     }
 
                     // Check parent's temporaries
                     if (parentEnv.Temporaries.TryGetValue(name, out var parentTempIndex))
                     {
-                        // Found in parent scope - generate pushTemp with parent's index
-                        emitter.PushTemporary(parentTempIndex);
+                        // Found in parent scope - need to adjust index for VM's homeContext lookup
+                        int blockLocalCount = environment.ArgumentCount + environment.TemporaryCount;
+                        int adjustedIndex = parentTempIndex + blockLocalCount;
+                        emitter.PushTemporary(adjustedIndex);
                         return;
                     }
 
                     // Check parent's hidden temporaries
                     if (parentEnv.HiddenTemporaries.TryGetValue(name, out var parentHiddenIndex))
                     {
-                        emitter.PushTemporary(parentHiddenIndex);
+                        int blockLocalCount = environment.ArgumentCount + environment.TemporaryCount;
+                        int adjustedIndex = parentHiddenIndex + blockLocalCount;
+                        emitter.PushTemporary(adjustedIndex);
                         return;
                     }
 

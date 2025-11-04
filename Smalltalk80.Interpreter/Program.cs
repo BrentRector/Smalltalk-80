@@ -153,7 +153,17 @@ public static class Program
                 // Skip list for init expressions requiring runtime features not available during bootstrap
                 var skipList = new HashSet<string>
                 {
-                    "Delay initialize",      // Requires process/threading primitives (forkAt:)
+                    "Delay initialize",                      // Requires process/threading primitives (forkAt:)
+                    "BitEditor initialize",                  // Requires PopUpMenu → TextStyle/Font infrastructure
+                    "FormMenuView initialize",               // Requires file I/O primitives (Form readFrom:) not available
+                    "ChangeListController initialize",       // Requires PopUpMenu → TextStyle/Font infrastructure
+                    "FormEditor initialize",                 // Requires PopUpMenu → TextStyle/Font infrastructure
+                    "NotifierController initialize",         // Requires PopUpMenu → TextStyle/Font infrastructure
+                    "ParagraphEditor initialize",            // Requires PopUpMenu → TextStyle/Font infrastructure
+                    "ProjectController initialize",          // Requires PopUpMenu → TextStyle/Font infrastructure
+                    "ScreenController initialize",           // Requires PopUpMenu → TextStyle/Font infrastructure
+                    "StandardSystemController initialize",   // Requires PopUpMenu → TextStyle/Font infrastructure
+                    "StringHolderController initialize",     // Requires PopUpMenu → TextStyle/Font infrastructure
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -213,30 +223,35 @@ public static class Program
                     var smallIntegerInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "SmallInteger initialize");
                     var floatInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Float initialize");
                     var characterInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Character initialize");
+                    var symbolInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Symbol initialize");
                     var windowsInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "WindowsFileSystem initialize");
 
-                    if (smallIntegerInitIndex > 0 && floatInitIndex > 0 && characterInitIndex > 0 && windowsInitIndex > 0)
+                    if (smallIntegerInitIndex > 0 && floatInitIndex > 0 && characterInitIndex > 0 && symbolInitIndex > 0 && windowsInitIndex > 0)
                     {
                         phase1Indices.Remove(smallIntegerInitIndex);
                         phase1Indices.Remove(floatInitIndex);
                         phase1Indices.Remove(characterInitIndex);
+                        phase1Indices.Remove(symbolInitIndex);
                         phase1Indices.Remove(windowsInitIndex);
 
-                        // Insert at beginning: SmallInteger, Float, Character, WindowsFileSystem, then rest
+                        // Insert at beginning: SmallInteger, Float, Character, Symbol, WindowsFileSystem, then rest
                         // ORDER IS CRITICAL:
                         // 1. SmallInteger - Creates Digitbuffer (required for error message formatting)
                         // 2. Float - Creates numeric constants
                         // 3. Character - Creates CharacterTable (required for String/Symbol operations)
-                        // 4. WindowsFileSystem - File system infrastructure
+                        // 4. Symbol - Creates SingleCharSymbols (128 pre-interned single-char symbols for performance)
+                        // 5. WindowsFileSystem - File system infrastructure
                         phase1Indices.Insert(0, windowsInitIndex);
+                        phase1Indices.Insert(0, symbolInitIndex);
                         phase1Indices.Insert(0, characterInitIndex);
                         phase1Indices.Insert(0, floatInitIndex);
                         phase1Indices.Insert(0, smallIntegerInitIndex);
 
                         Console.WriteLine($"\n=== Reordered init expressions for infrastructure ===");
-                        Console.WriteLine($"  Running: SmallInteger → Float → Character → WindowsFileSystem");
+                        Console.WriteLine($"  Running: SmallInteger → Float → Character → Symbol → WindowsFileSystem");
                         Console.WriteLine($"  SmallInteger FIRST (Digitbuffer prevents infinite recursion in error handling)");
                         Console.WriteLine($"  Character early (CharacterTable needed by String/Symbol)");
+                        Console.WriteLine($"  Symbol early (SingleCharSymbols needed for symbol interning)");
                         Console.WriteLine();
                     }
 
@@ -314,11 +329,25 @@ public static class Program
                     var expr = bundle.InitExpressions[index];
                     var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
 
+                    // Enable selector trace for Symbol initialize
+                    if (expr.Source == "Symbol initialize")
+                    {
+                        Console.WriteLine("\n========== ENABLING SELECTOR TRACE ==========\n");
+                        vm.EnableSelectorTrace();
+                    }
+
                     Console.WriteLine();
                     Console.WriteLine("******************************************");
                     Console.WriteLine($"[{index}] {expr.Source}");
                     Console.WriteLine("******************************************");
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+
+                    // Disable selector trace after Symbol initialize
+                    if (expr.Source == "Symbol initialize")
+                    {
+                        vm.DisableSelectorTrace();
+                        Console.WriteLine("\n========== SELECTOR TRACE DISABLED ==========\n");
+                    }
 
                     if (result.Status == InitStatus.Success)
                     {
@@ -1327,9 +1356,9 @@ public static class Program
                         try
                         {
                             int arraySize = heapManager.GetIndexedSize(fieldValueOOP);
+                            Console.WriteLine($"    Array size: {arraySize}");
                             if (arraySize > 0 && arraySize < 50) // Reasonable size check
                             {
-                                Console.WriteLine($"    Array size: {arraySize}");
                                 for (int i = 0; i < Math.Min(arraySize, 10); i++) // Show first 10 elements
                                 {
                                     var elementOOP = heapManager.GetIndexedOOP(fieldValueOOP, i);

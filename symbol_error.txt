@@ -1,0 +1,162 @@
+
+  
+  ******************************************
+> [253] Symbol initialize
+  ******************************************
+  [ExecuteExistingContext] Starting execution of context oop=90020
+  
+  ? METHOD NOT FOUND ERROR
+>    Selector: print:
+     Receiver: OOP(90342)
+     Receiver class: MethodContext OOP(10032)
+     Arguments: 1
+  
+> Smalltalk Context Chain:
+>   SENDER CHAIN (showing up to 10 contexts):
+>     [0] MethodContext>>print: (context=OOP(90632), method=block:f944d58860d94e3e88a7901400275591 OOP(26378))
+      [1] MethodContext>>valueWithArguments: (context=OOP(90624), method=method:BlockClosure>>value: OOP(54938))
+      [2] MethodContext>>basicAt: (context=OOP(90622), method=block:98320dfd2f6e40e1894a0921bfbb7edc OOP(41822))
+      [3] MethodContext>>whileTrue: (context=OOP(90618), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+      [4] MethodContext>><block> (context=OOP(90614), method=method:True>>ifTrue: OOP(53710))
+      [5] MethodContext>>ifTrue: (context=OOP(90606), method=method:BlockClosure>>whileTrue: OOP(54958))
+      ... (truncated, chain continues)
+  
+> ? FAILED: Symbol initialize
+     Status: FatalError
+>    Error: InvalidOperationException: Method not found: print: in class MethodContext OOP(10032)
+  
+  Stack trace:
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, 
+SmalltalkOOP[] args) in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2756
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecode(Byte bytecode, SmalltalkOOP methodOOP) in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 1847
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecodeStep() in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 538
+  
+  ? METHOD NOT FOUND ERROR
+>    Selector: print:
+     Receiver: OOP(91904)
+     Receiver class: MethodContext OOP(10032)
+     Arguments: 1
+  
+> Smalltalk Context Chain:
+>   SENDER CHAIN (showing up to 10 contexts):
+>     [0] MethodContext>>print: (context=OOP(92194), method=block:f944d58860d94e3e88a7901400275591 OOP(26378))
+      [1] MethodContext>>valueWithArguments: (context=OOP(92186), method=method:BlockClosure>>value: OOP(54938))
+      [2] MethodContext>>basicAt: (context=OOP(92184), method=block:98320dfd2f6e40e1894a0921bfbb7edc OOP(41822))
+      [3] MethodContext>>whileTrue: (context=OOP(92180), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+      [4] MethodContext>><block> (context=OOP(92176), method=method:True>>ifTrue: OOP(53710))
+      [5] MethodContext>>ifTrue: (context=OOP(92168), method=method:BlockClosure>>whileTrue: OOP(54958))
+  ? FAILED: ClassOrganizer initialize
+     Status: FatalError
+>    Error: InvalidOperationException: Method not found: print: in class MethodContext OOP(10032)
+  
+  Stack trace:
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, 
+SmalltalkOOP[] args) in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2756
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecode(Byte bytecode, SmalltalkOOP methodOOP) in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 1847
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecodeStep() in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 538
+  
+  ? METHOD NOT FOUND ERROR
+>    Selector: print:
+     Receiver: OOP(97592)
+     Receiver class: MethodContext OOP(10032)
+     Arguments: 1
+  
+> Smalltalk Context Chain:
+>   SENDER CHAIN (showing up to 10 contexts):
+>     [0] MethodContext>>print: (context=OOP(97882), method=block:f944d58860d94e3e88a7901400275591 OOP(26378))
+      [1] MethodContext>>valueWithArguments: (context=OOP(97874), method=method:BlockClosure>>value: OOP(54938))
+      [2] MethodContext>>basicAt: (context=OOP(97872), method=block:98320dfd2f6e40e1894a0921bfbb7edc OOP(41822))
+      [3] MethodContext>>whileTrue: (context=OOP(97868), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+      [4] MethodContext>><block> (context=OOP(97864), method=method:True>>ifTrue: OOP(53710))
+      [5] MethodContext>>ifTrue: (context=OOP(97856), method=method:BlockClosure>>whileTrue: OOP(54958))
+  ? FAILED: File initialize
+     Status: FatalError
+>    Error: InvalidOperationException: Method not found: print: in class MethodContext OOP(10032)
+  
+  Stack trace:
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, 
+SmalltalkOOP[] args) in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2756
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecode(Byte bytecode, SmalltalkOOP methodOOP) in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 1847
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecodeStep() in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 538
+  [CONTEXT DEPTH EXCEEDED] Depth: 5002, Limit: 5000
+  Current receiver: oop=99338, method: oop=54958
+>   SENDER CHAIN (showing up to 30 contexts):
+      [0] MethodContext>>whileTrue: (context=OOP(135962), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+      [1] MethodContext>><block> (context=OOP(135958), method=method:True>>ifTrue: OOP(53710))
+      [2] MethodContext>>ifTrue: (context=OOP(135950), method=method:BlockClosure>>whileTrue: OOP(54958))
+      [3] MethodContext>>whileTrue: (context=OOP(135940), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+      [4] MethodContext>><block> (context=OOP(135936), method=method:True>>ifTrue: OOP(53710))
+     Arguments: 1
+  
+> Smalltalk Context Chain:
+>   SENDER CHAIN (showing up to 10 contexts):
+      [0] MethodContext>>asCharacter (context=OOP(136008), method=block:acf151f5cd6d4b50a0625d5ca05ed1fb OOP(35346))
+      [1] MethodContext>><block> (context=OOP(136004), method=block:1920dccd01c140b88a308320332f6c68 OOP(40682))
+      [2] MethodContext>>whileTrue: (context=OOP(136000), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+      [3] MethodContext>><block> (context=OOP(135996), method=method:True>>ifTrue: OOP(53710))
+      [4] MethodContext>>ifTrue: (context=OOP(135988), method=method:BlockClosure>>whileTrue: OOP(54958))
+     Arguments: 0
+  
+> Smalltalk Context Chain:
+>   SENDER CHAIN (showing up to 10 contexts):
+      [0] MethodContext>>message:displayAt:centered:ifTrue:ifFalse: (context=OOP(137308), 
+method=method:Object>>confirm: OOP(41134))
+      [1] MethodContext>>confirm: (context=OOP(137306), method=method:Object_class>>initialize OOP(41354))
+      [2] MethodContext>>initialize (context=OOP(137302), method=OOP(63236))
+  
+  ? FAILED: Object initialize
+  [CONTEXT DEPTH EXCEEDED] Depth: 5001, Limit: 5000
+  Current receiver: oop=142150, method: oop=54958
+>   SENDER CHAIN (showing up to 30 contexts):
+      [0] MethodContext>>whileTrue: (context=OOP(178774), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+      [1] MethodContext>><block> (context=OOP(178770), method=method:True>>ifTrue: OOP(53710))
+      [2] MethodContext>>ifTrue: (context=OOP(178762), method=method:BlockClosure>>whileTrue: OOP(54958))
+      [3] MethodContext>>whileTrue: (context=OOP(178752), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+      [4] MethodContext>><block> (context=OOP(178748), method=method:True>>ifTrue: OOP(53710))
+     Arguments: 1
+  
+> Smalltalk Context Chain:
+>   SENDER CHAIN (showing up to 10 contexts):
+      [0] MethodContext>>basicAt: (context=OOP(178964), method=block:f8965ca75ac4448395a1b82e5654193d OOP(48098))
+      [1] MethodContext>><block> (context=OOP(178960), method=method:False>>ifFalse: OOP(30886))
+      [2] MethodContext>>basicAt: (context=OOP(178956), method=block:a6b7803bb5c1412895930873ff064f5e OOP(48094))
+      [3] MethodContext>><block> (context=OOP(178952), method=block:1920dccd01c140b88a308320332f6c68 OOP(40682))
+      [4] MethodContext>>whileTrue: (context=OOP(178948), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+  
+  ? METHOD NOT FOUND ERROR
+>    Selector: print:
+     Receiver: OOP(179202)
+     Receiver class: MethodContext OOP(10032)
+     Arguments: 1
+  
+> Smalltalk Context Chain:
+>   SENDER CHAIN (showing up to 10 contexts):
+>     [0] MethodContext>>print: (context=OOP(179492), method=block:f944d58860d94e3e88a7901400275591 OOP(26378))
+      [1] MethodContext>>valueWithArguments: (context=OOP(179484), method=method:BlockClosure>>value: OOP(54938))
+      [2] MethodContext>>basicAt: (context=OOP(179482), method=block:98320dfd2f6e40e1894a0921bfbb7edc OOP(41822))
+      [3] MethodContext>>whileTrue: (context=OOP(179478), method=block:c3d3c95151ce44fa8e5e591f5cc2ea17 OOP(54962))
+      [4] MethodContext>><block> (context=OOP(179474), method=method:True>>ifTrue: OOP(53710))
+      [5] MethodContext>>ifTrue: (context=OOP(179466), method=method:BlockClosure>>whileTrue: OOP(54958))
+  ? FAILED: TextList initialize
+     Status: FatalError
+>    Error: InvalidOperationException: Method not found: print: in class MethodContext OOP(10032)
+  
+  Stack trace:
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, 
+SmalltalkOOP[] args) in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2756
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecode(Byte bytecode, SmalltalkOOP methodOOP) in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 1847
+     at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecodeStep() in 
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 538
+
+

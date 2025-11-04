@@ -496,8 +496,8 @@ public class ObjectArrayPrimitivesTests
     #endregion
 }
 
-/// <summary>
-/// INTEGRATION TEST REQUIREMENTS FOR OBJECT/ARRAY PRIMITIVES
+/*
+ * INTEGRATION TEST REQUIREMENTS FOR OBJECT/ARRAY PRIMITIVES
 ///
 /// These tests require a fully initialized Smalltalk-80 VM environment with:
 ///
@@ -532,4 +532,4 @@ public class ObjectArrayPrimitivesTests
 ///
 /// Test count: 32 test cases covering primitives 60, 61, 62, 63, 64, 75
 /// Additional primitives (68, 69, 70, 71, 73, 74, 111) pending implementation
-/// </summary>
+ */

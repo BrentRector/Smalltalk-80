@@ -63,6 +63,9 @@ public class Phase5_GlobalsAndPatches
         // Step 3: Create and populate SystemDictionary (from Phase12)
         CreateAndPopulateSystemDictionary();
 
+        // Step 4: Create DefaultTextStyle (after AssociationRegistry is populated)
+        CreateDefaultTextStyle();
+
         // Freeze AssociationRegistry after all globals installed
         AssociationRegistry.Freeze();
         Console.WriteLine($"[AssociationRegistry] Frozen with {AssociationRegistry.Count} associations");
@@ -259,6 +262,8 @@ public class Phase5_GlobalsAndPatches
         var symbolObjects = SymbolRegistry.AllSymbols().ToList();
         int ustableSize = ComputeUSTableSize(symbolObjects.Count);
 
+        Console.WriteLine($"  [Phase5] Creating USTable: {symbolObjects.Count} symbols, table size {ustableSize}");
+
         // Pass 1: Count how many symbols will go in each bucket
         var bucketCounts = new int[ustableSize];
         foreach (var (index, _) in symbolObjects)
@@ -375,6 +380,10 @@ public class Phase5_GlobalsAndPatches
             installedGlobals++;
         }
 
+        // Initialize SingleCharSymbols class variable in Symbol's classPool
+        // Pre-populate with 128 single-character symbols so Symbol initialize works correctly
+        InitializeSingleCharSymbols();
+
         // Install Processor -> ProcessorScheduler singleton
         if (GlobalRegistry.TryGet("ProcessorScheduler", out SmalltalkOOP processorSchedulerOOP))
         {
@@ -415,19 +424,186 @@ public class Phase5_GlobalsAndPatches
     }
 
     /// <summary>
-    /// Installs "USTable" as a global variable that references the Universal Symbol Table.
-    /// This enables: Smalltalk at: #USTable -> Array of all symbols
+    /// Installs "USTable" as a class variable in Symbol's classPool.
+    /// USTable is defined as: Symbol classVariableNames: 'SingleCharSymbols USTable'
+    /// This enables: Symbol USTable -> Array of symbol buckets
     /// </summary>
     private void InstallUSTableGlobal(SmalltalkOOP ustableOOP)
     {
-        // Get or create canonical Association
-        var associationOOP = GetOrCreateCanonicalAssociation("USTable");
+        // CRITICAL: USTable is a CLASS VARIABLE of Symbol, not a global!
+        // Symbol class definition (line 37241 of Smalltalk-80.st):
+        //   classVariableNames: 'SingleCharSymbols USTable '
+        //
+        // We need to install USTable in Symbol's classPool (Dictionary)
 
-        // Set Association value to USTable
+        // Look up Symbol class
+        var symbolClassOOP = GlobalRegistry.LookupClassOOP("Symbol");
+        if (symbolClassOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            throw new InvalidOperationException("Symbol class not found during USTable installation");
+        }
+
+        // Get Symbol's classPool (instance variable index 7 for Class)
+        var classPoolOOP = _allocator.GetInstanceVariable(symbolClassOOP, 7);
+        if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            throw new InvalidOperationException("Symbol classPool is nil during USTable installation");
+        }
+
+        // Create Association for USTable
+        var associationOOP = GetOrCreateCanonicalAssociation("USTable");
         _allocator.SetInstanceVariable(associationOOP, 1, ustableOOP);
 
-        // Install in SystemDictionary
-        InstallAssociationInSystemDictionary(associationOOP, "USTable");
+        // Install Association in Symbol's classPool
+        // classPool is a Dictionary, search for existing USTable association first, then add if not found
+        int classPoolSize = _allocator.GetIndexedSize(classPoolOOP);
+        bool installed = false;
+        int emptySlotIndex = -1;
+
+        // Pass 1: Search for existing USTable association AND track first empty slot
+        for (int i = 0; i < classPoolSize; i++)
+        {
+            var entryOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
+
+            if (entryOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                // Track first empty slot (don't install yet)
+                if (emptySlotIndex == -1)
+                {
+                    emptySlotIndex = i;
+                }
+                continue;
+            }
+
+            // Check if this is the USTable association
+            var keyOOP = _allocator.GetInstanceVariable(entryOOP, 0);
+            string keyName = GetSymbolName(keyOOP);
+            if (keyName == "USTable")
+            {
+                // Update existing association's value
+                _allocator.SetInstanceVariable(entryOOP, 1, ustableOOP);
+                installed = true;
+                Console.WriteLine($"  [Phase5] Updated existing USTable association at index {i}");
+                break;
+            }
+        }
+
+        // Pass 2: If no existing association found, create new one in empty slot
+        if (!installed)
+        {
+            if (emptySlotIndex == -1)
+            {
+                throw new InvalidOperationException($"Failed to install USTable - no empty slots in Symbol classPool (size {classPoolSize})");
+            }
+
+            _allocator.SetIndexedOOP(classPoolOOP, emptySlotIndex, associationOOP);
+            installed = true;
+            Console.WriteLine($"  [Phase5] Installed USTable in Symbol classPool: array size {_allocator.GetIndexedSize(ustableOOP)} buckets");
+        }
+    }
+
+    /// <summary>
+    /// Initializes the "SingleCharSymbols" class variable in Symbol's classPool.
+    /// SingleCharSymbols is a class variable: Symbol classVariableNames: 'SingleCharSymbols USTable'
+    /// Pre-populates it with an Array of 128 single-character symbols (ASCII 0-127) so that
+    /// Symbol initialize can run without errors. The hasInterned:ifTrue: method expects this
+    /// to exist and be populated before Symbol initialize executes.
+    /// </summary>
+    private void InitializeSingleCharSymbols()
+    {
+        // Look up Symbol class
+        var symbolClassOOP = GlobalRegistry.LookupClassOOP("Symbol");
+        if (symbolClassOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            throw new InvalidOperationException("Symbol class not found during SingleCharSymbols installation");
+        }
+
+        // Get Symbol's classPool (instance variable index 7 for Class)
+        var classPoolOOP = _allocator.GetInstanceVariable(symbolClassOOP, 7);
+        if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            throw new InvalidOperationException("Symbol classPool is nil during SingleCharSymbols installation");
+        }
+
+        // Create Array with 128 nil elements - Symbol initialize will populate it
+        // hasInterned:ifTrue: will access SingleCharSymbols[ascii+1] and get nil,
+        // which it treats as "not found" - allowing Symbol initialize to proceed
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        if (arrayClassOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            throw new InvalidOperationException("Array class not found");
+        }
+        var arrayOOP = _allocator.AllocateArray(arrayClassOOP, 128);
+
+        // Initialize all elements to nil
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        for (int i = 0; i < 128; i++)
+        {
+            _allocator.SetIndexedOOP(arrayOOP, i, nilOOP);
+        }
+
+        // Create Association for SingleCharSymbols with the array as value
+        var associationOOP = GetOrCreateCanonicalAssociation("SingleCharSymbols");
+        _allocator.SetInstanceVariable(associationOOP, 1, arrayOOP);
+
+        // Install Association in Symbol's classPool
+        int classPoolSize = _allocator.GetIndexedSize(classPoolOOP);
+        bool installed = false;
+        int emptySlotIndex = -1;
+
+        // Pass 1: Search for existing SingleCharSymbols association AND track first empty slot
+        for (int i = 0; i < classPoolSize; i++)
+        {
+            var entryOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
+
+            if (entryOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                if (emptySlotIndex == -1)
+                {
+                    emptySlotIndex = i;
+                }
+                continue;
+            }
+
+            // Check if this is the SingleCharSymbols association
+            var keyOOP = _allocator.GetInstanceVariable(entryOOP, 0);
+            string? keyName = GetSymbolName(keyOOP);
+            if (keyName == "SingleCharSymbols")
+            {
+                // Update existing association
+                _allocator.SetInstanceVariable(entryOOP, 1, arrayOOP);
+                installed = true;
+                Console.WriteLine($"  [Phase5] Updated SingleCharSymbols class variable in Symbol classPool (128 nil elements)");
+                break;
+            }
+        }
+
+        // Pass 2: If not found, install in first empty slot
+        if (!installed)
+        {
+            if (emptySlotIndex == -1)
+            {
+                throw new InvalidOperationException($"Failed to install SingleCharSymbols - no empty slots in Symbol classPool (size {classPoolSize})");
+            }
+
+            _allocator.SetIndexedOOP(classPoolOOP, emptySlotIndex, associationOOP);
+            installed = true;
+            Console.WriteLine($"  [Phase5] Initialized SingleCharSymbols class variable in Symbol classPool at slot {emptySlotIndex} (128 nil elements)");
+        }
+    }
+
+    /// <summary>
+    /// Extracts the string name from a Symbol OOP by reading its indexed bytes.
+    /// </summary>
+    private string GetSymbolName(SmalltalkOOP symbolOOP)
+    {
+        int size = _allocator.GetIndexedSize(symbolOOP);
+        var bytes = new byte[size];
+        for (int i = 0; i < size; i++)
+        {
+            bytes[i] = _allocator.GetIndexedByte(symbolOOP, i);
+        }
+        return System.Text.Encoding.ASCII.GetString(bytes);
     }
 
     /// <summary>
@@ -674,4 +850,173 @@ public class Phase5_GlobalsAndPatches
         });
     }
 
+    #region DefaultTextStyle Creation
+
+    /// <summary>
+    /// Creates a minimal DefaultTextStyle object to support PopUpMenu and other UI features.
+    /// DefaultTextStyle is referenced by TextStyle class>>default which returns 'DefaultTextStyle copy'.
+    /// PopUpMenu initialization calls 'TextStyle default fontAt: 1', so we need at least one font.
+    ///
+    /// This MUST be called in Phase 5 after AssociationRegistry is populated (during method compilation).
+    /// The compiler creates Association objects as method literals, and we need to find and update the
+    /// DefaultTextStyle Association's value.
+    /// </summary>
+    private void CreateDefaultTextStyle()
+    {
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Step 1: Create a minimal stub StrikeFont
+        // StrikeFont has many instance variables, but most can be nil for our stub purposes
+        var strikeFontOOP = _allocator.AllocateFixedObject("StrikeFont");
+
+        // Set class reference for StrikeFont
+        var strikeFontClassOOP = GlobalRegistry.LookupClassOOP("StrikeFont");
+        _allocator.SetObjectClass(strikeFontOOP, strikeFontClassOOP);
+
+        // Initialize all StrikeFont fields to nil
+        int strikeFontInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("StrikeFont", _bundle);
+        for (int i = 0; i < strikeFontInstVarCount; i++)
+        {
+            _allocator.SetInstanceVariable(strikeFontOOP, i, nilOOP);
+            _initializedFields.Add((strikeFontOOP, i));
+        }
+
+        // Set minimal StrikeFont properties to prevent errors
+        // name: "SystemFont" (maps to Windows font later)
+        int nameIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "name", _bundle);
+        if (nameIndex >= 0)
+        {
+            var fontNameOOP = InternString("SystemFont");
+            _allocator.SetInstanceVariable(strikeFontOOP, nameIndex, fontNameOOP);
+        }
+
+        // ascent: 10 (matches typical Windows system font metrics)
+        int ascentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "ascent", _bundle);
+        if (ascentIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(strikeFontOOP, ascentIndex, SmalltalkOOP.FromSmallInteger(10));
+        }
+
+        // descent: 3
+        int descentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "descent", _bundle);
+        if (descentIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(strikeFontOOP, descentIndex, SmalltalkOOP.FromSmallInteger(3));
+        }
+
+        // maxWidth: 8 (monospace estimate)
+        int maxWidthIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "maxWidth", _bundle);
+        if (maxWidthIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(strikeFontOOP, maxWidthIndex, SmalltalkOOP.FromSmallInteger(8));
+        }
+
+        // Step 2: Create fontArray with one stub font
+        var fontArrayOOP = _allocator.AllocateArray("Array", 1);
+        _allocator.SetIndexedOOP(fontArrayOOP, 0, strikeFontOOP);
+
+        // Set class reference for Array
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        _allocator.SetObjectClass(fontArrayOOP, arrayClassOOP);
+
+        // Step 3: Create TextStyle object
+        var textStyleOOP = _allocator.AllocateFixedObject("TextStyle");
+
+        // Set class reference for TextStyle
+        var textStyleClassOOP = GlobalRegistry.LookupClassOOP("TextStyle");
+        _allocator.SetObjectClass(textStyleOOP, textStyleClassOOP);
+
+        // Get TextStyle instance variable indices
+        // TextStyle has: fontArray, lineGrid, baseline, alignment, firstIndent, restIndent, rightIndent, tabsArray, marginTabsArray, outputMedium
+        int fontArrayIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "fontArray", _bundle);
+        int lineGridIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "lineGrid", _bundle);
+        int baselineIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "baseline", _bundle);
+        int alignmentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "alignment", _bundle);
+
+        // Initialize critical TextStyle fields
+        if (fontArrayIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(textStyleOOP, fontArrayIndex, fontArrayOOP);
+            _initializedFields.Add((textStyleOOP, fontArrayIndex));
+        }
+
+        if (lineGridIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(textStyleOOP, lineGridIndex, SmalltalkOOP.FromSmallInteger(14)); // ascent + descent + 1
+            _initializedFields.Add((textStyleOOP, lineGridIndex));
+        }
+
+        if (baselineIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(textStyleOOP, baselineIndex, SmalltalkOOP.FromSmallInteger(10)); // matches ascent
+            _initializedFields.Add((textStyleOOP, baselineIndex));
+        }
+
+        if (alignmentIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(textStyleOOP, alignmentIndex, SmalltalkOOP.FromSmallInteger(0)); // 0 = left flush
+            _initializedFields.Add((textStyleOOP, alignmentIndex));
+        }
+
+        // Initialize remaining TextStyle fields to nil
+        int textStyleInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("TextStyle", _bundle);
+        for (int i = 0; i < textStyleInstVarCount; i++)
+        {
+            if (!_initializedFields.Contains((textStyleOOP, i)))
+            {
+                _allocator.SetInstanceVariable(textStyleOOP, i, nilOOP);
+                _initializedFields.Add((textStyleOOP, i));
+            }
+        }
+
+        // Step 4: Find and update the DefaultTextStyle Association
+        // The Association was created as a method literal during Phase 4 (method compilation)
+        // and is now registered in AssociationRegistry
+        var allAssociations = AssociationRegistry.GetAll();
+        if (allAssociations.TryGetValue("DefaultTextStyle", out SmalltalkOOP defaultTextStyleAssoc))
+        {
+            // Update the Association's value (instance variable 1) to point to our TextStyle
+            _allocator.SetInstanceVariable(defaultTextStyleAssoc, 1, textStyleOOP);
+            _initializedFields.Add((defaultTextStyleAssoc, 1));
+            Console.WriteLine($"  ✓ Created DefaultTextStyle (oop={textStyleOOP.RawValue}) with stub StrikeFont");
+            Console.WriteLine($"    Updated existing Association (oop={defaultTextStyleAssoc.RawValue})");
+        }
+        else
+        {
+            // Association doesn't exist - this means no code references DefaultTextStyle
+            // This is unexpected, so log a warning
+            Console.WriteLine($"  ⚠ WARNING: DefaultTextStyle Association not found in AssociationRegistry");
+            Console.WriteLine($"    This suggests no Smalltalk code references DefaultTextStyle");
+            Console.WriteLine($"    Created TextStyle object anyway (oop={textStyleOOP.RawValue})");
+
+            // Register in GlobalRegistry for manual access if needed
+            GlobalRegistry.Register("DefaultTextStyle", textStyleOOP);
+        }
+    }
+
+    /// <summary>
+    /// Interns a string by creating a String object with UTF-8 encoded bytes.
+    /// </summary>
+    private SmalltalkOOP InternString(string value)
+    {
+        // Encode string as UTF-8 bytes
+        byte[] stringBytes = System.Text.Encoding.UTF8.GetBytes(value);
+
+        // Allocate ByteIndexed object to hold the string text
+        var stringOOP = _allocator.AllocateString("String", stringBytes.Length);
+
+        // Store the string text as bytes
+        for (int i = 0; i < stringBytes.Length; i++)
+        {
+            _allocator.SetIndexedByte(stringOOP, i, stringBytes[i]);
+        }
+
+        // Set String class reference
+        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+        _allocator.SetObjectClass(stringOOP, stringClassOOP);
+
+        return stringOOP;
+    }
+
+    #endregion
 }

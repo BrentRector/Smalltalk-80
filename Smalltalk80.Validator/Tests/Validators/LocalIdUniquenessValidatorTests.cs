@@ -21,7 +21,7 @@ public class LocalIdUniquenessValidatorTests
         var diagnostics = await validator.ValidateAsync(ctx);
 
         // Assert
-        Assert.Empty(diagnostics.Where(d => d.Severity == Severity.Error));
+        Assert.DoesNotContain(diagnostics, d => d.Severity == Severity.Error);
     }
 
     [Fact]

@@ -57,6 +57,9 @@ public class Phase3_ObjectAllocation
         // Section 1: Allocation
         AllocateSentinelObjects();
         AllocateSpecialObjects();
+
+        // NOTE: DefaultTextStyle creation moved to Phase 5 (after AssociationRegistry is populated)
+
         LogAllocationCheckpoint();
 
         // Section 2: Class Reference Setting
@@ -229,6 +232,129 @@ public class Phase3_ObjectAllocation
         Console.WriteLine($"  Created Undeclared dictionary (capacity={initialCapacity}, undeclared count={undeclaredCount})");
     }
 
+    /// <summary>
+    /// Creates a minimal DefaultTextStyle object to support PopUpMenu and other UI features.
+    /// DefaultTextStyle is referenced by TextStyle class>>default which returns 'DefaultTextStyle copy'.
+    /// PopUpMenu initialization calls 'TextStyle default fontAt: 1', so we need at least one font.
+    /// </summary>
+    private void CreateDefaultTextStyle(SmalltalkOOP nilOOP)
+    {
+        // Step 1: Create a minimal stub StrikeFont
+        // StrikeFont has many instance variables, but most can be nil for our stub purposes
+        var strikeFontOOP = _allocator.AllocateFixedObject("StrikeFont");
+
+        // Initialize all StrikeFont fields to nil
+        int strikeFontInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("StrikeFont", _bundle);
+        for (int i = 0; i < strikeFontInstVarCount; i++)
+        {
+            _allocator.SetInstanceVariable(strikeFontOOP, i, nilOOP);
+            _initializedFields.Add((strikeFontOOP, i));
+        }
+
+        // Set minimal StrikeFont properties to prevent errors
+        // name: "DefaultFont"
+        int nameIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "name", _bundle);
+        if (nameIndex >= 0)
+        {
+            var fontNameOOP = InternString("DefaultFont");
+            _allocator.SetInstanceVariable(strikeFontOOP, nameIndex, fontNameOOP);
+        }
+
+        // ascent: 12
+        int ascentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "ascent", _bundle);
+        if (ascentIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(strikeFontOOP, ascentIndex, SmalltalkOOP.FromSmallInteger(12));
+        }
+
+        // descent: 4
+        int descentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "descent", _bundle);
+        if (descentIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(strikeFontOOP, descentIndex, SmalltalkOOP.FromSmallInteger(4));
+        }
+
+        // maxWidth: 8
+        int maxWidthIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "maxWidth", _bundle);
+        if (maxWidthIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(strikeFontOOP, maxWidthIndex, SmalltalkOOP.FromSmallInteger(8));
+        }
+
+        // Step 2: Create fontArray with one stub font
+        var fontArrayOOP = _allocator.AllocateArray("Array", 1);
+        _allocator.SetIndexedOOP(fontArrayOOP, 0, strikeFontOOP);
+
+        // Step 3: Create TextStyle object
+        var textStyleOOP = _allocator.AllocateFixedObject("TextStyle");
+
+        // Get TextStyle instance variable indices
+        // TextStyle has: fontArray, lineGrid, baseline, alignment, firstIndent, restIndent, rightIndent, tabsArray, marginTabsArray, outputMedium
+        int fontArrayIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "fontArray", _bundle);
+        int lineGridIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "lineGrid", _bundle);
+        int baselineIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "baseline", _bundle);
+        int alignmentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "alignment", _bundle);
+
+        // Initialize critical TextStyle fields
+        if (fontArrayIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(textStyleOOP, fontArrayIndex, fontArrayOOP);
+            _initializedFields.Add((textStyleOOP, fontArrayIndex));
+        }
+
+        if (lineGridIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(textStyleOOP, lineGridIndex, SmalltalkOOP.FromSmallInteger(16));
+            _initializedFields.Add((textStyleOOP, lineGridIndex));
+        }
+
+        if (baselineIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(textStyleOOP, baselineIndex, SmalltalkOOP.FromSmallInteger(12));
+            _initializedFields.Add((textStyleOOP, baselineIndex));
+        }
+
+        if (alignmentIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(textStyleOOP, alignmentIndex, SmalltalkOOP.FromSmallInteger(0)); // 0 = left flush
+            _initializedFields.Add((textStyleOOP, alignmentIndex));
+        }
+
+        // Initialize remaining TextStyle fields to nil
+        int textStyleInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("TextStyle", _bundle);
+        for (int i = 0; i < textStyleInstVarCount; i++)
+        {
+            if (!_initializedFields.Contains((textStyleOOP, i)))
+            {
+                _allocator.SetInstanceVariable(textStyleOOP, i, nilOOP);
+                _initializedFields.Add((textStyleOOP, i));
+            }
+        }
+
+        // Step 4: Register DefaultTextStyle globally
+        // This makes it accessible via Smalltalk at: #DefaultTextStyle
+        GlobalRegistry.Register("DefaultTextStyle", textStyleOOP);
+
+        // Step 5: Find existing DefaultTextStyle Association and update its value
+        // The compiler should have created an Association for DefaultTextStyle (either in
+        // TextConstants pool or Undeclared), we just need to find it and set the value
+        bool foundAndUpdated = FindAndUpdateAssociationValue("DefaultTextStyle", textStyleOOP);
+
+        if (!foundAndUpdated)
+        {
+            // Association doesn't exist - create one and add to Undeclared
+            Console.WriteLine($"  DefaultTextStyle Association not found in bundle, adding to Undeclared");
+            var defaultTextStyleSymbol = InternSymbol("DefaultTextStyle");
+            var defaultTextStyleAssoc = AllocateAssociationWithSemanticAllocator(defaultTextStyleSymbol, textStyleOOP);
+
+            // Add to Undeclared dictionary (will be migrated to proper location by runtime)
+            var undeclaredOOP = GlobalRegistry.Get("Undeclared");
+            InstallAssociationInDictionary(undeclaredOOP, defaultTextStyleAssoc, "DefaultTextStyle");
+        }
+
+        Console.WriteLine($"  Created DefaultTextStyle with stub StrikeFont for PopUpMenu support");
+    }
+
     #endregion
 
     #region Special Object Allocation
@@ -322,6 +448,84 @@ public class Phase3_ObjectAllocation
         }
 
         throw new InvalidOperationException($"SystemDictionary is full - cannot install {name} association");
+    }
+
+    /// <summary>
+    /// Installs an Association in any Dictionary object (including pool dictionaries).
+    /// Similar to InstallAssociationInSystemDictionary but works with any dictionary OOP.
+    /// </summary>
+    private void InstallAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string name)
+    {
+        int dictSize = _allocator.GetIndexedSize(dictionaryOOP);
+        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Find first available nil slot
+        for (int i = 0; i < dictSize; i++)
+        {
+            var slotOOP = _allocator.GetIndexedOOP(dictionaryOOP, i);
+            if (slotOOP == nilOOP)
+            {
+                // Found empty slot - install association
+                _allocator.SetIndexedOOP(dictionaryOOP, i, associationOOP);
+
+                // Increment tally field (field 0 for Dictionary)
+                int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
+                if (tallyIndex >= 0)
+                {
+                    var currentTallyOOP = _allocator.GetInstanceVariable(dictionaryOOP, tallyIndex);
+                    int currentTally = currentTallyOOP.IsSmallInteger ? currentTallyOOP.AsSmallInteger() : 0;
+                    _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(currentTally + 1));
+                }
+
+                return;
+            }
+        }
+
+        throw new InvalidOperationException($"Dictionary is full - cannot install {name} association");
+    }
+
+    /// <summary>
+    /// Finds an Association by key in all allocated objects and updates its value.
+    /// Searches through all objects looking for Association instances with matching key.
+    /// </summary>
+    private bool FindAndUpdateAssociationValue(string keyName, SmalltalkOOP newValueOOP)
+    {
+        var keySymbol = InternSymbol(keyName);
+        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
+
+        // Search through all allocated objects (both bundle objects and sentinel objects)
+        foreach (var kvp in _localIdToObjectId)
+        {
+            var objectOOP = kvp.Value;
+
+            try
+            {
+                // Check if this is an Association object
+                var classOOP = _allocator.GetSlot(objectOOP, 0);
+                if (classOOP == associationClassOOP)
+                {
+                    // Get the key (instance variable 0)
+                    var assocKeyOOP = _allocator.GetInstanceVariable(objectOOP, 0);
+
+                    // Check if key matches
+                    if (assocKeyOOP == keySymbol)
+                    {
+                        // Update the value (instance variable 1)
+                        _allocator.SetInstanceVariable(objectOOP, 1, newValueOOP);
+                        _initializedFields.Add((objectOOP, 1));
+                        Console.WriteLine($"  Updated existing {keyName} Association value to oop={newValueOOP.RawValue}");
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                // Skip objects that don't have the expected structure
+                continue;
+            }
+        }
+
+        return false;
     }
 
     #endregion
