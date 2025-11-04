@@ -1492,13 +1492,14 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             // Check if current context is a block execution context
+            int blockLocalCount = 0;
             if (foundMapping)
             {
                 // This is a block - check if index is out of range for block's own temps
                 var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                 var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                 var header = ParseMethodHeader(blockMethodOOP);
-                int blockLocalCount = header.NumArgs + header.NumTemps;
+                blockLocalCount = header.NumArgs + header.NumTemps;
 
                 // If storing beyond block's local scope, store to home context
                 if (index >= blockLocalCount)
@@ -1518,6 +1519,10 @@ public partial class VirtualMachine : IPrimitiveContext
                 }
             }
 
+            // Calculate the actual index to use
+            // If storing to homeContext, subtract blockLocalCount to get parent's temp index
+            int actualIndex = (contextToStoreTo != _activeContextOOP) ? (index - blockLocalCount) : index;
+
             // DIAGNOSTIC: Log ALL compact temp stores to track variable updates
             if (_createContextCallCount >= 999999 && _createContextCallCount <= 999999)
             {
@@ -1529,10 +1534,10 @@ public partial class VirtualMachine : IPrimitiveContext
 
                 // Show the BlockClosure object used
                 string blockOOPStr = blockOrClosureOOP.ToString();
-                Console.WriteLine($"[COMPACT_POP_STORE_TEMP#{_createContextCallCount}] bytecode=0x{bytecode:X2}, method={currentMethodLocalId}, index={index}, value={valStr}, storedToHome={storedToHome}, blockOOP={blockOOPStr}, context={contextToStoreTo}");
+                Console.WriteLine($"[COMPACT_POP_STORE_TEMP#{_createContextCallCount}] bytecode=0x{bytecode:X2}, method={currentMethodLocalId}, index={index}, actualIndex={actualIndex}, value={valStr}, storedToHome={storedToHome}, blockOOP={blockOOPStr}, context={contextToStoreTo}");
             }
 
-            _heapManager.SetIndexedOOP(contextToStoreTo, index, valueOOP);
+            _heapManager.SetIndexedOOP(contextToStoreTo, actualIndex, valueOOP);
 
             return true;
         }
@@ -2028,12 +2033,13 @@ public partial class VirtualMachine : IPrimitiveContext
 
                     // For block execution contexts, check if we need to access home context temps
                     SmalltalkOOP contextToReadFrom = _activeContextOOP;
+                    int blockLocalCount = 0;
                     if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
                         var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                         var header = ParseMethodHeader(blockMethodOOP);
-                        int blockLocalCount = header.NumArgs + header.NumTemps;
+                        blockLocalCount = header.NumArgs + header.NumTemps;
 
                         if (index >= blockLocalCount)
                         {
@@ -2055,7 +2061,11 @@ public partial class VirtualMachine : IPrimitiveContext
                         }
                     }
 
-                    var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, index);
+                    // Calculate the actual index to use
+                    // If reading from homeContext, subtract blockLocalCount to get parent's temp index
+                    int actualIndex = (contextToReadFrom != _activeContextOOP) ? (index - blockLocalCount) : index;
+
+                    var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, actualIndex);
                     Push(valueOOP);
                     return true;
                 }
@@ -2068,12 +2078,13 @@ public partial class VirtualMachine : IPrimitiveContext
 
                     // For block execution contexts, check if we need to store to home context
                     SmalltalkOOP contextToStoreTo = _activeContextOOP;
+                    int blockLocalCount = 0;
                     if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
                         var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                         var header = ParseMethodHeader(blockMethodOOP);
-                        int blockLocalCount = header.NumArgs + header.NumTemps;
+                        blockLocalCount = header.NumArgs + header.NumTemps;
 
                         if (index >= blockLocalCount)
                         {
@@ -2101,7 +2112,11 @@ public partial class VirtualMachine : IPrimitiveContext
                         }
                     }
 
-                    _heapManager.SetIndexedOOP(contextToStoreTo, index, valueOOP);
+                    // Calculate the actual index to use
+                    // If storing to homeContext, subtract blockLocalCount to get parent's temp index
+                    int actualIndex = (contextToStoreTo != _activeContextOOP) ? (index - blockLocalCount) : index;
+
+                    _heapManager.SetIndexedOOP(contextToStoreTo, actualIndex, valueOOP);
                     Push(valueOOP); // Leave value on stack
                     return true;
                 }
@@ -2116,12 +2131,13 @@ public partial class VirtualMachine : IPrimitiveContext
                     SmalltalkOOP contextToStoreTo = _activeContextOOP;
                     bool storedToHome = false;
                     SmalltalkOOP originalContext = _activeContextOOP;
+                    int blockLocalCount = 0;
                     if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
                         var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                         var header = ParseMethodHeader(blockMethodOOP);
-                        int blockLocalCount = header.NumArgs + header.NumTemps;
+                        blockLocalCount = header.NumArgs + header.NumTemps;
 
                         if (index >= blockLocalCount)
                         {
@@ -2145,13 +2161,17 @@ public partial class VirtualMachine : IPrimitiveContext
                         }
                     }
 
+                    // Calculate the actual index to use
+                    // If storing to homeContext, subtract blockLocalCount to get parent's temp index
+                    int actualIndex = (contextToStoreTo != _activeContextOOP) ? (index - blockLocalCount) : index;
+
                     // DIAGNOSTIC: Validate index is within bounds
                     int contextSize = _heapManager.GetIndexedSize(contextToStoreTo);
-                    if (index >= contextSize)
+                    if (actualIndex >= contextSize)
                     {
                         string? methodLocalId = GetLocalId(methodOOP);
                         throw new InvalidOperationException(
-                            $"POP_STORE_TEMP: index {index} out of bounds (context size={contextSize}). " +
+                            $"POP_STORE_TEMP: actualIndex {actualIndex} (from index {index}) out of bounds (context size={contextSize}). " +
                             $"Method: {methodLocalId}, PC: {ip - 2}, activeContext={_activeContextOOP}, targetContext={contextToStoreTo}");
                     }
 
@@ -2160,10 +2180,10 @@ public partial class VirtualMachine : IPrimitiveContext
                     {
                         string? currentMethodLocalId = GetLocalId(methodOOP);
                         string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"{valueOOP}";
-                        Console.WriteLine($"[POP_STORE_TEMP#{_createContextCallCount}] method={currentMethodLocalId}, index={index}, value={valStr}, storedToHome={storedToHome}, context={contextToStoreTo}");
+                        Console.WriteLine($"[POP_STORE_TEMP#{_createContextCallCount}] method={currentMethodLocalId}, index={index}, actualIndex={actualIndex}, value={valStr}, storedToHome={storedToHome}, context={contextToStoreTo}");
                     }
 
-                    _heapManager.SetIndexedOOP(contextToStoreTo, index, valueOOP);
+                    _heapManager.SetIndexedOOP(contextToStoreTo, actualIndex, valueOOP);
                     return true;
                 }
 
