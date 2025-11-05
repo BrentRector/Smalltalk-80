@@ -85,37 +85,15 @@ namespace Smalltalk80.Compiler
             // Check parent scopes (for block closures accessing outer temporaries)
             if (Parent != null && ScopeDepth > 0)
             {
-                // First check if it's in parent's arguments (already at correct relative index)
-                if (Parent.Arguments.TryGetValue(name, out var parentArgIndex))
+                var parentIndex = Parent.GetVariableIndex(name);
+                if (parentIndex.HasValue)
                 {
+                    // Variable found in parent scope
+                    // For blocks, we need to adjust the index so the VM knows to look in homeContext
+                    // The VM checks: if (index >= blockLocalCount) then look in homeContext
+                    // and then subtracts blockLocalCount to get the actual parent index
                     int blockLocalCount = ArgumentCount + TemporaryCount;
-                    return parentArgIndex + blockLocalCount;
-                }
-
-                // Check if it's in parent's temporaries (need to adjust for relative index)
-                if (Parent.Temporaries.TryGetValue(name, out var parentTempIndex))
-                {
-                    // parentTempIndex is absolute (includes parent's args), convert to relative
-                    int parentRelativeTempIndex = parentTempIndex - Parent.ArgumentCount;
-                    int blockLocalCount = ArgumentCount + TemporaryCount;
-                    return parentRelativeTempIndex + blockLocalCount;
-                }
-
-                // Check parent's hidden temps
-                if (Parent.HiddenTemporaries.TryGetValue(name, out var parentHiddenIndex))
-                {
-                    // Hidden temps are also absolute, need same adjustment
-                    int parentRelativeHiddenIndex = parentHiddenIndex - Parent.ArgumentCount;
-                    int blockLocalCount = ArgumentCount + TemporaryCount;
-                    return parentRelativeHiddenIndex + blockLocalCount;
-                }
-
-                // Continue searching up the parent chain
-                var grandParentIndex = Parent.GetVariableIndex(name);
-                if (grandParentIndex.HasValue)
-                {
-                    // Already adjusted by parent, just pass through
-                    return grandParentIndex.Value;
+                    return parentIndex.Value + blockLocalCount;
                 }
             }
 
@@ -1968,9 +1946,9 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
         {
             // DIAGNOSTIC: Log every block compilation
             var blockText = block.GetText();
-            if (blockText.Contains("index"))
+            if (blockText.Contains("char"))
             {
-                File.AppendAllText("compiler_debug.log", $"[CompileBlockAsLiteral] Compiling block containing 'index': {blockText.Substring(0, Math.Min(80, blockText.Length))}\n");
+                File.AppendAllText("compiler_debug.log", $"[CompileBlockAsLiteral] Compiling block containing 'char': {blockText.Substring(0, Math.Min(80, blockText.Length))}\n");
             }
 
             // Create a new compilation environment for the block
@@ -2010,14 +1988,14 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             var temporaryNames = new List<string>();
 
             // DIAGNOSTIC: Log block temp processing
-            if (blockText.Contains("index"))
+            if (blockText.Contains("char"))
             {
                 File.AppendAllText("compiler_debug.log", $"[CompileBlock] blockTemps = {(blockTemps == null ? "NULL" : "exists")}\n");
             }
 
             if (blockTemps != null)
             {
-                if (blockText.Contains("index"))
+                if (blockText.Contains("char"))
                 {
                     File.AppendAllText("compiler_debug.log", $"[CompileBlock] blockTemps.children.Count = {blockTemps.children?.Count ?? 0}\n");
                     if (blockTemps.children != null)
@@ -2034,7 +2012,7 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     .OfType<Smalltalk80Parser.TemporaryNameContext>()
                     .ToList();
 
-                if (blockText.Contains("index"))
+                if (blockText.Contains("char"))
                 {
                     File.AppendAllText("compiler_debug.log", $"[CompileBlock] Found {tempNodes.Count} IDENTIFIER nodes for block temps\n");
                 }
@@ -2045,7 +2023,7 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     var tempName = tempNodes[i].GetText();
                     temporaryNames.Add(tempName);
                     environment.Temporaries[tempName] = tempBase + i;
-                    if (blockText.Contains("index"))
+                    if (blockText.Contains("char"))
                     {
                         File.AppendAllText("compiler_debug.log", $"[CompileBlock]   Added temp '{tempName}' at index {tempBase + i}\n");
                     }
@@ -2053,11 +2031,9 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 environment.TemporaryCount = tempNodes.Count;
             }
 
-            if (blockText.Contains("index"))
+            if (blockText.Contains("char"))
             {
                 File.AppendAllText("compiler_debug.log", $"[CompileBlock] Final temporaryNames.Count = {temporaryNames.Count}, environment.TemporaryCount = {environment.TemporaryCount}\n");
-                File.AppendAllText("compiler_debug.log", $"[CompileBlock] environment.ArgumentCount = {environment.ArgumentCount}\n");
-                File.AppendAllText("compiler_debug.log", $"[CompileBlock] blockLocalCount would be = {environment.ArgumentCount + environment.TemporaryCount}\n");
             }
 
             // IMPORTANT: Block variable access in Blue Book specification:
@@ -2524,17 +2500,33 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
             // search up the parent environment chain to find where it's defined.
             if (environment.ScopeDepth > 0)
             {
+                // Accumulate blockLocalCounts for ALL intermediate blocks between current and parent
+                // For 3-level nesting: [:oa | | ot | [:ma | | mt | [:ia | | it | oa + ot + mt + it]]]
+                // When innermost accesses mt:
+                //   - Start with innermost blockLocalCount (1 arg + 1 temp = 2)
+                //   - Walk to middle block where mt is defined
+                //   - mt is at index 1 in middle block
+                //   - Adjusted index = mt_index (1) + inner_blockLocalCount (2) = 3? NO!
+                //   - Actually: inner must traverse through middle to reach outer
+                //   - So: mt_index (1) + inner_count (2) + middle_count (2) = 5 ✓
+                //
+                // Algorithm: Walk up chain, accumulating blockLocalCounts until we find the variable
+
+                int accumulatedBlockLocalCount = 0;
+                var currentEnv = environment;
                 var parentEnv = environment.Parent;
+
                 while (parentEnv != null)
                 {
+                    // Add current block's local count to accumulated total
+                    accumulatedBlockLocalCount += currentEnv.ArgumentCount + currentEnv.TemporaryCount;
+
                     // Check parent's arguments
                     if (parentEnv.Arguments.TryGetValue(name, out var parentArgIndex))
                     {
-                        // Found in parent scope - need to adjust index for VM's homeContext lookup
-                        // The VM checks: if (index >= blockLocalCount) then look in homeContext
-                        // and then subtracts blockLocalCount to get the actual parent index
-                        int blockLocalCount = environment.ArgumentCount + environment.TemporaryCount;
-                        int adjustedIndex = parentArgIndex + blockLocalCount;
+                        // Found in parent scope - adjust index by accumulated blockLocalCount
+                        // This accounts for ALL intermediate blocks between current and parent
+                        int adjustedIndex = parentArgIndex + accumulatedBlockLocalCount;
                         emitter.PushTemporary(adjustedIndex);
                         return;
                     }
@@ -2542,23 +2534,8 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     // Check parent's temporaries
                     if (parentEnv.Temporaries.TryGetValue(name, out var parentTempIndex))
                     {
-                        // Found in parent scope - need to adjust index for VM's homeContext lookup
-                        // CRITICAL: parentTempIndex is ABSOLUTE (includes args), but we need RELATIVE temp index
-                        // Temporaries are stored at slots [argCount..argCount+tempCount-1]
-                        // So temp[0] is at slot argCount, temp[1] is at slot argCount+1, etc.
-                        // We need to convert from absolute slot index to relative temp index
-                        int parentRelativeTempIndex = parentTempIndex - parentEnv.ArgumentCount;
-                        int blockLocalCount = environment.ArgumentCount + environment.TemporaryCount;
-                        int adjustedIndex = parentRelativeTempIndex + blockLocalCount;
-
-                        // DIAGNOSTIC: Log outer temp access
-                        File.AppendAllText("compiler_debug.log", $"[PushVariable] Accessing outer temp '{name}' from block\n");
-                        File.AppendAllText("compiler_debug.log", $"  parentTempIndex (absolute) = {parentTempIndex}\n");
-                        File.AppendAllText("compiler_debug.log", $"  parentEnv.ArgumentCount = {parentEnv.ArgumentCount}\n");
-                        File.AppendAllText("compiler_debug.log", $"  parentRelativeTempIndex = {parentRelativeTempIndex}\n");
-                        File.AppendAllText("compiler_debug.log", $"  blockLocalCount = {blockLocalCount} (argCount={environment.ArgumentCount} + tempCount={environment.TemporaryCount})\n");
-                        File.AppendAllText("compiler_debug.log", $"  adjustedIndex = {adjustedIndex}\n");
-
+                        // Found in parent scope - adjust index by accumulated blockLocalCount
+                        int adjustedIndex = parentTempIndex + accumulatedBlockLocalCount;
                         emitter.PushTemporary(adjustedIndex);
                         return;
                     }
@@ -2566,15 +2543,14 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     // Check parent's hidden temporaries
                     if (parentEnv.HiddenTemporaries.TryGetValue(name, out var parentHiddenIndex))
                     {
-                        // Hidden temps are also absolute (includes parent's args), convert to relative
-                        int parentRelativeHiddenIndex = parentHiddenIndex - parentEnv.ArgumentCount;
-                        int blockLocalCount = environment.ArgumentCount + environment.TemporaryCount;
-                        int adjustedIndex = parentRelativeHiddenIndex + blockLocalCount;
+                        // Found in parent scope - adjust index by accumulated blockLocalCount
+                        int adjustedIndex = parentHiddenIndex + accumulatedBlockLocalCount;
                         emitter.PushTemporary(adjustedIndex);
                         return;
                     }
 
                     // Continue up the scope chain
+                    currentEnv = parentEnv;
                     parentEnv = parentEnv.Parent;
                 }
             }
@@ -2608,23 +2584,10 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
         
         private void StoreVariable(string name, bool leaveOnStack)
         {
-            // DIAGNOSTIC: Log store operations
-            if (name == "index" && environment.Parent != null)
-            {
-                File.AppendAllText("compiler_debug.log", $"[StoreVariable] Storing to '{name}' from block\n");
-                File.AppendAllText("compiler_debug.log", $"  environment.ArgumentCount = {environment.ArgumentCount}\n");
-                File.AppendAllText("compiler_debug.log", $"  environment.TemporaryCount = {environment.TemporaryCount}\n");
-            }
-
             // Check local variables (arguments and temporaries)
             var index = environment.GetVariableIndex(name);
             if (index.HasValue)
             {
-                if (name == "index" && environment.Parent != null)
-                {
-                    File.AppendAllText("compiler_debug.log", $"  GetVariableIndex returned = {index.Value}\n");
-                    File.AppendAllText("compiler_debug.log", $"  leaveOnStack = {leaveOnStack}\n");
-                }
                 if (leaveOnStack)
                 {
                     emitter.Dup();

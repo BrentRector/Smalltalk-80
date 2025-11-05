@@ -427,13 +427,13 @@ n000222 "O[0,0] M[0,2] I[2,2]: max inner, access method temp"
 	| m | m _ 0. ^[[| mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia1 :ia2 | | it1 it2 | it1 _ 2. it2 _ 3. m + mt1 + mt2 + it1 + it2] value: 999 value: 888] value] value!
 
 n011011 "O[0,1] M[1,0] I[1,1]: middle arg, inner accesses outer temp"
-	^[| ot | ot _ 4. [:ma | [:ia | | it | it _ 3. ot + it] value: 999] value: 888] value] value!
+	^[| ot | ot _ 4. [:ma | [:ia | | it | it _ 3. ot + it] value: 999] value: 888] value!
 
 n011122 "O[0,1] M[1,1] I[2,2]: outer temp accessed by innermost"
-	^[| ot | ot _ 0. [:ma | | mt | mt _ 2. [:ia1 :ia2 | | it1 it2 | it1 _ 3. it2 _ 5. ot + mt + it1 + it2] value: 999 value: 888] value: 777] value] value!
+	^[| ot | ot _ 0. [:ma | | mt | mt _ 2. [:ia1 :ia2 | | it1 it2 | it1 _ 3. it2 _ 5. ot + mt + it1 + it2] value: 999 value: 888] value: 777] value!
 
 n022022 "O[0,2] M[2,0] I[2,2]: outer temps accessed by innermost"
-	^[| ot1 ot2 | ot1 _ 2. ot2 _ 3. [:ma1 :ma2 | [:ia1 :ia2 | | it1 it2 | it1 _ 2. it2 _ 3. ot1 + ot2 + it1 + it2] value: 999 value: 888] value: 777 value: 666] value] value!
+	^[| ot1 ot2 | ot1 _ 2. ot2 _ 3. [:ma1 :ma2 | [:ia1 :ia2 | | it1 it2 | it1 _ 2. it2 _ 3. ot1 + ot2 + it1 + it2] value: 999 value: 888] value: 777 value: 666] value!
 
 n100100 "O[1,0] M[0,1] I[0,0]: outer arg accessed through middle temp"
 	^[:oa | [| mt | mt _ 5. [oa + mt] value] value] value: 5!
@@ -472,10 +472,10 @@ n222222 "All [2,2]: maximum complexity"
 	^[:oa1 :oa2 | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma1 :ma2 | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia1 :ia2 | | it1 it2 | it1 _ 2. it2 _ 2. oa1 + oa2 + ot1 + ot2 + mt1 + mt2 + it1 + it2] value: 999 value: 888] value: 777 value: 666] value: 0 value: 0!
 
 n012012 "O[0,1] M[2,0] I[1,2]: varied nesting"
-	^[| ot | ot _ 3. [:ma1 :ma2 | [:ia | | it1 it2 | it1 _ 3. it2 _ 4. ot + it1 + it2] value: 999] value: 888 value: 777] value] value!
+	^[| ot | ot _ 3. [:ma1 :ma2 | [:ia | | it1 it2 | it1 _ 3. it2 _ 4. ot + it1 + it2] value: 999] value: 888 value: 777] value!
 
 n021021 "O[0,2] M[1,0] I[2,1]: varied nesting"
-	^[| ot1 ot2 | ot1 _ 3. ot2 _ 4. [:ma | [:ia1 :ia2 | | it | it _ 3. ot1 + ot2 + it] value: 999 value: 888] value: 777] value] value!
+	^[| ot1 ot2 | ot1 _ 3. ot2 _ 4. [:ma | [:ia1 :ia2 | | it | it _ 3. ot1 + ot2 + it] value: 999 value: 888] value: 777] value!
 
 n102102 "O[1,0] M[2,1] I[0,2]: varied nesting"
 	^[:oa | [:ma1 :ma2 | | mt | mt _ 2. [| it1 it2 | it1 _ 3. it2 _ 5. oa + mt + it1 + it2] value] value: 888 value: 777] value: 0!
@@ -490,7 +490,7 @@ n210210 "O[2,1] M[0,2] I[1,0]: varied nesting"
 	^[:oa1 :oa2 | | ot | ot _ 3. [| mt1 mt2 | mt1 _ 3. mt2 _ 4. [:ia | oa1 + oa2 + ot + mt1 + mt2] value: 999] value] value: 0 value: 0!
 
 n012210 "O[0,1] M[2,2] I[1,0]: varied nesting"
-	^[| ot | ot _ 2. [:ma1 :ma2 | | mt1 mt2 | mt1 _ 3. mt2 _ 5. [:ia | ot + mt1 + mt2] value: 999] value: 888 value: 777] value] value!
+	^[| ot | ot _ 2. [:ma1 :ma2 | | mt1 mt2 | mt1 _ 3. mt2 _ 5. [:ia | ot + mt1 + mt2] value: 999] value: 888 value: 777] value!
 
 n210012 "O[2,1] M[0,0] I[1,2]: varied nesting"
 	^[:oa1 :oa2 | | ot | ot _ 2. [[[:ia | | it1 it2 | it1 _ 3. it2 _ 5. oa1 + oa2 + ot + it1 + it2] value: 999] value] value] value: 0 value: 0!
