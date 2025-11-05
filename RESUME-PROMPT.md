@@ -1,594 +1,337 @@
-# Resume Prompt - Smalltalk-80 BlockClosure Implementation
+# Resume Prompt - Smalltalk-80 Interpreter Development
 
-**Last Updated**: 2025-01-23
-**Session**: 🎯 BlockClosure Architecture - Ready for Implementation
+**Last Updated**: 2025-11-04
+**Session**: VM Bug Fixes + Init Expression Progress
 
-## 🎯 Current Work: BlockClosure Integration
+## Current Status
 
-**🎉 MAJOR PROGRESS**: Block lexical scoping fixed, comprehensive architecture documented, implementation plan ready.
+### 🎉 Recent Accomplishments (2025-11-04)
 
-### Current Status
+**CRITICAL VM BUG FIXED**: BlockClosure primitive 207 incorrectly treated Strings/Symbols as Arrays, causing `GetIndexedOOP` crashes on ByteIndexed objects.
 
-**✅ BLOCK CLOSURE INFRASTRUCTURE COMPLETE**:
+**INIT EXPRESSION PROGRESS**: 29/34 init expressions now passing (+2 from previous session)
+- Before: 27/27 passing (19 skipped)
+- After: 29/34 passing (13 skipped)
+- Improvement: +2 expressions enabled
+
+### Bug Fix Details
+
+**Problem**: `BlockClosure>>valueWithArguments:` primitive distinguished between `value:` (direct arg) and `valueWithArguments:` (array arg) by checking `indexedSize > 0`. This incorrectly treated Strings/Symbols (ByteIndexed) as Arrays since they also have `indexedSize > 0`, causing:
 ```
-✅ Block lexical scoping: Fixed home context resolution
-✅ Temporary initialization: BlockContext temps initialized to nil
-✅ Temporary access: Fixed pushTemporary to use _activeContextOOP
-✅ Documentation: Complete compilation and runtime pipeline documented
-✅ Test Infrastructure: BlockValidatorTest and Phase0X validation
-✅ Implementation Plan: 3-phase strategy with detailed code examples
+InvalidOperationException: GetIndexedOOP called on non-PointerIndexed object!
+format: ByteIndexed (expected PointerIndexed)
 ```
 
-**✅ FIXES IMPLEMENTED (This Session)**:
-1. **Wrong home context**: Changed from `FindMethodContext(_activeContextOOP)` to `FindMethodContextByLocalId(ownerLocalId)`
-   - Blocks now access lexical environment from defining method, not calling method
-2. **Uninitialized temps**: Added nil initialization loop for BlockContext temp slots
-3. **Incorrect temp access**: Simplified pushTemporary to always read from _activeContextOOP
-   - Removed incorrect BlockContext lookup logic
-
-**📚 DOCUMENTATION CREATED**:
-1. **BlockClosure.st** - Complete Smalltalk-80 class definition (800+ lines)
-   - Instance variables: method, homeContext, returnContext, numArgs
-   - Full API: value, value:, value:value:, valueWithArguments:
-   - Control structures: whileTrue:, whileFalse:, fork, forkAt:
-   - Future-proof for non-local returns and exception handling
-
-2. **BlockValidatorTest.st** - Comprehensive test suite (300+ lines)
-   - Tests: simple blocks, nested blocks, lexical scope
-   - Block passing through multiple method layers
-   - Instance variable and receiver access validation
-   - Control flow structures (whileTrue, whileFalse)
-
-3. **Phase0X_BlockOwnershipValidation.cs** - Coldstart validation (300+ lines)
-   - Validates every block has valid ownerLocalId in blockOwnerMap
-   - Traces ownership chains for nested blocks
-   - Detects orphaned blocks and circular references
-   - Generates detailed ownership reports
-
-4. **BlockClosureArchitecture.md** - Complete specification (900+ lines)
-   - Full compilation pipeline from source to bytecode
-   - Runtime execution walkthrough with code examples
-   - Non-local return semantics and error handling
-   - VM mapping from compiler to runtime behavior
-   - Design tradeoffs and implementation checklist
-
-5. **BlockClosureImplementationPlan.md** - Phased implementation guide (400+ lines)
-   - Current state analysis (what's working vs. what needs work)
-   - 3-phase strategy with detailed code examples
-   - Risk mitigation and testing strategy
-   - Success criteria and effort estimates
-
-### 🔍 Compiler Analysis Results
-
-**✅ COMPILER IS ALREADY CORRECT**:
-- Emits blocks as separate CompiledMethod objects (BytecodeCompiler.cs:1724)
-- Pushes blocks as literals via PUSH_LITERAL bytecodes (0x20-0x3F)
-- Tracks arguments, temporaries, and scope depth correctly
-- Builds blockOwnerMap during Phase 8 (Phase8_MethodInstallation.cs:62-79)
-- Supports nested blocks with ownership chains
-- Block identification: `Selector == null` and localId starts with "block:"
-
-**blockOwnerMap Structure**:
+**Root Cause**: Detection used `GetIndexedSize()` to identify arrays:
 ```csharp
-Dictionary<string, string> blockOwnerMap; // blockLocalId → ownerMethodOrBlockLocalId
-
-// Example:
-{
-  "block:a1b2c3d4...": "method:BlockTest>>compute",
-  "block:nested123...": "block:a1b2c3d4..."  // Nested block
+// WRONG - treats any object with indexedSize > 0 as Array
+int indexedSize = ctx.GetIndexedSize(args[0]);
+if (indexedSize > 0) {
+    // Tries to call GetIndexedOOP on Strings/Symbols → CRASH
+    blockArgs = ExtractArrayElements(ctx, args[0]);
 }
 ```
 
-### 🎯 Next Session Goal: Implement BlockClosure
-
-**PRIMARY TASK**: Add BlockClosure to Smalltalk-80.st and implement VM support
-
-## Implementation Strategy
-
-### Phase 1: Add BlockClosure to Image (NEXT SESSION START HERE)
-
-**Step 1: Merge BlockClosure.st into Smalltalk-80.st**
-
-**Location**: After Object class, before Collection classes
-
-**Action Required**:
-```bash
-# Open Smalltalk-80.st in editor
-# Find section with Object subclasses (around line 1000-1500)
-# Insert BlockClosure.st content after Object, before Collection
-
-# Search for this marker in Smalltalk-80.st:
-"Object subclass:"
-
-# Insert BlockClosure definition in appropriate location
-# BlockClosure should be early in the hierarchy since it's fundamental
+**Solution**: Changed detection to check `ObjectFormat` instead:
+```csharp
+// CORRECT - checks if actually PointerIndexed
+var format = ctx.GetObjectFormat(args[0]);
+bool isArray = (format == ObjectFormat.PointerIndexed);
+if (isArray) {
+    blockArgs = ExtractArrayElements(ctx, args[0]);  // Safe now
+} else {
+    blockArgs = args;  // Treat as direct arg (includes Strings, Symbols)
+}
 ```
 
-**Critical**: BlockClosure.st is located at:
-```
-d:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk-80 Source\BlockClosure.st
-```
+**Impact**: Fixed crash when passing Strings/Symbols to blocks expecting direct arguments.
 
-**Step 2: Recompile Image**
+### Infrastructure Changes
 
-```bash
-cd "d:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler"
-dotnet run -- compile "..\Smalltalk-80 Source\Smalltalk-80.st" "..\bin\Debug\net9.0\coldstart.json"
-```
-
-**Expected Output**:
-- BlockClosure class compiled into coldstart.json
-- No compilation errors
-- BlockClosure appears in class list with proper instance variables
-
-**Step 3: Verify BlockClosure in Image**
-
-```bash
-# Check coldstart.json contains BlockClosure
-grep -c '"name": "BlockClosure"' "../bin/Debug/net9.0/coldstart.json"
-# Should output: 1
-
-# Verify instance variables
-grep -A 10 '"name": "BlockClosure"' "../bin/Debug/net9.0/coldstart.json"
-# Should show: method, homeContext, returnContext, numArgs
-```
-
-### Phase 2: Implement VM BlockClosure Wrapping
-
-**File**: `VirtualMachine.cs`
-
-**Change 1: Add Block Literal Detection Helper** (After line 2500):
-
+**Added to IPrimitiveContext interface**:
 ```csharp
 /// <summary>
-/// Checks if an OOP is a block literal (CompiledMethod with localId starting with "block:").
+/// Gets the object format (ByteIndexed, PointerIndexed, etc.) of an object.
 /// </summary>
-private bool IsBlockLiteral(SmalltalkOOP oop)
-{
-    if (oop.IsSmallInteger)
-        return false;
-
-    // Check if this OOP has a localId starting with "block:"
-    string? localId = GetLocalId(oop);
-    return localId != null && localId.StartsWith("block:");
-}
-
-/// <summary>
-/// Gets the localId for an OOP by searching GlobalRegistry.
-/// </summary>
-private string? GetLocalId(SmalltalkOOP oop)
-{
-    foreach (var kvp in _globalRegistry.GetAllEntries())
-    {
-        if (kvp.Value.Equals(oop))
-        {
-            return kvp.Key;
-        }
-    }
-    return null;
-}
-
-/// <summary>
-/// Gets the argument count from a block CompiledMethod header.
-/// </summary>
-private int GetBlockArgCount(SmalltalkOOP blockMethodOOP)
-{
-    var header = ParseMethodHeader(blockMethodOOP);
-    return header.NumArgs;
-}
+ObjectFormat GetObjectFormat(SmalltalkOOP objectOOP);
 ```
 
-**Change 2: Modify pushLiteral to Wrap Blocks** (Around line 333):
-
-**FIND THIS CODE**:
+**Implemented in VirtualMachine**:
 ```csharp
-// Push literal constant 0-31 (0x20-0x3F)
-// CRITICAL: Add +1 to skip header at lit[0]
-if (BytecodeUtil.IsPushLiteralConst(bytecode))
+ObjectFormat IPrimitiveContext.GetObjectFormat(SmalltalkOOP objectOOP)
 {
-    int index = BytecodeUtil.PushLiteralConstIndex(bytecode);
-    var literal = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-    Push(literal);
-    return true;
+    return _heapManager.GetObjectFormat(objectOOP);
 }
 ```
 
-**REPLACE WITH**:
-```csharp
-// Push literal constant 0-31 (0x20-0x3F)
-// CRITICAL: Add +1 to skip header at lit[0]
-if (BytecodeUtil.IsPushLiteralConst(bytecode))
-{
-    int index = BytecodeUtil.PushLiteralConstIndex(bytecode);
-    var literal = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
+### Init Expression Status
 
-    // Check if this literal is a block - wrap in BlockClosure
-    if (IsBlockLiteral(literal))
-    {
-        // Create BlockClosure instance to wrap the block
-        var closureOOP = CreateBlockClosure(literal, _activeContextOOP);
-        Push(closureOOP);
-    }
-    else
-    {
-        // Regular literal - push as-is
-        Push(literal);
-    }
-    return true;
-}
+**✅ NOW PASSING** (2 new expressions enabled):
+- `InstructionStream initialize` - Fixed by hierarchical temp indexing compiler fix
+- `Scanner initialize` - Fixed by hierarchical temp indexing compiler fix
+
+**❌ STILL FAILING** (need investigation):
+- `Form initialize` - Context depth exceeded (infinite recursion)
+- `Object initialize` - Method not found: `value:` in SmallInteger
+- `Text initialize` - Method not found: `value:` in String
+- `TextList initialize` - Context depth exceeded (infinite loop)
+- `VariableNode initialize` - Context depth exceeded (GetIndexedOOP bug fixed, but different recursion issue)
+- `InputSensor initialize` - Method not found: `cursorPoint` in UndefinedObject
+
+**Skip List** (require runtime features not yet implemented):
+```
+Delay initialize                     // Requires process/threading primitives (forkAt:)
+BitEditor initialize                 // Requires PopUpMenu → TextStyle/Font infrastructure
+FormMenuView initialize              // Requires file I/O primitives (Form readFrom:)
+ChangeListController initialize      // Requires PopUpMenu → TextStyle/Font infrastructure
+FormEditor initialize                // Requires PopUpMenu → TextStyle/Font infrastructure
+NotifierController initialize        // Requires PopUpMenu → TextStyle/Font infrastructure
+ParagraphEditor initialize           // Requires PopUpMenu → TextStyle/Font infrastructure
+ProjectController initialize         // Requires PopUpMenu → TextStyle/Font infrastructure
+ScreenController initialize          // Requires PopUpMenu → TextStyle/Font infrastructure
+StandardSystemController initialize  // Requires PopUpMenu → TextStyle/Font infrastructure
+StringHolderController initialize    // Requires PopUpMenu → TextStyle/Font infrastructure
 ```
 
-**Change 3: Add CreateBlockClosure Method** (After line 2500):
+### Files Modified (Commit 7aee82d)
 
-```csharp
-/// <summary>
-/// Creates a BlockClosure instance wrapping a block CompiledMethod.
-/// Captures the current execution context as the homeContext.
-/// </summary>
-private SmalltalkOOP CreateBlockClosure(SmalltalkOOP blockMethodOOP, SmalltalkOOP homeContextOOP)
-{
-    // Get BlockClosure class from GlobalRegistry
-    if (!_globalRegistry.TryGet("class:BlockClosure", out SmalltalkOOP blockClosureClassOOP))
-    {
-        throw new InvalidOperationException(
-            "BlockClosure class not found - ensure BlockClosure.st is in the image");
-    }
+**VM Primitive Fixes**:
+- `Smalltalk80.Interpreter/Core/VM/Primitives/BlockClosurePrimitives.cs`
+  - Lines 1-3: Added `using Smalltalk80.Interpreter.Core.Objects;`
+  - Lines 77-81: Fixed array detection to check ObjectFormat instead of indexedSize
 
-    // Get instance variable count for BlockClosure
-    int instVarCount = _layoutResolver.GetInstanceVariableCount("class:BlockClosure");
+- `Smalltalk80.Interpreter/Core/VM/Primitives/IPrimitiveContext.cs`
+  - Line 2: Added `using Smalltalk80.Interpreter.Core.Objects;`
+  - Lines 175-180: Added `GetObjectFormat(SmalltalkOOP)` method signature
 
-    // Allocate BlockClosure instance (no indexed slots)
-    var closureOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, instVarCount, 0);
-    _heapManager.SetSlot(closureOOP, 0, blockClosureClassOOP); // Set class reference
+- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs`
+  - Lines 5139-5142: Implemented `GetObjectFormat` method (delegates to `_heapManager`)
 
-    // Get field indices
-    int methodIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "method");
-    int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
-    int returnContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "returnContext");
-    int numArgsIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "numArgs");
+**Init Expression Management**:
+- `Smalltalk80.Interpreter/Program.cs`
+  - Lines 167-177: Updated skip list documentation with detailed status for each expression
 
-    // Get block argument count from method header
-    int numArgs = GetBlockArgCount(blockMethodOOP);
+**Test Files Added**:
+- `Smalltalk-80 Source/Tests/ContextAccessTest.st` - Context access validation tests
+- `Smalltalk-80 Source/Tests/SimpleNestedBlockTest.st` - Nested block tests
+- `Smalltalk-80 Source/Tests/SingleTest.st` - Single test runner
+- `Smalltalk80.Compiler.Tests/RuntimeExecutionTests.cs` - Runtime execution tests
 
-    // Initialize instance variables
-    _heapManager.SetInstanceVariable(closureOOP, methodIndex, blockMethodOOP);
-    _heapManager.SetInstanceVariable(closureOOP, homeContextIndex, homeContextOOP);
-    _heapManager.SetInstanceVariable(closureOOP, returnContextIndex, homeContextOOP);
-    _heapManager.SetInstanceVariable(closureOOP, numArgsIndex,
-        SmalltalkOOP.FromSmallInteger(numArgs));
+**Cleanup**:
+- Removed 153KB+ of temporary debug files (.txt files, test files, debug logs)
 
-    return closureOOP;
-}
-```
+## Testing Status
 
-**Change 4: Modify InvokeBlockInternal to Use BlockClosure** (Around line 1492):
+### Compiler Tests
+**✅ ALL PASSING**:
+- 35/35 bytecode validation tests passing
+- 120/120 BlockContextTest runtime tests passing (result = 1,191)
+- 3-level nested block hierarchical temp indexing working correctly
 
-**FIND THIS CODE**:
-```csharp
-// Step 2: Determine contexts
-// homeContext = find the method context where the block was DEFINED (using blockOwnerMap)
-// This is the context that owns the block's lexical environment (receiver, instance variables)
-var homeContextOOP = FindMethodContextByLocalId(ownerLocalId);
-if (homeContextOOP == default)
-{
-    throw new InvalidOperationException($"No method context found for block owner {ownerLocalId} - context may have already returned");
-}
-```
+### Init Expressions
+**Current**: 29/34 passing (85% success rate)
+**Skipped**: 13 expressions (runtime features not implemented)
+**Failing**: 5 expressions (VM bugs to investigate)
 
-**REPLACE WITH**:
-```csharp
-// Step 2: Determine contexts
-// Check if blockMethodOOP is wrapped in a BlockClosure
-SmalltalkOOP homeContextOOP;
+### Test Commands
 
-// Try to get homeContext from BlockClosure if this is a closure
-if (IsBlockClosure(blockMethodOOP))
-{
-    // Extract homeContext from BlockClosure
-    int homeContextIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
-    homeContextOOP = _heapManager.GetInstanceVariable(blockMethodOOP, homeContextIndex);
-
-    // Extract the actual block method
-    int methodIndex = _layoutResolver.GetFieldIndex("class:BlockClosure", "method");
-    blockMethodOOP = _heapManager.GetInstanceVariable(blockMethodOOP, methodIndex);
-}
-else
-{
-    // Fallback: raw CompiledMethod (for compatibility)
-    homeContextOOP = FindMethodContextByLocalId(ownerLocalId);
-    if (homeContextOOP == default)
-    {
-        throw new InvalidOperationException(
-            $"No method context found for block owner {ownerLocalId}");
-    }
-}
-```
-
-**Change 5: Add IsBlockClosure Helper** (After line 2500):
-
-```csharp
-/// <summary>
-/// Checks if an OOP is a BlockClosure instance.
-/// </summary>
-private bool IsBlockClosure(SmalltalkOOP oop)
-{
-    if (oop.IsSmallInteger)
-        return false;
-
-    try
-    {
-        var classOOP = _heapManager.GetClass(oop);
-        var className = GetClassName(classOOP);
-        return className == "BlockClosure";
-    }
-    catch
-    {
-        return false;
-    }
-}
-```
-
-### Phase 3: Testing
-
-**Test 1: Verify Compilation**
+**Run init expressions**:
 ```bash
 cd "d:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter"
-dotnet build
-
-# Should compile with no errors
+.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe --new-loader
 ```
 
-**Test 2: Run Cold Start**
+**Run BlockContextTest**:
 ```bash
-dotnet run -- --coldstart "../bin/Debug/net9.0/coldstart.json"
-
-# Expected: All 14 phases pass
-# Phase 14 should validate BlockClosure class
+.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe --execute "BlockContextTest testAllCombinations"
+# Expected result: 1,191 (sum of all 120 test results)
 ```
 
-**Test 3: Run Init Expressions**
+**Run compiler tests**:
 ```bash
-# Run init expressions 1-3
-dotnet run -- init 1
-dotnet run -- init 2
-dotnet run -- init 3
-
-# Expected:
-# init#1: WindowsFileSystem.initialize - PASS
-# init#2: WindowsFileDirectory.initialize - PASS
-# init#3: BinaryChoiceView.initialize - PASS (was failing before)
+cd "d:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests"
+dotnet test
 ```
 
-**Test 4: Verify Block Wrapping**
-Add temporary debug output to confirm blocks are being wrapped:
+## Next Steps / TODO
 
+### Immediate (Next Session)
+
+1. **Investigate Failing Init Expressions**:
+   - `Form initialize` - Why infinite recursion?
+   - `Object initialize` - Why `value:` not found in SmallInteger?
+   - `Text initialize` - Why `value:` not found in String?
+   - `TextList initialize` - Root cause of infinite loop?
+   - `VariableNode initialize` - Different recursion issue (not GetIndexedOOP related)
+
+2. **Missing Primitives**:
+   - `cursorPoint` for InputSensor (graphics/input primitive)
+   - May need IPlatformBridge implementation
+
+### Medium Term
+
+3. **Primitive Implementation**:
+   - Review remaining unimplemented primitives (see CLAUDE.md for full list)
+   - Prioritize primitives needed by failing init expressions
+
+4. **Graphics/UI Infrastructure**:
+   - TextStyle/Font system (needed by 11 controller initialize expressions)
+   - File I/O primitives (needed by FormMenuView)
+
+### Long Term
+
+5. **Process/Threading**:
+   - Implement `forkAt:` primitive for Delay
+   - ProcessorScheduler support
+
+6. **Performance**:
+   - Tail recursion optimization (documented in CLAUDE.md but not yet enabled)
+   - Consider method cache improvements
+
+## Project Architecture
+
+### Key Components
+
+**Compiler** (`Smalltalk80.Compiler`):
+- ANTLR4-based parser for Smalltalk-80 syntax
+- BytecodeCompiler generates VM bytecodes
+- Tail recursion analyzer (implemented but not enabled)
+- Cold start JSON generator (schema v1.0.6)
+
+**Interpreter** (`Smalltalk80.Interpreter`):
+- 6-phase cold start loader (Phases 1-6)
+- VirtualMachine with bytecode execution engine
+- Primitive table (200+ primitives defined)
+- HeapManager with garbage collection
+- LayoutResolver for runtime field access
+
+**Bundle Format** (coldstart-v1.0.6.schema.json):
+- Precomputed class layouts (`totalInstanceVarCount`, `fieldLayout[]`)
+- Method bytecodes with literal pools
+- Symbol table and global dictionary
+- Init expression list with ownership map
+
+### Important Files
+
+**Documentation**:
+- `CLAUDE.md` - Complete development history and guidelines (ALWAYS READ THIS FIRST!)
+- `docs/COLDSTART-PHASES-DETAILED.md` - Cold start loader architecture
+- `docs/Interpreter-Architecture.md` - VM architecture and BlockClosure support
+- `docs/schemas/coldstart-v1.0.6.schema.json` - Bundle schema
+
+**Core Implementation**:
+- `Smalltalk80.Compiler/BytecodeCompiler.cs` - Bytecode generation (2700+ lines)
+- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` - VM execution (5200+ lines)
+- `Smalltalk80.Interpreter/Core/HeapManager/SmalltalkHeapManager.cs` - Memory management
+- `Smalltalk80.Interpreter/Engine/Loader.cs` - Cold start loader (6 phases)
+
+**Test Suites**:
+- `Smalltalk80.Compiler.Tests/BlockContextTestBytecodeValidation.cs` - 35 bytecode tests
+- `Smalltalk-80 Source/Tests/BlockContextTest.st` - 120 runtime tests
+- `Smalltalk80.Compiler.Tests/ComprehensiveContextAccessTests.cs` - Context access tests
+
+## Git History (Recent)
+
+```
+7aee82d (HEAD -> main, origin/main) Fix VM bug: GetIndexedOOP on ByteIndexed objects + enable 2 more init expressions
+290731a Update .claude/settings.local.json after bug fix session
+607e4a0 Update CLAUDE.md with BlockClosure homeContext bug fix documentation
+b8fd832 CRITICAL FIX: BlockClosure homeContext bug causing instance variable access errors
+e4af4e7 Consolidate primitive documentation into single comprehensive summary
+```
+
+**Working Directory**: Clean (all changes committed and pushed)
+
+## Critical Principles (from CLAUDE.md)
+
+### Object-Oriented Design
+
+**ABSOLUTE PROHIBITION**: No hard-coded OOP values
 ```csharp
-// In pushLiteral, after if (IsBlockLiteral(literal))
-Console.WriteLine($"[DEBUG] Wrapping block {GetLocalId(literal)} in BlockClosure");
-Console.WriteLine($"[DEBUG] HomeContext captured: {_activeContextOOP}");
+// WRONG - Never create hardcoded OOPs
+return new SmalltalkOOP(0);
+var nilOOP = new SmalltalkOOP(0);
+
+// CORRECT - Use SpecialObjectsArray
+return SpecialObjectsArray.Instance.Nil;
+var nilOOP = SpecialObjectsArray.Instance.Nil;
 ```
 
-Expected output during init#3:
-```
-[DEBUG] Wrapping block block:xyz123... in BlockClosure
-[DEBUG] HomeContext captured: oop=12345
-```
-
-### Phase 4: Implement Primitive 207 (valueWithArguments:)
-
-**File**: `ObjectPrimitives.cs`
-
-**Add at end of class**:
-
+**Array Initialization Rule**: C# arrays default to `SmalltalkOOP(0)` which is NOT nil!
 ```csharp
-/// <summary>
-/// Primitive 207: BlockClosure>>valueWithArguments:
-/// Evaluate a block with arguments provided in an array.
-/// </summary>
-public static SmalltalkOOP Primitive207_ValueWithArguments(PrimitiveContext ctx)
-{
-    var blockClosureOOP = ctx.Receiver;
-    var argsArrayOOP = ctx.Arguments[0];
-
-    // Verify receiver is BlockClosure
-    var receiverClass = ctx.HeapManager.GetClass(blockClosureOOP);
-    var className = ctx.VirtualMachine.GetClassName(receiverClass);
-    if (className != "BlockClosure")
-    {
-        return ctx.PrimitiveFail("Receiver must be BlockClosure");
-    }
-
-    // Extract method and homeContext from BlockClosure
-    int methodIndex = ctx.LayoutResolver.GetFieldIndex("class:BlockClosure", "method");
-    int homeContextIndex = ctx.LayoutResolver.GetFieldIndex("class:BlockClosure", "homeContext");
-
-    var blockMethodOOP = ctx.HeapManager.GetInstanceVariable(blockClosureOOP, methodIndex);
-    var homeContextOOP = ctx.HeapManager.GetInstanceVariable(blockClosureOOP, homeContextIndex);
-
-    // Extract arguments from array
-    var entry = ctx.HeapManager.GetObjectTableEntry(argsArrayOOP);
-    int arraySize = ctx.HeapManager.GetIndexedSizeFromEntry(entry);
-    var args = new SmalltalkOOP[arraySize];
-    for (int i = 0; i < arraySize; i++)
-    {
-        args[i] = ctx.HeapManager.GetIndexedOOP(argsArrayOOP, i);
-    }
-
-    // Invoke block using VM infrastructure
-    return ctx.VirtualMachine.InvokeBlock(blockMethodOOP, args);
+// Must initialize after nil exists:
+var slots = new SmalltalkOOP[size];
+var nilOOP = SpecialObjectsArray.Instance.Nil;
+for (int i = 0; i < size; i++) {
+    slots[i] = nilOOP;  // REQUIRED - do not rely on default
 }
 ```
 
-**Register primitive** in PrimitiveRegistry:
+### Cold Start vs Runtime Separation
 
+**FUNDAMENTAL RULE**: All runtime operations must reference ONLY Smalltalk heap data, not C# proxy structures.
+
+**Cold Start Phase** (Phases 0-6):
+- Can use `ColdStartBundle`, registries (write), frozen data
+- Marked with `[ColdStartOnly]` attribute
+
+**Runtime Phase** (Init expressions onward):
+- ONLY `ISmalltalkHeapManager` and `LayoutResolver`
+- Marked with `[RuntimeOnly]` attribute
+- Registries frozen after Phase 6 (read-only)
+
+### Runtime Index Resolution
+
+**NEVER use hardcoded indices during runtime execution**. All indices must be resolved dynamically:
 ```csharp
-// In PrimitiveRegistry.RegisterPrimitives()
-Register(207, ObjectPrimitives.Primitive207_ValueWithArguments);
+// WRONG - hardcoded field count
+var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 6, stackSize);
+
+// CORRECT - query LayoutResolver
+int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
+var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
 ```
-
-## Critical Implementation Details
-
-### Example Method for Reference
-
-```smalltalk
-BlockTest >> compute
-    | a |
-    a := 10.
-    ^ [ a + 1 ] value
-```
-
-**What happens at runtime**:
-
-1. **Method Entry**: Create MethodContext M for `compute`
-   - M.indexed[0] will hold temp `a`
-
-2. **Execute `a := 10`**:
-   - Store 10 into M.indexed[0]
-
-3. **Execute `pushLiteral` for block**:
-   - Literal is CompiledMethod (block)
-   - `IsBlockLiteral()` returns true
-   - `CreateBlockClosure()` called:
-     - method = block CompiledMethod
-     - homeContext = M (current context - CAPTURED!)
-     - returnContext = M
-     - numArgs = 0
-   - BlockClosure pushed onto stack
-
-4. **Execute `send #value`**:
-   - Receiver is BlockClosure
-   - Extract homeContext (M) from BlockClosure
-   - Create block activation with homeContext linkage
-   - Block can now access M.indexed[0] (variable `a`)
-
-### BlockClosure Instance Variables
-
-```
-method          → CompiledMethod for the block
-homeContext     → MethodContext where block was defined (LEXICAL ENVIRONMENT)
-returnContext   → MethodContext to return to (for non-local returns)
-numArgs         → SmallInteger, number of arguments
-```
-
-### Key Principle
-
-**The homeContext is CAPTURED at block creation time (pushLiteral), NOT searched at invocation time (send #value).**
-
-This is the fundamental difference that makes blocks true closures.
-
-## Expected Outcomes
-
-### Success Criteria
-
-**Phase 1 Success**:
-- [ ] BlockClosure.st merged into Smalltalk-80.st without errors
-- [ ] Image recompiles successfully
-- [ ] BlockClosure class appears in coldstart.json
-- [ ] BlockClosure has 4 instance variables: method, homeContext, returnContext, numArgs
-
-**Phase 2 Success**:
-- [ ] VM compiles with no errors
-- [ ] All 14 coldstart phases pass
-- [ ] Blocks are wrapped in BlockClosure at pushLiteral time
-- [ ] Debug output confirms homeContext capture
-
-**Phase 3 Success**:
-- [ ] init#1, init#2, init#3 all pass
-- [ ] Blocks access correct outer variables (lexical scoping works)
-- [ ] Blocks access correct receiver (self)
-- [ ] No GC errors or crashes
-
-**Phase 4 Success**:
-- [ ] Primitive 207 works correctly
-- [ ] Can call `[ :x | x + 1 ] valueWithArguments: #(5)` from Smalltalk
-- [ ] BlockValidatorTest tests can run
-
-## Common Issues and Solutions
-
-### Issue: "BlockClosure class not found"
-**Cause**: BlockClosure.st not in image or not compiled
-**Solution**: Verify BlockClosure in Smalltalk-80.st, recompile image
-
-### Issue: "Cannot get instance variable... for BlockClosure"
-**Cause**: Field index resolution failing
-**Solution**: Check that BlockClosure has correct instance variable names in .st file
-
-### Issue: Blocks still accessing wrong lexical environment
-**Cause**: homeContext not captured or not used correctly
-**Solution**:
-1. Verify CreateBlockClosure captures _activeContextOOP
-2. Verify InvokeBlockInternal extracts homeContext from BlockClosure
-3. Add debug output to trace homeContext values
-
-### Issue: Circular reference or infinite loop during GC
-**Cause**: BlockClosure.homeContext creating cycles
-**Solution**: This is EXPECTED - GC should handle cycles correctly. If issues:
-1. Check that GC marks BlockClosure instances
-2. Verify MethodContext marking follows instance variables
-3. Test with simple case: `[ 1 + 1 ] value` (no outer variable capture)
-
-## Files to Review
-
-### Before Starting
-1. **BlockClosure.st** - The class definition to merge
-2. **BlockClosureArchitecture.md** - Complete specification
-3. **BlockClosureImplementationPlan.md** - Detailed implementation guide
-
-### During Implementation
-4. **VirtualMachine.cs** - Where all changes happen
-5. **ObjectPrimitives.cs** - Where Primitive 207 goes
-6. **Phase8_MethodInstallation.cs** - Verify blockOwnerMap population
-7. **Phase0X_BlockOwnershipValidation.cs** - Optional validation phase
-
-### For Testing
-8. **BlockValidatorTest.st** - Test suite (after Phase 4)
-9. **Smalltalk-80.st** - Check BinaryChoiceView.initialize example
 
 ## Quick Reference Commands
 
+**Build everything**:
 ```bash
-# 1. Add BlockClosure to image
-cd "d:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk-80 Source"
-# Edit Smalltalk-80.st to include BlockClosure.st content
-
-# 2. Recompile image
-cd "../Smalltalk80.Compiler"
-dotnet run -- compile "../Smalltalk-80 Source/Smalltalk-80.st" "../bin/Debug/net9.0/coldstart.json"
-
-# 3. Verify BlockClosure in image
-grep -c '"name": "BlockClosure"' "../bin/Debug/net9.0/coldstart.json"
-
-# 4. Build interpreter with changes
-cd "../Smalltalk80.Interpreter"
-dotnet build
-
-# 5. Test cold start
-dotnet run -- --coldstart "../bin/Debug/net9.0/coldstart.json"
-
-# 6. Test init expressions
-dotnet run -- init 1
-dotnet run -- init 2
-dotnet run -- init 3
-
-# 7. Run all init expressions
-dotnet run -- init-all
+dotnet build -c Debug
 ```
 
-## Git Status
+**Compile Smalltalk source to bundle**:
+```bash
+cd Smalltalk80.Compiler
+dotnet run -- "Smalltalk-80 Source/Smalltalk-80.st" bin/Debug/net9.0/coldstart.json
+```
 
-**Current Branch**: main
-**Recent Commits**:
-- `1872089` - fix: correct block context home resolution and temporary variable access
-- `4c8d4ea` - feat: add BlockClosure class, validator tests, and ownership validation
-- `8c07cd4` - docs: add comprehensive BlockClosure architecture documentation
-- `e930b3d` - docs: add comprehensive compilation and runtime pipeline
-- `4a03d8a` - docs: add comprehensive BlockClosure implementation plan
+**Run cold start**:
+```bash
+cd Smalltalk80.Interpreter
+.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe --new-loader
+```
 
-**Files Staged**: None
-**Modified Files**: None (clean working directory)
+**Run specific test suite**:
+```bash
+.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe --execute "BlockContextTest testAllCombinations"
+```
+
+**Run C# unit tests**:
+```bash
+cd Smalltalk80.Compiler.Tests
+dotnet test
+```
+
+**Git workflow**:
+```bash
+git status
+git add -A
+git commit -m "message"
+git push
+```
 
 ---
 
-**Session Status**: 🎯 **BlockClosure Architecture Complete - Ready for Implementation**
-**Achievement**: 📚 **Complete Documentation + Test Infrastructure + Implementation Plan**
-**Next Step**: 🚀 **Merge BlockClosure.st into Smalltalk-80.st and implement VM wrapping**
+**Session Status**: 🎯 **VM Bug Fixed - Init Expression Progress**
+**Achievement**: ✅ **GetIndexedOOP bug resolved, +2 init expressions passing**
+**Next Step**: 🔍 **Investigate remaining 5 failing init expressions**
