@@ -138,7 +138,7 @@ StringHolderController initialize    // Requires PopUpMenu → TextStyle/Font in
 **Run init expressions**:
 ```bash
 cd "d:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter"
-.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe --new-loader
+.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe
 ```
 
 **Run BlockContextTest**:
@@ -199,7 +199,13 @@ dotnet test
 - Cold start JSON generator (schema v1.0.6)
 
 **Interpreter** (`Smalltalk80.Interpreter`):
-- 6-phase cold start loader (Phases 1-6)
+- 6-phase cold start loader:
+  - Phase 1: Preflight + Symbol Interning
+  - Phase 2: Class Infrastructure
+  - Phase 3: Object Allocation
+  - Phase 4: Method Compilation
+  - Phase 5: Globals + Patches
+  - Phase 6: Validation + GC Verification
 - VirtualMachine with bytecode execution engine
 - Primitive table (200+ primitives defined)
 - HeapManager with garbage collection
@@ -308,7 +314,7 @@ dotnet run -- "Smalltalk-80 Source/Smalltalk-80.st" bin/Debug/net9.0/coldstart.j
 **Run cold start**:
 ```bash
 cd Smalltalk80.Interpreter
-.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe --new-loader
+.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe
 ```
 
 **Run specific test suite**:

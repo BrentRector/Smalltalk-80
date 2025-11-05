@@ -214,7 +214,7 @@ SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;  // Returns OOP(0)!
 
 **Next Steps**:
 1. **REBUILD**: `dotnet build -c Debug`
-2. **RUN**: `.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe --new-loader`
+2. **RUN**: `.\bin\Debug\net9.0\Smalltalk80.Interpreter.exe`
 3. If the defensive check triggers → SpecialObjectsArray architecture issue
 4. If it doesn't trigger → initialization working, look for other OOP(0) sources
 
@@ -264,7 +264,7 @@ if (format == ObjectFormat.PointerIndexed && indexedSize > 0)
 ```
 
 **Benefits**:
-- ✅ Instance variables properly initialized to nil, matching Phase Y behavior during cold start
+- ✅ Instance variables properly initialized to nil, matching Phase 3 behavior during cold start
 - ✅ WriteStream>>reset and similar methods work correctly with nil values
 - ✅ Error handling works without stack overflow
 - ✅ Arrays and other PointerIndexed objects have nil-initialized indexed slots
@@ -673,15 +673,16 @@ _allocator.SetSlot(methodDictOOP, 0, methodDictClassOOP); // Easy to forget!
 
 **Problem**: Previous architecture had suboptimal phase ordering with multi-pass initialization at the end, leading to complex placeholder management and potential circular dependency issues.
 
-**Solution**: Restructured phases to resolve circular dependencies early, then do full allocation+initialization:
-- **Moved Phase X (Class Reference Initialization) after Phase 6** - Sets class references immediately after nil singleton exists
-- **Moved Phase Y (Instance Variable Initialization) after Phase X** - Initializes instance variables to nil after class references set
-- **Phases 7-14 now do full allocation+initialization** - No placeholders needed
+**Solution**: Restructured into 6-phase architecture that resolves circular dependencies efficiently:
+- **Phase 2: Class Infrastructure** - Builds complete class hierarchy with layouts
+- **Phase 3: Object Allocation** - Creates all objects with full initialization in one pass
+- **Phase 4: Method Compilation** - Installs all methods after objects exist
+- No multi-pass initialization needed
 
 **Benefits**:
-- ✅ Eliminates placeholder OOP usage after Phase Y
+- ✅ Eliminates placeholder OOP usage entirely
 - ✅ Simpler mental model - objects fully initialized when created
-- ✅ Better performance - no second pass needed for most objects
+- ✅ Better performance - single-pass allocation with initialization
 - ✅ Cleaner code - allocation methods include full initialization
 - ✅ Easier debugging - objects always in valid state
 
@@ -711,52 +712,45 @@ _allocator.SetSlot(methodDictOOP, 0, methodDictClassOOP); // Easy to forget!
 - ✅ Primitive access patterns match actual Smalltalk-80 source code expectations
 - ✅ No GC traversal issues with mixed OOP/SmallInteger patterns
 
-### 🎉 Cold Start Loader Architectures
+### 🎉 Cold Start Loader Architecture
 
-**TWO LOADER IMPLEMENTATIONS AVAILABLE:**
+**SINGLE 6-PHASE LOADER IMPLEMENTATION:**
 
-1. **Current 17-Phase Loader** (`Loader.cs`) - Default
-   - Comprehensive phase-by-phase bootstrap
-   - Explicit separation of initialization steps
-   - Phases: 0-6, X, Y, 7-12
-   - Use by default (no flags needed)
+The cold start loader uses a streamlined 6-phase architecture that consolidates related operations:
 
-2. **New 6-Phase Loader** (`Loader_New.cs`) - Experimental
-   - Consolidated phases for better performance
-   - Phases: 1-6 (combined operations)
-   - Use with `--new-loader` flag
-   - Still under development
+**Phase 1: Preflight + Symbol Interning** ✅
+- Validates bundle schema and metadata
+- Creates all Symbol objects
+- Freezes symbol registry after completion
 
-**CURRENT 17-PHASE LOADER STATUS (All Working ✅)**
+**Phase 2: Class Infrastructure** ✅
+- Creates class/metaclass shells
+- Wires inheritance chains and metaclass circle
+- Resolves and loads precomputed class layouts (v1.0.6)
+- Initializes LayoutResolver for runtime field access
 
-**BOOTSTRAP PHASES (0-6):**
-- Phase 0: Preflight Validation ✅
-- Phase 1: Symbol Interning ✅
-- Phase 2: Class Shells ✅
-- Phase 3: Metaclass Wiring ✅
-- Phase 4: Class Resolution ✅
-- Phase 5: Layout Loading (precomputed from v1.0.6 bundles) ✅
-- Phase 6: Object Allocation (creates nil/true/false singletons) ✅
+**Phase 3: Object Allocation** ✅
+- Allocates all remaining objects (globals, singletons, strings, arrays)
+- Creates nil/true/false singletons
+- Populates SpecialObjectsArray
+- Initializes instance variables to nil
 
-**MULTI-PASS INITIALIZATION (X, Y):**
-- Phase X: Class Reference Initialization ✅
-  - Sets class slot (slot 0) for all objects
-  - Maps instances → metaclasses, symbols → class:Symbol, etc.
-- Phase Y: Instance Variable Initialization ✅
-  - Initializes remaining instance variables to nil
-  - Ensures no zero/uninitialized slots
+**Phase 4: Method Compilation** ✅
+- Compiles all methods (CompiledMethod + ByteArray objects)
+- Installs methods into method dictionaries
+- Prepares init expression array
 
-**FULL ALLOCATION + INITIALIZATION (7-12):**
-- Phase 7: Method Dictionary Allocation ✅
-- Phase 8: Method Installation ✅
-- Phase 9: Method Dictionary Installation ✅
-- Phase 10: Patch Application ✅
-- Phase 11: USTable Population ✅
-- Phase 12: Global Variable Installation ✅
+**Phase 5: Globals + Patches** ✅
+- Populates USTable (unique symbol table)
+- Installs global variables in Smalltalk dictionary
+- Applies system patches
 
-**Note:** Phase X and Y use letter designations because they were inserted between Phase 6 and Phase 7 after the initial numbering was established. They handle critical initialization that must occur after singleton allocation (Phase 6) but before method installation (Phase 7-12).
+**Phase 6: Validation + GC Verification** ✅
+- Comprehensive object validation
+- Garbage collection verification (ensures 0 unreachable objects)
+- Freezes global registry after completion
 
-**🎉 COMPLETE SUCCESS**: All 17 phases working with 100% validation success.
+**🎉 COMPLETE SUCCESS**: All 6 phases working with 100% validation success.
 
 ## Developer Principles
 
@@ -793,38 +787,41 @@ These invariants are non-negotiable requirements that the loader must enforce:
 The VM must provide these guarantees in the specified order:
 
 1. **Symbol Interning** (Phase 1): Deterministic symbol interning - same symbol indices → same symbol OOPs
+   - Validates bundle schema and metadata
+   - Freezes symbol registry after completion
 
-2. **Class Shell Allocation** (Phase 2): Allocate class shells for all classes/metaclasses before wiring any cross-class fields
+2. **Class Infrastructure** (Phase 2):
+   - Allocate class shells for all classes/metaclasses before wiring any cross-class fields
+   - Wire `metaclass.thisClass` and the metaclass circle exactly as in the file-out
+   - Populate class metadata (name, format, superclass references)
+   - Load precomputed class layouts deterministically (v1.0.6 bundle format)
+   - Initialize LayoutResolver for runtime field access
 
-3. **Metaclass Wiring** (Phase 3): Wire `metaclass.thisClass` and the metaclass circle exactly as in the file-out (deterministic wiring order)
+3. **Object Allocation** (Phase 3):
+   - Allocate nil/true/false singletons and register them in SpecialObjectsArray
+   - Set every object's class slot (slot 0) deterministically
+   - Initialize all instance variable slots to nil (not left as zero)
+   - Allocate all remaining objects (globals, strings, arrays, etc.)
 
-4. **Class Metadata** (Phase 4): Populate class metadata (name, format, superclass references) using the file-out data; defer `Object.superclass` until nil exists
+4. **Method Compilation** (Phase 4):
+   - Compile/allocate CompiledMethod and ByteArray objects exactly as described by the file-out
+   - All CompiledMethods have valid homeClass reference in fixed slot 0 for correct super send semantics
+   - Allocate method dictionaries with deterministic sizing
+   - Install methods into method dictionaries deterministically
+   - Prepare init expression array
 
-5. **Layout Loading** (Phase 5): Load or compute class layouts deterministically (precomputed layout from file-out preferred)
+5. **Globals + Patches** (Phase 5):
+   - Populate USTable (unique symbol table)
+   - Install global variables in Smalltalk dictionary using canonical Association objects
+   - Apply system patches
+   - Freeze global registry after completion
 
-6. **Singleton Allocation** (Phase 6): Allocate nil/true/false singletons and register them in SpecialObjectsArray
+6. **Validation** (Phase 6):
+   - Verify all invariants satisfied
+   - GC verification ensures 0 unreachable objects
+   - Ready for init expression execution
 
-7. **Class Reference Initialization** (Phase X): Set every object's class slot (slot 0) deterministically:
-   - Classes → metaclasses
-   - Symbols → `class:Symbol`
-   - etc.
-
-8. **Instance Variable Initialization** (Phase Y): Initialize all remaining instance variable slots to nil only where not explicitly set by earlier phases
-
-9. **Method Dictionary Allocation** (Phase 7): Allocate method dictionaries with deterministic sizing
-
-10. **Method Installation** (Phase 8):
-    - Compile/allocate CompiledMethod and ByteArray objects exactly as described by the file-out
-    - Canonicalize Associations used by methods globally
-    - All CompiledMethods have valid homeClass reference in fixed slot 0 for correct super send semantics
-
-11. **Method Dictionary Installation** (Phase 9): Install methods into method dictionaries deterministically (hash probing must be deterministic or use file-out placement data)
-
-12. **USTable and Globals** (Phases 12-13): Populate USTable and Smalltalk dictionary using canonical Association objects
-
-13. **Init Expression Execution** (Phase 16): Execute init expressions (if the running image does) in the same order and environment the file-out expects
-
-**Validation**: Phase 14 performs comprehensive validation to verify all invariants are satisfied before runtime execution begins.
+**Validation**: Phase 6 performs comprehensive validation to verify all invariants are satisfied before runtime execution begins.
 
 ### Object-Oriented Design Principles
 
@@ -875,8 +872,8 @@ var smalltalkDictOOP = GlobalRegistry.Get("Smalltalk");
 - **C# initializes to `default(SmalltalkOOP)` which is OOP(0) - NOT nil!**
 - **OOP(0) is a valid object table index** - it will reference whatever object happens to be at index 0
 - **MUST immediately fill array with valid OOPs before use**
-- **Before nil exists**: Cannot initialize to nil during early cold start phases (0-2)
-  - Solution: Allocate arrays only after nil is created (Phase 3+), or explicitly track uninitialized state
+- **Before nil exists**: Cannot initialize to nil during early cold start phases (1-2)
+  - Solution: Allocate arrays only after nil is created (Phase 3), or explicitly track uninitialized state
 - **After nil exists** (Phase 3+): Initialize all SmalltalkOOP arrays to nil immediately after allocation:
   ```csharp
   var slots = new SmalltalkOOP[size];
@@ -913,9 +910,9 @@ Executing `comment:` first causes failure:
 3. `printString` needs `Digitbuffer` (created by `SmallInteger initialize`)
 4. **Stack overflow** because Digitbuffer is nil!
 
-#### The Solution: Phase-Based Execution
+#### The Solution: Prioritized Init Expression Execution
 
-**Phase 1: Execute ALL `initialize!` expressions in file order (46 total)**
+**Priority 1: Execute ALL `initialize!` expressions in file order (46 total)**
 ```
 Lines 113 → 40,574 (96% through file)
 
@@ -929,7 +926,7 @@ Critical infrastructure setup:
 - VariableNode.initialize! (40,574) - Last initialization
 ```
 
-**Phase 2: Execute ALL `comment:` expressions in file order (259 total)**
+**Priority 2: Execute ALL `comment:` expressions in file order (259 total)**
 ```
 Lines 8 → 41,690
 
@@ -940,7 +937,7 @@ Safe to execute now - all infrastructure ready:
 - ... all others
 ```
 
-**Phase 3: Load and execute test classes (separate files)**
+**Priority 3: Load and execute test classes (separate files)**
 ```
 Smalltalk-80 Source/Tests/BlockValidatorTest.st → BlockValidatorTest run!
 Smalltalk-80 Source/Tests/SimpleBlockTest.st → SimpleBlockTest run!
@@ -950,7 +947,7 @@ Smalltalk-80 Source/Tests/ConditionalBlockTest.st → ConditionalBlockTest run!
 #### Implementation Pattern
 
 ```csharp
-// Phase 1: Execute ALL initialize! expressions first
+// Priority 1: Execute ALL initialize! expressions first
 var initExpressions = bundle.InitExpressions
     .Where(e => e.Source.EndsWith(" initialize!"))
     .ToList();
@@ -959,7 +956,7 @@ foreach (var expr in initExpressions) {
     ExecuteInitExpression(expr);
 }
 
-// Phase 2: Execute ALL comment: expressions
+// Priority 2: Execute ALL comment: expressions
 var commentExpressions = bundle.InitExpressions
     .Where(e => e.Source.Contains(" comment:"))
     .ToList();
@@ -968,7 +965,7 @@ foreach (var expr in commentExpressions) {
     ExecuteInitExpression(expr);
 }
 
-// Phase 3: Load and execute test classes (if requested)
+// Priority 3: Load and execute test classes (if requested)
 if (includeTests) {
     LoadAndExecuteTestSuite("BlockValidatorTest.st");
     LoadAndExecuteTestSuite("SimpleBlockTest.st");
@@ -1008,7 +1005,7 @@ if (includeTests) {
 
 ✅ **Fixes bootstrap crashes**: SmallInteger.initialize runs before ActionMenu comment
 ✅ **Prevents future failures**: All error handling infrastructure ready
-✅ **Respects file structure**: Natural 3-phase ordering (init → doc → test)
+✅ **Respects file structure**: Natural 3-priority ordering (init → doc → test)
 ✅ **Enables parallel execution**: Comments could theoretically run in parallel (no side effects)
 ✅ **Clear separation**: Infrastructure → Documentation → Validation
 ✅ **Test isolation**: Core system separate from validation code
@@ -1017,10 +1014,10 @@ if (includeTests) {
 
 **NEVER use hardcoded indices in the interpreter during runtime execution.**
 
-**Context**: The JSON coldstart bundle represents a frozen-in-time snapshot of Smalltalk classes. During cold start (Phases 0-14), indices from the JSON are valid and safe to use. However, once the system begins running (during init expression execution), the Smalltalk system can dynamically alter any class, changing the indices of fields, literals, variables, etc.
+**Context**: The JSON coldstart bundle represents a frozen-in-time snapshot of Smalltalk classes. During cold start (Phases 1-6), indices from the JSON are valid and safe to use. However, once the system begins running (during init expression execution), the Smalltalk system can dynamically alter any class, changing the indices of fields, literals, variables, etc.
 
 **Rules**:
-1. **Cold Start (Phases 0-14)**: Hardcoded indices from JSON are valid - classes are frozen
+1. **Cold Start (Phases 1-6)**: Hardcoded indices from JSON are valid - classes are frozen
 2. **Runtime Execution (Init expressions onward)**: ALL indices must be resolved dynamically from the live Smalltalk heap
 3. **No Magic Numbers**: Never hardcode field counts (e.g., `6` for MethodContext instance variables)
 4. **Use LayoutResolver**: Always query `_layoutResolver.GetInstanceVariableCount()` for field counts
@@ -1064,7 +1061,7 @@ Instead of relying on discipline ("don't use stale data"), we make stale data **
 3. **Frozen registries** after cold start - writes throw exceptions (✅ Done 2025-01-24)
 4. **Custom attributes** document architectural boundaries (✅ Done 2025-01-24)
 
-### Cold Start Phase (Phases 0-15)
+### Cold Start Phase (Phases 1-6)
 
 **Components**: `Loader`, `SemanticAllocator`, Phase classes
 **Data Access**: Can use `ColdStartBundle`, registries (write), `_symbols[]`
@@ -1120,7 +1117,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
 After `Loader.Run()` completes:
 - **SymbolRegistry.Freeze()** called after Phase 1 (3,834 symbols)
-- **GlobalRegistry.Freeze()** called after Phase 15 (246 globals)
+- **GlobalRegistry.Freeze()** called after Phase 5 (246 globals)
 
 Any attempts to modify frozen registries throw `InvalidOperationException` with descriptive message:
 ```
