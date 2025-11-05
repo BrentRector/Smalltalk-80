@@ -1017,12 +1017,15 @@ public partial class VirtualMachine : IPrimitiveContext
                 int blockLocalCount = header.NumArgs + header.NumTemps;
 
                 // DEBUG for block temp access investigation
-                string? activeMethodId = GetLocalId(_heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.METHODCONTEXT_METHOD_INDEX));
-                if (activeMethodId != null && activeMethodId.StartsWith("block:"))
+                if (_debugOptions.ShouldDebugBytecode)
                 {
-                    Console.WriteLine($"[DEBUG pushTemp in block] index={index}, blockLocalCount={blockLocalCount}, activeContext={_activeContextOOP}, blockOOP={blockContextOOP}");
-                    Console.WriteLine($"  Block ID: {activeMethodId}");
-                    Console.WriteLine($"  NumArgs={header.NumArgs}, NumTemps={header.NumTemps}");
+                    string? activeMethodId = GetLocalId(_heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.METHODCONTEXT_METHOD_INDEX));
+                    if (activeMethodId != null && activeMethodId.StartsWith("block:"))
+                    {
+                        Console.WriteLine($"[DEBUG pushTemp in block] index={index}, blockLocalCount={blockLocalCount}, activeContext={_activeContextOOP}, blockOOP={blockContextOOP}");
+                        Console.WriteLine($"  Block ID: {activeMethodId}");
+                        Console.WriteLine($"  NumArgs={header.NumArgs}, NumTemps={header.NumTemps}");
+                    }
                 }
 
                 // If accessing beyond block's local scope, read from home context
@@ -1100,12 +1103,15 @@ public partial class VirtualMachine : IPrimitiveContext
                             actualIndex = remainingIndex;
 
                             // DEBUG for block temp access investigation
-                            string? currentMethodId = GetLocalId(_heapManager.GetInstanceVariable(currentContext, VMConstants.METHODCONTEXT_METHOD_INDEX));
-                            if (currentMethodId != null && currentMethodId.StartsWith("block:"))
+                            if (_debugOptions.ShouldDebugBytecode)
                             {
-                                Console.WriteLine($"[DEBUG pushTemp] FOUND in parent block: context={contextToReadFrom}, actualIndex={actualIndex} (original {index}), localCount={currentLocalCount}");
-                                Console.WriteLine($"  Parent block ID: {currentMethodId}");
-                                Console.WriteLine($"  remainingIndex calculation: previous remainingIndex = {remainingIndex}");
+                                string? currentMethodId = GetLocalId(_heapManager.GetInstanceVariable(currentContext, VMConstants.METHODCONTEXT_METHOD_INDEX));
+                                if (currentMethodId != null && currentMethodId.StartsWith("block:"))
+                                {
+                                    Console.WriteLine($"[DEBUG pushTemp] FOUND in parent block: context={contextToReadFrom}, actualIndex={actualIndex} (original {index}), localCount={currentLocalCount}");
+                                    Console.WriteLine($"  Parent block ID: {currentMethodId}");
+                                    Console.WriteLine($"  remainingIndex calculation: previous remainingIndex = {remainingIndex}");
+                                }
                             }
                             break;
                         }
@@ -1158,20 +1164,23 @@ public partial class VirtualMachine : IPrimitiveContext
             var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, actualIndex);
 
             // DEBUG for block temp access
-            string? debugMethodId = GetLocalId(_heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.METHODCONTEXT_METHOD_INDEX));
-            if (debugMethodId != null && debugMethodId.StartsWith("block:") && index >= 2) // Only debug non-local accesses
+            if (_debugOptions.ShouldDebugBytecode)
             {
-                string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"OOP({valueOOP})";
-                Console.WriteLine($"[DEBUG pushTemp] Retrieved value: {valStr} from context {contextToReadFrom} slot {actualIndex}");
-
-                // Show what's in the context's slots
-                Console.WriteLine($"  Context slots (first 5):");
-                int slotsToDump = Math.Min(5, _heapManager.GetIndexedSize(contextToReadFrom));
-                for (int i = 0; i < slotsToDump; i++)
+                string? debugMethodId = GetLocalId(_heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.METHODCONTEXT_METHOD_INDEX));
+                if (debugMethodId != null && debugMethodId.StartsWith("block:") && index >= 2) // Only debug non-local accesses
                 {
-                    var slotValue = _heapManager.GetIndexedOOP(contextToReadFrom, i);
-                    string slotStr = slotValue.IsSmallInteger ? $"SmallInteger({slotValue.AsSmallInteger()})" : $"OOP({slotValue})";
-                    Console.WriteLine($"    [{i}] = {slotStr}");
+                    string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"OOP({valueOOP})";
+                    Console.WriteLine($"[DEBUG pushTemp] Retrieved value: {valStr} from context {contextToReadFrom} slot {actualIndex}");
+
+                    // Show what's in the context's slots
+                    Console.WriteLine($"  Context slots (first 5):");
+                    int slotsToDump = Math.Min(5, _heapManager.GetIndexedSize(contextToReadFrom));
+                    for (int i = 0; i < slotsToDump; i++)
+                    {
+                        var slotValue = _heapManager.GetIndexedOOP(contextToReadFrom, i);
+                        string slotStr = slotValue.IsSmallInteger ? $"SmallInteger({slotValue.AsSmallInteger()})" : $"OOP({slotValue})";
+                        Console.WriteLine($"    [{i}] = {slotStr}");
+                    }
                 }
             }
 

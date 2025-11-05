@@ -335,42 +335,54 @@ public static class Program
                 var successfulExpressions = new List<(int index, string source)>();
 
                 // Phase 1: Execute with reordered list
+                // QUIET MODE: Only show failures with full diagnostic output
                 foreach (int index in reorderedIndices)
                 {
                     var expr = bundle.InitExpressions[index];
                     var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
 
-                    Console.WriteLine();
-                    Console.WriteLine("******************************************");
-                    Console.WriteLine($"[{index}] {expr.Source}");
-                    Console.WriteLine("******************************************");
+                    // Quiet execution - no output for successful expressions
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
 
                     if (result.Status == InitStatus.Success)
                     {
-                        Console.WriteLine($"  ✓ Completed successfully");
                         succeeded++;
                         successfulExpressions.Add((index, expr.Source ?? ""));
+                        // Silent success - no console output
                     }
                     else
                     {
+                        // FAIL FAST: Stop on first failure with full diagnostics
                         failed++;
-                        Console.WriteLine($"\n❌ FAILED: {expr.Source}");
-                        Console.WriteLine($"   Status: {result.Status}");
+                        Console.WriteLine();
+                        Console.WriteLine("==========================================");
+                        Console.WriteLine($"❌ FIRST FAILURE: [{index}] {expr.Source}");
+                        Console.WriteLine("==========================================");
+                        Console.WriteLine($"Status: {result.Status}");
                         if (result.Diagnostic?.Message != null)
                         {
-                            Console.WriteLine($"   Error: {result.Diagnostic.Message}");
+                            Console.WriteLine($"\nError: {result.Diagnostic.Message}");
                         }
-                        // Stack trace suppressed for cleaner output
-                        // if (result.Diagnostic?.StackTrace != null)
-                        // {
-                        //     Console.WriteLine($"\n   Stack Trace:");
-                        //     Console.WriteLine($"   {result.Diagnostic.StackTrace}");
-                        // }
+                        if (result.Diagnostic?.StackTrace != null)
+                        {
+                            Console.WriteLine($"\nStack Trace:");
+                            Console.WriteLine(result.Diagnostic.StackTrace);
+                        }
 
-                        // EXPERIMENT: Continue executing other init expressions instead of fast-fail
-                        // This lets us see which expressions succeed and which fail
-                        Console.WriteLine($"  Continuing with next expression...");
+                        Console.WriteLine($"\n✓ Successfully executed {succeeded} expression(s) before this failure");
+                        if (successfulExpressions.Count > 0)
+                        {
+                            Console.WriteLine($"\nSuccessful expressions:");
+                            foreach (var (idx, source) in successfulExpressions)
+                            {
+                                Console.WriteLine($"  [{idx}] {source}");
+                            }
+                        }
+
+                        // FAIL FAST - stop execution here
+                        Console.WriteLine($"\n⚠️  Execution stopped at first failure to enable debugging");
+                        Console.WriteLine($"⚠️  Enable VM debug output and re-run to diagnose this specific failure");
+                        return;
                     }
                 }
 
