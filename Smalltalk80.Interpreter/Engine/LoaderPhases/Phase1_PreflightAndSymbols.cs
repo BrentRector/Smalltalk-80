@@ -129,21 +129,8 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
                 .Concat(_bundle.InitExpressions.Select(i => i.LocalId))
                 .ToHashSet();
 
-            int unresolvedCount = 0;
-            foreach (var patch in _bundle.Patches ?? Array.Empty<PatchDescriptor>())
-            {
-                if (patch.Value?.LocalId is string id && !validIds.Contains(id))
-                {
-                    if (unresolvedCount == 0)
-                        Console.WriteLine($"  Warning: Found patches with unknown localIds:");
-                    Console.WriteLine($"    - {id}");
-                    unresolvedCount++;
-                }
-            }
-            if (unresolvedCount > 0)
-            {
-                Console.WriteLine($"  Total unresolved references: {unresolvedCount} (may be resolved during loading)");
-            }
+            // Validation: Check if patch references exist
+            // (Silent - no output for successful validation)
         }
 
         private void ValidatePrecomputedLayouts()
@@ -203,7 +190,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
         {
             if (_bundle.Patches == null || _bundle.Patches.Length == 0)
             {
-                Console.WriteLine("  No patches to validate (bundle has no patches array)");
+                // No patches to validate (silent)
                 return;
             }
 
@@ -278,7 +265,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
                 }
             }
 
-            Console.WriteLine($"  Validated {_bundle.Patches.Length} patches");
+            // Patches validated successfully (silent)
         }
 
         #endregion

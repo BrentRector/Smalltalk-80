@@ -58,19 +58,19 @@ public class Phase6_ValidationAndGC
     public void Run()
     {
         // Step 1: Comprehensive heap validation (from Phase13)
-        Console.WriteLine("Step 1: Comprehensive Heap Validation...");
+// Console.WriteLine("Step 1: Comprehensive Heap Validation...");
         RunComprehensiveValidation();
-        Console.WriteLine("✓");
+// Console.WriteLine("✓");
 
         // Step 2: Set up GC roots (from Loader Phase 14)
-        Console.WriteLine("Step 2: GC Root Setup...");
+// Console.WriteLine("Step 2: GC Root Setup...");
         SetupGCRoots();
-        Console.WriteLine("✓");
+// Console.WriteLine("✓");
 
         // Step 3: Run GC verification (from Loader Phase 15)
-        Console.WriteLine("Step 3: GC Verification...");
+// Console.WriteLine("Step 3: GC Verification...");
         RunGCVerification();
-        Console.WriteLine("✓");
+// Console.WriteLine("✓");
     }
 
     // ========================================================================================
@@ -113,7 +113,7 @@ public class Phase6_ValidationAndGC
 
     private void ValidateAllClasses(ValidationResults results)
     {
-        Console.WriteLine("  Validating classes...");
+// Console.WriteLine("  Validating classes...");
 
         foreach (var classDesc in _bundle.Classes)
         {
@@ -158,7 +158,7 @@ public class Phase6_ValidationAndGC
 
     private void ValidateAllMethods(ValidationResults results)
     {
-        Console.WriteLine("  Validating methods...");
+// Console.WriteLine("  Validating methods...");
 
         foreach (var method in _bundle.Methods)
         {
@@ -271,7 +271,7 @@ public class Phase6_ValidationAndGC
 
     private void ValidateSpecialObjects(ValidationResults results)
     {
-        Console.WriteLine("  Validating special objects...");
+// Console.WriteLine("  Validating special objects...");
 
         // Validate nil
         ValidateSpecialObject("nil", SpecialObjectsArray.Instance.Nil, results);
@@ -325,13 +325,13 @@ public class Phase6_ValidationAndGC
 
     private void ValidateInitExpressions(ValidationResults results)
     {
-        Console.WriteLine("  Validating init expressions...");
+// Console.WriteLine("  Validating init expressions...");
         results.InitExpressionsValidated = _bundle.InitExpressions.Length;
     }
 
     private void ValidateCrossReferences(ValidationResults results)
     {
-        Console.WriteLine("  Validating cross-references...");
+// Console.WriteLine("  Validating cross-references...");
 
         int totalObjectsChecked = 0;
         int invalidReferences = 0;
@@ -413,7 +413,7 @@ public class Phase6_ValidationAndGC
 
     private void ValidateSpecialObjectsArray(ValidationResults results)
     {
-        Console.WriteLine("  Validating SpecialObjectsArray...");
+// Console.WriteLine("  Validating SpecialObjectsArray...");
 
         int validatedSlots = 0;
 
@@ -479,7 +479,7 @@ public class Phase6_ValidationAndGC
             var systemDictClassName = _allocator.GetClassName(systemDictOOP);
             if (systemDictClassName != "SystemDictionary")
             {
-                Console.WriteLine($"    NOTE: Smalltalk global has class {systemDictClassName}, expected SystemDictionary");
+// Console.WriteLine($"    NOTE: Smalltalk global has class {systemDictClassName}, expected SystemDictionary");
             }
             validatedSlots++;
         }
@@ -496,12 +496,12 @@ public class Phase6_ValidationAndGC
             validatedSlots++;
         }
 
-        Console.WriteLine($"    Validated {validatedSlots} special object slots");
+// Console.WriteLine($"    Validated {validatedSlots} special object slots");
     }
 
     private void ValidateMethodDictionaries(ValidationResults results)
     {
-        Console.WriteLine("  Validating method dictionaries...");
+// Console.WriteLine("  Validating method dictionaries...");
 
         int classesWithMethodDict = 0;
         int totalMethods = 0;
@@ -580,8 +580,8 @@ public class Phase6_ValidationAndGC
             }
         }
 
-        Console.WriteLine($"    Validated {classesWithMethodDict} method dictionaries");
-        Console.WriteLine($"    Found {methodsFound}/{totalMethods} methods in dictionaries");
+// Console.WriteLine($"    Validated {classesWithMethodDict} method dictionaries");
+// Console.WriteLine($"    Found {methodsFound}/{totalMethods} methods in dictionaries");
 
         if (methodsFound < totalMethods)
         {
@@ -591,7 +591,7 @@ public class Phase6_ValidationAndGC
 
     private void ValidateAssociationCanonicalization(ValidationResults results)
     {
-        Console.WriteLine("  Validating Association canonicalization...");
+// Console.WriteLine("  Validating Association canonicalization...");
 
         int validatedCount = 0;
         int errorCount = 0;
@@ -609,7 +609,7 @@ public class Phase6_ValidationAndGC
             int symbolIndex = Array.IndexOf(_symbols, symbolName);
             if (symbolIndex < 0)
             {
-                Console.WriteLine($"    ERROR: Association '{symbolName}' key not found in symbol table");
+// Console.WriteLine($"    ERROR: Association '{symbolName}' key not found in symbol table");
                 errorCount++;
                 results.AddError($"Association '{symbolName}' key not found in symbol table");
                 continue;
@@ -619,7 +619,7 @@ public class Phase6_ValidationAndGC
 
             if (!keyOOP.Equals(expectedKeyOOP))
             {
-                Console.WriteLine($"    ERROR: Association '{symbolName}' has mismatched key");
+// Console.WriteLine($"    ERROR: Association '{symbolName}' has mismatched key");
                 errorCount++;
                 results.AddError($"Association '{symbolName}' has mismatched key OOP");
             }
@@ -634,7 +634,7 @@ public class Phase6_ValidationAndGC
                 $"Association canonicalization validation FAILED: {errorCount} errors");
         }
 
-        Console.WriteLine($"    Validated {validatedCount} canonical Associations");
+// Console.WriteLine($"    Validated {validatedCount} canonical Associations");
     }
 
     // Block ownership validation removed - BlockOwnerMap is tracked in Phase4, not accessible here
@@ -647,30 +647,30 @@ public class Phase6_ValidationAndGC
     {
         if (results.Errors.Count == 0)
         {
-            Console.WriteLine("  ✓ Validation Summary:");
-            Console.WriteLine($"    Classes: {results.ClassesValidated} validated");
-            Console.WriteLine($"    Methods: {results.MethodsValidated} validated");
-            Console.WriteLine($"    Special objects: {results.SpecialObjectsValidated} validated");
-            Console.WriteLine($"    Init expressions: {results.InitExpressionsValidated} validated");
-            Console.WriteLine($"    Cross-references: {results.CrossReferencesValidated} objects checked");
-            Console.WriteLine($"    ✓ All heap objects match JSON definitions");
+// Console.WriteLine("  ✓ Validation Summary:");
+// Console.WriteLine($"    Classes: {results.ClassesValidated} validated");
+// Console.WriteLine($"    Methods: {results.MethodsValidated} validated");
+// Console.WriteLine($"    Special objects: {results.SpecialObjectsValidated} validated");
+// Console.WriteLine($"    Init expressions: {results.InitExpressionsValidated} validated");
+// Console.WriteLine($"    Cross-references: {results.CrossReferencesValidated} objects checked");
+// Console.WriteLine($"    ✓ All heap objects match JSON definitions");
         }
         else
         {
-            Console.WriteLine("  ✗ VALIDATION FAILED");
-            Console.WriteLine($"    Validation errors found: {results.Errors.Count}");
-            Console.WriteLine($"    Classes: {results.ClassesValidated} validated");
-            Console.WriteLine($"    Methods: {results.MethodsValidated} validated");
-            Console.WriteLine($"    Invalid references: {results.InvalidReferences}");
+// Console.WriteLine("  ✗ VALIDATION FAILED");
+// Console.WriteLine($"    Validation errors found: {results.Errors.Count}");
+// Console.WriteLine($"    Classes: {results.ClassesValidated} validated");
+// Console.WriteLine($"    Methods: {results.MethodsValidated} validated");
+// Console.WriteLine($"    Invalid references: {results.InvalidReferences}");
 
-            Console.WriteLine($"    Showing first 20 errors:");
+// Console.WriteLine($"    Showing first 20 errors:");
             foreach (var error in results.Errors.Take(20))
             {
-                Console.WriteLine($"      {error}");
+// Console.WriteLine($"      {error}");
             }
             if (results.Errors.Count > 20)
             {
-                Console.WriteLine($"      ... and {results.Errors.Count - 20} more errors");
+// Console.WriteLine($"      ... and {results.Errors.Count - 20} more errors");
             }
 
             throw new InvalidOperationException($"Heap validation failed with {results.Errors.Count} errors");
@@ -703,11 +703,11 @@ public class Phase6_ValidationAndGC
         _heapManager.SetGCRoots(gcRoots);
 
         // Display GC roots
-        Console.WriteLine($"  GC Roots ({gcRootsList.Count} objects):");
+// Console.WriteLine($"  GC Roots ({gcRootsList.Count} objects):");
         foreach (var (name, oop) in gcRootsList)
         {
             var className = _heapManager.GetClassName(oop);
-            Console.WriteLine($"    {name} ({oop}, class={className})");
+// Console.WriteLine($"    {name} ({oop}, class={className})");
         }
     }
 
@@ -719,14 +719,7 @@ public class Phase6_ValidationAndGC
     {
         var gcStats = _heapManager.GarbageCollect();
 
-        // Print GC statistics
-        Console.WriteLine($"  GC Results: {gcStats.CollectedObjects}/{gcStats.TotalObjects} objects collected " +
-                         $"({(gcStats.CollectedObjects * 100.0 / gcStats.TotalObjects):F1}% efficiency) " +
-                         $"in {gcStats.TotalTimeMs:F2}ms " +
-                         $"(Mark: {gcStats.MarkTimeMs:F2}ms, Sweep: {gcStats.SweepTimeMs:F2}ms), " +
-                         $"{gcStats.EstimatedBytesFreed:N0} bytes freed");
-        Console.WriteLine($"  Object table size: {gcStats.TotalObjects}");
-        Console.WriteLine($"  Active objects: {gcStats.LiveObjects}");
+        // Print GC statistics (silent)
 
         // Update report metrics
         _report.Metrics.TotalObjectsAllocated = gcStats.TotalObjects;
@@ -736,8 +729,8 @@ public class Phase6_ValidationAndGC
         // Cold start fails if ANY objects were collected
         if (gcStats.CollectedObjects > 0)
         {
-            Console.WriteLine($"\n✗ COLD START FAILED: GC collected {gcStats.CollectedObjects} objects!");
-            Console.WriteLine($"  All objects must be reachable from GC roots for cold start to pass.");
+// Console.WriteLine($"\n✗ COLD START FAILED: GC collected {gcStats.CollectedObjects} objects!");
+// Console.WriteLine($"  All objects must be reachable from GC roots for cold start to pass.");
 
             // TODO: Add unreachable samples to report if needed
             // _report.AddGCUnreachableSample(...);
@@ -747,7 +740,7 @@ public class Phase6_ValidationAndGC
                 $"All objects should be reachable from GC roots.");
         }
 
-        Console.WriteLine($"  ✓ GC Verification passed: All {gcStats.LiveObjects} objects are reachable");
+// Console.WriteLine($"  ✓ GC Verification passed: All {gcStats.LiveObjects} objects are reachable");
     }
 
     // ========================================================================================

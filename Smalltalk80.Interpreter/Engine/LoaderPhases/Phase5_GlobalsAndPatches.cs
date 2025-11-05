@@ -68,12 +68,12 @@ public class Phase5_GlobalsAndPatches
 
         // Freeze AssociationRegistry after all globals installed
         AssociationRegistry.Freeze();
-        Console.WriteLine($"[AssociationRegistry] Frozen with {AssociationRegistry.Count} associations");
+// Console.WriteLine($"[AssociationRegistry] Frozen with {AssociationRegistry.Count} associations");
 
         // DEBUG: Check ALL Associations in the heap, not just those in AssociationRegistry
         if (_debugOptions.ShouldDebugAssociations)
         {
-            Console.WriteLine($"[Phase5] Scanning entire heap for ALL Associations...");
+// Console.WriteLine($"[Phase5] Scanning entire heap for ALL Associations...");
             var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
             int totalAssociations = 0;
             int registeredCount = AssociationRegistry.GetAll().Count;
@@ -96,9 +96,9 @@ public class Phase5_GlobalsAndPatches
                 }
             }
 
-            Console.WriteLine($"  Total Associations in heap: {totalAssociations}");
-            Console.WriteLine($"  Associations in AssociationRegistry: {registeredCount}");
-            Console.WriteLine($"  Unregistered Associations: {totalAssociations - registeredCount}");
+// Console.WriteLine($"  Total Associations in heap: {totalAssociations}");
+// Console.WriteLine($"  Associations in AssociationRegistry: {registeredCount}");
+// Console.WriteLine($"  Unregistered Associations: {totalAssociations - registeredCount}");
         }
     }
 
@@ -113,11 +113,11 @@ public class Phase5_GlobalsAndPatches
     {
         if (_bundle.Patches == null || _bundle.Patches.Length == 0)
         {
-            Console.WriteLine($"  No patches to apply");
+// Console.WriteLine($"  No patches to apply");
             return;
         }
 
-        Console.WriteLine($"  Applying {_bundle.Patches.Length} patches...");
+// Console.WriteLine($"  Applying {_bundle.Patches.Length} patches...");
 
         foreach (var patch in _bundle.Patches)
         {
@@ -162,7 +162,7 @@ public class Phase5_GlobalsAndPatches
         // Debug output only if enabled
         if (_debugOptions.ShouldDebugPatches)
         {
-            Console.WriteLine($"    [PATCH] SetInstanceVariable: {patch.TargetLocalId}.{patch.FieldName} = {valueOOP} (before: {beforeOOP})");
+// Console.WriteLine($"    [PATCH] SetInstanceVariable: {patch.TargetLocalId}.{patch.FieldName} = {valueOOP} (before: {beforeOOP})");
         }
     }
 
@@ -175,7 +175,7 @@ public class Phase5_GlobalsAndPatches
 
         if (_debugOptions.ShouldDebugPatches)
         {
-            Console.WriteLine($"    [PATCH] InstallMethodDictionary: {patch.ClassLocalId} (already installed in Phase 4)");
+// Console.WriteLine($"    [PATCH] InstallMethodDictionary: {patch.ClassLocalId} (already installed in Phase 4)");
         }
     }
 
@@ -203,7 +203,7 @@ public class Phase5_GlobalsAndPatches
 
             if (_debugOptions.ShouldDebugPatches)
             {
-                Console.WriteLine($"    [PATCH] ReplaceLiteral: {patch.MethodLocalId}[{patch.LiteralIndex}] Association.value = {newValueOOP} (before: {beforeValue})");
+// Console.WriteLine($"    [PATCH] ReplaceLiteral: {patch.MethodLocalId}[{patch.LiteralIndex}] Association.value = {newValueOOP} (before: {beforeValue})");
             }
         }
         else
@@ -213,7 +213,7 @@ public class Phase5_GlobalsAndPatches
 
             if (_debugOptions.ShouldDebugPatches)
             {
-                Console.WriteLine($"    [PATCH] ReplaceLiteral: {patch.MethodLocalId}[{patch.LiteralIndex}] = {newValueOOP} (before: {literalOOP})");
+// Console.WriteLine($"    [PATCH] ReplaceLiteral: {patch.MethodLocalId}[{patch.LiteralIndex}] = {newValueOOP} (before: {literalOOP})");
             }
         }
     }
@@ -229,7 +229,7 @@ public class Phase5_GlobalsAndPatches
             // DEBUG: Check if String class is being resolved correctly
             if (_debugOptions.ShouldDebugPatches && value.LocalId == "class:String")
             {
-                Console.WriteLine($"      [DEBUG] Resolving class:String -> {resolvedOOP}");
+// Console.WriteLine($"      [DEBUG] Resolving class:String -> {resolvedOOP}");
             }
             return resolvedOOP;
         }
@@ -262,7 +262,7 @@ public class Phase5_GlobalsAndPatches
         var symbolObjects = SymbolRegistry.AllSymbols().ToList();
         int ustableSize = ComputeUSTableSize(symbolObjects.Count);
 
-        Console.WriteLine($"  [Phase5] Creating USTable: {symbolObjects.Count} symbols, table size {ustableSize}");
+// Console.WriteLine($"  [Phase5] Creating USTable: {symbolObjects.Count} symbols, table size {ustableSize}");
 
         // Pass 1: Count how many symbols will go in each bucket
         var bucketCounts = new int[ustableSize];
@@ -291,14 +291,14 @@ public class Phase5_GlobalsAndPatches
             // DIAGNOSTIC: Verify we're inserting Symbol OOPs, not SmallIntegers
             if (symbolOOP.IsSmallInteger)
             {
-                Console.WriteLine($"  ERROR: Inserting SmallInteger {symbolOOP.AsSmallInteger()} into USTable bucket {bucketIndex} position {position}!");
-                Console.WriteLine($"    Symbol name: \"{symbolName}\"");
+// Console.WriteLine($"  ERROR: Inserting SmallInteger {symbolOOP.AsSmallInteger()} into USTable bucket {bucketIndex} position {position}!");
+// Console.WriteLine($"    Symbol name: \"{symbolName}\"");
             }
 
             // DIAGNOSTIC: Log bucket 3240 population
             if (bucketIndex == 3240)
             {
-                Console.WriteLine($"  [Phase5] Inserting symbol \"{symbolName}\" ({symbolOOP}) into bucket 3240 position {position}");
+// Console.WriteLine($"  [Phase5] Inserting symbol \"{symbolName}\" ({symbolOOP}) into bucket 3240 position {position}");
             }
 
             _allocator.SetIndexedOOP(bucketOOP, position, symbolOOP);
@@ -343,7 +343,7 @@ public class Phase5_GlobalsAndPatches
             // DIAGNOSTIC: Log bucket 68364 creation
             if (bucketOOP.RawValue == 68364)
             {
-                Console.WriteLine($"  [Phase5] Created USTable bucket {bucketOOP} (index {i}, size {bucketCounts[i]})");
+// Console.WriteLine($"  [Phase5] Created USTable bucket {bucketOOP} (index {i}, size {bucketCounts[i]})");
             }
 
             // Initialize all indexed slots to nil (C# arrays default to OOP(0))
@@ -487,7 +487,7 @@ public class Phase5_GlobalsAndPatches
                 // Update existing association's value
                 _allocator.SetInstanceVariable(entryOOP, 1, ustableOOP);
                 installed = true;
-                Console.WriteLine($"  [Phase5] Updated existing USTable association at index {i}");
+// Console.WriteLine($"  [Phase5] Updated existing USTable association at index {i}");
                 break;
             }
         }
@@ -502,7 +502,7 @@ public class Phase5_GlobalsAndPatches
 
             _allocator.SetIndexedOOP(classPoolOOP, emptySlotIndex, associationOOP);
             installed = true;
-            Console.WriteLine($"  [Phase5] Installed USTable in Symbol classPool: array size {_allocator.GetIndexedSize(ustableOOP)} buckets");
+// Console.WriteLine($"  [Phase5] Installed USTable in Symbol classPool: array size {_allocator.GetIndexedSize(ustableOOP)} buckets");
         }
     }
 
@@ -577,7 +577,7 @@ public class Phase5_GlobalsAndPatches
                 // Update existing association
                 _allocator.SetInstanceVariable(entryOOP, 1, arrayOOP);
                 installed = true;
-                Console.WriteLine($"  [Phase5] Updated SingleCharSymbols class variable in Symbol classPool (128 nil elements)");
+// Console.WriteLine($"  [Phase5] Updated SingleCharSymbols class variable in Symbol classPool (128 nil elements)");
                 break;
             }
         }
@@ -592,7 +592,7 @@ public class Phase5_GlobalsAndPatches
 
             _allocator.SetIndexedOOP(classPoolOOP, emptySlotIndex, associationOOP);
             installed = true;
-            Console.WriteLine($"  [Phase5] Initialized SingleCharSymbols class variable in Symbol classPool at slot {emptySlotIndex} (128 nil elements)");
+// Console.WriteLine($"  [Phase5] Initialized SingleCharSymbols class variable in Symbol classPool at slot {emptySlotIndex} (128 nil elements)");
         }
     }
 
@@ -645,11 +645,11 @@ public class Phase5_GlobalsAndPatches
 
         if (poolToClasses.Count == 0)
         {
-            Console.WriteLine($"  [Phase5] No pool dictionaries declared in system");
+// Console.WriteLine($"  [Phase5] No pool dictionaries declared in system");
             return;
         }
 
-        Console.WriteLine($"  [Phase5] Initializing {poolToClasses.Count} pool dictionar{(poolToClasses.Count == 1 ? "y" : "ies")}:");
+// Console.WriteLine($"  [Phase5] Initializing {poolToClasses.Count} pool dictionar{(poolToClasses.Count == 1 ? "y" : "ies")}:");
 
         // Initialize each discovered pool dictionary
         foreach (var (poolName, declaringClasses) in poolToClasses)
@@ -684,7 +684,7 @@ public class Phase5_GlobalsAndPatches
             // Install in all declaring classes' sharedPools fields
             InstallPoolDictionaryInClasses(dictionaryOOP, poolName, declaringClasses.ToArray());
 
-            Console.WriteLine($"    {poolName}: global created, installed in {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")}");
+// Console.WriteLine($"    {poolName}: global created, installed in {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")}");
         }
     }
 
@@ -705,7 +705,7 @@ public class Phase5_GlobalsAndPatches
         int sharedPoolsIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "sharedPools", _bundle);
         if (sharedPoolsIndex < 0)
         {
-            Console.WriteLine($"  [Phase5] WARNING: sharedPools field not found in Class - skipping pool installation");
+// Console.WriteLine($"  [Phase5] WARNING: sharedPools field not found in Class - skipping pool installation");
             return;
         }
 
@@ -714,7 +714,7 @@ public class Phase5_GlobalsAndPatches
             // Look up the class
             if (!GlobalRegistry.TryGet($"class:{className}", out SmalltalkOOP classOOP))
             {
-                Console.WriteLine($"  [Phase5] WARNING: Class {className} not found - skipping pool installation");
+// Console.WriteLine($"  [Phase5] WARNING: Class {className} not found - skipping pool installation");
                 continue;
             }
 
@@ -733,7 +733,7 @@ public class Phase5_GlobalsAndPatches
                 _allocator.SetIndexedOOP(arrayOOP, 0, poolDictionaryOOP);
                 _allocator.SetInstanceVariable(classOOP, sharedPoolsIndex, arrayOOP);
 
-                Console.WriteLine($"    Installed {poolName} in {className}.sharedPools (created new array)");
+// Console.WriteLine($"    Installed {poolName} in {className}.sharedPools (created new array)");
             }
             else
             {
@@ -775,11 +775,11 @@ public class Phase5_GlobalsAndPatches
                     // Install new array
                     _allocator.SetInstanceVariable(classOOP, sharedPoolsIndex, newArrayOOP);
 
-                    Console.WriteLine($"    Installed {poolName} in {className}.sharedPools (appended to existing array)");
+// Console.WriteLine($"    Installed {poolName} in {className}.sharedPools (appended to existing array)");
                 }
                 else
                 {
-                    Console.WriteLine($"    {poolName} already in {className}.sharedPools (skipped)");
+// Console.WriteLine($"    {poolName} already in {className}.sharedPools (skipped)");
                 }
             }
         }
@@ -950,11 +950,11 @@ public class Phase5_GlobalsAndPatches
     {
         if (_bundle.Undeclared == null || _bundle.Undeclared.Length == 0)
         {
-            Console.WriteLine("[Phase5] No undeclared variables in bundle - skipping Undeclared population");
+// Console.WriteLine("[Phase5] No undeclared variables in bundle - skipping Undeclared population");
             return;
         }
 
-        Console.WriteLine($"[Phase5] Populating Undeclared dictionary with {_bundle.Undeclared.Length} variables...");
+// Console.WriteLine($"[Phase5] Populating Undeclared dictionary with {_bundle.Undeclared.Length} variables...");
 
         var undeclaredOOP = GlobalRegistry.Get("Undeclared");
         var nilOOP = SpecialObjectsArray.Instance.Nil;
@@ -978,18 +978,18 @@ public class Phase5_GlobalsAndPatches
             _allocator.SetInstanceVariable(undeclaredOOP, tallyIndex, tallyOOP);
         }
 
-        Console.WriteLine($"  ✓ Added {addedCount} Associations to Undeclared dictionary");
+// Console.WriteLine($"  ✓ Added {addedCount} Associations to Undeclared dictionary");
 
         // Show sample of undeclared variables
         if (addedCount > 0)
         {
             var sampleCount = Math.Min(5, _bundle.Undeclared.Length);
-            Console.WriteLine($"  Sample undeclared variables:");
+// Console.WriteLine($"  Sample undeclared variables:");
             for (int i = 0; i < sampleCount; i++)
             {
                 var varName = _bundle.Undeclared[i].Key;
                 var refCount = _bundle.Undeclared[i].References.Length;
-                Console.WriteLine($"    - {varName} ({refCount} reference(s))");
+// Console.WriteLine($"    - {varName} ({refCount} reference(s))");
             }
         }
     }
@@ -1171,16 +1171,16 @@ public class Phase5_GlobalsAndPatches
             // Update the Association's value (instance variable 1) to point to our TextStyle
             _allocator.SetInstanceVariable(defaultTextStyleAssoc, 1, textStyleOOP);
             _initializedFields.Add((defaultTextStyleAssoc, 1));
-            Console.WriteLine($"  ✓ Created DefaultTextStyle (oop={textStyleOOP.RawValue}) with stub StrikeFont");
-            Console.WriteLine($"    Updated existing Association (oop={defaultTextStyleAssoc.RawValue})");
+// Console.WriteLine($"  ✓ Created DefaultTextStyle (oop={textStyleOOP.RawValue}) with stub StrikeFont");
+// Console.WriteLine($"    Updated existing Association (oop={defaultTextStyleAssoc.RawValue})");
         }
         else
         {
             // Association doesn't exist - this means no code references DefaultTextStyle
             // This is unexpected, so log a warning
-            Console.WriteLine($"  ⚠ WARNING: DefaultTextStyle Association not found in AssociationRegistry");
-            Console.WriteLine($"    This suggests no Smalltalk code references DefaultTextStyle");
-            Console.WriteLine($"    Created TextStyle object anyway (oop={textStyleOOP.RawValue})");
+// Console.WriteLine($"  ⚠ WARNING: DefaultTextStyle Association not found in AssociationRegistry");
+// Console.WriteLine($"    This suggests no Smalltalk code references DefaultTextStyle");
+// Console.WriteLine($"    Created TextStyle object anyway (oop={textStyleOOP.RawValue})");
 
             // Register in GlobalRegistry for manual access if needed
             GlobalRegistry.Register("DefaultTextStyle", textStyleOOP);

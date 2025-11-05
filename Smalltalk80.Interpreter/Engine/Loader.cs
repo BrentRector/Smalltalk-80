@@ -79,7 +79,6 @@ public class Loader
 
         // Initialize SpecialObjectsArray (will be populated during Phase 3)
         SpecialObjectsArray.Initialize();
-        Console.WriteLine($"[Loader] BUILD TIMESTAMP: 2025-10-28 13:45 UTC - SpecialObjectsArray.Initialize() called");
 
         // Initialize the report with bundle metadata
         _report = new ColdstartReport
@@ -207,7 +206,6 @@ public class Loader
             throw new InvalidOperationException("Cannot build VM metadata before cold start completes");
 
         int thisClassIdx = LayoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
-        Console.WriteLine($"VMMetadata: MetaclassThisClassFieldIndex = {thisClassIdx}");
 
         return new VMMetadata
         {
@@ -251,11 +249,6 @@ public class Loader
             if (nameFieldIndex >= 0)
             {
                 concreteHeapManager.SetClassNameFieldIndex(nameFieldIndex);
-                Console.WriteLine($"Configured heap manager: Class.name field index = {nameFieldIndex}");
-            }
-            else
-            {
-                Console.WriteLine("Warning: Could not find Class.name field index");
             }
         }
     }

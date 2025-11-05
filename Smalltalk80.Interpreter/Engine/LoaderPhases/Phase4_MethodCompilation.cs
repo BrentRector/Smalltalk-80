@@ -103,7 +103,7 @@ public class Phase4_MethodCompilation
         {
             if (!_localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
             {
-                Console.WriteLine($"WARNING: Class not found in localIdToObjectId: {cls.LocalId}");
+// Console.WriteLine($"WARNING: Class not found in localIdToObjectId: {cls.LocalId}");
                 continue;
             }
 
@@ -210,7 +210,7 @@ public class Phase4_MethodCompilation
             }
         }
 
-        Console.WriteLine($"[Phase4] Built blockOwnerMap with {blockOwnerMap.Count} block ownership entries");
+// Console.WriteLine($"[Phase4] Built blockOwnerMap with {blockOwnerMap.Count} block ownership entries");
 
         // Store blockOwnerMap in GlobalRegistry for runtime access
         GlobalRegistry.Set("blockOwnerMap", blockOwnerMap);
@@ -242,7 +242,7 @@ public class Phase4_MethodCompilation
                 if (_localIdToObjectId.ContainsKey(method.LocalId))
                 {
                     var oldOOP = _localIdToObjectId[method.LocalId];
-                    Console.WriteLine($"[OVERWRITE!] {method.LocalId}: old={oldOOP} -> new={methodOOP}");
+// Console.WriteLine($"[OVERWRITE!] {method.LocalId}: old={oldOOP} -> new={methodOOP}");
                 }
             }
 
@@ -267,11 +267,11 @@ public class Phase4_MethodCompilation
                 }
                 catch (Exception)
                 {
-                    Console.WriteLine($"ERROR resolving literal {i} in method {method.LocalId}");
-                    Console.WriteLine($"  Literal type: {method.Literals[i].Type}");
+// Console.WriteLine($"ERROR resolving literal {i} in method {method.LocalId}");
+// Console.WriteLine($"  Literal type: {method.Literals[i].Type}");
                     var index = method.Literals[i].Index;
                     if (index.HasValue)
-                        Console.WriteLine($"  Index: {index.Value}");
+// Console.WriteLine($"  Index: {index.Value}");
                     throw;
                 }
             }
@@ -482,14 +482,8 @@ public class Phase4_MethodCompilation
             ? _localIdToObjectId[assoc.ValueRef.LocalId]
             : SpecialObjectsArray.Instance.Nil;
 
-        // Warn if incoming value is non-nil (policy violation)
-        if (incomingValueOOP != SpecialObjectsArray.Instance.Nil)
-        {
-            Console.WriteLine(
-                $"WARNING: Association literal for '{keyName}' has non-nil value: {incomingValueOOP}\n" +
-                $"  Policy: Association literals should have nil values at compile time.\n" +
-                $"  Creating Association with nil value (ignoring incoming value).");
-        }
+        // Warn if incoming value is non-nil (policy violation - silent)
+        // Policy: Association literals should have nil values at compile time
 
         // Use AssociationRegistry for canonicalization
         return AssociationRegistry.GetOrCreate(keyName, () =>
@@ -595,21 +589,21 @@ public class Phase4_MethodCompilation
         double dedupRatio = totalAssociations > 0 ? (double)canonicalAssociations / totalAssociations : 1.0;
         double memoryReduction = totalAssociations > 0 ? (1.0 - dedupRatio) : 0.0;
 
-        Console.WriteLine($"[Phase4] Association canonicalization validation PASSED:");
-        Console.WriteLine($"  Total Association literals in methods: {totalAssociations}");
-        Console.WriteLine($"  Canonical Associations created: {AssociationRegistry.Count}");
-        Console.WriteLine($"  Duplicate Associations avoided: {duplicatesAvoided}");
-        Console.WriteLine($"  Canonicalization ratio: {dedupRatio:P1}");
-        Console.WriteLine($"  Memory reduction: {memoryReduction:P1}");
-        Console.WriteLine($"  Associations with non-nil values: {nonNilValueCount}");
+// Console.WriteLine($"[Phase4] Association canonicalization validation PASSED:");
+// Console.WriteLine($"  Total Association literals in methods: {totalAssociations}");
+// Console.WriteLine($"  Canonical Associations created: {AssociationRegistry.Count}");
+// Console.WriteLine($"  Duplicate Associations avoided: {duplicatesAvoided}");
+// Console.WriteLine($"  Canonicalization ratio: {dedupRatio:P1}");
+// Console.WriteLine($"  Memory reduction: {memoryReduction:P1}");
+// Console.WriteLine($"  Associations with non-nil values: {nonNilValueCount}");
 
         // VALUE MIGRATION POLICY WARNING
         if (nonNilValueCount > 0)
         {
-            Console.WriteLine($"\n[Phase4] WARNING: {nonNilValueCount} Association(s) have non-nil values!");
-            Console.WriteLine($"  Association literals should have nil values at compile time.");
-            Console.WriteLine($"  Values should only be set at runtime via bytecode 0x09.");
-            Console.WriteLine($"  This may indicate a compiler anomaly or special cold-start initialization.");
+// Console.WriteLine($"\n[Phase4] WARNING: {nonNilValueCount} Association(s) have non-nil values!");
+// Console.WriteLine($"  Association literals should have nil values at compile time.");
+// Console.WriteLine($"  Values should only be set at runtime via bytecode 0x09.");
+// Console.WriteLine($"  This may indicate a compiler anomaly or special cold-start initialization.");
         }
 
         // STRICT REACHABILITY VALIDATION
@@ -700,8 +694,8 @@ public class Phase4_MethodCompilation
             throw new InvalidOperationException(errorMessage);
         }
 
-        Console.WriteLine($"[Phase4] Association reachability validation PASSED:");
-        Console.WriteLine($"  All {associationsByKey.Sum(kvp => kvp.Value.Count)} Association literals are reachable from canonical sources.");
+// Console.WriteLine($"[Phase4] Association reachability validation PASSED:");
+// Console.WriteLine($"  All {associationsByKey.Sum(kvp => kvp.Value.Count)} Association literals are reachable from canonical sources.");
 
     }
 
@@ -782,7 +776,7 @@ public class Phase4_MethodCompilation
         // NOTE: Store init expressions in ORIGINAL bundle order
         // Program.cs handles the execution ordering (initialize → comments → other)
         // We must maintain 1:1 index mapping between bundle.InitExpressions and InitExpressionMethods array
-        Console.WriteLine($"[Phase4] Creating {_bundle.InitExpressions.Length} init expression methods in bundle order");
+// Console.WriteLine($"[Phase4] Creating {_bundle.InitExpressions.Length} init expression methods in bundle order");
 
         var initExprMethods = new List<SmalltalkOOP>();
 
@@ -852,7 +846,7 @@ public class Phase4_MethodCompilation
             // Get the CompiledMethod object created earlier
             if (!_localIdToObjectId.TryGetValue(method.LocalId, out SmalltalkOOP methodOOP))
             {
-                Console.WriteLine($"WARNING: Method not found in localIdToObjectId: {method.LocalId}");
+// Console.WriteLine($"WARNING: Method not found in localIdToObjectId: {method.LocalId}");
                 skippedMethods++;
                 continue;
             }
@@ -860,7 +854,7 @@ public class Phase4_MethodCompilation
             // Resolve the home class object
             if (!_localIdToObjectId.TryGetValue(method.HomeClassLocalId, out SmalltalkOOP classOOP))
             {
-                Console.WriteLine($"WARNING: Home class not found: {method.HomeClassLocalId}");
+// Console.WriteLine($"WARNING: Home class not found: {method.HomeClassLocalId}");
                 skippedMethods++;
                 continue;
             }
@@ -870,7 +864,7 @@ public class Phase4_MethodCompilation
 
             if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
             {
-                Console.WriteLine($"WARNING: Class {method.HomeClassLocalId} has nil methodDict");
+// Console.WriteLine($"WARNING: Class {method.HomeClassLocalId} has nil methodDict");
                 skippedMethods++;
                 continue;
             }

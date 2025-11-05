@@ -52,7 +52,7 @@ public class Phase3_ObjectAllocation
 
     public void Run()
     {
-        Console.WriteLine("Phase 3: Object Allocation and Initialization");
+// Console.WriteLine("Phase 3: Object Allocation and Initialization");
 
         // Section 1: Allocation
         AllocateSentinelObjects();
@@ -73,13 +73,13 @@ public class Phase3_ObjectAllocation
         InitializeUnsetInstanceVariables();
         LogInitializationCheckpoint();
 
-        Console.WriteLine("  Phase 3 complete: All objects allocated and initialized");
+// Console.WriteLine("  Phase 3 complete: All objects allocated and initialized");
     }
 
     private void LogAllocationCheckpoint()
     {
         int objectCount = _localIdToObjectId.Count + 3;  // +3 for nil/true/false in GlobalRegistry
-        Console.WriteLine($"  ✓ Allocation checkpoint: {objectCount} objects allocated");
+// Console.WriteLine($"  ✓ Allocation checkpoint: {objectCount} objects allocated");
 
         // Record Phase3 metrics
         if (_report.Metrics.Phase3Metrics == null)
@@ -94,7 +94,7 @@ public class Phase3_ObjectAllocation
         // Count all objects that now have class references
         // This includes classes, metaclasses, symbols, and allocated objects
         int classRefCount = _bundle.Classes.Length + SymbolRegistry.AllSymbols().Count() + _localIdToObjectId.Count;
-        Console.WriteLine($"  ✓ Class reference checkpoint: {classRefCount} class references set");
+// Console.WriteLine($"  ✓ Class reference checkpoint: {classRefCount} class references set");
 
         // Record Phase3 metrics
         if (_report.Metrics.Phase3Metrics == null)
@@ -107,7 +107,7 @@ public class Phase3_ObjectAllocation
     private void LogInitializationCheckpoint()
     {
         // Initialize unset instance variables completes Phase 3
-        Console.WriteLine($"  ✓ Initialization checkpoint: All unset fields initialized to nil");
+// Console.WriteLine($"  ✓ Initialization checkpoint: All unset fields initialized to nil");
 
         // Record Phase3 metrics
         if (_report.Metrics.Phase3Metrics == null)
@@ -134,7 +134,7 @@ public class Phase3_ObjectAllocation
         GlobalRegistry.Register("true", trueOOP);
         GlobalRegistry.Register("false", falseOOP);
 
-        Console.WriteLine($"  Allocated sentinel objects: nil={nilOOP}, true={trueOOP}, false={falseOOP}");
+// Console.WriteLine($"  Allocated sentinel objects: nil={nilOOP}, true={trueOOP}, false={falseOOP}");
 
         // Initialize SystemDictionary slots with nil (created in Phase 2 but couldn't be initialized until now)
         InitializeSystemDictionaryWithNil(nilOOP);
@@ -229,7 +229,7 @@ public class Phase3_ObjectAllocation
         var undeclaredAssoc = AllocateAssociationWithSemanticAllocator(undeclaredSymbol, undeclaredOOP);
         InstallAssociationInSystemDictionary(undeclaredAssoc, "Undeclared");
 
-        Console.WriteLine($"  Created Undeclared dictionary (capacity={initialCapacity}, undeclared count={undeclaredCount})");
+// Console.WriteLine($"  Created Undeclared dictionary (capacity={initialCapacity}, undeclared count={undeclaredCount})");
     }
 
     /// <summary>
@@ -343,7 +343,7 @@ public class Phase3_ObjectAllocation
         if (!foundAndUpdated)
         {
             // Association doesn't exist - create one and add to Undeclared
-            Console.WriteLine($"  DefaultTextStyle Association not found in bundle, adding to Undeclared");
+// Console.WriteLine($"  DefaultTextStyle Association not found in bundle, adding to Undeclared");
             var defaultTextStyleSymbol = InternSymbol("DefaultTextStyle");
             var defaultTextStyleAssoc = AllocateAssociationWithSemanticAllocator(defaultTextStyleSymbol, textStyleOOP);
 
@@ -352,7 +352,7 @@ public class Phase3_ObjectAllocation
             InstallAssociationInDictionary(undeclaredOOP, defaultTextStyleAssoc, "DefaultTextStyle");
         }
 
-        Console.WriteLine($"  Created DefaultTextStyle with stub StrikeFont for PopUpMenu support");
+// Console.WriteLine($"  Created DefaultTextStyle with stub StrikeFont for PopUpMenu support");
     }
 
     #endregion
@@ -390,7 +390,7 @@ public class Phase3_ObjectAllocation
             objectsAllocated++;
         }
 
-        Console.WriteLine($"  Allocated {objectsAllocated} special objects from bundle");
+// Console.WriteLine($"  Allocated {objectsAllocated} special objects from bundle");
     }
 
     /// <summary>
@@ -513,7 +513,7 @@ public class Phase3_ObjectAllocation
                         // Update the value (instance variable 1)
                         _allocator.SetInstanceVariable(objectOOP, 1, newValueOOP);
                         _initializedFields.Add((objectOOP, 1));
-                        Console.WriteLine($"  Updated existing {keyName} Association value to oop={newValueOOP.RawValue}");
+// Console.WriteLine($"  Updated existing {keyName} Association value to oop={newValueOOP.RawValue}");
                         return true;
                     }
                 }
@@ -568,12 +568,12 @@ public class Phase3_ObjectAllocation
                     // Debug: Show first few and class:Point and class:MethodDictionary specifically
                     if (classReferencesSet < 5 || instanceClassName == "Point" || instanceClassName == "MethodDictionary")
                     {
-                        Console.WriteLine($"    Set {cls.LocalId}.class = {metaclassLocalId} (classOOP={classOOP}, metaclassOOP={metaclassOOP})");
+// Console.WriteLine($"    Set {cls.LocalId}.class = {metaclassLocalId} (classOOP={classOOP}, metaclassOOP={metaclassOOP})");
                     }
                 }
                 else
                 {
-                    Console.WriteLine($"WARNING: Could not find metaclass for {instanceClassName}");
+// Console.WriteLine($"WARNING: Could not find metaclass for {instanceClassName}");
                 }
             }
 
@@ -602,7 +602,7 @@ public class Phase3_ObjectAllocation
         // Step 4: Set class references for symbols, strings, and other runtime objects
         SetRuntimeObjectClassReferences();
 
-        Console.WriteLine($"  Set {classReferencesSet} class references");
+// Console.WriteLine($"  Set {classReferencesSet} class references");
     }
 
     private void SetSingletonClassReference(string globalName, string className)
@@ -690,7 +690,7 @@ public class Phase3_ObjectAllocation
                         int superclassIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "superclass", _bundle);
                         if (i == superclassIndex)
                         {
-                            Console.WriteLine($"    Initialized class:Object.superclass = nil (field index {i})");
+// Console.WriteLine($"    Initialized class:Object.superclass = nil (field index {i})");
                         }
                     }
                 }
@@ -740,7 +740,7 @@ public class Phase3_ObjectAllocation
         // Step 5: Initialize Dictionary indexed slots to nil
         InitializeDictionaryIndexedSlots(nilOOP);
 
-        Console.WriteLine($"  Initialized {instanceVariablesInitialized} instance variables to nil");
+// Console.WriteLine($"  Initialized {instanceVariablesInitialized} instance variables to nil");
     }
 
     private void InitializeSingletonInstanceVariables(string globalName, string className, SmalltalkOOP nilOOP)
@@ -1028,7 +1028,7 @@ public class Phase3_ObjectAllocation
     /// </summary>
     private void PopulateSubclassesField()
     {
-        Console.WriteLine("  Populating Behavior.subclasses fields...");
+// Console.WriteLine("  Populating Behavior.subclasses fields...");
 
         int setCount = 0;
         int totalSubclassRefs = 0;
@@ -1115,8 +1115,8 @@ public class Phase3_ObjectAllocation
             }
         }
 
-        Console.WriteLine($"    Populated subclasses for {setCount} classes with children");
-        Console.WriteLine($"    Total subclass references: {totalSubclassRefs}");
+// Console.WriteLine($"    Populated subclasses for {setCount} classes with children");
+// Console.WriteLine($"    Total subclass references: {totalSubclassRefs}");
         _report.AddValidation("Phase 3", "Behavior.subclasses populated", true);
     }
 
