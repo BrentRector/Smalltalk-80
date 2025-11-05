@@ -1,5 +1,6 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.Objects;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -74,11 +75,12 @@ public static class BlockClosurePrimitives
             // Single argument that's not a SmallInteger
             // Could be either value: (direct arg) or valueWithArguments: (array arg)
             // Distinguish between value: (direct arg) and valueWithArguments: (array arg)
-            // by checking if argument has indexed size (is array-like)
-            // GetIndexedSize returns 0 for objects without indexed slots
-            int indexedSize = ctx.GetIndexedSize(args[0]);
+            // by checking if argument is a PointerIndexed object (Array)
+            // Strings/Symbols are ByteIndexed and should be treated as direct args
+            var format = ctx.GetObjectFormat(args[0]);
+            bool isArray = (format == ObjectFormat.PointerIndexed);
 
-            if (indexedSize > 0)
+            if (isArray)
             {
                 // valueWithArguments: - arg is an Array, extract elements
                 // This handles arbitrary argument counts via Array
@@ -87,7 +89,7 @@ public static class BlockClosurePrimitives
             else
             {
                 // value: - arg is a direct parameter (not an array)
-                // Pass the single argument directly to the block
+                // Pass the single argument directly to the block (includes Strings, Symbols, etc.)
                 blockArgs = args;
             }
         }

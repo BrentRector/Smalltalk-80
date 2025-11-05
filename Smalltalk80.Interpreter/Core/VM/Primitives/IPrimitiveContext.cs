@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Objects;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -171,6 +172,13 @@ public interface IPrimitiveContext
     /// <param name="index">Index.</param>
     /// <returns>Indexed element as SmalltalkOOP.</returns>
     SmalltalkOOP GetIndexedOOP(SmalltalkOOP objectOOP, int index);
+
+    /// <summary>
+    /// Gets the object format (ByteIndexed, PointerIndexed, etc.) of an object.
+    /// </summary>
+    /// <param name="objectOOP">Object pointer.</param>
+    /// <returns>ObjectFormat enum value.</returns>
+    ObjectFormat GetObjectFormat(SmalltalkOOP objectOOP);
 
     // Symbol interning support
 

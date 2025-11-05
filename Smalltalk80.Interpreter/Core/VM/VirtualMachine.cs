@@ -1016,118 +1016,122 @@ public partial class VirtualMachine : IPrimitiveContext
                 var header = ParseMethodHeader(blockMethodOOP);
                 int blockLocalCount = header.NumArgs + header.NumTemps;
 
-                if (_debugOptions.ShouldDebugBytecode)
+                // DEBUG for block temp access investigation
+                string? activeMethodId = GetLocalId(_heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.METHODCONTEXT_METHOD_INDEX));
+                if (activeMethodId != null && activeMethodId.StartsWith("block:"))
                 {
-                    Console.WriteLine($"[DEBUG pushTemp] index={index}, blockLocalCount={blockLocalCount}");
+                    Console.WriteLine($"[DEBUG pushTemp in block] index={index}, blockLocalCount={blockLocalCount}, activeContext={_activeContextOOP}, blockOOP={blockContextOOP}");
+                    Console.WriteLine($"  Block ID: {activeMethodId}");
+                    Console.WriteLine($"  NumArgs={header.NumArgs}, NumTemps={header.NumTemps}");
                 }
 
                 // If accessing beyond block's local scope, read from home context
                 if (index >= blockLocalCount)
                 {
-                    // CRITICAL: Follow the homeContext chain recursively until we find a context
-                    // that can provide the requested temp index.
+                    // CRITICAL: The compiler generates indices in a hierarchical manner:
+                    // - Inner block locals: 0..(innerLocals-1)
+                    // - Middle block locals: innerLocals..(innerLocals+middleLocals-1)
+                    // - Outer block locals: (innerLocals+middleLocals)..
                     //
-                    // For deeply nested blocks like [[[homeTemp + 20] value] value]:
-                    //   - Innermost block: 0 args/temps, index=1 → check homeContext
-                    //   - Middle block: 0 args/temps, index=1 → check ITS homeContext
-                    //   - Method: has homeTemp at index 1 → found!
+                    // When we traverse up, we need to track the cumulative offset
+                    // to map the compiler's index to the actual slot in the parent.
                     //
-                    // For blocks accessing outer block args like [:x | [x + 10] value]:
-                    //   - Inner block: 0 args/temps, index=0 → check homeContext
-                    //   - Outer block: 1 arg, has x at index 0 → found!
-                    SmalltalkOOP currentContext = _activeContextOOP;
+                    // For example, with [:ia | | it | ... ot ...]:
+                    // - ia=0, it=1 (inner block has 2 locals)
+                    // - If parent has [:ma | ...], ma would be index 2 from compiler's view
+                    // - If grandparent has [| ot | ...], ot would be index 3 from compiler's view
+                    //
+                    // When accessing index 3 (ot) from inner block:
+                    // - Not in inner (3 >= 2), go to parent with remainingIndex = 3 - 2 = 1
+                    // - Not in middle (1 >= 1), go to grandparent with remainingIndex = 1 - 1 = 0
+                    // - Found in grandparent at slot 0!
 
+                    int remainingIndex = index - blockLocalCount;  // How many slots to skip in parent chain
+
+                    // Get the BlockClosure for the active context
+                    var activeBlockClass = GetClassName(GetClass(blockContextOOP));
+                    SmalltalkOOP currentContext;
+
+                    if (activeBlockClass == "BlockClosure")
+                    {
+                        var homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
+                        currentContext = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                    }
+                    else if (activeBlockClass == "BlockContext")
+                    {
+                        var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
+                        currentContext = _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException($"Unexpected block class: {activeBlockClass}");
+                    }
+
+                    // Now traverse the parent chain
                     while (true)
                     {
-                        // DIAGNOSTIC: Log mapping lookup to track what BlockClosure is retrieved
+                        // Check if current context is a block or method
                         bool found = _blockContextMapping.TryGetValue(currentContext, out var currentBlockOOP);
-                        if (_createContextCallCount >= 999999 && _createContextCallCount <= 999999)
-                        {
-                            Console.WriteLine($"  [PUSH_TEMP LOOKUP#{_createContextCallCount}] currentContext={currentContext}, found={found}, blockOOP={currentBlockOOP}");
-                        }
 
-                        // Get the BlockClosure/BlockContext object for current context
                         if (!found)
                         {
                             // Current context is a MethodContext - use it directly
                             contextToReadFrom = currentContext;
-                            // CRITICAL FIX: Subtract blockLocalCount to get the actual parent index
-                            // The compiler adds blockLocalCount to signal home context access,
-                            // but the actual index in the parent is the original value
-                            actualIndex = index - blockLocalCount;
+                            actualIndex = remainingIndex;
 
                             if (_debugOptions.ShouldDebugBytecode)
                             {
-                                Console.WriteLine($"[DEBUG pushTemp] Reached MethodContext: {contextToReadFrom}, adjusted index: {actualIndex} (was {index})");
+                                Console.WriteLine($"[DEBUG pushTemp] Found in MethodContext: {contextToReadFrom}, index: {actualIndex} (original {index})");
                             }
                             break;
                         }
 
+                        // Current context is a block - get its local count
+                        var currentMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                        var currentBlockMethodOOP = _heapManager.GetInstanceVariable(currentContext, currentMethodIndex);
+                        var currentHeader = ParseMethodHeader(currentBlockMethodOOP);
+                        int currentLocalCount = currentHeader.NumArgs + currentHeader.NumTemps;
+
+                        // Check if index is within this block's locals
+                        if (remainingIndex < currentLocalCount)
+                        {
+                            // Found it!
+                            contextToReadFrom = currentContext;
+                            actualIndex = remainingIndex;
+
+                            // DEBUG for block temp access investigation
+                            string? currentMethodId = GetLocalId(_heapManager.GetInstanceVariable(currentContext, VMConstants.METHODCONTEXT_METHOD_INDEX));
+                            if (currentMethodId != null && currentMethodId.StartsWith("block:"))
+                            {
+                                Console.WriteLine($"[DEBUG pushTemp] FOUND in parent block: context={contextToReadFrom}, actualIndex={actualIndex} (original {index}), localCount={currentLocalCount}");
+                                Console.WriteLine($"  Parent block ID: {currentMethodId}");
+                                Console.WriteLine($"  remainingIndex calculation: previous remainingIndex = {remainingIndex}");
+                            }
+                            break;
+                        }
+
+                        // Not in this block either, adjust index and move to its parent
+                        remainingIndex -= currentLocalCount;
+
                         // Get homeContext from BlockClosure/BlockContext
                         var blockClass = GetClassName(GetClass(currentBlockOOP));
-                        SmalltalkOOP homeContext;
 
                         if (blockClass == "BlockClosure")
                         {
                             var homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
-                            homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
-
-                            // DIAGNOSTIC: Show homeContext resolution
-                            if (_createContextCallCount >= 999999 && _createContextCallCount <= 999999)
-                            {
-                                Console.WriteLine($"  [PUSH_TEMP RESOLUTION] blockOOP={currentBlockOOP}, homeContextIndex={homeIndex}, resolved homeContext={homeContext}");
-                            }
+                            currentContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
                         }
                         else if (blockClass == "BlockContext")
                         {
                             var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
-                            homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
+                            currentContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
                         }
                         else
                         {
                             throw new InvalidOperationException($"Unexpected class in homeContext chain: {blockClass}");
                         }
 
-                        // Check if homeContext has enough slots for the index
-                        // If homeContext is also a block, check its arg+temp count
-                        if (_blockContextMapping.TryGetValue(homeContext, out var homeBlockOOP))
-                        {
-                            // HomeContext is a block - check if it has the index
-                            var homeMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
-                            var homeBlockMethodOOP = _heapManager.GetInstanceVariable(homeContext, homeMethodIndex);
-                            var homeHeader = ParseMethodHeader(homeBlockMethodOOP);
-                            int homeLocalCount = homeHeader.NumArgs + homeHeader.NumTemps;
-
-                            if (index - blockLocalCount < homeLocalCount)
-                            {
-                                // Home block has this index - use it with adjustment
-                                contextToReadFrom = homeContext;
-                                // The index needs to be adjusted relative to the current block's locals
-                                actualIndex = index - blockLocalCount;
-
-                                if (_debugOptions.ShouldDebugBytecode)
-                                {
-                                    Console.WriteLine($"[DEBUG pushTemp] Found in block homeContext: {contextToReadFrom}, adjusted index: {actualIndex} (was {index})");
-                                }
-                                break;
-                            }
-
-                            // Home block doesn't have it either - continue up the chain
-                            currentContext = homeContext;
-                        }
-                        else
-                        {
-                            // HomeContext is a MethodContext - use it with adjustment
-                            contextToReadFrom = homeContext;
-                            // CRITICAL FIX: Subtract blockLocalCount to get the actual parent index
-                            actualIndex = index - blockLocalCount;
-
-                            if (_debugOptions.ShouldDebugBytecode)
-                            {
-                                Console.WriteLine($"[DEBUG pushTemp] Found in method homeContext: {contextToReadFrom}, adjusted index: {actualIndex} (was {index})");
-                            }
-                            break;
-                        }
+                        // Continue to next iteration to check the parent context
                     }
                 }
                 else
@@ -1152,6 +1156,24 @@ public partial class VirtualMachine : IPrimitiveContext
             }
 
             var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, actualIndex);
+
+            // DEBUG for block temp access
+            string? debugMethodId = GetLocalId(_heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.METHODCONTEXT_METHOD_INDEX));
+            if (debugMethodId != null && debugMethodId.StartsWith("block:") && index >= 2) // Only debug non-local accesses
+            {
+                string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"OOP({valueOOP})";
+                Console.WriteLine($"[DEBUG pushTemp] Retrieved value: {valStr} from context {contextToReadFrom} slot {actualIndex}");
+
+                // Show what's in the context's slots
+                Console.WriteLine($"  Context slots (first 5):");
+                int slotsToDump = Math.Min(5, _heapManager.GetIndexedSize(contextToReadFrom));
+                for (int i = 0; i < slotsToDump; i++)
+                {
+                    var slotValue = _heapManager.GetIndexedOOP(contextToReadFrom, i);
+                    string slotStr = slotValue.IsSmallInteger ? $"SmallInteger({slotValue.AsSmallInteger()})" : $"OOP({slotValue})";
+                    Console.WriteLine($"    [{i}] = {slotStr}");
+                }
+            }
 
             // DIAGNOSTIC: Log temp reads in the same range as stores to compare
             if (_createContextCallCount >= 999999 && _createContextCallCount <= 999999)
@@ -1482,46 +1504,91 @@ public partial class VirtualMachine : IPrimitiveContext
             var valueOOP = Pop();
 
             // For block execution contexts, check if we need to store to home context
+            // We need to traverse the context chain for nested blocks
             SmalltalkOOP contextToStoreTo = _activeContextOOP;
-
-            // DIAGNOSTIC: Log mapping lookup for POP_STORE_TEMP
-            bool foundMapping = _blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP);
-            if (_createContextCallCount >= 999999 && _createContextCallCount <= 999999)
-            {
-                Console.WriteLine($"  [POP_STORE_TEMP LOOKUP#{_createContextCallCount}] _activeContextOOP={_activeContextOOP}, found={foundMapping}, blockOOP={blockOrClosureOOP}");
-            }
+            int actualIndex = index;
 
             // Check if current context is a block execution context
-            int blockLocalCount = 0;
-            if (foundMapping)
+            if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
             {
                 // This is a block - check if index is out of range for block's own temps
                 var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                 var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                 var header = ParseMethodHeader(blockMethodOOP);
-                blockLocalCount = header.NumArgs + header.NumTemps;
+                int blockLocalCount = header.NumArgs + header.NumTemps;
 
-                // If storing beyond block's local scope, store to home context
+                // If storing beyond block's local scope, traverse to find the right context
                 if (index >= blockLocalCount)
                 {
-                    // Check if it's a BlockClosure or BlockContext
-                    var blockClass = GetClassName(GetClass(blockOrClosureOOP));
-                    if (blockClass == "BlockClosure")
+                    // Need to traverse the context chain
+                    SmalltalkOOP currentContext = _activeContextOOP;
+                    int adjustedIndex = index;
+
+                    while (true)
                     {
-                        var homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
-                        contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
-                    }
-                    else
-                    {
-                        var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
-                        contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
+                        bool found = _blockContextMapping.TryGetValue(currentContext, out var currentBlockOOP);
+                        if (!found)
+                        {
+                            // Reached a MethodContext
+                            contextToStoreTo = currentContext;
+                            actualIndex = adjustedIndex;
+                            break;
+                        }
+
+                        // Get current block's local count
+                        var currentMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                        var currentBlockMethodOOP = _heapManager.GetInstanceVariable(currentContext, currentMethodIndex);
+                        var currentHeader = ParseMethodHeader(currentBlockMethodOOP);
+                        int currentLocalCount = currentHeader.NumArgs + currentHeader.NumTemps;
+
+                        // Adjust index for current level
+                        adjustedIndex -= currentLocalCount;
+
+                        // Get homeContext
+                        var blockClass = GetClassName(GetClass(currentBlockOOP));
+                        SmalltalkOOP homeContext;
+
+                        if (blockClass == "BlockClosure")
+                        {
+                            var homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
+                            homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
+                        }
+                        else
+                        {
+                            var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
+                            homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
+                        }
+
+                        // Check if homeContext is also a block
+                        if (_blockContextMapping.TryGetValue(homeContext, out var homeBlockOOP))
+                        {
+                            // HomeContext is a block - check if it has the index
+                            var homeMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                            var homeBlockMethodOOP = _heapManager.GetInstanceVariable(homeContext, homeMethodIndex);
+                            var homeHeader = ParseMethodHeader(homeBlockMethodOOP);
+                            int homeLocalCount = homeHeader.NumArgs + homeHeader.NumTemps;
+
+                            if (adjustedIndex < homeLocalCount)
+                            {
+                                // Found it!
+                                contextToStoreTo = homeContext;
+                                actualIndex = adjustedIndex;
+                                break;
+                            }
+
+                            // Continue up the chain
+                            currentContext = homeContext;
+                        }
+                        else
+                        {
+                            // HomeContext is a MethodContext
+                            contextToStoreTo = homeContext;
+                            actualIndex = adjustedIndex;
+                            break;
+                        }
                     }
                 }
             }
-
-            // Calculate the actual index to use
-            // If storing to homeContext, subtract blockLocalCount to get parent's temp index
-            int actualIndex = (contextToStoreTo != _activeContextOOP) ? (index - blockLocalCount) : index;
 
             // DIAGNOSTIC: Log ALL compact temp stores to track variable updates
             if (_createContextCallCount >= 999999 && _createContextCallCount <= 999999)
@@ -1532,8 +1599,8 @@ public partial class VirtualMachine : IPrimitiveContext
                 string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"{valueOOP}";
                 bool storedToHome = (contextToStoreTo != _activeContextOOP);
 
-                // Show the BlockClosure object used
-                string blockOOPStr = blockOrClosureOOP.ToString();
+                // Show the BlockClosure object used if available
+                string blockOOPStr = (blockOrClosureOOP.RawValue != 0) ? blockOrClosureOOP.ToString() : "N/A";
                 Console.WriteLine($"[COMPACT_POP_STORE_TEMP#{_createContextCallCount}] bytecode=0x{bytecode:X2}, method={currentMethodLocalId}, index={index}, actualIndex={actualIndex}, value={valStr}, storedToHome={storedToHome}, blockOOP={blockOOPStr}, context={contextToStoreTo}");
             }
 
@@ -2032,38 +2099,91 @@ public partial class VirtualMachine : IPrimitiveContext
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
                     // For block execution contexts, check if we need to access home context temps
+                    // We need to traverse the context chain for nested blocks
                     SmalltalkOOP contextToReadFrom = _activeContextOOP;
-                    int blockLocalCount = 0;
+                    int actualIndex = index;
+
                     if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
                         var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                         var header = ParseMethodHeader(blockMethodOOP);
-                        blockLocalCount = header.NumArgs + header.NumTemps;
+                        int blockLocalCount = header.NumArgs + header.NumTemps;
 
                         if (index >= blockLocalCount)
                         {
-                            // Check if it's a BlockClosure or BlockContext
-                            var objClass = _heapManager.GetSlot(blockOrClosureOOP, 0);
-                            var blockClosureClassOOP = RuntimeSpecialObjects.Instance.BlockClosureClass;
-                            if (objClass == blockClosureClassOOP)
+                            // Need to traverse the context chain
+                            SmalltalkOOP currentContext = _activeContextOOP;
+                            int adjustedIndex = index;
+
+                            while (true)
                             {
-                                // It's a BlockClosure - get homeContext field
-                                var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
-                                contextToReadFrom = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeContextIndex);
-                            }
-                            else
-                            {
-                                // It's a BlockContext - get home field
-                                var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
-                                contextToReadFrom = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
+                                bool found = _blockContextMapping.TryGetValue(currentContext, out var currentBlockOOP);
+                                if (!found)
+                                {
+                                    // Reached a MethodContext
+                                    contextToReadFrom = currentContext;
+                                    actualIndex = adjustedIndex;
+                                    break;
+                                }
+
+                                // Get current block's local count
+                                var currentMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                                var currentBlockMethodOOP = _heapManager.GetInstanceVariable(currentContext, currentMethodIndex);
+                                var currentHeader = ParseMethodHeader(currentBlockMethodOOP);
+                                int currentLocalCount = currentHeader.NumArgs + currentHeader.NumTemps;
+
+                                // Adjust index for current level
+                                adjustedIndex -= currentLocalCount;
+
+                                // Get homeContext
+                                var objClass = _heapManager.GetSlot(currentBlockOOP, 0);
+                                var blockClosureClassOOP = RuntimeSpecialObjects.Instance.BlockClosureClass;
+                                SmalltalkOOP homeContext;
+
+                                if (objClass == blockClosureClassOOP)
+                                {
+                                    // It's a BlockClosure - get homeContext field
+                                    var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
+                                    homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeContextIndex);
+                                }
+                                else
+                                {
+                                    // It's a BlockContext - get home field
+                                    var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
+                                    homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
+                                }
+
+                                // Check if homeContext is also a block
+                                if (_blockContextMapping.TryGetValue(homeContext, out var homeBlockOOP))
+                                {
+                                    // HomeContext is a block - check if it has the index
+                                    var homeMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                                    var homeBlockMethodOOP = _heapManager.GetInstanceVariable(homeContext, homeMethodIndex);
+                                    var homeHeader = ParseMethodHeader(homeBlockMethodOOP);
+                                    int homeLocalCount = homeHeader.NumArgs + homeHeader.NumTemps;
+
+                                    if (adjustedIndex < homeLocalCount)
+                                    {
+                                        // Found it!
+                                        contextToReadFrom = homeContext;
+                                        actualIndex = adjustedIndex;
+                                        break;
+                                    }
+
+                                    // Continue up the chain
+                                    currentContext = homeContext;
+                                }
+                                else
+                                {
+                                    // HomeContext is a MethodContext
+                                    contextToReadFrom = homeContext;
+                                    actualIndex = adjustedIndex;
+                                    break;
+                                }
                             }
                         }
                     }
-
-                    // Calculate the actual index to use
-                    // If reading from homeContext, subtract blockLocalCount to get parent's temp index
-                    int actualIndex = (contextToReadFrom != _activeContextOOP) ? (index - blockLocalCount) : index;
 
                     var valueOOP = _heapManager.GetIndexedOOP(contextToReadFrom, actualIndex);
                     Push(valueOOP);
@@ -2077,44 +2197,91 @@ public partial class VirtualMachine : IPrimitiveContext
                     var valueOOP = Pop();
 
                     // For block execution contexts, check if we need to store to home context
+                    // We need to traverse the context chain for nested blocks
                     SmalltalkOOP contextToStoreTo = _activeContextOOP;
-                    int blockLocalCount = 0;
+                    int actualIndex = index;
+
                     if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
                         var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                         var header = ParseMethodHeader(blockMethodOOP);
-                        blockLocalCount = header.NumArgs + header.NumTemps;
+                        int blockLocalCount = header.NumArgs + header.NumTemps;
 
                         if (index >= blockLocalCount)
                         {
-                            // Check if it's a BlockClosure or BlockContext
-                            var objClass = _heapManager.GetSlot(blockOrClosureOOP, 0);
-                            var blockClosureClassOOP = RuntimeSpecialObjects.Instance.BlockClosureClass;
-                            if (objClass == blockClosureClassOOP)
-                            {
-                                // It's a BlockClosure - get homeContext field
-                                var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
-                                contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeContextIndex);
+                            // Need to traverse the context chain
+                            SmalltalkOOP currentContext = _activeContextOOP;
+                            int adjustedIndex = index;
 
-                                // DIAGNOSTIC: Show homeContext resolution
-                                if (_createContextCallCount >= 5000 && _createContextCallCount <= 5005)
-                                {
-                                    Console.WriteLine($"  [POP_STORE_TEMP RESOLUTION] blockOOP={blockOrClosureOOP}, homeContextIndex={homeContextIndex}, resolved homeContext={contextToStoreTo}");
-                                }
-                            }
-                            else
+                            while (true)
                             {
-                                // It's a BlockContext - get home field
-                                var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
-                                contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
+                                bool found = _blockContextMapping.TryGetValue(currentContext, out var currentBlockOOP);
+                                if (!found)
+                                {
+                                    // Reached a MethodContext
+                                    contextToStoreTo = currentContext;
+                                    actualIndex = adjustedIndex;
+                                    break;
+                                }
+
+                                // Get current block's local count
+                                var currentMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                                var currentBlockMethodOOP = _heapManager.GetInstanceVariable(currentContext, currentMethodIndex);
+                                var currentHeader = ParseMethodHeader(currentBlockMethodOOP);
+                                int currentLocalCount = currentHeader.NumArgs + currentHeader.NumTemps;
+
+                                // Adjust index for current level
+                                adjustedIndex -= currentLocalCount;
+
+                                // Get homeContext
+                                var objClass = _heapManager.GetSlot(currentBlockOOP, 0);
+                                var blockClosureClassOOP = RuntimeSpecialObjects.Instance.BlockClosureClass;
+                                SmalltalkOOP homeContext;
+
+                                if (objClass == blockClosureClassOOP)
+                                {
+                                    // It's a BlockClosure - get homeContext field
+                                    var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
+                                    homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeContextIndex);
+                                }
+                                else
+                                {
+                                    // It's a BlockContext - get home field
+                                    var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
+                                    homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
+                                }
+
+                                // Check if homeContext is also a block
+                                if (_blockContextMapping.TryGetValue(homeContext, out var homeBlockOOP))
+                                {
+                                    // HomeContext is a block - check if it has the index
+                                    var homeMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                                    var homeBlockMethodOOP = _heapManager.GetInstanceVariable(homeContext, homeMethodIndex);
+                                    var homeHeader = ParseMethodHeader(homeBlockMethodOOP);
+                                    int homeLocalCount = homeHeader.NumArgs + homeHeader.NumTemps;
+
+                                    if (adjustedIndex < homeLocalCount)
+                                    {
+                                        // Found it!
+                                        contextToStoreTo = homeContext;
+                                        actualIndex = adjustedIndex;
+                                        break;
+                                    }
+
+                                    // Continue up the chain
+                                    currentContext = homeContext;
+                                }
+                                else
+                                {
+                                    // HomeContext is a MethodContext
+                                    contextToStoreTo = homeContext;
+                                    actualIndex = adjustedIndex;
+                                    break;
+                                }
                             }
                         }
                     }
-
-                    // Calculate the actual index to use
-                    // If storing to homeContext, subtract blockLocalCount to get parent's temp index
-                    int actualIndex = (contextToStoreTo != _activeContextOOP) ? (index - blockLocalCount) : index;
 
                     _heapManager.SetIndexedOOP(contextToStoreTo, actualIndex, valueOOP);
                     Push(valueOOP); // Leave value on stack
@@ -2128,42 +2295,93 @@ public partial class VirtualMachine : IPrimitiveContext
                     var valueOOP = Pop();
 
                     // For block execution contexts, check if we need to store to home context
+                    // We need to traverse the context chain for nested blocks
                     SmalltalkOOP contextToStoreTo = _activeContextOOP;
+                    int actualIndex = index;
                     bool storedToHome = false;
-                    SmalltalkOOP originalContext = _activeContextOOP;
-                    int blockLocalCount = 0;
+
                     if (_blockContextMapping.TryGetValue(_activeContextOOP, out var blockOrClosureOOP))
                     {
                         var methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
                         var blockMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                         var header = ParseMethodHeader(blockMethodOOP);
-                        blockLocalCount = header.NumArgs + header.NumTemps;
+                        int blockLocalCount = header.NumArgs + header.NumTemps;
 
                         if (index >= blockLocalCount)
                         {
-                            // Check if it's a BlockClosure or BlockContext
-                            var objClass = _heapManager.GetSlot(blockOrClosureOOP, 0);
-                            var blockClosureClassOOP = RuntimeSpecialObjects.Instance.BlockClosureClass;
-                            if (objClass == blockClosureClassOOP)
+                            storedToHome = true;
+                            // Need to traverse the context chain
+                            SmalltalkOOP currentContext = _activeContextOOP;
+                            int adjustedIndex = index;
+
+                            while (true)
                             {
-                                // It's a BlockClosure - get homeContext field
-                                var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
-                                contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeContextIndex);
-                                storedToHome = true;
-                            }
-                            else
-                            {
-                                // It's a BlockContext - get home field
-                                var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
-                                contextToStoreTo = _heapManager.GetInstanceVariable(blockOrClosureOOP, homeIndex);
-                                storedToHome = true;
+                                bool found = _blockContextMapping.TryGetValue(currentContext, out var currentBlockOOP);
+                                if (!found)
+                                {
+                                    // Reached a MethodContext
+                                    contextToStoreTo = currentContext;
+                                    actualIndex = adjustedIndex;
+                                    break;
+                                }
+
+                                // Get current block's local count
+                                var currentMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                                var currentBlockMethodOOP = _heapManager.GetInstanceVariable(currentContext, currentMethodIndex);
+                                var currentHeader = ParseMethodHeader(currentBlockMethodOOP);
+                                int currentLocalCount = currentHeader.NumArgs + currentHeader.NumTemps;
+
+                                // Adjust index for current level
+                                adjustedIndex -= currentLocalCount;
+
+                                // Get homeContext
+                                var objClass = _heapManager.GetSlot(currentBlockOOP, 0);
+                                var blockClosureClassOOP = RuntimeSpecialObjects.Instance.BlockClosureClass;
+                                SmalltalkOOP homeContext;
+
+                                if (objClass == blockClosureClassOOP)
+                                {
+                                    // It's a BlockClosure - get homeContext field
+                                    var homeContextIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
+                                    homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeContextIndex);
+                                }
+                                else
+                                {
+                                    // It's a BlockContext - get home field
+                                    var homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
+                                    homeContext = _heapManager.GetInstanceVariable(currentBlockOOP, homeIndex);
+                                }
+
+                                // Check if homeContext is also a block
+                                if (_blockContextMapping.TryGetValue(homeContext, out var homeBlockOOP))
+                                {
+                                    // HomeContext is a block - check if it has the index
+                                    var homeMethodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                                    var homeBlockMethodOOP = _heapManager.GetInstanceVariable(homeContext, homeMethodIndex);
+                                    var homeHeader = ParseMethodHeader(homeBlockMethodOOP);
+                                    int homeLocalCount = homeHeader.NumArgs + homeHeader.NumTemps;
+
+                                    if (adjustedIndex < homeLocalCount)
+                                    {
+                                        // Found it!
+                                        contextToStoreTo = homeContext;
+                                        actualIndex = adjustedIndex;
+                                        break;
+                                    }
+
+                                    // Continue up the chain
+                                    currentContext = homeContext;
+                                }
+                                else
+                                {
+                                    // HomeContext is a MethodContext
+                                    contextToStoreTo = homeContext;
+                                    actualIndex = adjustedIndex;
+                                    break;
+                                }
                             }
                         }
                     }
-
-                    // Calculate the actual index to use
-                    // If storing to homeContext, subtract blockLocalCount to get parent's temp index
-                    int actualIndex = (contextToStoreTo != _activeContextOOP) ? (index - blockLocalCount) : index;
 
                     // DIAGNOSTIC: Validate index is within bounds
                     int contextSize = _heapManager.GetIndexedSize(contextToStoreTo);
@@ -4916,6 +5134,11 @@ public partial class VirtualMachine : IPrimitiveContext
     SmalltalkOOP IPrimitiveContext.GetIndexedOOP(SmalltalkOOP objectOOP, int index)
     {
         return _heapManager.GetIndexedOOP(objectOOP, index);
+    }
+
+    ObjectFormat IPrimitiveContext.GetObjectFormat(SmalltalkOOP objectOOP)
+    {
+        return _heapManager.GetObjectFormat(objectOOP);
     }
 
     SmalltalkOOP IPrimitiveContext.InternSymbol(string symbolName)

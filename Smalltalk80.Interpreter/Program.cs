@@ -100,9 +100,9 @@ public static class Program
             Console.WriteLine("\n=== DIAGNOSTIC: Testing RuntimeHeapAccess.BuildFieldMap() ===");
             TestBuildFieldMap(heapManager);
 
-            // Execute init expressions - ONLY BlockContextTest for nested block context testing
-            bool executeInitExpressions = true; // Run only the test expression
-            bool onlyRunTests = false; // DISABLED - Debug Character initialization only
+            // Execute init expressions - Run normal init expressions to check for regressions
+            bool executeInitExpressions = true;
+            bool onlyRunTests = false; // DISABLED - Run normal init expressions (not just tests)
             if (executeInitExpressions && bundle.InitExpressions.Length > 0)
             {
                 Console.WriteLine("\n=== Init Expression Execution ===");
@@ -164,6 +164,17 @@ public static class Program
                     "ScreenController initialize",           // Requires PopUpMenu → TextStyle/Font infrastructure
                     "StandardSystemController initialize",   // Requires PopUpMenu → TextStyle/Font infrastructure
                     "StringHolderController initialize",     // Requires PopUpMenu → TextStyle/Font infrastructure
+                    // NOW PASSING (enabled after compiler fix):
+                    // ✅ InstructionStream initialize - FIXED by hierarchical temp indexing
+                    // ✅ Scanner initialize - FIXED by hierarchical temp indexing
+
+                    // Still failing - need investigation:
+                    // "Form initialize",                    // Context depth limit exceeded (infinite recursion)
+                    // "Object initialize",                  // Method not found: value: in SmallInteger
+                    // "Text initialize",                    // Method not found: value: in String
+                    // "TextList initialize",                // Context depth limit exceeded (infinite loop)
+                    "VariableNode initialize",               // Context depth limit exceeded (fixed GetIndexedOOP bug, but still has infinite recursion)
+                    "InputSensor initialize",                // Method not found: cursorPoint in UndefinedObject
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -184,7 +195,7 @@ public static class Program
                     // TESTING MODE: Only run test classes
                     if (onlyRunTests)
                     {
-                        if (expr.Source != null && (expr.Source.Contains("BlockContextTest") || expr.Source.Contains("IfTrueTest") || expr.Source.Contains("PrimitiveTest")))
+                        if (expr.Source != null && (expr.Source.Contains("BlockContextTest") || expr.Source.Contains("SimpleBlockTest") || expr.Source.Contains("IfTrueTest") || expr.Source.Contains("PrimitiveTest")))
                         {
                             Console.WriteLine($"  DEBUG: Found test expression [{i}]: {expr.Source}");
                             testIndices.Add(i);

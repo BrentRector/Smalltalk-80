@@ -291,6 +291,290 @@ test
             "Inner block should PUSH_TEMP 1 when accessing grandparent temp (block has 1 arg)");
     }
 
+    // ===== ARGUMENT ACCESS TESTS =====
+
+    [Test]
+    public void L2_BlockAccessesMethodArg_AfterArg()
+    {
+        var source = WrapInTestClass(@"
+test: arg1 with: arg2
+    ^[arg2 + 1] value");
+
+        using var json = CompileToJson(source);
+        var blocks = FindBlocks(json);
+
+        Assert.That(blocks.Count, Is.EqualTo(1));
+        var bytecodes = blocks[0].GetProperty("bytecodes");
+
+        // Block has no args/temps (blockLocalCount=0)
+        // Accesses arg2 (parent arg 1)
+        // Should generate: PUSH_TEMP 1
+        Assert.That(bytecodes[0].GetInt32(), Is.EqualTo(17),
+            "Block should PUSH_TEMP 1 when accessing second parent arg");
+    }
+
+    [Test]
+    public void L2_BlockWithArgAccessesMethodArg()
+    {
+        var source = WrapInTestClass(@"
+test: arg1
+    ^[:x | arg1 + x] value: 5");
+
+        using var json = CompileToJson(source);
+        var blocks = FindBlocks(json);
+
+        Assert.That(blocks.Count, Is.EqualTo(1));
+        var bytecodes = blocks[0].GetProperty("bytecodes");
+
+        // Block has 1 arg (blockLocalCount=1)
+        // Accesses arg1 (parent arg 0)
+        // Should generate: PUSH_TEMP 1 (0 + blockLocalCount)
+        Assert.That(bytecodes[0].GetInt32(), Is.EqualTo(17),
+            "Block should PUSH_TEMP 1 when accessing parent arg (block has 1 arg)");
+    }
+
+    [Test]
+    public void L2_BlockAccessesOwnArg()
+    {
+        var source = WrapInTestClass(@"
+test
+    ^[:x | x + 1] value: 5");
+
+        using var json = CompileToJson(source);
+        var blocks = FindBlocks(json);
+
+        Assert.That(blocks.Count, Is.EqualTo(1));
+        var bytecodes = blocks[0].GetProperty("bytecodes");
+
+        // Block has 1 arg (x at index 0)
+        // Should generate: PUSH_TEMP 0
+        Assert.That(bytecodes[0].GetInt32(), Is.EqualTo(16),
+            "Block should PUSH_TEMP 0 when accessing own arg");
+    }
+
+    [Test]
+    public void L2_BlockAccessesOwnTemp()
+    {
+        var source = WrapInTestClass(@"
+test
+    ^[| temp | temp := 10. temp + 1] value");
+
+        using var json = CompileToJson(source);
+        var blocks = FindBlocks(json);
+
+        Assert.That(blocks.Count, Is.EqualTo(1));
+        var bytecodes = blocks[0].GetProperty("bytecodes");
+
+        // Block has 1 temp (temp at index 0)
+        // After assignment, should PUSH_TEMP 0
+        bool foundPushTemp = false;
+        for (int i = 2; i < bytecodes.GetArrayLength(); i++)
+        {
+            if (bytecodes[i].GetInt32() == 16)
+            {
+                foundPushTemp = true;
+                break;
+            }
+        }
+
+        Assert.That(foundPushTemp, Is.True,
+            "Block should PUSH_TEMP 0 when accessing own temp");
+    }
+
+    [Test]
+    public void L2_BlockWithArgAndTempAccessesBoth()
+    {
+        var source = WrapInTestClass(@"
+test
+    ^[:x | | temp | temp := x. temp + x] value: 5");
+
+        using var json = CompileToJson(source);
+        var blocks = FindBlocks(json);
+
+        Assert.That(blocks.Count, Is.EqualTo(1));
+        var bytecodes = blocks[0].GetProperty("bytecodes");
+
+        // Block has 1 arg (x at 0), 1 temp (temp at 1)
+        // First bytecode should PUSH_TEMP 0 (accessing x for assignment)
+        Assert.That(bytecodes[0].GetInt32(), Is.EqualTo(16),
+            "Block should PUSH_TEMP 0 for own arg");
+
+        // After assignment, should access temp (index 1) and arg (index 0)
+        bool foundTempPush = false;
+        bool foundArgPush = false;
+        for (int i = 2; i < bytecodes.GetArrayLength(); i++)
+        {
+            if (bytecodes[i].GetInt32() == 17) foundTempPush = true;
+            if (bytecodes[i].GetInt32() == 16) foundArgPush = true;
+        }
+
+        Assert.That(foundTempPush, Is.True, "Should PUSH_TEMP 1 for own temp");
+        Assert.That(foundArgPush, Is.True, "Should PUSH_TEMP 0 for own arg");
+    }
+
+    // ===== INSTANCE VARIABLE ACCESS TESTS =====
+
+    [Test]
+    public void L1_MethodAccessesInstanceVar()
+    {
+        var source = WrapInTestClass(@"
+test
+    ^ivar1");
+
+        using var json = CompileToJson(source);
+        var method = json.RootElement.GetProperty("methods")[0];
+        var bytecodes = method.GetProperty("bytecodes");
+
+        // Should be PUSH_IVAR 0
+        Assert.That(bytecodes[0].GetInt32(), Is.EqualTo(0),
+            "Method should PUSH_IVAR 0 for first instance var");
+    }
+
+    [Test]
+    public void L2_BlockAccessesMethodInstanceVar()
+    {
+        var source = WrapInTestClass(@"
+test
+    ^[ivar1 + 5] value");
+
+        using var json = CompileToJson(source);
+        var blocks = FindBlocks(json);
+
+        Assert.That(blocks.Count, Is.EqualTo(1));
+        var bytecodes = blocks[0].GetProperty("bytecodes");
+
+        // Block should access instance var from receiver (self)
+        // Should generate: PUSH_IVAR 0
+        Assert.That(bytecodes[0].GetInt32(), Is.EqualTo(0),
+            "Block should PUSH_IVAR 0 when accessing instance var");
+    }
+
+    [Test]
+    public void L2_BlockModifiesMethodInstanceVar()
+    {
+        var source = WrapInTestClass(@"
+test
+    ^[ivar1 := 10. ivar1] value");
+
+        using var json = CompileToJson(source);
+        var blocks = FindBlocks(json);
+
+        Assert.That(blocks.Count, Is.EqualTo(1));
+        var bytecodes = blocks[0].GetProperty("bytecodes");
+
+        // Should find STORE_IVAR 0 and PUSH_IVAR 0
+        bool foundStore = false;
+        bool foundPush = false;
+
+        for (int i = 0; i < bytecodes.GetArrayLength(); i++)
+        {
+            int bc = bytecodes[i].GetInt32();
+            if (bc == 96) foundStore = true; // STORE_IVAR 0
+            if (bc == 0) foundPush = true;   // PUSH_IVAR 0
+        }
+
+        Assert.That(foundStore, Is.True, "Block should STORE_IVAR 0");
+        Assert.That(foundPush, Is.True, "Block should PUSH_IVAR 0");
+    }
+
+    // ===== MIXED ACCESS TESTS =====
+
+    [Test]
+    public void L2_BlockAccessesMixedVariables()
+    {
+        var source = WrapInTestClass(@"
+test: arg1
+    | temp1 |
+    temp1 := 10.
+    ^[:x | ivar1 + arg1 + temp1 + x] value: 5");
+
+        using var json = CompileToJson(source);
+        var blocks = FindBlocks(json);
+
+        Assert.That(blocks.Count, Is.EqualTo(1));
+        var bytecodes = blocks[0].GetProperty("bytecodes");
+
+        // Block accesses:
+        // - ivar1 (PUSH_IVAR 0)
+        // - arg1 (parent arg 0, block has 1 arg, so PUSH_TEMP 1)
+        // - temp1 (parent temp 0, block has 1 arg, so PUSH_TEMP 2)
+        // - x (own arg 0, PUSH_TEMP 0)
+
+        bool foundIvar = false;
+        bool foundParentArg = false;
+        bool foundParentTemp = false;
+        bool foundOwnArg = false;
+
+        for (int i = 0; i < bytecodes.GetArrayLength(); i++)
+        {
+            int bc = bytecodes[i].GetInt32();
+            if (bc == 0) foundIvar = true;   // PUSH_IVAR 0
+            if (bc == 17) foundParentArg = true; // PUSH_TEMP 1 (parent arg)
+            if (bc == 18) foundParentTemp = true; // PUSH_TEMP 2 (parent temp)
+            if (bc == 16) foundOwnArg = true; // PUSH_TEMP 0 (own arg)
+        }
+
+        Assert.That(foundIvar, Is.True, "Should access instance var");
+        Assert.That(foundParentArg, Is.True, "Should access parent arg");
+        Assert.That(foundParentTemp, Is.True, "Should access parent temp");
+        Assert.That(foundOwnArg, Is.True, "Should access own arg");
+    }
+
+    [Test]
+    public void L3_NestedBlockAccessesMixedVariables()
+    {
+        var source = WrapInTestClass(@"
+test: arg1
+    | temp1 |
+    temp1 := 10.
+    ^[:x | [:y | ivar1 + arg1 + temp1 + x + y] value: 2] value: 1");
+
+        using var json = CompileToJson(source);
+        var blocks = FindBlocks(json);
+
+        Assert.That(blocks.Count, Is.EqualTo(2));
+
+        // Find the inner block (has arg y, accesses all vars)
+        JsonElement? innerBlock = null;
+        foreach (var block in blocks)
+        {
+            var bc = block.GetProperty("bytecodes");
+            // Inner block should have more variable accesses
+            if (bc.GetArrayLength() > 5)
+            {
+                innerBlock = block;
+                break;
+            }
+        }
+
+        Assert.That(innerBlock, Is.Not.Null, "Should find inner block");
+
+        var bytecodes = innerBlock.Value.GetProperty("bytecodes");
+
+        // Inner block (has 1 arg: y) accesses:
+        // - ivar1 (PUSH_IVAR 0)
+        // - arg1 (grandparent arg, PUSH_TEMP 1)
+        // - temp1 (grandparent temp, PUSH_TEMP 2)
+        // - x (parent arg, PUSH_TEMP 1... wait, same as arg1!)
+        // - y (own arg, PUSH_TEMP 0)
+
+        bool foundIvar = false;
+        bool foundGrandparentVar = false;
+        bool foundOwnArg = false;
+
+        for (int i = 0; i < bytecodes.GetArrayLength(); i++)
+        {
+            int bc = bytecodes[i].GetInt32();
+            if (bc == 0) foundIvar = true;
+            if (bc >= 17 && bc <= 19) foundGrandparentVar = true;
+            if (bc == 16) foundOwnArg = true;
+        }
+
+        Assert.That(foundIvar, Is.True, "Inner block should access instance var");
+        Assert.That(foundGrandparentVar, Is.True, "Inner block should access grandparent vars");
+        Assert.That(foundOwnArg, Is.True, "Inner block should access own arg");
+    }
+
     // ===== COMPREHENSIVE atAllPut: test (the real-world failure case) =====
 
     [Test]
