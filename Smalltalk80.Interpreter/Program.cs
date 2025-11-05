@@ -49,6 +49,8 @@ public static class Program
                 Console.Error.WriteLine("  Runtime VM diagnostics:");
                 Console.Error.WriteLine("    --debug-bytecode       Show bytecode execution trace");
                 Console.Error.WriteLine("    --debug-messages       Show message send and method lookup trace");
+                Console.Error.WriteLine("  Post cold-start diagnostics:");
+                Console.Error.WriteLine("    --debug-diagnostics    Show diagnostic reports (ClassDescription, BuildFieldMap)");
                 Console.Error.WriteLine("  --debug-all              Enable all debug output");
                 Environment.Exit(1);
                 return;
@@ -93,12 +95,15 @@ public static class Program
             Console.WriteLine("Cold start completed successfully!");
 
             // DIAGNOSTIC: Inspect ClassDescription.instanceVariables field (slot 4)
-            Console.WriteLine("\n=== DIAGNOSTIC: Checking ClassDescription.instanceVariables ===");
-            InspectClassDescriptionInstanceVariables(heapManager, bundle);
+            if (debugOptions.ShouldDebugDiagnostics)
+            {
+                Console.WriteLine("\n=== DIAGNOSTIC: Checking ClassDescription.instanceVariables ===");
+                InspectClassDescriptionInstanceVariables(heapManager, bundle);
 
-            // DIAGNOSTIC: Test RuntimeHeapAccess.BuildFieldMap()
-            Console.WriteLine("\n=== DIAGNOSTIC: Testing RuntimeHeapAccess.BuildFieldMap() ===");
-            TestBuildFieldMap(heapManager);
+                // DIAGNOSTIC: Test RuntimeHeapAccess.BuildFieldMap()
+                Console.WriteLine("\n=== DIAGNOSTIC: Testing RuntimeHeapAccess.BuildFieldMap() ===");
+                TestBuildFieldMap(heapManager);
+            }
 
             // Execute init expressions - Run normal init expressions to check for regressions
             bool executeInitExpressions = true;
@@ -1002,6 +1007,10 @@ public static class Program
             else if (args[i] == "--debug-messages")
             {
                 debugOptions.DebugMessages = true;
+            }
+            else if (args[i] == "--debug-diagnostics")
+            {
+                debugOptions.DebugDiagnostics = true;
             }
         }
 

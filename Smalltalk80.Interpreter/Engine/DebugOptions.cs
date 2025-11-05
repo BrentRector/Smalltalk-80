@@ -49,6 +49,12 @@ public class DebugOptions
     public bool DebugMessages { get; set; }
 
     /// <summary>
+    /// Enable diagnostic reports (ClassDescription inspection, BuildFieldMap test)
+    /// Command line: --debug-diagnostics
+    /// </summary>
+    public bool DebugDiagnostics { get; set; }
+
+    /// <summary>
     /// Enable all debug output (equivalent to specifying all --debug-* flags)
     /// Command line: --debug-all
     /// </summary>
@@ -71,7 +77,8 @@ public class DebugOptions
         DebugMethods = true,
         DebugGlobals = true,
         DebugBytecode = true,
-        DebugMessages = true
+        DebugMessages = true,
+        DebugDiagnostics = true
     };
 
     /// <summary>
@@ -108,4 +115,9 @@ public class DebugOptions
     /// Checks if message send and method lookup debug output should be enabled.
     /// </summary>
     public bool ShouldDebugMessages => DebugAll || DebugMessages;
+
+    /// <summary>
+    /// Checks if diagnostic reports should be enabled.
+    /// </summary>
+    public bool ShouldDebugDiagnostics => DebugAll || DebugDiagnostics;
 }
