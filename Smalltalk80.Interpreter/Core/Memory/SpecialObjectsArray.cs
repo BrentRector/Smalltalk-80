@@ -211,7 +211,7 @@ public readonly struct SpecialObjectsArray
     /// </summary>
     public static void SetNil(SmalltalkOOP nilObject)
     {
-        Console.WriteLine($"[SpecialObjectsArray.SetNil] Setting nil to {nilObject} (was {_instance.Nil})");
+        // Console.WriteLine($"[SpecialObjectsArray.SetNil] Setting nil to {nilObject} (was {_instance.Nil})");
         _instance = new SpecialObjectsArray(
             nilObject,
             _instance.False,
@@ -220,7 +220,7 @@ public readonly struct SpecialObjectsArray
             _instance.ProcessorScheduler,
             _instance.InitExpressionMethods
         );
-        Console.WriteLine($"[SpecialObjectsArray.SetNil] VERIFY: _instance.Nil is now {_instance.Nil}");
+        // Console.WriteLine($"[SpecialObjectsArray.SetNil] VERIFY: _instance.Nil is now {_instance.Nil}");
     }
 
     /// <summary>

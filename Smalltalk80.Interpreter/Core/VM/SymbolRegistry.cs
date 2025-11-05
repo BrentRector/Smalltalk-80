@@ -25,7 +25,7 @@ public static class SymbolRegistry
     public static void Freeze()
     {
         _isFrozen = true;
-        Console.WriteLine($"[SymbolRegistry] Frozen with {_symbolIndexToOOP.Count} symbols");
+        // Console.WriteLine($"[SymbolRegistry] Frozen with {_symbolIndexToOOP.Count} symbols");
     }
 
     /// <summary>

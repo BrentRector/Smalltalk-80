@@ -33,7 +33,7 @@ public static class GlobalRegistry
     public static void Freeze()
     {
         _isFrozen = true;
-        Console.WriteLine($"[GlobalRegistry] Frozen with {_globals.Count} global entries, {_objects.Count} object entries");
+        // Console.WriteLine($"[GlobalRegistry] Frozen with {_globals.Count} global entries, {_objects.Count} object entries");
     }
 
     /// <summary>

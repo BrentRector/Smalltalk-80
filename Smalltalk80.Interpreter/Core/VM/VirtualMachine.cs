@@ -307,10 +307,10 @@ public partial class VirtualMachine : IPrimitiveContext
         // Each init expression should start with depth=0
         _activeContextCount = 0;
 
-        Console.WriteLine($"[ExecuteExistingContext] Starting execution of context {contextOOP}");
+        // Console.WriteLine($"[ExecuteExistingContext] Starting execution of context {contextOOP}");
         _activeContextOOP = contextOOP;
         var result = InterpreterLoop();
-        Console.WriteLine($"[ExecuteExistingContext] Finished with result {result}");
+        // Console.WriteLine($"[ExecuteExistingContext] Finished with result {result}");
         return result;
     }
 
@@ -325,13 +325,13 @@ public partial class VirtualMachine : IPrimitiveContext
     /// <returns>Allocated and initialized MethodContext OOP</returns>
     private SmalltalkOOP CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP = default)
     {
-        // DEBUG: Log first 20 context creations
-        System.Threading.Interlocked.Increment(ref _createContextCallCount);
-        if (_createContextCallCount <= 20)
-        {
-            string? methodLocalId = GetLocalId(methodOOP);
-            Console.WriteLine($"[CreateMethodContext #{_createContextCallCount}] method={methodLocalId}, receiver={receiverOOP}");
-        }
+        // DEBUG: Log first 20 context creations (disabled for quiet mode)
+        // System.Threading.Interlocked.Increment(ref _createContextCallCount);
+        // if (_createContextCallCount <= 20)
+        // {
+        //     string? methodLocalId = GetLocalId(methodOOP);
+        //     Console.WriteLine($"[CreateMethodContext #{_createContextCallCount}] method={methodLocalId}, receiver={receiverOOP}");
+        // }
 
         // Step 1: Validate CompiledMethod exists and parse header
         var header = ParseMethodHeader(methodOOP);
@@ -767,15 +767,15 @@ public partial class VirtualMachine : IPrimitiveContext
             Console.WriteLine($"  Return value: {returnValue} (SmallInt={returnValue.IsSmallInteger})");
         }
 
-        // DIAGNOSTIC: Track return values from hash/stringhash methods
-        int methodIndex2 = VMConstants.METHODCONTEXT_METHOD_INDEX;
-        var returningMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex2);
-        string? methodLocalId = GetLocalId(returningMethodOOP);
-        if (methodLocalId != null && (methodLocalId.Contains(">>hash") || methodLocalId.Contains(">>stringhash")))
-        {
-            var className = returnValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(returnValue));
-            Console.WriteLine($"\n[RETURN from {methodLocalId}] value={returnValue}, class={className}, isSmallInt={returnValue.IsSmallInteger}");
-        }
+        // DIAGNOSTIC: Track return values from hash/stringhash methods (disabled for quiet mode)
+        // int methodIndex2 = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        // var returningMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex2);
+        // string? methodLocalId = GetLocalId(returningMethodOOP);
+        // if (methodLocalId != null && (methodLocalId.Contains(">>hash") || methodLocalId.Contains(">>stringhash")))
+        // {
+        //     var className = returnValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(returnValue));
+        //     Console.WriteLine($"\n[RETURN from {methodLocalId}] value={returnValue}, class={className}, isSmallInt={returnValue.IsSmallInteger}");
+        // }
 
         // Clean up block context mapping if this was a block
         bool wasBlock = _blockContextMapping.ContainsKey(_activeContextOOP);
@@ -2488,11 +2488,12 @@ public partial class VirtualMachine : IPrimitiveContext
                     // DIAGNOSTIC: Log Association key for debugging
                     if (_createContextCallCount <= 20)
                     {
-                        string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"{valueOOP}";
-                        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                        string? keyName = GetSymbolName(keyOOP);
-                        string? methodLocalId = GetLocalId(methodOOP);
-                        Console.WriteLine($"[POP_STORE_LITERAL_VAR] Storing to Association key='{keyName}', value={valStr}, method={methodLocalId}");
+                        // Debug output disabled for quiet mode
+                        // string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"{valueOOP}";
+                        // var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                        // string? keyName = GetSymbolName(keyOOP);
+                        // string? methodLocalId = GetLocalId(methodOOP);
+                        // Console.WriteLine($"[POP_STORE_LITERAL_VAR] Storing to Association key='{keyName}', value={valStr}, method={methodLocalId}");
                     }
 
                     // Store the value in the Association using write-barrier (runtime mode)
@@ -3093,13 +3094,13 @@ public partial class VirtualMachine : IPrimitiveContext
 
         var methodInfo = GetMethod(classOOP, selectorName!);
 
-        // DIAGNOSTIC: Show what method was found for hash/stringhash
-        if ((selectorName == "hash" || selectorName == "stringhash") && methodInfo != null)
-        {
-            int primNum = GetPrimitiveNumber(methodInfo.MethodOOP);
-            string methodLocalId = GetLocalId(methodInfo.MethodOOP) ?? "unknown";
-            Console.WriteLine($"  Found method: {methodLocalId}, primitiveNumber={primNum}");
-        }
+        // DIAGNOSTIC: Show what method was found for hash/stringhash (disabled for quiet mode)
+        // if ((selectorName == "hash" || selectorName == "stringhash") && methodInfo != null)
+        // {
+        //     int primNum = GetPrimitiveNumber(methodInfo.MethodOOP);
+        //     string methodLocalId = GetLocalId(methodInfo.MethodOOP) ?? "unknown";
+        //     Console.WriteLine($"  Found method: {methodLocalId}, primitiveNumber={primNum}");
+        // }
 
         if (methodInfo == null)
         {
