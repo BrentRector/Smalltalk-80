@@ -61,6 +61,7 @@ public static class VMConstants
     public const int BLOCKCLOSURE_HOMECONTEXT_INDEX = 1;
     public const int BLOCKCLOSURE_RETURNCONTEXT_INDEX = 2;
     public const int BLOCKCLOSURE_NUMARGS_INDEX = 3;
+    public const int BLOCKCLOSURE_EXECUTIONCONTEXT_INDEX = 4;
 
     // ========================================================================
     // Blue Book: Association field indices

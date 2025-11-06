@@ -41837,7 +41837,7 @@ It wraps a CompiledMethod and preserves the context where the block was defined,
 enabling proper lexical scoping and non-local returns."!
 
 Object subclass: #BlockClosure
-	instanceVariableNames: 'method homeContext returnContext numArgs '
+	instanceVariableNames: 'method homeContext returnContext numArgs executionContext '
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Kernel-Methods'!
