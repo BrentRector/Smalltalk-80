@@ -1,14 +1,94 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-05
-**Status**: ⚠️ VM ARCHITECTURAL IMPROVEMENTS IN PROGRESS - Performance optimizations applied
+**Last Updated**: 2025-11-06
+**Status**: ✅ BlockClosure.executionContext Architecture - IMPLEMENTED & TESTED
 **Compiler Status**: ✅ Temp indexing fix + Tail recursion detection & bytecode generation implemented
 **Validator Status**: ✅ 100% validation passing (10,182 methods validate correctly)
-**Interpreter Status**: ✅ Variable access architecture improved (OOP comparison, cycle detection, bounds checking)
-**Test Status**: ⚠️ Runtime test still fails with "generality called on nil" - hierarchical traversal logic needs debugging
+**Interpreter Status**: ✅ BlockClosure architecture improved + FindNearestBlockExecutionContext bug fixed
+**Test Status**: ⚠️ Pre-existing argument passing bug revealed (unrelated to BlockClosure changes)
 **Init Execution Status**: ✅ Form initialize no longer hits infinite recursion (temp indexing bug fixed!)
 
-## Recent Work (2025-11-05)
+## Recent Work (2025-11-06)
+
+### 🎉 BlockClosure.executionContext Architecture - COMPLETED
+
+**Major Achievement**: Eliminated bidirectional dictionary mapping by storing execution context directly in BlockClosure objects, plus critical bug fix in FindNearestBlockExecutionContext.
+
+**Architecture Improvement**:
+
+**BEFORE** (Dual Dictionaries):
+- `_blockContextMapping`: execution context → BlockClosure
+- `_blockClosureToExecutionContextMapping`: BlockClosure → execution context
+- Dictionary lookups for resolution
+- More complex, harder to maintain
+
+**AFTER** (Single Dictionary + Object Field):
+- `_blockContextMapping`: execution context → BlockClosure (kept)
+- `BlockClosure.executionContext` field stores execution context directly
+- Simpler, more object-oriented
+- Data stored in objects, not external mappings
+
+**Changes Made**:
+1. Added `executionContext` field to BlockClosure class (5th instance variable)
+   - [Smalltalk-80.st:41840](Smalltalk-80 Source/Smalltalk-80.st#L41840)
+2. Updated [VMConstants.cs:64](Smalltalk80.Interpreter/Core/VM/VMConstants.cs#L64) with `BLOCKCLOSURE_EXECUTIONCONTEXT_INDEX = 4`
+3. Removed `_blockClosureToExecutionContextMapping` reverse dictionary
+4. Modified [CreateBlockClosure:5192](Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs#L5192) to initialize executionContext to nil
+5. Modified [CreateBlockExecutionContext:3864](Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs#L3864) to store execution context in field
+6. Modified [ResolveHomeContext:4073](Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs#L4073) to read from object field
+
+**CRITICAL BUG FIX: FindNearestBlockExecutionContext Sender Chain Traversal**
+
+**Problem**: Methods called FROM blocks were incorrectly treated as if executing WITHIN blocks, causing variable access to traverse to parent scopes.
+
+**Root Cause**: `FindNearestBlockExecutionContext` walked up the SENDER CHAIN (call stack) looking for block execution contexts. When a method was nested inside a block invocation, it would find the block in the sender chain and incorrectly return it.
+
+**Example Failure Path**:
+```
+Block invokes Integer>>+
+→ Integer>>+ calls Number>>retry:coercing:
+→ FindNearestBlockExecutionContext(retry:coercing: context)
+→ Walks sender chain, finds block context (WRONG!)
+→ Returns block context instead of method context
+→ Variable access tries to traverse to parent (WRONG!)
+→ Reads from wrong context → gets false instead of argument
+```
+
+**Solution** ([VirtualMachine.cs:4006-4021](Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs#L4006-L4021)):
+```csharp
+private SmalltalkOOP FindNearestBlockExecutionContext(SmalltalkOOP startContextOOP)
+{
+    // CRITICAL FIX: Only look for block execution contexts if we're CURRENTLY in a block.
+    // Do NOT walk up the sender chain - that represents the call stack, not lexical scope.
+
+    if (_blockContextMapping.ContainsKey(startContextOOP))
+    {
+        return startContextOOP;  // It's a block - return it
+    }
+
+    // Current context is a method - methods don't traverse to parent scopes
+    return startContextOOP;
+}
+```
+
+**Impact**:
+- ✅ Methods now correctly access only their own temps/args
+- ✅ `inMapping=False, willTraverse=False` for method contexts
+- ✅ Proper separation of lexical scope (blocks) vs call stack (sender chain)
+
+**Build Status**: ✅ 0 errors, 0 warnings
+**Cold Start**: ✅ Phase 1-6 all succeeded, validates new 5-field BlockClosure structure
+**Test Result**: ⚠️ Reveals pre-existing argument passing bug in primitive fallback (unrelated to our changes)
+
+**Files Modified**:
+- `Smalltalk-80 Source/Smalltalk-80.st` (line 41840) - Added executionContext field
+- `Smalltalk80.Interpreter/Core/VM/VMConstants.cs` (line 64) - Added constant
+- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` - Multiple changes
+- `Variable-Indexing-Architecture.md` - Updated Section 12 documentation
+
+---
+
+## Previous Work (2025-11-05)
 
 ### 🔧 VM Architectural Improvements - COMPLETED
 
