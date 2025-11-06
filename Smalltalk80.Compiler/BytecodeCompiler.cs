@@ -67,39 +67,7 @@ namespace Smalltalk80.Compiler
         /// Total number of temporaries (including hidden).
         /// </summary>
         public int TemporaryCount { get; set; }
-        
-        /// <summary>
-        /// Gets the index for a variable name.
-        /// Searches current scope, then walks up parent scopes to find the variable.
-        /// </summary>
-        public int? GetVariableIndex(string name)
-        {
-            // Check current scope
-            if (Arguments.TryGetValue(name, out var argIndex))
-                return argIndex;
-            if (Temporaries.TryGetValue(name, out var tempIndex))
-                return tempIndex;
-            if (HiddenTemporaries.TryGetValue(name, out var hiddenIndex))
-                return hiddenIndex;
 
-            // Check parent scopes (for block closures accessing outer temporaries)
-            if (Parent != null && ScopeDepth > 0)
-            {
-                var parentIndex = Parent.GetVariableIndex(name);
-                if (parentIndex.HasValue)
-                {
-                    // Variable found in parent scope
-                    // For blocks, we need to adjust the index so the VM knows to look in homeContext
-                    // The VM checks: if (index >= blockLocalCount) then look in homeContext
-                    // and then subtracts blockLocalCount to get the actual parent index
-                    int blockLocalCount = ArgumentCount + TemporaryCount;
-                    return parentIndex.Value + blockLocalCount;
-                }
-            }
-
-            return null;
-        }
-        
         /// <summary>
         /// Allocates a hidden temporary variable.
         /// </summary>
@@ -112,6 +80,36 @@ namespace Smalltalk80.Compiler
                 TemporaryCount++;
             }
             return HiddenTemporaries[name];
+        }
+
+        /// <summary>
+        /// Checks if a variable name is an argument (not assignable).
+        /// </summary>
+        public bool IsArgument(string name)
+        {
+            return Arguments.ContainsKey(name);
+        }
+
+        /// <summary>
+        /// Gets the absolute temporary index (including argument count).
+        /// Returns -1 if not found.
+        /// </summary>
+        public int GetAbsoluteTemporaryIndex(string name)
+        {
+            return Temporaries.TryGetValue(name, out var index) ? index : -1;
+        }
+
+        /// <summary>
+        /// Gets the relative temporary index (excluding argument count).
+        /// Returns -1 if not found.
+        /// </summary>
+        public int GetRelativeTemporaryIndex(string name)
+        {
+            if (Temporaries.TryGetValue(name, out var absoluteIndex))
+            {
+                return absoluteIndex - ArgumentCount;  // Convert to relative
+            }
+            return -1;
         }
     }
     
@@ -937,6 +935,7 @@ namespace Smalltalk80.Compiler
     {
         private CompilationEnvironment environment = null!;
         private BytecodeEmitter emitter = null!;
+        private readonly VariableResolver resolver = new();  // Unified variable resolution
         private string selector = "";
         private int primitiveNumber = 0;
         private bool hasPrimitive = false;
@@ -1149,8 +1148,7 @@ namespace Smalltalk80.Compiler
             }
             catch (Exception ex)
             {
-Console.WriteLine($"Error compiling method: {ex.Message}");
-Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                Console.WriteLine($"Error compiling method {selector}: {ex.Message}");
                 // Return minimal stub method
                 emitter = new BytecodeEmitter();
                 emitter.ReturnSelf();
@@ -2439,204 +2437,109 @@ Console.WriteLine($"Stack trace: {ex.StackTrace}");
         
         private void PushVariable(string name)
         {
-            // Special variables
-            if (name == "self")
-            {
-                emitter.PushSelf();
-                return;
-            }
-            if (name == "super")
-            {
-                emitter.PushSelf(); // Super uses self as receiver
-                return;
-            }
-            if (name == "true")
-            {
-                emitter.PushTrue();
-                return;
-            }
-            if (name == "false")
-            {
-                emitter.PushFalse();
-                return;
-            }
-            if (name == "nil")
-            {
-                emitter.PushNil();
-                return;
-            }
-            if (name == "thisContext")
-            {
-                emitter.PushActiveContext();
-                return;
-            }
+            // Use unified variable resolver
+            var result = resolver.ResolveVariable(name, environment);
 
-            // Check if it's an argument FIRST
-            // Arguments are stored in temporary locations starting at index 0
-            if (environment.Arguments.TryGetValue(name, out var argIndex))
+            switch (result.Type)
             {
-                // Arguments use temporary location bytecodes (16-31 for indices 0-15)
-                // NOT literal constant bytecodes (32-63)
-                emitter.PushTemporary(argIndex);
-                return;
-            }
-            
-            // Check if it's a temporary
-            if (environment.Temporaries.TryGetValue(name, out var tempIndex))
-            {
-                emitter.PushTemporary(tempIndex);
-                return;
-            }
-            
-            // Check hidden temporaries
-            if (environment.HiddenTemporaries.TryGetValue(name, out var hiddenIndex))
-            {
-                emitter.PushTemporary(hiddenIndex);
-                return;
-            }
+                case VariableResolver.VariableType.BlockArgument:
+                case VariableResolver.VariableType.BlockTemporary:
+                case VariableResolver.VariableType.ParentVariable:
+                case VariableResolver.VariableType.MethodArgument:
+                case VariableResolver.VariableType.MethodTemporary:
+                    emitter.PushTemporary(result.Index);
+                    break;
 
-            // CRITICAL: Check parent scopes for free variables (lexical scoping in nested blocks)
-            // If we're in a block (ScopeDepth > 0) and the variable isn't in the block's own scope,
-            // search up the parent environment chain to find where it's defined.
-            if (environment.ScopeDepth > 0)
-            {
-                // Accumulate blockLocalCounts for ALL intermediate blocks between current and parent
-                // For 3-level nesting: [:oa | | ot | [:ma | | mt | [:ia | | it | oa + ot + mt + it]]]
-                // When innermost accesses mt:
-                //   - Start with innermost blockLocalCount (1 arg + 1 temp = 2)
-                //   - Walk to middle block where mt is defined
-                //   - mt is at index 1 in middle block
-                //   - Adjusted index = mt_index (1) + inner_blockLocalCount (2) = 3? NO!
-                //   - Actually: inner must traverse through middle to reach outer
-                //   - So: mt_index (1) + inner_count (2) + middle_count (2) = 5 ✓
-                //
-                // Algorithm: Walk up chain, accumulating blockLocalCounts until we find the variable
+                case VariableResolver.VariableType.InstanceVariable:
+                    emitter.PushReceiverVariable(result.Index);
+                    break;
 
-                int accumulatedBlockLocalCount = 0;
-                var currentEnv = environment;
-                var parentEnv = environment.Parent;
-
-                while (parentEnv != null)
-                {
-                    // Add current block's local count to accumulated total
-                    accumulatedBlockLocalCount += currentEnv.ArgumentCount + currentEnv.TemporaryCount;
-
-                    // Check parent's arguments
-                    if (parentEnv.Arguments.TryGetValue(name, out var parentArgIndex))
+                case VariableResolver.VariableType.ClassVariable:
+                case VariableResolver.VariableType.PoolVariable:
+                case VariableResolver.VariableType.Global:
+                    // These are all resolved via literal associations
+                    if (result.Type == VariableResolver.VariableType.Global)
                     {
-                        // Found in parent scope - adjust index by accumulated blockLocalCount
-                        // This accounts for ALL intermediate blocks between current and parent
-                        int adjustedIndex = parentArgIndex + accumulatedBlockLocalCount;
-                        emitter.PushTemporary(adjustedIndex);
-                        return;
+                        // Record undeclared variables for reporting
+                        RecordUndeclaredVariable(name, currentMethodIdentifier);
                     }
+                    emitter.PushLiteralVariable(name);
+                    break;
 
-                    // Check parent's temporaries
-                    if (parentEnv.Temporaries.TryGetValue(name, out var parentTempIndex))
+                case VariableResolver.VariableType.PseudoVariable:
+                    // Handle pseudo-variables
+                    switch (name)
                     {
-                        // Found in parent scope - adjust index by accumulated blockLocalCount
-                        int adjustedIndex = parentTempIndex + accumulatedBlockLocalCount;
-                        emitter.PushTemporary(adjustedIndex);
-                        return;
+                        case "self":
+                            emitter.PushSelf();
+                            break;
+                        case "super":
+                            emitter.PushSelf();  // Super uses self as receiver
+                            break;
+                        case "true":
+                            emitter.PushTrue();
+                            break;
+                        case "false":
+                            emitter.PushFalse();
+                            break;
+                        case "nil":
+                            emitter.PushNil();
+                            break;
+                        case "thisContext":
+                            emitter.PushActiveContext();
+                            break;
                     }
+                    break;
 
-                    // Check parent's hidden temporaries
-                    if (parentEnv.HiddenTemporaries.TryGetValue(name, out var parentHiddenIndex))
-                    {
-                        // Found in parent scope - adjust index by accumulated blockLocalCount
-                        int adjustedIndex = parentHiddenIndex + accumulatedBlockLocalCount;
-                        emitter.PushTemporary(adjustedIndex);
-                        return;
-                    }
-
-                    // Continue up the scope chain
-                    currentEnv = parentEnv;
-                    parentEnv = parentEnv.Parent;
-                }
+                default:
+                    throw new InvalidOperationException($"Unknown variable type: {result.Type} for variable: {name}");
             }
-
-            // Check instance variables
-            if (environment.InstanceVariables.TryGetValue(name, out var instIndex))
-            {
-                emitter.PushReceiverVariable(instIndex);
-                return;
-            }
-            
-            // Check class variables (Blue Book: these use PushLiteralVariable with Association)
-            if (environment.ClassVariables.ContainsKey(name))
-            {
-                emitter.PushLiteralVariable(name);
-                return;
-            }
-            
-            // Check pool variables (Blue Book: these also use PushLiteralVariable with Association)
-            if (environment.PoolVariables.ContainsKey(name))
-            {
-                emitter.PushLiteralVariable(name);
-                return;
-            }
-
-            // Global variable (also uses PushLiteralVariable with Association)
-            // This is an undeclared variable - record it for reporting
-            RecordUndeclaredVariable(name, currentMethodIdentifier);
-            emitter.PushLiteralVariable(name);
         }
-        
+
         private void StoreVariable(string name, bool leaveOnStack)
         {
-            // Check local variables (arguments and temporaries)
-            var index = environment.GetVariableIndex(name);
-            if (index.HasValue)
+            // Use unified variable resolver
+            var result = resolver.ResolveVariable(name, environment);
+
+            // Check assignment legality
+            if (!result.IsAssignable)
             {
-                if (leaveOnStack)
-                {
-                    emitter.Dup();
-                }
-                emitter.StoreTemporary(index.Value);
-                return;
-            }
-            
-            // Check instance variables
-            if (environment.InstanceVariables.TryGetValue(name, out var instIndex))
-            {
-                if (leaveOnStack)
-                {
-                    emitter.Dup();
-                }
-                emitter.StoreReceiverVariable(instIndex);
-                return;
-            }
-            
-            // Check class variables (Blue Book: these use StoreLiteralVariable with Association)
-            if (environment.ClassVariables.ContainsKey(name))
-            {
-                if (leaveOnStack)
-                {
-                    emitter.Dup();
-                }
-                emitter.StoreLiteralVariable(name);
-                return;
-            }
-            
-            // Check pool variables (Blue Book: these also use StoreLiteralVariable with Association)
-            if (environment.PoolVariables.ContainsKey(name))
-            {
-                if (leaveOnStack)
-                {
-                    emitter.Dup();
-                }
-                emitter.StoreLiteralVariable(name);
-                return;
+                throw new InvalidOperationException($"Cannot assign to {result.Type}: {name}");
             }
 
-            // Global variable (also uses StoreLiteralVariable with Association)
-            // This is an undeclared variable - record it for reporting
-            RecordUndeclaredVariable(name, currentMethodIdentifier);
+            // Duplicate stack value if caller wants to leave it on stack
             if (leaveOnStack)
             {
                 emitter.Dup();
             }
-            emitter.StoreLiteralVariable(name);
+
+            switch (result.Type)
+            {
+                case VariableResolver.VariableType.BlockTemporary:
+                case VariableResolver.VariableType.ParentVariable:
+                case VariableResolver.VariableType.MethodTemporary:
+                    emitter.StoreTemporary(result.Index);
+                    break;
+
+                case VariableResolver.VariableType.InstanceVariable:
+                    emitter.StoreReceiverVariable(result.Index);
+                    break;
+
+                case VariableResolver.VariableType.ClassVariable:
+                case VariableResolver.VariableType.PoolVariable:
+                case VariableResolver.VariableType.Global:
+                    // These are all stored via literal associations
+                    if (result.Type == VariableResolver.VariableType.Global)
+                    {
+                        // Record undeclared variables for reporting
+                        RecordUndeclaredVariable(name, currentMethodIdentifier);
+                    }
+                    emitter.StoreLiteralVariable(name);
+                    break;
+
+                default:
+                    throw new InvalidOperationException($"Cannot store to {result.Type}: {name}");
+            }
         }
         
         private void EnsureMethodReturn()

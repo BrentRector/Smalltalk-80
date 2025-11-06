@@ -24,7 +24,7 @@ public static class Program
         try
         {
             // Parse command line arguments
-            var (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions) = ParseCommandLine(args);
+            var (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions, skipInitExpressions, executeExpression) = ParseCommandLine(args);
 
             if (!File.Exists(coldStartFile))
             {
@@ -37,6 +37,9 @@ public static class Program
                 Console.Error.WriteLine("                         after cold start completes");
                 Console.Error.WriteLine("  --test-filter <pattern> Run only init expressions matching pattern");
                 Console.Error.WriteLine("                         (e.g., 'BlockValidator' or 'Test')");
+                Console.Error.WriteLine("  --skip-init-expressions Skip all init expression execution");
+                Console.Error.WriteLine("  --execute <expression>  Execute specific Smalltalk expression after cold start");
+                Console.Error.WriteLine("                         (e.g., 'BlockContextTest testAllCombinations')");
                 Console.Error.WriteLine("  --verbose, -v          Enable verbose debugging (logs all method calls)");
                 Console.Error.WriteLine("  --coldstart-report=<path>  Write coldstart metrics to JSON file");
                 Console.Error.WriteLine("\nDebug Options:");
@@ -106,8 +109,8 @@ public static class Program
             }
 
             // Execute init expressions - Run normal init expressions to check for regressions
-            bool executeInitExpressions = true;
-            bool onlyRunTests = false; // DISABLED - Run normal init expressions (not just tests)
+            bool executeInitExpressions = !skipInitExpressions;
+            bool onlyRunTests = false; // DISABLED - Run normal init expressions for debugging
             if (executeInitExpressions && bundle.InitExpressions.Length > 0)
             {
                 Console.WriteLine("\n=== Init Expression Execution ===");
@@ -477,6 +480,91 @@ public static class Program
 
             Console.WriteLine("\n✓ All systems ready!");
             Console.WriteLine("Virtual machine initialized successfully.");
+
+            // Execute user-specified expression if provided
+            if (executeExpression != null)
+            {
+                Console.WriteLine($"\n=== Executing User Expression ===");
+                Console.WriteLine($"  Expression: {executeExpression}");
+                Console.WriteLine();
+
+                if (layoutResolver == null)
+                {
+                    Console.WriteLine("  ⚠️  Execution skipped - LayoutResolver not available");
+                }
+                else
+                {
+                    // Find the expression in the bundle's init expressions
+                    int exprIndex = -1;
+                    for (int i = 0; i < bundle.InitExpressions.Length; i++)
+                    {
+                        var source = bundle.InitExpressions[i].Source;
+                        if (source != null && source.Contains(executeExpression))
+                        {
+                            exprIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (exprIndex == -1)
+                    {
+                        Console.WriteLine($"  ⚠️  Expression not found in bundle init expressions");
+                        Console.WriteLine($"  Searching for: {executeExpression}");
+                        Environment.Exit(1);
+                        return;
+                    }
+
+                    var vmMetadata = BuildVMMetadata(layoutResolver);
+
+                    // Convert Engine.DebugOptions to Core.VM.DebugOptions for the VirtualMachine
+                    var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.DebugOptions
+                    {
+                        ShouldDebugBytecode = debugOptions.ShouldDebugBytecode,
+                        ShouldDebugMessages = debugOptions.ShouldDebugMessages,
+                        ShouldDebugMethodLookup = debugOptions.ShouldDebugMessages
+                    };
+
+                    var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions: vmDebugOptions);
+                    vm.VerboseDebug = verboseDebug;
+                    vm.InitializeSelectorCaches();
+
+                    var executor = new InitExpressionExecutor(
+                        heapManager,
+                        vm,
+                        InitPolicy.AbortOnFirstError,
+                        defaultTimeoutMs: 10000
+                    );
+
+                    var expr = bundle.InitExpressions[exprIndex];
+                    var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
+                    var methodOOP = heapManager.GetIndexedOOP(initArrayOOP, exprIndex);
+
+                    Console.WriteLine($"  Found expression at index {exprIndex}: {expr.Source}");
+                    Console.WriteLine();
+
+                    var result = executor.ExecuteInitExpression(expr.LocalId, methodOOP);
+
+                    if (result.Status == InitStatus.Success)
+                    {
+                        Console.WriteLine($"\n✓ Expression executed successfully");
+                        // InitResult doesn't expose ReturnValue, just show success
+                    }
+                    else
+                    {
+                        Console.WriteLine($"\n❌ Expression execution failed");
+                        Console.WriteLine($"   Status: {result.Status}");
+                        if (result.Diagnostic?.Message != null)
+                        {
+                            Console.WriteLine($"   Error: {result.Diagnostic.Message}");
+                        }
+                        if (verboseDebug && result.Diagnostic?.StackTrace != null)
+                        {
+                            Console.WriteLine($"   Stack trace:\n{result.Diagnostic.StackTrace}");
+                        }
+                        Environment.Exit(1);
+                    }
+                }
+            }
 
             // TODO: Implement --dump-class after ClassPrettyPrinter is migrated to new heap manager
             if (dumpClassName != null)
@@ -942,13 +1030,15 @@ public static class Program
         }
     }
 
-    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.DebugOptions debugOptions) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.DebugOptions debugOptions, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
         bool verboseDebug = false;
         string? testFilter = null;
         string? reportOutput = null;
+        bool skipInitExpressions = false;
+        string? executeExpression = null;
         var debugOptions = new Smalltalk80.Interpreter.Engine.DebugOptions();
 
         for (int i = 0; i < args.Length; i++)
@@ -966,6 +1056,15 @@ public static class Program
             else if (args[i] == "--test-filter" && i + 1 < args.Length)
             {
                 testFilter = args[i + 1];
+                i++; // Skip the next argument
+            }
+            else if (args[i] == "--skip-init-expressions")
+            {
+                skipInitExpressions = true;
+            }
+            else if (args[i] == "--execute" && i + 1 < args.Length)
+            {
+                executeExpression = args[i + 1];
                 i++; // Skip the next argument
             }
             else if (args[i] == "--verbose" || args[i] == "-v")
@@ -1021,7 +1120,7 @@ public static class Program
             coldStartFile = Path.Combine(exeDir, "coldstart.json");
         }
 
-        return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions);
+        return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions, skipInitExpressions, executeExpression);
     }
 
     private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver)

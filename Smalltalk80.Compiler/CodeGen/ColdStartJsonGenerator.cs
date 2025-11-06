@@ -126,6 +126,10 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             {
                 symbols.Add(method.Selector);
                 ExtractSymbolsFromLiterals(method.Literals, symbols);
+
+                // Add argument and temporary variable names
+                symbols.UnionWith(method.ArgNames);
+                symbols.UnionWith(method.TempNames);
             }
         }
 
