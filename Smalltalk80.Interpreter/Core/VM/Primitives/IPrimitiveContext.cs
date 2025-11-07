@@ -221,4 +221,11 @@ public interface IPrimitiveContext
     /// This ensures runtime heap access uses updated class structures.
     /// </summary>
     void InvalidateAllRuntimeCaches();
+
+    /// <summary>
+    /// Gets the BlockContext class OOP from VMMetadata.
+    /// Used by primitive 80 (blockCopy:) to allocate BlockContext instances.
+    /// </summary>
+    /// <returns>BlockContext class OOP.</returns>
+    SmalltalkOOP GetBlockContextClassOOP();
 }

@@ -403,8 +403,8 @@ public partial class VirtualMachine : IPrimitiveContext
         int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
         int pcIndex = VMConstants.CONTEXT_PC_INDEX;
         int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
-        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
+        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
+        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         // Step 6: Initialize MethodContext fixed fields
 
@@ -508,9 +508,9 @@ public partial class VirtualMachine : IPrimitiveContext
             return HandleReturn(_nlrValue);
         }
 
-        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
         int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
+        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
         var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
@@ -755,7 +755,7 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // DIAGNOSTIC: Track return values from hash/stringhash methods (disabled for quiet mode)
-        // int methodIndex2 = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        // int methodIndex2 = VMConstants.CONTEXT_METHOD_INDEX;
         // var returningMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex2);
         // string? methodLocalId = GetLocalId(returningMethodOOP);
         // if (methodLocalId != null && (methodLocalId.Contains(">>hash") || methodLocalId.Contains(">>stringhash")))
@@ -809,12 +809,31 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP ExecuteBytecodeLoop()
     {
-        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
         int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
+        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
-        var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
-        var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+        // Check if this is a BlockContext - they store the method in VM-side mapping
+        var contextClassOOP = _heapManager.GetClassOOP(_activeContextOOP);
+        bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
+
+        SmalltalkOOP methodOOP;
+        SmalltalkOOP receiverOOP;
+
+        if (isBlockContext)
+        {
+            // BlockContext: bytecode stored inline in parent method, receiver from home MethodContext
+            // Blue Book design: BlockContext.startpc points to bytecode offset in parent method
+            var homeOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+            methodOOP = _heapManager.GetInstanceVariable(homeOOP, methodIndex);  // Get method from home MethodContext
+            receiverOOP = _heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_RECEIVER_INDEX);
+        }
+        else
+        {
+            // MethodContext: method and receiver in instance variables
+            methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+            receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+        }
 
         // Diagnostic: Show method name when recursion depth > 10
         if (_activeContextCount > 10 && _activeContextCount <= 15)  // Limit output
@@ -928,8 +947,12 @@ public partial class VirtualMachine : IPrimitiveContext
     private bool ExecuteBytecode(byte bytecode, SmalltalkOOP methodOOP)
     {
         // DEBUG: Track bytecode execution for debugging
+        if (_activeContextCount <= 3)  // Only log first few contexts
+        {
+            Console.WriteLine($"[BYTECODE] 0x{bytecode:X2} ({bytecode}) in method {GetLocalId(methodOOP)}");
+        }
 
-        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
+        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
         var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
 
         // Push receiver variable 0-15 (0x00-0x0F)
@@ -937,7 +960,7 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             int index = BytecodeUtil.PushIvarIndex(bytecode);
 
-            // Console.WriteLine($"[DEBUG IsPushIvar] bytecode=0x{bytecode:X2}, index={index}, receiverOOP={receiverOOP}, receiverClass={GetClassName(GetClass(receiverOOP))}");
+            Console.WriteLine($"[DEBUG IsPushIvar] bytecode=0x{bytecode:X2}, index={index}, receiverOOP={receiverOOP}, receiverClass={GetClassName(GetClass(receiverOOP))}, method={GetLocalId(methodOOP)}");
 
             // TODO: For blocks, need to get receiver from lexicalParent chain (Single-Context Architecture)
             // For now, use direct receiver (works for methods, blocks need implementation)
@@ -950,36 +973,41 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Push temporary variable 0-15 (0x10-0x1F)
-        // Push temporary variable 0-15 (0x10-0x1F)
-        // TODO: Implement using lexicalParent traversal (Single-Context Architecture)
+        // Blue Book: BlockContext shares parent method's temp frame via home context
         if (BytecodeUtil.IsPushTemp(bytecode))
         {
             int index = BytecodeUtil.PushTempIndex(bytecode);
-            // STUB: Simple read from active context - works for methods, NOT blocks accessing parent temps
-            var valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, index);
+
+            // Check if we're in a BlockContext
+            var contextClassOOP = _heapManager.GetClassOOP(_activeContextOOP);
+            bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
+
+            SmalltalkOOP valueOOP;
+            if (isBlockContext)
+            {
+                // BlockContext: Access temps from home MethodContext
+                // BlockContext indexed slots: [0..nargs-1] = block args, [nargs..] = shared parent temps
+                var homeOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                valueOOP = _heapManager.GetIndexedOOP(homeOOP, index);
+            }
+            else
+            {
+                // MethodContext: Direct access
+                valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, index);
+            }
+
             Push(valueOOP);
             return true;
         }
 
         // Push literal constant 0-31 (0x20-0x3F)
         // CRITICAL: Add +1 to skip header at lit[0]
+        // NOTE: Blocks are NOT stored as literals anymore (Blue Book inline bytecode approach)
         if (BytecodeUtil.IsPushLiteralConst(bytecode))
         {
             int index = BytecodeUtil.PushLiteralConstIndex(bytecode);
             var literal = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-
-            // Check if this literal is a block - wrap in BlockClosure
-            if (IsBlockLiteral(literal))
-            {
-                // TODO: Implement BlockClosure creation with lexicalParent (Single-Context Architecture)
-                var homeContextOOP = FindMethodContext(_activeContextOOP);
-                var closureOOP = CreateBlockClosure(literal, homeContextOOP);
-                Push(closureOOP);
-            }
-            else
-            {
-                Push(literal);
-            }
+            Push(literal);
             return true;
         }
 
@@ -1328,7 +1356,7 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         byte[] bytecodes = GetMethodBytecodes(methodOOP);
         int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
+        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
         int ip = ipOOP.AsSmallInteger();
@@ -1646,7 +1674,9 @@ public partial class VirtualMachine : IPrimitiveContext
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
                     int offset = (offsetHigh << 8) | offsetLow;
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
+                    int newIP = ip + offset;
+                    Console.WriteLine($"[JUMP] from IP={ip-2} offset={offset} to newIP={newIP}, method={GetLocalId(methodOOP)}");
+                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(newIP));
                     return true;
                 }
 
@@ -1821,7 +1851,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 Console.WriteLine($"  Stack was: ... value={arg2Str}, index={arg1Str}, receiver={recvClass} <-- WRONG! Should be String!");
 
                 // Disassemble the current method to see what bytecode was generated
-                int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+                int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
                 var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
                 string methodLocalId = GetLocalId(methodOOP) ?? "unknown";
                 Console.WriteLine($"\n  Current method: {methodLocalId}");
@@ -1935,7 +1965,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 $"Cannot safely read slot 3 (MethodContext=method, BlockContext=nargs).");
         }
 
-        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
         var currentMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
 
         // Get the class that owns this method (the home class)
@@ -2369,8 +2399,8 @@ public partial class VirtualMachine : IPrimitiveContext
         // Get field indices
         int pcIndex = VMConstants.CONTEXT_PC_INDEX;
         int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
-        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
+        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
+        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         // Replace method and receiver
         _heapManager.SetInstanceVariable(_activeContextOOP, methodIndex, methodOOP);
@@ -2413,7 +2443,7 @@ public partial class VirtualMachine : IPrimitiveContext
             int currentPC = pcOOP.AsSmallInteger();
 
             // Get method
-            int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+            int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
             var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
 
             // Get bytecodes from method (last indexed item is the bytecode array OOP)
@@ -2446,7 +2476,7 @@ public partial class VirtualMachine : IPrimitiveContext
         Console.WriteLine($"  SENDER CHAIN (showing up to {maxDepth} contexts):");
 
         int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
-        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
 
         var currentOOP = contextOOP;
         int depth = 0;
@@ -2873,8 +2903,25 @@ public partial class VirtualMachine : IPrimitiveContext
         // sp is absolute index: [0..numArgs-1][numArgs..numArgs+numTemps-1][numArgs+numTemps..stackSize-1]
         //                        ^--arguments--^------temporaries--------^-------execution stack----------^
         // Execution stack empty when sp == (numArgs + numTemps)
-        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
-        var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
+
+        // Check if this is a BlockContext - they store the method in VM-side mapping
+        var contextClassOOP = _heapManager.GetClassOOP(_activeContextOOP);
+        bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
+
+        SmalltalkOOP methodOOP;
+        if (isBlockContext)
+        {
+            // BlockContext: bytecode stored inline in parent method
+            var homeOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+            methodOOP = _heapManager.GetInstanceVariable(homeOOP, methodIndex);
+        }
+        else
+        {
+            // MethodContext: method in instance variable
+            methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+        }
+
         var header = ParseMethodHeader(methodOOP);
         int initialSP = header.NumArgs + header.NumTemps;
 
@@ -3413,6 +3460,12 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         _runtimeHeapAccess.InvalidateAllCaches();
     }
+
+    SmalltalkOOP IPrimitiveContext.GetBlockContextClassOOP()
+    {
+        return _metadata.BlockContextClassOOP;
+    }
+
     IPlatformBridge? IPrimitiveContext.PlatformBridge => _platformBridge;
     bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
 
@@ -3554,6 +3607,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
         return blockContextOOP;
     }
+
 
     SmalltalkOOP IPrimitiveContext.ActivateBlockContext(SmalltalkOOP blockContextOop, SmalltalkOOP argumentsArray)
     {
@@ -3845,10 +3899,41 @@ public partial class VirtualMachine : IPrimitiveContext
         return localId != null && localId.StartsWith("block:");
     }
 
-    // REMOVED: CreateBlockClosure - obsolete in single-context architecture
+    /// <summary>
+    /// Creates a BlockClosure wrapper for a block CompiledMethod.
+    /// BlockClosure provides user-facing methods (value, whileTrue:, etc.) while
+    /// block EXECUTION uses MethodContext (Single-Context Architecture).
+    /// </summary>
     private SmalltalkOOP CreateBlockClosure(SmalltalkOOP blockMethodOOP, SmalltalkOOP homeContextOOP)
     {
-        throw new NotImplementedException("CreateBlockClosure is obsolete. Blocks are now represented by CompiledMethod objects directly.");
+        // Get BlockClosure class
+        var blockClosureClassOOP = _runtimeHeapAccess.GetClass("BlockClosure");
+        if (blockClosureClassOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            throw new InvalidOperationException("BlockClosure class not found");
+        }
+
+        // BlockClosure has 5 instance variables: method, homeContext, returnContext, numArgs, executionContext
+        // All initialized to nil except method and numArgs
+        var blockClosureOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 5, 0);
+        _heapManager.SetSlot(blockClosureOOP, 0, blockClosureClassOOP); // class reference
+
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Set fields using VMConstants indices
+        _heapManager.SetInstanceVariable(blockClosureOOP, VMConstants.BLOCKCLOSURE_METHOD_INDEX, blockMethodOOP);
+        _heapManager.SetInstanceVariable(blockClosureOOP, VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX, homeContextOOP);
+        _heapManager.SetInstanceVariable(blockClosureOOP, VMConstants.BLOCKCLOSURE_RETURNCONTEXT_INDEX, nilOOP);
+
+        // Get numArgs from method header
+        var methodHeader = ParseMethodHeader(blockMethodOOP);
+        var numArgsOOP = SmalltalkOOP.FromSmallInteger(methodHeader.NumArgs);
+        _heapManager.SetInstanceVariable(blockClosureOOP, VMConstants.BLOCKCLOSURE_NUMARGS_INDEX, numArgsOOP);
+
+        // executionContext starts as nil (set when block is invoked)
+        _heapManager.SetInstanceVariable(blockClosureOOP, VMConstants.BLOCKCLOSURE_EXECUTIONCONTEXT_INDEX, nilOOP);
+
+        return blockClosureOOP;
     }
 
 

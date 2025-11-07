@@ -258,7 +258,9 @@ public static class BytecodeUtil
     public static int PushIvarIndex(byte op) => op & 0x0F;
 
     // Push temporary/argument (0x10 - 0x1F)
-    public static bool IsPushTemp(byte op) => op >= 0x10 && op <= 0x1F;
+    // NOTE: Exclude 0x14-0x19 which are control flow opcodes (JUMP_TRUE, JUMP_FALSE, JUMP, etc.)
+    // even though they fall in the PUSH_TEMP range
+    public static bool IsPushTemp(byte op) => op >= 0x10 && op <= 0x13;
     public static int PushTempIndex(byte op) => op & 0x0F;
 
     // Push literal constant (0x20 - 0x3F)

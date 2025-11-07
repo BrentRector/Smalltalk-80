@@ -597,32 +597,11 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                     layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable[instVarName], SlotIndex = slotIndex++, InheritedFrom = inheritedFrom });
                 }
             }
-            else if (cls.Name == "MethodContext")
-            {
-                // Single-Context Architecture: Unified MethodContext for methods and blocks
-                // MethodContext inherits sender(1), pc(2), stackp(3) from ContextPart
-                // New field layout: method(4), lexicalParent(5), receiver(6), temps(7+)
-                var requiredFields = new[] { "method", "lexicalParent", "receiver" };
-                var missingFields = requiredFields.Where(f => !cls.InstanceVariables.Contains(f)).ToList();
-
-                if (missingFields.Any())
-                {
-                    throw new InvalidOperationException(
-                        $"FATAL: MethodContext class is missing required fields: {string.Join(", ", missingFields)}. " +
-                        "The Single-Context Architecture requires MethodContext to define 'method', 'lexicalParent', and 'receiver' at fixed indices 4, 5, and 6.");
-                }
-
-                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["method"], SlotIndex = 4, InheritedFrom = inheritedFrom });
-                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["lexicalParent"], SlotIndex = 5, InheritedFrom = inheritedFrom });
-                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["receiver"], SlotIndex = 6, InheritedFrom = inheritedFrom });
-
-                slotIndex = 7; // TempFrameStart
-                foreach (var instVarName in cls.InstanceVariables)
-                {
-                    if (requiredFields.Contains(instVarName)) continue;
-                    layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable[instVarName], SlotIndex = slotIndex++, InheritedFrom = inheritedFrom });
-                }
-            }
+            // MethodContext no longer needs special handling - normal inheritance chain works correctly:
+            // InstructionStream: sender(0), pc(1)
+            // ContextPart: stackp(2) [inherits sender, pc]
+            // MethodContext: method(3), lexicalParent(4), receiver(5) [inherits sender, pc, stackp]
+            // Note: Removed special case - now handled by normal else branch below
             else if (cls.Name == "BlockContext")
             {
                 // Blue Book Chapter 27: BlockArgumentCountIndex := 3. InitialIPIndex := 4. HomeIndex := 5.

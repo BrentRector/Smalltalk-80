@@ -584,4 +584,5 @@ internal class TestPrimitiveContext : IPrimitiveContext
     public void ClearMethodCache() => throw new NotImplementedException();
     public void InvalidateAllRuntimeCaches() => throw new NotImplementedException();
     public ObjectFormat GetObjectFormat(SmalltalkOOP objectOOP) => throw new NotImplementedException();
+    public SmalltalkOOP GetBlockContextClassOOP() => throw new NotImplementedException();
 }

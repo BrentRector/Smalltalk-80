@@ -4679,7 +4679,8 @@ locateMagnifiedView: aForm scale: scaleFactor
 	^tempRect! !
 
 BitEditor initialize!
-ContextPart variableSubclass: #BlockContext
+
+ContextPart variableSubclass: #BlockContext
 	instanceVariableNames: 'nargs startpc home '
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -11696,7 +11697,9 @@ doItReceiver
 !ContextInspector methodsFor: 'initialization'!
 inspect: anObject 
 	object _ anObject.
-	self changed: #field! !InstructionStream subclass: #ContextPart
+	self changed: #field! !
+	
+InstructionStream subclass: #ContextPart
 	instanceVariableNames: 'stackp '
 	classVariableNames: 'TryPrimitiveMethods '
 	poolDictionaries: ''
@@ -22090,7 +22093,9 @@ print: instruction
 	stream nextPutAll: instruction.
 	stream cr.
 	oldPC _ pc
-	"(InstructionPrinter compiledMethodAt: #print:) symbolic."! !Object subclass: #InstructionStream
+	"(InstructionPrinter compiledMethodAt: #print:) symbolic."! !
+	
+Object subclass: #InstructionStream
 	instanceVariableNames: 'sender pc '
 	classVariableNames: 'SpecialConstants '
 	poolDictionaries: ''

@@ -1143,7 +1143,9 @@ public static class Program
             StringClassOOP = GlobalRegistry.Get("class:String"),
             ArrayClassOOP = GlobalRegistry.Get("class:Array"),
             CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
-            SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger")
+            SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
+            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
+            BlockClosureClassOOP = GlobalRegistry.Get("class:BlockClosure")
         };
     }
 

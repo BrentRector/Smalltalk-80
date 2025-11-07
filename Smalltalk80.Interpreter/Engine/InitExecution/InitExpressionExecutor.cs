@@ -223,9 +223,9 @@ public class InitExpressionExecutor
         int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
         int pcIndex = VMConstants.CONTEXT_PC_INDEX;
         int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
+        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
         // TODO: receiverMapIndex removed - part of obsolete dual-context architecture
-        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
+        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         _heapManager.SetSlot(contextOOP, senderIndex + 1, SpecialObjectsArray.Instance.Nil);
         _heapManager.SetSlot(contextOOP, pcIndex + 1, SmalltalkOOP.FromSmallInteger(0));

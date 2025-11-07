@@ -155,7 +155,38 @@ namespace Smalltalk80.Compiler
         /// Gets the current instruction pointer.
         /// </summary>
         public int CurrentIP => bytecodes.Count;
-        
+
+        /// <summary>
+        /// Gets the current bytecode offset (alias for CurrentIP).
+        /// </summary>
+        public int CurrentOffset => bytecodes.Count;
+
+        /// <summary>
+        /// Emits a single byte (alias for Emit(byte)).
+        /// </summary>
+        public void EmitByte(byte value) => Emit(value);
+
+        /// <summary>
+        /// Patches a byte at a specific offset in the bytecode stream.
+        /// Used for backpatching jump offsets after compiling the target code.
+        /// </summary>
+        public void PatchByteAt(int offset, byte value)
+        {
+            if (offset < 0 || offset >= bytecodes.Count)
+                throw new ArgumentOutOfRangeException(nameof(offset), $"Offset {offset} out of range [0, {bytecodes.Count})");
+            bytecodes[offset] = value;
+        }
+
+        /// <summary>
+        /// Pushes a SmallInteger literal constant onto the stack.
+        /// </summary>
+        public void PushSmallInteger(int value)
+        {
+            // Small integers are immediate values in Smalltalk-80
+            // For bytecode, we push them as literal constants
+            PushLiteralConstant(value);
+        }
+
         /// <summary>
         /// Calculates the maximum stack depth required by the bytecode.
         /// </summary>
@@ -1925,228 +1956,124 @@ namespace Smalltalk80.Compiler
         
         private void CompileBlock(Smalltalk80Parser.BlockContext block)
         {
-            // Blue Book Specification: Blocks are compiled as separate CompiledMethod objects
-            // stored as literals in the enclosing method's literal frame.
-            // This allows blocks to be first-class objects that can be stored, passed around,
-            // and executed in different contexts.
+            // Blue Book Specification: Blocks compile bytecode INLINE in the method.
+            // Pattern:
+            //   JUMP_FORWARD <offset>      ; Skip over block body during normal execution
+            //   <block bytecode inline>     ; Block body bytecode
+            //   RETURN_BLOCK               ; Block return
+            //   <after jump lands here>    ; Continue method execution
+            //   SEND_SPECIAL_BLOCKCOPY     ; 0xC8 - creates BlockContext with startpc pointing back
 
-            var blockMethod = CompileBlockAsLiteral(block);
-
-            // Add the block CompiledMethod as a literal and push it onto the stack
-            emitter.PushLiteralConstant(blockMethod);
-        }
-
-        /// <summary>
-        /// Compiles a block into a separate CompiledMethodData object per Blue Book spec.
-        /// Blocks are CompiledMethods with selector = null and primitiveNumber = 0.
-        /// </summary>
-        private CompiledMethodData CompileBlockAsLiteral(Smalltalk80Parser.BlockContext block)
-        {
-            // DIAGNOSTIC: Log every block compilation
-            var blockText = block.GetText();
-            if (blockText.Contains("char"))
-            {
-                File.AppendAllText("compiler_debug.log", $"[CompileBlockAsLiteral] Compiling block containing 'char': {blockText.Substring(0, Math.Min(80, blockText.Length))}\n");
-            }
-
-            // Create a new compilation environment for the block
-            var savedEnvironment = environment;
-            var savedEmitter = emitter;
-
-            // Create new environment and emitter for the block
-            environment = new CompilationEnvironment
-            {
-                Parent = savedEnvironment,  // Link to parent for lexical scoping
-                ScopeDepth = savedEnvironment.ScopeDepth + 1
-            };
-            emitter = new BytecodeEmitter();
-
-            // Process block arguments
+            // Parse block arguments to get argument count
             var blockArgs = block.blockArgs();
+            int argCount = 0;
             var argumentNames = new List<string>();
+
             if (blockArgs != null)
             {
-                // Extract ArgumentNameContext nodes (each contains one IDENTIFIER)
                 var argNodes = blockArgs.children
                     .OfType<Smalltalk80Parser.ArgumentNameContext>()
                     .Select(ctx => ctx.IDENTIFIER())
                     .ToList();
 
+                argCount = argNodes.Count;
                 for (int i = 0; i < argNodes.Count; i++)
                 {
-                    var argName = argNodes[i].GetText();
-                    argumentNames.Add(argName);
-                    environment.Arguments[argName] = i;
+                    argumentNames.Add(argNodes[i].GetText());
                 }
-                environment.ArgumentCount = argNodes.Count;
             }
 
-            // Process block temporaries
-            var blockTemps = block.blockTemps();
-            var temporaryNames = new List<string>();
+            // Blue Book pattern: blockCopy: + LONG_JUMP + block body
+            // Primitive 80 calculates initialIP = IP + 3 (skips the 3-byte LONG_JUMP)
+            // So block body comes AFTER the blockCopy: send, not before!
 
-            // DIAGNOSTIC: Log block temp processing
-            if (blockText.Contains("char"))
+            // STEP 1: Emit blockCopy: send first
+            emitter.EmitByte(0x89); // PUSH_ACTIVE_CONTEXT (receiver for blockCopy:)
+            emitter.PushSmallInteger(argCount); // Push argument count
+            emitter.EmitByte(0xC8); // SEND_SPECIAL_BLOCKCOPY ← Primitive executes here
+
+            // STEP 2: Emit 3-byte LONG_JUMP to skip over block body
+            // 0xA1 = long jump forward with 2-byte offset
+            int jumpBytecodeOffset = emitter.CurrentOffset;
+            emitter.EmitByte(0xA1); // LONG_JUMP_FORWARD (3 bytes total: opcode + 2 offset bytes)
+            int jumpOffsetLocation = emitter.CurrentOffset;
+            emitter.EmitByte(0x00); // Placeholder for offset high byte
+            emitter.EmitByte(0x00); // Placeholder for offset low byte
+
+            // STEP 3: Block body starts here (initialIP = IP + 3 points here)
+            int blockStartOffset = emitter.CurrentOffset;
+
+            // Blue Book inline blocks: Share parent method's environment (same temp frame)
+            // Block arguments are added to the EXISTING environment temporarily
+            // Save current argument mappings to restore later
+            var savedArguments = new Dictionary<string, int>(environment.Arguments);
+            int savedArgCount = environment.ArgumentCount;
+
+            // Add block arguments to current environment (they'll be in BlockContext indexed slots)
+            for (int i = 0; i < argumentNames.Count; i++)
             {
-                File.AppendAllText("compiler_debug.log", $"[CompileBlock] blockTemps = {(blockTemps == null ? "NULL" : "exists")}\n");
+                environment.Arguments[argumentNames[i]] = i;
             }
+            environment.ArgumentCount = argCount;
 
+            // Parse and register block temporaries in parent environment
+            // Block temps are allocated after parent method's temps
+            var blockTemps = block.blockTemps();
             if (blockTemps != null)
             {
-                if (blockText.Contains("char"))
-                {
-                    File.AppendAllText("compiler_debug.log", $"[CompileBlock] blockTemps.children.Count = {blockTemps.children?.Count ?? 0}\n");
-                    if (blockTemps.children != null)
-                    {
-                        foreach (var child in blockTemps.children)
-                        {
-                            File.AppendAllText("compiler_debug.log", $"[CompileBlock]   child: {child.GetType().Name} = '{child.GetText()}'\n");
-                        }
-                    }
-                }
-
-                // Extract TemporaryNameContext nodes (not raw IDENTIFIER terminals!)
                 var tempNodes = (blockTemps.children ?? Enumerable.Empty<IParseTree>())
                     .OfType<Smalltalk80Parser.TemporaryNameContext>()
                     .ToList();
 
-                if (blockText.Contains("char"))
-                {
-                    File.AppendAllText("compiler_debug.log", $"[CompileBlock] Found {tempNodes.Count} IDENTIFIER nodes for block temps\n");
-                }
-
-                int tempBase = environment.ArgumentCount;
+                int tempBase = environment.TemporaryCount;  // After parent temps
                 for (int i = 0; i < tempNodes.Count; i++)
                 {
                     var tempName = tempNodes[i].GetText();
-                    temporaryNames.Add(tempName);
                     environment.Temporaries[tempName] = tempBase + i;
-                    if (blockText.Contains("char"))
-                    {
-                        File.AppendAllText("compiler_debug.log", $"[CompileBlock]   Added temp '{tempName}' at index {tempBase + i}\n");
-                    }
                 }
-                environment.TemporaryCount = tempNodes.Count;
+                environment.TemporaryCount += tempNodes.Count;  // Extend parent's temp count
             }
 
-            if (blockText.Contains("char"))
-            {
-                File.AppendAllText("compiler_debug.log", $"[CompileBlock] Final temporaryNames.Count = {temporaryNames.Count}, environment.TemporaryCount = {environment.TemporaryCount}\n");
-            }
-
-            // IMPORTANT: Block variable access in Blue Book specification:
-            // Blocks access outer variables through their "home context" at runtime.
-            // The block's CompiledMethod contains bytecodes that reference:
-            // - Block's own arguments and temps (indices 0..N)
-            // - Outer context variables via special bytecodes (push from outer context)
-            //
-            // For now, we compile blocks with access to:
-            // - Instance variables (these are per-object, not per-context)
-            // - Class variables and pool variables (these are global)
-            //
-            // TODO: Implement proper outer context variable access for blocks
-            // This requires special bytecodes to access variables from the home context
-
-            // Copy instance variables - available to all methods/blocks in the class
-            foreach (var kvp in savedEnvironment.InstanceVariables)
-            {
-                environment.InstanceVariables[kvp.Key] = kvp.Value;
-            }
-
-            // Copy class variables - shared across all instances
-            foreach (var kvp in savedEnvironment.ClassVariables)
-            {
-                environment.ClassVariables[kvp.Key] = kvp.Value;
-            }
-
-            // Copy pool variables - imported shared dictionaries
-            foreach (var kvp in savedEnvironment.PoolVariables)
-            {
-                environment.PoolVariables[kvp.Key] = kvp.Value;
-            }
-
-            // CRITICAL: Do NOT copy parent's arguments and temporaries into the block's environment.
-            //
-            // In Smalltalk-80, blocks capture their lexical environment through the homeContext pointer,
-            // and the VM walks this chain at runtime to resolve free variables. The compiler should NOT
-            // duplicate parent variables with the same indices in nested blocks.
-            //
-            // Instead, when the compiler encounters a free variable (not in block's own args/temps),
-            // it will search the parent scope chain and generate the temp index from the DEFINING scope.
-            // The VM's homeContext chain walking will then correctly resolve the variable at runtime.
-            //
-            // Example: [:x | [x + 10] value]
-            //   - Outer block: x is arg at index 0
-            //   - Inner block: When accessing x, compiler searches parent and finds x at index 0 in outer block
-            //   - Compiler generates pushTemp 0 (meaning index 0 in homeContext)
-            //   - VM executes: index 0 >= blockLocalCount (0), so walks to homeContext (outer block), reads index 0
-            //
-            // This approach maintains proper lexical scoping without index conflicts in nested blocks.
-
-            // Link parent environment for lexical scope chain
-            environment.Parent = savedEnvironment;
-
-            // Set scope depth to indicate we're in a block
-            environment.ScopeDepth = savedEnvironment.ScopeDepth + 1;
-
-            // IMPORTANT: Collect literals for the block first (just like methods)
-            // This ensures all literals are in the frame before we generate bytecodes
-            var blockStatements = block.statements();
-            if (blockStatements != null)
-            {
-                var visitor = new LiteralCollector(this, emitter, environment);
-                visitor.Visit(blockStatements);
-            }
-
-            // Compile the block body
+            // Compile block body statements
             var statements = block.statements();
             if (statements != null)
             {
-                CompileStatements(statements, inBlock: true);
-
-                // Check if the last statement already emitted a return (e.g., ^1, ^self)
-                // If so, don't emit another RETURN_TOP (would be unreachable dead code)
-                var bytecodes = emitter.GetBytecodes();
-                if (bytecodes.Length == 0 || !IsReturnBytecode(bytecodes[^1]))
-                {
-                    // The last statement didn't return explicitly, so emit RETURN_TOP
-                    // to return the value left on stack by the last statement
-                    emitter.Emit(Bytecode.RETURN_TOP);
-                }
+                CompileStatements(statements);
             }
             else
             {
-                // Empty block returns nil
+                // Empty block - push nil
                 emitter.PushNil();
-                emitter.Emit(Bytecode.RETURN_TOP);
             }
 
-            // Get the bytecode and literals from the block's emitter
-            var blockBytecode = emitter.GetBytecodes();
-            var blockLiterals = emitter.GetLiterals();
+            // STEP 4: Emit RETURN_BLOCK bytecode
+            emitter.EmitByte(0x7D); // RETURN_BLOCK (EndRemote - returns from block)
 
-            // Create the CompiledMethodData for the block
-            var blockMethod = new CompiledMethodData
+            // STEP 5: Calculate jump offset and patch it
+            // The jump lands here (after the block body), so method execution continues
+            int afterBlockOffset = emitter.CurrentOffset;
+            int jumpDistance = afterBlockOffset - (jumpOffsetLocation + 2); // Distance from after jump operand to here
+
+            // Patch the jump offset (big-endian 16-bit offset, encoded as distance - 1 per Blue Book)
+            int encodedDistance = jumpDistance - 1;  // Blue Book: distance encoded as (distance - 1)
+            byte offsetHigh = (byte)((encodedDistance >> 8) & 0xFF);
+            byte offsetLow = (byte)(encodedDistance & 0xFF);
+            emitter.PatchByteAt(jumpOffsetLocation, offsetHigh);
+            emitter.PatchByteAt(jumpOffsetLocation + 1, offsetLow);
+
+            // Restore parent environment state
+            // Clear block arguments from environment
+            foreach (var argName in argumentNames)
             {
-                Selector = null,  // Blocks have no selector per Blue Book
-                PrimitiveNumber = 0,  // Blocks never have primitives
-                IsPrimitive = false,
-                ArgumentCount = environment.ArgumentCount,
-                TemporaryCount = environment.TemporaryCount,
-                ArgumentNames = argumentNames,
-                TemporaryNames = temporaryNames,
-                Bytecode = blockBytecode,
-                Literals = blockLiterals,
-                MaxStackDepth = emitter.CalculateMaxStackDepth(),  // Calculate the max stack depth
-                IsQuickReturnSelf = false,  // Blocks cannot be quick-return-self
-                QuickReturnFieldIndex = -1  // Blocks cannot be quick-return-field
-            };
-
-            // Restore the parent environment and emitter
-            environment = savedEnvironment;
-            emitter = savedEmitter;
-
-            return blockMethod;
+                environment.Arguments.Remove(argName);
+            }
+            // Restore saved arguments
+            foreach (var kvp in savedArguments)
+            {
+                environment.Arguments[kvp.Key] = kvp.Value;
+            }
+            environment.ArgumentCount = savedArgCount;
+            // Note: We keep the extended TemporaryCount (block temps extend method temps)
         }
 
         /// <summary>
