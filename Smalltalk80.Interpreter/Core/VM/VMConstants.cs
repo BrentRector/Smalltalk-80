@@ -16,40 +16,47 @@ public static class VMConstants
     public const int BEHAVIOR_FORMAT_INDEX = 2;
 
     // ========================================================================
-    // Blue Book Chapter 27: Context object field indices
+    // Unified Context Architecture (Single-Context Design)
     // ========================================================================
-    // Source: "SenderIndex := 0. InstructionPointerIndex := 1. StackPointerIndex := 2.
-    //          MethodIndex := 3. ReceiverIndex := 5."
-
-    // Common to all contexts (from InstructionStream and ContextPart)
-    public const int CONTEXT_SENDER_INDEX = 0;           // InstructionStream field
-    public const int CONTEXT_PC_INDEX = 1;               // InstructionStream field
-    public const int CONTEXT_STACKP_INDEX = 2;           // ContextPart field
-
-    // MethodContext-specific fields
-    // MethodContext inherits: InstructionStream (sender, pc) -> ContextPart (stackp) -> MethodContext
-    public const int METHODCONTEXT_METHOD_INDEX = 3;     // MethodContext field
-    public const int METHODCONTEXT_RECEIVERMAP_INDEX = 4; // MethodContext field (implementation-specific)
-    public const int METHODCONTEXT_RECEIVER_INDEX = 5;   // MethodContext field
-    public const int METHODCONTEXT_TEMP_FRAME_START = 6; // Start of indexed slots
-
-    // BlockContext-specific fields
-    // BlockContext inherits: InstructionStream (sender, pc) -> ContextPart (stackp) -> BlockContext
+    // All contexts (methods and blocks) use MethodContext with unified field layout.
+    // lexicalParent field enables proper lexical scoping for blocks.
     //
-    // CRITICAL ARCHITECTURAL CONSTRAINT:
-    // MethodContext slot 3 = method (CompiledMethod)
-    // BlockContext slot 3 = nargs (SmallInteger)
-    //
-    // These are DIFFERENT and cannot be changed (defined by Smalltalk-80 Blue Book specification).
-    // Code that reads slot 3 MUST verify the context type first!
-    //
-    // Our VM uses MethodContext for block execution (CreateBlockExecutionContext creates MethodContext),
-    // so _activeContextOOP is always a MethodContext. BlockContext is only used as a data holder.
-    // This is validated at runtime in SendSuperMessage().
-    public const int BLOCKCONTEXT_NARGS_INDEX = 3;       // BlockContext field - BlockArgumentCountIndex (DIFFERENT from MethodContext!)
-    public const int BLOCKCONTEXT_STARTPC_INDEX = 4;     // BlockContext field - InitialIPIndex
-    public const int BLOCKCONTEXT_HOME_INDEX = 5;        // BlockContext field - HomeIndex
-    public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;  // Start of indexed slots
+    // MethodContext layout (slot numbers are instance variable indices):
+    //   Slot 0: class (inherited from Object)
+    //   Slot 1: sender (from InstructionStream) - dynamic call chain
+    //   Slot 2: pc (from InstructionStream) - program counter
+    //   Slot 3: stackp (from ContextPart) - stack pointer
+    //   Slot 4: method (MethodContext field) - CompiledMethod being executed
+    //   Slot 5: lexicalParent (MethodContext field) - lexical scope chain (nil for methods, non-nil for blocks)
+    //   Slot 6: receiver (MethodContext field) - self
+    //   Slot 7+: indexed temps (variable part)
+
+    // Common context fields (shared by all contexts)
+    public const int CONTEXT_SENDER_INDEX = 1;           // InstructionStream field (dynamic call chain)
+    public const int CONTEXT_PC_INDEX = 2;               // InstructionStream field
+    public const int CONTEXT_STACKP_INDEX = 3;           // ContextPart field
+    public const int CONTEXT_METHOD_INDEX = 4;           // MethodContext field - CompiledMethod
+    public const int CONTEXT_LEXICALPARENT_INDEX = 5;    // MethodContext field - lexical scope chain (NEW!)
+    public const int CONTEXT_RECEIVER_INDEX = 6;         // MethodContext field - self
+    public const int CONTEXT_TEMP_FRAME_START = 7;       // Start of indexed slots
+
+    // Legacy MethodContext constants (DEPRECATED - use CONTEXT_* instead)
+    [Obsolete("Use CONTEXT_METHOD_INDEX instead")]
+    public const int METHODCONTEXT_METHOD_INDEX = 4;
+    [Obsolete("Use CONTEXT_RECEIVER_INDEX instead")]
+    public const int METHODCONTEXT_RECEIVER_INDEX = 6;
+    [Obsolete("Use CONTEXT_TEMP_FRAME_START instead")]
+    public const int METHODCONTEXT_TEMP_FRAME_START = 7;
+
+    // Legacy BlockContext constants (OBSOLETE - blocks now use MethodContext)
+    [Obsolete("Blocks now use MethodContext - this constant is obsolete")]
+    public const int BLOCKCONTEXT_NARGS_INDEX = 3;
+    [Obsolete("Blocks now use MethodContext - this constant is obsolete")]
+    public const int BLOCKCONTEXT_STARTPC_INDEX = 4;
+    [Obsolete("Blocks now use MethodContext - this constant is obsolete")]
+    public const int BLOCKCONTEXT_HOME_INDEX = 5;
+    [Obsolete("Blocks now use MethodContext - this constant is obsolete")]
+    public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;
 
     // ========================================================================
     // VM Extension: BlockClosure field indices

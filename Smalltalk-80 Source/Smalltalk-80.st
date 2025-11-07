@@ -25665,7 +25665,7 @@ selector
 	^selector!
 selector: aSymbol
 	selector _ aSymbol asSymbol! !ContextPart variableSubclass: #MethodContext
-	instanceVariableNames: 'method receiverMap receiver '
+	instanceVariableNames: 'method lexicalParent receiver '
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Kernel-Methods'!
@@ -25676,7 +25676,7 @@ MethodContexts, though normal in their variable size, are actually only used in 
 
 Instance Variables:  *indexed*
 	method			<CompiledMethod>
-	receiverMap		unused (we expect to use it later for multiple inheritance)
+	lexicalParent		<MethodContext | nil>  The context where this method/block was defined (nil for top-level methods, non-nil for blocks)
 	receiver			<Object>
 '!
 

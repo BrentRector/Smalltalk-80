@@ -2,11 +2,15 @@
 
 ## Definitive Specification for Smalltalk-80 Variable Access
 
-**Version**: 1.0.0
+**Version**: 2.0.0 - Single-Context Architecture
 **Status**: AUTHORITATIVE
-**Last Updated**: 2025-11-05
+**Last Updated**: 2025-11-06
 
-This document defines THE definitive algorithm for how the Smalltalk-80 compiler generates bytecode indices for variable access and how the interpreter resolves these indices at runtime. This specification supersedes all other documentation and must be followed exactly by both compiler and interpreter.
+This document defines THE definitive algorithm for how the Smalltalk-80 compiler generates bytecode indices for variable access and how the interpreter resolves these indices at runtime.
+
+**IMPORTANT**: This specification uses the **Single-Context Architecture** where MethodContext is used for both methods and blocks, with blocks having a `lexicalParent` field for scope chain traversal. See [Single-Context-Architecture.md](docs/Single-Context-Architecture.md) for complete architectural details.
+
+This specification supersedes all other documentation and must be followed exactly by both compiler and interpreter.
 
 ---
 
@@ -305,61 +309,48 @@ int CalculateVariableIndex(string varName, Environment env)
 
 The interpreter uses the hierarchical index to traverse the context chain, subtracting blockLocalCounts at each level.
 
-### 3.2 PUSH_TEMP Algorithm
+### 3.2 PUSH_TEMP Algorithm (Single-Context Architecture)
+
+**Note**: With the Single-Context Architecture, there is no `IsBlockContext()` check. Instead, we check if `lexicalParent == nil` to determine if we're in a method (nil) or block (non-nil).
 
 ```csharp
 void PushTemp(int index)
 {
-    // If in method context, direct access
-    if (!IsBlockContext(_activeContext))
-    {
-        value = GetIndexedSlot(_activeContext, index);
-        Push(value);
-        return;
-    }
-
-    // In block context - check if local or inherited
-    var blockLocalCount = GetBlockLocalCount(_activeContext);
-
-    if (index < blockLocalCount)
-    {
-        // Local to this block
-        value = GetIndexedSlot(_activeContext, index);
-        Push(value);
-        return;
-    }
-
-    // Inherited from parent - traverse chain
-    int remainingIndex = index - blockLocalCount;
-    var currentContext = GetHomeContext(_activeContext);
+    SmalltalkOOP contextOOP = _activeContextOOP;
+    int remainingIndex = index;
 
     while (true)
     {
-        if (!IsBlockContext(currentContext))
+        // Get local count for this context (args + temps from method header)
+        var methodOOP = GetInstanceVariable(contextOOP, CONTEXT_METHOD_INDEX);
+        var header = ParseMethodHeader(methodOOP);
+        int localCount = header.NumArgs + header.NumTemps;
+
+        if (remainingIndex < localCount)
         {
-            // Reached method context
-            value = GetIndexedSlot(currentContext, remainingIndex);
+            // Found it in this context!
+            var value = GetIndexedSlot(contextOOP, remainingIndex);
             Push(value);
             return;
         }
 
-        // Another block context - check its locals
-        var currentLocalCount = GetBlockLocalCount(currentContext);
+        // Not here, traverse to lexical parent
+        remainingIndex -= localCount;
+        contextOOP = GetInstanceVariable(contextOOP, CONTEXT_LEXICALPARENT_INDEX);
 
-        if (remainingIndex < currentLocalCount)
+        if (contextOOP == nil)
         {
-            // Found in this parent block
-            value = GetIndexedSlot(currentContext, remainingIndex);
-            Push(value);
-            return;
+            throw new InvalidOperationException(
+                $"Variable index {index} out of bounds (traversed all contexts)");
         }
-
-        // Continue traversing
-        remainingIndex -= currentLocalCount;
-        currentContext = GetHomeContext(currentContext);
     }
 }
 ```
+
+**Key Changes**:
+- No type checking (`IsBlockContext()`) - unified MethodContext for everything
+- Traverse via `lexicalParent` field instead of `homeContext`
+- Loop termination: `lexicalParent == nil` means we've reached the top (method)
 
 ### 3.3 STORE_TEMP Algorithm
 

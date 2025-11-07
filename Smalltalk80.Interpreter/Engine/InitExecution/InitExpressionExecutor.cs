@@ -224,14 +224,14 @@ public class InitExpressionExecutor
         int pcIndex = VMConstants.CONTEXT_PC_INDEX;
         int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
         int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
-        int receiverMapIndex = VMConstants.METHODCONTEXT_RECEIVERMAP_INDEX;
+        // TODO: receiverMapIndex removed - part of obsolete dual-context architecture
         int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
 
         _heapManager.SetSlot(contextOOP, senderIndex + 1, SpecialObjectsArray.Instance.Nil);
         _heapManager.SetSlot(contextOOP, pcIndex + 1, SmalltalkOOP.FromSmallInteger(0));
         _heapManager.SetSlot(contextOOP, stackpIndex + 1, SmalltalkOOP.FromSmallInteger(0));
         _heapManager.SetSlot(contextOOP, methodIndex + 1, methodOOP);
-        _heapManager.SetSlot(contextOOP, receiverMapIndex + 1, SpecialObjectsArray.Instance.Nil);
+        // receiverMapIndex initialization removed - obsolete field
         _heapManager.SetSlot(contextOOP, receiverIndex + 1, receiverOOP);
 
         // Initialize indexed portion (stack) with nil
