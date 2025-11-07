@@ -306,15 +306,17 @@ public partial class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
-    /// Creates a MethodContext object for executing a method.
+    /// Creates a MethodContext object for executing a method or block.
     /// Implements proper Blue Book MethodContext initialization with all required fields.
+    /// Supports Single-Context Architecture with lexicalParent field for blocks.
     /// </summary>
     /// <param name="methodOOP">CompiledMethod OOP to execute</param>
     /// <param name="receiverOOP">Receiver OOP for this activation</param>
     /// <param name="arguments">Method arguments as OOPs</param>
     /// <param name="callerContextOOP">Optional caller context (sender), default for top-level DoIts</param>
+    /// <param name="lexicalParentOOP">Optional lexical parent (nil for methods, defining context for blocks)</param>
     /// <returns>Allocated and initialized MethodContext OOP</returns>
-    private SmalltalkOOP CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP = default)
+    private SmalltalkOOP CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP = default, SmalltalkOOP lexicalParentOOP = default)
     {
         // DEBUG: Log first 20 context creations
         System.Threading.Interlocked.Increment(ref _createContextCallCount);
@@ -419,8 +421,9 @@ public partial class VirtualMachine : IPrimitiveContext
         // method: the CompiledMethod being executed
         _heapManager.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
 
-        // lexicalParent: nil for top-level methods (blocks will set this to their defining context)
-        _heapManager.SetInstanceVariable(contextOOP, VMConstants.CONTEXT_LEXICALPARENT_INDEX, SpecialObjectsArray.Instance.Nil);
+        // lexicalParent: nil for methods, defining context for blocks (Single-Context Architecture)
+        var lexicalParent = lexicalParentOOP == default ? SpecialObjectsArray.Instance.Nil : lexicalParentOOP;
+        _heapManager.SetInstanceVariable(contextOOP, VMConstants.CONTEXT_LEXICALPARENT_INDEX, lexicalParent);
 
         // receiver: the object receiving this message
         _heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
@@ -1103,9 +1106,42 @@ public partial class VirtualMachine : IPrimitiveContext
                 return false;
 
             case Bytecode.RETURN_TOP_POP:
-                // TODO: Implement non-local return using lexicalParent (Single-Context Architecture)
-                // Value already on stack, normal method return
-                return false;
+                // Implements non-local return using lexicalParent chain
+                {
+                    var returnValue = Pop();
+
+                    // Check if we're in a block (has lexical parent)
+                    var lexicalParentOOP = _heapManager.GetInstanceVariable(
+                        _activeContextOOP,
+                        VMConstants.CONTEXT_LEXICALPARENT_INDEX
+                    );
+
+                    if (lexicalParentOOP != SpecialObjectsArray.Instance.Nil)
+                    {
+                        // We're in a block - find defining method
+                        var targetContextOOP = FindReturnTargetMethod(_activeContextOOP);
+
+                        // Validate target is in sender chain (safety check)
+                        if (!IsInSenderChain(targetContextOOP))
+                        {
+                            throw new InvalidOperationException(
+                                "Non-local return target not in sender chain - block's defining method has already returned");
+                        }
+
+                        // Initiate non-local return
+                        _nonLocalReturnPending = true;
+                        _nlrTargetContext = targetContextOOP;
+                        _nlrValue = returnValue;
+
+                        return false; // Exit bytecode loop to unwind
+                    }
+                    else
+                    {
+                        // Normal method return
+                        Push(returnValue);
+                        return false;
+                    }
+                }
 
             case Bytecode.RESERVED_RETURN:
                 // No operation / reserved (0x7F)
@@ -1332,33 +1368,32 @@ public partial class VirtualMachine : IPrimitiveContext
                 }
 
             case 0x03: // PUSH_TEMP - Push temporary at any index
-                // TODO: Implement using lexicalParent traversal (Single-Context Architecture)
+                // Uses lexicalParent traversal for proper block variable access
                 {
                     byte index = bytecodes[ip++];
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, index);
+                    var valueOOP = ReadTemp(_activeContextOOP, index);
                     Push(valueOOP);
                     return true;
                 }
 
             case 0x04: // STORE_TEMP - Store to temporary without popping
-                // TODO: Implement using lexicalParent traversal (Single-Context Architecture)
+                // Uses lexicalParent traversal for proper block variable access
                 {
                     byte index = bytecodes[ip++];
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var valueOOP = Pop();
-                    _heapManager.SetIndexedOOP(_activeContextOOP, index, valueOOP);
-                    Push(valueOOP); // Leave value on stack
+                    var valueOOP = Peek(); // Don't pop - STORE keeps value on stack
+                    WriteTemp(_activeContextOOP, index, valueOOP);
                     return true;
                 }
 
             case 0x05: // POP_STORE_TEMP - Pop and store to temporary
-                // TODO: Implement using lexicalParent traversal (Single-Context Architecture)
+                // Uses lexicalParent traversal for proper block variable access
                 {
                     byte index = bytecodes[ip++];
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
-                    _heapManager.SetIndexedOOP(_activeContextOOP, index, valueOOP);
+                    WriteTemp(_activeContextOOP, index, valueOOP);
                     return true;
                 }
 
@@ -2584,126 +2619,45 @@ public partial class VirtualMachine : IPrimitiveContext
 
     private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args, SmalltalkOOP blockClosureOOP = default)
     {
-        // Step 1: Resolve block ownership from blockOwnerMap
-        // NOTE: blockOwnerMap is VM metadata (not Smalltalk data), so GlobalRegistry access is correct
-        var blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap");
-        if (blockOwnerMap == null)
-        {
-            throw new InvalidOperationException("blockOwnerMap not found in GlobalRegistry - ensure Phase6 completed");
-        }
+        // Single-Context Architecture: blocks use MethodContext with lexicalParent field
 
-        // Get local ID for the block method
-        string? blockLocalId = GetLocalId(blockMethodOOP);
-        if (blockLocalId == null || !blockOwnerMap.TryGetValue(blockLocalId, out string? ownerLocalId))
-        {
-            throw new InvalidOperationException($"Block method {blockMethodOOP} not found in blockOwnerMap");
-        }
-
-        // Step 2: Determine contexts
-        // homeContext = find the method context where the block was DEFINED (using blockOwnerMap)
-        // This is the context that owns the block's lexical environment (receiver, instance variables)
-        var homeContextOOP = FindMethodContextByLocalId(ownerLocalId);
-        if (homeContextOOP == default)
-        {
-            throw new InvalidOperationException($"No method context found for block owner {ownerLocalId} - context may have already returned");
-        }
-
-        // Step 3: Parse block method header for metadata
-        // NOTE: Argument count validation is done by Primitive 207 using BlockClosure.numArgs
-        // We just need temp count from the block header
+        // Parse block header for metadata
         var blockHeader = ParseMethodHeader(blockMethodOOP);
-        int argCount = args.Length;  // Use actual args length, already validated by caller
+        int argCount = args.Length;
         int tempCount = blockHeader.NumTemps;
 
-        // Step 4: Create BlockContext
-        // Get field indices using LayoutResolver (VirtualMachine responsibility)
-        int nargsIndex = VMConstants.BLOCKCONTEXT_NARGS_INDEX;
-        int startpcIndex = VMConstants.BLOCKCONTEXT_STARTPC_INDEX;
-        int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
-        
-        // Call heap manager to create BlockContext with resolved field indices (proper architectural boundaries)
-        // Get BlockContext class from RuntimeSpecialObjects
-        var blockContextClassOOP = RuntimeSpecialObjects.Instance.BlockContextClass;
+        // Get receiver from current context (blocks inherit self)
+        var currentReceiverOOP = _heapManager.GetInstanceVariable(
+            _activeContextOOP,
+            VMConstants.CONTEXT_RECEIVER_INDEX
+        );
 
-        // Allocate BlockContext
-        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:BlockContext");
-        var blockContextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, argCount + tempCount);
-        _heapManager.SetSlot(blockContextOOP, 0, blockContextClassOOP); // Set class reference
-        
-        // Initialize BlockContext fields
-        _heapManager.SetInstanceVariable(blockContextOOP, nargsIndex, SmalltalkOOP.FromSmallInteger(argCount));
-        _heapManager.SetInstanceVariable(blockContextOOP, startpcIndex, SmalltalkOOP.FromSmallInteger(0));
-        _heapManager.SetInstanceVariable(blockContextOOP, homeIndex, homeContextOOP);
+        // Create MethodContext for block execution
+        // CRITICAL: lexicalParent = _activeContextOOP (the defining context)
+        // This creates the lexical scope chain automatically!
+        var blockContextOOP = CreateMethodContext(
+            blockMethodOOP,
+            currentReceiverOOP,
+            args,
+            _activeContextOOP,      // sender = current context (return point)
+            _activeContextOOP       // lexicalParent = current context (scope chain)
+        );
 
-        // Step 5: Bind arguments into BlockContext indexed fields
-        for (int i = 0; i < args.Length; i++)
-        {
-            _heapManager.SetIndexedOOP(blockContextOOP, i, args[i]);
-        }
-
-        // Initialize temps to nil (after arguments)
-        for (int i = argCount; i < argCount + tempCount; i++)
-        {
-            _heapManager.SetIndexedOOP(blockContextOOP, i, SpecialObjectsArray.Instance.Nil);
-        }
-
-        // Step 6: Get home context receiver for proper self resolution
-        // For blocks, we need to find the method where the block was originally defined
-        var homeContextReceiverOOP = GetBlockHomeReceiver(blockMethodOOP, ownerLocalId);
-
-        // Step 7: Create execution MethodContext backed by BlockContext
-        // Sender = where control returns (calling context), Home = where block was defined (lexical scope)
-        var executionContextOOP = CreateBlockExecutionContext(
-            blockMethodOOP, homeContextReceiverOOP, blockContextOOP, _activeContextOOP, blockClosureOOP);
-
-        // DIAGNOSTIC: Validate executionContextOOP format before using it
-        var execContextFormat = _heapManager.GetObjectFormat(executionContextOOP);
-        if (execContextFormat != ObjectFormat.PointerIndexed)
-        {
-            var execContextClass = GetClassName(GetClass(executionContextOOP));
-            Console.WriteLine($"[ERROR] executionContextOOP has wrong format!");
-            Console.WriteLine($"  executionContextOOP: {executionContextOOP}");
-            Console.WriteLine($"  Expected: PointerIndexed");
-            Console.WriteLine($"  Actual: {execContextFormat}");
-            Console.WriteLine($"  Class: {execContextClass}");
-            Console.WriteLine($"  blockClosureOOP: {blockClosureOOP}");
-            Console.WriteLine($"  blockMethodOOP: {blockMethodOOP}");
-            Console.WriteLine($"  About to copy {args.Length} arguments");
-            throw new InvalidOperationException($"CreateBlockExecutionContext returned {execContextFormat} object instead of PointerIndexed");
-        }
-
-        // Step 7a: Copy arguments to MethodContext indexed slots
-        // The MethodContext's indexed slots 0..(argCount-1) hold the arguments
-        for (int i = 0; i < args.Length; i++)
-        {
-            _heapManager.SetIndexedOOP(executionContextOOP, i, args[i]);
-        }
-
-        // Step 7b: Initialize temps to nil (after arguments)
-        for (int i = argCount; i < argCount + tempCount; i++)
-        {
-            _heapManager.SetIndexedOOP(executionContextOOP, i, SpecialObjectsArray.Instance.Nil);
-        }
-
-        // Step 8: TRAMPOLINE MODE - Signal context switch instead of recursing
-        // Set the block execution context as active
+        // Switch to block context
         var previousContext = _activeContextOOP;
-        _activeContextOOP = executionContextOOP;
-        Console.WriteLine($"[InvokeBlockInternal] Context switch: {previousContext} -> {executionContextOOP}");
-        Console.WriteLine($"  Block has {argCount} args, {tempCount} temps");
+        _activeContextOOP = blockContextOOP;
 
         if (_verboseDebugMode)
         {
-            Console.WriteLine($"[InvokeBlockInternal] VERBOSE: Context switch details logged");
+            Console.WriteLine($"[InvokeBlockInternal] Context switch: {previousContext} -> {blockContextOOP}");
+            Console.WriteLine($"  Block has {argCount} args, {tempCount} temps");
+            Console.WriteLine($"  lexicalParent = {previousContext}");
         }
 
-        // Signal that primitive created a new context
-        // The InterpreterLoop will continue execution in the block context
-        // When the block returns, HandleReturn will push the result onto the sender's stack
+        // Signal context switch to primitive caller
         _contextSwitchedByPrimitive = true;
 
-        // Return nil as sentinel (actual block result will be pushed onto sender's stack by HandleReturn)
-        // The primitive caller (SendMessage) will detect _contextSwitchedByPrimitive and return ContextSwitch
+        // Return nil as sentinel (actual result will be pushed by HandleReturn)
         return SpecialObjectsArray.Instance.Nil;
     }
 
@@ -2717,162 +2671,14 @@ public partial class VirtualMachine : IPrimitiveContext
         throw new NotImplementedException("CreateBlockExecutionContext is obsolete in single-context architecture. Blocks should use CreateMethodContext with lexicalParent field.");
     }
 
-    /// <summary>
-    /// Resolves the outer context by walking the blockOwnerMap to find the root method.
-    /// </summary>
-    private SmalltalkOOP ResolveOuterContext(string ownerLocalId, Dictionary<string, string> blockOwnerMap)
-    {
-        string currentLocalId = ownerLocalId;
-        
-        // Walk the ownership chain to find the root method
-        while (blockOwnerMap.TryGetValue(currentLocalId, out string? parentLocalId))
-        {
-            currentLocalId = parentLocalId;
-        }
 
-        // currentLocalId is now the root method's localId
-        // For now, return the home context (we'd need to implement proper outer context tracking)
-        return _activeContextOOP;
-    }
 
-    // REMOVED: GetHomeContextReceiver - obsolete in single-context architecture
-    private SmalltalkOOP GetHomeContextReceiver(SmalltalkOOP homeContextOOP)
-    {
-        // In the new architecture, just get the receiver field from the context
-        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
-        return _heapManager.GetInstanceVariable(homeContextOOP, receiverIndex);
-    }
 
-    /// <summary>
-    /// Gets the receiver from the home method context for a block.
-    /// Uses the blockOwnerMap to find the ultimate method where the block was defined.
-    /// </summary>
-    private SmalltalkOOP GetBlockHomeReceiver(SmalltalkOOP blockMethodOOP, string ownerLocalId)
-    {
 
-        // Walk the blockOwnerMap to find the root method (not another block)
-        // NOTE: blockOwnerMap is VM metadata (not Smalltalk data), so GlobalRegistry access is correct
-        var blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap");
-        if (blockOwnerMap == null)
-        {
-            throw new InvalidOperationException("blockOwnerMap not found");
-        }
-        
-        string currentLocalId = ownerLocalId;
-        while (blockOwnerMap.TryGetValue(currentLocalId, out string? parentLocalId))
-        {
-            currentLocalId = parentLocalId;
-        }
-        
-        
-        // Now find the MethodContext for this root method
-        // Look through all active contexts to find one executing this method
-        var methodContextOOP = FindMethodContextByLocalId(currentLocalId);
-        if (methodContextOOP == default)
-        {
-            throw new InvalidOperationException($"No active context found for method {currentLocalId}");
-        }
-        
-        
-        // Get the receiver from this method context
-        int receiverIndex = VMConstants.METHODCONTEXT_RECEIVER_INDEX;
-        var receiver = _heapManager.GetInstanceVariable(methodContextOOP, receiverIndex);
-        
-        return receiver;
-    }
 
-    /// <summary>
-    /// Finds a MethodContext that is executing the given method localId.
-    /// </summary>
-    private SmalltalkOOP FindMethodContextByLocalId(string methodLocalId)
-    {
-        // For now, we'll use a simple approach: find the first context in the sender chain
-        // that has the correct method. In a real implementation, we'd maintain a proper
-        // context stack or use the blockOwnerMap more sophisticatedly.
-        
-        var currentContextOOP = _activeContextOOP;
-        
-        while (currentContextOOP != default && currentContextOOP != SpecialObjectsArray.Instance.Nil)
-        {
-            // Get the method from this context
-            int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
-            var methodOOP = _heapManager.GetInstanceVariable(currentContextOOP, methodIndex);
-            
-            // Check if this matches our target method
-            string? contextMethodLocalId = GetLocalId(methodOOP);
-            
-            if (contextMethodLocalId == methodLocalId)
-            {
-                return currentContextOOP;
-            }
-            
-            // Move to sender
-            int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
-            var senderContextOOP = _heapManager.GetInstanceVariable(currentContextOOP, senderIndex);
-            currentContextOOP = senderContextOOP;
-        }
-        
-        return default;
-    }
 
-    // REMOVED: FindNearestBlockExecutionContext - obsolete in single-context architecture
-    private SmalltalkOOP FindNearestBlockExecutionContext(SmalltalkOOP startContextOOP)
-    {
-        throw new NotImplementedException("FindNearestBlockExecutionContext is obsolete. Use lexicalParent field for hierarchical variable access.");
-    }
 
-    // REMOVED: CleanupBlockContextMappings - obsolete in single-context architecture
-    private void CleanupBlockContextMappings(SmalltalkOOP contextOOP)
-    {
-        // No-op stub - no mappings to clean up in single-context architecture
-    }
 
-    // REMOVED: LookupBlockClosureForExecutionContext - obsolete in single-context architecture
-    private SmalltalkOOP LookupBlockClosureForExecutionContext(SmalltalkOOP executionContextOOP)
-    {
-        throw new NotImplementedException("LookupBlockClosureForExecutionContext is obsolete in single-context architecture.");
-    }
-
-    // REMOVED: ResolveHomeContext - obsolete in single-context architecture
-    private SmalltalkOOP ResolveHomeContext(SmalltalkOOP homeContextOOP)
-    {
-        throw new NotImplementedException("ResolveHomeContext is obsolete. Use lexicalParent field for hierarchical access.");
-    }
-
-    /// <summary>
-    /// Finds the actual method context by walking up the sender chain.
-    /// Skips block execution contexts to find the underlying method context.
-    /// </summary>
-    /// <summary>
-    /// Finds the MethodContext for a specific CompiledMethod by searching the context chain.
-    /// Used when pushing block literals to find the correct homeContext.
-    /// </summary>
-    private SmalltalkOOP FindMethodContextForMethod(SmalltalkOOP targetMethodOOP)
-    {
-        var currentContextOOP = _activeContextOOP;
-
-        // Walk up the sender chain looking for a context with this method
-        while (currentContextOOP != default && currentContextOOP != SpecialObjectsArray.Instance.Nil)
-        {
-            // Get the method from this context
-            int methodIndex = VMConstants.METHODCONTEXT_METHOD_INDEX;
-            var contextMethodOOP = _heapManager.GetInstanceVariable(currentContextOOP, methodIndex);
-
-            // Check if this context is for our target method
-            if (contextMethodOOP == targetMethodOOP)
-            {
-                return currentContextOOP;
-            }
-
-            // Follow sender link
-            int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
-            var senderContextOOP = _heapManager.GetInstanceVariable(currentContextOOP, senderIndex);
-            currentContextOOP = senderContextOOP;
-        }
-
-        // Not found - return default
-        return default;
-    }
 
     // TODO: Implement using lexicalParent field (Single-Context Architecture)
     private SmalltalkOOP FindMethodContext(SmalltalkOOP startContextOOP)
@@ -3100,7 +2906,174 @@ public partial class VirtualMachine : IPrimitiveContext
         return value;
     }
 
+    /// <summary>
+    /// Peeks at the top value on the operand stack without removing it.
+    /// </summary>
+    private SmalltalkOOP Peek()
+    {
+        int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
+        var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+        int sp = spOOP.AsSmallInteger();
 
+        if (sp <= 0)
+        {
+            throw new InvalidOperationException("Stack underflow in Peek()");
+        }
+
+        var value = _heapManager.GetIndexedOOP(_activeContextOOP, sp - 1);
+        return value;
+    }
+
+    /// <summary>
+    /// Reads a temporary variable using lexicalParent chain traversal.
+    /// Implements Single-Context Architecture variable access algorithm.
+    /// </summary>
+    /// <param name="contextOOP">Starting context for the search</param>
+    /// <param name="tempIndex">Compiler-generated hierarchical index</param>
+    /// <returns>The variable value</returns>
+    private SmalltalkOOP ReadTemp(SmalltalkOOP contextOOP, int tempIndex)
+    {
+        int remainingIndex = tempIndex;
+        var currentContextOOP = contextOOP;
+        int depth = 0;
+        const int MAX_DEPTH = 100; // Safety limit for traversal
+
+        while (depth < MAX_DEPTH)
+        {
+            // Get method and parse header for local count
+            var methodOOP = _heapManager.GetInstanceVariable(currentContextOOP, VMConstants.CONTEXT_METHOD_INDEX);
+            var header = ParseMethodHeader(methodOOP);
+            int localCount = header.NumArgs + header.NumTemps;
+
+            if (remainingIndex < localCount)
+            {
+                // Variable is in this context
+                var value = _heapManager.GetIndexedOOP(currentContextOOP, remainingIndex);
+                return value;
+            }
+
+            // Not in this context - traverse to lexical parent
+            remainingIndex -= localCount;
+            var lexicalParentOOP = _heapManager.GetInstanceVariable(currentContextOOP, VMConstants.CONTEXT_LEXICALPARENT_INDEX);
+
+            if (lexicalParentOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                throw new InvalidOperationException(
+                    $"ReadTemp: Temp index {tempIndex} out of range (remainingIndex={remainingIndex}, traversed {depth} contexts)");
+            }
+
+            currentContextOOP = lexicalParentOOP;
+            depth++;
+        }
+
+        throw new InvalidOperationException(
+            $"ReadTemp: Max traversal depth exceeded (tempIndex={tempIndex}, depth={MAX_DEPTH})");
+    }
+
+    /// <summary>
+    /// Writes a temporary variable using lexicalParent chain traversal.
+    /// Implements Single-Context Architecture variable access algorithm.
+    /// </summary>
+    /// <param name="contextOOP">Starting context for the search</param>
+    /// <param name="tempIndex">Compiler-generated hierarchical index</param>
+    /// <param name="valueOOP">Value to store</param>
+    private void WriteTemp(SmalltalkOOP contextOOP, int tempIndex, SmalltalkOOP valueOOP)
+    {
+        int remainingIndex = tempIndex;
+        var currentContextOOP = contextOOP;
+        int depth = 0;
+        const int MAX_DEPTH = 100; // Safety limit for traversal
+
+        while (depth < MAX_DEPTH)
+        {
+            // Get method and parse header for local count
+            var methodOOP = _heapManager.GetInstanceVariable(currentContextOOP, VMConstants.CONTEXT_METHOD_INDEX);
+            var header = ParseMethodHeader(methodOOP);
+            int localCount = header.NumArgs + header.NumTemps;
+
+            if (remainingIndex < localCount)
+            {
+                // Variable is in this context
+                _heapManager.SetIndexedOOP(currentContextOOP, remainingIndex, valueOOP);
+                return;
+            }
+
+            // Not in this context - traverse to lexical parent
+            remainingIndex -= localCount;
+            var lexicalParentOOP = _heapManager.GetInstanceVariable(currentContextOOP, VMConstants.CONTEXT_LEXICALPARENT_INDEX);
+
+            if (lexicalParentOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                throw new InvalidOperationException(
+                    $"WriteTemp: Temp index {tempIndex} out of range (remainingIndex={remainingIndex}, traversed {depth} contexts)");
+            }
+
+            currentContextOOP = lexicalParentOOP;
+            depth++;
+        }
+
+        throw new InvalidOperationException(
+            $"WriteTemp: Max traversal depth exceeded (tempIndex={tempIndex}, depth={MAX_DEPTH})");
+    }
+
+    /// <summary>
+    /// Finds the defining method context for a non-local return.
+    /// Walks the lexicalParent chain until finding a context with lexicalParent = nil.
+    /// </summary>
+    /// <param name="contextOOP">Starting context (typically a block context)</param>
+    /// <returns>The defining method's context OOP</returns>
+    private SmalltalkOOP FindReturnTargetMethod(SmalltalkOOP contextOOP)
+    {
+        var currentOOP = contextOOP;
+        int depth = 0;
+        const int MAX_DEPTH = 100; // Safety limit
+
+        while (depth < MAX_DEPTH)
+        {
+            var lexicalParentOOP = _heapManager.GetInstanceVariable(
+                currentOOP,
+                VMConstants.CONTEXT_LEXICALPARENT_INDEX
+            );
+
+            if (lexicalParentOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                // This context has no lexical parent - it's the defining method
+                return currentOOP;
+            }
+
+            currentOOP = lexicalParentOOP;
+            depth++;
+        }
+
+        throw new InvalidOperationException(
+            $"FindReturnTargetMethod: Max traversal depth exceeded (depth={MAX_DEPTH})");
+    }
+
+    /// <summary>
+    /// Checks if a target context is in the sender chain (for NLR validation).
+    /// </summary>
+    /// <param name="targetOOP">Context to search for</param>
+    /// <returns>True if target is in sender chain</returns>
+    private bool IsInSenderChain(SmalltalkOOP targetOOP)
+    {
+        var currentOOP = _activeContextOOP;
+        int depth = 0;
+        const int MAX_DEPTH = 5000;
+
+        while (currentOOP != SpecialObjectsArray.Instance.Nil && depth < MAX_DEPTH)
+        {
+            if (currentOOP == targetOOP)
+                return true;
+
+            currentOOP = _heapManager.GetInstanceVariable(
+                currentOOP,
+                VMConstants.CONTEXT_SENDER_INDEX
+            );
+            depth++;
+        }
+
+        return false;
+    }
 
     // Helper methods for heap access during refactoring
     private byte[] GetMethodBytecodes(SmalltalkOOP methodOOP)
@@ -3878,13 +3851,6 @@ public partial class VirtualMachine : IPrimitiveContext
         throw new NotImplementedException("CreateBlockClosure is obsolete. Blocks are now represented by CompiledMethod objects directly.");
     }
 
-    // REMOVED: GetBlockArgCount - obsolete in single-context architecture
-    private int GetBlockArgCount(SmalltalkOOP blockMethodOOP)
-    {
-        // Use ParseMethodHeader which already extracts argument count
-        var header = ParseMethodHeader(blockMethodOOP);
-        return header.NumArgs;
-    }
 
     IEnumerable<SmalltalkOOP> IPrimitiveContext.GetAllObjects()
     {

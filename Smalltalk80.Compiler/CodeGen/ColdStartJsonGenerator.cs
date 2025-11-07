@@ -599,23 +599,24 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             }
             else if (cls.Name == "MethodContext")
             {
-                // Blue Book Chapter 27: MethodIndex := 3. ReceiverIndex := 5.
-                // MethodContext inherits sender(0), pc(1), stackp(2) from ContextPart
-                var requiredFields = new[] { "method", "receiverMap", "receiver" };
+                // Single-Context Architecture: Unified MethodContext for methods and blocks
+                // MethodContext inherits sender(1), pc(2), stackp(3) from ContextPart
+                // New field layout: method(4), lexicalParent(5), receiver(6), temps(7+)
+                var requiredFields = new[] { "method", "lexicalParent", "receiver" };
                 var missingFields = requiredFields.Where(f => !cls.InstanceVariables.Contains(f)).ToList();
 
                 if (missingFields.Any())
                 {
                     throw new InvalidOperationException(
                         $"FATAL: MethodContext class is missing required fields: {string.Join(", ", missingFields)}. " +
-                        "The Blue Book VM architecture requires MethodContext to define 'method', 'receiverMap', and 'receiver' at fixed indices 3, 4, and 5.");
+                        "The Single-Context Architecture requires MethodContext to define 'method', 'lexicalParent', and 'receiver' at fixed indices 4, 5, and 6.");
                 }
 
-                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["method"], SlotIndex = 3, InheritedFrom = inheritedFrom });
-                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["receiverMap"], SlotIndex = 4, InheritedFrom = inheritedFrom });
-                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["receiver"], SlotIndex = 5, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["method"], SlotIndex = 4, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["lexicalParent"], SlotIndex = 5, InheritedFrom = inheritedFrom });
+                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["receiver"], SlotIndex = 6, InheritedFrom = inheritedFrom });
 
-                slotIndex = 6; // TempFrameStart
+                slotIndex = 7; // TempFrameStart
                 foreach (var instVarName in cls.InstanceVariables)
                 {
                     if (requiredFields.Contains(instVarName)) continue;

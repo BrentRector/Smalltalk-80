@@ -49,13 +49,15 @@ public static class VMConstants
     public const int METHODCONTEXT_TEMP_FRAME_START = 7;
 
     // Legacy BlockContext constants (OBSOLETE - blocks now use MethodContext)
-    [Obsolete("Blocks now use MethodContext - this constant is obsolete")]
+    // These are only used by legacy primitives 80-82 (CreateBlockContext, ActivateBlockContext)
+    // which will be removed once migration to BlockClosure (primitive 207) is complete
+    [Obsolete("Blocks now use MethodContext - this constant is obsolete, only used by legacy primitives 80-82")]
     public const int BLOCKCONTEXT_NARGS_INDEX = 3;
-    [Obsolete("Blocks now use MethodContext - this constant is obsolete")]
+    [Obsolete("Blocks now use MethodContext - this constant is obsolete, only used by legacy primitives 80-82")]
     public const int BLOCKCONTEXT_STARTPC_INDEX = 4;
-    [Obsolete("Blocks now use MethodContext - this constant is obsolete")]
+    [Obsolete("Blocks now use MethodContext - this constant is obsolete, only used by legacy primitives 80-82")]
     public const int BLOCKCONTEXT_HOME_INDEX = 5;
-    [Obsolete("Blocks now use MethodContext - this constant is obsolete")]
+    [Obsolete("Blocks now use MethodContext - this constant is obsolete, only used by legacy primitives 80-82")]
     public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;
 
     // ========================================================================

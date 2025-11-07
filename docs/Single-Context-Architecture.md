@@ -386,19 +386,20 @@ private void StoreTemporary(int index, SmalltalkOOP value)
 
 **Question**: How do we know a literal is a block?
 
-**Answer**: Check the `blockOwnerMap` (VM metadata from compiler):
+**Answer**: A block literal is simply a CompiledMethod in the literal array:
 
 ```csharp
 private bool IsBlockLiteral(SmalltalkOOP literalOOP)
 {
-    // Blocks are CompiledMethods that have an entry in blockOwnerMap
-    string? blockId = GetLocalId(literalOOP);
-    if (blockId == null) return false;
-
-    var blockOwnerMap = GlobalRegistry.GetObject<Dictionary<string, string>>("blockOwnerMap");
-    return blockOwnerMap?.ContainsKey(blockId) ?? false;
+    // A block literal is simply a CompiledMethod
+    // (Methods store blocks as CompiledMethod literals in their literal array)
+    var classOOP = _heapManager.GetClass(literalOOP);
+    var className = GetClassName(classOOP);
+    return className == "CompiledMethod";
 }
 ```
+
+**Note**: In practice, this check is rarely needed. The VM treats block literals and regular literals identically - both are just pushed onto the stack. The distinction only matters during block invocation (primitive 207).
 
 ### 5.2 Push Literal Handler
 
@@ -414,23 +415,15 @@ case PUSH_LITERAL:
 
         var literalOOP = GetLiteral(methodOOP, literalIndex);
 
-        if (IsBlockLiteral(literalOOP))
-        {
-            // It's a block CompiledMethod - push it directly
-            // The block will be invoked later via primitive 207
-            Push(literalOOP);
-        }
-        else
-        {
-            // Regular literal
-            Push(literalOOP);
-        }
+        // Push the literal (whether it's a block CompiledMethod or regular literal)
+        // Blocks will be invoked later via primitive 207
+        Push(literalOOP);
 
         return true;
     }
 ```
 
-**Key Insight**: We don't create BlockClosure objects! We just push the block's CompiledMethod.
+**Key Insight**: We don't create BlockClosure objects! We just push literals - whether they're block CompiledMethods or regular values. The VM doesn't need to distinguish between them at push time.
 
 ### 5.3 Primitive 207 (value, value:, value:value:)
 
