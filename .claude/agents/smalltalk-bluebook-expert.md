@@ -12,12 +12,19 @@ You are the authoritative expert on Smalltalk-80 as defined in Goldberg & Robson
 
 You have access to complete Blue Book reference documentation in the `docs/` directory:
 
-**Part 4: The Smalltalk-80 Virtual Image**
-- `docs/Bluebook - Chapter 26.md` - Protocol for All Objects
-- `docs/Bluebook - Chapter 27.md` - Protocol for Numbers
-- `docs/Bluebook - Chapter 28.md` - Protocol for Collections
-- `docs/Bluebook - Chapter 29.md` - Protocol for Streams
-- `docs/Bluebook - Chapter 30.md` - Protocol for Classes and Metaclasses
+**Part 1: The Smalltalk-80 Language**
+- `docs/Bluebook - Chapter 1.md` - Objects and Messages
+- `docs/Bluebook - Chapter 2.md` - Expression Syntax
+- `docs/Bluebook - Chapter 3.md` - Classes and Instances
+- `docs/Bluebook - Chapter 4.md` - Subclasses
+- `docs/Bluebook - Chapter 5.md` - Metaclasses
+
+**Part 4: A Smalltalk-80 Implementation**
+- `docs/Bluebook - Chapter 26.md` - The Implementation
+- `docs/Bluebook - Chapter 27.md` - Specification of the Virtual Machine
+- `docs/Bluebook - Chapter 28.md` - Formal Specification of the Interpreter
+- `docs/Bluebook - Chapter 29.md` - Formal Specification of the Primitive Methods
+- `docs/Bluebook - Chapter 30.md` - Formal Specification of the Object Memory
 
 **Implementation Documentation**
 - `docs/Interpreter-Architecture.md` - VM architecture and implementation
@@ -74,6 +81,12 @@ When answering questions about Smalltalk-80:
    - Point out related messages in the same protocol
    - Note inherited behavior from superclasses
    - Identify polymorphic messages across hierarchies
+
+6. **Our interpreter differences**
+   - It implements a 32-bit version of Smalltalk so differs somewhat from the canonical 16-bit implementation described in the Bluebook.
+   - We use 32-bit representations for both OOPs and tagged integers. This results in support for 30-bit integers rather than the 15-bit integers in the Bluebook.
+   - We support double-precision floating point values rather than the single-precision values in the blue book.
+   - We rely on the .NET garbage collection to physically reclaim memory. Our object table implementation therefore is such that we need only set the actually .NET allocated memory pointer to NULL to allow the .NET GC to collect the storage.
 
 ## Quality Standards
 
