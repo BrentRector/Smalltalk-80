@@ -122,6 +122,9 @@ namespace Smalltalk80.Compiler
 
         // Separate collections for selectors and other literals
         private readonly List<Symbol> selectors = new();
+
+        // For debugging: track current method name
+        public string currentMethodName = "";
         private readonly List<object> otherLiterals = new();
 
         private readonly Dictionary<object, int> literalIndex = new();
@@ -179,12 +182,32 @@ namespace Smalltalk80.Compiler
 
         /// <summary>
         /// Pushes a SmallInteger literal constant onto the stack.
+        /// Uses special bytecodes for common values (0, 1, 2, -1) and
+        /// literal constants for other values.
         /// </summary>
         public void PushSmallInteger(int value)
         {
             // Small integers are immediate values in Smalltalk-80
-            // For bytecode, we push them as literal constants
-            PushLiteralConstant(value);
+            // Use special bytecodes for common values (0, 1, 2, -1)
+            switch (value)
+            {
+                case -1:
+                    PushMinusOne();
+                    break;
+                case 0:
+                    PushZero();
+                    break;
+                case 1:
+                    PushOne();
+                    break;
+                case 2:
+                    PushTwo();
+                    break;
+                default:
+                    // For other values, push as literal constant
+                    PushLiteralConstant(value);
+                    break;
+            }
         }
 
         /// <summary>
@@ -372,6 +395,10 @@ namespace Smalltalk80.Compiler
                 {
                     if (LiteralsEqual(selectors[i], literal))
                     {
+                        if (currentMethodName == "t0020")
+                        {
+                            Console.WriteLine($"[t0020] AddLiteral Symbol({symbol.Value}) -> FOUND at index {i}");
+                        }
                         return i;  // Selectors are at indices 0..N-1
                     }
                 }
@@ -379,6 +406,10 @@ namespace Smalltalk80.Compiler
                 // Not found - add new selector
                 int index = selectors.Count;
                 selectors.Add(symbol);
+                if (currentMethodName == "t0020")
+                {
+                    Console.WriteLine($"[t0020] AddLiteral Symbol({symbol.Value}) -> NEW at index {index}");
+                }
                 return index;
             }
             else
@@ -388,6 +419,10 @@ namespace Smalltalk80.Compiler
                 {
                     if (LiteralsEqual(otherLiterals[i], literal))
                     {
+                        if (currentMethodName == "t0020")
+                        {
+                            Console.WriteLine($"[t0020] AddLiteral {literal} -> FOUND at index {selectors.Count + i}");
+                        }
                         // Return index = selectors.Count + position in otherLiterals
                         return selectors.Count + i;
                     }
@@ -396,6 +431,10 @@ namespace Smalltalk80.Compiler
                 // Not found - add new literal
                 int index = selectors.Count + otherLiterals.Count;
                 otherLiterals.Add(literal);
+                if (currentMethodName == "t0020")
+                {
+                    Console.WriteLine($"[t0020] AddLiteral {literal} -> NEW at index {index}");
+                }
                 return index;
             }
         }
@@ -1013,6 +1052,7 @@ namespace Smalltalk80.Compiler
             // Initialize compilation state
             environment = new CompilationEnvironment();
             emitter = new BytecodeEmitter();
+            emitter.currentMethodName = "doIt";
             selector = "doIt"; // Standard selector for expressions
             primitiveNumber = 0;
             hasPrimitive = false;
@@ -1251,6 +1291,9 @@ namespace Smalltalk80.Compiler
                 selector = string.Join("", parts);
                 environment.ArgumentCount = args.Length;
             }
+
+            // Set emitter method name for debugging
+            emitter.currentMethodName = selector;
         }
         
         private List<string> temporaryNames = new();
@@ -2008,6 +2051,13 @@ namespace Smalltalk80.Compiler
             // Save current argument mappings to restore later
             var savedArguments = new Dictionary<string, int>(environment.Arguments);
             int savedArgCount = environment.ArgumentCount;
+            int savedScopeDepth = environment.ScopeDepth;
+            // Save temporaries dictionary to handle shadowing correctly
+            var savedTemporaries = new Dictionary<string, int>(environment.Temporaries);
+
+            // Increment scope depth to indicate we're compiling inside a block
+            // This is critical for VariableResolver to correctly identify block variables!
+            environment.ScopeDepth = savedScopeDepth + 1;
 
             // Add block arguments to current environment (they'll be in BlockContext indexed slots)
             for (int i = 0; i < argumentNames.Count; i++)
@@ -2018,6 +2068,7 @@ namespace Smalltalk80.Compiler
 
             // Parse and register block temporaries in parent environment
             // Block temps are allocated after parent method's temps
+            var blockTempNames = new List<string>();
             var blockTemps = block.blockTemps();
             if (blockTemps != null)
             {
@@ -2029,6 +2080,7 @@ namespace Smalltalk80.Compiler
                 for (int i = 0; i < tempNodes.Count; i++)
                 {
                     var tempName = tempNodes[i].GetText();
+                    blockTempNames.Add(tempName);  // Track for later cleanup
                     environment.Temporaries[tempName] = tempBase + i;
                 }
                 environment.TemporaryCount += tempNodes.Count;  // Extend parent's temp count
@@ -2038,7 +2090,7 @@ namespace Smalltalk80.Compiler
             var statements = block.statements();
             if (statements != null)
             {
-                CompileStatements(statements);
+                CompileStatements(statements, inBlock: true);
             }
             else
             {
@@ -2046,8 +2098,11 @@ namespace Smalltalk80.Compiler
                 emitter.PushNil();
             }
 
-            // STEP 4: Emit RETURN_BLOCK bytecode
-            emitter.EmitByte(0x7D); // RETURN_BLOCK (EndRemote - returns from block)
+            // STEP 4: Emit local return bytecode for implicit block returns
+            // Implicit block returns (no ^) should return to the caller of value/value:/etc.
+            // Use RETURN_TOP (0x7C) which returns to sender without non-local semantics
+            // This is different from RETURN_TOP_POP (0x7E) which does non-local returns (^)
+            emitter.ReturnTop(); // 0x7C - local return to sender
 
             // STEP 5: Calculate jump offset and patch it
             // The jump lands here (after the block body), so method execution continues
@@ -2073,6 +2128,16 @@ namespace Smalltalk80.Compiler
                 environment.Arguments[kvp.Key] = kvp.Value;
             }
             environment.ArgumentCount = savedArgCount;
+
+            // Restore temporaries dictionary (handles shadowed temps correctly)
+            // This fixes bug where block temps shadowing method temps would remove the method temp
+            environment.Temporaries.Clear();
+            foreach (var kvp in savedTemporaries)
+            {
+                environment.Temporaries[kvp.Key] = kvp.Value;
+            }
+
+            environment.ScopeDepth = savedScopeDepth; // Restore scope depth
             // Note: We keep the extended TemporaryCount (block temps extend method temps)
         }
 
@@ -2854,8 +2919,10 @@ namespace Smalltalk80.Compiler
             
             public override object? VisitUnaryMessage(Smalltalk80Parser.UnaryMessageContext context)
             {
+                // CRITICAL: Collect selectors during Phase 1 to establish selector indices
+                // BEFORE other literals are added in Phase 2. This ensures selectors occupy
+                // indices 0..N-1 and other literals start at index N.
                 var selector = context.unarySelector().GetText();
-                // Only add to literals if not a special selector
                 if (!SpecialSelectors.ContainsKey(selector))
                 {
                     emitter.AddLiteral(new Symbol(selector));
@@ -2865,8 +2932,8 @@ namespace Smalltalk80.Compiler
             
             public override object? VisitBinaryMessage(Smalltalk80Parser.BinaryMessageContext context)
             {
+                // CRITICAL: Collect selectors during Phase 1.
                 var selector = context.binarySelector().GetText();
-                // Only add to literals if not a special selector
                 if (!SpecialSelectors.ContainsKey(selector))
                 {
                     emitter.AddLiteral(new Symbol(selector));
@@ -2876,6 +2943,7 @@ namespace Smalltalk80.Compiler
             
             public override object? VisitKeywordMessage(Smalltalk80Parser.KeywordMessageContext context)
             {
+                // CRITICAL: Collect selectors during Phase 1.
                 var parts = context.keywordPart();
                 var keywords = new List<string>();
                 foreach (var part in parts)
@@ -2883,12 +2951,10 @@ namespace Smalltalk80.Compiler
                     keywords.Add(part.IDENTIFIER().GetText() + ":");
                 }
                 var selector = string.Join("", keywords);
-                // Only add to literals if not a special selector
                 if (!SpecialSelectors.ContainsKey(selector))
                 {
                     emitter.AddLiteral(new Symbol(selector));
                 }
-                // Continue with base implementation to visit all children properly
                 return base.VisitKeywordMessage(context);
             }
             
@@ -2933,64 +2999,21 @@ namespace Smalltalk80.Compiler
             
             public override object? VisitLiteral(Smalltalk80Parser.LiteralContext context)
             {
-                // Collect literal constants
-                if (context.numberLiteral() != null)
-                {
-                    var text = context.numberLiteral().GetText();
-                    if (compiler.TryParseSmalltalkNumber(text, out object? numValue))
-                    {
-                        if (numValue is int intVal)
-                        {
-                            // Only add to literals if not a special small integer
-                            if (intVal != -1 && intVal != 0 && intVal != 1 && intVal != 2)
-                            {
-                                emitter.AddLiteral(intVal);
-                            }
-                        }
-                        else if (numValue is double floatVal)
-                        {
-                            emitter.AddLiteral(floatVal);
-                        }
-                    }
-                }
-                else if (context.stringConst() != null)
-                {
-                    var text = context.stringConst().GetText();
-                    var str = text.Substring(1, text.Length - 2);
-                    emitter.AddLiteral(str);
-                }
-                else if (context.symbolConst() != null)
-                {
-                    var text = context.symbolConst().GetText();
-                    var sym = new Symbol(text.Substring(1));
-                    emitter.AddLiteral(sym);
-                }
-                else if (context.arrayLiteral() != null)
-                {
-                    // Array literals need special handling
-                    var array = context.arrayLiteral();
-                    var elements = new List<object>();
-                    
-                    // Process each array element
-                    foreach (var element in array.arrayElement())
-                    {
-                        elements.Add(compiler.ProcessArrayElement(element));
-                    }
-                    
-                    // Add the array as a literal constant
-                    emitter.AddLiteral(elements.ToArray());
-                }
-                
+                // DO NOT collect literals during Phase 1!
+                // All literal collection happens during Phase 2 (bytecode generation)
+                // to ensure indices match the order bytecode generation encounters them.
                 return base.VisitLiteral(context);
             }
             
             public override object? VisitBlock(Smalltalk80Parser.BlockContext context)
             {
-                // DO NOT visit block contents during literal collection!
-                // Blocks have their own separate literal frames and are compiled separately.
-                // If we visit block contents here, we'll add block literals to the main method's
-                // literal frame, causing index mismatches during compilation.
-                return null; // Don't traverse into blocks
+                // CRITICAL: Phase 1 MUST visit block contents to collect selectors from
+                // message sends inside blocks. Selectors must be collected BEFORE Phase 2
+                // adds other literals, to ensure selectors occupy indices 0..N-1.
+                //
+                // However, Phase 1 does NOT collect literal constants (numbers, strings, etc.)
+                // - only selectors. Literal constants are added during Phase 2 (bytecode gen).
+                return base.VisitBlock(context); // Visit blocks to find selectors
             }
             
             public override object? VisitNonKeywordExpr(Smalltalk80Parser.NonKeywordExprContext context)
