@@ -78,6 +78,18 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             _ => throw new ArgumentException($"Unknown object format: {format}")
         };
 
+        // CRITICAL: Initialize all OOP slots to nil (Blue Book requirement)
+        // In Smalltalk-80, uninitialized instance variables must be nil, not OOP(0)
+        // C# arrays default to zero, but Smalltalk requires explicit nil initialization
+        if (managedStorage is SmalltalkOOP[] oopArray)
+        {
+            var nilOOP = SpecialObjectsArray.Instance.Nil;
+            for (int i = 1; i < oopArray.Length; i++) // Skip slot 0 (class pointer, set below)
+            {
+                oopArray[i] = nilOOP;
+            }
+        }
+
         // Get ObjectTable index
         int tableIndex = AllocateObjectTableIndex();
 

@@ -16,15 +16,27 @@
 - **Solution**: Check if _activeContextOOP is BlockContext; if so, walk to home MethodContext before reading method slot
 - **Example**: `Cursor class>>extent:fromArray:offset:` has `ifTrue: [^super ...]` - super send inside block closure
 
+**Instance Variable Initialization Fix** ([SmalltalkHeapManager.cs:81-91](Smalltalk80.Interpreter/Core/HeapManager/SmalltalkHeapManager.cs#L81-L91)):
+- **Problem**: C# arrays default to all-zero, leaving instance variables as OOP(0) instead of nil
+- **Solution**: After allocating OOP arrays, initialize all slots (except class pointer) to nil
+- **Blue Book Requirement**: Uninitialized instance variables MUST be nil, not arbitrary values
+- **Impact**: Prevents garbage OOP values in newly allocated objects
+
 **Build Status**: ✅ 0 errors, 0 warnings
 **Cold Start**: ✅ Phase 1-6 all succeeded
-**Init Expressions**: ⚠️ 52 init expressions run in dependency order, BinaryChoiceView initialize progresses past super send (new error: Point>>at: subscript bounds)
+**Init Expressions**: ⚠️ 52 expressions execute in dependency order
+- ✅ Super send from blocks now works (BinaryChoiceView progresses past super send)
+- ⚠️ Remaining issue: Point>>at: subscript bounds error (investigation needed)
 
 **Files Modified (2025-11-10)**:
 - `Smalltalk80.Interpreter/Program.cs` - Added dependency-ordered init execution (lines 257-273, 1686-1810)
 - `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` - Fixed super send from blocks (lines 2142-2174)
+- `Smalltalk80.Interpreter/Core/HeapManager/SmalltalkHeapManager.cs` - Initialize instance vars to nil (lines 81-91)
 - `InitExpression-DependencyAnalysis.md` - NEW: Complete 68-class dependency analysis
 - `init_order.json` - NEW: Machine-readable dependency order
+
+**Known Issues**:
+- Point>>at: error in BinaryChoiceView initialize - needs further investigation (receiver oop=64012 is a Point being sent `at:` message)
 
 ---
 
