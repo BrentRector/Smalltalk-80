@@ -968,18 +968,17 @@ public class Phase3_ObjectAllocation
     }
 
     /// <summary>
-    /// Allocates a Float object.
+    /// Allocates a Float object using SemanticAllocator.
+    /// Float must be WordIndexed with 4 words (16-bit each) per Blue Book specification.
     /// </summary>
     private SmalltalkOOP AllocateFloat(double value)
     {
-        var floatOOP = _allocator.AllocateByteArray("Float", 8); // 8 bytes for IEEE 754 double
+        Console.WriteLine($"[Phase3.AllocateFloat] Creating Float value={value}");
 
-        // Store the double as 8 bytes
-        byte[] bytes = BitConverter.GetBytes(value);
-        for (int i = 0; i < 8; i++)
-        {
-            _allocator.SetIndexedByte(floatOOP, i, bytes[i]);
-        }
+        // Use SemanticAllocator's AllocateFloat which correctly creates WordIndexed Float with 4 words
+        var floatOOP = _allocator.AllocateFloat(value);
+
+        Console.WriteLine($"[Phase3.AllocateFloat] Created floatOOP={floatOOP}, format={_heapManager.GetObjectFormat(floatOOP)}, size={_heapManager.GetIndexedSize(floatOOP)}");
 
         // Set Float class reference
         var floatClassOOP = GlobalRegistry.LookupClassOOP("Float");

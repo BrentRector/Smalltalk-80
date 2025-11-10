@@ -64,9 +64,11 @@ namespace Smalltalk80.Compiler
         public int ArgumentCount { get; set; }
         
         /// <summary>
-        /// Total number of temporaries (including hidden).
+        /// Total number of temporary slots allocated in the frame (including both named and hidden).
+        /// This represents the actual size of the temp frame, not just the count of named temps.
+        /// Used for allocating the next available temp slot index.
         /// </summary>
-        public int TemporaryCount { get; set; }
+        public int TemporariesAllocatedInFrame { get; set; }
 
         /// <summary>
         /// Method's original argument count (before entering any blocks).
@@ -97,9 +99,9 @@ namespace Smalltalk80.Compiler
         {
             if (!HiddenTemporaries.ContainsKey(name))
             {
-                var index = ArgumentCount + TemporaryCount;
+                var index = ArgumentCount + TemporariesAllocatedInFrame;
                 HiddenTemporaries[name] = index;
-                TemporaryCount++;
+                TemporariesAllocatedInFrame++;
             }
             return HiddenTemporaries[name];
         }
@@ -1085,7 +1087,7 @@ namespace Smalltalk80.Compiler
             {
                 // No arguments or temporaries for file-scope expressions
                 environment.ArgumentCount = 0;
-                environment.TemporaryCount = 0;
+                environment.TemporariesAllocatedInFrame = 0;
                 
                 // Collect literals first (just like in CompileMethod)
                 var visitor = new LiteralCollector(this, emitter, environment);
@@ -1117,7 +1119,7 @@ namespace Smalltalk80.Compiler
             {
                 Selector = selector,
                 ArgumentCount = 0,
-                TemporaryCount = environment.TemporaryCount,
+                TemporaryCount = environment.TemporariesAllocatedInFrame,
                 IsPrimitive = false,
                 PrimitiveNumber = 0,
                 Bytecode = emitter.GetBytecodes(),
@@ -1256,7 +1258,7 @@ namespace Smalltalk80.Compiler
             {
                 Selector = selector,
                 ArgumentCount = environment.ArgumentCount,
-                TemporaryCount = environment.TemporaryCount,
+                TemporaryCount = environment.TemporariesAllocatedInFrame,
                 IsPrimitive = hasPrimitive,
                 PrimitiveNumber = primitiveNumber,
                 Bytecode = emitter.GetBytecodes(),
@@ -1330,7 +1332,7 @@ namespace Smalltalk80.Compiler
                 temporaryNames.Add(name);
                 environment.Temporaries[name] = environment.ArgumentCount + i;
             }
-            environment.TemporaryCount = tempNames.Length;
+            environment.TemporariesAllocatedInFrame = tempNames.Length;
         }
         
         private void ProcessPrimitive(Smalltalk80Parser.PrimitiveDeclContext primitive)
@@ -2078,12 +2080,15 @@ namespace Smalltalk80.Compiler
             var savedTemporaries = new Dictionary<string, int>(environment.Temporaries);
             // Save cumulative block arg offset to restore after block compilation
             int savedCumulativeBlockArgOffset = environment.CumulativeBlockArgOffset;
+            // Save temporary count to restore after block compilation
+            // BUG FIX: Block temps should not persist in method's TemporariesAllocatedInFrame after block ends
+            int savedTemporariesAllocatedInFrame = environment.TemporariesAllocatedInFrame;
 
             // Save method-level counts if this is the first block (ScopeDepth == 0)
             if (savedScopeDepth == 0)
             {
                 environment.MethodArgumentCount = savedArgCount;
-                environment.MethodTemporaryCount = environment.TemporaryCount;
+                environment.MethodTemporaryCount = environment.TemporariesAllocatedInFrame;
             }
 
             // Increment scope depth to indicate we're compiling inside a block
@@ -2102,7 +2107,7 @@ namespace Smalltalk80.Compiler
             environment.ArgumentCount = argCount;
 
             // Parse and register block temporaries in parent environment
-            // Block temps are allocated after parent method's temps
+            // Block temps are allocated after parent method's temps AND block arguments
             var blockTempNames = new List<string>();
             var blockTemps = block.blockTemps();
             if (blockTemps != null)
@@ -2111,14 +2116,16 @@ namespace Smalltalk80.Compiler
                     .OfType<Smalltalk80Parser.TemporaryNameContext>()
                     .ToList();
 
-                int tempBase = environment.TemporaryCount;  // After parent temps
+                // BUG FIX: Block temps start after block args + parent temps
+                // Example: [:i | | char | ...] → i=0, char=1 (not char=0!)
+                int tempBase = environment.ArgumentCount + environment.TemporariesAllocatedInFrame;
                 for (int i = 0; i < tempNodes.Count; i++)
                 {
                     var tempName = tempNodes[i].GetText();
                     blockTempNames.Add(tempName);  // Track for later cleanup
                     environment.Temporaries[tempName] = tempBase + i;
                 }
-                environment.TemporaryCount += tempNodes.Count;  // Extend parent's temp count
+                environment.TemporariesAllocatedInFrame += tempNodes.Count;  // Extend parent's temp count
             }
 
             // Compile block body statements
@@ -2174,7 +2181,11 @@ namespace Smalltalk80.Compiler
 
             environment.ScopeDepth = savedScopeDepth; // Restore scope depth
             environment.CumulativeBlockArgOffset = savedCumulativeBlockArgOffset; // Restore cumulative offset
-            // Note: We keep the extended TemporaryCount (block temps extend method temps)
+
+            // BUG FIX: Restore TemporariesAllocatedInFrame after block compilation
+            // Block temps should NOT persist in the method's TemporariesAllocatedInFrame after the block ends
+            // Otherwise, the method header will have incorrect tempCount, causing wrong bytecode indices
+            environment.TemporariesAllocatedInFrame = savedTemporariesAllocatedInFrame;
         }
 
         /// <summary>
@@ -2644,14 +2655,14 @@ namespace Smalltalk80.Compiler
             //   - The VM skips activation record creation for quick-returns
             //   - Any arguments or temps would require a frame, violating the optimization
             //
-            // HOW: We reject any method with ArgumentCount != 0 or TemporaryCount != 0
+            // HOW: We reject any method with ArgumentCount != 0 or TemporariesAllocatedInFrame != 0
             //
             // EXAMPLES:
             //   ✓ position  ^position      (0 args, 0 temps)
             //   ✗ at: index  ^array at: index    (1 arg - not eligible)
             //   ✗ compute  | temp |  temp := x. ^temp   (1 temp - not eligible)
 
-            if (environment.ArgumentCount != 0 || environment.TemporaryCount != 0)
+            if (environment.ArgumentCount != 0 || environment.TemporariesAllocatedInFrame != 0)
             {
                 return (false, -1);
             }

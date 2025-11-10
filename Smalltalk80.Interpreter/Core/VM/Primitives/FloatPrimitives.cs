@@ -74,10 +74,17 @@ public static class FloatPrimitives
         // Check if the object's format is WordIndexed with 4 words (Float characteristic)
         var format = ctx.HeapManager.GetObjectFormat(objectOop);
         if (format != ObjectFormat.WordIndexed)
+        {
+            Console.WriteLine($"[IsFloat DEBUG] {objectOop} format={format}, expected WordIndexed");
             return false;
+        }
 
         // Float objects always have exactly 4 indexed words (16-bit each = 64 bits = IEEE 754 double precision)
         int size = ctx.HeapManager.GetIndexedSize(objectOop);
+        if (size != 4)
+        {
+            Console.WriteLine($"[IsFloat DEBUG] {objectOop} WordIndexed but size={size}, expected 4");
+        }
         return size == 4;
     }
 

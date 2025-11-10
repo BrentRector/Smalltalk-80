@@ -256,7 +256,7 @@ namespace Smalltalk80.Compiler
         /// </summary>
         private ResolutionResult? TryResolveParentVariable(string varName, CompilationEnvironment context)
         {
-            int accumulatedOffset = context.ArgumentCount + context.TemporaryCount;
+            int accumulatedOffset = context.ArgumentCount + context.TemporariesAllocatedInFrame;
             var parentContext = context.Parent;
 
             while (parentContext != null)
@@ -291,7 +291,7 @@ namespace Smalltalk80.Compiler
                     }
 
                     // Accumulate this parent's locals for next iteration
-                    accumulatedOffset += parentContext.ArgumentCount + parentContext.TemporaryCount;
+                    accumulatedOffset += parentContext.ArgumentCount + parentContext.TemporariesAllocatedInFrame;
                     parentContext = parentContext.Parent;
                 }
                 else
@@ -319,7 +319,7 @@ namespace Smalltalk80.Compiler
             // Walk from current block up to method, accumulating local counts
             while (current.ScopeDepth > 0 && current.Parent != null)
             {
-                offset += current.ArgumentCount + current.TemporaryCount;
+                offset += current.ArgumentCount + current.TemporariesAllocatedInFrame;
                 current = current.Parent;
             }
 

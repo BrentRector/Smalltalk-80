@@ -2068,9 +2068,20 @@ public partial class VirtualMachine : IPrimitiveContext
 
         if (selectorIndex == 7) // class
         {
-            var classOOP = GetClass(receiverOOP);
-            Push(classOOP);
-            return true;
+            try
+            {
+                var classOOP = GetClass(receiverOOP);
+                Push(classOOP);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"\n❌ ERROR in 'class' special selector");
+                Console.WriteLine($"   receiverOOP: {receiverOOP}");
+                Console.WriteLine($"   IsSmallInteger: {receiverOOP.IsSmallInteger}");
+                Console.WriteLine($"   Exception: {ex.Message}");
+                throw;
+            }
         }
 
         // Fall back to message send using cached selector OOP
@@ -3633,15 +3644,18 @@ public partial class VirtualMachine : IPrimitiveContext
         int formatValue = formatOOP.AsSmallInteger();
 
         // Decode format field per ColdStartJsonGenerator.CalculateFormatWord()
+        // Bits 13-12: Instance Specification (00=no fields, 01=pointers, 10=words, 11=bytes)
+        // Bit 3: Pointer flag (1 = indexed portion contains pointers)
         int instanceSpec = (formatValue >> 12) & 0x3;  // Bits 13-12
         int fixedSize = (formatValue >> 6) & 0x3F;      // Bits 11-6
+        bool hasPointerIndexedSlots = (formatValue & 0x08) != 0;  // Bit 3
 
         ObjectFormat format = instanceSpec switch
         {
             0 => ObjectFormat.Pointer,          // Fixed-size pointer object
-            1 => ObjectFormat.ByteIndexed,      // Byte-indexed (String, Symbol, ByteArray)
-            2 => ObjectFormat.PointerIndexed,   // Pointer-indexed (Array, MethodContext, BlockContext)
-            3 => ObjectFormat.WordIndexed,      // Word-indexed (Bitmap, WordArray)
+            1 => ObjectFormat.Pointer,          // 01 = pointer fields (subclass:)
+            2 => hasPointerIndexedSlots ? ObjectFormat.PointerIndexed : ObjectFormat.WordIndexed,  // 10 = variableSubclass: (PointerIndexed) or variableWordSubclass: (WordIndexed)
+            3 => ObjectFormat.ByteIndexed,      // 11 = byte-indexed (variableByteSubclass:)
             _ => throw new InvalidOperationException($"Invalid instanceSpec {instanceSpec} in format {formatValue:X4}")
         };
 

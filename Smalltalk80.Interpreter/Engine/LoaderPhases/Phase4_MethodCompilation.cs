@@ -1024,28 +1024,17 @@ public class Phase4_MethodCompilation
     }
 
     /// <summary>
-    /// Allocates a Float object.
+    /// Allocates a Float object using SemanticAllocator.
+    /// Float must be WordIndexed with 4 words (16-bit each) per Blue Book specification.
     /// </summary>
     private SmalltalkOOP AllocateFloat(double value)
     {
-        // Look up Float class layout
-        var floatClassDefinition = ClassHierarchyUtils.FindClassDefinition("Float", _bundle);
-        if (floatClassDefinition == null)
-        {
-            throw new InvalidOperationException("Float class not found in bundle");
-        }
+        // Use SemanticAllocator's AllocateFloat which correctly creates WordIndexed Float with 4 words
+        var floatOOP = _allocator.AllocateFloat(value);
 
-        var floatOOP = _allocator.AllocateByteArray("Float", 8);
         // Set Float class reference
         var floatClassOOP = GlobalRegistry.LookupClassOOP("Float");
         _allocator.SetObjectClass(floatOOP, floatClassOOP);
-
-        // Store the double as 8 bytes
-        byte[] bytes = BitConverter.GetBytes(value);
-        for (int i = 0; i < 8; i++)
-        {
-            _allocator.SetIndexedByte(floatOOP, i, bytes[i]);
-        }
 
         return floatOOP;
     }
