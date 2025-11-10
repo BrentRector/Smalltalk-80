@@ -103,17 +103,28 @@ namespace Smalltalk80.Compiler
             // Step 6: Check method temporaries
             if (context.Temporaries.TryGetValue(varName, out int methodTempAbsoluteIndex))
             {
+                // Determine which ArgumentCount to use for calculations
+                // If we're in a block (ScopeDepth > 0), use MethodArgumentCount for the calculation
+                // because methodTempAbsoluteIndex was calculated using the method's arg count
+                int argCountForCalculation = context.ScopeDepth > 0
+                    ? context.MethodArgumentCount
+                    : context.ArgumentCount;
+
                 // Compiler stores temps with absolute indices (including arg count)
                 // Convert to relative temp index for bytecode
-                int methodTempRelativeIndex = methodTempAbsoluteIndex - context.ArgumentCount;
-                int baseIndex = context.ArgumentCount + methodTempRelativeIndex;
+                int methodTempRelativeIndex = methodTempAbsoluteIndex - argCountForCalculation;
+                int baseIndex = argCountForCalculation + methodTempRelativeIndex;
 
                 int finalIndex = baseIndex;
 
-                // If we're in a block, add hierarchical offset
+                // If we're in a block, add cumulative block argument count as offset
+                // This is because the interpreter will skip over ALL enclosing block args before accessing home temps
                 if (context.ScopeDepth > 0)
                 {
-                    int offset = CalculateBlockLocalOffset(context);
+                    // For nested blocks: offset = cumulative count from ALL enclosing blocks
+                    // Example: [:x | [:y | methodTemp]] needs offset of 2 (x + y)
+                    // The interpreter's GetTemporaryVariable will subtract nargs and recurse to home
+                    int offset = context.CumulativeBlockArgOffset;
                     finalIndex += offset;
                 }
 
@@ -192,10 +203,11 @@ namespace Smalltalk80.Compiler
 
         /// <summary>
         /// Try to resolve a block-local variable (block argument or block temporary).
+        /// Only matches variables defined IN this block scope, not inherited from method.
         /// </summary>
         private ResolutionResult? TryResolveBlockLocal(string varName, CompilationEnvironment context)
         {
-            // Check block arguments
+            // Check block arguments (these are always block-local)
             if (context.Arguments.TryGetValue(varName, out int argIndex))
             {
                 return new ResolutionResult(
@@ -207,8 +219,22 @@ namespace Smalltalk80.Compiler
             }
 
             // Check block temporaries
+            // NOTE: context.Temporaries contains BOTH method temps AND block temps (inline block approach).
+            // We need to distinguish: if the temp's absolute index is >= method's temp boundary,
+            // it's a BLOCK temp. Otherwise, it's a METHOD temp and should be handled by Step 6.
             if (context.Temporaries.TryGetValue(varName, out int tempAbsoluteIndex))
             {
+                // Calculate where method temps end: methodArgCount + methodTempCount
+                int methodTempBoundary = context.MethodArgumentCount + context.MethodTemporaryCount;
+
+                // If this temp's index is before the boundary, it's a METHOD temp, not a BLOCK temp
+                if (tempAbsoluteIndex < methodTempBoundary)
+                {
+                    // Not a block-local variable - let it fall through to Step 6 (method temporaries)
+                    return null;
+                }
+
+                // This is a genuine block temporary
                 // Convert absolute index to relative (exclude arg count)
                 int tempRelativeIndex = tempAbsoluteIndex - context.ArgumentCount;
                 int finalIndex = context.ArgumentCount + tempRelativeIndex;

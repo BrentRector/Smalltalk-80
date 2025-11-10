@@ -244,4 +244,119 @@ atAllPut: anObject
         }
         Assert.That(foundSizePush, Is.True, "Should PUSH_TEMP 2 for 'size' (2nd temp)");
     }
+
+    [Test]
+    public void TestNestedBlockAccessingMethodTemp()
+    {
+        // This test validates the fix for nested block temp variable access
+        // Pattern: [:x | [:y | methodTemp]]
+        // When compiling 'methodTemp' in the innermost block:
+        // - Must skip over 'y' (1 arg from inner block)
+        // - Must skip over 'x' (1 arg from outer block)
+        // - Then access 'methodTemp' at offset 2
+        //
+        // Note: With the Blue Book inline block approach, blocks are compiled inline
+        // in the method bytecode, but we can still verify the generated PUSH_TEMP bytecodes
+        var source = WrapInTestClass(@"
+testNestedBlock
+    | outer |
+    outer := 42.
+    ^[:x | [:y | outer]] value: 1");
+
+        using var json = CompileToJson(source);
+        var root = json.RootElement;
+
+        // Get the main method's bytecodes
+        var methods = root.GetProperty("methods");
+        Assert.That(methods.GetArrayLength(), Is.GreaterThan(0), "Should have at least one method");
+
+        var mainMethod = methods[0];
+        var bytecodes = mainMethod.GetProperty("bytecodes");
+
+        // Print all bytecodes for debugging
+        Console.WriteLine("All bytecodes:");
+        for (int i = 0; i < bytecodes.GetArrayLength(); i++)
+        {
+            Console.WriteLine($"  [{i}] = {bytecodes[i].GetInt32()}");
+        }
+
+        // The innermost block [:y | outer] should generate PUSH_TEMP bytecode
+        // that skips over both 'x' (outer block arg) and 'y' (inner block arg)
+        // to access 'outer' (method temp at position 0)
+        //
+        // Expected: PUSH_TEMP 2 (bytecode 18)
+        // - Skips 'y' (innermost block's arg)
+        // - Skips 'x' (outer block's arg)
+        // - Accesses 'outer' (method temp 0, but at cumulative offset 2)
+
+        bool foundCorrectPushTemp = false;
+        for (int i = 0; i < bytecodes.GetArrayLength(); i++)
+        {
+            if (bytecodes[i].GetInt32() == 18)  // PUSH_TEMP 2
+            {
+                foundCorrectPushTemp = true;
+                Console.WriteLine($"Found PUSH_TEMP 2 at bytecode index {i}");
+                break;
+            }
+        }
+
+        Assert.That(foundCorrectPushTemp, Is.True,
+            "Should find PUSH_TEMP 2 (bytecode 18) for accessing method temp from nested block");
+    }
+
+    [Test]
+    public void TestDoubleNestedBlockAccessingMethodTemp()
+    {
+        // More complex nesting: [:a | [:b | [:c | methodTemp]]]
+        // When compiling 'methodTemp' in the triple-nested block:
+        // - Must skip 'c' (1 arg from innermost block)
+        // - Must skip 'b' (1 arg from middle block)
+        // - Must skip 'a' (1 arg from outer block)
+        // - Then access 'methodTemp' at offset 3
+        var source = WrapInTestClass(@"
+testTripleNestedBlock
+    | outer |
+    outer := 99.
+    ^[:a | [:b | [:c | outer]]] value: 1");
+
+        using var json = CompileToJson(source);
+        var root = json.RootElement;
+
+        // Get the main method's bytecodes (inline blocks)
+        var methods = root.GetProperty("methods");
+        Assert.That(methods.GetArrayLength(), Is.GreaterThan(0), "Should have at least one method");
+
+        var mainMethod = methods[0];
+        var bytecodes = mainMethod.GetProperty("bytecodes");
+
+        // Print all bytecodes for debugging
+        Console.WriteLine("All bytecodes:");
+        for (int i = 0; i < bytecodes.GetArrayLength(); i++)
+        {
+            Console.WriteLine($"  [{i}] = {bytecodes[i].GetInt32()}");
+        }
+
+        // The triple-nested block [:c | outer] should generate PUSH_TEMP bytecode
+        // that skips over 'a', 'b', and 'c' to access 'outer' (method temp at position 0)
+        //
+        // Expected: PUSH_TEMP 3 (bytecode 19)
+        // - Skips 'c' (innermost block's arg)
+        // - Skips 'b' (middle block's arg)
+        // - Skips 'a' (outer block's arg)
+        // - Accesses 'outer' (method temp 0, but at cumulative offset 3)
+
+        bool foundCorrectPushTemp = false;
+        for (int i = 0; i < bytecodes.GetArrayLength(); i++)
+        {
+            if (bytecodes[i].GetInt32() == 19)  // PUSH_TEMP 3
+            {
+                foundCorrectPushTemp = true;
+                Console.WriteLine($"Found PUSH_TEMP 3 at bytecode index {i}");
+                break;
+            }
+        }
+
+        Assert.That(foundCorrectPushTemp, Is.True,
+            "Should find PUSH_TEMP 3 (bytecode 19) for accessing method temp from triple-nested block");
+    }
 }

@@ -69,6 +69,28 @@ namespace Smalltalk80.Compiler
         public int TemporaryCount { get; set; }
 
         /// <summary>
+        /// Method's original argument count (before entering any blocks).
+        /// Used to distinguish method-level variables from block-level variables.
+        /// </summary>
+        public int MethodArgumentCount { get; set; }
+
+        /// <summary>
+        /// Method's original temporary count (before entering any blocks).
+        /// Used to distinguish method-level variables from block-level variables.
+        /// </summary>
+        public int MethodTemporaryCount { get; set; }
+
+        /// <summary>
+        /// Cumulative block argument offset for nested blocks.
+        /// Tracks the total number of block arguments from ALL enclosing blocks.
+        /// Used to correctly calculate temp variable offsets in nested block scenarios.
+        /// Example: For [:x | [:y | methodTemp]], when compiling 'methodTemp' in inner block:
+        ///   - This will be 2 (1 arg from outer block + 1 arg from inner block)
+        ///   - Ensures PUSH_TEMP skips both x and y to reach methodTemp
+        /// </summary>
+        public int CumulativeBlockArgOffset { get; set; } = 0;
+
+        /// <summary>
         /// Allocates a hidden temporary variable.
         /// </summary>
         public int AllocateHiddenTemp(string name)
@@ -2054,10 +2076,23 @@ namespace Smalltalk80.Compiler
             int savedScopeDepth = environment.ScopeDepth;
             // Save temporaries dictionary to handle shadowing correctly
             var savedTemporaries = new Dictionary<string, int>(environment.Temporaries);
+            // Save cumulative block arg offset to restore after block compilation
+            int savedCumulativeBlockArgOffset = environment.CumulativeBlockArgOffset;
+
+            // Save method-level counts if this is the first block (ScopeDepth == 0)
+            if (savedScopeDepth == 0)
+            {
+                environment.MethodArgumentCount = savedArgCount;
+                environment.MethodTemporaryCount = environment.TemporaryCount;
+            }
 
             // Increment scope depth to indicate we're compiling inside a block
             // This is critical for VariableResolver to correctly identify block variables!
             environment.ScopeDepth = savedScopeDepth + 1;
+
+            // Accumulate block argument count for nested block temp variable offset calculation
+            // Example: [:x | [:y | methodTemp]] - inner block needs offset of 2 (x + y)
+            environment.CumulativeBlockArgOffset += argCount;
 
             // Add block arguments to current environment (they'll be in BlockContext indexed slots)
             for (int i = 0; i < argumentNames.Count; i++)
@@ -2138,6 +2173,7 @@ namespace Smalltalk80.Compiler
             }
 
             environment.ScopeDepth = savedScopeDepth; // Restore scope depth
+            environment.CumulativeBlockArgOffset = savedCumulativeBlockArgOffset; // Restore cumulative offset
             // Note: We keep the extended TemporaryCount (block temps extend method temps)
         }
 
@@ -2180,13 +2216,15 @@ namespace Smalltalk80.Compiler
                     emitter.Emit(Bytecode.EXTENDED_PREFIX);
                     emitter.Emit((byte)ExtendedSubOp.DUP);
 
+                    // Push 1-based index (Smalltalk arrays are 1-indexed)
+                    // MUST push index FIRST (at: index put: value)
+                    emitter.PushLiteralConstant(i + 1);
+
                     // Compile the expression (leaves value on stack)
                     CompileExpression(expressions[i]);
 
-                    // Push 1-based index (Smalltalk arrays are 1-indexed)
-                    emitter.PushLiteralConstant(i + 1);
-
-                    // Send at:put: (pops index, value, array ref; pushes value)
+                    // Send at:put: (pops value, index, array ref from stack; pushes value)
+                    // Stack order (bottom to top): array, index, value
                     emitter.EmitSend("at:put:", 2);
 
                     // Pop the returned value (we don't need it, we have the array ref on stack)

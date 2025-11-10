@@ -177,9 +177,9 @@ testAllCombinations
 	sum _ sum + (self nlr1SimpleReturn).
 	sum _ sum + (self nlr2NestedReturn).
 	sum _ sum + (self nlr3ReturnWithMutation).
-	"Exception handling: 2 tests"
-	sum _ sum + (self eh1BasicHandler).
-	sum _ sum + (self eh2NestedHandlers).
+	"Exception handling: 2 tests - SKIPPED (requires on:do: not in Blue Book base)"
+	"sum _ sum + (self eh1BasicHandler)."
+	"sum _ sum + (self eh2NestedHandlers)."
 	"Block lifetime: 2 tests"
 	sum _ sum + (self bl1StoredBlock).
 	sum _ sum + (self bl2BlockInArray).

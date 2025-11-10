@@ -16,36 +16,30 @@ public static class VMConstants
     public const int BEHAVIOR_FORMAT_INDEX = 2;
 
     // ========================================================================
-    // Unified Context Architecture (Single-Context Design)
+    // Blue Book: MethodContext field indices
     // ========================================================================
-    // All contexts (methods and blocks) use MethodContext with unified field layout.
-    // lexicalParent field enables proper lexical scoping for blocks.
+    // MethodContext inherits: InstructionStream (sender, pc) → ContextPart (stackp)
+    // MethodContext adds: method, receiver
     //
-    // MethodContext layout (slot numbers are instance variable indices):
-    //   Slot 0: sender (from InstructionStream) - dynamic call chain
+    // Blue Book source (Smalltalk-80.st):
+    //   ContextPart variableSubclass: #MethodContext
+    //   instanceVariableNames: 'method receiver'
+    //
+    // Complete layout:
+    //   Slot 0: sender (from InstructionStream) - caller context
     //   Slot 1: pc (from InstructionStream) - program counter
     //   Slot 2: stackp (from ContextPart) - stack pointer
     //   Slot 3: method (MethodContext field) - CompiledMethod being executed
-    //   Slot 4: lexicalParent (MethodContext field) - lexical scope chain (nil for methods, non-nil for blocks)
-    //   Slot 5: receiver (MethodContext field) - self
-    //   Slot 6+: indexed temps (variable part)
+    //   Slot 4: receiver (MethodContext field) - self
+    //   Slot 5+: indexed temps/stack (variable part)
 
     // Common context fields (shared by all contexts)
     public const int CONTEXT_SENDER_INDEX = 0;           // InstructionStream field (dynamic call chain)
     public const int CONTEXT_PC_INDEX = 1;               // InstructionStream field
     public const int CONTEXT_STACKP_INDEX = 2;           // ContextPart field
     public const int CONTEXT_METHOD_INDEX = 3;           // MethodContext field - CompiledMethod
-    public const int CONTEXT_LEXICALPARENT_INDEX = 4;    // MethodContext field - lexical scope chain (NEW!)
-    public const int CONTEXT_RECEIVER_INDEX = 5;         // MethodContext field - self
-    public const int CONTEXT_TEMP_FRAME_START = 6;       // Start of indexed slots
-
-    // Legacy MethodContext constants (DEPRECATED - use CONTEXT_* instead)
-    [Obsolete("Use CONTEXT_METHOD_INDEX instead")]
-    public const int METHODCONTEXT_METHOD_INDEX = 4;
-    [Obsolete("Use CONTEXT_RECEIVER_INDEX instead")]
-    public const int METHODCONTEXT_RECEIVER_INDEX = 6;
-    [Obsolete("Use CONTEXT_TEMP_FRAME_START instead")]
-    public const int METHODCONTEXT_TEMP_FRAME_START = 7;
+    public const int CONTEXT_RECEIVER_INDEX = 4;         // MethodContext field - self
+    public const int CONTEXT_TEMP_FRAME_START = 5;       // Start of indexed slots
 
     // ========================================================================
     // Blue Book: BlockContext field indices (Primitives 80-82)
