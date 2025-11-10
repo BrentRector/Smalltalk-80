@@ -228,4 +228,11 @@ public interface IPrimitiveContext
     /// </summary>
     /// <returns>BlockContext class OOP.</returns>
     SmalltalkOOP GetBlockContextClassOOP();
+
+    /// <summary>
+    /// Sets the active context and signals that a primitive has switched contexts.
+    /// Used by block activation primitives (81, 82) to trampoline to BlockContext execution.
+    /// </summary>
+    /// <param name="newContextOOP">The new context to switch to.</param>
+    void SetActiveContext(SmalltalkOOP newContextOOP);
 }

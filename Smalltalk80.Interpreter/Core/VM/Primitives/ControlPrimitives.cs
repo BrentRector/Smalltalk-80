@@ -79,71 +79,69 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Blue Book line 1151: context ← self popStack
-        // In our implementation, receiver is the context (active context at bytecode execution time)
-        SmalltalkOOP context = receiver;
+        // Blue Book: blockCopy: creates a BlockContext
+        // BlockContext inherits from ContextPart: sender, pc, stackp
+        // BlockContext adds: nargs, startpc, home
 
-        // Blue Book lines 1152-1155: (self isBlockContext: context)
-        //     ifTrue: [methodContext ← memory fetchPointer: HomeIndex ofObject: context]
-        //     ifFalse: [methodContext ← context]
-        // Determine if context is a BlockContext, and if so, get its home MethodContext
-        SmalltalkOOP methodContext;
-        SmalltalkOOP contextClassOOP = ctx.HeapManager.GetClassOOP(context);
+        // Get active context (receiver of blockCopy: bytecode)
+        SmalltalkOOP activeContext = receiver;
+
+        // Get BlockContext class from VM metadata
         SmalltalkOOP blockContextClassOOP = ctx.GetBlockContextClassOOP();
 
-        if (contextClassOOP == blockContextClassOOP)
+        // Determine home context for lexical scoping
+        // If active context is a BlockContext, we're creating a nested block
+        // Blue Book: nested blocks have home pointing to outer BlockContext for proper variable access
+        SmalltalkOOP homeContext;
+        SmalltalkOOP contextClassOOP = ctx.HeapManager.GetClassOOP(activeContext);
+        string contextClassName = ctx.HeapManager.GetClassName(contextClassOOP);
+
+        if (contextClassName == "BlockContext")
         {
-            // It's a BlockContext - get its home field (slot 5)
-            methodContext = ctx.HeapManager.GetInstanceVariable(context, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+            // Nested block - home points to active BlockContext (creates lexical chain)
+            homeContext = activeContext;
         }
         else
         {
-            // It's a MethodContext - use it directly
-            methodContext = context;
+            // Top-level block - home points to the MethodContext
+            homeContext = activeContext;
         }
 
-        // Blue Book line 1156: contextSize ← memory fetchWordLengthOf: methodContext
-        // Get the indexed slot count from the method context (for temp frame size)
-        int contextSize = ctx.HeapManager.GetIndexedSize(methodContext);
+        // Get current PC and calculate startpc
+        // Blue Book pattern: blockCopy: is followed by 3-byte LONG_JUMP, then block body
+        // When primitive executes, PC has already been incremented past the blockCopy: bytecode
+        // So PC points to the first byte of LONG_JUMP
+        // Block body starts 3 bytes later (after the 3-byte LONG_JUMP)
+        int currentPC = ctx.GetInstructionPointer();
+        int blockBodyPC = currentPC + 3;
+        SmalltalkOOP startPC = SmalltalkOOP.FromSmallInteger(blockBodyPC);
 
-        // Blue Book line 1157-1158: newContext ← memory instantiateClass: ClassBlockContextPointer
-        //                                         withPointers: contextSize
-        // Allocate new BlockContext with same indexed size as method context
-        SmalltalkOOP newContext = ctx.HeapManager.AllocateInstanceOf(blockContextClassOOP, contextSize);
+        // Allocate BlockContext with indexed slots for temps/stack
+        // Blue Book: BlockContext is variableSubclass, needs indexed slots
+        int indexedSize = 32; // Enough space for block temps and stack
+        SmalltalkOOP newBlockContext = ctx.HeapManager.AllocateInstanceOf(blockContextClassOOP, indexedSize);
 
-        // Blue Book line 1159: initialIP ← memory integerObjectOf: instructionPointer + 3
-        // Get current instruction pointer and calculate block start PC
-        int instructionPointer = ctx.GetInstructionPointer();
-        SmalltalkOOP initialIP = SmalltalkOOP.FromSmallInteger(instructionPointer + 3);
+        // Initialize BlockContext fields (6 fixed instance variables)
+        // Slot 0: sender/caller - initially nil, set by primitiveValue
+        ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, SpecialObjectsArray.Instance.Nil);
 
-        // Blue Book lines 1160-1162: memory storePointer: InitialIPIndex
-        //                                    ofObject: newContext
-        //                                    withValue: initialIP
-        ctx.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, initialIP);
+        // Slot 1: pc - instruction pointer, set by primitiveValue
+        ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_PC_INDEX, SpecialObjectsArray.Instance.Nil);
 
-        // Blue Book lines 1163-1165: memory storePointer: InstructionPointerIndex
-        //                                    ofObject: newContext
-        //                                    withValue: initialIP
-        ctx.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_PC_INDEX, initialIP);
+        // Slot 2: stackp - stack pointer, set by primitiveValue
+        ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SpecialObjectsArray.Instance.Nil);
 
-        // Blue Book lines 1166-1167: self storeStackPointerValue: 0
-        //                                  inContext: newContext
-        SmalltalkOOP stackPointerZero = SmalltalkOOP.FromSmallInteger(0);
-        ctx.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, stackPointerZero);
+        // Slot 3: nargs - number of arguments block expects
+        ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX, blockArgumentCount);
 
-        // Blue Book lines 1168-1170: memory storePointer: BlockArgumentCountIndex
-        //                                    ofObject: newContext
-        //                                    withValue: blockArgumentCount
-        ctx.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX, blockArgumentCount);
+        // Slot 4: startpc - saved PC where block bytecode starts
+        ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, startPC);
 
-        // Blue Book lines 1171-1173: memory storePointer: HomeIndex
-        //                                    ofObject: newContext
-        //                                    withValue: methodContext
-        ctx.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_HOME_INDEX, methodContext);
+        // Slot 5: home - lexical parent context (enables nested block variable access)
+        ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContext);
 
-        // Blue Book line 1174: self push: newContext
-        // Return the BlockContext as the result
-        return newContext;
+        // Return the new BlockContext
+        return newBlockContext;
     }
 
     // <summary>
@@ -274,17 +272,13 @@ public static class ControlPrimitives
         ctx.HeapManager.SetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, activeContext);
 
         // Blue Book line 1203: self newActiveContext: blockContext
-        // NOTE: In the Blue Book, this is a trampoline context switch that doesn't return.
-        // Our VM implementation will need to handle this context switch after the primitive returns.
-        // For now, create an Array wrapper for compatibility with existing ActivateBlockContext API
-        SmalltalkOOP argumentsArray = ctx.AllocateObject("class:Array", argumentCount);
-        for (int i = 0; i < argumentCount; i++)
-        {
-            ctx.HeapManager.SetIndexedOOP(argumentsArray, i, args[i]);
-        }
+        // Switch to the BlockContext - the VM will continue execution in the new context
+        // This is a trampoline: primitive succeeds, signals context switch, and returns nil
+        // The actual block execution happens when the VM continues in the new context
+        ctx.SetActiveContext(blockContext);
 
-        // Delegate to existing ActivateBlockContext which will perform the actual context switch
-        return ctx.ActivateBlockContext(blockContext, argumentsArray);
+        // Return value doesn't matter - context switch will be detected by VM
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     // <summary>
@@ -333,27 +327,57 @@ public static class ControlPrimitives
 
         // Validate it's actually an Array class
         string className = ctx.HeapManager.GetClassName(arrayArg);
-        if (className != "class:Array")
+        if (className != "Array")
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // The array is already in the correct format for ActivateBlockContext
-        // ActivateBlockContext will validate that the array size matches the block's nargs
+        SmalltalkOOP blockContext = receiver;
 
-        // Activate the block with the array argument
-        SmalltalkOOP resultOop = ctx.ActivateBlockContext(receiver, arrayArg);
+        // Get block's expected argument count
+        SmalltalkOOP blockArgumentCountOOP = ctx.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
+        if (!blockArgumentCountOOP.IsSmallInteger)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+        int blockArgumentCount = blockArgumentCountOOP.AsSmallInteger();
 
-        // Check if activation failed (argument count mismatch returns nil)
-        if (resultOop == SpecialObjectsArray.Instance.Nil)
+        // Verify array size matches block's argument count
+        int arraySize = ctx.GetIndexedSize(arrayArg);
+        if (arraySize != blockArgumentCount)
         {
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Return the result of block execution
-        return resultOop;
+        // Transfer arguments from array to block's temp frame
+        for (int i = 0; i < arraySize; i++)
+        {
+            SmalltalkOOP arg = ctx.GetIndexedOOP(arrayArg, i);
+            ctx.HeapManager.SetIndexedOOP(blockContext, i, arg);
+        }
+
+        // Get initialIP from blockContext
+        SmalltalkOOP initialIP = ctx.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+
+        // Set PC to initialIP
+        ctx.HeapManager.SetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_PC_INDEX, initialIP);
+
+        // Set stack pointer to argument count
+        SmalltalkOOP stackPointerValue = SmalltalkOOP.FromSmallInteger(arraySize);
+        ctx.HeapManager.SetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, stackPointerValue);
+
+        // Set sender to current active context
+        SmalltalkOOP activeContext = ctx.GetActiveContext();
+        ctx.HeapManager.SetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, activeContext);
+
+        // Switch to the BlockContext
+        ctx.SetActiveContext(blockContext);
+
+        // Return value doesn't matter - context switch will be detected by VM
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     // <summary>

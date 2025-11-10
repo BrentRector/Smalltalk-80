@@ -17,15 +17,17 @@ public static class FloatPrimitives
     // </summary>
     private static double ToDouble(IPrimitiveContext ctx, SmalltalkOOP floatOop)
     {
-        // Float objects in Smalltalk-80 are ByteIndexed with 8 bytes
-        // These 8 bytes store an IEEE 754 double precision value
-        // Get the 8 bytes from the Float object (byte-indexed)
+        // Float objects in Smalltalk-80 are WordIndexed with 4 words (16-bit each)
+        // These 4 words store an IEEE 754 double precision value (64 bits total)
+        // Get the 4 words from the Float object (word-indexed)
         byte[] bytes = new byte[8];
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 4; i++)
         {
-            // Read each byte from the Float's indexed storage
-            // Indexed bytes are stored directly in the object, not as OOPs
-            bytes[i] = ctx.HeapManager.GetIndexedByte(floatOop, i);
+            // Read each 16-bit word from the Float's indexed storage
+            ushort word = ctx.HeapManager.GetIndexedWord(floatOop, i);
+            // Store word as 2 bytes in little-endian order
+            bytes[i * 2] = (byte)(word & 0xFF);
+            bytes[i * 2 + 1] = (byte)((word >> 8) & 0xFF);
         }
 
         // BitConverter handles endianness conversion automatically
@@ -39,19 +41,20 @@ public static class FloatPrimitives
     private static SmalltalkOOP FromDouble(IPrimitiveContext ctx, double value)
     {
         // Blue Book: memory instantiateClass: ClassFloatPointer withValue: floatValue
-        // Allocate Float object with 8 indexed bytes using dynamic class lookup
-        // Float is a ByteIndexed object format (stores raw bytes, not OOPs)
-        SmalltalkOOP floatOop = ctx.AllocateObject("class:Float", 8);
+        // Allocate Float object with 4 indexed words using dynamic class lookup
+        // Float is a WordIndexed object format (stores 16-bit words, not OOPs)
+        SmalltalkOOP floatOop = ctx.AllocateObject("class:Float", 4);
 
         // Convert the double to IEEE 754 binary representation
         // BitConverter.GetBytes returns 8 bytes in platform byte order
-        // Store the double as 8 bytes
+        // Store the double as 4 words (16-bit each)
         byte[] bytes = BitConverter.GetBytes(value);
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 4; i++)
         {
-            // Store each byte directly in the Float's indexed storage
-            // These are raw bytes, not SmallInteger OOPs
-            ctx.HeapManager.SetIndexedByte(floatOop, i, bytes[i]);
+            // Combine 2 bytes into a 16-bit word (little-endian)
+            ushort word = (ushort)(bytes[i * 2] | (bytes[i * 2 + 1] << 8));
+            // Store word directly in the Float's indexed storage
+            ctx.HeapManager.SetIndexedWord(floatOop, i, word);
         }
 
         return floatOop;
@@ -68,14 +71,14 @@ public static class FloatPrimitives
 
         // Blue Book: memory fetchClassOf: object = ClassFloatPointer
         // We identify Floats by their format and size characteristics
-        // Check if the object's format is ByteIndexed with 8 bytes (Float characteristic)
+        // Check if the object's format is WordIndexed with 4 words (Float characteristic)
         var format = ctx.HeapManager.GetObjectFormat(objectOop);
-        if (format != ObjectFormat.ByteIndexed)
+        if (format != ObjectFormat.WordIndexed)
             return false;
 
-        // Float objects always have exactly 8 indexed bytes (IEEE 754 double precision)
+        // Float objects always have exactly 4 indexed words (16-bit each = 64 bits = IEEE 754 double precision)
         int size = ctx.HeapManager.GetIndexedSize(objectOop);
-        return size == 8;
+        return size == 4;
     }
 
 
