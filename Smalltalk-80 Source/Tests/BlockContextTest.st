@@ -188,13 +188,13 @@ testAllCombinations
 	sum _ sum + (self cf2RecursiveBlock).
 	"Edge special: 2 tests"
 	sum _ sum + (self es1SelfModifying).
-	"sum _ sum + (self es2MixedAccess)."  "SKIPPED: Unrelated Symbol>>asString / String>>at: interpreter bug"
+	sum _ sum + (self es2MixedAccess).  "NOW ENABLED: Testing if Symbol>>asString bug is fixed"
 	"Stress deep: 1 test"
 	sum _ sum + (self sd1DeepNesting10).
 	"Instance variables: 10 tests"
 	sum _ sum + (self iv1SimpleAccess).
 	sum _ sum + (self iv2ModifyFromBlock).
-	"sum _ sum + (self iv3NestedBlockIVAccess)."  "SKIPPED: Unrelated Symbol>>asString / String>>at: interpreter bug"
+	sum _ sum + (self iv3NestedBlockIVAccess).  "NOW ENABLED: Testing if Symbol>>asString bug is fixed"
 	sum _ sum + (self iv4IVPlusTempAccess).
 	sum _ sum + (self iv5IVInCondition).
 	sum _ sum + (self iv6IVInLoop).
@@ -1161,5 +1161,14 @@ mx5WhileMixed "Mixed variables in while blocks"
 	[count < temp] whileTrue: [count _ count + 1].
 	^count! !
 
-"Global test"
-BlockContextTest new testAllCombinations!
+!BlockContextTest class methodsFor: 'validation'!
+
+validate
+	"Self-validating test that verifies all 193 tests pass and return expected sum"
+	| result expected |
+	expected _ 107504.  "Expected sum with all 193 tests enabled (es2MixedAccess + iv3NestedBlockIVAccess now passing)"
+	result _ self new testAllCombinations.
+	^result = expected ifTrue: [99] ifFalse: [result]! !
+
+"Global test - Self-validating"
+BlockContextTest validate!

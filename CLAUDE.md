@@ -253,7 +253,7 @@ When running comprehensive test suites like BlockContextTest, use the `--skip-in
 cd Smalltalk80.Interpreter
 dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_tests.json \
               --skip-init-expressions \
-              --execute "BlockContextTest testAllCombinations"
+              --execute "testAllCombinations"
 ```
 
 **Flags**:

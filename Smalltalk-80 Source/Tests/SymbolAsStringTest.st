@@ -15,6 +15,13 @@ test
 !SymbolAsStringTest class methodsFor: 'running'!
 
 run
-	^self new test! !!
+	^self new test!
 
-SymbolAsStringTest run!
+validate
+	"Self-validating test - returns 99 if asString returns correct value"
+	| result expected |
+	expected _ 'SymbolAsStringTest'.
+	result _ self new test.
+	^result = expected ifTrue: [99] ifFalse: [0]! !!
+
+SymbolAsStringTest validate!

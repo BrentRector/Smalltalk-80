@@ -431,7 +431,12 @@ public static class Program
                     }
                 }
 
-                return;
+                // Only return here if we're NOT skipping init expressions
+                // When --skip-init-expressions is used, we want to continue to execute user code
+                if (!skipInitExpressions)
+                {
+                    return;
+                }
 
                 #if false  // Phase 2 disabled - unreachable code preserved for reference
                 // Phase 2: Execute all comment: expressions (DISABLED - not running)
@@ -568,7 +573,41 @@ public static class Program
                     if (result.Status == InitStatus.Success)
                     {
                         Console.WriteLine($"\n✓ Expression executed successfully");
-                        // InitResult doesn't expose ReturnValue, just show success
+                        if (result.ReturnValueOop.HasValue)
+                        {
+                            var returnOop = result.ReturnValueOop.Value;
+                            if (returnOop.IsSmallInteger)
+                            {
+                                Console.WriteLine($"   Return value: {returnOop.AsSmallInteger()}");
+                            }
+                            else
+                            {
+                                // Try to display as String if it's a String object
+                                var className = heapManager.GetClassName(returnOop);
+                                if (className == "String")
+                                {
+                                    try
+                                    {
+                                        int stringSize = heapManager.GetIndexedSize(returnOop);
+                                        var stringBytes = new byte[stringSize];
+                                        for (int i = 0; i < stringSize; i++)
+                                        {
+                                            stringBytes[i] = heapManager.GetIndexedByte(returnOop, i);
+                                        }
+                                        var stringValue = System.Text.Encoding.UTF8.GetString(stringBytes);
+                                        Console.WriteLine($"   Return value: \"{stringValue}\"");
+                                    }
+                                    catch
+                                    {
+                                        Console.WriteLine($"   Return value: String (OOP={returnOop.RawValue})");
+                                    }
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"   Return value: {className} (OOP={returnOop.RawValue})");
+                                }
+                            }
+                        }
                     }
                     else
                     {
