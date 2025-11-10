@@ -601,15 +601,26 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     // Context switch - continue execution in new context
                     _contextSwitchPending = false;
-                    if (_verboseDebugMode)
-                        Console.WriteLine($"[ExecuteBytecodeStep] Context switch detected, continuing in {_activeContextOOP}");
                     return InterpreterStatus.Continue;
                 }
 
                 // Method returned - handle the return
-                var returnValue = Pop();
-                if (_verboseDebugMode)
-                    Console.WriteLine($"[ExecuteBytecodeStep] Method returned, popped value: {returnValue}");
+                // For non-local returns, the value was already popped and stored in _nlrValue
+                SmalltalkOOP returnValue;
+                if (_nonLocalReturnPending)
+                {
+                    // Non-local return: value already popped by RETURN_*_POP bytecode
+                    returnValue = _nlrValue;
+                    if (_verboseDebugMode)
+                        Console.WriteLine($"[ExecuteBytecodeStep] Non-local return pending, using _nlrValue: {returnValue}");
+                }
+                else
+                {
+                    // Normal return: pop the return value from stack
+                    returnValue = Pop();
+                    if (_verboseDebugMode)
+                        Console.WriteLine($"[ExecuteBytecodeStep] Method returned, popped value: {returnValue}");
+                }
                 return HandleReturn(returnValue);
             }
 
@@ -2325,8 +2336,6 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             // Context switch occurred - signal to exit bytecode loop and continue in new context
             _contextSwitchPending = true;
-            if (_verboseDebugMode)
-                Console.WriteLine($"  ContextSwitch: set _contextSwitchPending=true, returning false");
             return false;
         }
 
@@ -2988,14 +2997,8 @@ public partial class VirtualMachine : IPrimitiveContext
                 $"Stack overflow: sp={sp}, allocated size={stackSize}, context={_activeContextOOP}");
         }
 
-        if (_verboseDebugMode)
-            Console.WriteLine($"[Push] context={_activeContextOOP}, sp before={sp}, value={valueOOP}");
-
         _heapManager.SetIndexedOOP(_activeContextOOP, sp, valueOOP);
         _heapManager.SetInstanceVariable(_activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp + 1));
-
-        if (_verboseDebugMode)
-            Console.WriteLine($"[Push] sp after={sp + 1}");
     }
 
     /// <summary>
