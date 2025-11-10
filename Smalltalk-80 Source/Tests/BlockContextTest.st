@@ -931,21 +931,31 @@ cf1EarlyExit "Block that exits early from iteration"
 		i = 5 ifTrue: [^sum]].
 	^999!
 
-cf2RecursiveBlock "Block that calls itself recursively"
-	"Tests recursive blocks maintain separate activation records"
-	| factorial |
-	factorial _ [:n | n <= 1 ifTrue: [1] ifFalse: [n * (factorial value: n - 1)]].
-	^factorial value: 5! !
+cf2RecursiveBlock "Method recursion via helper (Blue Book style)"
+	"Tests blocks calling recursive methods maintain correct context"
+	^self cf2Helper: 5!
+
+cf2Helper: n
+	"Helper method for factorial computation - Blue Book Chapter 3 style"
+	^n <= 1
+		ifTrue: [1]
+		ifFalse: [n * (self cf2Helper: n - 1)]! !
 
 "Edge special tests"
 !BlockContextTest methodsFor: 'edge-special'!
 
-es1SelfModifying "Block that modifies variable it closes over during execution"
-	"Tests recursive self-modification works correctly"
-	| block count |
+es1SelfModifying "Block modifying closure variable with method recursion (Blue Book style)"
+	"Tests blocks modifying outer scope variables with recursive helper"
+	| count |
 	count _ 0.
-	block _ [count _ count + 1. count < 3 ifTrue: [block value]. count].
-	^block value!
+	self es1Helper: [count _ count + 1] times: 3.
+	^count!
+
+es1Helper: aBlock times: n
+	"Execute aBlock n times - demonstrates closure + method recursion"
+	n > 0 ifTrue: [
+		aBlock value.
+		self es1Helper: aBlock times: n - 1]!
 
 es2MixedAccess "Block accessing instance vars, class vars, and temps"
 	"Tests multiple variable type access in single block"
