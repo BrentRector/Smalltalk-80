@@ -3170,57 +3170,36 @@ public partial class VirtualMachine : IPrimitiveContext
     /// <param name="valueOOP">Value to store</param>
     private void WriteTemp(SmalltalkOOP contextOOP, int tempIndex, SmalltalkOOP valueOOP)
     {
-        int remainingIndex = tempIndex;
-        var currentContextOOP = contextOOP;
-        int depth = 0;
-        const int MAX_DEPTH = 100; // Safety limit for traversal
+        var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
+        bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
 
-        while (depth < MAX_DEPTH)
+        if (isBlockContext)
         {
-            // Check if this is a BlockContext or MethodContext
-            var contextClassOOP = _heapManager.GetClassOOP(currentContextOOP);
-            bool isBlockContext = false;  // BlockContext support removed - using BlockClosure only
+            // BlockContext: Check if writing to local args or need to traverse home chain
+            var nargsOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
+            int nargs = nargsOOP.AsSmallInteger();
 
-            // Get method - for BlockContext, get from home MethodContext
-            SmalltalkOOP methodOOP;
-            if (isBlockContext)
+            if (tempIndex < nargs)
             {
-                // BlockContext: get method from home MethodContext
-                var homeOOP = _heapManager.GetInstanceVariable(currentContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                methodOOP = _heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
+                // Local block argument - stored in THIS BlockContext's indexed slots
+                _heapManager.SetIndexedOOP(contextOOP, tempIndex, valueOOP);
+                return;
             }
             else
             {
-                // MethodContext: method is in slot 3
-                methodOOP = _heapManager.GetInstanceVariable(currentContextOOP, VMConstants.CONTEXT_METHOD_INDEX);
-            }
-
-            var header = ParseMethodHeader(methodOOP);
-            int localCount = header.NumArgs + header.NumTemps;
-
-            if (remainingIndex < localCount)
-            {
-                // Variable is in this context
-                _heapManager.SetIndexedOOP(currentContextOOP, remainingIndex, valueOOP);
+                // Parent temp or argument - RECURSIVELY traverse home chain
+                var homeOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                // Adjust index by subtracting our local count and recurse
+                WriteTemp(homeOOP, tempIndex - nargs, valueOOP);
                 return;
             }
-
-            // Not in this context - traverse to lexical parent
-            remainingIndex -= localCount;
-            var lexicalParentOOP = _heapManager.GetInstanceVariable(currentContextOOP, VMConstants.CONTEXT_LEXICALPARENT_INDEX);
-
-            if (lexicalParentOOP == SpecialObjectsArray.Instance.Nil)
-            {
-                throw new InvalidOperationException(
-                    $"WriteTemp: Temp index {tempIndex} out of range (remainingIndex={remainingIndex}, traversed {depth} contexts)");
-            }
-
-            currentContextOOP = lexicalParentOOP;
-            depth++;
         }
-
-        throw new InvalidOperationException(
-            $"WriteTemp: Max traversal depth exceeded (tempIndex={tempIndex}, depth={MAX_DEPTH})");
+        else
+        {
+            // MethodContext: Direct write to method's temp frame
+            _heapManager.SetIndexedOOP(contextOOP, tempIndex, valueOOP);
+            return;
+        }
     }
 
     /// <summary>

@@ -118,6 +118,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // - Bit 4: isIndexable flag
         // - Bit 3: hasPointers flag
         int formatValue = formatOOP.AsSmallInteger();
+
         int instanceSpec = (formatValue >> 12) & 0x03;
         int instanceVariableCount = (formatValue >> 6) & 0x3F; // Bits 6-11
         bool isIndexable = (formatValue & 0x10) != 0;
@@ -146,29 +147,8 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // C# arrays default to SmalltalkOOP(0), but we need nil
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // DEBUG: Log allocations (limit output to first 50 runtime allocations)
+        // Track runtime allocations for debugging
         System.Threading.Interlocked.Increment(ref _runtimeAllocationCount);
-
-        // DIAGNOSTIC: Always log Array allocations to debug USTable bucket issue
-        string? className = null;
-        try
-        {
-            className = GetClassName(classOOP);
-        }
-        catch { /* Ignore - early in initialization */ }
-
-        if (className == "Array" && indexedSize > 0)
-        {
-            Console.WriteLine($"[AllocateInstanceOf ARRAY] {classOOP} → {newInstanceOOP} | format={format}, iVars={instanceVariableCount}, indexed={indexedSize}");
-        }
-        else if (VerboseDebugMode && _runtimeAllocationCount <= 50)
-        {
-            Console.WriteLine($"[AllocateInstanceOf #{_runtimeAllocationCount}] {classOOP} → {newInstanceOOP} | format={format}, iVars={instanceVariableCount}, indexed={indexedSize}");
-        }
-        else if (VerboseDebugMode && _runtimeAllocationCount == 51)
-        {
-            Console.WriteLine($"[AllocateInstanceOf] (suppressing after 50 allocations)");
-        }
 
         // DEBUG: Verify nil OOP is not zero
         if (nilOOP.RawValue == 0)
@@ -191,17 +171,6 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             for (int i = 0; i < indexedSize; i++)
             {
                 SetIndexedOOP(newInstanceOOP, i, nilOOP);
-            }
-
-            // DIAGNOSTIC: Verify Array initialization worked correctly
-            if (className == "Array" && indexedSize > 0)
-            {
-                var slot0 = GetIndexedOOP(newInstanceOOP, 0);
-                Console.WriteLine($"  [VERIFY] Array {newInstanceOOP} slot[0] = {slot0} (should be nil={nilOOP})");
-                if (slot0 != nilOOP)
-                {
-                    Console.WriteLine($"    ERROR: Array slot[0] is NOT nil! It's {slot0}");
-                }
             }
         }
 

@@ -2,6 +2,7 @@ namespace Smalltalk80.Interpreter.Core.Memory;
 
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
 /// The Special Objects Array - GC roots for the Smalltalk-80 Virtual Machine.
@@ -94,22 +95,21 @@ public readonly struct SpecialObjectsArray
     }
 
     /// <summary>
-    /// Gets the active process (6th root, accessed via ProcessorScheduler).
+    /// Gets the active process from ProcessorScheduler.activeProcess field.
+    /// Requires heap manager access to dereference the field.
     /// This is not stored separately per Blue Book spec - it's ProcessorScheduler.activeProcess.
     /// </summary>
-    public SmalltalkOOP ActiveProcess
+    /// <param name="heapManager">Heap manager for field access</param>
+    /// <returns>The active process OOP, or Null if not available</returns>
+    public SmalltalkOOP GetActiveProcess(ISmalltalkHeapManager heapManager)
     {
-        get
-        {
-            if (ProcessorScheduler == SmalltalkOOP.Null)
-                return SmalltalkOOP.Null;
-
-            // ProcessorScheduler.activeProcess is field index 1
-            // TODO: Get actual field index from layout when LayoutManagement is implemented
-            // Note: This needs to be implemented via heap manager when available
-            // For now return null as placeholder
+        if (ProcessorScheduler == SmalltalkOOP.Null)
             return SmalltalkOOP.Null;
-        }
+
+        // ProcessorScheduler.activeProcess is field index 1 per VMConstants
+        return heapManager.GetInstanceVariable(
+            ProcessorScheduler,
+            VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
     }
 
     /// <summary>
@@ -128,10 +128,13 @@ public readonly struct SpecialObjectsArray
 
     /// <summary>
     /// Returns all roots including ActiveProcess for comprehensive GC.
+    /// NOTE: ActiveProcess is reachable from ProcessorScheduler, so this is mainly
+    /// for explicit rooting. The standard GetRootsForGC() is sufficient for normal GC.
     /// </summary>
-    public SmalltalkOOP[] GetAllRootsForGC()
+    /// <param name="heapManager">Heap manager for accessing activeProcess field</param>
+    public SmalltalkOOP[] GetAllRootsForGC(ISmalltalkHeapManager heapManager)
     {
-        var activeProcess = ActiveProcess;
+        var activeProcess = GetActiveProcess(heapManager);
         var roots = new List<SmalltalkOOP> { Nil, False, True, Smalltalk, ProcessorScheduler };
 
         if (InitExpressionMethods != SmalltalkOOP.Null)

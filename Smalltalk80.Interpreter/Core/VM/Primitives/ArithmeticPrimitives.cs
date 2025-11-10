@@ -65,6 +65,7 @@ public static class ArithmeticPrimitives
         // Our calling convention passes arguments separately, validate single argument
         if (args.Length != 1)
         {
+            Console.WriteLine($"[Primitive 1: Add] FAILED - Wrong argument count: {args.Length}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -73,6 +74,9 @@ public static class ArithmeticPrimitives
         // Validate both receiver and argument are SmallIntegers (tagged with low bit set)
         if (!receiver.IsSmallInteger || !args[0].IsSmallInteger)
         {
+            Console.WriteLine($"[Primitive 1: Add] FAILED - Not both SmallIntegers");
+            Console.WriteLine($"[Primitive 1: Add]   receiver: IsSmallInteger={receiver.IsSmallInteger}, RawValue=0x{receiver.RawValue:X}");
+            Console.WriteLine($"[Primitive 1: Add]   argument: IsSmallInteger={args[0].IsSmallInteger}, RawValue=0x{args[0].RawValue:X}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -92,6 +96,7 @@ public static class ArithmeticPrimitives
             if (result < SmallIntegerMin || result > SmallIntegerMax)
             {
                 // Overflow SmallInteger range - fail primitive, let Smalltalk handle with LargeInteger
+                Console.WriteLine($"[Primitive 1: Add] FAILED - Overflow SmallInteger range: {a} + {b} = {result}");
                 ctx.PrimitiveSuccess = false;
                 return SpecialObjectsArray.Instance.Nil;
             }
@@ -103,6 +108,7 @@ public static class ArithmeticPrimitives
         catch (OverflowException)
         {
             // Int32 overflow detected by checked arithmetic - fail primitive
+            Console.WriteLine($"[Primitive 1: Add] FAILED - Int32 overflow: {a} + {b}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }

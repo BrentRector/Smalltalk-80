@@ -436,7 +436,6 @@ public class RuntimeSpecialObjects
     private SmalltalkOOP? _compiledMethodClass;
     private SmalltalkOOP? _byteArrayClass;
     private SmalltalkOOP? _methodContextClass;
-    private SmalltalkOOP? _blockContextClass;
     private SmalltalkOOP? _blockClosureClass;
     private SmalltalkOOP? _dictionaryClass;
     private SmalltalkOOP? _arrayClass;
@@ -468,9 +467,6 @@ public class RuntimeSpecialObjects
     public SmalltalkOOP MethodContextClass =>
         _methodContextClass ??= LookupClass("MethodContext");
 
-    public SmalltalkOOP BlockContextClass =>
-        _blockContextClass ??= LookupClass("BlockContext");
-
     public SmalltalkOOP BlockClosureClass =>
         _blockClosureClass ??= LookupClass("BlockClosure");
 
@@ -494,7 +490,6 @@ public class RuntimeSpecialObjects
         _compiledMethodClass = null;
         _byteArrayClass = null;
         _methodContextClass = null;
-        _blockContextClass = null;
         _blockClosureClass = null;
         _dictionaryClass = null;
         _arrayClass = null;

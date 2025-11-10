@@ -154,7 +154,12 @@ public enum Bytecode : byte
 
     // 0x80 - 0xAF  Extended operations (prefix 0x80 + sub-op bytes)
     EXTENDED_PREFIX   = 0x80,
-    // 0x81..0xAF reserved/variant extended encodings
+    // 0x81..0x88 reserved/variant extended encodings
+
+    // 0x89 - Push active context (for blockCopy: primitive)
+    PUSH_ACTIVE_CONTEXT = 0x89, // LdThisContext - pushes current execution context
+
+    // 0x8A..0xAF reserved/variant extended encodings
 
     // 0xB0 - 0xBF  Send arithmetic selector with 0, 1, or 2 args
     SEND_ARITH_PLUS        = 0xB0, // +
@@ -258,9 +263,9 @@ public static class BytecodeUtil
     public static int PushIvarIndex(byte op) => op & 0x0F;
 
     // Push temporary/argument (0x10 - 0x1F)
-    // NOTE: Exclude 0x14-0x19 which are control flow opcodes (JUMP_TRUE, JUMP_FALSE, JUMP, etc.)
-    // even though they fall in the PUSH_TEMP range
-    public static bool IsPushTemp(byte op) => op >= 0x10 && op <= 0x13;
+    // Blue Book Chapter 28: "16-31 | 0001iiii | Push Temporary Location #iiii"
+    // All 16 bytecodes in this range are PUSH_TEMP (0x10 through 0x1F)
+    public static bool IsPushTemp(byte op) => op >= 0x10 && op <= 0x1F;
     public static int PushTempIndex(byte op) => op & 0x0F;
 
     // Push literal constant (0x20 - 0x3F)

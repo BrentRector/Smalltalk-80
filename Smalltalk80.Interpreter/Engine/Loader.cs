@@ -207,10 +207,6 @@ public class Loader
 
         int thisClassIdx = LayoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
 
-        // Debug: Check if BlockContext is registered
-        bool hasBlockContext = GlobalRegistry.TryGet("class:BlockContext", out var blockContextOOP);
-        Console.WriteLine($"[Loader] GlobalRegistry has class:BlockContext = {hasBlockContext}, OOP = {blockContextOOP}");
-
         var metadata = new VMMetadata
         {
             ClassNameFieldIndex = LayoutResolver.GetFieldIndex("class:Class", "name"),
@@ -228,11 +224,9 @@ public class Loader
             ArrayClassOOP = GlobalRegistry.Get("class:Array"),
             CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
-            BlockContextClassOOP = hasBlockContext ? blockContextOOP : default(SmalltalkOOP),
-            BlockClosureClassOOP = GlobalRegistry.Get("class:BlockClosure")
+            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext")
         };
 
-        Console.WriteLine($"[Loader] VMMetadata.BlockContextClassOOP = {metadata.BlockContextClassOOP}");
         return metadata;
     }
 

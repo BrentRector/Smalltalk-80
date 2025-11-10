@@ -25,23 +25,22 @@
     </ProjectReference>
   </ItemGroup>
   
-  <!-- Copy coldstart.json from Compiler output to Interpreter output after Compiler builds -->
-  <Target Name="CopyColdStartJson" AfterTargets="Build">
+  <!-- Verify coldstart.json exists after build -->
+  <Target Name="VerifyColdStartJson" AfterTargets="Build">
     <PropertyGroup>
-      <!-- Compiler outputs to shared bin directory: bin/Debug/net9.0/coldstart.json -->
-      <ColdStartSource>$(OutDir)coldstart.json</ColdStartSource>
+      <!-- Both Compiler and Interpreter output to shared bin directory: bin/Debug/net9.0/ -->
+      <ColdStartFile>$(OutDir)coldstart.json</ColdStartFile>
     </PropertyGroup>
 
     <!-- Check if coldstart.json exists in output directory -->
     <Message
-      Text="coldstart.json found: $(ColdStartSource)"
+      Text="✓ coldstart.json found: $(ColdStartFile)"
       Importance="high"
-      Condition="Exists('$(ColdStartSource)')" />
+      Condition="Exists('$(ColdStartFile)')" />
 
-    <Message
-      Text="coldstart.json not found: $(ColdStartSource) - run Compiler to generate it"
-      Importance="high"
-      Condition="!Exists('$(ColdStartSource)')" />
+    <Warning
+      Text="⚠ coldstart.json not found: $(ColdStartFile) - Compiler should have generated it"
+      Condition="!Exists('$(ColdStartFile)')" />
   </Target>
 
 

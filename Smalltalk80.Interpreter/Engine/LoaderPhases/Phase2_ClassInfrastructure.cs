@@ -344,18 +344,9 @@ public class Phase2_ClassInfrastructure
             // Set format field (encode as SmallInteger for AllocateInstance)
             int format = cls.Format;
 
-            // WORKAROUND: Fix compiler bug where MethodContext and BlockContext are incorrectly
-            // marked as word-indexable (instance_spec=2) instead of pointer-indexable (instance_spec=1)
-            // These classes need to store object pointers in their indexed fields for args/temps
-            if (className == "MethodContext" || className == "BlockContext")
-            {
-                int instanceSpec = (format >> 12) & 0x3;
-                if (instanceSpec == 2) // word-indexable
-                {
-                    // Convert to pointer-indexable: change instance_spec from 2 to 1
-                    format = (format & 0x0FFF) | (1 << 12); // Clear top 4 bits, set instance_spec=1
-                }
-            }
+            // NOTE: MethodContext and BlockContext use instanceSpec=2 with hasPointers=true and isIndexable=true
+            // This correctly maps to ObjectFormat.PointerIndexed, allowing them to store both fixed fields
+            // (sender, pc, stackp, method, etc.) and indexed slots for arguments/temps/stack.
 
             if (ClassHierarchyUtils.HasInstanceVariable(templateClassName, "format", _bundle))
             {

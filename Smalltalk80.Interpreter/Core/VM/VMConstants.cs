@@ -65,7 +65,8 @@ public static class VMConstants
     //   Slot 4: startpc (BlockContext field) - saved PC (called initialIP in Blue Book)
     //   Slot 5: home (BlockContext field) - lexical parent MethodContext
     //   Slot 6+: indexed temps/stack (variable part)
-
+    //
+    // Blue Book BlockContext - used by primitives 80, 81, 82
     public const int BLOCKCONTEXT_CALLER_INDEX = 0;        // sender field (from InstructionStream)
     public const int BLOCKCONTEXT_PC_INDEX = 1;            // pc field (from InstructionStream)
     public const int BLOCKCONTEXT_STACKP_INDEX = 2;        // stackp field (from ContextPart)

@@ -29,5 +29,4 @@ public class VMMetadata
     public SmalltalkOOP CompiledMethodClassOOP { get; init; }
     public SmalltalkOOP SmallIntegerClassOOP { get; init; }
     public SmalltalkOOP BlockContextClassOOP { get; init; }
-    public SmalltalkOOP BlockClosureClassOOP { get; init; }
 }
