@@ -1,0 +1,9 @@
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs(2846,31): error CS1501: No overload for method 'CreateMethodContext' takes 5 arguments [D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\Smalltalk80.Interpreter.Core.csproj]
+
+Build FAILED.
+
+D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs(2846,31): error CS1501: No overload for method 'CreateMethodContext' takes 5 arguments [D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\Smalltalk80.Interpreter.Core.csproj]
+    0 Warning(s)
+    1 Error(s)
+
+Time Elapsed 00:00:00.70

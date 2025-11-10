@@ -1,0 +1,2720 @@
+EXEC : warning : 353 undeclared variable(s) found during compilation: [D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj]
+Smalltalk-80 Interpreter
+========================
+
+Loading cold start bundle: ../bin/Debug/net9.0/coldstart_with_tests.json
+Bundle loaded: 1.0.7
+  Symbols: 5484
+  Classes: 472
+  Objects: 2
+  Methods: 4820
+
+Initializing heap manager...
+Starting cold start loader (6-phase)...
+
+=== Cold Start Loader (New 6-Phase Architecture) ===
+
+Phase 1: Preflight + Symbol Interning... ✓ (99ms)
+Phase 2: Class Infrastructure... ✓ (32ms)
+Phase 3: Object Allocation... ✓ (14ms)
+Phase 4: Method Compilation... ✓ (408ms)
+Phase 5: Globals + Patches... ✓ (65ms)
+Phase 6: Validation + GC Verification... ✓ (101ms)
+
+=== Cold Start Complete ===
+
+Cold start completed successfully!
+
+=== Init Expression Execution ===
+  Found 281 init expression(s) in bundle (DISABLED)
+
+=== Reordered init expressions for infrastructure ===
+  Running: SmallInteger → Float → Character → Symbol → WindowsFileSystem
+  SmallInteger FIRST (Digitbuffer prevents infinite recursion in error handling)
+  Character early (CharacterTable needed by String/Symbol)
+  Symbol early (SingleCharSymbols needed for symbol interning)
+
+
+=== Executing ALL Initialize Expressions ===
+  Total initialize! expressions: 33
+  Will attempt to execute all of them
+
+[BYTECODE] 0x41 (65) in method 
+[BYTECODE] 0xD0 (208) in method 
+[CreateMethodContext #1] method=method:SmallInteger_class>>initialize, receiver=oop=11768
+[BYTECODE] 0x45 (69) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x2A (42) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xCD (205) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x74 (116) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x75 (117) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x75 (117) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xC8 (200) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xA1 (161) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x75 (117) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xC8 (200) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xA1 (161) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE2 (226) in method method:SmallInteger_class>>initialize
+[CreateMethodContext #2] method=method:BlockContext>>whileTrue:, receiver=oop=63996
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[CreateMethodContext #3] method=method:Object>>notNil, receiver=SmallInteger(-2)
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #4] method=method:True>>ifTrue:, receiver=oop=13970
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64006, method=method:True>>ifTrue:, index=0, value=oop=64004
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64004, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64000, new index=0
+[GetTemp] MethodContext oop=oop=64000, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(0)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64004, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64000, new index=0
+[GetTemp] MethodContext oop=oop=64000, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #5] method=method:BlockContext>>whileTrue:, receiver=oop=63996
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-2)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[CreateMethodContext #6] method=method:Object>>notNil, receiver=SmallInteger(-3)
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #7] method=method:True>>ifTrue:, receiver=oop=13970
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64014, method=method:True>>ifTrue:, index=0, value=oop=64012
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64012, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64008, new index=0
+[GetTemp] MethodContext oop=oop=64008, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-2)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-2)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(1)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64012, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64008, new index=0
+[GetTemp] MethodContext oop=oop=64008, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #8] method=method:BlockContext>>whileTrue:, receiver=oop=63996
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-4)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[CreateMethodContext #9] method=method:Object>>notNil, receiver=SmallInteger(-5)
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #10] method=method:True>>ifTrue:, receiver=oop=13970
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64022, method=method:True>>ifTrue:, index=0, value=oop=64020
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64020, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64016, new index=0
+[GetTemp] MethodContext oop=oop=64016, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-4)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-4)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(2)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64020, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64016, new index=0
+[GetTemp] MethodContext oop=oop=64016, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #11] method=method:BlockContext>>whileTrue:, receiver=oop=63996
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-8)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[CreateMethodContext #12] method=method:Object>>notNil, receiver=SmallInteger(-9)
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #13] method=method:True>>ifTrue:, receiver=oop=13970
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64030, method=method:True>>ifTrue:, index=0, value=oop=64028
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64028, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64024, new index=0
+[GetTemp] MethodContext oop=oop=64024, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-8)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-8)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(3)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64028, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64024, new index=0
+[GetTemp] MethodContext oop=oop=64024, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #14] method=method:BlockContext>>whileTrue:, receiver=oop=63996
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-16)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[CreateMethodContext #15] method=method:Object>>notNil, receiver=SmallInteger(-17)
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #16] method=method:True>>ifTrue:, receiver=oop=13970
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64038, method=method:True>>ifTrue:, index=0, value=oop=64036
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64036, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64032, new index=0
+[GetTemp] MethodContext oop=oop=64032, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-16)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-16)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(4)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64036, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64032, new index=0
+[GetTemp] MethodContext oop=oop=64032, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #17] method=method:BlockContext>>whileTrue:, receiver=oop=63996
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-32)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[CreateMethodContext #18] method=method:Object>>notNil, receiver=SmallInteger(-33)
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #19] method=method:True>>ifTrue:, receiver=oop=13970
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64046, method=method:True>>ifTrue:, index=0, value=oop=64044
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64044, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64040, new index=0
+[GetTemp] MethodContext oop=oop=64040, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-32)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-32)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(5)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64044, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64040, new index=0
+[GetTemp] MethodContext oop=oop=64040, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #20] method=method:BlockContext>>whileTrue:, receiver=oop=63996
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-64)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64054, method=method:True>>ifTrue:, index=0, value=oop=64052
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64052, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64048, new index=0
+[GetTemp] MethodContext oop=oop=64048, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-64)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-64)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(6)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64052, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64048, new index=0
+[GetTemp] MethodContext oop=oop=64048, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-128)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64062, method=method:True>>ifTrue:, index=0, value=oop=64060
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64060, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64056, new index=0
+[GetTemp] MethodContext oop=oop=64056, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-128)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-128)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(7)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64060, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64056, new index=0
+[GetTemp] MethodContext oop=oop=64056, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-256)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64070, method=method:True>>ifTrue:, index=0, value=oop=64068
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64068, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64064, new index=0
+[GetTemp] MethodContext oop=oop=64064, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-256)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-256)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(8)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64068, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64064, new index=0
+[GetTemp] MethodContext oop=oop=64064, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-512)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64078, method=method:True>>ifTrue:, index=0, value=oop=64076
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64076, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64072, new index=0
+[GetTemp] MethodContext oop=oop=64072, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-512)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-512)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(9)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64076, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64072, new index=0
+[GetTemp] MethodContext oop=oop=64072, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1024)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64086, method=method:True>>ifTrue:, index=0, value=oop=64084
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64084, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64080, new index=0
+[GetTemp] MethodContext oop=oop=64080, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1024)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1024)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(10)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64084, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64080, new index=0
+[GetTemp] MethodContext oop=oop=64080, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-2048)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64094, method=method:True>>ifTrue:, index=0, value=oop=64092
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64092, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64088, new index=0
+[GetTemp] MethodContext oop=oop=64088, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-2048)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-2048)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(11)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64092, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64088, new index=0
+[GetTemp] MethodContext oop=oop=64088, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-4096)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64102, method=method:True>>ifTrue:, index=0, value=oop=64100
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64100, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64096, new index=0
+[GetTemp] MethodContext oop=oop=64096, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-4096)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-4096)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(12)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64100, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64096, new index=0
+[GetTemp] MethodContext oop=oop=64096, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-8192)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64110, method=method:True>>ifTrue:, index=0, value=oop=64108
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64108, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64104, new index=0
+[GetTemp] MethodContext oop=oop=64104, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-8192)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-8192)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(13)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64108, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64104, new index=0
+[GetTemp] MethodContext oop=oop=64104, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-16384)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64118, method=method:True>>ifTrue:, index=0, value=oop=64116
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64116, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64112, new index=0
+[GetTemp] MethodContext oop=oop=64112, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-16384)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-16384)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(14)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64116, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64112, new index=0
+[GetTemp] MethodContext oop=oop=64112, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-32768)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64126, method=method:True>>ifTrue:, index=0, value=oop=64124
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64124, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64120, new index=0
+[GetTemp] MethodContext oop=oop=64120, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-32768)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-32768)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(15)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64124, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64120, new index=0
+[GetTemp] MethodContext oop=oop=64120, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-65536)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64134, method=method:True>>ifTrue:, index=0, value=oop=64132
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64132, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64128, new index=0
+[GetTemp] MethodContext oop=oop=64128, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-65536)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-65536)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(16)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64132, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64128, new index=0
+[GetTemp] MethodContext oop=oop=64128, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-131072)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64142, method=method:True>>ifTrue:, index=0, value=oop=64140
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64140, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64136, new index=0
+[GetTemp] MethodContext oop=oop=64136, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-131072)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-131072)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(17)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64140, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64136, new index=0
+[GetTemp] MethodContext oop=oop=64136, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-262144)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64150, method=method:True>>ifTrue:, index=0, value=oop=64148
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64148, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64144, new index=0
+[GetTemp] MethodContext oop=oop=64144, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-262144)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-262144)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(18)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64148, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64144, new index=0
+[GetTemp] MethodContext oop=oop=64144, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-524288)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64158, method=method:True>>ifTrue:, index=0, value=oop=64156
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64156, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64152, new index=0
+[GetTemp] MethodContext oop=oop=64152, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-524288)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-524288)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(19)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64156, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64152, new index=0
+[GetTemp] MethodContext oop=oop=64152, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1048576)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64166, method=method:True>>ifTrue:, index=0, value=oop=64164
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64164, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64160, new index=0
+[GetTemp] MethodContext oop=oop=64160, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1048576)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1048576)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(20)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64164, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64160, new index=0
+[GetTemp] MethodContext oop=oop=64160, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-2097152)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64174, method=method:True>>ifTrue:, index=0, value=oop=64172
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64172, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64168, new index=0
+[GetTemp] MethodContext oop=oop=64168, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-2097152)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-2097152)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(21)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64172, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64168, new index=0
+[GetTemp] MethodContext oop=oop=64168, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-4194304)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64182, method=method:True>>ifTrue:, index=0, value=oop=64180
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64180, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64176, new index=0
+[GetTemp] MethodContext oop=oop=64176, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-4194304)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-4194304)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(22)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64180, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64176, new index=0
+[GetTemp] MethodContext oop=oop=64176, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-8388608)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64190, method=method:True>>ifTrue:, index=0, value=oop=64188
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64188, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64184, new index=0
+[GetTemp] MethodContext oop=oop=64184, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-8388608)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-8388608)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(23)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64188, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64184, new index=0
+[GetTemp] MethodContext oop=oop=64184, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-16777216)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64198, method=method:True>>ifTrue:, index=0, value=oop=64196
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64196, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64192, new index=0
+[GetTemp] MethodContext oop=oop=64192, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-16777216)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-16777216)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(24)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64196, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64192, new index=0
+[GetTemp] MethodContext oop=oop=64192, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-33554432)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64206, method=method:True>>ifTrue:, index=0, value=oop=64204
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64204, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64200, new index=0
+[GetTemp] MethodContext oop=oop=64200, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-33554432)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-33554432)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(25)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64204, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64200, new index=0
+[GetTemp] MethodContext oop=oop=64200, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-67108864)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64214, method=method:True>>ifTrue:, index=0, value=oop=64212
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64212, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64208, new index=0
+[GetTemp] MethodContext oop=oop=64208, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-67108864)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-67108864)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(26)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64212, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64208, new index=0
+[GetTemp] MethodContext oop=oop=64208, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-134217728)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64222, method=method:True>>ifTrue:, index=0, value=oop=64220
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64220, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64216, new index=0
+[GetTemp] MethodContext oop=oop=64216, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-134217728)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-134217728)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(27)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64220, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64216, new index=0
+[GetTemp] MethodContext oop=oop=64216, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-268435456)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64230, method=method:True>>ifTrue:, index=0, value=oop=64228
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64228, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64224, new index=0
+[GetTemp] MethodContext oop=oop=64224, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-268435456)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-268435456)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(28)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64228, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64224, new index=0
+[GetTemp] MethodContext oop=oop=64224, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-536870912)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x71 (113) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:Object>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64238, method=method:True>>ifTrue:, index=0, value=oop=64236
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64236, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64232, new index=0
+[GetTemp] MethodContext oop=oop=64232, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-536870912)
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-536870912)
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x68 (104) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63998, index=1, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=1
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(29)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x69 (105) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64236, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64232, new index=0
+[GetTemp] MethodContext oop=oop=64232, method=method:BlockContext>>whileTrue:, index=0, value=oop=63998
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] BlockContext oop=oop=63996, index=0, nargs=0
+[GetTemp] Traversing to home: oop=63992, new index=0
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1073741824)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xE0 (224) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x73 (115) in method method:SmallInteger>>subtractOrFail:
+[BYTECODE] 0x7C (124) in method method:SmallInteger>>subtractOrFail:
+[BYTECODE] 0xD1 (209) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x72 (114) in method method:UndefinedObject>>notNil
+[BYTECODE] 0x7C (124) in method method:UndefinedObject>>notNil
+[BYTECODE] 0x7C (124) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1073741824)
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x10 (16) in method method:SmallInteger_class>>initialize
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=0, value=SmallInteger(-1073741824)
+[BYTECODE] 0x76 (118) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xD3 (211) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x75 (117) in method method:Number>>negated
+[BYTECODE] 0x70 (112) in method method:Number>>negated
+[BYTECODE] 0xB1 (177) in method method:Number>>negated
+[BYTECODE] 0x7C (124) in method method:Number>>negated
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(30)
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x11 (17) in method method:SmallInteger_class>>initialize
+[GetTemp] MethodContext oop=oop=63992, method=method:SmallInteger_class>>initialize, index=1, value=SmallInteger(30)
+[BYTECODE] 0x2B (43) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xB0 (176) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x2C (44) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0xBD (189) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x80 (128) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x78 (120) in method method:SmallInteger_class>>initialize
+[BYTECODE] 0x41 (65) in method 
+[BYTECODE] 0xD0 (208) in method 
+[BYTECODE] 0x2C (44) in method method:Float_class>>initialize
+[BYTECODE] 0x80 (128) in method method:Float_class>>initialize
+[BYTECODE] 0x40 (64) in method method:Float_class>>initialize
+[BYTECODE] 0x2D (45) in method method:Float_class>>initialize
+[BYTECODE] 0xB9 (185) in method method:Float_class>>initialize
+[BYTECODE] 0x10 (16) in method method:Float>>/
+[GetTemp] MethodContext oop=oop=64258, method=method:Float>>/, index=0, value=oop=38146
+[BYTECODE] 0x75 (117) in method method:Float>>/
+[BYTECODE] 0xB6 (182) in method method:Float>>/
+[BYTECODE] 0x70 (112) in method method:Float>>=
+[BYTECODE] 0x21 (33) in method method:Float>>=
+[BYTECODE] 0x10 (16) in method method:Float>>=
+[GetTemp] MethodContext oop=oop=64260, method=method:Float>>=, index=0, value=SmallInteger(0)
+[BYTECODE] 0xF0 (240) in method method:Float>>=
+[GetTemp] MethodContext oop=oop=64262, method=method:Number>>retry:coercing:, index=0, value=oop=26
+[GetTemp] MethodContext oop=oop=64266, method=method:True>>and:, index=0, value=oop=64264
+[GetTemp] BlockContext oop=oop=64264, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64262, new index=1
+[GetTemp] MethodContext oop=oop=64262, method=method:Number>>retry:coercing:, index=1, value=SmallInteger(0)
+[GetTemp] MethodContext oop=oop=64268, method=method:Object>>isKindOf:, index=0, value=oop=11600
+[GetTemp] MethodContext oop=oop=64274, method=method:False>>ifTrue:ifFalse:, index=1, value=oop=64272
+[GetTemp] BlockContext oop=oop=64272, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64268, new index=0
+[GetTemp] MethodContext oop=oop=64268, method=method:Object>>isKindOf:, index=0, value=oop=11600
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=11768, receiverClass=SmallInteger class, method=method:Behavior>>superclasses
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=11768, receiverClass=SmallInteger class, method=method:Behavior>>superclasses
+[GetTemp] MethodContext oop=oop=64292, method=method:ArrayedCollection_class>>with:, index=1, value=oop=64294
+[GetTemp] MethodContext oop=oop=64292, method=method:ArrayedCollection_class>>with:, index=0, value=oop=11456
+[GetTemp] MethodContext oop=oop=64292, method=method:ArrayedCollection_class>>with:, index=1, value=oop=64294
+[GetTemp] BlockContext oop=oop=64300, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64298, new index=1
+[GetTemp] MethodContext oop=oop=64298, method=method:SequenceableCollection>>do:, index=1, value=SmallInteger(0)
+[GetTemp] BlockContext oop=oop=64300, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64298, new index=2
+[GetTemp] MethodContext oop=oop=64298, method=method:SequenceableCollection>>do:, index=2, value=SmallInteger(1)
+[GetTemp] MethodContext oop=oop=64308, method=method:True>>ifTrue:, index=0, value=oop=64306
+[GetTemp] BlockContext oop=oop=64306, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64304, new index=0
+[GetTemp] MethodContext oop=oop=64304, method=method:BlockContext>>whileTrue:, index=0, value=oop=64302
+[GetTemp] BlockContext oop=oop=64302, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64298, new index=0
+[GetTemp] MethodContext oop=oop=64298, method=method:SequenceableCollection>>do:, index=0, value=oop=64296
+[GetTemp] BlockContext oop=oop=64302, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64298, new index=1
+[GetTemp] MethodContext oop=oop=64298, method=method:SequenceableCollection>>do:, index=1, value=SmallInteger(1)
+[GetTemp] BlockContext oop=oop=64296, index=0, nargs=1
+[GetTemp] Local arg: indexed[0] = oop=11456
+[GetTemp] BlockContext oop=oop=64296, index=0, nargs=1
+[GetTemp] Local arg: indexed[0] = oop=11456
+[GetTemp] MethodContext oop=oop=64316, method=method:True>>ifTrue:, index=0, value=oop=64314
+[GetTemp] BlockContext oop=oop=64306, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64304, new index=0
+[GetTemp] MethodContext oop=oop=64304, method=method:BlockContext>>whileTrue:, index=0, value=oop=64302
+[GetTemp] BlockContext oop=oop=64300, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64298, new index=1
+[GetTemp] MethodContext oop=oop=64298, method=method:SequenceableCollection>>do:, index=1, value=SmallInteger(1)
+[GetTemp] BlockContext oop=oop=64300, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64298, new index=2
+[GetTemp] MethodContext oop=oop=64298, method=method:SequenceableCollection>>do:, index=2, value=SmallInteger(1)
+[BYTECODE] 0x80 (128) in method method:SequenceableCollection>>do:
+[BYTECODE] 0x78 (120) in method method:SequenceableCollection>>do:
+[BYTECODE] 0x80 (128) in method method:Behavior>>inheritsFrom:
+[BYTECODE] 0x72 (114) in method method:Behavior>>inheritsFrom:
+[BYTECODE] 0x7C (124) in method method:Behavior>>inheritsFrom:
+[BYTECODE] 0x7E (126) in method method:Object>>isKindOf:
+[BYTECODE] 0x72 (114) in method method:Number>>retry:coercing:
+[BYTECODE] 0xC6 (198) in method method:Number>>retry:coercing:
+[BYTECODE] 0x7C (124) in method method:Number>>retry:coercing:
+[BYTECODE] 0x7C (124) in method method:True>>and:
+[BYTECODE] 0x89 (137) in method method:Number>>retry:coercing:
+[BYTECODE] 0x75 (117) in method method:Number>>retry:coercing:
+[BYTECODE] 0xC8 (200) in method method:Number>>retry:coercing:
+[BYTECODE] 0xA1 (161) in method method:Number>>retry:coercing:
+[BYTECODE] 0xE2 (226) in method method:Number>>retry:coercing:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64326, method=method:True>>ifTrue:, index=0, value=oop=64324
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x72 (114) in method method:Number>>retry:coercing:
+[BYTECODE] 0x7E (126) in method method:Number>>retry:coercing:
+[BYTECODE] 0x7C (124) in method method:Float>>=
+[BYTECODE] 0x89 (137) in method method:Float>>/
+[BYTECODE] 0x75 (117) in method method:Float>>/
+[BYTECODE] 0xC8 (200) in method method:Float>>/
+[BYTECODE] 0xA1 (161) in method method:Float>>/
+[BYTECODE] 0x89 (137) in method method:Float>>/
+[BYTECODE] 0x75 (117) in method method:Float>>/
+[BYTECODE] 0xC8 (200) in method method:Float>>/
+[BYTECODE] 0xA1 (161) in method method:Float>>/
+[BYTECODE] 0xF0 (240) in method method:Float>>/
+[BYTECODE] 0x11 (17) in method method:False>>ifTrue:ifFalse:
+[GetTemp] MethodContext oop=oop=64332, method=method:False>>ifTrue:ifFalse:, index=1, value=oop=64330
+[BYTECODE] 0xC9 (201) in method method:False>>ifTrue:ifFalse:
+[BYTECODE] 0x70 (112) in method method:Float>>/
+[BYTECODE] 0x23 (35) in method method:Float>>/
+[BYTECODE] 0x10 (16) in method method:Float>>/
+[GetTemp] BlockContext oop=oop=64330, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64258, new index=0
+[GetTemp] MethodContext oop=oop=64258, method=method:Float>>/, index=0, value=oop=38146
+[BYTECODE] 0xF2 (242) in method method:Float>>/
+[BYTECODE] 0x10 (16) in method method:Number>>retry:coercing:
+[GetTemp] MethodContext oop=oop=64334, method=method:Number>>retry:coercing:, index=0, value=oop=12
+[BYTECODE] 0x27 (39) in method method:Number>>retry:coercing:
+[BYTECODE] 0xC6 (198) in method method:Number>>retry:coercing:
+[BYTECODE] 0x89 (137) in method method:Number>>retry:coercing:
+[BYTECODE] 0x75 (117) in method method:Number>>retry:coercing:
+[BYTECODE] 0xC8 (200) in method method:Number>>retry:coercing:
+[BYTECODE] 0xA1 (161) in method method:Number>>retry:coercing:
+[BYTECODE] 0xE0 (224) in method method:Number>>retry:coercing:
+[BYTECODE] 0x70 (112) in method method:False>>and:
+[BYTECODE] 0x7C (124) in method method:False>>and:
+[BYTECODE] 0x89 (137) in method method:Number>>retry:coercing:
+[BYTECODE] 0x75 (117) in method method:Number>>retry:coercing:
+[BYTECODE] 0xC8 (200) in method method:Number>>retry:coercing:
+[BYTECODE] 0xA1 (161) in method method:Number>>retry:coercing:
+[BYTECODE] 0xE2 (226) in method method:Number>>retry:coercing:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x80 (128) in method method:Number>>retry:coercing:
+[BYTECODE] 0x70 (112) in method method:Number>>retry:coercing:
+[BYTECODE] 0xD3 (211) in method method:Number>>retry:coercing:
+[BYTECODE] 0x20 (32) in method method:Float>>generality
+[BYTECODE] 0x7C (124) in method method:Float>>generality
+[BYTECODE] 0x11 (17) in method method:Number>>retry:coercing:
+[GetTemp] MethodContext oop=oop=64334, method=method:Number>>retry:coercing:, index=1, value=oop=38146
+[BYTECODE] 0xD3 (211) in method method:Number>>retry:coercing:
+[BYTECODE] 0x20 (32) in method method:Float>>generality
+[BYTECODE] 0x7C (124) in method method:Float>>generality
+[BYTECODE] 0xB2 (178) in method method:Number>>retry:coercing:
+[BYTECODE] 0x89 (137) in method method:Number>>retry:coercing:
+[BYTECODE] 0x75 (117) in method method:Number>>retry:coercing:
+[BYTECODE] 0xC8 (200) in method method:Number>>retry:coercing:
+[BYTECODE] 0xA1 (161) in method method:Number>>retry:coercing:
+[BYTECODE] 0xE2 (226) in method method:Number>>retry:coercing:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x80 (128) in method method:Number>>retry:coercing:
+[BYTECODE] 0x70 (112) in method method:Number>>retry:coercing:
+[BYTECODE] 0xD3 (211) in method method:Number>>retry:coercing:
+[BYTECODE] 0x20 (32) in method method:Float>>generality
+[BYTECODE] 0x7C (124) in method method:Float>>generality
+[BYTECODE] 0x11 (17) in method method:Number>>retry:coercing:
+[GetTemp] MethodContext oop=oop=64334, method=method:Number>>retry:coercing:, index=1, value=oop=38146
+[BYTECODE] 0xD3 (211) in method method:Number>>retry:coercing:
+[BYTECODE] 0x20 (32) in method method:Float>>generality
+[BYTECODE] 0x7C (124) in method method:Float>>generality
+[BYTECODE] 0xB3 (179) in method method:Number>>retry:coercing:
+[BYTECODE] 0x89 (137) in method method:Number>>retry:coercing:
+[BYTECODE] 0x75 (117) in method method:Number>>retry:coercing:
+[BYTECODE] 0xC8 (200) in method method:Number>>retry:coercing:
+[BYTECODE] 0xA1 (161) in method method:Number>>retry:coercing:
+[BYTECODE] 0xE2 (226) in method method:Number>>retry:coercing:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x80 (128) in method method:Number>>retry:coercing:
+[BYTECODE] 0x70 (112) in method method:Number>>retry:coercing:
+[BYTECODE] 0x29 (41) in method method:Number>>retry:coercing:
+[BYTECODE] 0xE6 (230) in method method:Number>>retry:coercing:
+[BYTECODE] 0x42 (66) in method method:Object>>error:
+[BYTECODE] 0x89 (137) in method method:Object>>error:
+[BYTECODE] 0x10 (16) in method method:Object>>error:
+[GetTemp] MethodContext oop=oop=64360, method=method:Object>>error:, index=0, value=oop=39104
+[BYTECODE] 0x89 (137) in method method:Object>>error:
+[BYTECODE] 0xD1 (209) in method method:Object>>error:
+[BYTECODE] 0x45 (69) in method method:ContextPart>>shortStack
+[BYTECODE] 0x46 (70) in method method:ContextPart>>shortStack
+[BYTECODE] 0x28 (40) in method method:ContextPart>>shortStack
+[BYTECODE] 0xCD (205) in method method:ContextPart>>shortStack
+[BYTECODE] 0xE0 (224) in method method:ContextPart>>shortStack
+[BYTECODE] 0x70 (112) in method method:PositionableStream_class>>on:
+[BYTECODE] 0xD0 (208) in method method:PositionableStream_class>>on:
+[BYTECODE] 0x10 (16) in method method:PositionableStream_class>>on:
+[GetTemp] MethodContext oop=oop=64366, method=method:PositionableStream_class>>on:, index=0, value=oop=64364
+[BYTECODE] 0xE1 (225) in method method:PositionableStream_class>>on:
+[BYTECODE] 0x70 (112) in method method:WriteStream>>on:
+[BYTECODE] 0x10 (16) in method method:WriteStream>>on:
+[GetTemp] MethodContext oop=oop=64370, method=method:WriteStream>>on:, index=0, value=oop=64364
+[BYTECODE] 0x80 (128) in method method:WriteStream>>on:
+[SendMessage AFTER CreateMethodContext] _activeContextOOP = oop=64372
+[BYTECODE] 0x10 (16) in method method:PositionableStream>>on:
+[GetTemp] MethodContext oop=oop=64372, method=method:PositionableStream>>on:, index=0, value=oop=64364
+[BYTECODE] 0x60 (96) in method method:PositionableStream>>on:
+[BYTECODE] 0x10 (16) in method method:PositionableStream>>on:
+[GetTemp] MethodContext oop=oop=64372, method=method:PositionableStream>>on:, index=0, value=oop=64364
+[BYTECODE] 0xC2 (194) in method method:PositionableStream>>on:
+[BYTECODE] 0x62 (98) in method method:PositionableStream>>on:
+[BYTECODE] 0x75 (117) in method method:PositionableStream>>on:
+[BYTECODE] 0x61 (97) in method method:PositionableStream>>on:
+[BYTECODE] 0x70 (112) in method method:PositionableStream>>on:
+[BYTECODE] 0xD0 (208) in method method:PositionableStream>>on:
+[BYTECODE] 0x02 (2) in method method:WriteStream>>reset
+[DEBUG IsPushIvar] bytecode=0x02, index=2, receiverOOP=oop=64368, receiverClass=WriteStream, method=method:WriteStream>>reset
+[BYTECODE] 0x01 (1) in method method:WriteStream>>reset
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64368, receiverClass=WriteStream, method=method:WriteStream>>reset
+[BYTECODE] 0xE0 (224) in method method:WriteStream>>reset
+[BYTECODE] 0x70 (112) in method method:Magnitude>>max:
+[BYTECODE] 0x10 (16) in method method:Magnitude>>max:
+[GetTemp] MethodContext oop=oop=64376, method=method:Magnitude>>max:, index=0, value=SmallInteger(0)
+[BYTECODE] 0xB3 (179) in method method:Magnitude>>max:
+[BYTECODE] 0x89 (137) in method method:Magnitude>>max:
+[BYTECODE] 0x75 (117) in method method:Magnitude>>max:
+[BYTECODE] 0xC8 (200) in method method:Magnitude>>max:
+[BYTECODE] 0xA1 (161) in method method:Magnitude>>max:
+[BYTECODE] 0x89 (137) in method method:Magnitude>>max:
+[BYTECODE] 0x75 (117) in method method:Magnitude>>max:
+[BYTECODE] 0xC8 (200) in method method:Magnitude>>max:
+[BYTECODE] 0xA1 (161) in method method:Magnitude>>max:
+[BYTECODE] 0xF0 (240) in method method:Magnitude>>max:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:ifFalse:
+[GetTemp] MethodContext oop=oop=64382, method=method:True>>ifTrue:ifFalse:, index=0, value=oop=64378
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0x70 (112) in method method:Magnitude>>max:
+[BYTECODE] 0x7E (126) in method method:Magnitude>>max:
+[BYTECODE] 0x62 (98) in method method:WriteStream>>reset
+[BYTECODE] 0x75 (117) in method method:WriteStream>>reset
+[BYTECODE] 0x61 (97) in method method:WriteStream>>reset
+[BYTECODE] 0x78 (120) in method method:WriteStream>>reset
+[BYTECODE] 0x80 (128) in method method:PositionableStream>>on:
+[BYTECODE] 0x78 (120) in method method:PositionableStream>>on:
+[BYTECODE] 0x80 (128) in method method:WriteStream>>on:
+[BYTECODE] 0x75 (117) in method method:WriteStream>>on:
+[BYTECODE] 0x62 (98) in method method:WriteStream>>on:
+[BYTECODE] 0x10 (16) in method method:WriteStream>>on:
+[GetTemp] MethodContext oop=oop=64370, method=method:WriteStream>>on:, index=0, value=oop=64364
+[BYTECODE] 0xC2 (194) in method method:WriteStream>>on:
+[BYTECODE] 0x63 (99) in method method:WriteStream>>on:
+[BYTECODE] 0x78 (120) in method method:WriteStream>>on:
+[BYTECODE] 0x7C (124) in method method:PositionableStream_class>>on:
+[BYTECODE] 0x68 (104) in method method:ContextPart>>shortStack
+[BYTECODE] 0x70 (112) in method method:ContextPart>>shortStack
+[BYTECODE] 0x29 (41) in method method:ContextPart>>shortStack
+[BYTECODE] 0xE1 (225) in method method:ContextPart>>shortStack
+[BYTECODE] 0x45 (69) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x26 (38) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xCD (205) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection_class>>new:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection_class>>new:
+[GetTemp] MethodContext oop=oop=64386, method=method:OrderedCollection_class>>new:, index=0, value=SmallInteger(100)
+[BYTECODE] 0x80 (128) in method method:OrderedCollection_class>>new:
+[BYTECODE] 0xD0 (208) in method method:OrderedCollection_class>>new:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0xD0 (208) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0x77 (119) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0xBD (189) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0xE1 (225) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0x70 (112) in method method:Magnitude>>max:
+[BYTECODE] 0x10 (16) in method method:Magnitude>>max:
+[GetTemp] MethodContext oop=oop=64392, method=method:Magnitude>>max:, index=0, value=SmallInteger(1)
+[BYTECODE] 0xB3 (179) in method method:Magnitude>>max:
+[BYTECODE] 0x89 (137) in method method:Magnitude>>max:
+[BYTECODE] 0x75 (117) in method method:Magnitude>>max:
+[BYTECODE] 0xC8 (200) in method method:Magnitude>>max:
+[BYTECODE] 0xA1 (161) in method method:Magnitude>>max:
+[BYTECODE] 0x89 (137) in method method:Magnitude>>max:
+[BYTECODE] 0x75 (117) in method method:Magnitude>>max:
+[BYTECODE] 0xC8 (200) in method method:Magnitude>>max:
+[BYTECODE] 0xA1 (161) in method method:Magnitude>>max:
+[BYTECODE] 0xF0 (240) in method method:Magnitude>>max:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:ifFalse:
+[GetTemp] MethodContext oop=oop=64398, method=method:True>>ifTrue:ifFalse:, index=0, value=oop=64394
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0x70 (112) in method method:Magnitude>>max:
+[BYTECODE] 0x7E (126) in method method:Magnitude>>max:
+[BYTECODE] 0x60 (96) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0x00 (0) in method method:OrderedCollection>>setIndices
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>setIndices
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0xB1 (177) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0x75 (117) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0xE1 (225) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0x70 (112) in method method:Magnitude>>max:
+[BYTECODE] 0x10 (16) in method method:Magnitude>>max:
+[GetTemp] MethodContext oop=oop=64400, method=method:Magnitude>>max:, index=0, value=SmallInteger(0)
+[BYTECODE] 0xB3 (179) in method method:Magnitude>>max:
+[BYTECODE] 0x89 (137) in method method:Magnitude>>max:
+[BYTECODE] 0x75 (117) in method method:Magnitude>>max:
+[BYTECODE] 0xC8 (200) in method method:Magnitude>>max:
+[BYTECODE] 0xA1 (161) in method method:Magnitude>>max:
+[BYTECODE] 0x89 (137) in method method:Magnitude>>max:
+[BYTECODE] 0x75 (117) in method method:Magnitude>>max:
+[BYTECODE] 0xC8 (200) in method method:Magnitude>>max:
+[BYTECODE] 0xA1 (161) in method method:Magnitude>>max:
+[BYTECODE] 0xF0 (240) in method method:Magnitude>>max:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:ifFalse:
+[GetTemp] MethodContext oop=oop=64406, method=method:True>>ifTrue:ifFalse:, index=0, value=oop=64402
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0x70 (112) in method method:Magnitude>>max:
+[BYTECODE] 0x7E (126) in method method:Magnitude>>max:
+[BYTECODE] 0x61 (97) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0x78 (120) in method method:OrderedCollection>>setIndices
+[BYTECODE] 0x7C (124) in method method:OrderedCollection_class>>new:
+[BYTECODE] 0x6A (106) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0x70 (112) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x80 (128) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x69 (105) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE0 (224) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xD0 (208) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xB6 (182) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x89 (137) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x75 (117) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xC8 (200) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xA1 (161) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xE1 (225) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x80 (128) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xB0 (176) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x61 (97) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>addLast:
+[GetTemp] MethodContext oop=oop=64408, method=method:OrderedCollection>>addLast:, index=0, value=oop=64360
+[BYTECODE] 0xF3 (243) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x80 (128) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>addLast:
+[GetTemp] MethodContext oop=oop=64408, method=method:OrderedCollection>>addLast:, index=0, value=oop=64360
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x80 (128) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x89 (137) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x75 (117) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xC8 (200) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xA1 (161) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x89 (137) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x75 (117) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xC8 (200) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xA1 (161) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE4 (228) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64414, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=1
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=1, value=oop=64360
+[BYTECODE] 0xD1 (209) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x00 (0) in method method:ContextPart>>sender
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64360, receiverClass=MethodContext, method=method:ContextPart>>sender
+[BYTECODE] 0x7C (124) in method method:ContextPart>>sender
+[BYTECODE] 0x80 (128) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x69 (105) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x73 (115) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE2 (226) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x70 (112) in method method:Object>>~~
+[BYTECODE] 0x10 (16) in method method:Object>>~~
+[GetTemp] MethodContext oop=oop=64422, method=method:Object>>~~, index=0, value=oop=13968
+[BYTECODE] 0xC6 (198) in method method:Object>>~~
+[BYTECODE] 0xD0 (208) in method method:Object>>~~
+[BYTECODE] 0x71 (113) in method method:False>>not
+[BYTECODE] 0x7C (124) in method method:False>>not
+[BYTECODE] 0x7C (124) in method method:Object>>~~
+[BYTECODE] 0x89 (137) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x75 (117) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xC8 (200) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xA1 (161) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE3 (227) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x10 (16) in method method:True>>and:
+[GetTemp] MethodContext oop=oop=64428, method=method:True>>and:, index=0, value=oop=64426
+[BYTECODE] 0xC9 (201) in method method:True>>and:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64426, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64414, new index=2
+[GetTemp] BlockContext oop=oop=64414, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=2
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0xC2 (194) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>size
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>size
+[BYTECODE] 0x00 (0) in method method:OrderedCollection>>size
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>size
+[BYTECODE] 0xB1 (177) in method method:OrderedCollection>>size
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>size
+[BYTECODE] 0xB0 (176) in method method:OrderedCollection>>size
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>size
+[BYTECODE] 0x10 (16) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64426, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64414, new index=0
+[GetTemp] BlockContext oop=oop=64414, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=0
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=0, value=SmallInteger(5)
+[BYTECODE] 0xB2 (178) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x7C (124) in method method:True>>and:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64434, method=method:True>>ifTrue:, index=0, value=oop=64432
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64432, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64418, new index=0
+[GetTemp] MethodContext oop=oop=64418, method=method:BlockContext>>whileTrue:, index=0, value=oop=64416
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64416, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=2
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0x11 (17) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64416, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=1
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=1, value=oop=64334
+[BYTECODE] 0xE0 (224) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xD0 (208) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xB6 (182) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x89 (137) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x75 (117) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xC8 (200) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xA1 (161) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xE1 (225) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x80 (128) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xB0 (176) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x61 (97) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>addLast:
+[GetTemp] MethodContext oop=oop=64436, method=method:OrderedCollection>>addLast:, index=0, value=oop=64334
+[BYTECODE] 0xF3 (243) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x80 (128) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>addLast:
+[GetTemp] MethodContext oop=oop=64436, method=method:OrderedCollection>>addLast:, index=0, value=oop=64334
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64432, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64418, new index=0
+[GetTemp] MethodContext oop=oop=64418, method=method:BlockContext>>whileTrue:, index=0, value=oop=64416
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64414, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=1
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=1, value=oop=64334
+[BYTECODE] 0xD1 (209) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x00 (0) in method method:ContextPart>>sender
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64334, receiverClass=MethodContext, method=method:ContextPart>>sender
+[BYTECODE] 0x7C (124) in method method:ContextPart>>sender
+[BYTECODE] 0x80 (128) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x69 (105) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x73 (115) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE2 (226) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x70 (112) in method method:Object>>~~
+[BYTECODE] 0x10 (16) in method method:Object>>~~
+[GetTemp] MethodContext oop=oop=64446, method=method:Object>>~~, index=0, value=oop=13968
+[BYTECODE] 0xC6 (198) in method method:Object>>~~
+[BYTECODE] 0xD0 (208) in method method:Object>>~~
+[BYTECODE] 0x71 (113) in method method:False>>not
+[BYTECODE] 0x7C (124) in method method:False>>not
+[BYTECODE] 0x7C (124) in method method:Object>>~~
+[BYTECODE] 0x89 (137) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x75 (117) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xC8 (200) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xA1 (161) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE3 (227) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x10 (16) in method method:True>>and:
+[GetTemp] MethodContext oop=oop=64452, method=method:True>>and:, index=0, value=oop=64450
+[BYTECODE] 0xC9 (201) in method method:True>>and:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64450, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64414, new index=2
+[GetTemp] BlockContext oop=oop=64414, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=2
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0xC2 (194) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>size
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>size
+[BYTECODE] 0x00 (0) in method method:OrderedCollection>>size
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>size
+[BYTECODE] 0xB1 (177) in method method:OrderedCollection>>size
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>size
+[BYTECODE] 0xB0 (176) in method method:OrderedCollection>>size
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>size
+[BYTECODE] 0x10 (16) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64450, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64414, new index=0
+[GetTemp] BlockContext oop=oop=64414, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=0
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=0, value=SmallInteger(5)
+[BYTECODE] 0xB2 (178) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x7C (124) in method method:True>>and:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64458, method=method:True>>ifTrue:, index=0, value=oop=64456
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64456, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64442, new index=0
+[GetTemp] MethodContext oop=oop=64442, method=method:BlockContext>>whileTrue:, index=0, value=oop=64416
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64416, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=2
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0x11 (17) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64416, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=1
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=1, value=oop=64330
+[BYTECODE] 0xE0 (224) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xD0 (208) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xB6 (182) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x89 (137) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x75 (117) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xC8 (200) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xA1 (161) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xE1 (225) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x80 (128) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xB0 (176) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x61 (97) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>addLast:
+[GetTemp] MethodContext oop=oop=64460, method=method:OrderedCollection>>addLast:, index=0, value=oop=64330
+[BYTECODE] 0xF3 (243) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x80 (128) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>addLast:
+[GetTemp] MethodContext oop=oop=64460, method=method:OrderedCollection>>addLast:, index=0, value=oop=64330
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64456, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64442, new index=0
+[GetTemp] MethodContext oop=oop=64442, method=method:BlockContext>>whileTrue:, index=0, value=oop=64416
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64414, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=1
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=1, value=oop=64330
+[BYTECODE] 0xD1 (209) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x00 (0) in method method:ContextPart>>sender
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64330, receiverClass=BlockContext, method=method:ContextPart>>sender
+[BYTECODE] 0x7C (124) in method method:ContextPart>>sender
+[BYTECODE] 0x80 (128) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x69 (105) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x73 (115) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE2 (226) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x70 (112) in method method:Object>>~~
+[BYTECODE] 0x10 (16) in method method:Object>>~~
+[GetTemp] MethodContext oop=oop=64470, method=method:Object>>~~, index=0, value=oop=13968
+[BYTECODE] 0xC6 (198) in method method:Object>>~~
+[BYTECODE] 0xD0 (208) in method method:Object>>~~
+[BYTECODE] 0x71 (113) in method method:False>>not
+[BYTECODE] 0x7C (124) in method method:False>>not
+[BYTECODE] 0x7C (124) in method method:Object>>~~
+[BYTECODE] 0x89 (137) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x75 (117) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xC8 (200) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xA1 (161) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE3 (227) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x10 (16) in method method:True>>and:
+[GetTemp] MethodContext oop=oop=64476, method=method:True>>and:, index=0, value=oop=64474
+[BYTECODE] 0xC9 (201) in method method:True>>and:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64474, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64414, new index=2
+[GetTemp] BlockContext oop=oop=64414, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=2
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0xC2 (194) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>size
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>size
+[BYTECODE] 0x00 (0) in method method:OrderedCollection>>size
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>size
+[BYTECODE] 0xB1 (177) in method method:OrderedCollection>>size
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>size
+[BYTECODE] 0xB0 (176) in method method:OrderedCollection>>size
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>size
+[BYTECODE] 0x10 (16) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64474, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64414, new index=0
+[GetTemp] BlockContext oop=oop=64414, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=0
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=0, value=SmallInteger(5)
+[BYTECODE] 0xB2 (178) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x7C (124) in method method:True>>and:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64482, method=method:True>>ifTrue:, index=0, value=oop=64480
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64480, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64466, new index=0
+[GetTemp] MethodContext oop=oop=64466, method=method:BlockContext>>whileTrue:, index=0, value=oop=64416
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64416, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=2
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0x11 (17) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64416, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=1
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=1, value=oop=64332
+[BYTECODE] 0xE0 (224) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xD0 (208) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xB6 (182) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x89 (137) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x75 (117) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xC8 (200) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xA1 (161) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xE1 (225) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x80 (128) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xB0 (176) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x61 (97) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>addLast:
+[GetTemp] MethodContext oop=oop=64484, method=method:OrderedCollection>>addLast:, index=0, value=oop=64332
+[BYTECODE] 0xF3 (243) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x80 (128) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>addLast:
+[GetTemp] MethodContext oop=oop=64484, method=method:OrderedCollection>>addLast:, index=0, value=oop=64332
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64480, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64466, new index=0
+[GetTemp] MethodContext oop=oop=64466, method=method:BlockContext>>whileTrue:, index=0, value=oop=64416
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64414, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=1
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=1, value=oop=64332
+[BYTECODE] 0xD1 (209) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x00 (0) in method method:ContextPart>>sender
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64332, receiverClass=MethodContext, method=method:ContextPart>>sender
+[BYTECODE] 0x7C (124) in method method:ContextPart>>sender
+[BYTECODE] 0x80 (128) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x69 (105) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x73 (115) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE2 (226) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x70 (112) in method method:Object>>~~
+[BYTECODE] 0x10 (16) in method method:Object>>~~
+[GetTemp] MethodContext oop=oop=64494, method=method:Object>>~~, index=0, value=oop=13968
+[BYTECODE] 0xC6 (198) in method method:Object>>~~
+[BYTECODE] 0xD0 (208) in method method:Object>>~~
+[BYTECODE] 0x71 (113) in method method:False>>not
+[BYTECODE] 0x7C (124) in method method:False>>not
+[BYTECODE] 0x7C (124) in method method:Object>>~~
+[BYTECODE] 0x89 (137) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x75 (117) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xC8 (200) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xA1 (161) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE3 (227) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x10 (16) in method method:True>>and:
+[GetTemp] MethodContext oop=oop=64500, method=method:True>>and:, index=0, value=oop=64498
+[BYTECODE] 0xC9 (201) in method method:True>>and:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64498, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64414, new index=2
+[GetTemp] BlockContext oop=oop=64414, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=2
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0xC2 (194) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>size
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>size
+[BYTECODE] 0x00 (0) in method method:OrderedCollection>>size
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>size
+[BYTECODE] 0xB1 (177) in method method:OrderedCollection>>size
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>size
+[BYTECODE] 0xB0 (176) in method method:OrderedCollection>>size
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>size
+[BYTECODE] 0x10 (16) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64498, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64414, new index=0
+[GetTemp] BlockContext oop=oop=64414, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=0
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=0, value=SmallInteger(5)
+[BYTECODE] 0xB2 (178) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x7C (124) in method method:True>>and:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64506, method=method:True>>ifTrue:, index=0, value=oop=64504
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64504, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64490, new index=0
+[GetTemp] MethodContext oop=oop=64490, method=method:BlockContext>>whileTrue:, index=0, value=oop=64416
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64416, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=2
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0x11 (17) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64416, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=1
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=1, value=oop=64258
+[BYTECODE] 0xE0 (224) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xD0 (208) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xB6 (182) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x89 (137) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x75 (117) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xC8 (200) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xA1 (161) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xE1 (225) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x80 (128) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0xB0 (176) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x61 (97) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>addLast:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>addLast:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>addLast:
+[GetTemp] MethodContext oop=oop=64508, method=method:OrderedCollection>>addLast:, index=0, value=oop=64258
+[BYTECODE] 0xF3 (243) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x80 (128) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>addLast:
+[GetTemp] MethodContext oop=oop=64508, method=method:OrderedCollection>>addLast:, index=0, value=oop=64258
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>addLast:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64504, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64490, new index=0
+[GetTemp] MethodContext oop=oop=64490, method=method:BlockContext>>whileTrue:, index=0, value=oop=64416
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64414, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=1
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=1, value=oop=64258
+[BYTECODE] 0xD1 (209) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x00 (0) in method method:ContextPart>>sender
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64258, receiverClass=MethodContext, method=method:ContextPart>>sender
+[BYTECODE] 0x7C (124) in method method:ContextPart>>sender
+[BYTECODE] 0x80 (128) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x69 (105) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x73 (115) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE2 (226) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x70 (112) in method method:Object>>~~
+[BYTECODE] 0x10 (16) in method method:Object>>~~
+[GetTemp] MethodContext oop=oop=64518, method=method:Object>>~~, index=0, value=oop=13968
+[BYTECODE] 0xC6 (198) in method method:Object>>~~
+[BYTECODE] 0xD0 (208) in method method:Object>>~~
+[BYTECODE] 0x71 (113) in method method:False>>not
+[BYTECODE] 0x7C (124) in method method:False>>not
+[BYTECODE] 0x7C (124) in method method:Object>>~~
+[BYTECODE] 0x89 (137) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x75 (117) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xC8 (200) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xA1 (161) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0xE3 (227) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x10 (16) in method method:True>>and:
+[GetTemp] MethodContext oop=oop=64524, method=method:True>>and:, index=0, value=oop=64522
+[BYTECODE] 0xC9 (201) in method method:True>>and:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64522, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64414, new index=2
+[GetTemp] BlockContext oop=oop=64414, index=2, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=2
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0xC2 (194) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>size
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>size
+[BYTECODE] 0x00 (0) in method method:OrderedCollection>>size
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>size
+[BYTECODE] 0xB1 (177) in method method:OrderedCollection>>size
+[BYTECODE] 0x76 (118) in method method:OrderedCollection>>size
+[BYTECODE] 0xB0 (176) in method method:OrderedCollection>>size
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>size
+[BYTECODE] 0x10 (16) in method method:ContextPart>>stackOfSize:
+[GetTemp] BlockContext oop=oop=64522, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64414, new index=0
+[GetTemp] BlockContext oop=oop=64414, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64384, new index=0
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=0, value=SmallInteger(5)
+[BYTECODE] 0xB2 (178) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x7C (124) in method method:True>>and:
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x80 (128) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x12 (18) in method method:ContextPart>>stackOfSize:
+[GetTemp] MethodContext oop=oop=64384, method=method:ContextPart>>stackOfSize:, index=2, value=oop=64388
+[BYTECODE] 0x7C (124) in method method:ContextPart>>stackOfSize:
+[BYTECODE] 0x89 (137) in method method:ContextPart>>shortStack
+[BYTECODE] 0x76 (118) in method method:ContextPart>>shortStack
+[BYTECODE] 0xC8 (200) in method method:ContextPart>>shortStack
+[BYTECODE] 0xA1 (161) in method method:ContextPart>>shortStack
+[BYTECODE] 0xCB (203) in method method:ContextPart>>shortStack
+[BYTECODE] 0x00 (0) in method method:OrderedCollection>>do:
+[DEBUG IsPushIvar] bytecode=0x00, index=0, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>do:
+[BYTECODE] 0x69 (105) in method method:OrderedCollection>>do:
+[BYTECODE] 0x89 (137) in method method:OrderedCollection>>do:
+[BYTECODE] 0x75 (117) in method method:OrderedCollection>>do:
+[BYTECODE] 0xC8 (200) in method method:OrderedCollection>>do:
+[BYTECODE] 0xA1 (161) in method method:OrderedCollection>>do:
+[BYTECODE] 0x89 (137) in method method:OrderedCollection>>do:
+[BYTECODE] 0x75 (117) in method method:OrderedCollection>>do:
+[BYTECODE] 0xC8 (200) in method method:OrderedCollection>>do:
+[BYTECODE] 0xA1 (161) in method method:OrderedCollection>>do:
+[BYTECODE] 0xE0 (224) in method method:OrderedCollection>>do:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:OrderedCollection>>do:
+[GetTemp] BlockContext oop=oop=64536, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64534, new index=1
+[GetTemp] MethodContext oop=oop=64534, method=method:OrderedCollection>>do:, index=1, value=SmallInteger(50)
+[BYTECODE] 0x01 (1) in method method:OrderedCollection>>do:
+[DEBUG IsPushIvar] bytecode=0x01, index=1, receiverOOP=oop=64388, receiverClass=OrderedCollection, method=method:OrderedCollection>>do:
+[BYTECODE] 0xB4 (180) in method method:OrderedCollection>>do:
+[BYTECODE] 0x7C (124) in method method:OrderedCollection>>do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[GetTemp] MethodContext oop=oop=64544, method=method:True>>ifTrue:, index=0, value=oop=64542
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[GetTemp] BlockContext oop=oop=64542, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64540, new index=0
+[GetTemp] MethodContext oop=oop=64540, method=method:BlockContext>>whileTrue:, index=0, value=oop=64538
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:OrderedCollection>>do:
+[GetTemp] BlockContext oop=oop=64538, index=0, nargs=0
+[GetTemp] Traversing to home: oop=64534, new index=0
+[GetTemp] MethodContext oop=oop=64534, method=method:OrderedCollection>>do:, index=0, value=oop=64532
+[BYTECODE] 0x70 (112) in method method:OrderedCollection>>do:
+[BYTECODE] 0x11 (17) in method method:OrderedCollection>>do:
+[GetTemp] BlockContext oop=oop=64538, index=1, nargs=0
+[GetTemp] Traversing to home: oop=64534, new index=1
+[GetTemp] MethodContext oop=oop=64534, method=method:OrderedCollection>>do:, index=1, value=SmallInteger(50)
+[BYTECODE] 0xE1 (225) in method method:OrderedCollection>>do:
+[BYTECODE] 0xCA (202) in method method:OrderedCollection>>do:
+[BYTECODE] 0x10 (16) in method method:ContextPart>>shortStack
+[GetTemp] BlockContext oop=oop=64532, index=0, nargs=1
+[GetTemp] Local arg: indexed[0] = oop=64360
+[BYTECODE] 0x80 (128) in method method:ContextPart>>shortStack
+[BYTECODE] 0x10 (16) in method method:ContextPart>>shortStack
+[GetTemp] BlockContext oop=oop=64532, index=0, nargs=1
+[GetTemp] Local arg: indexed[0] = oop=64360
+[BYTECODE] 0xE2 (226) in method method:ContextPart>>shortStack
+
+❌ METHOD NOT FOUND ERROR
+   Selector: print:
+   Receiver: OOP(64360)
+   Receiver class: MethodContext OOP(11556)
+   Arguments: 1
+
+Smalltalk Context Chain:
+  SENDER CHAIN (showing up to 10 contexts):
+    [0] BlockContext>><error: SmallIntegers don't have object format> (context=OOP(64532), method=OOP(3))
+    [1] BlockContext>><error: SmallIntegers don't have object format> (context=OOP(64538), method=OOP(1))
+    [2] BlockContext>><error: SmallIntegers don't have object format> (context=OOP(64542), method=OOP(1))
+    [3] MethodContext>><block> (context=OOP(64544), method=method:True>>ifTrue: OOP(33990))
+    [4] MethodContext>>ifTrue: (context=OOP(64540), method=method:BlockContext>>whileTrue: OOP(18394))
+    [5] MethodContext>>whileTrue: (context=OOP(64534), method=method:OrderedCollection>>do: OOP(28382))
+    [6] MethodContext>>on: (context=OOP(64362), method=method:ContextPart>>shortStack OOP(21314))
+    [7] MethodContext>>openContext:label:contents: (context=OOP(64360), method=method:Object>>error: OOP(28022))
+    [8] MethodContext>>and: (context=OOP(64334), method=method:Number>>retry:coercing: OOP(27778))
+    [9] BlockContext>><error: SmallIntegers don't have object format> (context=OOP(64330), method=OOP(1))
+    ... (truncated, chain continues)
+
+==========================================
+❌ FIRST FAILURE: [118] Float initialize
+==========================================
+Status: FatalError
+
+Error: InvalidOperationException: Method not found: print: in class MethodContext OOP(11556)
+
+Stack trace:
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2219
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecode(Byte bytecode, SmalltalkOOP methodOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 1395
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecodeStep() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 588
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.InterpreterLoop() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 472
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteExistingContext(SmalltalkOOP contextOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 303
+   at Smalltalk80.Interpreter.Core.VM.Primitives.ProcessPrimitives.Resume(SmalltalkOOP processOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\Primitives\ProcessPrimitives.cs:line 97
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 350
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 135
+
+✓ Successfully executed 1 expression(s) before this failure
+
+Successful expressions:
+  [235] SmallInteger initialize
+
+⚠️  Execution stopped at first failure to enable debugging
+⚠️  Enable VM debug output and re-run to diagnose this specific failure
