@@ -111,7 +111,9 @@ public static class Program
             // Execute init expressions - Run normal init expressions to check for regressions
             bool executeInitExpressions = !skipInitExpressions;
             bool onlyRunTests = false; // DISABLED - Run normal init expressions for debugging
-            if (executeInitExpressions && bundle.InitExpressions.Length > 0)
+
+            // ALWAYS execute init expressions (essential ones ALWAYS run, others conditional on --skip-init-expressions)
+            if (bundle.InitExpressions.Length > 0)
             {
                 Console.WriteLine("\n=== Init Expression Execution ===");
                 Console.WriteLine($"  Found {bundle.InitExpressions.Length} init expression(s) in bundle (DISABLED)");
@@ -157,6 +159,15 @@ public static class Program
 
                 var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
                 int totalExpressions = bundle.InitExpressions.Length;
+
+                // Essential init expressions that MUST run for basic VM functionality
+                // These are required even with --skip-init-expressions flag
+                var essentialList = new HashSet<string>
+                {
+                    "Character initialize",      // Required for CharacterTable (used by String>>at: primitive 63)
+                    "SmallInteger initialize",   // Required for SmallInteger constants/utilities
+                    "Float initialize",          // Required for Float constants (Pi, E, etc.)
+                };
 
                 // Skip list for init expressions requiring runtime features not available during bootstrap
                 var skipList = new HashSet<string>
@@ -213,10 +224,20 @@ public static class Program
 
                     if (expr.Source != null)
                     {
-                        // Check skip list first
-                        if (skipList.Contains(expr.Source))
+                        // ALWAYS include essential init expressions (required for basic VM functionality)
+                        bool isEssential = essentialList.Contains(expr.Source);
+
+                        // Check skip list first (unless essential)
+                        if (!isEssential && skipList.Contains(expr.Source))
                         {
                             skippedIndices.Add((i, "Requires runtime features not available during bootstrap"));
+                            continue;
+                        }
+
+                        // If --skip-init-expressions flag is set, ONLY run essential init expressions
+                        if (skipInitExpressions && !isEssential)
+                        {
+                            skippedIndices.Add((i, "Skipped by --skip-init-expressions flag (not essential)"));
                             continue;
                         }
 
