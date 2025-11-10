@@ -257,44 +257,19 @@ public static class Program
                 // Skip phase reordering when in test mode
                 if (!onlyRunTests)
                 {
-                    // CRITICAL: Reorder to run fundamental infrastructure FIRST
-                    // SmallInteger MUST run first - creates Digitbuffer needed by error handling
-                    // If any init expression triggers an error before Digitbuffer exists, infinite recursion occurs
-                    var smallIntegerInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "SmallInteger initialize");
-                    var floatInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Float initialize");
-                    var characterInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Character initialize");
-                    var symbolInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "Symbol initialize");
-                    var windowsInitIndex = phase1Indices.FirstOrDefault(i => bundle.InitExpressions[i].Source == "WindowsFileSystem initialize");
+                    // DEPENDENCY-ORDERED EXECUTION
+                    // Based on comprehensive dependency analysis (see InitExpression-DependencyAnalysis.md)
+                    // 68 total classes: Level 0 (62), Level 1 (5), Level 2 (1)
+                    // No circular dependencies detected
 
-                    if (smallIntegerInitIndex > 0 && floatInitIndex > 0 && characterInitIndex > 0 && symbolInitIndex > 0 && windowsInitIndex > 0)
-                    {
-                        phase1Indices.Remove(smallIntegerInitIndex);
-                        phase1Indices.Remove(floatInitIndex);
-                        phase1Indices.Remove(characterInitIndex);
-                        phase1Indices.Remove(symbolInitIndex);
-                        phase1Indices.Remove(windowsInitIndex);
+                    var dependencyOrder = GetInitExpressionDependencyOrder();
+                    phase1Indices = ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
-                        // Insert at beginning: SmallInteger, Float, Character, Symbol, WindowsFileSystem, then rest
-                        // ORDER IS CRITICAL:
-                        // 1. SmallInteger - Creates Digitbuffer (required for error message formatting)
-                        // 2. Float - Creates numeric constants
-                        // 3. Character - Creates CharacterTable (required for String/Symbol operations)
-                        // 4. Symbol - Creates SingleCharSymbols (128 pre-interned single-char symbols for performance)
-                        // 5. WindowsFileSystem - File system infrastructure
-                        phase1Indices.Insert(0, windowsInitIndex);
-                        phase1Indices.Insert(0, symbolInitIndex);
-                        phase1Indices.Insert(0, characterInitIndex);
-                        phase1Indices.Insert(0, floatInitIndex);
-                        phase1Indices.Insert(0, smallIntegerInitIndex);
-
-                        Console.WriteLine($"\n=== Reordered init expressions for infrastructure ===");
-                        Console.WriteLine($"  Running: SmallInteger → Float → Character → Symbol → WindowsFileSystem");
-                        Console.WriteLine($"  SmallInteger FIRST (Digitbuffer prevents infinite recursion in error handling)");
-                        Console.WriteLine($"  Character early (CharacterTable needed by String/Symbol)");
-                        Console.WriteLine($"  Symbol early (SingleCharSymbols needed for symbol interning)");
-                        Console.WriteLine();
-                    }
-
+                    Console.WriteLine($"\n=== Dependency-Ordered Init Expression Execution ===");
+                    Console.WriteLine($"  Total: {phase1Indices.Count} initialize expressions");
+                    Console.WriteLine($"  Order: SmallInteger → ... → LargeNegativeInteger");
+                    Console.WriteLine($"  See: InitExpression-DependencyAnalysis.md");
+                    Console.WriteLine();
                 }
 
                 int succeeded = 0;
@@ -1702,5 +1677,135 @@ public static class Program
             Console.WriteLine($"❌ BuildFieldMap() failed: {ex.Message}");
             Console.WriteLine($"   Stack trace: {ex.StackTrace}");
         }
+    }
+
+    /// <summary>
+    /// Returns the complete dependency-ordered list of class names for init expression execution.
+    /// Based on InitExpression-DependencyAnalysis.md topological sort (3 levels, no circular deps).
+    /// </summary>
+    private static List<string> GetInitExpressionDependencyOrder()
+    {
+        return new List<string>
+        {
+            // LEVEL 0: 62 classes with no dependencies (alphabetically sorted within level)
+            "Benchmark class",
+            "BinaryChoiceView class",
+            "BlockContextTest class",
+            "BrowserView class",
+            "Change class",
+            "ChangesView class",
+            "Class class",
+            "ClassHierarchyBrowserView class",
+            "CompiledMethod class",
+            "ControlManager class",
+            "DebuggerView class",
+            "DigitBuffer class",
+            "DiskBrowserView class",
+            "DisplayScreen class",
+            "DisplayTextView class",
+            "Encoder class",
+            "File class",
+            "FileList class",
+            "Form class",
+            "FormButtonView class",
+            "FormEditor class",
+            "FormView class",
+            "Inspector class",
+            "InspectorView class",
+            "Lexicon class",
+            "ListController class",
+            "ListView class",
+            "LockedTextView class",
+            "LowSpaceView class",
+            "Magnitude class",
+            "MenuView class",
+            "MessageNode class",
+            "MethodNode class",
+            "MixedInspectorView class",
+            "NameSetInspectorView class",
+            "NoControllerView class",
+            "Notifier class",
+            "NotifierView class",
+            "Object class",
+            "OccupationView class",
+            "OrderedCollection class",
+            "ParseNode class",
+            "Path class",
+            "Point class",
+            "Project class",
+            "Rectangle class",
+            "SmallInteger class",
+            "SourceFileManager class",
+            "SplinesView class",
+            "StandardSystemView class",
+            "StringHolderView class",
+            "Symbol class",
+            "SymbolAsStringTest class",
+            "SystemView class",
+            "SystemWorkspace class",
+            "TextCollectorView class",
+            "TextEditor class",
+            "TextList class",
+            "TileableView class",
+            "UndefinedObject class",
+            "WorkspaceView class",
+
+            // LEVEL 1: 5 classes that depend on Level 0
+            "BitEditor class",      // depends on: OrderedCollection, Point
+            "Debugger class",       // depends on: NotifierView, Project
+            "FormMenuView class",   // depends on: DisplayScreen
+            "LargePositiveInteger class",  // depends on: DigitBuffer
+            "Spline class",         // depends on: Point
+
+            // LEVEL 2: 1 class that depends on Level 1
+            "LargeNegativeInteger class"   // depends on: LargePositiveInteger
+        };
+    }
+
+    /// <summary>
+    /// Reorders init expression indices according to dependency order.
+    /// Maps class names from bundle to desired execution order, preserving any not in dependency list.
+    /// </summary>
+    private static List<int> ReorderByDependencies(
+        List<int> originalIndices,
+        ColdStartBundle bundle,
+        List<string> dependencyOrder)
+    {
+        var result = new List<int>();
+        var remainingIndices = new HashSet<int>(originalIndices);
+
+        // Process each class in dependency order
+        foreach (var className in dependencyOrder)
+        {
+            // Find the init expression index for this class
+            // Match by looking for the expected format: "ClassName initialize"
+            // Strip " class" from dependency order (e.g., "SmallInteger class" -> "SmallInteger")
+            var bareClassName = className.Replace(" class", "");
+            var expectedSource = $"{bareClassName} initialize";
+
+            for (int i = 0; i < bundle.InitExpressions.Length; i++)
+            {
+                if (!remainingIndices.Contains(i))
+                    continue;
+
+                var initExpr = bundle.InitExpressions[i];
+                if (initExpr.Source == expectedSource)
+                {
+                    result.Add(i);
+                    remainingIndices.Remove(i);
+                    break;
+                }
+            }
+        }
+
+        // Add any remaining indices that weren't in dependency order (at the end)
+        // These are init expressions that don't match our dependency analysis
+        if (remainingIndices.Count > 0)
+        {
+            Console.WriteLine($"  ⚠️  {remainingIndices.Count} init expressions not in dependency order (appending at end)");
+            result.AddRange(remainingIndices.OrderBy(i => i));
+        }
+
+        return result;
     }
 }

@@ -1,0 +1,870 @@
+{
+  "execution_order": [
+    "Benchmark class",
+    "BinaryChoiceView class",
+    "BitBlt class",
+    "Change class",
+    "ChangeListController class",
+    "ChangeScanner class",
+    "Character class",
+    "ClassOrganizer class",
+    "CompiledMethod class",
+    "ContextPart class",
+    "Controller class",
+    "Cursor class",
+    "Date class",
+    "Decompiler class",
+    "Delay class",
+    "DisplayText class",
+    "Explainer class",
+    "ExternalTextStream",
+    "File class",
+    "FileDirectory class",
+    "FileStream class",
+    "Float class",
+    "Form class",
+    "FormEditor class",
+    "InputSensor class",
+    "InputState class",
+    "InstructionStream class",
+    "Link class",
+    "MessageNode class",
+    "MethodDescription class",
+    "NotifierController class",
+    "Object class",
+    "Paragraph class",
+    "ParagraphEditor class",
+    "ParseNode class",
+    "ProcessorScheduler class",
+    "Project class",
+    "ProjectController class",
+    "ProjectView class",
+    "Scanner class",
+    "ScreenController class",
+    "SmallInteger class",
+    "StandardSystemController class",
+    "String class",
+    "StringHolder class",
+    "StringHolderController class",
+    "Switch class",
+    "Symbol class",
+    "SystemDictionary class",
+    "SystemTracer class",
+    "Text class",
+    "TextStyle class",
+    "VariableNode class",
+    "WindowsDirectoryReference",
+    "WindowsFileAttributes",
+    "WindowsFileDirectory",
+    "WindowsFileReference",
+    "WindowsFileStream",
+    "WindowsFileSystem",
+    "WindowsPathName",
+    "WindowsVolume",
+    "superclass class",
+    "BitEditor class",
+    "Debugger class",
+    "FormMenuView class",
+    "LargePositiveInteger class",
+    "Spline class",
+    "LargeNegativeInteger class"
+  ],
+  "levels": [
+    [
+      "Benchmark class",
+      "BinaryChoiceView class",
+      "BitBlt class",
+      "Change class",
+      "ChangeListController class",
+      "ChangeScanner class",
+      "Character class",
+      "ClassOrganizer class",
+      "CompiledMethod class",
+      "ContextPart class",
+      "Controller class",
+      "Cursor class",
+      "Date class",
+      "Decompiler class",
+      "Delay class",
+      "DisplayText class",
+      "Explainer class",
+      "ExternalTextStream",
+      "File class",
+      "FileDirectory class",
+      "FileStream class",
+      "Float class",
+      "Form class",
+      "FormEditor class",
+      "InputSensor class",
+      "InputState class",
+      "InstructionStream class",
+      "Link class",
+      "MessageNode class",
+      "MethodDescription class",
+      "NotifierController class",
+      "Object class",
+      "Paragraph class",
+      "ParagraphEditor class",
+      "ParseNode class",
+      "ProcessorScheduler class",
+      "Project class",
+      "ProjectController class",
+      "ProjectView class",
+      "Scanner class",
+      "ScreenController class",
+      "SmallInteger class",
+      "StandardSystemController class",
+      "String class",
+      "StringHolder class",
+      "StringHolderController class",
+      "Switch class",
+      "Symbol class",
+      "SystemDictionary class",
+      "SystemTracer class",
+      "Text class",
+      "TextStyle class",
+      "VariableNode class",
+      "WindowsDirectoryReference",
+      "WindowsFileAttributes",
+      "WindowsFileDirectory",
+      "WindowsFileReference",
+      "WindowsFileStream",
+      "WindowsFileSystem",
+      "WindowsPathName",
+      "WindowsVolume",
+      "superclass class"
+    ],
+    [
+      "BitEditor class",
+      "Debugger class",
+      "FormMenuView class",
+      "LargePositiveInteger class",
+      "Spline class"
+    ],
+    [
+      "LargeNegativeInteger class"
+    ]
+  ],
+  "dependencies": {
+    "WindowsFileSystem": {
+      "line": 106,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "WindowsPathName": {
+      "line": 159,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "WindowsFileDirectory": {
+      "line": 440,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "WindowsFileReference": {
+      "line": 627,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "WindowsDirectoryReference": {
+      "line": 805,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "WindowsFileStream": {
+      "line": 989,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ExternalTextStream": {
+      "line": 1074,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "WindowsVolume": {
+      "line": 1239,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "WindowsFileAttributes": {
+      "line": 1311,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Benchmark class": {
+      "line": 3844,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "BinaryChoiceView class": {
+      "line": 3998,
+      "writes": [
+        "ThumbsUp",
+        "ThumbsDown"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "BitBlt class": {
+      "line": 4424,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "BitEditor class": {
+      "line": 4489,
+      "writes": [
+        "YellowButtonMenu",
+        "YellowButtonMessages"
+      ],
+      "instantiates": [],
+      "reads_globals": [
+        "YellowButtonMenu",
+        "YellowButtonMessages"
+      ]
+    },
+    "Change class": {
+      "line": 6599,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ChangeListController class": {
+      "line": 6758,
+      "writes": [
+        "ChangeListYellowButtonMenu",
+        "ChangeListYellowButtonMessages"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ChangeScanner class": {
+      "line": 7160,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Character class": {
+      "line": 7573,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "superclass class": {
+      "line": 9012,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ClassOrganizer class": {
+      "line": 10421,
+      "writes": [
+        "Default"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "CompiledMethod class": {
+      "line": 11281,
+      "writes": [
+        "SmallFrame",
+        "LargeFrame",
+        "BytesForHeader",
+        "BytesPerLiteral"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ContextPart class": {
+      "line": 12245,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Controller class": {
+      "line": 12405,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Cursor class": {
+      "line": 12716,
+      "writes": [
+        "OriginCursor",
+        "CornerCursor",
+        "ReadCursor",
+        "WriteCursor",
+        "WaitCursor",
+        "BlankCursor",
+        "XeqCursor",
+        "SquareCursor",
+        "NormalCursor",
+        "CrossHairCursor",
+        "MarkerCursor",
+        "UpCursor",
+        "DownCursor"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Date class": {
+      "line": 13371,
+      "writes": [
+        "MonthNames",
+        "SecondsInDay",
+        "DaysInMonth",
+        "FirstDayOfMonth",
+        "WeekDayNames"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Debugger class": {
+      "line": 13879,
+      "writes": [
+        "HighlightPC"
+      ],
+      "instantiates": [],
+      "reads_globals": [
+        "CascadeFlag",
+        "ArgumentFlag"
+      ]
+    },
+    "Decompiler class": {
+      "line": 14156,
+      "writes": [
+        "CascadeFlag",
+        "ArgumentFlag"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Delay class": {
+      "line": 14385,
+      "writes": [
+        "TimingSemaphore",
+        "AccessProtect",
+        "SuspendedDelays",
+        "ActiveDelay"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "DisplayText class": {
+      "line": 15633,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Explainer class": {
+      "line": 16409,
+      "writes": [
+        "NewLine"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "File class": {
+      "line": 16886,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "FileDirectory class": {
+      "line": 17252,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "FileStream class": {
+      "line": 18410,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Float class": {
+      "line": 19065,
+      "writes": [
+        "Pi",
+        "Halfpi",
+        "Fourthpi",
+        "Twopi",
+        "RadiansPerDegree",
+        "Ln2",
+        "Sqrt2",
+        "SinCoefficients",
+        "TanCoefficients",
+        "ExpPCoefficients",
+        "ExpQCoefficients",
+        "LnCoefficients"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Form class": {
+      "line": 20052,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "FormEditor class": {
+      "line": 20511,
+      "writes": [
+        "FlashCursor",
+        "YellowButtonMenu",
+        "YellowButtonMessages"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "FormMenuView class": {
+      "line": 20842,
+      "writes": [
+        "FormButtons",
+        "SpecialBorderForm",
+        "BorderForm"
+      ],
+      "instantiates": [],
+      "reads_globals": [
+        "Keyboard"
+      ]
+    },
+    "InputSensor class": {
+      "line": 21489,
+      "writes": [
+        "DefaultKeyboardMap",
+        "CurrentInputState"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "InputState class": {
+      "line": 21789,
+      "writes": [
+        "BitMin",
+        "BitMax",
+        "LshiftKey",
+        "RshiftKey",
+        "CtrlKey",
+        "LockKey"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "InstructionStream class": {
+      "line": 22329,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "LargeNegativeInteger class": {
+      "line": 23386,
+      "writes": [
+        "MinHi"
+      ],
+      "instantiates": [],
+      "reads_globals": [
+        "MaxHi"
+      ]
+    },
+    "LargePositiveInteger class": {
+      "line": 23640,
+      "writes": [
+        "MaxHi"
+      ],
+      "instantiates": [],
+      "reads_globals": [
+        "LdInstType",
+        "LdTempType",
+        "LdLitType",
+        "LdLitIndType",
+        "SendType"
+      ]
+    },
+    "Link class": {
+      "line": 24133,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "MessageNode class": {
+      "line": 25005,
+      "writes": [
+        "MacroSelectors",
+        "MacroTransformers",
+        "MacroEmitters",
+        "MacroSizers"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "MethodDescription class": {
+      "line": 26264,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "NotifierController class": {
+      "line": 26335,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Object class": {
+      "line": 27450,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Paragraph class": {
+      "line": 29260,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ParagraphEditor class": {
+      "line": 29892,
+      "writes": [
+        "CurrentSelection",
+        "TextEditorYellowButtonMenu",
+        "TextEditorYellowButtonMessages",
+        "Keyboard"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ParseNode class": {
+      "line": 30131,
+      "writes": [
+        "LdInstType",
+        "LdTempType",
+        "LdLitType",
+        "LdLitIndType",
+        "SendType",
+        "CodeBases",
+        "CodeLimits",
+        "LdSelf",
+        "LdTrue",
+        "LdFalse",
+        "LdNil",
+        "LdMinus1",
+        "LdInstLong",
+        "Store",
+        "StorePop",
+        "ShortStoP",
+        "SendLong",
+        "LdSuper",
+        "Pop",
+        "Dup",
+        "LdThisContext",
+        "EndMethod",
+        "EndRemote",
+        "Jmp",
+        "Bfp",
+        "JmpLimit",
+        "JmpLong",
+        "SendPlus",
+        "Send",
+        "SendLimit"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ProcessorScheduler class": {
+      "line": 32132,
+      "writes": [
+        "SystemRockBottomPriority",
+        "SystemBackgroundPriority",
+        "UserBackgroundPriority",
+        "UserSchedulingPriority",
+        "UserInterruptPriority",
+        "LowIOPriority",
+        "HighIOPriority",
+        "TimingPriority"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Project class": {
+      "line": 32247,
+      "writes": [
+        "CurrentProject"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ProjectController class": {
+      "line": 32291,
+      "writes": [
+        "ProjectYellowButtonMenu",
+        "ProjectYellowButtonMessages"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ProjectView class": {
+      "line": 32368,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Scanner class": {
+      "line": 33634,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "ScreenController class": {
+      "line": 33742,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "SmallInteger class": {
+      "line": 35048,
+      "writes": [
+        "Digitbuffer"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Spline class": {
+      "line": 35430,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": [
+        "ScheduledBlueButtonMenu",
+        "ScheduledBlueButtonMessages"
+      ]
+    },
+    "StandardSystemController class": {
+      "line": 35601,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "String class": {
+      "line": 36532,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "StringHolder class": {
+      "line": 36618,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "StringHolderController class": {
+      "line": 36742,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Switch class": {
+      "line": 37072,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Symbol class": {
+      "line": 37372,
+      "writes": [
+        "SingleCharSymbols"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "SystemDictionary class": {
+      "line": 38282,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "SystemTracer class": {
+      "line": 38884,
+      "writes": [
+        "ODD",
+        "PTRS",
+        "MT",
+        "NoRefs",
+        "OVref",
+        "Clamped",
+        "NewNil"
+      ],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "Text class": {
+      "line": 39241,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "TextStyle class": {
+      "line": 40007,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    },
+    "VariableNode class": {
+      "line": 40624,
+      "writes": [],
+      "instantiates": [],
+      "reads_globals": []
+    }
+  },
+  "global_writes": {
+    "ThumbsUp": "BinaryChoiceView class",
+    "ThumbsDown": "BinaryChoiceView class",
+    "YellowButtonMenu": "FormEditor class",
+    "YellowButtonMessages": "FormEditor class",
+    "ChangeListYellowButtonMenu": "ChangeListController class",
+    "ChangeListYellowButtonMessages": "ChangeListController class",
+    "Default": "ClassOrganizer class",
+    "SmallFrame": "CompiledMethod class",
+    "LargeFrame": "CompiledMethod class",
+    "BytesForHeader": "CompiledMethod class",
+    "BytesPerLiteral": "CompiledMethod class",
+    "OriginCursor": "Cursor class",
+    "CornerCursor": "Cursor class",
+    "ReadCursor": "Cursor class",
+    "WriteCursor": "Cursor class",
+    "WaitCursor": "Cursor class",
+    "BlankCursor": "Cursor class",
+    "XeqCursor": "Cursor class",
+    "SquareCursor": "Cursor class",
+    "NormalCursor": "Cursor class",
+    "CrossHairCursor": "Cursor class",
+    "MarkerCursor": "Cursor class",
+    "UpCursor": "Cursor class",
+    "DownCursor": "Cursor class",
+    "MonthNames": "Date class",
+    "SecondsInDay": "Date class",
+    "DaysInMonth": "Date class",
+    "FirstDayOfMonth": "Date class",
+    "WeekDayNames": "Date class",
+    "HighlightPC": "Debugger class",
+    "CascadeFlag": "Decompiler class",
+    "ArgumentFlag": "Decompiler class",
+    "TimingSemaphore": "Delay class",
+    "AccessProtect": "Delay class",
+    "SuspendedDelays": "Delay class",
+    "ActiveDelay": "Delay class",
+    "NewLine": "Explainer class",
+    "Pi": "Float class",
+    "Halfpi": "Float class",
+    "Fourthpi": "Float class",
+    "Twopi": "Float class",
+    "RadiansPerDegree": "Float class",
+    "Ln2": "Float class",
+    "Sqrt2": "Float class",
+    "SinCoefficients": "Float class",
+    "TanCoefficients": "Float class",
+    "ExpPCoefficients": "Float class",
+    "ExpQCoefficients": "Float class",
+    "LnCoefficients": "Float class",
+    "OneBitForm": "Form class",
+    "FlashCursor": "FormEditor class",
+    "FormButtons": "FormMenuView class",
+    "SpecialBorderForm": "FormMenuView class",
+    "BorderForm": "FormMenuView class",
+    "DefaultKeyboardMap": "InputSensor class",
+    "CurrentInputState": "InputSensor class",
+    "BitMin": "InputState class",
+    "BitMax": "InputState class",
+    "LshiftKey": "InputState class",
+    "RshiftKey": "InputState class",
+    "CtrlKey": "InputState class",
+    "LockKey": "InputState class",
+    "MinHi": "LargeNegativeInteger class",
+    "MaxHi": "LargePositiveInteger class",
+    "MacroSelectors": "MessageNode class",
+    "MacroTransformers": "MessageNode class",
+    "MacroEmitters": "MessageNode class",
+    "MacroSizers": "MessageNode class",
+    "NotifierYellowButtonMenu": "NotifierController class",
+    "NotifierYellowButtonMessages": "NotifierController class",
+    "CurrentSelection": "ParagraphEditor class",
+    "TextEditorYellowButtonMenu": "ParagraphEditor class",
+    "TextEditorYellowButtonMessages": "ParagraphEditor class",
+    "Keyboard": "ParagraphEditor class",
+    "LdInstType": "ParseNode class",
+    "LdTempType": "ParseNode class",
+    "LdLitType": "ParseNode class",
+    "LdLitIndType": "ParseNode class",
+    "SendType": "ParseNode class",
+    "CodeBases": "ParseNode class",
+    "CodeLimits": "ParseNode class",
+    "LdSelf": "ParseNode class",
+    "LdTrue": "ParseNode class",
+    "LdFalse": "ParseNode class",
+    "LdNil": "ParseNode class",
+    "LdMinus1": "ParseNode class",
+    "LdInstLong": "ParseNode class",
+    "Store": "ParseNode class",
+    "StorePop": "ParseNode class",
+    "ShortStoP": "ParseNode class",
+    "SendLong": "ParseNode class",
+    "LdSuper": "ParseNode class",
+    "Pop": "ParseNode class",
+    "Dup": "ParseNode class",
+    "LdThisContext": "ParseNode class",
+    "EndMethod": "ParseNode class",
+    "EndRemote": "ParseNode class",
+    "Jmp": "ParseNode class",
+    "Bfp": "ParseNode class",
+    "JmpLimit": "ParseNode class",
+    "JmpLong": "ParseNode class",
+    "SendPlus": "ParseNode class",
+    "Send": "ParseNode class",
+    "SendLimit": "ParseNode class",
+    "SystemRockBottomPriority": "ProcessorScheduler class",
+    "SystemBackgroundPriority": "ProcessorScheduler class",
+    "UserBackgroundPriority": "ProcessorScheduler class",
+    "UserSchedulingPriority": "ProcessorScheduler class",
+    "UserInterruptPriority": "ProcessorScheduler class",
+    "LowIOPriority": "ProcessorScheduler class",
+    "HighIOPriority": "ProcessorScheduler class",
+    "TimingPriority": "ProcessorScheduler class",
+    "CurrentProject": "Project class",
+    "ProjectYellowButtonMenu": "ProjectController class",
+    "ProjectYellowButtonMessages": "ProjectController class",
+    "EndChar": "Scanner class",
+    "TypeTable": "Scanner class",
+    "ScreenYellowButtonMenu": "ScreenController class",
+    "ScreenYellowButtonMessages": "ScreenController class",
+    "Digitbuffer": "SmallInteger class",
+    "ScheduledBlueButtonMenu": "StandardSystemController class",
+    "ScheduledBlueButtonMessages": "StandardSystemController class",
+    "CodeYellowButtonMenu": "StringHolderController class",
+    "CodeYellowButtonMessages": "StringHolderController class",
+    "SingleCharSymbols": "Symbol class",
+    "ODD": "SystemTracer class",
+    "PTRS": "SystemTracer class",
+    "MT": "SystemTracer class",
+    "NoRefs": "SystemTracer class",
+    "OVref": "SystemTracer class",
+    "Clamped": "SystemTracer class",
+    "NewNil": "SystemTracer class",
+    "StdVariables": "VariableNode class",
+    "StdSelectors": "VariableNode class",
+    "StdLiterals": "VariableNode class",
+    "NodeNil": "VariableNode class",
+    "NodeTrue": "VariableNode class",
+    "NodeFalse": "VariableNode class",
+    "NodeSelf": "VariableNode class",
+    "NodeThisContext": "VariableNode class",
+    "NodeSuper": "VariableNode class"
+  }
+}

@@ -1,8 +1,34 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-09
+**Last Updated**: 2025-11-10
 
-## Recent Work (2025-11-09 continued)
+## Recent Work (2025-11-10)
+
+**Init Expression Dependency Analysis & Execution**:
+- Analyzed all 68 class-side initialize methods in Smalltalk-80 system
+- Created [InitExpression-DependencyAnalysis.md](InitExpression-DependencyAnalysis.md) with complete dependency graph (3 levels, no circular deps)
+- Implemented dependency-ordered execution in [Program.cs](Smalltalk80.Interpreter/Program.cs#L257-L273)
+- **Fixed critical VM bug**: Super sends from within blocks now correctly walk BlockContext → home MethodContext
+
+**Super Send Fix** ([VirtualMachine.cs:2142-2174](Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs#L2142-L2174)):
+- **Problem**: Super send failed with "Cannot safely read slot 3" when executing inside a block
+- **Root Cause**: BlockContext slot 3 = nargs, MethodContext slot 3 = method (different fields!)
+- **Solution**: Check if _activeContextOOP is BlockContext; if so, walk to home MethodContext before reading method slot
+- **Example**: `Cursor class>>extent:fromArray:offset:` has `ifTrue: [^super ...]` - super send inside block closure
+
+**Build Status**: ✅ 0 errors, 0 warnings
+**Cold Start**: ✅ Phase 1-6 all succeeded
+**Init Expressions**: ⚠️ 52 init expressions run in dependency order, BinaryChoiceView initialize progresses past super send (new error: Point>>at: subscript bounds)
+
+**Files Modified (2025-11-10)**:
+- `Smalltalk80.Interpreter/Program.cs` - Added dependency-ordered init execution (lines 257-273, 1686-1810)
+- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` - Fixed super send from blocks (lines 2142-2174)
+- `InitExpression-DependencyAnalysis.md` - NEW: Complete 68-class dependency analysis
+- `init_order.json` - NEW: Machine-readable dependency order
+
+---
+
+## Previous Work (2025-11-09)
 
 **FIXED: BlockContext Execution Now Working** ✅:
 

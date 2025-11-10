@@ -2139,25 +2139,39 @@ public partial class VirtualMachine : IPrimitiveContext
         // For super sends, we need to start method lookup from the superclass of the class
         // that contains the currently executing method, NOT from the receiver's class.
 
-        // CRITICAL FIX: Read the method directly from _activeContextOOP, not from FindMethodContext!
-        // When executing inside a block, _activeContextOOP is a MethodContext with the BLOCK's method in slot 3.
-        // The block's method has the correct homeClass for super sends.
-        // FindMethodContext() walks the sender chain and would return the CALLING method (wrong!).
-        // For super sends, we always want the method from the CURRENTLY EXECUTING context.
+        // CRITICAL FIX: Read the method from the correct context
+        // When executing inside a block, _activeContextOOP is a BlockContext, and we need to walk to home MethodContext.
+        // When executing in a method, _activeContextOOP is already a MethodContext.
 
-        // ARCHITECTURAL INVARIANT: _activeContextOOP must be a MethodContext (not BlockContext)
-        // because MethodContext slot 3 = method, but BlockContext slot 3 = nargs (different!)
-        // This is guaranteed because CreateBlockExecutionContext() creates a MethodContext for block execution.
+        // Check if we're in a BlockContext or MethodContext
         var contextClass = GetClassName(_heapManager.GetSlot(_activeContextOOP, 0));
-        if (contextClass != "MethodContext")
+        SmalltalkOOP methodContextOOP;
+
+        if (contextClass == "BlockContext")
+        {
+            // We're in a block - walk to the home MethodContext
+            // BlockContext slot 5 = home (the MethodContext that created this block)
+            methodContextOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+
+            if (_debugOptions.ShouldDebugMessages)
+            {
+                Console.WriteLine($"[Super Send in Block] Walking from BlockContext to home MethodContext (oop={methodContextOOP})");
+            }
+        }
+        else if (contextClass == "MethodContext")
+        {
+            // We're already in a MethodContext
+            methodContextOOP = _activeContextOOP;
+        }
+        else
         {
             throw new InvalidOperationException(
-                $"Super send requires MethodContext but _activeContextOOP is {contextClass}. " +
-                $"Cannot safely read slot 3 (MethodContext=method, BlockContext=nargs).");
+                $"Super send requires MethodContext or BlockContext, but _activeContextOOP is {contextClass}.");
         }
 
+        // Now read the method from the MethodContext (slot 3)
         int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
-        var currentMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+        var currentMethodOOP = _heapManager.GetInstanceVariable(methodContextOOP, methodIndex);
 
         // Get the class that owns this method (the home class)
         // CompiledMethod structure: fixed slot 0 = homeClass, indexed slots = [header] [literals...] [bytecodeArray]
