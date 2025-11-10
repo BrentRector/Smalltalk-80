@@ -4394,21 +4394,31 @@ public partial class VirtualMachine : IPrimitiveContext
         var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
         bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
 
+        // DEBUG: Log temporary variable access
+        string contextType = isBlockContext ? "BlockContext" : "MethodContext";
+        Console.WriteLine($"[GetTemp] contextOOP={contextOOP}, type={contextType}, index={index}");
+
         if (isBlockContext)
         {
             // BlockContext: Check if accessing local args or need to traverse home chain
             var nargsOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
             int nargs = nargsOOP.AsSmallInteger();
 
+            Console.WriteLine($"[GetTemp] BlockContext nargs={nargs}, index < nargs = {index < nargs}");
+
             if (index < nargs)
             {
                 // Local block argument - stored in THIS BlockContext's indexed slots
-                return _heapManager.GetIndexedOOP(contextOOP, index);
+                var result = _heapManager.GetIndexedOOP(contextOOP, index);
+                string resultClass = result.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassName(result);
+                Console.WriteLine($"[GetTemp] Returning block arg: {result} (class={resultClass})");
+                return result;
             }
             else
             {
                 // Parent temp or argument - RECURSIVELY traverse home chain
                 var homeOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                Console.WriteLine($"[GetTemp] Traversing to home context: {homeOOP}, adjustedIndex={index - nargs}");
                 // Adjust index by subtracting our local count and recurse
                 return GetTemporaryVariable(homeOOP, index - nargs);
             }
@@ -4416,7 +4426,10 @@ public partial class VirtualMachine : IPrimitiveContext
         else
         {
             // MethodContext: Direct access to method's temp frame (base case)
-            return _heapManager.GetIndexedOOP(contextOOP, index);
+            var result = _heapManager.GetIndexedOOP(contextOOP, index);
+            string resultClass = result.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassName(result);
+            Console.WriteLine($"[GetTemp] Returning method temp: {result} (class={resultClass})");
+            return result;
         }
     }
 
