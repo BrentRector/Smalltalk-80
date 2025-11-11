@@ -11,10 +11,33 @@ using Smalltalk80.Core.Bytecodes;
 namespace Smalltalk80.Compiler
 {
     /// <summary>
+    /// Defines the type of compilation scope.
+    /// </summary>
+    public enum ScopeType
+    {
+        /// <summary>
+        /// Method-level scope (outermost, depth 0).
+        /// </summary>
+        Method,
+
+        /// <summary>
+        /// Block-level scope (nested, depth 1+).
+        /// </summary>
+        Block
+    }
+
+    /// <summary>
     /// Environment for bytecode generation tracking variable indices and scope.
+    /// Uses immutable scope chain - each scope has its OWN variables, no inheritance/mutation.
     /// </summary>
     public class CompilationEnvironment
     {
+        /// <summary>
+        /// Type of this scope (Method or Block).
+        /// </summary>
+        public ScopeType Type { get; set; }
+
+
         /// <summary>
         /// Parent environment for lexical scope chain (null for method scope).
         /// Used to resolve free variables in nested blocks.
@@ -27,12 +50,27 @@ namespace Smalltalk80.Compiler
         public int ScopeDepth { get; set; }
 
         /// <summary>
-        /// Map of argument names to their indices.
+        /// Arguments defined in THIS scope only (no inheritance).
+        /// For method scope: method arguments. For block scope: block arguments only.
+        /// Indices are 0-based within this scope.
+        /// </summary>
+        public Dictionary<string, int> OwnArguments { get; set; } = new();
+
+        /// <summary>
+        /// Temporaries defined in THIS scope only (no inheritance).
+        /// Indices are 0-based within this scope.
+        /// </summary>
+        public Dictionary<string, int> OwnTemporaries { get; set; } = new();
+
+        /// <summary>
+        /// [DEPRECATED - Use OwnArguments] Map of argument names to their indices.
+        /// This property is maintained for backward compatibility but should not be used for new code.
         /// </summary>
         public Dictionary<string, int> Arguments { get; } = new();
 
         /// <summary>
-        /// Map of temporary variable names to their indices.
+        /// [DEPRECATED - Use OwnTemporaries] Map of temporary variable names to their indices.
+        /// This property is maintained for backward compatibility but should not be used for new code.
         /// </summary>
         public Dictionary<string, int> Temporaries { get; } = new();
         
@@ -525,6 +563,12 @@ namespace Smalltalk80.Compiler
         /// </summary>
         public void Emit(byte bytecode)
         {
+            // DIAGNOSTIC: Track position 22 emissions in do: methods
+            if (currentMethodName == "do:" && bytecodes.Count >= 20 && bytecodes.Count <= 25)
+            {
+                Console.WriteLine($"[BytecodeEmitter.Emit] Emitting 0x{bytecode:X2} at position {bytecodes.Count} in method {currentMethodName}");
+                Console.WriteLine($"  Stack trace: {Environment.StackTrace.Split('\n').Take(5).Skip(1).Select(s => s.Trim()).Aggregate((a, b) => a + "\n  " + b)}");
+            }
             bytecodes.Add(bytecode);
         }
 
@@ -557,7 +601,14 @@ namespace Smalltalk80.Compiler
         /// </summary>
         private void EmitWithOffset(Bytecode baseCode, int offset)
         {
-            Emit((byte)((byte)baseCode + offset));
+            byte result = (byte)((byte)baseCode + offset);
+            // DIAGNOSTIC: Track PUSH_TEMP emissions
+            if (baseCode == Bytecode.PUSH_TEMP_0)
+            {
+                Console.WriteLine($"[BytecodeEmitter.EmitWithOffset] PUSH_TEMP baseCode=0x{(byte)baseCode:X2}, offset={offset}, result=0x{result:X2}");
+                Console.WriteLine($"  Current bytecode position: {bytecodes.Count}");
+            }
+            Emit(result);
         }
 
         // Push operations
@@ -1112,6 +1163,7 @@ namespace Smalltalk80.Compiler
         {
             // Initialize compilation state
             environment = new CompilationEnvironment();
+            environment.Type = ScopeType.Method; // Set scope type for method
             emitter = new BytecodeEmitter();
             emitter.currentMethodName = "doIt";
             selector = "doIt"; // Standard selector for expressions
@@ -1181,6 +1233,7 @@ namespace Smalltalk80.Compiler
 
             // Initialize compilation state
             environment = new CompilationEnvironment();
+            environment.Type = ScopeType.Method; // Set scope type for method
             emitter = new BytecodeEmitter();
             selector = "";
             primitiveNumber = 0;
@@ -1291,6 +1344,15 @@ namespace Smalltalk80.Compiler
                 methodDef.methodBody(),
                 null);
 
+            // DIAGNOSTIC: Check bytecode BEFORE creating CompiledMethodData
+            var bytecodeArray = emitter.GetBytecodes();
+            if (selector == "do:" && bytecodeArray.Length > 22)
+            {
+                Console.WriteLine($"[BytecodeCompiler.CompileMethodFromTree] Creating CompiledMethodData for {selector}");
+                Console.WriteLine($"  Bytecode array length: {bytecodeArray.Length}");
+                Console.WriteLine($"  Bytecode[20-25]: {string.Join(", ", bytecodeArray.Skip(20).Take(6).Select(b => $"0x{b:X2}"))}");
+            }
+
             return new CompiledMethodData
             {
                 Selector = selector,
@@ -1298,7 +1360,7 @@ namespace Smalltalk80.Compiler
                 TemporaryCount = environment.TemporariesAllocatedInFrame,
                 IsPrimitive = hasPrimitive,
                 PrimitiveNumber = primitiveNumber,
-                Bytecode = emitter.GetBytecodes(),
+                Bytecode = bytecodeArray,
                 Literals = emitter.GetLiterals(),
                 ArgumentNames = new List<string>(argumentNames),
                 TemporaryNames = new List<string>(temporaryNames),
@@ -1326,6 +1388,9 @@ namespace Smalltalk80.Compiler
                 {
                     var argName = arg.GetText();
                     argumentNames.Add(argName);
+                    // Populate OwnArguments for method scope
+                    environment.OwnArguments[argName] = 0;
+                    // Maintain backward compatibility
                     environment.Arguments[argName] = 0;
                     environment.ArgumentCount = 1;
                 }
@@ -1345,6 +1410,9 @@ namespace Smalltalk80.Compiler
                     {
                         var argText = args[i].GetText();
                         argumentNames.Add(argText);
+                        // Populate OwnArguments for method scope
+                        environment.OwnArguments[argText] = i;
+                        // Maintain backward compatibility
                         environment.Arguments[argText] = i;
                     }
                 }
@@ -1367,6 +1435,9 @@ namespace Smalltalk80.Compiler
             {
                 var name = tempNames[i].GetText();
                 temporaryNames.Add(name);
+                // Populate OwnTemporaries for method scope (0-based, no inheritance)
+                environment.OwnTemporaries[name] = i;
+                // Maintain backward compatibility (absolute index including args)
                 environment.Temporaries[name] = environment.ArgumentCount + i;
             }
             environment.TemporariesAllocatedInFrame = tempNames.Length;
@@ -2115,6 +2186,10 @@ namespace Smalltalk80.Compiler
             int savedScopeDepth = environment.ScopeDepth;
             // Save temporaries dictionary to handle shadowing correctly
             var savedTemporaries = new Dictionary<string, int>(environment.Temporaries);
+            // Save OwnArguments and OwnTemporaries to restore after block compilation
+            // CRITICAL FIX: Without this, nested blocks lose parent's OwnArguments/OwnTemporaries!
+            var savedOwnArguments = new Dictionary<string, int>(environment.OwnArguments);
+            var savedOwnTemporaries = new Dictionary<string, int>(environment.OwnTemporaries);
             // Save cumulative block arg offset to restore after block compilation
             int savedCumulativeBlockArgOffset = environment.CumulativeBlockArgOffset;
             // Save temporary count to restore after block compilation
@@ -2136,6 +2211,7 @@ namespace Smalltalk80.Compiler
             // because the offset calculation should NOT include method temps, only block locals
             var parentSnapshot = new CompilationEnvironment
             {
+                Type = (savedScopeDepth == 0) ? ScopeType.Method : ScopeType.Block,
                 ArgumentCount = savedArgCount,
                 TemporariesAllocatedInFrame = (savedScopeDepth == 0) ? 0 : savedTemporariesAllocatedInFrame,
                 ScopeDepth = savedScopeDepth,
@@ -2149,6 +2225,13 @@ namespace Smalltalk80.Compiler
                 parentSnapshot.Arguments[kvp.Key] = kvp.Value;
             foreach (var kvp in savedTemporaries)
                 parentSnapshot.Temporaries[kvp.Key] = kvp.Value;
+            // Copy OwnArguments and OwnTemporaries from SAVED state (parent scope's own variables)
+            // CRITICAL FIX: Use savedOwnArguments/savedOwnTemporaries, NOT environment.OwnArguments/OwnTemporaries
+            // The environment dictionaries are about to be cleared and repopulated with THIS block's variables
+            foreach (var kvp in savedOwnArguments)
+                parentSnapshot.OwnArguments[kvp.Key] = kvp.Value;
+            foreach (var kvp in savedOwnTemporaries)
+                parentSnapshot.OwnTemporaries[kvp.Key] = kvp.Value;
             foreach (var kvp in environment.InstanceVariables)
                 parentSnapshot.InstanceVariables[kvp.Key] = kvp.Value;
             foreach (var kvp in environment.ClassVariables)
@@ -2158,6 +2241,9 @@ namespace Smalltalk80.Compiler
 
             environment.Parent = parentSnapshot;
 
+            // Set scope type to Block
+            environment.Type = ScopeType.Block;
+
             // Increment scope depth to indicate we're compiling inside a block
             // This is critical for VariableResolver to correctly identify block variables!
             environment.ScopeDepth = savedScopeDepth + 1;
@@ -2166,7 +2252,16 @@ namespace Smalltalk80.Compiler
             // Example: [:x | [:y | methodTemp]] - inner block needs offset of 2 (x + y)
             environment.CumulativeBlockArgOffset += argCount;
 
+            // Populate OwnArguments with block arguments (0-based, no inheritance)
+            // CRITICAL: Always clear OwnArguments, even if block has 0 arguments
+            environment.OwnArguments.Clear();
+            for (int i = 0; i < argumentNames.Count; i++)
+            {
+                environment.OwnArguments[argumentNames[i]] = i;
+            }
+
             // Add block arguments to current environment (they'll be in BlockContext indexed slots)
+            // Maintain backward compatibility
             for (int i = 0; i < argumentNames.Count; i++)
             {
                 environment.Arguments[argumentNames[i]] = i;
@@ -2178,6 +2273,11 @@ namespace Smalltalk80.Compiler
             // This is needed for CalculateBlockLocalOffset to compute the correct offset
             environment.TemporariesAllocatedInFrame = 0;
 
+            // Populate OwnTemporaries with block temps (0-based, no inheritance)
+            // CRITICAL: Always clear OwnTemporaries FIRST, even if block has 0 temps
+            // BUG FIX: Was only clearing inside `if (blockTemps != null)`, causing parent temps to leak into block scope
+            environment.OwnTemporaries.Clear();
+
             // Parse and register block temporaries in parent environment
             // Block temps are allocated after parent method's temps AND block arguments
             var blockTempNames = new List<string>();
@@ -2188,13 +2288,21 @@ namespace Smalltalk80.Compiler
                     .OfType<Smalltalk80Parser.TemporaryNameContext>()
                     .ToList();
 
+                // Populate OwnTemporaries with block temps (0-based, no inheritance)
+                for (int i = 0; i < tempNodes.Count; i++)
+                {
+                    var tempName = tempNodes[i].GetText();
+                    blockTempNames.Add(tempName);  // Track for later cleanup
+                    environment.OwnTemporaries[tempName] = i;  // 0-based index
+                }
+
+                // Maintain backward compatibility (absolute index)
                 // BUG FIX: Block temps start after block args + parent temps
                 // Example: [:i | | char | ...] → i=0, char=1 (not char=0!)
                 int tempBase = environment.ArgumentCount + environment.TemporariesAllocatedInFrame;
                 for (int i = 0; i < tempNodes.Count; i++)
                 {
                     var tempName = tempNodes[i].GetText();
-                    blockTempNames.Add(tempName);  // Track for later cleanup
                     environment.Temporaries[tempName] = tempBase + i;
                 }
                 environment.TemporariesAllocatedInFrame += tempNodes.Count;  // Extend parent's temp count
@@ -2249,6 +2357,19 @@ namespace Smalltalk80.Compiler
             foreach (var kvp in savedTemporaries)
             {
                 environment.Temporaries[kvp.Key] = kvp.Value;
+            }
+
+            // Restore OwnArguments and OwnTemporaries
+            // CRITICAL FIX: Without this, nested blocks lose parent's OwnArguments/OwnTemporaries!
+            environment.OwnArguments.Clear();
+            foreach (var kvp in savedOwnArguments)
+            {
+                environment.OwnArguments[kvp.Key] = kvp.Value;
+            }
+            environment.OwnTemporaries.Clear();
+            foreach (var kvp in savedOwnTemporaries)
+            {
+                environment.OwnTemporaries[kvp.Key] = kvp.Value;
             }
 
             environment.ScopeDepth = savedScopeDepth; // Restore scope depth
@@ -2554,6 +2675,15 @@ namespace Smalltalk80.Compiler
             // Use unified variable resolver
             var result = resolver.ResolveVariable(name, environment);
 
+            // DIAGNOSTIC: Track specific variable pushes
+            if (name == "aBlock" || name == "index" || name == "anArray" || name == "extentPoint")
+            {
+                Console.WriteLine($"[BytecodeCompiler.PushVariable] Pushing '{name}' in method {currentMethodIdentifier ?? "unknown"}");
+                Console.WriteLine($"  VariableResolver returned: Type={result.Type}, Index={result.Index}");
+                Console.WriteLine($"  Environment: ScopeDepth={environment.ScopeDepth}, ArgCount={environment.ArgumentCount}, TemporariesAllocatedInFrame={environment.TemporariesAllocatedInFrame}");
+                Console.WriteLine($"  OwnArguments.Count={environment.OwnArguments.Count}, OwnTemporaries.Count={environment.OwnTemporaries.Count}");
+            }
+
             switch (result.Type)
             {
                 case VariableResolver.VariableType.BlockArgument:
@@ -2561,6 +2691,10 @@ namespace Smalltalk80.Compiler
                 case VariableResolver.VariableType.ParentVariable:
                 case VariableResolver.VariableType.MethodArgument:
                 case VariableResolver.VariableType.MethodTemporary:
+                    if (name == "aBlock")
+                    {
+                        Console.WriteLine($"  ACTION: Calling emitter.PushTemporary({result.Index})");
+                    }
                     emitter.PushTemporary(result.Index);
                     break;
 

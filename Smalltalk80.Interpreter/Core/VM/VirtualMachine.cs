@@ -4621,21 +4621,43 @@ public partial class VirtualMachine : IPrimitiveContext
         var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
         bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
 
+        // DIAGNOSTIC: Track temp variable access
+        bool diagnose = (index == 0 || index == 1);
+        if (diagnose)
+        {
+            Console.WriteLine($"[VM.GetTemporaryVariable] index={index}, isBlock={isBlockContext}, contextOOP={contextOOP}");
+        }
+
         if (isBlockContext)
         {
             // BlockContext: Check if accessing local args or need to traverse home chain
             var nargsOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
             int nargs = nargsOOP.AsSmallInteger();
 
+            if (diagnose)
+            {
+                Console.WriteLine($"  BlockContext nargs={nargs}, index<nargs={index < nargs}");
+            }
+
             if (index < nargs)
             {
                 // Local block argument - stored in THIS BlockContext's indexed slots
-                return _heapManager.GetIndexedOOP(contextOOP, index);
+                var result = _heapManager.GetIndexedOOP(contextOOP, index);
+                if (diagnose)
+                {
+                    var resultClass = result.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassOOP(result).ToString();
+                    Console.WriteLine($"  Returning local block arg: {result}, class={resultClass}");
+                }
+                return result;
             }
             else
             {
                 // Parent temp or argument - RECURSIVELY traverse home chain
                 var homeOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                if (diagnose)
+                {
+                    Console.WriteLine($"  Recursing to home={homeOOP} with adjusted index={index - nargs}");
+                }
                 // Adjust index by subtracting our local count and recurse
                 return GetTemporaryVariable(homeOOP, index - nargs);
             }
@@ -4643,7 +4665,13 @@ public partial class VirtualMachine : IPrimitiveContext
         else
         {
             // MethodContext: Direct access to method's temp frame (base case)
-            return _heapManager.GetIndexedOOP(contextOOP, index);
+            var result = _heapManager.GetIndexedOOP(contextOOP, index);
+            if (diagnose)
+            {
+                var resultClass = result.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassOOP(result).ToString();
+                Console.WriteLine($"  MethodContext returning temp[{index}]: {result}, class={resultClass}");
+            }
+            return result;
         }
     }
 

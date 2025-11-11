@@ -81,20 +81,19 @@ namespace Smalltalk80.Compiler
             }
 
             // Step 5: Check method arguments
-            // When in a block, we need to check the method's arguments (not current block's arguments)
-            // Traverse to the method level (ScopeDepth == 0)
+            // IMPORTANT: Must traverse to method level to find method arguments
+            // Use OwnArguments to get method's own arguments (no inheritance)
             var methodContext = context;
-            while (methodContext != null && methodContext.ScopeDepth > 0 && methodContext.Parent != null)
+            while (methodContext.ScopeDepth > 0 && methodContext.Parent != null)
             {
                 methodContext = methodContext.Parent;
             }
 
-            // Check method arguments if we found a context (should be at method level after traversal)
-            if (methodContext != null && methodContext.Arguments.TryGetValue(varName, out int methodArgIndex))
+            if (methodContext.OwnArguments.TryGetValue(varName, out int methodArgIndex))
             {
                 int finalIndex = methodArgIndex;
 
-                // If we're in a block, add hierarchical offset
+                // If we're in a block, add hierarchical offset for all intervening block locals
                 if (context.ScopeDepth > 0)
                 {
                     int offset = CalculateBlockLocalOffset(context);
@@ -110,30 +109,24 @@ namespace Smalltalk80.Compiler
             }
 
             // Step 6: Check method temporaries
-            if (context.Temporaries.TryGetValue(varName, out int methodTempAbsoluteIndex))
+            // Use OwnTemporaries to get method's own temps (0-based, no inheritance)
+            // (methodContext was computed in Step 5 above)
+            if (methodContext.OwnTemporaries.TryGetValue(varName, out int methodTempIndex))
             {
-                // Determine which ArgumentCount to use for calculations
-                // If we're in a block (ScopeDepth > 0), use MethodArgumentCount for the calculation
-                // because methodTempAbsoluteIndex was calculated using the method's arg count
-                int argCountForCalculation = context.ScopeDepth > 0
-                    ? context.MethodArgumentCount
-                    : context.ArgumentCount;
-
-                // Compiler stores temps with absolute indices (including arg count)
-                // Convert to relative temp index for bytecode
-                int methodTempRelativeIndex = methodTempAbsoluteIndex - argCountForCalculation;
-                int baseIndex = argCountForCalculation + methodTempRelativeIndex;
+                // OwnTemporaries uses 0-based indexing within the method scope
+                // Need to add method's argument count to get position in temp frame
+                int baseIndex = methodContext.ArgumentCount + methodTempIndex;
 
                 int finalIndex = baseIndex;
 
-                // If we're in a block, add cumulative block argument count as offset
-                // This is because the interpreter will skip over ALL enclosing block args before accessing home temps
+                // If we're in a block, add offset to skip ALL intervening block locals (args + temps)
+                // This is because the interpreter will skip over ALL enclosing block args AND temps before accessing home temps
                 if (context.ScopeDepth > 0)
                 {
                     // For nested blocks: offset = cumulative count from ALL enclosing blocks
-                    // Example: [:x | [:y | methodTemp]] needs offset of 2 (x + y)
-                    // The interpreter's GetTemporaryVariable will subtract nargs and recurse to home
-                    int offset = context.CumulativeBlockArgOffset;
+                    // Example: [:x | [| t | methodTemp]] needs offset of 2 (x + t)
+                    // The interpreter's GetTemporaryVariable will subtract block local count and recurse to home
+                    int offset = CalculateBlockLocalOffset(context);
                     finalIndex += offset;
                 }
 
@@ -213,47 +206,27 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Try to resolve a block-local variable (block argument or block temporary).
         /// Only matches variables defined IN this block scope, not inherited from method.
+        /// USES OwnArguments/OwnTemporaries - simple and clean!
         /// </summary>
         private ResolutionResult? TryResolveBlockLocal(string varName, CompilationEnvironment context)
         {
-            // Check block arguments (these are always block-local)
-            if (context.Arguments.TryGetValue(varName, out int argIndex))
+            // Check this block's OWN arguments (no inheritance, no boundary checks needed!)
+            if (context.OwnArguments.TryGetValue(varName, out int argIndex))
             {
-                // With inline blocks, context.Arguments contains BOTH method args AND block args
-                // Only treat as block argument if within current block's argument count
-                // Method arguments will be handled by Step 5
-                if (argIndex < context.ArgumentCount)
-                {
-                    return new ResolutionResult(
-                        VariableType.BlockArgument,
-                        argIndex,
-                        true,  // Block arguments ARE assignable in Smalltalk-80 (unlike method args)
-                        varName
-                    );
-                }
-                // Otherwise, this is a method argument - fall through to Step 5
+                return new ResolutionResult(
+                    VariableType.BlockArgument,
+                    argIndex,
+                    true,  // Block arguments ARE assignable in Smalltalk-80 (pass-by-value)
+                    varName
+                );
             }
 
-            // Check block temporaries
-            // NOTE: context.Temporaries contains BOTH method temps AND block temps (inline block approach).
-            // We need to distinguish: if the temp's absolute index is >= method's temp boundary,
-            // it's a BLOCK temp. Otherwise, it's a METHOD temp and should be handled by Step 6.
-            if (context.Temporaries.TryGetValue(varName, out int tempAbsoluteIndex))
+            // Check this block's OWN temporaries (no inheritance!)
+            if (context.OwnTemporaries.TryGetValue(varName, out int tempIndex))
             {
-                // Calculate where method temps end: methodArgCount + methodTempCount
-                int methodTempBoundary = context.MethodArgumentCount + context.MethodTemporaryCount;
-
-                // If this temp's index is before the boundary, it's a METHOD temp, not a BLOCK temp
-                if (tempAbsoluteIndex < methodTempBoundary)
-                {
-                    // Not a block-local variable - let it fall through to Step 6 (method temporaries)
-                    return null;
-                }
-
-                // This is a genuine block temporary
-                // Convert absolute index to relative (exclude arg count)
-                int tempRelativeIndex = tempAbsoluteIndex - context.ArgumentCount;
-                int finalIndex = context.ArgumentCount + tempRelativeIndex;
+                // OwnTemporaries uses 0-based indexing within scope
+                // Add argument count to get position in temp frame
+                int finalIndex = context.ArgumentCount + tempIndex;
 
                 return new ResolutionResult(
                     VariableType.BlockTemporary,
@@ -269,6 +242,7 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Try to resolve a variable from parent scopes (hierarchical traversal).
         /// Walks up the parent chain accumulating offsets.
+        /// USES OwnArguments/OwnTemporaries - no boundary checks needed!
         /// </summary>
         private ResolutionResult? TryResolveParentVariable(string varName, CompilationEnvironment context)
         {
@@ -280,9 +254,10 @@ namespace Smalltalk80.Compiler
                 // Check if parent is also a block (not method)
                 if (parentContext.ScopeDepth > 0)
                 {
-                    // Check parent block arguments
-                    if (parentContext.Arguments.TryGetValue(varName, out int pArgIndex))
+                    // Check parent block's OWN arguments (no inheritance, no collisions!)
+                    if (parentContext.OwnArguments.TryGetValue(varName, out int pArgIndex))
                     {
+                        // Found in parent block's own arguments
                         return new ResolutionResult(
                             VariableType.ParentVariable,
                             pArgIndex + accumulatedOffset,
@@ -291,12 +266,12 @@ namespace Smalltalk80.Compiler
                         );
                     }
 
-                    // Check parent block temporaries
-                    if (parentContext.Temporaries.TryGetValue(varName, out int pTempAbsoluteIndex))
+                    // Check parent block's OWN temporaries (no inheritance!)
+                    if (parentContext.OwnTemporaries.TryGetValue(varName, out int pTempIndex))
                     {
-                        // Convert to relative index
-                        int pTempRelativeIndex = pTempAbsoluteIndex - parentContext.ArgumentCount;
-                        int pTempBaseIndex = parentContext.ArgumentCount + pTempRelativeIndex;
+                        // OwnTemporaries uses 0-based indexing within the scope
+                        // Need to add argument count to get the correct position in the temp frame
+                        int pTempBaseIndex = parentContext.ArgumentCount + pTempIndex;
 
                         return new ResolutionResult(
                             VariableType.ParentVariable,
@@ -306,7 +281,7 @@ namespace Smalltalk80.Compiler
                         );
                     }
 
-                    // Accumulate this parent's locals for next iteration
+                    // Not found in this parent - accumulate its locals and continue up the chain
                     accumulatedOffset += parentContext.ArgumentCount + parentContext.TemporariesAllocatedInFrame;
                     parentContext = parentContext.Parent;
                 }
@@ -323,25 +298,28 @@ namespace Smalltalk80.Compiler
 
         /// <summary>
         /// Calculate the accumulated offset for hierarchical indexing.
-        /// Walks from current block up to method, summing PARENT block-local counts.
-        /// IMPORTANT: Does NOT include the current block's own locals, only parent blocks.
+        /// Walks from current block up to method, summing block-local counts.
         /// </summary>
         /// <param name="context">Current compilation environment</param>
         /// <returns>Total offset for hierarchical variable access</returns>
         private int CalculateBlockLocalOffset(CompilationEnvironment context)
         {
             int offset = 0;
-            var current = context.Parent;  // Start with PARENT, not current block
+            var current = context;
 
-            // Walk from parent block up to method, accumulating local counts
-            // NOTE: We skip the current block because we're calculating the offset
-            // to reach variables in parent scopes, not the current scope
+            Console.WriteLine($"[CalculateBlockLocalOffset] Starting from depth={context.ScopeDepth}");
+
+            // Walk from current block up to method, accumulating local counts
             while (current != null && current.ScopeDepth > 0 && current.Parent != null)
             {
-                offset += current.ArgumentCount + current.TemporariesAllocatedInFrame;
+                int blockLocals = current.ArgumentCount + current.TemporariesAllocatedInFrame;
+                Console.WriteLine($"  Depth {current.ScopeDepth}: args={current.ArgumentCount}, temps={current.TemporariesAllocatedInFrame}, blockLocals={blockLocals}, offset before={offset}");
+                offset += blockLocals;
+                Console.WriteLine($"  offset after={offset}");
                 current = current.Parent;
             }
 
+            Console.WriteLine($"[CalculateBlockLocalOffset] Final offset={offset}");
             return offset;
         }
     }
