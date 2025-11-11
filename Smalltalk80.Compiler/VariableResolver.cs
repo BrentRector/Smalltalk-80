@@ -228,30 +228,18 @@ namespace Smalltalk80.Compiler
         /// </summary>
         private ResolutionResult? TryResolveParentVariable(string varName, CompilationEnvironment context)
         {
-            Console.WriteLine($"[TryResolveParentVariable] Resolving '{varName}' from depth={context.ScopeDepth}");
-            Console.WriteLine($"  Current context: ArgCount={context.ArgumentCount}, TempCount={context.TemporariesAllocatedInFrame}");
-            Console.WriteLine($"  Current OwnArguments: [{string.Join(", ", context.OwnArguments.Select(kv => $"{kv.Key}={kv.Value}"))}]");
-            Console.WriteLine($"  Current OwnTemporaries: [{string.Join(", ", context.OwnTemporaries.Select(kv => $"{kv.Key}={kv.Value}"))}]");
-
             int accumulatedOffset = context.ArgumentCount + context.TemporariesAllocatedInFrame;
             var parentContext = context.Parent;
             int parentLevel = 1;
 
             while (parentContext != null)
             {
-                Console.WriteLine($"  Parent[{parentLevel}]: depth={parentContext.ScopeDepth}, ArgCount={parentContext.ArgumentCount}, TempCount={parentContext.TemporariesAllocatedInFrame}");
-                Console.WriteLine($"    OwnArguments: [{string.Join(", ", parentContext.OwnArguments.Select(kv => $"{kv.Key}={kv.Value}"))}]");
-                Console.WriteLine($"    OwnTemporaries: [{string.Join(", ", parentContext.OwnTemporaries.Select(kv => $"{kv.Key}={kv.Value}"))}]");
-
                 // Check if parent is also a block (not method)
                 if (parentContext.ScopeDepth > 0)
                 {
                     // Check parent block's OWN arguments (no inheritance, no collisions!)
                     if (parentContext.OwnArguments.TryGetValue(varName, out int pArgIndex))
                     {
-                        Console.WriteLine($"    FOUND '{varName}' in parent[{parentLevel}] OwnArguments at index {pArgIndex}");
-                        Console.WriteLine($"    Accumulated offset = {accumulatedOffset}, final index = {pArgIndex + accumulatedOffset}");
-
                         // Found in parent block's own arguments
                         return new ResolutionResult(
                             VariableType.ParentVariable,
@@ -268,10 +256,6 @@ namespace Smalltalk80.Compiler
                         // Need to add argument count to get the correct position in the temp frame
                         int pTempBaseIndex = parentContext.ArgumentCount + pTempIndex;
 
-                        Console.WriteLine($"    FOUND '{varName}' in parent[{parentLevel}] OwnTemporaries at index {pTempIndex}");
-                        Console.WriteLine($"    Parent arg count = {parentContext.ArgumentCount}, temp base = {pTempBaseIndex}");
-                        Console.WriteLine($"    Accumulated offset = {accumulatedOffset}, final index = {pTempBaseIndex + accumulatedOffset}");
-
                         return new ResolutionResult(
                             VariableType.ParentVariable,
                             pTempBaseIndex + accumulatedOffset,
@@ -281,7 +265,6 @@ namespace Smalltalk80.Compiler
                     }
 
                     // Not found in this parent - accumulate its locals and continue up the chain
-                    Console.WriteLine($"    Not found in parent[{parentLevel}], accumulating offset += {parentContext.ArgumentCount + parentContext.TemporariesAllocatedInFrame}");
                     accumulatedOffset += parentContext.ArgumentCount + parentContext.TemporariesAllocatedInFrame;
                     parentContext = parentContext.Parent;
                     parentLevel++;
@@ -290,12 +273,10 @@ namespace Smalltalk80.Compiler
                 {
                     // Parent is method - stop hierarchical traversal
                     // Method variables will be checked in main resolution (steps 5-6)
-                    Console.WriteLine($"    Parent[{parentLevel}] is method (depth=0), stopping traversal");
                     break;
                 }
             }
 
-            Console.WriteLine($"  Variable '{varName}' NOT FOUND in any parent block");
             return null;
         }
 
@@ -310,19 +291,14 @@ namespace Smalltalk80.Compiler
             int offset = 0;
             var current = context;
 
-            Console.WriteLine($"[CalculateBlockLocalOffset] Starting from depth={context.ScopeDepth}");
-
             // Walk from current block up to method, accumulating local counts
             while (current != null && current.ScopeDepth > 0 && current.Parent != null)
             {
                 int blockLocals = current.ArgumentCount + current.TemporariesAllocatedInFrame;
-                Console.WriteLine($"  Depth {current.ScopeDepth}: args={current.ArgumentCount}, temps={current.TemporariesAllocatedInFrame}, blockLocals={blockLocals}, offset before={offset}");
                 offset += blockLocals;
-                Console.WriteLine($"  offset after={offset}");
                 current = current.Parent;
             }
 
-            Console.WriteLine($"[CalculateBlockLocalOffset] Final offset={offset}");
             return offset;
         }
     }

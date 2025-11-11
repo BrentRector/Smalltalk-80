@@ -199,27 +199,7 @@ public class Phase5_GlobalsAndPatches
                 beforeValue = _heapManager.GetInstanceVariable(literalOOP, 1);
             }
 
-            // DIAGNOSTIC: Track Dictionary Association patching
-            if (patch.MethodLocalId == "method:File_class>>initialize" && patch.LiteralIndex == 4)
-            {
-                var keyOOP = _heapManager.GetInstanceVariable(literalOOP, 0);
-                beforeValue = _heapManager.GetInstanceVariable(literalOOP, 1);
-                Console.WriteLine($"[Phase5-PATCH] Patching File_class>>initialize literal[4]:");
-                Console.WriteLine($"  Association OOP: {literalOOP}");
-                Console.WriteLine($"  Association.key (index 0): {keyOOP}");
-                Console.WriteLine($"  Association.value BEFORE (index 1): {beforeValue}");
-                Console.WriteLine($"  Dictionary class OOP to install: {newValueOOP}");
-            }
-
             _heapManager.SetInstanceVariable(literalOOP, 1, newValueOOP);
-
-            // DIAGNOSTIC: Verify patch was applied
-            if (patch.MethodLocalId == "method:File_class>>initialize" && patch.LiteralIndex == 4)
-            {
-                var afterValue = _heapManager.GetInstanceVariable(literalOOP, 1);
-                Console.WriteLine($"  Association.value AFTER (index 1): {afterValue}");
-                Console.WriteLine($"  Patch applied correctly: {afterValue == newValueOOP}");
-            }
 
             if (_debugOptions.ShouldDebugPatches)
             {
@@ -845,28 +825,8 @@ public class Phase5_GlobalsAndPatches
         // Get or create canonical Association
         var associationOOP = GetOrCreateCanonicalAssociation(className);
 
-        // DIAGNOSTIC: Log Dictionary class installation
-        if (className == "Dictionary")
-        {
-            var keyOOP = _allocator.GetInstanceVariable(associationOOP, 0);
-            var valueBeforeOOP = _allocator.GetInstanceVariable(associationOOP, 1);
-            Console.WriteLine($"[Phase5] Installing Dictionary class:");
-            Console.WriteLine($"  Association OOP: {associationOOP}");
-            Console.WriteLine($"  Association.key (index 0): {keyOOP}");
-            Console.WriteLine($"  Association.value BEFORE (index 1): {valueBeforeOOP}");
-            Console.WriteLine($"  Dictionary class OOP to install: {classOOP}");
-        }
-
         // Set Association value to the class object
         _allocator.SetInstanceVariable(associationOOP, 1, classOOP);
-
-        // DIAGNOSTIC: Verify the value was set correctly
-        if (className == "Dictionary")
-        {
-            var valueAfterOOP = _allocator.GetInstanceVariable(associationOOP, 1);
-            Console.WriteLine($"  Association.value AFTER (index 1): {valueAfterOOP}");
-            Console.WriteLine($"  Value set correctly: {valueAfterOOP == classOOP}");
-        }
 
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationOOP, className);

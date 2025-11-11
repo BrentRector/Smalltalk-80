@@ -236,16 +236,6 @@ public class Phase4_MethodCompilation
 
             var methodOOP = CreateCompiledMethod(method, placeholderLiterals, bytecodes, compiledMethodClassOOP, byteArrayClassOOP);
 
-            // DIAGNOSTIC: Detect if we're overwriting a Cursor block
-            if (method.LocalId.StartsWith("block:8eed95d4") || method.LocalId.StartsWith("block:8042a80d"))
-            {
-                if (_localIdToObjectId.ContainsKey(method.LocalId))
-                {
-                    var oldOOP = _localIdToObjectId[method.LocalId];
-// Console.WriteLine($"[OVERWRITE!] {method.LocalId}: old={oldOOP} -> new={methodOOP}");
-                }
-            }
-
             _localIdToObjectId[method.LocalId] = methodOOP;
             objectIdToLocalId[methodOOP] = method.LocalId;
             methodsCreated++;
@@ -492,24 +482,8 @@ public class Phase4_MethodCompilation
             // Always use nil value per VALUE MIGRATION POLICY
             var assocOOP = AllocateAssociation(keyOOP, SpecialObjectsArray.Instance.Nil);
 
-            // DIAGNOSTIC: Log Dictionary Association creation
-            if (keyName == "Dictionary")
-            {
-                Console.WriteLine($"[Phase4] Creating Dictionary Association:");
-                Console.WriteLine($"  Association OOP: {assocOOP}");
-                Console.WriteLine($"  Key Symbol OOP: {keyOOP}");
-                Console.WriteLine($"  Value (nil): {SpecialObjectsArray.Instance.Nil}");
-            }
-
             return assocOOP;
         });
-
-        // DIAGNOSTIC: Log when Dictionary Association is retrieved (not created)
-        if (keyName == "Dictionary" && _allocator.GetInstanceVariable(result, 0) == keyOOP)
-        {
-            var currentValue = _allocator.GetInstanceVariable(result, 1);
-            Console.WriteLine($"[Phase4] Retrieved existing Dictionary Association: {result}, current value: {currentValue}");
-        }
 
         return result;
     }
@@ -801,86 +775,8 @@ public class Phase4_MethodCompilation
 
         foreach (var expr in _bundle.InitExpressions)
         {
-            // DIAGNOSTIC: Check File initialize init expression
-            if (expr.Source == "File initialize")
-            {
-                Console.WriteLine($"\n[Phase4] Processing init expression: {expr.Source}");
-                Console.WriteLine($"  LocalId: {expr.LocalId}");
-                Console.WriteLine($"  Literal count: {expr.Literals.Length}");
-                for (int i = 0; i < expr.Literals.Length; i++)
-                {
-                    var lit = expr.Literals[i];
-                    Console.WriteLine($"  Literal[{i}]: type={lit.Type}");
-                    if (lit.Type == "symbol" && lit.Index.HasValue)
-                    {
-                        Console.WriteLine($"    Symbol index: {lit.Index.Value}, name: '{_symbols[lit.Index.Value]}'");
-                    }
-                    if (lit.Type == "association" && lit.Association != null)
-                    {
-                        Console.WriteLine($"    Association keyIndex: {lit.Association.KeyIndex}, key: '{_symbols[lit.Association.KeyIndex]}'");
-                    }
-                }
-            }
-
             // Resolve literals using the SAME canonicalization mechanism as regular methods
             var literalOOPs = expr.Literals.Select(ResolveLiteralValueAsOOP).ToArray();
-
-            // DIAGNOSTIC: Check resolved OOPs for File initialize
-            if (expr.Source == "File initialize")
-            {
-                Console.WriteLine($"\n[Phase4] Resolved literals for File initialize:");
-                for (int i = 0; i < literalOOPs.Length; i++)
-                {
-                    var litOOP = literalOOPs[i];
-                    Console.WriteLine($"  Literal[{i}]: OOP={litOOP}");
-
-                    try
-                    {
-                        var litClassOOP = _heapManager.GetSlot(litOOP, 0);
-                        Console.WriteLine($"    Class OOP: {litClassOOP}");
-
-                        // Check if it's an Association by checking instance var count
-                        var format = _allocator.GetObjectFormat(litOOP);
-                        Console.WriteLine($"    Format: {format}");
-
-                        if (format == ObjectFormat.Pointer)
-                        {
-                            int instanceVarCount = _allocator.GetInstanceVariableCount(litOOP);
-                            Console.WriteLine($"    Instance var count: {instanceVarCount}");
-
-                            if (instanceVarCount == 2)
-                            {
-                                // Probably an Association
-                                var keyOOP = _heapManager.GetInstanceVariable(litOOP, 0);
-                                var valueOOP = _heapManager.GetInstanceVariable(litOOP, 1);
-                                Console.WriteLine($"    Looks like Association: key OOP={keyOOP}, value OOP={valueOOP}");
-
-                                // Try to get key name
-                                try
-                                {
-                                    var keyName = _allocator.GetSymbolName(keyOOP);
-                                    Console.WriteLine($"    Association key name: '{keyName}'");
-                                }
-                                catch { }
-                            }
-                        }
-                        else if (format == ObjectFormat.ByteIndexed)
-                        {
-                            // Probably a Symbol
-                            try
-                            {
-                                var symbolName = _allocator.GetSymbolName(litOOP);
-                                Console.WriteLine($"    Looks like Symbol: '{symbolName}'");
-                            }
-                            catch { }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"    ERROR accessing literal: {ex.Message}");
-                    }
-                }
-            }
 
             // Determine homeClass from the resolved literals (not by parsing source!)
             // Init expressions like "BinaryChoiceView initialize" have first literal = Association for the class
@@ -906,51 +802,6 @@ public class Phase4_MethodCompilation
 
             initExprMethods.Add(initMethodOOP);
             _localIdToObjectId[expr.LocalId] = initMethodOOP;
-
-            // DIAGNOSTIC: Verify File initialize method's literals after creation
-            if (expr.Source == "File initialize")
-            {
-                Console.WriteLine($"\n[Phase4] Verifying File initialize CompiledMethod after creation:");
-                Console.WriteLine($"  Method OOP: {initMethodOOP}");
-
-                int litCount = _heapManager.GetIndexedSize(initMethodOOP);
-                Console.WriteLine($"  Indexed size (header + literals + bytecode array): {litCount}");
-
-                // Literals start at indexed slot 1 (slot 0 is header)
-                for (int i = 1; i < Math.Min(litCount, 4); i++)
-                {
-                    var litOOP = _allocator.GetIndexedOOP(initMethodOOP, i);
-                    Console.WriteLine($"  Indexed slot [{i}]: OOP={litOOP}");
-
-                    try
-                    {
-                        var litClassOOP = _heapManager.GetSlot(litOOP, 0);
-                        var format = _allocator.GetObjectFormat(litOOP);
-                        Console.WriteLine($"    Format: {format}");
-
-                        if (format == ObjectFormat.Pointer)
-                        {
-                            int instanceVarCount = _allocator.GetInstanceVariableCount(litOOP);
-                            if (instanceVarCount == 2)
-                            {
-                                var keyOOP = _heapManager.GetInstanceVariable(litOOP, 0);
-                                var keyName = _allocator.GetSymbolName(keyOOP);
-                                var valueOOP = _heapManager.GetInstanceVariable(litOOP, 1);
-                                Console.WriteLine($"    Association: key='{keyName}', value OOP={valueOOP}");
-                            }
-                        }
-                        else if (format == ObjectFormat.ByteIndexed)
-                        {
-                            var symbolName = _allocator.GetSymbolName(litOOP);
-                            Console.WriteLine($"    Symbol: '{symbolName}'");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"    ERROR: {ex.Message}");
-                    }
-                }
-            }
         }
 
         // Create array to hold all init expression methods

@@ -457,10 +457,6 @@ namespace Smalltalk80.Compiler
                 {
                     if (LiteralsEqual(selectors[i], literal))
                     {
-                        if (currentMethodName == "t0020")
-                        {
-                            Console.WriteLine($"[t0020] AddLiteral Symbol({symbol.Value}) -> FOUND at index {i}");
-                        }
                         return i;  // Selectors are at indices 0..N-1
                     }
                 }
@@ -468,10 +464,6 @@ namespace Smalltalk80.Compiler
                 // Not found - add new selector
                 int index = selectors.Count;
                 selectors.Add(symbol);
-                if (currentMethodName == "t0020")
-                {
-                    Console.WriteLine($"[t0020] AddLiteral Symbol({symbol.Value}) -> NEW at index {index}");
-                }
                 return index;
             }
             else
@@ -481,10 +473,6 @@ namespace Smalltalk80.Compiler
                 {
                     if (LiteralsEqual(otherLiterals[i], literal))
                     {
-                        if (currentMethodName == "t0020")
-                        {
-                            Console.WriteLine($"[t0020] AddLiteral {literal} -> FOUND at index {selectors.Count + i}");
-                        }
                         // Return index = selectors.Count + position in otherLiterals
                         return selectors.Count + i;
                     }
@@ -493,10 +481,6 @@ namespace Smalltalk80.Compiler
                 // Not found - add new literal
                 int index = selectors.Count + otherLiterals.Count;
                 otherLiterals.Add(literal);
-                if (currentMethodName == "t0020")
-                {
-                    Console.WriteLine($"[t0020] AddLiteral {literal} -> NEW at index {index}");
-                }
                 return index;
             }
         }
@@ -563,12 +547,6 @@ namespace Smalltalk80.Compiler
         /// </summary>
         public void Emit(byte bytecode)
         {
-            // DIAGNOSTIC: Track position 22 emissions in do: methods
-            if (currentMethodName == "do:" && bytecodes.Count >= 20 && bytecodes.Count <= 25)
-            {
-                Console.WriteLine($"[BytecodeEmitter.Emit] Emitting 0x{bytecode:X2} at position {bytecodes.Count} in method {currentMethodName}");
-                Console.WriteLine($"  Stack trace: {Environment.StackTrace.Split('\n').Take(5).Skip(1).Select(s => s.Trim()).Aggregate((a, b) => a + "\n  " + b)}");
-            }
             bytecodes.Add(bytecode);
         }
 
@@ -602,12 +580,6 @@ namespace Smalltalk80.Compiler
         private void EmitWithOffset(Bytecode baseCode, int offset)
         {
             byte result = (byte)((byte)baseCode + offset);
-            // DIAGNOSTIC: Track PUSH_TEMP emissions
-            if (baseCode == Bytecode.PUSH_TEMP_0)
-            {
-                Console.WriteLine($"[BytecodeEmitter.EmitWithOffset] PUSH_TEMP baseCode=0x{(byte)baseCode:X2}, offset={offset}, result=0x{result:X2}");
-                Console.WriteLine($"  Current bytecode position: {bytecodes.Count}");
-            }
             Emit(result);
         }
 
@@ -1300,10 +1272,8 @@ namespace Smalltalk80.Compiler
 
                     if (options.EmitOptimizationComments && tailCalls.Count > 0)
                     {
-                        Console.WriteLine($"[TailOpt] {selector}: {tailCalls.Count} tail call(s) detected");
                         foreach (var diagnostic in analyzer.GetDiagnosticMessages())
                         {
-                            Console.WriteLine($"[TailOpt]   {diagnostic}");
                         }
                     }
                 }
@@ -1316,11 +1286,6 @@ namespace Smalltalk80.Compiler
                 if (options.OptimizeTailRecursion && tailCalls != null && tailCalls.Count > 0)
                 {
                     methodStartLabel = emitter.MarkMethodStart();
-
-                    if (options.EmitOptimizationComments)
-                    {
-                        Console.WriteLine($"[TailOpt] Method entry marked at offset {methodStartLabel}");
-                    }
                 }
 
                 // Generate bytecode
@@ -1344,14 +1309,8 @@ namespace Smalltalk80.Compiler
                 methodDef.methodBody(),
                 null);
 
-            // DIAGNOSTIC: Check bytecode BEFORE creating CompiledMethodData
+            // Get bytecode array
             var bytecodeArray = emitter.GetBytecodes();
-            if (selector == "do:" && bytecodeArray.Length > 22)
-            {
-                Console.WriteLine($"[BytecodeCompiler.CompileMethodFromTree] Creating CompiledMethodData for {selector}");
-                Console.WriteLine($"  Bytecode array length: {bytecodeArray.Length}");
-                Console.WriteLine($"  Bytecode[20-25]: {string.Join(", ", bytecodeArray.Skip(20).Take(6).Select(b => $"0x{b:X2}"))}");
-            }
 
             return new CompiledMethodData
             {
@@ -1895,11 +1854,6 @@ namespace Smalltalk80.Compiler
                             // No arguments for unary messages
                             emitter.EmitTailRecursiveJump(methodStartLabel, 0);
 
-                            if (emitter is BytecodeEmitter e && e.GetType().GetField("_emitOptimizationComments") != null)
-                            {
-                                Console.WriteLine($"[TailOpt] Emitted jump for unary tail call: {selector}");
-                            }
-
                             continue; // Skip normal send emission
                         }
                     }
@@ -1994,8 +1948,6 @@ namespace Smalltalk80.Compiler
             {
                 // Emit tail-recursive jump instead of SEND
                 emitter.EmitTailRecursiveJump(methodStartLabel, keywordParts.Length);
-
-                Console.WriteLine($"[TailOpt] Emitted jump for keyword tail call: {selector}");
             }
             else
             {
@@ -2675,15 +2627,6 @@ namespace Smalltalk80.Compiler
             // Use unified variable resolver
             var result = resolver.ResolveVariable(name, environment);
 
-            // DIAGNOSTIC: Track specific variable pushes
-            if (name == "aBlock" || name == "index" || name == "anArray" || name == "extentPoint")
-            {
-                Console.WriteLine($"[BytecodeCompiler.PushVariable] Pushing '{name}' in method {currentMethodIdentifier ?? "unknown"}");
-                Console.WriteLine($"  VariableResolver returned: Type={result.Type}, Index={result.Index}");
-                Console.WriteLine($"  Environment: ScopeDepth={environment.ScopeDepth}, ArgCount={environment.ArgumentCount}, TemporariesAllocatedInFrame={environment.TemporariesAllocatedInFrame}");
-                Console.WriteLine($"  OwnArguments.Count={environment.OwnArguments.Count}, OwnTemporaries.Count={environment.OwnTemporaries.Count}");
-            }
-
             switch (result.Type)
             {
                 case VariableResolver.VariableType.BlockArgument:
@@ -2691,10 +2634,6 @@ namespace Smalltalk80.Compiler
                 case VariableResolver.VariableType.ParentVariable:
                 case VariableResolver.VariableType.MethodArgument:
                 case VariableResolver.VariableType.MethodTemporary:
-                    if (name == "aBlock")
-                    {
-                        Console.WriteLine($"  ACTION: Calling emitter.PushTemporary({result.Index})");
-                    }
                     emitter.PushTemporary(result.Index);
                     break;
 

@@ -1,8 +1,78 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-01-10
+**Last Updated**: 2025-11-11
 
-## Recent Work (2025-01-10)
+## Recent Work (2025-11-11)
+
+**CRITICAL FIX: VM Variable Access Architecture Mismatch**:
+
+Fixed a fundamental architecture mismatch between compiler and VM for block temporary variable access:
+
+### The Bug
+
+The compiler was emitting **DIRECT indices** into target contexts' temp frames (correct), but the VM was using **HIERARCHICAL indexing** with offset adjustments (incorrect).
+
+**Example**: Test `ma1` from BlockContextTestSimple.st
+```smalltalk
+ma1 "Method 1 arg, 2-level block accesses it"
+    ^[:arg | [[arg] value] value] value: 42
+```
+
+**Compiler behavior** (correct):
+- Outer block: `arg` is argument 0
+- Inner block accessing `arg`: Emits index=0 (direct offset into outer block's arg frame)
+
+**VM behavior** (broken):
+- Inner BlockContext (nargs=0) sees index=0
+- Checked if 0 < 0 (false), so traversed to home
+- Subtracted nargs: `index - 0 = 0` (seemed to work by accident!)
+- But for blocks with args, this would compute WRONG indices
+
+### The Fix
+
+**Files Modified**:
+1. `d:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs`
+   - Line 4625: Changed `GetTemporaryVariable(homeOOP, index - nargs)` to `GetTemporaryVariable(homeOOP, index)`
+   - Line 4669: Changed `SetTemporaryVariable(homeOOP, index - nargs, valueOOP)` to `SetTemporaryVariable(homeOOP, index, valueOOP)`
+   - Added XML doc comments explaining direct indexing semantics
+
+**Key Insight**: When traversing the home chain from BlockContext to parent, the VM must **NOT** adjust the index. The compiler already emitted the correct direct index into the target context's temp frame.
+
+### Test Results
+
+**BlockContextTestSimple.st**: All 3 tests PASS
+```
+ma1: 42   (2-level nested block accessing outer arg)
+ma2: 42   (3-level nested block accessing two outer args)
+t0001: 10 (2-level nested block accessing method temp)
+Total: 94
+```
+
+**Verification**: VM diagnostic output shows correct traversal:
+```
+[VM.GetTemporaryVariable] index=0, isBlock=True
+  Traversing to home=oop=64680 with SAME index=0 (direct indexing)
+  Returning local block arg[0]: SmallInteger(42)
+```
+
+### Architecture Validation
+
+This fix aligns with the compiler's variable resolution architecture:
+
+**Compiler** (`Smalltalk80.Compiler/VariableResolver.cs` lines 92-121):
+- Steps 5-6: Method arguments and temps use **DIRECT indices**
+- Comments explicitly state: "NO hierarchical offset! VM will traverse home chain automatically"
+
+**VM** (now fixed):
+- `GetTemporaryVariable`: Traverses home chain WITHOUT index adjustment
+- `SetTemporaryVariable`: Traverses home chain WITHOUT index adjustment
+
+**Build Status**: ✅ 0 errors, 0 warnings
+**Test Status**: ✅ BlockContextTestSimple: 94 (all tests pass)
+
+---
+
+## Previous Work (2025-01-10)
 
 **File Initialize Debugging - Multiple Compiler & VM Bugs Fixed**:
 

@@ -103,7 +103,6 @@ public partial class VirtualMachine : IPrimitiveContext
 
     // Verbose debugging support
     public bool VerboseDebug { get; set; } = false;
-    private int _callDepth = 0;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
     // Selector trace mechanism - shows nested method calls and returns
@@ -259,7 +258,7 @@ public partial class VirtualMachine : IPrimitiveContext
         if (_selectorTraceEnabled)
         {
             string indent = new string(' ', _selectorTraceDepth * 2);
-            Console.WriteLine($"{indent}{message}");
+            // Console.WriteLine($"{indent}{message}");
         }
     }
 
@@ -319,66 +318,6 @@ public partial class VirtualMachine : IPrimitiveContext
         // DEBUG: Log first 20 context creations
         System.Threading.Interlocked.Increment(ref _createContextCallCount);
         string? methodLocalId = GetLocalId(methodOOP);
-        if (_createContextCallCount <= 20)
-        {
-            Console.WriteLine($"[CreateMethodContext #{_createContextCallCount}] method={methodLocalId}, receiver={receiverOOP}");
-        }
-
-        // DIAGNOSTIC: For File class>>initialize, dump ALL literal frame contents
-        if (methodLocalId == "method:File_class>>initialize")
-        {
-            Console.WriteLine($"\n========== [File class>>initialize ENTRY] LITERAL FRAME DUMP ==========");
-            Console.WriteLine($"Method OOP: {methodOOP}");
-
-            // Get the method's literals
-            int totalSlots = _heapManager.GetIndexedSize(methodOOP);
-            Console.WriteLine($"Total indexed slots: {totalSlots}");
-
-            // Dump ALL literals
-            for (int i = 0; i < totalSlots; i++)
-            {
-                var litOOP = GetMethodLiteral(methodOOP, i);
-                Console.WriteLine($"\n  Literal[{i}] (raw index {i}, bytecode would use index {i-1} with +1 adjustment):");
-                Console.WriteLine($"    OOP: {litOOP} (raw={litOOP.RawValue:X8})");
-
-                if (litOOP.IsSmallInteger)
-                {
-                    Console.WriteLine($"    Type: SmallInteger");
-                    Console.WriteLine($"    Value: {litOOP.AsSmallInteger()}");
-                }
-                else
-                {
-                    var litClassOOP = GetClass(litOOP);
-                    var litClassName = GetClassName(litClassOOP);
-                    Console.WriteLine($"    Type: Object (class={litClassName}, classOOP={litClassOOP})");
-
-                    int instVarCount = _heapManager.GetInstanceVariableCount(litOOP);
-                    Console.WriteLine($"    Instance variables: {instVarCount}");
-
-                    // If it's an Association, show key/value
-                    if (litClassName == "Association" && instVarCount >= 2)
-                    {
-                        var keyOOP = _heapManager.GetInstanceVariable(litOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                        var valueOOP = _heapManager.GetInstanceVariable(litOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-
-                        var keyName = GetSymbolName(keyOOP) ?? $"<not a symbol: {keyOOP}>";
-
-                        var valueClassOOP = GetClass(valueOOP);
-                        var valueClassName = GetClassName(valueClassOOP);
-
-                        Console.WriteLine($"    Association key: '{keyName}' (OOP={keyOOP})");
-                        Console.WriteLine($"    Association value: {valueOOP} (class={valueClassName})");
-                    }
-                    // If it's a Symbol, show the string
-                    else if (litClassName == "Symbol")
-                    {
-                        var symbolName = GetSymbolName(litOOP) ?? "<unknown>";
-                        Console.WriteLine($"    Symbol: '{symbolName}'");
-                    }
-                }
-            }
-            Console.WriteLine($"========== END LITERAL FRAME DUMP ==========\n");
-        }
 
         // Step 1: Validate CompiledMethod exists and parse header
         var header = ParseMethodHeader(methodOOP);
@@ -419,8 +358,8 @@ public partial class VirtualMachine : IPrimitiveContext
             }
             else
             {
-                if (_verboseDebugMode)
-                    Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {pool.Count})");
+                // if (_verboseDebugMode)
+                //     Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {pool.Count})");
             }
         }
         else
@@ -428,24 +367,17 @@ public partial class VirtualMachine : IPrimitiveContext
             // Allocate new context
             contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
             _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
-            if (_verboseDebugMode)
-                Console.WriteLine($"[POOL] Allocated new context {contextOOP} with size {stackSize} (pool empty or doesn't exist)");
+            // if (_verboseDebugMode)
+            //     Console.WriteLine($"[POOL] Allocated new context {contextOOP} with size {stackSize} (pool empty or doesn't exist)");
         }
 
         // Increment context depth and check limit
         _activeContextCount++;
 
-        // Diagnostic snapshots at key thresholds
-        if (_verboseDebugMode && (_activeContextCount == 100 || _activeContextCount == 250 || _activeContextCount == 400))
-        {
-            Console.WriteLine($"\n[DEPTH SNAPSHOT] Context depth reached {_activeContextCount}");
-            DumpSenderChain(callerContextOOP, 20);
-        }
-
         if (_activeContextCount > MAX_CONTEXT_DEPTH)
         {
-            Console.WriteLine($"\n[CONTEXT DEPTH EXCEEDED] Depth: {_activeContextCount}, Limit: {MAX_CONTEXT_DEPTH}");
-            Console.WriteLine($"Current receiver: {receiverOOP}, method: {methodOOP}");
+            // Console.WriteLine($"\n[CONTEXT DEPTH EXCEEDED] Depth: {_activeContextCount}, Limit: {MAX_CONTEXT_DEPTH}");
+            // Console.WriteLine($"Current receiver: {receiverOOP}, method: {methodOOP}");
             DumpSenderChain(callerContextOOP, 30);
 
             throw new InvalidOperationException(
@@ -547,14 +479,14 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private InterpreterStatus ExecuteBytecodeStep()
     {
-        if (_verboseDebugMode)
-            Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_activeContextOOP}");
+        // if (_verboseDebugMode)
+        //     Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_activeContextOOP}");
 
         // If NLR is pending, continue unwinding instead of executing bytecodes
         if (_nonLocalReturnPending)
         {
-            if (_verboseDebugMode)
-                Console.WriteLine($"[ExecuteBytecodeStep] NLR pending, continuing unwinding");
+            // if (_verboseDebugMode)
+            //     Console.WriteLine($"[ExecuteBytecodeStep] NLR pending, continuing unwinding");
             return HandleReturn(_nlrValue);
         }
 
@@ -590,11 +522,11 @@ public partial class VirtualMachine : IPrimitiveContext
         var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
 
-        if (_verboseDebugMode)
-        {
-            Console.WriteLine($"  methodOOP={methodOOP}, receiverOOP={receiverOOP}");
-            Console.WriteLine($"  receiverClass={GetClassName(GetClass(receiverOOP))}, sp={sp}");
-        }
+        // if (_verboseDebugMode)
+        // {
+        //     Console.WriteLine($"  methodOOP={methodOOP}, receiverOOP={receiverOOP}");
+        //     Console.WriteLine($"  receiverClass={GetClassName(GetClass(receiverOOP))}, sp={sp}");
+        // }
 
         // Validate that methodOOP is a CompiledMethod (PointerIndexed), not a bytecode array (ByteIndexed)
         var methodFormat = _heapManager.GetObjectFormat(methodOOP);
@@ -625,24 +557,8 @@ public partial class VirtualMachine : IPrimitiveContext
             // Update IP
             _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
-            // DIAGNOSTIC: Show sp before/after executing bytecode
-            int spBefore = 0, spAfter = 0;
-            if (_verboseDebugMode)
-            {
-                var spBeforeOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
-                spBefore = spBeforeOOP.AsSmallInteger();
-                Console.WriteLine($"[ExecuteBytecode] context={_activeContextOOP}, ip={ip-1}, bytecode=0x{bytecode:X2}, sp before={spBefore}");
-            }
-
             // Execute the bytecode
             bool continueExecution = ExecuteBytecode(bytecode, methodOOP);
-
-            if (_verboseDebugMode)
-            {
-                var spAfterOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
-                spAfter = spAfterOOP.AsSmallInteger();
-                Console.WriteLine($"[ExecuteBytecode] sp after={spAfter}, delta={spAfter - spBefore}");
-            }
 
             if (!continueExecution)
             {
@@ -661,15 +577,15 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     // Non-local return: value already popped by RETURN_*_POP bytecode
                     returnValue = _nlrValue;
-                    if (_verboseDebugMode)
-                        Console.WriteLine($"[ExecuteBytecodeStep] Non-local return pending, using _nlrValue: {returnValue}");
+                    // if (_verboseDebugMode)
+                    //     Console.WriteLine($"[ExecuteBytecodeStep] Non-local return pending, using _nlrValue: {returnValue}");
                 }
                 else
                 {
                     // Normal return: pop the return value from stack
                     returnValue = Pop();
-                    if (_verboseDebugMode)
-                        Console.WriteLine($"[ExecuteBytecodeStep] Method returned, popped value: {returnValue}");
+                    // if (_verboseDebugMode)
+                    //     Console.WriteLine($"[ExecuteBytecodeStep] Method returned, popped value: {returnValue}");
                 }
                 return HandleReturn(returnValue);
             }
@@ -692,16 +608,16 @@ public partial class VirtualMachine : IPrimitiveContext
         // NEVER pool the active context
         if (contextOOP == _activeContextOOP)
         {
-            if (_verboseDebugMode)
-                Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's the active context!");
+            // if (_verboseDebugMode)
+            //     Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's the active context!");
             return;
         }
 
         // NEVER pool a context that's in the active context's sender chain
         if (IsInSenderChain(contextOOP, _activeContextOOP))
         {
-            if (_verboseDebugMode)
-                Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's in the sender chain of {_activeContextOOP}");
+            // if (_verboseDebugMode)
+            //     Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's in the sender chain of {_activeContextOOP}");
             return;
         }
 
@@ -714,8 +630,8 @@ public partial class VirtualMachine : IPrimitiveContext
         if (poolForSize.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
         {
             poolForSize.Push(contextOOP);
-            if (_verboseDebugMode)
-                Console.WriteLine($"[POOL] Added {contextOOP} to pool (size {size}), pool now has {poolForSize.Count} contexts");
+            // if (_verboseDebugMode)
+            //     Console.WriteLine($"[POOL] Added {contextOOP} to pool (size {size}), pool now has {poolForSize.Count} contexts");
         }
     }
 
@@ -758,14 +674,14 @@ public partial class VirtualMachine : IPrimitiveContext
         // Handle non-local returns (NLR)
         if (_nonLocalReturnPending)
         {
-            if (_verboseDebugMode)
-                Console.WriteLine($"[HandleReturn NLR] Unwinding from {_activeContextOOP} to target {_nlrTargetContext}, value={_nlrValue}");
+            // if (_verboseDebugMode)
+            //     Console.WriteLine($"[HandleReturn NLR] Unwinding from {_activeContextOOP} to target {_nlrTargetContext}, value={_nlrValue}");
 
             // Check if current context is the NLR target
             if (_activeContextOOP == _nlrTargetContext)
             {
-                if (_verboseDebugMode)
-                    Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_activeContextOOP}");
+                // if (_verboseDebugMode)
+                //     Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_activeContextOOP}");
 
                 // Target reached - clear NLR state and push value
                 _nonLocalReturnPending = false;
@@ -787,23 +703,23 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     _returnValue = nlrValue;
                     _activeContextOOP = _initialContextOOP;
-                    if (_verboseDebugMode)
-                        Console.WriteLine($"[HandleReturn NLR] Returning to initial context");
+                    // if (_verboseDebugMode)
+                    //     Console.WriteLine($"[HandleReturn NLR] Returning to initial context");
                     return InterpreterStatus.Return;
                 }
 
                 // Switch to sender and push NLR value
                 _activeContextOOP = senderOOP;
                 Push(nlrValue);
-                if (_verboseDebugMode)
-                    Console.WriteLine($"[HandleReturn NLR] Pushed NLR value onto sender {senderOOP}");
+                // if (_verboseDebugMode)
+                //     Console.WriteLine($"[HandleReturn NLR] Pushed NLR value onto sender {senderOOP}");
                 return InterpreterStatus.Continue;
             }
 
             // Not the target - continue unwinding (don't push value)
             senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
-            if (_verboseDebugMode)
-                Console.WriteLine($"[HandleReturn NLR] Unwinding through {_activeContextOOP}, next sender={senderOOP}");
+            // if (_verboseDebugMode)
+            //     Console.WriteLine($"[HandleReturn NLR] Unwinding through {_activeContextOOP}, next sender={senderOOP}");
 
             // Add context to size-specific pool for reuse
             AddContextToPool(_activeContextOOP);
@@ -821,19 +737,19 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // Continue unwinding
             _activeContextOOP = senderOOP;
-            if (_verboseDebugMode)
-                Console.WriteLine($"[HandleReturn NLR] Switched to sender {_activeContextOOP}, continuing unwinding");
+            // if (_verboseDebugMode)
+            //     Console.WriteLine($"[HandleReturn NLR] Switched to sender {_activeContextOOP}, continuing unwinding");
             return InterpreterStatus.Continue;
         }
 
         // Normal return (not NLR)
         senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
 
-        if (_verboseDebugMode)
-        {
-            Console.WriteLine($"[HandleReturn] Normal return from {_activeContextOOP} to {senderOOP}");
-            Console.WriteLine($"  Return value: {returnValue} (SmallInt={returnValue.IsSmallInteger})");
-        }
+        // if (_verboseDebugMode)
+        // {
+        //     Console.WriteLine($"[HandleReturn] Normal return from {_activeContextOOP} to {senderOOP}");
+        //     Console.WriteLine($"  Return value: {returnValue} (SmallInt={returnValue.IsSmallInteger})");
+        // }
 
         // DIAGNOSTIC: Track return values from hash/stringhash methods (disabled for quiet mode)
         // int methodIndex2 = VMConstants.CONTEXT_METHOD_INDEX;
@@ -869,16 +785,16 @@ public partial class VirtualMachine : IPrimitiveContext
             // Execution complete - return to caller
             _returnValue = returnValue;
             _activeContextOOP = _initialContextOOP;
-            if (_verboseDebugMode)
-                Console.WriteLine($"[HandleReturn] Execution complete, returning to initial context");
+            // if (_verboseDebugMode)
+            //     Console.WriteLine($"[HandleReturn] Execution complete, returning to initial context");
             return InterpreterStatus.Return;
         }
 
         // Switch to sender context and push return value
         _activeContextOOP = senderOOP;
         Push(returnValue);
-        if (_verboseDebugMode)
-            Console.WriteLine($"  Pushed return value onto sender's stack");
+        // if (_verboseDebugMode)
+        //     Console.WriteLine($"  Pushed return value onto sender's stack");
 
         // Continue execution in sender context
         return InterpreterStatus.Continue;
@@ -918,31 +834,31 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Diagnostic: Show method name when recursion depth > 10
-        if (_activeContextCount > 10 && _activeContextCount <= 15)  // Limit output
-        {
-            var selectorOOP = GetMethodLiteral(methodOOP, 0);
-            var selectorName = GetSymbolName(selectorOOP);
-            var receiverClass = GetClass(receiverOOP);
-            var className = GetClassName(receiverClass);
-
-            // Debug: show what literal[0] actually is
-            string literalInfo = "";
-            if (selectorOOP == SpecialObjectsArray.Instance.Nil)
-            {
-                literalInfo = " [literal[0]=nil]";
-            }
-            else if (selectorOOP.IsSmallInteger)
-            {
-                literalInfo = $" [literal[0]=SmallInteger({selectorOOP.AsSmallInteger()})]";
-            }
-            else
-            {
-                var litClass = GetClassName(GetClass(selectorOOP));
-                literalInfo = $" [literal[0]={litClass}, name='{selectorName}']";
-            }
-
-            Console.WriteLine($"[DEPTH={_activeContextCount}] {className}>>{selectorName}{literalInfo}");
-        }
+        // if (_activeContextCount > 10 && _activeContextCount <= 15)  // Limit output
+        // {
+        //     var selectorOOP = GetMethodLiteral(methodOOP, 0);
+        //     var selectorName = GetSymbolName(selectorOOP);
+        //     var receiverClass = GetClass(receiverOOP);
+        //     var className = GetClassName(receiverClass);
+        //
+        //     // Debug: show what literal[0] actually is
+        //     string literalInfo = "";
+        //     if (selectorOOP == SpecialObjectsArray.Instance.Nil)
+        //     {
+        //         literalInfo = " [literal[0]=nil]";
+        //     }
+        //     else if (selectorOOP.IsSmallInteger)
+        //     {
+        //         literalInfo = $" [literal[0]=SmallInteger({selectorOOP.AsSmallInteger()})]";
+        //     }
+        //     else
+        //     {
+        //         var litClass = GetClassName(GetClass(selectorOOP));
+        //         literalInfo = $" [literal[0]={litClass}, name='{selectorName}']";
+        //     }
+        //
+        //     Console.WriteLine($"[DEPTH={_activeContextCount}] {className}>>{selectorName}{literalInfo}");
+        // }
 
         // Debug: Check what methodOOP we got
         if (methodOOP.IsSmallInteger)
@@ -1007,10 +923,10 @@ public partial class VirtualMachine : IPrimitiveContext
                 opcodeBytes = $"0x{bytecode:X2}";
             }
 
-            if (_debugOptions.ShouldDebugBytecode)
-            {
-                Console.WriteLine($"[BYTECODE EXEC] context={_activeContextOOP}, ip={ip-1}, bytecode={opcodeName} ({opcodeBytes})");
-            }
+            // if (_debugOptions.ShouldDebugBytecode)
+            // {
+            //     Console.WriteLine($"[BYTECODE EXEC] context={_activeContextOOP}, ip={ip-1}, bytecode={opcodeName} ({opcodeBytes})");
+            // }
 
             // Update IP
             _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
@@ -1020,10 +936,10 @@ public partial class VirtualMachine : IPrimitiveContext
 
             if (!continueExecution)
             {
-                if (_debugOptions.ShouldDebugBytecode)
-                {
-                    Console.WriteLine($"[BYTECODE RETURN] context={_activeContextOOP}, returning from bytecode loop");
-                }
+                // if (_debugOptions.ShouldDebugBytecode)
+                // {
+                //     Console.WriteLine($"[BYTECODE RETURN] context={_activeContextOOP}, returning from bytecode loop");
+                // }
                 // Check if this is a non-local return (block return bytecodes 0x7D/0x7E)
                 // If so, the return value is already in _nlrValue and we must not pop again
                 if (_nonLocalReturnPending)
@@ -1051,10 +967,10 @@ public partial class VirtualMachine : IPrimitiveContext
     private bool ExecuteBytecode(byte bytecode, SmalltalkOOP methodOOP)
     {
         // DEBUG: Track bytecode execution for debugging
-        if (_activeContextCount <= 3)  // Only log first few contexts
-        {
-            Console.WriteLine($"[BYTECODE] 0x{bytecode:X2} ({bytecode}) in method {GetLocalId(methodOOP)}");
-        }
+        // if (_activeContextCount <= 3)  // Only log first few contexts
+        // {
+        //     Console.WriteLine($"[BYTECODE] 0x{bytecode:X2} ({bytecode}) in method {GetLocalId(methodOOP)}");
+        // }
 
         // Check if this is a BlockContext - they retrieve receiver from home MethodContext
         var contextClassOOP = _heapManager.GetClassOOP(_activeContextOOP);
@@ -1112,47 +1028,6 @@ public partial class VirtualMachine : IPrimitiveContext
             int index = BytecodeUtil.PushLiteralVarIndex(bytecode);
             var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
-            // DIAGNOSTIC: For File class>>initialize and bytecode 0x41, show what literal[1] contains
-            string? methodLocalId = GetLocalId(methodOOP);
-            if (methodLocalId == "method:File_class>>initialize" && bytecode == 0x41)
-            {
-                Console.WriteLine($"\n========== [EXECUTING BYTECODE 0x41 in File class>>initialize] ==========");
-                Console.WriteLine($"Bytecode: 0x{bytecode:X2} (Push literal variable, index={index})");
-                Console.WriteLine($"Literal index with +1 adjustment: {index + 1}");
-                Console.WriteLine($"Retrieved literal OOP: {associationOOP} (raw={associationOOP.RawValue:X8})");
-
-                if (associationOOP.IsSmallInteger)
-                {
-                    Console.WriteLine($"ERROR: Literal is a SmallInteger value {associationOOP.AsSmallInteger()}");
-                    Console.WriteLine($"Expected an Association object!");
-                }
-                else
-                {
-                    var diagClassOOP = _heapManager.GetClassOOP(associationOOP);
-                    var diagClassName = GetClassName(diagClassOOP);
-                    int diagInstVarCount = _heapManager.GetInstanceVariableCount(associationOOP);
-
-                    Console.WriteLine($"Literal class: {diagClassName} (classOOP={diagClassOOP})");
-                    Console.WriteLine($"Instance variables: {diagInstVarCount}");
-
-                    if (diagClassName == "Association" && diagInstVarCount >= 2)
-                    {
-                        var diagKeyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                        var diagValueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-                        var diagKeyName = GetSymbolName(diagKeyOOP) ?? $"<not a symbol: {diagKeyOOP}>";
-                        var diagValueClassName = GetClassName(GetClass(diagValueOOP));
-
-                        Console.WriteLine($"Association key: '{diagKeyName}'");
-                        Console.WriteLine($"Association value: {diagValueOOP} (class={diagValueClassName})");
-                        Console.WriteLine($"Will push value OOP: {diagValueOOP}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"ERROR: Expected Association with 2+ inst vars, got {diagClassName} with {diagInstVarCount}");
-                    }
-                }
-                Console.WriteLine($"========== END BYTECODE 0x41 DIAGNOSTIC ==========\n");
-            }
 
             // TODO: Handle blocks with nil literals using lexicalParent (Single-Context Architecture)
             if (associationOOP == SpecialObjectsArray.Instance.Nil)
@@ -1446,16 +1321,6 @@ public partial class VirtualMachine : IPrimitiveContext
             int selectorIndex = BytecodeUtil.Send0Index(bytecode);
             var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
-            // DIAGNOSTIC: Show what selector we retrieved
-            if (_verboseDebugMode)
-            {
-                string selectorName = GetSymbolName(selectorOOP) ?? "<nil>";
-                string methodLocalId = GetLocalId(methodOOP) ?? "<unknown>";
-                Console.WriteLine($"[SEND0 0x{bytecode:X2}] methodOOP={methodOOP}, methodLocalId={methodLocalId}");
-                Console.WriteLine($"  selectorIndex={selectorIndex}, litIndex={selectorIndex + 1}");
-                Console.WriteLine($"  selectorOOP={selectorOOP}, selectorName='{selectorName}'");
-            }
-
             // TODO: Handle blocks with nil literals using lexicalParent (Single-Context Architecture)
 
             var receiverOOP2 = Pop();
@@ -1475,50 +1340,6 @@ public partial class VirtualMachine : IPrimitiveContext
 
             var argOOP = Pop();
             var receiverOOP2 = Pop();
-
-            // DIAGNOSTIC: Track File>>initialize execution
-            string methodLocalId = GetLocalId(methodOOP) ?? "";
-            string selectorName = GetSymbolName(selectorOOP) ?? "";
-            if (methodLocalId.Contains("File") && methodLocalId.Contains("initialize"))
-            {
-                Console.WriteLine($"\n[SEND1 in File>>initialize]");
-                Console.WriteLine($"  Bytecode: 0x{bytecode:X2}, selectorIndex={selectorIndex}");
-                Console.WriteLine($"  Selector: {selectorName}");
-                Console.WriteLine($"  Receiver: {receiverOOP2} (SmallInt={receiverOOP2.IsSmallInteger})");
-                if (!receiverOOP2.IsSmallInteger)
-                {
-                    var recvClass = GetClass(receiverOOP2);
-                    Console.WriteLine($"  Receiver class: {GetClassName(recvClass)} OOP({recvClass.RawValue})");
-                }
-                Console.WriteLine($"  Argument: {argOOP}");
-
-                // Dump all literals in the method
-                Console.WriteLine($"\n  Method literals:");
-                int litCount = GetLiteralCount(methodOOP);
-                for (int i = 0; i < litCount; i++)
-                {
-                    var litOOP = GetMethodLiteral(methodOOP, i);
-                    string litDesc = litOOP.IsSmallInteger ? $"SmallInteger({litOOP.AsSmallInteger()})" : $"OOP({litOOP.RawValue})";
-                    if (!litOOP.IsSmallInteger)
-                    {
-                        var litClass = GetClass(litOOP);
-                        string litClassName = GetClassName(litClass) ?? "?";
-                        Console.WriteLine($"    Literal[{i}]: {litDesc} class={litClassName}");
-                        if (litClassName == "Association")
-                        {
-                            var key = _heapManager.GetInstanceVariable(litOOP, 0);
-                            string keyName = GetSymbolName(key) ?? "?";
-                            var value = _heapManager.GetInstanceVariable(litOOP, 1);
-                            Console.WriteLine($"      Association: key='{keyName}', value={value}");
-                        }
-                        else if (litClassName == "Symbol")
-                        {
-                            string symName = GetSymbolName(litOOP) ?? "?";
-                            Console.WriteLine($"      Symbol: '{symName}'");
-                        }
-                    }
-                }
-            }
 
             // Console.WriteLine($"[SEND1 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
             var outcome1 = SendMessage(receiverOOP2, selectorOOP, new[] { argOOP });
@@ -1540,16 +1361,6 @@ public partial class VirtualMachine : IPrimitiveContext
             var arg2OOP = Pop();
             var arg1OOP = Pop();
             var receiverOOP2 = Pop();
-
-            // DIAGNOSTIC: Show at:put: sends to diagnose Symbol initialize failure
-            string selName = GetSymbolName(selectorOOP) ?? "";
-            if (selName == "at:put:")
-            {
-                string recvClass = receiverOOP2.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(receiverOOP2)) ?? "?";
-                string arg1Str = arg1OOP.IsSmallInteger ? arg1OOP.AsSmallInteger().ToString() : $"OOP({arg1OOP.RawValue})";
-                string arg2Str = arg2OOP.IsSmallInteger ? arg2OOP.AsSmallInteger().ToString() : $"OOP({arg2OOP.RawValue})";
-                Console.WriteLine($"[at:put:] receiver={receiverOOP2} (class={recvClass}), arg1={arg1Str}, arg2={arg2Str}");
-            }
 
             // Console.WriteLine($"[SEND2 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
             var outcome2 = SendMessage(receiverOOP2, selectorOOP, new[] { arg1OOP, arg2OOP });
@@ -1655,20 +1466,6 @@ public partial class VirtualMachine : IPrimitiveContext
 
                     var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
                     var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-
-                    // DIAGNOSTIC: Track Dictionary association specifically
-                    string? keyName = GetSymbolName(keyOOP);
-                    if (keyName == "Dictionary")
-                    {
-                        var valueClassOOP = GetClass(valueOOP);
-                        var valueClassName = GetClassName(valueClassOOP);
-                        string? methodLocalId = GetLocalId(methodOOP);
-                        Console.WriteLine($"\n[DICTIONARY LITERAL] method={methodLocalId}");
-                        Console.WriteLine($"  Association OOP: {associationOOP}");
-                        Console.WriteLine($"  Value OOP: {valueOOP}");
-                        Console.WriteLine($"  Value class: {valueClassName} (OOP {valueClassOOP})");
-                        Console.WriteLine($"  About to push valueOOP onto stack");
-                    }
 
                     Push(valueOOP);
                     return true;
@@ -1895,7 +1692,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     byte offsetLow = bytecodes[ip++];
                     int offset = (offsetHigh << 8) | offsetLow;
                     int newIP = ip + offset;
-                    Console.WriteLine($"[JUMP] from IP={ip-2} offset={offset} to newIP={newIP}, method={GetLocalId(methodOOP)}");
+                    // Console.WriteLine($"[JUMP] from IP={ip-2} offset={offset} to newIP={newIP}, method={GetLocalId(methodOOP)}");
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(newIP));
                     return true;
                 }
@@ -2048,194 +1845,15 @@ public partial class VirtualMachine : IPrimitiveContext
             _ => throw new InvalidOperationException($"Invalid special selector index: {selectorIndex}")
         };
 
-        // DIAGNOSTIC: Show stack BEFORE popping for at:put: and value:
-        if (selectorIndex == 1 || selectorIndex == 10) // at:put: or value:
-        {
-            string selName = selectorIndex == 1 ? "at:put:" : "value:";
-            Console.WriteLine($"\n[{selName} BEFORE POP] Examining stack state:");
-
-            // Get current stack pointer
-            int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-            var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
-            int sp = spOOP.AsSmallInteger();
-
-            // Determine where execution stack starts
-            var contextClassOOP = _heapManager.GetClassOOP(_activeContextOOP);
-            bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
-            int initialSP;
-
-            if (isBlockContext)
-            {
-                var nargsOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-                initialSP = nargsOOP.AsSmallInteger();
-            }
-            else
-            {
-                int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
-                var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
-                var header = ParseMethodHeader(methodOOP);
-                initialSP = header.NumArgs + header.NumTemps;
-            }
-
-            Console.WriteLine($"  Stack pointer: {sp}, Initial SP: {initialSP}");
-            Console.WriteLine($"  Stack depth: {sp - initialSP} items");
-            Console.WriteLine($"  Context type: {(isBlockContext ? "BlockContext" : "MethodContext")}");
-
-            // Show top 5 stack items (or all if fewer)
-            int itemsToShow = Math.Min(5, sp - initialSP);
-            Console.WriteLine($"  Top {itemsToShow} stack items (TOS at bottom):");
-
-            for (int i = itemsToShow - 1; i >= 0; i--)
-            {
-                int stackIndex = sp - 1 - i;
-                if (stackIndex >= initialSP)
-                {
-                    var itemOOP = _heapManager.GetIndexedOOP(_activeContextOOP, stackIndex);
-                    string itemDesc;
-
-                    if (itemOOP.IsSmallInteger)
-                    {
-                        itemDesc = $"SmallInteger({itemOOP.AsSmallInteger()})";
-                    }
-                    else
-                    {
-                        string className = GetClassName(GetClass(itemOOP)) ?? "?";
-                        itemDesc = $"{className}(OOP={itemOOP.RawValue})";
-                    }
-
-                    string position = i == 0 ? "TOS" : i == 1 ? "TOS-1" : i == 2 ? "TOS-2" : $"TOS-{i}";
-                    Console.WriteLine($"    [{stackIndex}] {position}: {itemDesc}");
-                }
-            }
-
-            if (selectorIndex == 1)
-            {
-                Console.WriteLine($"  Expected for 'receiver at:put: value':");
-                Console.WriteLine($"    TOS-2 should be: receiver (Array)");
-                Console.WriteLine($"    TOS-1 should be: index (SmallInteger)");
-                Console.WriteLine($"    TOS   should be: value (any object)");
-            }
-            else // value:
-            {
-                Console.WriteLine($"  Expected for 'receiver value: argument':");
-                Console.WriteLine($"    TOS-1 should be: receiver (CompiledMethod block)");
-                Console.WriteLine($"    TOS   should be: argument (any object)");
-            }
-        }
-
         // Pop arguments
         var args = new SmalltalkOOP[argCount];
-
-        // DIAGNOSTIC: Track pops for at:put: and value:
-        if (selectorIndex == 1 || selectorIndex == 10) // at:put: or value:
-        {
-            string selName = selectorIndex == 1 ? "at:put:" : "value:";
-            Console.WriteLine($"\n[{selName} POPPING] About to pop {argCount} args + 1 receiver:");
-        }
 
         for (int i = argCount - 1; i >= 0; i--)
         {
             args[i] = Pop();
-
-            // DIAGNOSTIC: Show what we just popped for at:put: and value:
-            if (selectorIndex == 1 || selectorIndex == 10) // at:put: or value:
-            {
-                string selName = selectorIndex == 1 ? "at:put:" : "value:";
-                string argDesc = args[i].IsSmallInteger
-                    ? $"SmallInteger({args[i].AsSmallInteger()})"
-                    : $"{GetClassName(GetClass(args[i])) ?? "?"}(OOP={args[i].RawValue})";
-                Console.WriteLine($"  Popped arg[{i}]: {argDesc}");
-            }
         }
 
         var receiverOOP = Pop();
-
-        // DIAGNOSTIC: Show at:put: and value: arguments
-        if (selectorIndex == 1 || selectorIndex == 10) // at:put: or value:
-        {
-            string selName = selectorIndex == 1 ? "at:put:" : "value:";
-            string recvClass = receiverOOP.IsSmallInteger ? $"SmallInteger({receiverOOP.AsSmallInteger()})" : $"{GetClassName(GetClass(receiverOOP)) ?? "?"}";
-
-            Console.WriteLine($"  Popped receiver: {recvClass}");
-
-            if (selectorIndex == 1) // at:put:
-            {
-                string arg1Str = args[0].IsSmallInteger ? args[0].AsSmallInteger().ToString() : $"OOP({args[0].RawValue})";
-                string arg2Str = args[1].IsSmallInteger ? args[1].AsSmallInteger().ToString() : $"OOP({args[1].RawValue})";
-                Console.WriteLine($"\n[at:put: AFTER POP] receiver={recvClass}, arg[0]={arg1Str}, arg[1]={arg2Str}");
-            }
-            else // value:
-            {
-                string argStr = args[0].IsSmallInteger
-                    ? $"SmallInteger({args[0].AsSmallInteger()})"
-                    : $"{GetClassName(GetClass(args[0])) ?? "?"}(OOP={args[0].RawValue})";
-                Console.WriteLine($"\n[value: AFTER POP] receiver={recvClass}, arg[0]={argStr}");
-            }
-
-            // Only log extra diagnostics if there's an error
-            bool isError = (selectorIndex == 1 && receiverOOP.IsSmallInteger) ||
-                          (selectorIndex == 10 && receiverOOP.IsSmallInteger);
-
-            if (isError)
-            {
-                if (selectorIndex == 1)
-                {
-                    Console.WriteLine($"\n[at:put: ERROR!] Receiver should be Array but got {recvClass}!");
-                }
-                else
-                {
-                    Console.WriteLine($"\n[value: ERROR!] Receiver should be CompiledMethod (block) but got {recvClass}!");
-                }
-
-                Console.WriteLine($"  This means either:");
-                Console.WriteLine($"    1. The correct receiver was never pushed");
-                Console.WriteLine($"    2. Something consumed/popped it before we got here");
-                Console.WriteLine($"    3. The wrong value was pushed in its place");
-
-                // Disassemble the current method to see what bytecode was generated
-                // Check if this is a BlockContext - need to get method from home
-                var contextClassOOP = _heapManager.GetClassOOP(_activeContextOOP);
-                bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
-
-                SmalltalkOOP methodOOP;
-                if (isBlockContext)
-                {
-                    // For BlockContext, home might be another BlockContext (nested blocks)
-                    // Must traverse to find the ultimate MethodContext
-                    var methodContextOOP = FindMethodContext(_activeContextOOP);
-                    methodOOP = _heapManager.GetInstanceVariable(methodContextOOP, VMConstants.CONTEXT_METHOD_INDEX);
-                }
-                else
-                {
-                    methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.CONTEXT_METHOD_INDEX);
-                }
-
-                string methodLocalId = GetLocalId(methodOOP) ?? "unknown";
-                string contextType = isBlockContext ? "BlockContext" : "MethodContext";
-                Console.WriteLine($"\n  Current context: {contextType}");
-                Console.WriteLine($"  Current method: {methodLocalId}");
-
-                // Get bytecodes and literals
-                byte[] bytecodes = GetMethodBytecodes(methodOOP);
-                var literalCount = _heapManager.GetIndexedSize(methodOOP) - 1; // -1 for bytecode array slot
-                var literalOOPs = new SmalltalkOOP[literalCount];
-                for (int i = 0; i < literalCount; i++)
-                {
-                    literalOOPs[i] = _heapManager.GetIndexedOOP(methodOOP, i);
-                }
-
-                // Disassemble
-                Func<SmalltalkOOP, string> getLiteralDisplay = (oop) => {
-                    if (oop.IsSmallInteger) return oop.AsSmallInteger().ToString();
-                    string? symbolName = GetSymbolName(oop);
-                    if (symbolName != null) return $"#{symbolName}";
-                    return $"OOP({oop.RawValue})";
-                };
-                string[] optimizedSelectors = new[] { "+", "-", "<", ">", "<=", ">=", "=", "~=", "*", "/", "\\", "@", "bitShift:", "//", "bitAnd:", "bitOr:" };
-                string disasm = BytecodeDisassembler.Disassemble(bytecodes, literalOOPs, getLiteralDisplay, optimizedSelectors);
-                Console.WriteLine($"  Bytecode disassembly:\n{disasm}\n");
-            }
-        }
 
         // Handle special cases
         if (selectorIndex == 6) // ==
@@ -2264,26 +1882,6 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Fall back to message send using cached selector OOP
-        // DIAGNOSTIC: Show what we're about to send for value:
-        if (selectorIndex == 10) // value:
-        {
-            string recvClass = receiverOOP.IsSmallInteger
-                ? $"SmallInteger({receiverOOP.AsSmallInteger()})"
-                : $"{GetClassName(GetClass(receiverOOP)) ?? "?"}";
-            string selectorName = GetSymbolName(selectorOOP) ?? "?";
-            Console.WriteLine($"\n[value: FALLBACK TO SendMessage]");
-            Console.WriteLine($"  receiver: {recvClass} (OOP={receiverOOP.RawValue})");
-            Console.WriteLine($"  selector: {selectorName} (OOP={selectorOOP.RawValue})");
-            Console.WriteLine($"  args[0]: {(args[0].IsSmallInteger ? $"SmallInteger({args[0].AsSmallInteger()})" : $"{GetClassName(GetClass(args[0])) ?? "?"}(OOP={args[0].RawValue})")}");
-
-            if (receiverOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"\n[value: CRITICAL ERROR] About to send '{selectorName}' to SmallInteger!");
-                Console.WriteLine($"  SmallInteger value: {receiverOOP.AsSmallInteger()}");
-                Console.WriteLine($"  This will fail because SmallInteger doesn't understand value:");
-            }
-        }
-
         var outcome = SendMessage(receiverOOP, selectorOOP, args);
         return ConsumeCallOutcome(outcome);
     }
@@ -2353,10 +1951,10 @@ public partial class VirtualMachine : IPrimitiveContext
             // Must traverse the home chain to find the ultimate MethodContext
             methodContextOOP = FindMethodContext(_activeContextOOP);
 
-            if (_debugOptions.ShouldDebugMessages)
-            {
-                Console.WriteLine($"[Super Send in Block] Walking from BlockContext to home MethodContext (oop={methodContextOOP})");
-            }
+            // if (_debugOptions.ShouldDebugMessages)
+            // {
+            //     Console.WriteLine($"[Super Send in Block] Walking from BlockContext to home MethodContext (oop={methodContextOOP})");
+            // }
         }
         else if (contextClass == "MethodContext")
         {
@@ -2413,7 +2011,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
         // Create new context with current context as sender
         _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _activeContextOOP);
-        Console.WriteLine($"[SendMessage AFTER CreateMethodContext] _activeContextOOP = {_activeContextOOP}");
+        // Console.WriteLine($"[SendMessage AFTER CreateMethodContext] _activeContextOOP = {_activeContextOOP}");
 
         // Signal context switch - InterpreterLoop will continue in new context
         return CallOutcome.ContextSwitch();
@@ -2432,58 +2030,11 @@ public partial class VirtualMachine : IPrimitiveContext
         // Get selector name once for all uses
         string? selectorName = GetSymbolName(selectorOOP);
 
-        // DIAGNOSTIC: Track 'new' sends to see what receiver class we have
-        if (selectorName == "new")
-        {
-            var receiverClassName = GetClassName(classOOP);
-            Console.WriteLine($"\n[SEND new] receiver={receiverOOP}, receiver class={receiverClassName} (OOP {classOOP})");
-
-            // If receiver is a Symbol, this is the bug!
-            if (receiverClassName == "Symbol")
-            {
-                Console.WriteLine($"  ❌ BUG DETECTED: Sending 'new' to a Symbol instance!");
-                Console.WriteLine($"  Stack trace:");
-                DumpSenderChain(_activeContextOOP, 5);
-            }
-        }
 
 
 
 
 
-        // DEBUG: Log value sends to see what's receiving them
-        if (_verboseDebugMode && (selectorName == "value" || selectorName == "value:" || selectorName == "value:value:"))
-        {
-            var className = GetClassName(classOOP);
-            Console.WriteLine($"\n[{selectorName}] receiver {receiverOOP} | class=\"{className}\" | args={args.Length}");
-            if (className != "CompiledMethod")
-            {
-                Console.WriteLine($"  WARNING: value sent to {className}, not CompiledMethod (block)!");
-            }
-        }
-
-        // DEBUG: Check if receiver is a class object
-        if (_verboseDebugMode && selectorName == "new:")
-        {
-            var className = GetClassName(classOOP);
-            var classFormat = _heapManager.GetObjectFormat(classOOP);
-            var classOfClass = _heapManager.GetClassOOP(classOOP);
-            var classOfClassName = GetClassName(classOfClass);
-            Console.WriteLine($"\n[new:] receiver \"{className}\" {receiverOOP} | class \"{classOfClassName}\" {classOOP} | format={classFormat}, iVars={_heapManager.GetInstanceVariableCount(classOOP)}");
-        }
-
-
-
-        // DEBUG: Log when selector is <unknown>
-        if (selectorName == null)
-        {
-            if (_debugOptions.ShouldDebugMessages)
-            {
-                Console.WriteLine($"[SendMessage] WARNING: selectorOOP={selectorOOP} does not resolve to a Symbol!");
-                Console.WriteLine($"  receiverOOP={receiverOOP}, classOOP={classOOP}, className={GetClassName(classOOP)}");
-                Console.WriteLine($"  selectorOOP.IsSmallInteger={selectorOOP.IsSmallInteger}, selectorOOP.RawValue=0x{selectorOOP.RawValue:X}");
-            }
-        }
 
 
         // DIAGNOSTIC: Track > and max: message sends (DISABLED - causes issues with SmallInteger diagnostic output)
@@ -2498,14 +2049,6 @@ public partial class VirtualMachine : IPrimitiveContext
         //     Console.WriteLine($"\n[max:] receiver {receiverOOP} | arg={argInfo} | class=\"{GetClassName(classOOP)}\"");
         // }
 
-        // Verbose debug: log method entry
-        if (VerboseDebug)
-        {
-            string className = GetClassName(classOOP) ?? "?";
-            string indent = new string(' ', _callDepth * 2);
-            Console.WriteLine($"{indent}>> {className}>>{selectorName} (args={args.Length})");
-            _callDepth++;
-        }
         // SPECIAL CASE: Block CompiledMethods responding to value/value:/value:value:
         // In v1.0.3, blocks are separate CompiledMethod objects that respond to value messages
         // by creating proper BlockContext and executing with closure semantics
@@ -2559,37 +2102,16 @@ public partial class VirtualMachine : IPrimitiveContext
         // Check if the method has a primitive
         int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
 
-        // DEBUG: Log primitive lookups for + and <= during Character.initialize
-        if (selectorName == "+" || selectorName == "<=")
-        {
-            Console.WriteLine($"[SendMessage] Selector '{selectorName}' → primitiveNumber={primitiveNumber}, methodOOP={methodInfo.MethodOOP}");
-        }
-
         if (primitiveNumber > 0)
         {
-            // DEBUG: Always log primitive 4 (>) to diagnose why it's not being called
-            if (primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
-            {
-                Console.WriteLine($"[SendMessage] Executing primitive {primitiveNumber} for {selectorName}");
-            }
             // Try to execute the primitive
             var primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiverOOP, args);
 
             if (_primitiveSuccess)
             {
-                if (primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
-                {
-                    Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} succeeded");
-                }
-
                 // Check if primitive created a new context (e.g., block invocation via Primitive 207)
                 if (_contextSwitchedByPrimitive)
                 {
-                    if (_verboseDebugMode)
-                    {
-                        Console.WriteLine($"[SendMessage] Primitive {primitiveNumber} switched context");
-                        Console.WriteLine($"  _activeContextOOP is now: {_activeContextOOP}");
-                    }
                     _contextSwitchedByPrimitive = false;
                     // Primitive created new context - signal context switch
                     return CallOutcome.ContextSwitch();
@@ -2597,11 +2119,6 @@ public partial class VirtualMachine : IPrimitiveContext
 
                 // Normal primitive success - return result directly
                 return CallOutcome.Normal(primitiveResult);
-            }
-
-            if (_verboseDebugMode || primitiveNumber == 4 || _debugOptions.ShouldDebugMessages)
-            {
-                Console.WriteLine($"[Primitive {primitiveNumber} ({selectorName}) failed → executing bytecode fallback]");
             }
 
             // Primitive failed - execute method bytecodes as fallback
@@ -2631,14 +2148,6 @@ public partial class VirtualMachine : IPrimitiveContext
             _selectorTraceDepth++;
         }
 
-        // Verbose debug: log method entry
-        if (VerboseDebug)
-        {
-            _callDepth++;
-            string indent = new string(' ', _callDepth * 2);
-            string argsStr = string.Join(", ", args.Select(a => a.IsSmallInteger ? $"{a.AsSmallInteger()}" : $"oop({a})"));
-            Console.WriteLine($"{indent}>> {GetClassName(classOOP)}>>{selectorName}({argsStr})");
-        }
 
         // Signal context switch - InterpreterLoop will continue in new context
         return CallOutcome.ContextSwitch();
@@ -2652,14 +2161,14 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private bool ConsumeCallOutcome(CallOutcome outcome)
     {
-        if (_verboseDebugMode)
-            Console.WriteLine($"[ConsumeCallOutcome] outcome.Kind={outcome.Kind}");
+        // if (_verboseDebugMode)
+        //     Console.WriteLine($"[ConsumeCallOutcome] outcome.Kind={outcome.Kind}");
 
         if (outcome.Kind == CallOutcomeKind.Normal)
         {
             Push(outcome.Value);
-            if (_verboseDebugMode)
-                Console.WriteLine($"  Normal: pushed {outcome.Value}");
+            // if (_verboseDebugMode)
+            //     Console.WriteLine($"  Normal: pushed {outcome.Value}");
             return true;
         }
 
@@ -3401,14 +2910,14 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         sp--;
-        if (_verboseDebugMode)
-            Console.WriteLine($"[Pop] context={_activeContextOOP}, sp before={sp+1}, sp after={sp}");
+        // if (_verboseDebugMode)
+        //     Console.WriteLine($"[Pop] context={_activeContextOOP}, sp before={sp+1}, sp after={sp}");
 
         _heapManager.SetInstanceVariable(_activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp));
         var value = _heapManager.GetIndexedOOP(_activeContextOOP, sp);
 
-        if (_verboseDebugMode)
-            Console.WriteLine($"[Pop] popped value={value}");
+        // if (_verboseDebugMode)
+        //     Console.WriteLine($"[Pop] popped value={value}");
 
         return value;
     }
@@ -3582,10 +3091,10 @@ public partial class VirtualMachine : IPrimitiveContext
         while (currentClassOOP != SpecialObjectsArray.Instance.Nil && depth < maxDepth)
         {
             string currentClassName = GetClassName(currentClassOOP);
-            if (_debugOptions.ShouldDebugMethodLookup)
-            {
-                Console.WriteLine($"  [GetMethod] depth={depth}, {currentClassName}, looking for '{selectorName}'");
-            }
+            // if (_debugOptions.ShouldDebugMethodLookup)
+            // {
+            //     Console.WriteLine($"  [GetMethod] depth={depth}, {currentClassName}, looking for '{selectorName}'");
+            // }
 
             // Get the method dictionary from the class
             // Use Blue Book architectural constants: methodDict is ALWAYS at index 1 in Behavior
@@ -3599,18 +3108,18 @@ public partial class VirtualMachine : IPrimitiveContext
 
                 if (superclassOOP == SpecialObjectsArray.Instance.Nil)
                 {
-                    if (_debugOptions.ShouldDebugMethodLookup)
-                    {
-                        Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root of hierarchy)");
-                    }
+                    // if (_debugOptions.ShouldDebugMethodLookup)
+                    // {
+                    //     Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root of hierarchy)");
+                    // }
                     break; // Reached root of class hierarchy
                 }
 
-                if (_debugOptions.ShouldDebugMethodLookup)
-                {
-                    string superclassName = GetClassName(superclassOOP);
-                    Console.WriteLine($"  '{selectorName}' not found, trying superclass={superclassName}");
-                }
+                // if (_debugOptions.ShouldDebugMethodLookup)
+                // {
+                //     string superclassName = GetClassName(superclassOOP);
+                //     Console.WriteLine($"  '{selectorName}' not found, trying superclass={superclassName}");
+                // }
                 currentClassOOP = superclassOOP;
                 depth++;
                 continue;
@@ -3716,37 +3225,6 @@ public partial class VirtualMachine : IPrimitiveContext
 
             int dictSize = _heapManager.GetIndexedSize(methodDictOOP);
 
-            // Diagnostic code already ran above, so we know methodDictFormat is PointerIndexed here
-            if (_debugOptions.ShouldDebugMethodLookup && methodDictFormat != ObjectFormat.PointerIndexed)
-            {
-                var methodDictClass = GetClassName(GetClass(methodDictOOP));
-                Console.WriteLine($"[ERROR] methodDictOOP={methodDictOOP} has wrong format!");
-                Console.WriteLine($"  Expected: PointerIndexed (MethodDictionary)");
-                Console.WriteLine($"  Actual: {methodDictFormat}");
-                Console.WriteLine($"  Class: {methodDictClass}");
-                Console.WriteLine($"  currentClassOOP={currentClassOOP}, className={GetClassName(currentClassOOP)}");
-                Console.WriteLine($"  methodDictIndex={VMConstants.BEHAVIOR_METHODDICT_INDEX} (Blue Book architectural constant)");
-                Console.WriteLine($"  Looking for selector: {selectorName}");
-
-                // Check what's in the other slots to diagnose field index issue
-                Console.WriteLine($"  Checking class instance variables:");
-                for (int slot = 0; slot < 7; slot++)
-                {
-                    try
-                    {
-                        var slotValue = _heapManager.GetInstanceVariable(currentClassOOP, slot);
-                        var slotFormat = slotValue.IsSmallInteger ? "SmallInteger" : _heapManager.GetObjectFormat(slotValue).ToString();
-                        var slotClass = slotValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(slotValue));
-                        Console.WriteLine($"    slot[{slot}]: {slotValue}, format={slotFormat}, class={slotClass}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"    slot[{slot}]: ERROR - {ex.Message}");
-                    }
-                }
-
-                throw new InvalidOperationException($"methodDict field contains {methodDictFormat} object (class={methodDictClass}) instead of PointerIndexed MethodDictionary");
-            }
 
             for (int i = 0; i < dictSize; i++)
             {
@@ -3771,27 +3249,27 @@ public partial class VirtualMachine : IPrimitiveContext
             // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
             var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
 
-            if (_debugOptions.ShouldDebugMethodLookup)
-            {
-                if (nextSuperclassOOP == SpecialObjectsArray.Instance.Nil)
-                {
-                    Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root)");
-                }
-                else
-                {
-                    string nextSuperclassName = GetClassName(nextSuperclassOOP);
-                    Console.WriteLine($"  '{selectorName}' not found, trying superclass={nextSuperclassName}");
-                }
-            }
+            // if (_debugOptions.ShouldDebugMethodLookup)
+            // {
+            //     if (nextSuperclassOOP == SpecialObjectsArray.Instance.Nil)
+            //     {
+            //         Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root)");
+            //     }
+            //     else
+            //     {
+            //         string nextSuperclassName = GetClassName(nextSuperclassOOP);
+            //         Console.WriteLine($"  '{selectorName}' not found, trying superclass={nextSuperclassName}");
+            //     }
+            // }
 
             currentClassOOP = nextSuperclassOOP;
             depth++;
         }
 
-        if (_debugOptions.ShouldDebugMethodLookup)
-        {
-            Console.WriteLine($"  [GetMethod] FAILED: '{selectorName}' not found after {depth} levels");
-        }
+        // if (_debugOptions.ShouldDebugMethodLookup)
+        // {
+        //     Console.WriteLine($"  [GetMethod] FAILED: '{selectorName}' not found after {depth} levels");
+        // }
         return null;
     }
 
@@ -4567,20 +4045,18 @@ public partial class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
-    /// Gets a temporary variable using recursive home chain traversal.
+    /// Gets a temporary variable (argument or temp) from a context using DIRECT indexing.
+    /// The compiler emits direct indices into the target context's temp frame.
+    /// For BlockContexts accessing parent variables, we traverse the home chain WITHOUT adjusting indices.
     /// Blue Book Chapter 30: BlueBook-Context-Architecture.md lines 527-553
     /// </summary>
+    /// <param name="contextOOP">Context to access (MethodContext or BlockContext)</param>
+    /// <param name="index">Direct index into the target context's temp frame (0-based)</param>
+    /// <returns>The value of the temporary variable</returns>
     private SmalltalkOOP GetTemporaryVariable(SmalltalkOOP contextOOP, int index)
     {
         var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
         bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
-
-        // DIAGNOSTIC: Track temp variable access
-        bool diagnose = (index == 0 || index == 1);
-        if (diagnose)
-        {
-            Console.WriteLine($"[VM.GetTemporaryVariable] index={index}, isBlock={isBlockContext}, contextOOP={contextOOP}");
-        }
 
         if (isBlockContext)
         {
@@ -4588,51 +4064,36 @@ public partial class VirtualMachine : IPrimitiveContext
             var nargsOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
             int nargs = nargsOOP.AsSmallInteger();
 
-            if (diagnose)
-            {
-                Console.WriteLine($"  BlockContext nargs={nargs}, index<nargs={index < nargs}");
-            }
-
             if (index < nargs)
             {
                 // Local block argument - stored in THIS BlockContext's indexed slots
-                var result = _heapManager.GetIndexedOOP(contextOOP, index);
-                if (diagnose)
-                {
-                    var resultClass = result.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassOOP(result).ToString();
-                    Console.WriteLine($"  Returning local block arg: {result}, class={resultClass}");
-                }
-                return result;
+                return _heapManager.GetIndexedOOP(contextOOP, index);
             }
             else
             {
-                // Parent temp or argument - RECURSIVELY traverse home chain
+                // Parent variable - traverse home chain WITHOUT modifying index
+                // The compiler already emitted the correct DIRECT index into the parent's temp frame
                 var homeOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                if (diagnose)
-                {
-                    Console.WriteLine($"  Recursing to home={homeOOP} with adjusted index={index - nargs}");
-                }
-                // Adjust index by subtracting our local count and recurse
-                return GetTemporaryVariable(homeOOP, index - nargs);
+                // CRITICAL: Do NOT adjust index! Compiler uses direct indices.
+                return GetTemporaryVariable(homeOOP, index);
             }
         }
         else
         {
             // MethodContext: Direct access to method's temp frame (base case)
-            var result = _heapManager.GetIndexedOOP(contextOOP, index);
-            if (diagnose)
-            {
-                var resultClass = result.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassOOP(result).ToString();
-                Console.WriteLine($"  MethodContext returning temp[{index}]: {result}, class={resultClass}");
-            }
-            return result;
+            return _heapManager.GetIndexedOOP(contextOOP, index);
         }
     }
 
     /// <summary>
-    /// Sets a temporary variable using recursive home chain traversal.
+    /// Sets a temporary variable (argument or temp) in a context using DIRECT indexing.
+    /// The compiler emits direct indices into the target context's temp frame.
+    /// For BlockContexts accessing parent variables, we traverse the home chain WITHOUT adjusting indices.
     /// Blue Book Chapter 30: BlueBook-Context-Architecture.md lines 527-553
     /// </summary>
+    /// <param name="contextOOP">Context to access (MethodContext or BlockContext)</param>
+    /// <param name="index">Direct index into the target context's temp frame (0-based)</param>
+    /// <param name="valueOOP">Value to store</param>
     private void SetTemporaryVariable(SmalltalkOOP contextOOP, int index, SmalltalkOOP valueOOP)
     {
         var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
@@ -4651,10 +4112,11 @@ public partial class VirtualMachine : IPrimitiveContext
             }
             else
             {
-                // Parent temp or argument - RECURSIVELY traverse home chain
+                // Parent variable - traverse home chain WITHOUT modifying index
+                // The compiler already emitted the correct DIRECT index into the parent's temp frame
                 var homeOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                // Adjust index by subtracting our local count and recurse
-                SetTemporaryVariable(homeOOP, index - nargs, valueOOP);
+                // CRITICAL: Do NOT adjust index! Compiler uses direct indices.
+                SetTemporaryVariable(homeOOP, index, valueOOP);
             }
         }
         else
