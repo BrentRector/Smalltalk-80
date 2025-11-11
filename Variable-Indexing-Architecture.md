@@ -1980,3 +1980,215 @@ private SmalltalkOOP ResolveHomeContext(SmalltalkOOP blockExecutionContextOOP)
 - **v1.0.0** (2025-11-05): Initial specification based on bug fix for temp variable indexing
 - **v2.0.0** (2025-11-05): Production-complete specification with all variable types, detailed compiler/interpreter instructions, and complete bytecode mapping
 - **v2.1.0** (2025-11-05): Added Section 12 documenting BlockClosure homeContext chicken-and-egg problem and recommended solution architecture
+---
+
+## 12. Compiler Implementation: OwnArguments/OwnTemporaries Architecture
+
+**Version**: 3.0.0  
+**Status**: IN PROGRESS  
+**Last Updated**: 2025-01-10  
+
+### 12.1 Problem Statement
+
+The original compiler implementation used shared `Arguments` and `Temporaries` dictionaries that accumulated variables from all enclosing scopes. This caused index collisions when method arguments and block arguments had the same name or when traversing nested blocks.
+
+**Example of the collision**:
+```smalltalk
+Set>>do: aBlock
+    1 to: self basicSize do:
+        [:index | aBlock value: (self basicAt: index)]
+```
+
+The outer block `[:index | ...]` has argument `index` at position 0.
+The method has argument `aBlock` at position 0.
+When the inner reference `aBlock` tried to resolve, it would find `index` instead because both were at position 0 in the shared dictionary.
+
+### 12.2 Solution: Per-Scope Variable Tracking
+
+Each `CompilationEnvironment` now maintains TWO sets of variable dictionaries:
+
+#### Legacy Dictionaries (Backward Compatibility)
+- `Arguments`: Accumulated arguments from all scopes (method + all enclosing blocks)
+- `Temporaries`: Accumulated temporaries from all scopes
+- **Purpose**: Maintains existing bytecode generation logic
+
+#### New OwnArguments/OwnTemporaries Dictionaries  
+- `OwnArguments`: ONLY the arguments defined in THIS scope (0-based indexing)
+- `OwnTemporaries`: ONLY the temporaries defined in THIS scope (0-based indexing)
+- **Purpose**: Enables VariableResolver to distinguish between local and parent variables
+
+### 12.3 Scope Type Enum
+
+```csharp
+public enum ScopeType
+{
+    Method,  // Outermost scope (ScopeDepth=0)
+    Block    // Nested scope (ScopeDepth>0)
+}
+```
+
+### 12.4 CompilationEnvironment Structure
+
+```csharp
+public class CompilationEnvironment
+{
+    // Scope identification
+    public ScopeType Type { get; set; }
+    public int ScopeDepth { get; set; }
+    public CompilationEnvironment Parent { get; set; }
+    
+    // Per-scope variable tracking (NEW)
+    public Dictionary<string, int> OwnArguments { get; set; } = new();
+    public Dictionary<string, int> OwnTemporaries { get; set; } = new();
+    
+    // Accumulated variable tracking (LEGACY)
+    public Dictionary<string, int> Arguments { get; set; } = new();
+    public Dictionary<string, int> Temporaries { get; set; } = new();
+    
+    // Other fields...
+}
+```
+
+### 12.5 CompileBlock Save/Restore Pattern
+
+When entering a block scope:
+
+```csharp
+// STEP 1: Save current scope state
+var savedOwnArguments = new Dictionary<string, int>(environment.OwnArguments);
+var savedOwnTemporaries = new Dictionary<string, int>(environment.OwnTemporaries);
+var savedArguments = new Dictionary<string, int>(environment.Arguments);
+var savedTemporaries = new Dictionary<string, int>(environment.Temporaries);
+
+// STEP 2: Create parent snapshot for VariableResolver
+var parentSnapshot = new CompilationEnvironment
+{
+    Type = (savedScopeDepth == 0) ? ScopeType.Method : ScopeType.Block,
+    ScopeDepth = savedScopeDepth,
+    Parent = savedParent,
+    // ... other fields
+};
+
+// CRITICAL: Copy from SAVED dictionaries, not environment!
+foreach (var kvp in savedOwnArguments)
+    parentSnapshot.OwnArguments[kvp.Key] = kvp.Value;
+foreach (var kvp in savedOwnTemporaries)
+    parentSnapshot.OwnTemporaries[kvp.Key] = kvp.Value;
+
+// STEP 3: Set parent reference
+environment.Parent = parentSnapshot;
+environment.Type = ScopeType.Block;
+environment.ScopeDepth = savedScopeDepth + 1;
+
+// STEP 4: Clear and populate with THIS block's variables
+environment.OwnArguments.Clear();
+for (int i = 0; i < blockArgNames.Count; i++)
+    environment.OwnArguments[blockArgNames[i]] = i;
+
+environment.OwnTemporaries.Clear();
+for (int i = 0; i < blockTempNames.Count; i++)
+    environment.OwnTemporaries[blockTempNames[i]] = i;
+
+// STEP 5: Compile block body
+CompileStatements(block.statements(), inBlock: true);
+
+// STEP 6: Restore parent scope state
+environment.OwnArguments.Clear();
+foreach (var kvp in savedOwnArguments)
+    environment.OwnArguments[kvp.Key] = kvp.Value;
+    
+environment.OwnTemporaries.Clear();
+foreach (var kvp in savedOwnTemporaries)
+    environment.OwnTemporaries[kvp.Key] = kvp.Value;
+```
+
+### 12.6 VariableResolver Resolution Steps
+
+The resolver now uses OwnArguments/OwnTemporaries to distinguish scope boundaries:
+
+#### Step 1: Pseudo-variables (unchanged)
+Check for `self`, `super`, `true`, `false`, `nil`, `thisContext`
+
+#### Step 2: Block-local variables (NEW logic)
+```csharp
+// Check THIS block's OWN arguments (not inherited!)
+if (context.OwnArguments.TryGetValue(varName, out int argIndex))
+    return BlockArgument at index argIndex;
+
+// Check THIS block's OWN temporaries (not inherited!)
+if (context.OwnTemporaries.TryGetValue(varName, out int tempIndex))
+    return BlockTemporary at index (context.ArgumentCount + tempIndex);
+```
+
+#### Step 3-4: Parent scope traversal (NEW logic)
+```csharp
+int accumulatedOffset = context.ArgumentCount + context.TemporariesAllocatedInFrame;
+var parentContext = context.Parent;
+
+while (parentContext != null && parentContext.ScopeDepth > 0)
+{
+    // Check parent's OWN arguments (not accumulated!)
+    if (parentContext.OwnArguments.TryGetValue(varName, out int pArgIndex))
+        return ParentVariable at index (pArgIndex + accumulatedOffset);
+    
+    // Check parent's OWN temporaries (not accumulated!)
+    if (parentContext.OwnTemporaries.TryGetValue(varName, out int pTempIndex))
+    {
+        int baseIndex = parentContext.ArgumentCount + pTempIndex;
+        return ParentVariable at index (baseIndex + accumulatedOffset);
+    }
+    
+    // Not found - accumulate this parent's locals and continue up
+    accumulatedOffset += parentContext.ArgumentCount + parentContext.TemporariesAllocatedInFrame;
+    parentContext = parentContext.Parent;
+}
+```
+
+#### Step 5: Method arguments (NEW logic)
+```csharp
+// Traverse to method level (ScopeDepth == 0)
+var methodContext = context;
+while (methodContext.ScopeDepth > 0 && methodContext.Parent != null)
+    methodContext = methodContext.Parent;
+
+// Use methodContext.OwnArguments (method's own args, 0-based)
+if (methodContext.OwnArguments.TryGetValue(varName, out int methodArgIndex))
+{
+    int finalIndex = methodArgIndex;
+    if (context.ScopeDepth > 0)
+        finalIndex += CalculateBlockLocalOffset(context);
+    return MethodArgument at index finalIndex;
+}
+```
+
+#### Step 6: Method temporaries (NEW logic)
+```csharp
+// Use methodContext.OwnTemporaries (method's own temps, 0-based)
+if (methodContext.OwnTemporaries.TryGetValue(varName, out int methodTempIndex))
+{
+    int baseIndex = methodContext.ArgumentCount + methodTempIndex;
+    int finalIndex = baseIndex;
+    if (context.ScopeDepth > 0)
+        finalIndex += CalculateBlockLocalOffset(context);
+    return MethodTemporary at index finalIndex;
+}
+```
+
+### 12.7 Key Invariants
+
+1. **OwnArguments/OwnTemporaries are always 0-based** within their scope
+2. **OwnArguments/OwnTemporaries contain ONLY this scope's variables** (no inheritance)
+3. **Parent snapshot uses SAVED dictionaries**, not current environment
+4. **Each scope's Own* dictionaries are saved before entering nested scope and restored after**
+5. **VariableResolver NEVER uses accumulated Arguments/Temporaries dictionaries**
+
+### 12.8 Known Issues (2025-01-10)
+
+**Status**: Architecture implemented but causing subscript bounds errors in BinaryChoiceView initialize.
+
+**Current Investigation**: Verifying that parentSnapshot is correctly populated from savedOwnArguments/savedOwnTemporaries rather than environment.OwnArguments/OwnTemporaries.
+
+**Files Modified**:
+- [Smalltalk80.Compiler/BytecodeCompiler.cs](Smalltalk80.Compiler/BytecodeCompiler.cs) (lines 2184-2199, 2355-2366)
+- [Smalltalk80.Compiler/VariableResolver.cs](Smalltalk80.Compiler/VariableResolver.cs) (lines 211-240, 247-297, 92, 114)
+
