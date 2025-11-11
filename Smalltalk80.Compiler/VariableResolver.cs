@@ -59,17 +59,10 @@ namespace Smalltalk80.Compiler
         /// <exception cref="InvalidOperationException">Thrown if variable not found in any scope</exception>
         public ResolutionResult ResolveVariable(string varName, CompilationEnvironment context)
         {
-            // DEBUG: Log variable resolution
-            bool isInBlock = context.ScopeDepth > 0;
-            Console.WriteLine($"[ResolveVar] varName='{varName}', ScopeDepth={context.ScopeDepth}, ArgCount={context.ArgumentCount}");
-
             // Step 1: Check pseudo-variables first (highest priority, cannot be shadowed)
             var pseudoResult = TryResolvePseudoVariable(varName);
             if (pseudoResult.HasValue)
-            {
-                Console.WriteLine($"[ResolveVar] → PseudoVariable");
                 return pseudoResult.Value;
-            }
 
             // Step 2: Check block-local variables (if in block)
             if (context.ScopeDepth > 0)
@@ -99,7 +92,6 @@ namespace Smalltalk80.Compiler
                     finalIndex += offset;
                 }
 
-                Console.WriteLine($"[ResolveVar] → MethodArgument rawIndex={methodArgIndex}, finalIndex={finalIndex}");
                 return new ResolutionResult(
                     VariableType.MethodArgument,
                     finalIndex,
@@ -136,7 +128,6 @@ namespace Smalltalk80.Compiler
                     finalIndex += offset;
                 }
 
-                Console.WriteLine($"[ResolveVar] → MethodTemporary absIndex={methodTempAbsoluteIndex}, finalIndex={finalIndex}");
                 return new ResolutionResult(
                     VariableType.MethodTemporary,
                     finalIndex,
@@ -148,7 +139,6 @@ namespace Smalltalk80.Compiler
             // Step 7: Check instance variables
             if (context.InstanceVariables.TryGetValue(varName, out int fieldIndex))
             {
-                Console.WriteLine($"[ResolveVar] → InstanceVariable index={fieldIndex}");
                 return new ResolutionResult(
                     VariableType.InstanceVariable,
                     fieldIndex,
@@ -160,7 +150,6 @@ namespace Smalltalk80.Compiler
             // Step 8: Check class variables
             if (context.ClassVariables.ContainsKey(varName))
             {
-                Console.WriteLine($"[ResolveVar] → ClassVariable");
                 // Class variables are resolved via literal associations
                 // The actual literal index will be added by the caller
                 return new ResolutionResult(
@@ -174,7 +163,6 @@ namespace Smalltalk80.Compiler
             // Step 9: Check pool dictionary variables
             if (context.PoolVariables.ContainsKey(varName))
             {
-                Console.WriteLine($"[ResolveVar] → PoolVariable");
                 // Pool variables are resolved via literal associations
                 // The actual literal index will be added by the caller
                 return new ResolutionResult(
@@ -187,7 +175,6 @@ namespace Smalltalk80.Compiler
 
             // Step 10: Assume global variable (will be resolved at runtime)
             // Global variables are stored as Associations in Smalltalk dictionary
-            Console.WriteLine($"[ResolveVar] → Global (not found in any scope)");
             return new ResolutionResult(
                 VariableType.Global,
                 -1,  // Literal index assigned by caller
@@ -223,12 +210,19 @@ namespace Smalltalk80.Compiler
             // Check block arguments (these are always block-local)
             if (context.Arguments.TryGetValue(varName, out int argIndex))
             {
-                return new ResolutionResult(
-                    VariableType.BlockArgument,
-                    argIndex,
-                    true,  // Block arguments ARE assignable in Smalltalk-80 (unlike method args)
-                    varName
-                );
+                // With inline blocks, context.Arguments contains BOTH method args AND block args
+                // Only treat as block argument if within current block's argument count
+                // Method arguments will be handled by Step 5
+                if (argIndex < context.ArgumentCount)
+                {
+                    return new ResolutionResult(
+                        VariableType.BlockArgument,
+                        argIndex,
+                        true,  // Block arguments ARE assignable in Smalltalk-80 (unlike method args)
+                        varName
+                    );
+                }
+                // Otherwise, this is a method argument - fall through to Step 5
             }
 
             // Check block temporaries
@@ -330,7 +324,7 @@ namespace Smalltalk80.Compiler
             var current = context;
 
             // Walk from current block up to method, accumulating local counts
-            while (current.ScopeDepth > 0 && current.Parent != null)
+            while (current != null && current.ScopeDepth > 0 && current.Parent != null)
             {
                 offset += current.ArgumentCount + current.TemporariesAllocatedInFrame;
                 current = current.Parent;

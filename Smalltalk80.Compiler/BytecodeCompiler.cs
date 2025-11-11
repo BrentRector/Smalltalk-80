@@ -2083,6 +2083,8 @@ namespace Smalltalk80.Compiler
             // Save temporary count to restore after block compilation
             // BUG FIX: Block temps should not persist in method's TemporariesAllocatedInFrame after block ends
             int savedTemporariesAllocatedInFrame = environment.TemporariesAllocatedInFrame;
+            // Save parent reference to restore after block compilation
+            var savedParent = environment.Parent;
 
             // Save method-level counts if this is the first block (ScopeDepth == 0)
             if (savedScopeDepth == 0)
@@ -2090,6 +2092,34 @@ namespace Smalltalk80.Compiler
                 environment.MethodArgumentCount = savedArgCount;
                 environment.MethodTemporaryCount = environment.TemporariesAllocatedInFrame;
             }
+
+            // Create parent environment snapshot for VariableResolver to traverse
+            // This allows CalculateBlockLocalOffset to walk the parent chain
+            // CRITICAL: For METHOD scope (ScopeDepth=0), TemporariesAllocatedInFrame should be 0
+            // because the offset calculation should NOT include method temps, only block locals
+            var parentSnapshot = new CompilationEnvironment
+            {
+                ArgumentCount = savedArgCount,
+                TemporariesAllocatedInFrame = (savedScopeDepth == 0) ? 0 : savedTemporariesAllocatedInFrame,
+                ScopeDepth = savedScopeDepth,
+                Parent = savedParent,
+                MethodArgumentCount = environment.MethodArgumentCount,
+                MethodTemporaryCount = environment.MethodTemporaryCount,
+                CumulativeBlockArgOffset = savedCumulativeBlockArgOffset
+            };
+            // Copy dictionary contents (can't assign to get-only properties)
+            foreach (var kvp in savedArguments)
+                parentSnapshot.Arguments[kvp.Key] = kvp.Value;
+            foreach (var kvp in savedTemporaries)
+                parentSnapshot.Temporaries[kvp.Key] = kvp.Value;
+            foreach (var kvp in environment.InstanceVariables)
+                parentSnapshot.InstanceVariables[kvp.Key] = kvp.Value;
+            foreach (var kvp in environment.ClassVariables)
+                parentSnapshot.ClassVariables[kvp.Key] = kvp.Value;
+            foreach (var kvp in environment.PoolVariables)
+                parentSnapshot.PoolVariables[kvp.Key] = kvp.Value;
+
+            environment.Parent = parentSnapshot;
 
             // Increment scope depth to indicate we're compiling inside a block
             // This is critical for VariableResolver to correctly identify block variables!
@@ -2105,6 +2135,11 @@ namespace Smalltalk80.Compiler
                 environment.Arguments[argumentNames[i]] = i;
             }
             environment.ArgumentCount = argCount;
+
+            // CRITICAL: Reset TemporariesAllocatedInFrame to 0 for the block's local temp frame
+            // Block temps will be added below, starting from 0
+            // This is needed for CalculateBlockLocalOffset to compute the correct offset
+            environment.TemporariesAllocatedInFrame = 0;
 
             // Parse and register block temporaries in parent environment
             // Block temps are allocated after parent method's temps AND block arguments
@@ -2181,6 +2216,7 @@ namespace Smalltalk80.Compiler
 
             environment.ScopeDepth = savedScopeDepth; // Restore scope depth
             environment.CumulativeBlockArgOffset = savedCumulativeBlockArgOffset; // Restore cumulative offset
+            environment.Parent = savedParent; // Restore parent reference
 
             // BUG FIX: Restore TemporariesAllocatedInFrame after block compilation
             // Block temps should NOT persist in the method's TemporariesAllocatedInFrame after the block ends

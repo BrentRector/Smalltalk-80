@@ -1023,15 +1023,7 @@ public partial class VirtualMachine : IPrimitiveContext
         if (BytecodeUtil.IsPushIvar(bytecode))
         {
             int index = BytecodeUtil.PushIvarIndex(bytecode);
-
-            Console.WriteLine($"[DEBUG IsPushIvar] bytecode=0x{bytecode:X2}, index={index}, receiverOOP={receiverOOP}, receiverClass={GetClassName(GetClass(receiverOOP))}, method={GetLocalId(methodOOP)}");
-
-            // TODO: For blocks, need to get receiver from lexicalParent chain (Single-Context Architecture)
-            // For now, use direct receiver (works for methods, blocks need implementation)
-            var actualReceiverOOP = receiverOOP;
-
-            var valueOOP = _heapManager.GetInstanceVariable(actualReceiverOOP, index);
-            // Console.WriteLine($"[DEBUG IsPushIvar] Retrieved value: {valueOOP}, class={GetClassName(GetClass(valueOOP))}");
+            var valueOOP = _heapManager.GetInstanceVariable(receiverOOP, index);
             Push(valueOOP);
             return true;
         }
@@ -4394,31 +4386,21 @@ public partial class VirtualMachine : IPrimitiveContext
         var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
         bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
 
-        // DEBUG: Log temporary variable access
-        string contextType = isBlockContext ? "BlockContext" : "MethodContext";
-        Console.WriteLine($"[GetTemp] contextOOP={contextOOP}, type={contextType}, index={index}");
-
         if (isBlockContext)
         {
             // BlockContext: Check if accessing local args or need to traverse home chain
             var nargsOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
             int nargs = nargsOOP.AsSmallInteger();
 
-            Console.WriteLine($"[GetTemp] BlockContext nargs={nargs}, index < nargs = {index < nargs}");
-
             if (index < nargs)
             {
                 // Local block argument - stored in THIS BlockContext's indexed slots
-                var result = _heapManager.GetIndexedOOP(contextOOP, index);
-                string resultClass = result.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassName(result);
-                Console.WriteLine($"[GetTemp] Returning block arg: {result} (class={resultClass})");
-                return result;
+                return _heapManager.GetIndexedOOP(contextOOP, index);
             }
             else
             {
                 // Parent temp or argument - RECURSIVELY traverse home chain
                 var homeOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                Console.WriteLine($"[GetTemp] Traversing to home context: {homeOOP}, adjustedIndex={index - nargs}");
                 // Adjust index by subtracting our local count and recurse
                 return GetTemporaryVariable(homeOOP, index - nargs);
             }
@@ -4426,10 +4408,7 @@ public partial class VirtualMachine : IPrimitiveContext
         else
         {
             // MethodContext: Direct access to method's temp frame (base case)
-            var result = _heapManager.GetIndexedOOP(contextOOP, index);
-            string resultClass = result.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassName(result);
-            Console.WriteLine($"[GetTemp] Returning method temp: {result} (class={resultClass})");
-            return result;
+            return _heapManager.GetIndexedOOP(contextOOP, index);
         }
     }
 
