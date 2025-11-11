@@ -99,7 +99,7 @@ public partial class VirtualMachine : IPrimitiveContext
     private static int _createContextCallCount = 0;
 
     // Blue Book architectural constants are defined in VMConstants.cs
-    // All context and BlockClosure field indices are now static constants shared across the VM
+    // All context field indices are now static constants shared across the VM
 
     // Verbose debugging support
     public bool VerboseDebug { get; set; } = false;
@@ -2113,12 +2113,12 @@ public partial class VirtualMachine : IPrimitiveContext
                 Console.WriteLine($"  Expected for 'receiver at:put: value':");
                 Console.WriteLine($"    TOS-2 should be: receiver (Array)");
                 Console.WriteLine($"    TOS-1 should be: index (SmallInteger)");
-                Console.WriteLine($"    TOS   should be: value (BlockClosure)");
+                Console.WriteLine($"    TOS   should be: value (any object)");
             }
             else // value:
             {
                 Console.WriteLine($"  Expected for 'receiver value: argument':");
-                Console.WriteLine($"    TOS-1 should be: receiver (BlockClosure)");
+                Console.WriteLine($"    TOS-1 should be: receiver (CompiledMethod block)");
                 Console.WriteLine($"    TOS   should be: argument (any object)");
             }
         }
@@ -2184,7 +2184,7 @@ public partial class VirtualMachine : IPrimitiveContext
                 }
                 else
                 {
-                    Console.WriteLine($"\n[value: ERROR!] Receiver should be BlockClosure but got {recvClass}!");
+                    Console.WriteLine($"\n[value: ERROR!] Receiver should be CompiledMethod (block) but got {recvClass}!");
                 }
 
                 Console.WriteLine($"  This means either:");
@@ -2456,9 +2456,9 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             var className = GetClassName(classOOP);
             Console.WriteLine($"\n[{selectorName}] receiver {receiverOOP} | class=\"{className}\" | args={args.Length}");
-            if (className != "BlockClosure")
+            if (className != "CompiledMethod")
             {
-                Console.WriteLine($"  WARNING: value sent to {className}, not BlockClosure!");
+                Console.WriteLine($"  WARNING: value sent to {className}, not CompiledMethod (block)!");
             }
         }
 
@@ -3051,13 +3051,12 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     /// <param name="blockMethodOOP">The block CompiledMethod to invoke</param>
     /// <param name="args">Arguments to pass to the block</param>
-    /// <param name="blockClosureOOP">Optional BlockClosure object for Primitive 207 support</param>
     /// <returns>The result of block execution</returns>
-    private SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args, SmalltalkOOP blockClosureOOP = default)
+    private SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args)
     {
         try
         {
-            return InvokeBlockInternal(blockMethodOOP, args, blockClosureOOP);
+            return InvokeBlockInternal(blockMethodOOP, args);
         }
         catch (Exception)
         {
@@ -3065,7 +3064,7 @@ public partial class VirtualMachine : IPrimitiveContext
         }
     }
 
-    private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args, SmalltalkOOP blockClosureOOP = default)
+    private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args)
     {
         // Parse block header for metadata
         var blockHeader = ParseMethodHeader(blockMethodOOP);
@@ -3079,7 +3078,6 @@ public partial class VirtualMachine : IPrimitiveContext
         );
 
         // Create MethodContext for block execution
-        // Note: This is for Primitive 207 (BlockClosure value), not BlockContext
         var blockContextOOP = CreateMethodContext(
             blockMethodOOP,
             currentReceiverOOP,
@@ -3110,7 +3108,7 @@ public partial class VirtualMachine : IPrimitiveContext
     /// This implements Approach B from the documentation.
     /// </summary>
     // REMOVED: CreateBlockExecutionContext - obsolete in single-context architecture
-    private SmalltalkOOP CreateBlockExecutionContext(SmalltalkOOP blockMethodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP blockContextOOP, SmalltalkOOP senderContextOOP, SmalltalkOOP blockClosureOOP)
+    private SmalltalkOOP CreateBlockExecutionContext(SmalltalkOOP blockMethodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP blockContextOOP, SmalltalkOOP senderContextOOP)
     {
         throw new NotImplementedException("CreateBlockExecutionContext is obsolete in single-context architecture. Blocks should use CreateMethodContext with lexicalParent field.");
     }
@@ -4316,44 +4314,6 @@ public partial class VirtualMachine : IPrimitiveContext
         return localId != null && localId.StartsWith("block:");
     }
 
-    /// <summary>
-    /// Creates a BlockClosure wrapper for a block CompiledMethod.
-    /// BlockClosure provides user-facing methods (value, whileTrue:, etc.) while
-    /// block EXECUTION uses MethodContext (Single-Context Architecture).
-    /// </summary>
-    private SmalltalkOOP CreateBlockClosure(SmalltalkOOP blockMethodOOP, SmalltalkOOP homeContextOOP)
-    {
-        // Get BlockClosure class
-        var blockClosureClassOOP = _runtimeHeapAccess.GetClass("BlockClosure");
-        if (blockClosureClassOOP == SpecialObjectsArray.Instance.Nil)
-        {
-            throw new InvalidOperationException("BlockClosure class not found");
-        }
-
-        // BlockClosure has 5 instance variables: method, homeContext, returnContext, numArgs, executionContext
-        // All initialized to nil except method and numArgs
-        var blockClosureOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 5, 0);
-        _heapManager.SetSlot(blockClosureOOP, 0, blockClosureClassOOP); // class reference
-
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
-
-        // Set fields using VMConstants indices
-        _heapManager.SetInstanceVariable(blockClosureOOP, VMConstants.BLOCKCLOSURE_METHOD_INDEX, blockMethodOOP);
-        _heapManager.SetInstanceVariable(blockClosureOOP, VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX, homeContextOOP);
-        _heapManager.SetInstanceVariable(blockClosureOOP, VMConstants.BLOCKCLOSURE_RETURNCONTEXT_INDEX, nilOOP);
-
-        // Get numArgs from method header
-        var methodHeader = ParseMethodHeader(blockMethodOOP);
-        var numArgsOOP = SmalltalkOOP.FromSmallInteger(methodHeader.NumArgs);
-        _heapManager.SetInstanceVariable(blockClosureOOP, VMConstants.BLOCKCLOSURE_NUMARGS_INDEX, numArgsOOP);
-
-        // executionContext starts as nil (set when block is invoked)
-        _heapManager.SetInstanceVariable(blockClosureOOP, VMConstants.BLOCKCLOSURE_EXECUTIONCONTEXT_INDEX, nilOOP);
-
-        return blockClosureOOP;
-    }
-
-
     IEnumerable<SmalltalkOOP> IPrimitiveContext.GetAllObjects()
     {
         // TODO: Implement proper enumeration of all objects in the object table
@@ -4373,12 +4333,6 @@ public partial class VirtualMachine : IPrimitiveContext
         // This needs to swap all references between oop1 and oop2
     }
 
-    SmalltalkOOP IPrimitiveContext.InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] arguments, SmalltalkOOP homeContextOOP, SmalltalkOOP blockClosureOOP)
-    {
-        // Canonical Primitive 207 implementation: all metadata is in the BlockClosure
-        // The blockMethodOOP and homeContextOOP parameters are redundant but kept for compatibility
-        return InvokeBlockInternal(blockMethodOOP, arguments, blockClosureOOP);
-    }
 
     int IPrimitiveContext.GetFieldIndex(string className, string fieldName)
     {

@@ -130,22 +130,10 @@ public interface IPrimitiveContext
     /// <param name="oop2">Second object pointer.</param>
     void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2);
 
-    // BlockClosure support
-
-    /// <summary>
-    /// Invokes a block closure with given arguments and home context.
-    /// </summary>
-    /// <param name="blockMethodOOP">CompiledMethod of the block.</param>
-    /// <param name="arguments">Array of argument OOPs.</param>
-    /// <param name="homeContextOOP">Home context for lexical scoping.</param>
-    /// <param name="blockClosureOOP">The BlockClosure instance being invoked (for nested block support).</param>
-    /// <returns>Result of block execution.</returns>
-    SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] arguments, SmalltalkOOP homeContextOOP, SmalltalkOOP blockClosureOOP);
-
     /// <summary>
     /// Gets a field index from a class using the layout resolver.
     /// </summary>
-    /// <param name="className">Class name (e.g., "class:BlockClosure").</param>
+    /// <param name="className">Class name (e.g., "class:MethodContext").</param>
     /// <param name="fieldName">Field name (e.g., "method").</param>
     /// <returns>Field index.</returns>
     int GetFieldIndex(string className, string fieldName);

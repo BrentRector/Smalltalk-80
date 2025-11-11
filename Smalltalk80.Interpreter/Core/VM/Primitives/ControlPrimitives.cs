@@ -41,8 +41,7 @@ public static class ControlPrimitives
     // <item>Creates BlockContext that captures home context for proper lexical scoping</item>
     // <item>Sets initial IP to PC + 2 (after blockCopy: bytecode and its argument)</item>
     // <item>Handles MethodContext vs BlockContext as home (finds ultimate MethodContext)</item>
-    // <item>BlockContext is used for traditional block implementation</item>
-    // <item>NOTE: Our VM also supports BlockClosure (primitive 207) for modern blocks</item>
+    // <item>BlockContext is the Blue Book's standard block implementation</item>
     // </list>
     //
     // <para><b>Analysis:</b></para>

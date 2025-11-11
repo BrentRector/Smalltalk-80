@@ -572,7 +572,6 @@ internal class TestPrimitiveContext : IPrimitiveContext
     public SmalltalkOOP GetGlobalObjectByName(string globalName) => throw new NotImplementedException();
     public void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2) => throw new NotImplementedException();
     public void BecomeOneWay(SmalltalkOOP fromOop, SmalltalkOOP toOop) => throw new NotImplementedException();
-    public SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] args, SmalltalkOOP homeContextOOP, SmalltalkOOP blockClosureOOP) => throw new NotImplementedException();
     public SmalltalkOOP SendMessage(SmalltalkOOP receiverOop, SmalltalkOOP selectorOop, SmalltalkOOP argumentsArray) => throw new NotImplementedException();
     public SmalltalkOOP GetActiveContext() => throw new NotImplementedException();
     public int GetInstructionPointer() => throw new NotImplementedException();

@@ -627,31 +627,6 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                     layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable[instVarName], SlotIndex = slotIndex++, InheritedFrom = inheritedFrom });
                 }
             }
-            else if (cls.Name == "BlockClosure")
-            {
-                // VM Extension: BlockClosure field indices are fixed by our VM implementation
-                var requiredFields = new[] { "method", "homeContext", "returnContext", "numArgs" };
-                var missingFields = requiredFields.Where(f => !cls.InstanceVariables.Contains(f)).ToList();
-
-                if (missingFields.Any())
-                {
-                    throw new InvalidOperationException(
-                        $"FATAL: BlockClosure class is missing required fields: {string.Join(", ", missingFields)}. " +
-                        "The VM extension requires BlockClosure to define 'method', 'homeContext', 'returnContext', and 'numArgs' at fixed indices 0, 1, 2, and 3.");
-                }
-
-                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["method"], SlotIndex = 0, InheritedFrom = inheritedFrom });
-                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["homeContext"], SlotIndex = 1, InheritedFrom = inheritedFrom });
-                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["returnContext"], SlotIndex = 2, InheritedFrom = inheritedFrom });
-                layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable["numArgs"], SlotIndex = 3, InheritedFrom = inheritedFrom });
-
-                slotIndex = 4;
-                foreach (var instVarName in cls.InstanceVariables)
-                {
-                    if (requiredFields.Contains(instVarName)) continue;
-                    layout.Add(new JsonFieldLayoutEntry { NameIndex = _symbolTable[instVarName], SlotIndex = slotIndex++, InheritedFrom = inheritedFrom });
-                }
-            }
             else
             {
                 // Normal field layout for all other classes

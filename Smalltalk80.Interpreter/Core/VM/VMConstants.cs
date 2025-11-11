@@ -70,18 +70,6 @@ public static class VMConstants
     public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;    // First indexed slot
 
     // ========================================================================
-    // VM Extension: BlockClosure field indices
-    // ========================================================================
-    // BlockClosure is a modern VM extension (not in original Blue Book) for proper lexical closures.
-    // These indices are fixed by our VM implementation and treated as architectural constants.
-
-    public const int BLOCKCLOSURE_METHOD_INDEX = 0;
-    public const int BLOCKCLOSURE_HOMECONTEXT_INDEX = 1;
-    public const int BLOCKCLOSURE_RETURNCONTEXT_INDEX = 2;
-    public const int BLOCKCLOSURE_NUMARGS_INDEX = 3;
-    public const int BLOCKCLOSURE_EXECUTIONCONTEXT_INDEX = 4;
-
-    // ========================================================================
     // Blue Book: Association field indices
     // ========================================================================
     // Association is a fundamental class used for global bindings, class pools, etc.

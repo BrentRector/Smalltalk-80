@@ -176,9 +176,6 @@ public static class PrimitiveTable
         _primitives[133] = SystemPrimitives.ForceGC;
         _primitives[139] = SystemPrimitives.NextObject;
 
-        // BlockClosure primitives (207)
-        _primitives[207] = BlockClosurePrimitives.ValueWithArguments;
-
         // Note: Primitives 117-127, 132, 134-138 are reserved/not implemented in Blue Book
     }
 

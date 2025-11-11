@@ -136,10 +136,10 @@ testNestedBlocks
     }
     
     [Test]
-    public void TestBlockClosure()
+    public void TestBlockContext()
     {
         var source = WrapInTestClass(@"
-testBlockClosure
+testBlockContext
     | outer |
     outer := 10.
     ^[outer + 5] value");

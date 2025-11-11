@@ -37,7 +37,7 @@ public sealed record CompilerOptions
     /// <remarks>
     /// Example output:
     /// <code>
-    /// [TailOpt] BlockClosure>>whileTrue: 1 tail call(s) detected
+    /// [TailOpt] BlockContext>>whileTrue: 1 tail call(s) detected
     /// [TailOpt]   - Line 3: self whileTrue: aBlock (safe to optimize)
     /// </code>
     /// </remarks>
