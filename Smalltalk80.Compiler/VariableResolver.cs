@@ -81,7 +81,16 @@ namespace Smalltalk80.Compiler
             }
 
             // Step 5: Check method arguments
-            if (context.Arguments.TryGetValue(varName, out int methodArgIndex))
+            // When in a block, we need to check the method's arguments (not current block's arguments)
+            // Traverse to the method level (ScopeDepth == 0)
+            var methodContext = context;
+            while (methodContext != null && methodContext.ScopeDepth > 0 && methodContext.Parent != null)
+            {
+                methodContext = methodContext.Parent;
+            }
+
+            // Check method arguments if we found a context (should be at method level after traversal)
+            if (methodContext != null && methodContext.Arguments.TryGetValue(varName, out int methodArgIndex))
             {
                 int finalIndex = methodArgIndex;
 
@@ -314,16 +323,19 @@ namespace Smalltalk80.Compiler
 
         /// <summary>
         /// Calculate the accumulated offset for hierarchical indexing.
-        /// Walks from current block up to method, summing block-local counts.
+        /// Walks from current block up to method, summing PARENT block-local counts.
+        /// IMPORTANT: Does NOT include the current block's own locals, only parent blocks.
         /// </summary>
         /// <param name="context">Current compilation environment</param>
         /// <returns>Total offset for hierarchical variable access</returns>
         private int CalculateBlockLocalOffset(CompilationEnvironment context)
         {
             int offset = 0;
-            var current = context;
+            var current = context.Parent;  // Start with PARENT, not current block
 
-            // Walk from current block up to method, accumulating local counts
+            // Walk from parent block up to method, accumulating local counts
+            // NOTE: We skip the current block because we're calculating the offset
+            // to reach variables in parent scopes, not the current scope
             while (current != null && current.ScopeDepth > 0 && current.Parent != null)
             {
                 offset += current.ArgumentCount + current.TemporariesAllocatedInFrame;

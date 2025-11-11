@@ -57144,16 +57144,6 @@ sameAsStoredFile
 File class
 	instanceVariableNames: ''!
 
-!File class methodsFor: 'class initialization'!
-initialize
-	"Subclasses of File may want to share variables in pools. 
-	Execute before filin:  Smalltalk at: #XFilePool as: (Dictionary: 16). 
-	in XFile initialize."
-
-	FilePool at: #Read put: 1.
-	FilePool at: #Write put: 2.
-	FilePool at: #Shorten put: 3! !
-
 !File class methodsFor: 'documentation'!
 documentation
 	"Subclasses of File are expected to implement the following messages.  Unless 	otherwise indicated, they are provided as self subclassResponsibilty

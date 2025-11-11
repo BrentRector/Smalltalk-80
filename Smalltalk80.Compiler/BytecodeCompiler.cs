@@ -463,18 +463,40 @@ namespace Smalltalk80.Compiler
             }
         }
         
+        /// <summary>
+        /// Adds a literal to otherLiterals, bypassing the selector-specific logic in AddLiteral.
+        /// Used for Symbol literals (like #Read, #Write) that should NOT be treated as selectors.
+        /// </summary>
+        private int AddNonSelectorLiteral(object literal)
+        {
+            // Search through otherLiterals list for duplicates
+            for (int i = 0; i < otherLiterals.Count; i++)
+            {
+                if (LiteralsEqual(otherLiterals[i], literal))
+                {
+                    // Return index = selectors.Count + position in otherLiterals
+                    return selectors.Count + i;
+                }
+            }
+
+            // Not found - add new literal
+            int index = selectors.Count + otherLiterals.Count;
+            otherLiterals.Add(literal);
+            return index;
+        }
+
         private bool LiteralsEqual(object a, object b)
         {
             if (a == null || b == null) return a == b;
-            
+
             // Compare Symbols by their Value
-            if (a is Symbol symA && b is Symbol symB) 
+            if (a is Symbol symA && b is Symbol symB)
                 return symA.Value == symB.Value;
-            
+
             // Compare Associations by their Key's Value
-            if (a is Association assocA && b is Association assocB) 
+            if (a is Association assocA && b is Association assocB)
                 return assocA.Key.Value == assocB.Key.Value;
-            
+
             // Compare arrays element by element
             if (a is object[] arrayA && b is object[] arrayB)
             {
@@ -487,13 +509,13 @@ namespace Smalltalk80.Compiler
                 }
                 return true;
             }
-            
+
             // For primitive types, use standard equality
             if (a is string strA && b is string strB) return strA == strB;
             if (a is int intA && b is int intB) return intA == intB;
             if (a is bool boolA && b is bool boolB) return boolA == boolB;
             if (a is NilObject && b is NilObject) return true;
-            
+
             // Default to standard equality
             return a.Equals(b);
         }
@@ -570,7 +592,22 @@ namespace Smalltalk80.Compiler
         
         public void PushLiteralConstant(object literal)
         {
-            var index = AddLiteral(literal);
+            // CRITICAL FIX: Symbol literals (like #Read, #Write) must go in otherLiterals,
+            // NOT in selectors. Only message send selectors should go in the selectors list.
+            // This ensures bytecode indices reference the correct literal type.
+            int index;
+            if (literal is Symbol)
+            {
+                // Force Symbol literals into otherLiterals by bypassing AddLiteral's
+                // Symbol-specific logic that would put them in selectors
+                index = AddNonSelectorLiteral(literal);
+            }
+            else
+            {
+                // For non-Symbol literals, use normal AddLiteral
+                index = AddLiteral(literal);
+            }
+
             if (index <= 31)
             {
                 // Bytecodes 0x20-0x3F: Push Literal Constant #0 to #31

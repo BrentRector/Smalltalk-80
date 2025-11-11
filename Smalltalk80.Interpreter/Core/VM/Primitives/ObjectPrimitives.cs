@@ -70,8 +70,8 @@ public static class ObjectPrimitives
         {
             // DIAGNOSTIC: Log what's being used as index to find uninitialized dependencies
             var indexClassName = ctx.GetClassNameForObject(args[0]);
-            var receiverClassName = ctx.GetClassNameForObject(receiver);
-            Console.WriteLine($"[Prim60] Non-integer index: receiver={receiverClassName}, index={indexClassName}");
+            var recvClassName = ctx.GetClassNameForObject(receiver);
+            Console.WriteLine($"[Prim60] Non-integer index: receiver={recvClassName}, index={indexClassName}");
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -100,9 +100,9 @@ public static class ObjectPrimitives
         {
             // FAST-FAIL for debugging: Throw exception immediately to avoid infinite recursion
             // TODO: Remove this after init expressions are working - should use normal error handling
-            var receiverClassName = ctx.GetClassNameForObject(receiver);
+            var recvClassName = ctx.GetClassNameForObject(receiver);
             throw new InvalidOperationException(
-                $"SUBSCRIPT BOUNDS ERROR: {receiverClassName}>>at: {index} (size={size})\n" +
+                $"SUBSCRIPT BOUNDS ERROR: {recvClassName}>>at: {index} (size={size})\n" +
                 $"  receiver={receiver}, index={index}, size={size}");
 
             // Normal behavior (commented out for fast-fail debugging):
@@ -114,6 +114,14 @@ public static class ObjectPrimitives
         // Convert Smalltalk 1-based index to C# 0-based index
         // Arrays use PointerIndexed format - get OOP directly
         var result = ctx.HeapManager.GetIndexedOOP(receiver, index - 1);
+
+        // DIAGNOSTIC: Track ALL reads to find SmallInteger-instead-of-Association bug
+        var receiverClassName = ctx.GetClassNameForObject(receiver);
+        if (receiverClassName?.Contains("Dictionary") == true || receiverClassName?.Contains("Set") == true)
+        {
+            var resultClassName = ctx.GetClassNameForObject(result);
+            Console.WriteLine($"[Prim60] READ: {receiverClassName}>>at:{index} => {result} (class:{resultClassName})");
+        }
 
         // Blue Book: self push: result
         return result;
@@ -218,6 +226,14 @@ public static class ObjectPrimitives
         // Blue Book: self subscript: array with: index storing: value
         // Check object format and use appropriate storage method
         var format = ctx.HeapManager.GetObjectFormat(receiver);
+
+        // DIAGNOSTIC: Track ALL writes to find SmallInteger-instead-of-Association bug
+        var receiverClassName = ctx.GetClassNameForObject(receiver);
+        if (receiverClassName?.Contains("Dictionary") == true || receiverClassName?.Contains("Set") == true)
+        {
+            var valueClassName = ctx.GetClassNameForObject(value);
+            Console.WriteLine($"[Prim61] WRITE: {receiverClassName}>>at:{index} put:{value} (class:{valueClassName})");
+        }
 
         if (format == ObjectFormat.PointerIndexed)
         {
@@ -405,6 +421,14 @@ public static class ObjectPrimitives
         try
         {
             var result = ctx.HeapManager.AllocateInstanceOf(receiver, 0);
+
+            // DIAGNOSTIC: Track Association creation
+            var className = ctx.GetClassNameForObject(receiver);
+            if (className == "class:Association")
+            {
+                Console.WriteLine($"[Prim70-Assoc] NEW: Created Association {result}");
+            }
+
             return result;
         }
         catch
@@ -790,6 +814,15 @@ public static class ObjectPrimitives
 
         // Blue Book: newValue ← self popStack
         SmalltalkOOP value = args[1];
+
+        // DIAGNOSTIC: Track Association field updates
+        var receiverClassName = ctx.GetClassNameForObject(receiver);
+        if (receiverClassName == "class:Association")
+        {
+            var fieldName = index == 1 ? "key" : (index == 2 ? "value" : $"field{index}");
+            var valueClassName = ctx.GetClassNameForObject(value);
+            Console.WriteLine($"[Prim74-Assoc] SET: Association {receiver} {fieldName} := {value} (class:{valueClassName})");
+        }
 
         // Blue Book: memory storePointer: index - 1 ofObject: thisReceiver withValue: newValue
         // Convert Smalltalk 1-based index to C# 0-based index
