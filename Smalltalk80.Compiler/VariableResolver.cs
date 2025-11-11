@@ -91,18 +91,11 @@ namespace Smalltalk80.Compiler
 
             if (methodContext.OwnArguments.TryGetValue(varName, out int methodArgIndex))
             {
-                int finalIndex = methodArgIndex;
-
-                // If we're in a block, add hierarchical offset for all intervening block locals
-                if (context.ScopeDepth > 0)
-                {
-                    int offset = CalculateBlockLocalOffset(context);
-                    finalIndex += offset;
-                }
-
+                // Method arguments use DIRECT indices - NO hierarchical offset!
+                // VM will traverse home chain automatically to reach the method context
                 return new ResolutionResult(
                     VariableType.MethodArgument,
-                    finalIndex,
+                    methodArgIndex,
                     false,  // Arguments are read-only
                     varName
                 );
@@ -117,22 +110,11 @@ namespace Smalltalk80.Compiler
                 // Need to add method's argument count to get position in temp frame
                 int baseIndex = methodContext.ArgumentCount + methodTempIndex;
 
-                int finalIndex = baseIndex;
-
-                // If we're in a block, add offset to skip ALL intervening block locals (args + temps)
-                // This is because the interpreter will skip over ALL enclosing block args AND temps before accessing home temps
-                if (context.ScopeDepth > 0)
-                {
-                    // For nested blocks: offset = cumulative count from ALL enclosing blocks
-                    // Example: [:x | [| t | methodTemp]] needs offset of 2 (x + t)
-                    // The interpreter's GetTemporaryVariable will subtract block local count and recurse to home
-                    int offset = CalculateBlockLocalOffset(context);
-                    finalIndex += offset;
-                }
-
+                // Method temps use DIRECT indices - NO hierarchical offset!
+                // VM will traverse home chain automatically to reach the method context
                 return new ResolutionResult(
                     VariableType.MethodTemporary,
-                    finalIndex,
+                    baseIndex,
                     true,  // Temporaries are assignable
                     varName
                 );
@@ -246,17 +228,30 @@ namespace Smalltalk80.Compiler
         /// </summary>
         private ResolutionResult? TryResolveParentVariable(string varName, CompilationEnvironment context)
         {
+            Console.WriteLine($"[TryResolveParentVariable] Resolving '{varName}' from depth={context.ScopeDepth}");
+            Console.WriteLine($"  Current context: ArgCount={context.ArgumentCount}, TempCount={context.TemporariesAllocatedInFrame}");
+            Console.WriteLine($"  Current OwnArguments: [{string.Join(", ", context.OwnArguments.Select(kv => $"{kv.Key}={kv.Value}"))}]");
+            Console.WriteLine($"  Current OwnTemporaries: [{string.Join(", ", context.OwnTemporaries.Select(kv => $"{kv.Key}={kv.Value}"))}]");
+
             int accumulatedOffset = context.ArgumentCount + context.TemporariesAllocatedInFrame;
             var parentContext = context.Parent;
+            int parentLevel = 1;
 
             while (parentContext != null)
             {
+                Console.WriteLine($"  Parent[{parentLevel}]: depth={parentContext.ScopeDepth}, ArgCount={parentContext.ArgumentCount}, TempCount={parentContext.TemporariesAllocatedInFrame}");
+                Console.WriteLine($"    OwnArguments: [{string.Join(", ", parentContext.OwnArguments.Select(kv => $"{kv.Key}={kv.Value}"))}]");
+                Console.WriteLine($"    OwnTemporaries: [{string.Join(", ", parentContext.OwnTemporaries.Select(kv => $"{kv.Key}={kv.Value}"))}]");
+
                 // Check if parent is also a block (not method)
                 if (parentContext.ScopeDepth > 0)
                 {
                     // Check parent block's OWN arguments (no inheritance, no collisions!)
                     if (parentContext.OwnArguments.TryGetValue(varName, out int pArgIndex))
                     {
+                        Console.WriteLine($"    FOUND '{varName}' in parent[{parentLevel}] OwnArguments at index {pArgIndex}");
+                        Console.WriteLine($"    Accumulated offset = {accumulatedOffset}, final index = {pArgIndex + accumulatedOffset}");
+
                         // Found in parent block's own arguments
                         return new ResolutionResult(
                             VariableType.ParentVariable,
@@ -273,6 +268,10 @@ namespace Smalltalk80.Compiler
                         // Need to add argument count to get the correct position in the temp frame
                         int pTempBaseIndex = parentContext.ArgumentCount + pTempIndex;
 
+                        Console.WriteLine($"    FOUND '{varName}' in parent[{parentLevel}] OwnTemporaries at index {pTempIndex}");
+                        Console.WriteLine($"    Parent arg count = {parentContext.ArgumentCount}, temp base = {pTempBaseIndex}");
+                        Console.WriteLine($"    Accumulated offset = {accumulatedOffset}, final index = {pTempBaseIndex + accumulatedOffset}");
+
                         return new ResolutionResult(
                             VariableType.ParentVariable,
                             pTempBaseIndex + accumulatedOffset,
@@ -282,17 +281,21 @@ namespace Smalltalk80.Compiler
                     }
 
                     // Not found in this parent - accumulate its locals and continue up the chain
+                    Console.WriteLine($"    Not found in parent[{parentLevel}], accumulating offset += {parentContext.ArgumentCount + parentContext.TemporariesAllocatedInFrame}");
                     accumulatedOffset += parentContext.ArgumentCount + parentContext.TemporariesAllocatedInFrame;
                     parentContext = parentContext.Parent;
+                    parentLevel++;
                 }
                 else
                 {
                     // Parent is method - stop hierarchical traversal
                     // Method variables will be checked in main resolution (steps 5-6)
+                    Console.WriteLine($"    Parent[{parentLevel}] is method (depth=0), stopping traversal");
                     break;
                 }
             }
 
+            Console.WriteLine($"  Variable '{varName}' NOT FOUND in any parent block");
             return null;
         }
 
