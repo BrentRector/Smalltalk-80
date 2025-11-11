@@ -2575,7 +2575,10 @@ namespace Smalltalk80.Compiler
                     if (result.Type == VariableResolver.VariableType.Global)
                     {
                         // Record undeclared variables for reporting
-                        RecordUndeclaredVariable(name, currentMethodIdentifier);
+                        if (currentMethodIdentifier != null)
+                        {
+                            RecordUndeclaredVariable(name, currentMethodIdentifier);
+                        }
                     }
                     emitter.PushLiteralVariable(name);
                     break;

@@ -1,0 +1,135 @@
+{
+  "metadata": {
+    "version": "1.0.7",
+    "generator": "Smalltalk80.Compiler v1.0.0.0",
+    "generatedAt": "2025-11-11T04:42:40.0267520Z",
+    "sourceFile": "test_nested_block.st",
+    "sourceChecksum": "multi-file-bundle",
+    "symbolCount": 6,
+    "stringCount": 1,
+    "classCount": 2,
+    "methodCount": 1,
+    "objectCount": 0,
+    "initExpressionCount": 0,
+    "blockContextCount": 0,
+    "undeclaredCount": 0,
+    "blockContexts": []
+  },
+  "symbols": [
+    "aBlock",
+    "do:",
+    "index",
+    "Object",
+    "tally",
+    "TestClass"
+  ],
+  "strings": [
+    "do: aBlock\n    \u0022Test method with nested block that accesses method parameter\u0022\n    [:index | aBlock value: index]\n!"
+  ],
+  "optimizedSelectors": [],
+  "classes": [
+    {
+      "localId": "class:TestClass",
+      "nameIndex": 5,
+      "isMetaclass": false,
+      "format": 4168,
+      "instVarNames": [
+        4
+      ],
+      "classVarNames": [],
+      "poolLocalIds": [],
+      "superNameIndex": 3,
+      "category": "",
+      "totalInstanceVarCount": 1,
+      "fieldLayout": [
+        {
+          "nameIndex": 4,
+          "slotIndex": 0
+        }
+      ]
+    },
+    {
+      "localId": "meta:TestClass",
+      "nameIndex": 5,
+      "isMetaclass": true,
+      "metaclassOfLocalId": "class:TestClass",
+      "format": 4104,
+      "instVarNames": [],
+      "classVarNames": [],
+      "poolLocalIds": [],
+      "superNameIndex": 3,
+      "category": "",
+      "totalInstanceVarCount": 0,
+      "fieldLayout": []
+    }
+  ],
+  "objects": [],
+  "methods": [
+    {
+      "localId": "method:TestClass\u003E\u003Edo:",
+      "homeClassLocalId": "class:TestClass",
+      "selectorIndex": 1,
+      "category": "testing",
+      "header": {
+        "word": 4097,
+        "literalCount": 1,
+        "tempCount": 0,
+        "argCount": 1,
+        "primitiveIndex": 0,
+        "largeContext": false
+      },
+      "literals": [
+        {
+          "type": "association",
+          "association": {
+            "keyType": "symbol",
+            "keyIndex": 2,
+            "valueRef": null
+          }
+        }
+      ],
+      "bytecodes": [
+        137,
+        118,
+        200,
+        161,
+        0,
+        3,
+        16,
+        16,
+        202,
+        124,
+        128,
+        18,
+        120
+      ],
+      "source": "do: aBlock\n    \u0022Test method with nested block that accesses method parameter\u0022\n    [:index | aBlock value: index]\n!",
+      "argNames": [
+        "aBlock"
+      ],
+      "tempNames": []
+    }
+  ],
+  "initExpressions": [],
+  "installOrder": {
+    "phases": [
+      {
+        "name": "Core Classes",
+        "kind": "classes",
+        "localIds": [
+          "class:TestClass",
+          "meta:TestClass"
+        ]
+      },
+      {
+        "name": "Methods",
+        "kind": "methods",
+        "localIds": [
+          "method:TestClass\u003E\u003Edo:"
+        ]
+      }
+    ]
+  },
+  "patches": [],
+  "undeclared": []
+}

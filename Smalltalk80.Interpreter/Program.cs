@@ -106,6 +106,10 @@ public static class Program
                 // DIAGNOSTIC: Test RuntimeHeapAccess.BuildFieldMap()
                 Console.WriteLine("\n=== DIAGNOSTIC: Testing RuntimeHeapAccess.BuildFieldMap() ===");
                 TestBuildFieldMap(heapManager);
+
+                // DIAGNOSTIC: Inspect File class>>initialize method's literal frame
+                Console.WriteLine("\n=== DIAGNOSTIC: Checking File class>>initialize Literals AFTER Phase 4 ===");
+                InspectFileInitializeLiterals(heapManager, bundle);
             }
 
             // Execute init expressions - Run normal init expressions to check for regressions
@@ -1675,6 +1679,187 @@ public static class Program
         catch (Exception ex)
         {
             Console.WriteLine($"❌ BuildFieldMap() failed: {ex.Message}");
+            Console.WriteLine($"   Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    /// <summary>
+    /// DIAGNOSTIC: Inspects the File class>>initialize method's literal frame AFTER Phase 4 completion.
+    /// This checks what literals are actually stored in the CompiledMethod at runtime.
+    /// </summary>
+    private static void InspectFileInitializeLiterals(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    {
+        try
+        {
+            Console.WriteLine("\nSearching for File class>>initialize init expression...");
+
+            // Find the File initialize init expression
+            int fileInitIndex = -1;
+            for (int i = 0; i < bundle.InitExpressions.Length; i++)
+            {
+                if (bundle.InitExpressions[i].Source == "File initialize")
+                {
+                    fileInitIndex = i;
+                    break;
+                }
+            }
+
+            if (fileInitIndex == -1)
+            {
+                Console.WriteLine("  File initialize init expression not found in bundle");
+                return;
+            }
+
+            Console.WriteLine($"  Found at index {fileInitIndex}");
+
+            // Get the CompiledMethod OOP from the InitExpressionMethods array
+            var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
+            if (initArrayOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                Console.WriteLine("  InitExpressionMethods array is nil");
+                return;
+            }
+
+            var methodOOP = heapManager.GetIndexedOOP(initArrayOOP, fileInitIndex);
+            Console.WriteLine($"  Method OOP: {methodOOP}");
+
+            // Get the CompiledMethod's indexed size (header + literals + bytecode array)
+            int indexedSize = heapManager.GetIndexedSize(methodOOP);
+            Console.WriteLine($"  Indexed size: {indexedSize}");
+
+            // Literals start at indexed slot 1 (slot 0 is header)
+            // Last indexed slot is the bytecode array
+            int literalCount = indexedSize - 2; // Subtract header and bytecode array
+            Console.WriteLine($"  Literal count: {literalCount}");
+
+            Console.WriteLine("\n  Literals:");
+            for (int i = 0; i < literalCount; i++)
+            {
+                int slotIndex = i + 1; // +1 to skip header
+                var literalOOP = heapManager.GetIndexedOOP(methodOOP, slotIndex);
+
+                Console.WriteLine($"    [{i}] OOP={literalOOP}");
+
+                try
+                {
+                    // Check if it's a SmallInteger
+                    if (literalOOP.IsSmallInteger)
+                    {
+                        Console.WriteLine($"        SmallInteger: {literalOOP.AsSmallInteger()}");
+                        continue;
+                    }
+
+                    // Check special values
+                    if (literalOOP == SpecialObjectsArray.Instance.Nil)
+                    {
+                        Console.WriteLine($"        nil");
+                        continue;
+                    }
+                    if (literalOOP == SpecialObjectsArray.Instance.True)
+                    {
+                        Console.WriteLine($"        true");
+                        continue;
+                    }
+                    if (literalOOP == SpecialObjectsArray.Instance.False)
+                    {
+                        Console.WriteLine($"        false");
+                        continue;
+                    }
+
+                    // Get object format
+                    var format = heapManager.GetObjectFormat(literalOOP);
+                    Console.WriteLine($"        Format: {format}");
+
+                    // Get class OOP
+                    var classOOP = heapManager.GetSlot(literalOOP, 0);
+                    Console.WriteLine($"        Class OOP: {classOOP}");
+
+                    if (format == ObjectFormat.Pointer)
+                    {
+                        // Check if it's an Association (2 instance variables)
+                        try
+                        {
+                            var keyOOP = heapManager.GetInstanceVariable(literalOOP, 0);
+                            var valueOOP = heapManager.GetInstanceVariable(literalOOP, 1);
+
+                            Console.WriteLine($"        Pointer object with 2 fields:");
+                            Console.WriteLine($"          Field[0] (key?): {keyOOP}");
+                            Console.WriteLine($"          Field[1] (value?): {valueOOP}");
+
+                            // Try to read key as Symbol
+                            if (!keyOOP.IsSmallInteger && keyOOP != SpecialObjectsArray.Instance.Nil)
+                            {
+                                try
+                                {
+                                    var keyFormat = heapManager.GetObjectFormat(keyOOP);
+                                    if (keyFormat == ObjectFormat.ByteIndexed)
+                                    {
+                                        int keyLen = heapManager.GetIndexedSize(keyOOP);
+                                        if (keyLen > 0 && keyLen < 100)
+                                        {
+                                            var keyBytes = new byte[keyLen];
+                                            for (int b = 0; b < keyLen; b++)
+                                            {
+                                                keyBytes[b] = heapManager.GetIndexedByte(keyOOP, b);
+                                            }
+                                            string keyName = System.Text.Encoding.Latin1.GetString(keyBytes);
+                                            Console.WriteLine($"          Key is Symbol: '{keyName}'");
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+
+                            // Check if value is SmallInteger
+                            if (valueOOP.IsSmallInteger)
+                            {
+                                Console.WriteLine($"          Value is SmallInteger: {valueOOP.AsSmallInteger()}");
+                            }
+                            else if (valueOOP == SpecialObjectsArray.Instance.Nil)
+                            {
+                                Console.WriteLine($"          Value is nil");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"          Value is object: {valueOOP}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"        ERROR reading as Association: {ex.Message}");
+                        }
+                    }
+                    else if (format == ObjectFormat.ByteIndexed)
+                    {
+                        // Probably a Symbol
+                        try
+                        {
+                            int len = heapManager.GetIndexedSize(literalOOP);
+                            if (len > 0 && len < 100)
+                            {
+                                var bytes = new byte[len];
+                                for (int b = 0; b < len; b++)
+                                {
+                                    bytes[b] = heapManager.GetIndexedByte(literalOOP, b);
+                                }
+                                string name = System.Text.Encoding.Latin1.GetString(bytes);
+                                Console.WriteLine($"        ByteIndexed (Symbol?): '{name}'");
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"        ERROR inspecting literal: {ex.Message}");
+                }
+            }
+
+            Console.WriteLine("\n✓ File initialize literal inspection complete");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"\n❌ Error inspecting File initialize literals: {ex.Message}");
             Console.WriteLine($"   Stack trace: {ex.StackTrace}");
         }
     }

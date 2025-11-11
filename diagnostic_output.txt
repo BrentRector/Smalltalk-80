@@ -1,0 +1,2693 @@
+EXEC : warning : 353 undeclared variable(s) found during compilation: [D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj]
+Smalltalk-80 Interpreter
+========================
+
+Loading cold start bundle: ../bin/Debug/net9.0/coldstart.json
+Bundle loaded: 1.0.7
+  Symbols: 5251
+  Classes: 470
+  Objects: 2
+  Methods: 4623
+
+Initializing heap manager...
+Starting cold start loader (6-phase)...
+
+=== Cold Start Loader (New 6-Phase Architecture) ===
+
+Phase 1: Preflight + Symbol Interning... ✓ (97ms)
+Phase 2: Class Infrastructure... ✓ (29ms)
+Phase 3: Object Allocation... ✓ (15ms)
+Phase 4: Method Compilation... [Phase4] Creating Dictionary Association:
+  Association OOP: oop=34308
+  Key Symbol OOP: oop=2666
+  Value (nil): oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+[Phase4] Retrieved existing Dictionary Association: oop=34308, current value: oop=13494
+
+[Phase4] Processing init expression: File initialize
+  LocalId: init:107
+  Literal count: 2
+  Literal[0]: type=symbol
+    Symbol index: 2162, name: 'initialize'
+  Literal[1]: type=association
+    Association keyIndex: 1736, key: 'File'
+
+[Phase4] Resolved literals for File initialize:
+  Literal[0]: OOP=oop=4326
+    Class OOP: oop=11358
+    Format: ByteIndexed
+    Looks like Symbol: 'initialize'
+  Literal[1]: OOP=oop=39624
+    Class OOP: oop=10594
+    Format: Pointer
+    Instance var count: 2
+    Looks like Association: key OOP=oop=3474, value OOP=oop=13494
+    Association key name: 'File'
+
+[Phase4] Verifying File initialize CompiledMethod after creation:
+  Method OOP: oop=39634
+  Indexed size (header + literals + bytecode array): 4
+  Indexed slot [1]: OOP=oop=4326
+    Format: ByteIndexed
+    Symbol: 'initialize'
+  Indexed slot [2]: OOP=oop=39624
+    Format: Pointer
+    Association: key='File', value OOP=oop=13494
+  Indexed slot [3]: OOP=oop=39632
+    Format: ByteIndexed
+    Symbol: 'A�|'
+✓ (358ms)
+Phase 5: Globals + Patches... [Phase5] Installing Dictionary class:
+  Association OOP: oop=34308
+  Association.key (index 0): oop=2666
+  Association.value BEFORE (index 1): oop=10826
+  Dictionary class OOP to install: oop=10826
+  Association.value AFTER (index 1): oop=10826
+  Value set correctly: True
+✓ (67ms)
+Phase 6: Validation + GC Verification... ✓ (98ms)
+
+=== Cold Start Complete ===
+
+Cold start completed successfully!
+
+=== Init Expression Execution ===
+  Found 280 init expression(s) in bundle (DISABLED)
+  ⚠️  19 init expressions not in dependency order (appending at end)
+
+=== Dependency-Ordered Init Expression Execution ===
+  Total: 33 initialize expressions
+  Order: SmallInteger → ... → LargeNegativeInteger
+  See: InitExpression-DependencyAnalysis.md
+
+
+=== Executing ALL Initialize Expressions ===
+  Total initialize! expressions: 33
+  Will attempt to execute all of them
+
+[BYTECODE] 0x41 (65) in method 
+[BYTECODE] 0xD0 (208) in method 
+[CreateMethodContext #1] method=method:BinaryChoiceView_class>>initialize, receiver=oop=10618
+[BYTECODE] 0x42 (66) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x24 (36) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x24 (36) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0xBB (187) in method method:BinaryChoiceView_class>>initialize
+[AllocateObject] className=Point, classOOP=oop=11194, indexedSize=0
+[BYTECODE] 0x25 (37) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x26 (38) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x75 (117) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0xBB (187) in method method:BinaryChoiceView_class>>initialize
+[AllocateObject] className=Point, classOOP=oop=11194, indexedSize=0
+[BYTECODE] 0x80 (128) in method method:BinaryChoiceView_class>>initialize
+[CreateMethodContext #2] method=method:Cursor_class>>extent:fromArray:offset:, receiver=oop=10798
+[BYTECODE] 0x10 (16) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x23 (35) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x23 (35) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xBB (187) in method method:Cursor_class>>extent:fromArray:offset:
+[AllocateObject] className=Point, classOOP=oop=11194, indexedSize=0
+[BYTECODE] 0xB6 (182) in method method:Cursor_class>>extent:fromArray:offset:
+[CreateMethodContext #3] method=method:Point>>=, receiver=oop=61710
+[BYTECODE] 0x70 (112) in method method:Point>>=
+[BYTECODE] 0xD0 (208) in method method:Point>>=
+[CreateMethodContext #4] method=method:Object>>species, receiver=oop=61710
+[BYTECODE] 0x10 (16) in method method:Point>>=
+[BYTECODE] 0xD0 (208) in method method:Point>>=
+[CreateMethodContext #5] method=method:Object>>species, receiver=oop=61716
+[BYTECODE] 0xB6 (182) in method method:Point>>=
+[CreateMethodContext #6] method=method:Object>>=, receiver=oop=11194
+[BYTECODE] 0x89 (137) in method method:Point>>=
+[BYTECODE] 0x75 (117) in method method:Point>>=
+[BYTECODE] 0xC8 (200) in method method:Point>>=
+[BYTECODE] 0xA1 (161) in method method:Point>>=
+[BYTECODE] 0x89 (137) in method method:Point>>=
+[BYTECODE] 0x75 (117) in method method:Point>>=
+[BYTECODE] 0xC8 (200) in method method:Point>>=
+[BYTECODE] 0xA1 (161) in method method:Point>>=
+[BYTECODE] 0xF1 (241) in method method:Point>>=
+[CreateMethodContext #7] method=method:True>>ifTrue:ifFalse:, receiver=oop=13496
+[CreateMethodContext #8] method=method:Point>>x, receiver=oop=61716
+[CreateMethodContext #9] method=method:True>>and:, receiver=oop=13496
+[CreateMethodContext #10] method=method:Point>>y, receiver=oop=61716
+[BYTECODE] 0x7E (126) in method method:Point>>=
+[BYTECODE] 0x89 (137) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x75 (117) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xC8 (200) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xA1 (161) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x89 (137) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x75 (117) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xC8 (200) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xA1 (161) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xF0 (240) in method method:Cursor_class>>extent:fromArray:offset:
+[CreateMethodContext #11] method=method:True>>ifTrue:ifFalse:, receiver=oop=13496
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0x70 (112) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x10 (16) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x11 (17) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x12 (18) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x80 (128) in method method:Cursor_class>>extent:fromArray:offset:
+[CreateMethodContext #12] method=method:Form_class>>extent:fromArray:offset:, receiver=oop=10798
+[SendMessage AFTER CreateMethodContext] _activeContextOOP = oop=61746
+[BYTECODE] 0x70 (112) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0xD0 (208) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x10 (16) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x11 (17) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x12 (18) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x80 (128) in method method:Form_class>>extent:fromArray:offset:
+[CreateMethodContext #13] method=method:Form>>setExtent:fromArray:setOffset:, receiver=oop=61748
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xCE (206) in method method:Form>>setExtent:fromArray:setOffset:
+[CreateMethodContext #14] method=method:Point>>x, receiver=oop=61710
+[BYTECODE] 0x61 (97) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xCF (207) in method method:Form>>setExtent:fromArray:setOffset:
+[CreateMethodContext #15] method=method:Point>>y, receiver=oop=61710
+[BYTECODE] 0x62 (98) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x63 (99) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x41 (65) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x01 (1) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x23 (35) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xB0 (176) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x24 (36) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xBD (189) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x02 (2) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xB8 (184) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xCD (205) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x60 (96) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x76 (118) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x11 (17) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC2 (194) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x89 (137) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x76 (118) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC8 (200) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xA1 (161) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xF0 (240) in method method:Form>>setExtent:fromArray:setOffset:
+[CreateMethodContext #16] method=method:Number>>to:do:, receiver=SmallInteger(1)
+[CreateMethodContext #17] method=method:BlockContext>>whileTrue:, receiver=oop=61762
+[CreateMethodContext #18] method=method:True>>ifTrue:, receiver=oop=13496
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(1)
+    [3] TOS: SmallInteger(16)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(16)
+  Popped arg[0]: SmallInteger(1)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=1, arg[1]=16
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #19] method=method:BlockContext>>whileTrue:, receiver=oop=61762
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[CreateMethodContext #20] method=method:True>>ifTrue:, receiver=oop=13496
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(2)
+    [3] TOS: SmallInteger(104)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(104)
+  Popped arg[0]: SmallInteger(2)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=2, arg[1]=104
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(3)
+    [3] TOS: SmallInteger(72)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(72)
+  Popped arg[0]: SmallInteger(3)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=3, arg[1]=72
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(4)
+    [3] TOS: SmallInteger(120)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(120)
+  Popped arg[0]: SmallInteger(4)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=4, arg[1]=120
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(5)
+    [3] TOS: SmallInteger(136)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(136)
+  Popped arg[0]: SmallInteger(5)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=5, arg[1]=136
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(6)
+    [3] TOS: SmallInteger(136)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(136)
+  Popped arg[0]: SmallInteger(6)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=6, arg[1]=136
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(7)
+    [3] TOS: SmallInteger(3980)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(3980)
+  Popped arg[0]: SmallInteger(7)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=7, arg[1]=3980
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(8)
+    [3] TOS: SmallInteger(4227)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(4227)
+  Popped arg[0]: SmallInteger(8)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=8, arg[1]=4227
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(9)
+    [3] TOS: SmallInteger(8192)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(8192)
+  Popped arg[0]: SmallInteger(9)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=9, arg[1]=8192
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(10)
+    [3] TOS: SmallInteger(16128)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(16128)
+  Popped arg[0]: SmallInteger(10)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=10, arg[1]=16128
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(11)
+    [3] TOS: SmallInteger(8192)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(8192)
+  Popped arg[0]: SmallInteger(11)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=11, arg[1]=8192
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(12)
+    [3] TOS: SmallInteger(16128)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(16128)
+  Popped arg[0]: SmallInteger(12)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=12, arg[1]=16128
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(13)
+    [3] TOS: SmallInteger(8192)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(8192)
+  Popped arg[0]: SmallInteger(13)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=13, arg[1]=8192
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(14)
+    [3] TOS: SmallInteger(7943)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(7943)
+  Popped arg[0]: SmallInteger(14)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=14, arg[1]=7943
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(15)
+    [3] TOS: SmallInteger(2056)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(2056)
+  Popped arg[0]: SmallInteger(15)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=15, arg[1]=2056
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61756)
+    [2] TOS-1: SmallInteger(16)
+    [3] TOS: SmallInteger(4080)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(4080)
+  Popped arg[0]: SmallInteger(16)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=16, arg[1]=4080
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x78 (120) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x78 (120) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x7C (124) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x7E (126) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x80 (128) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x42 (66) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x24 (36) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x24 (36) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0xBB (187) in method method:BinaryChoiceView_class>>initialize
+[AllocateObject] className=Point, classOOP=oop=11194, indexedSize=0
+[BYTECODE] 0x27 (39) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x75 (117) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x75 (117) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0xBB (187) in method method:BinaryChoiceView_class>>initialize
+[AllocateObject] className=Point, classOOP=oop=11194, indexedSize=0
+[BYTECODE] 0x80 (128) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x10 (16) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x23 (35) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x23 (35) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xBB (187) in method method:Cursor_class>>extent:fromArray:offset:
+[AllocateObject] className=Point, classOOP=oop=11194, indexedSize=0
+[BYTECODE] 0xB6 (182) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x70 (112) in method method:Point>>=
+[BYTECODE] 0xD0 (208) in method method:Point>>=
+[BYTECODE] 0x70 (112) in method method:Object>>species
+[BYTECODE] 0xC7 (199) in method method:Object>>species
+[BYTECODE] 0x7C (124) in method method:Object>>species
+[BYTECODE] 0x10 (16) in method method:Point>>=
+[BYTECODE] 0xD0 (208) in method method:Point>>=
+[BYTECODE] 0x70 (112) in method method:Object>>species
+[BYTECODE] 0xC7 (199) in method method:Object>>species
+[BYTECODE] 0x7C (124) in method method:Object>>species
+[BYTECODE] 0xB6 (182) in method method:Point>>=
+[BYTECODE] 0x70 (112) in method method:Object>>=
+[BYTECODE] 0x10 (16) in method method:Object>>=
+[BYTECODE] 0xC6 (198) in method method:Object>>=
+[BYTECODE] 0x7C (124) in method method:Object>>=
+[BYTECODE] 0x89 (137) in method method:Point>>=
+[BYTECODE] 0x75 (117) in method method:Point>>=
+[BYTECODE] 0xC8 (200) in method method:Point>>=
+[BYTECODE] 0xA1 (161) in method method:Point>>=
+[BYTECODE] 0x89 (137) in method method:Point>>=
+[BYTECODE] 0x75 (117) in method method:Point>>=
+[BYTECODE] 0xC8 (200) in method method:Point>>=
+[BYTECODE] 0xA1 (161) in method method:Point>>=
+[BYTECODE] 0xF1 (241) in method method:Point>>=
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0x00 (0) in method method:Point>>=
+[BYTECODE] 0x10 (16) in method method:Point>>=
+[BYTECODE] 0xCE (206) in method method:Point>>=
+[BYTECODE] 0x00 (0) in method method:Point>>x
+[BYTECODE] 0x7C (124) in method method:Point>>x
+[BYTECODE] 0xB6 (182) in method method:Point>>=
+[BYTECODE] 0x89 (137) in method method:Point>>=
+[BYTECODE] 0x75 (117) in method method:Point>>=
+[BYTECODE] 0xC8 (200) in method method:Point>>=
+[BYTECODE] 0xA1 (161) in method method:Point>>=
+[BYTECODE] 0xE2 (226) in method method:Point>>=
+[BYTECODE] 0x10 (16) in method method:True>>and:
+[BYTECODE] 0xC9 (201) in method method:True>>and:
+[BYTECODE] 0x01 (1) in method method:Point>>=
+[BYTECODE] 0x10 (16) in method method:Point>>=
+[BYTECODE] 0xCF (207) in method method:Point>>=
+[BYTECODE] 0x01 (1) in method method:Point>>y
+[BYTECODE] 0x7C (124) in method method:Point>>y
+[BYTECODE] 0xB6 (182) in method method:Point>>=
+[BYTECODE] 0x7C (124) in method method:Point>>=
+[BYTECODE] 0x7C (124) in method method:True>>and:
+[BYTECODE] 0x7E (126) in method method:Point>>=
+[BYTECODE] 0x89 (137) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x75 (117) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xC8 (200) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xA1 (161) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x89 (137) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x75 (117) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xC8 (200) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xA1 (161) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0xF0 (240) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0x70 (112) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x10 (16) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x11 (17) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x12 (18) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x80 (128) in method method:Cursor_class>>extent:fromArray:offset:
+[SendMessage AFTER CreateMethodContext] _activeContextOOP = oop=61904
+[BYTECODE] 0x70 (112) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0xD0 (208) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x10 (16) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x11 (17) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x12 (18) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x80 (128) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xCE (206) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x00 (0) in method method:Point>>x
+[BYTECODE] 0x7C (124) in method method:Point>>x
+[BYTECODE] 0x61 (97) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xCF (207) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x01 (1) in method method:Point>>y
+[BYTECODE] 0x7C (124) in method method:Point>>y
+[BYTECODE] 0x62 (98) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x63 (99) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x41 (65) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x01 (1) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x23 (35) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xB0 (176) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x24 (36) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xBD (189) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x02 (2) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xB8 (184) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xCD (205) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x60 (96) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x76 (118) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x11 (17) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC2 (194) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x89 (137) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x76 (118) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC8 (200) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xA1 (161) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xF0 (240) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x70 (112) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:Number>>to:do:
+[BYTECODE] 0x75 (117) in method method:Number>>to:do:
+[BYTECODE] 0xC8 (200) in method method:Number>>to:do:
+[BYTECODE] 0xA1 (161) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:Number>>to:do:
+[BYTECODE] 0x75 (117) in method method:Number>>to:do:
+[BYTECODE] 0xC8 (200) in method method:Number>>to:do:
+[BYTECODE] 0xA1 (161) in method method:Number>>to:do:
+[BYTECODE] 0xE0 (224) in method method:Number>>to:do:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(1)
+    [3] TOS: SmallInteger(4080)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(4080)
+  Popped arg[0]: SmallInteger(1)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=1, arg[1]=4080
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(2)
+    [3] TOS: SmallInteger(2056)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(2056)
+  Popped arg[0]: SmallInteger(2)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=2, arg[1]=2056
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(3)
+    [3] TOS: SmallInteger(7943)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(7943)
+  Popped arg[0]: SmallInteger(3)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=3, arg[1]=7943
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(4)
+    [3] TOS: SmallInteger(8192)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(8192)
+  Popped arg[0]: SmallInteger(4)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=4, arg[1]=8192
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(5)
+    [3] TOS: SmallInteger(16128)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(16128)
+  Popped arg[0]: SmallInteger(5)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=5, arg[1]=16128
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(6)
+    [3] TOS: SmallInteger(8192)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(8192)
+  Popped arg[0]: SmallInteger(6)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=6, arg[1]=8192
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(7)
+    [3] TOS: SmallInteger(16128)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(16128)
+  Popped arg[0]: SmallInteger(7)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=7, arg[1]=16128
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(8)
+    [3] TOS: SmallInteger(8192)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(8192)
+  Popped arg[0]: SmallInteger(8)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=8, arg[1]=8192
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(9)
+    [3] TOS: SmallInteger(4227)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(4227)
+  Popped arg[0]: SmallInteger(9)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=9, arg[1]=4227
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(10)
+    [3] TOS: SmallInteger(3980)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(3980)
+  Popped arg[0]: SmallInteger(10)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=10, arg[1]=3980
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(11)
+    [3] TOS: SmallInteger(136)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(136)
+  Popped arg[0]: SmallInteger(11)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=11, arg[1]=136
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(12)
+    [3] TOS: SmallInteger(136)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(136)
+  Popped arg[0]: SmallInteger(12)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=12, arg[1]=136
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(13)
+    [3] TOS: SmallInteger(120)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(120)
+  Popped arg[0]: SmallInteger(13)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=13, arg[1]=120
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(14)
+    [3] TOS: SmallInteger(72)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(72)
+  Popped arg[0]: SmallInteger(14)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=14, arg[1]=72
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(15)
+    [3] TOS: SmallInteger(104)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(104)
+  Popped arg[0]: SmallInteger(15)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=15, arg[1]=104
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x11 (17) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0xCA (202) in method method:Number>>to:do:
+[BYTECODE] 0x00 (0) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x12 (18) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x10 (16) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC0 (192) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0xC1 (193) in method method:Form>>setExtent:fromArray:setOffset:
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 4, Initial SP: 1
+  Stack depth: 3 items
+  Context type: BlockContext
+  Top 3 stack items (TOS at bottom):
+    [1] TOS-2: WordArray(OOP=61914)
+    [2] TOS-1: SmallInteger(16)
+    [3] TOS: SmallInteger(16)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(16)
+  Popped arg[0]: SmallInteger(16)
+  Popped receiver: WordArray
+
+[at:put: AFTER POP] receiver=WordArray, arg[0]=16, arg[1]=16
+[BYTECODE] 0x7C (124) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x76 (118) in method method:Number>>to:do:
+[BYTECODE] 0xB0 (176) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x10 (16) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE1 (225) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x12 (18) in method method:Number>>to:do:
+[BYTECODE] 0x10 (16) in method method:Number>>to:do:
+[BYTECODE] 0xB4 (180) in method method:Number>>to:do:
+[BYTECODE] 0x7C (124) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x80 (128) in method method:Number>>to:do:
+[BYTECODE] 0x78 (120) in method method:Number>>to:do:
+[BYTECODE] 0x80 (128) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x78 (120) in method method:Form>>setExtent:fromArray:setOffset:
+[BYTECODE] 0x7C (124) in method method:Form_class>>extent:fromArray:offset:
+[BYTECODE] 0x7E (126) in method method:Cursor_class>>extent:fromArray:offset:
+[BYTECODE] 0x80 (128) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x78 (120) in method method:BinaryChoiceView_class>>initialize
+[BYTECODE] 0x41 (65) in method 
+[BYTECODE] 0xD0 (208) in method 
+[BYTECODE] 0x25 (37) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x80 (128) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x26 (38) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x80 (128) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x70 (112) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x75 (117) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x75 (117) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0xF0 (240) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0xC2 (194) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x80 (128) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x70 (112) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x75 (117) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x76 (118) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0xF0 (240) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0xC2 (194) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x43 (67) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0xB1 (177) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x80 (128) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x78 (120) in method method:CompiledMethod_class>>initialize
+[BYTECODE] 0x41 (65) in method 
+[BYTECODE] 0xD0 (208) in method 
+[BYTECODE] 0x41 (65) in method method:File_class>>initialize
+[BYTECODE] 0xCC (204) in method method:File_class>>initialize
+
+[SEND new] receiver=oop=10826, receiver class=Dictionary class (OOP oop=10828)
+[BYTECODE] 0x70 (112) in method method:Set_class>>new
+[BYTECODE] 0x77 (119) in method method:Set_class>>new
+[BYTECODE] 0xCD (205) in method method:Set_class>>new
+[BYTECODE] 0x70 (112) in method method:Set_class>>new:
+[BYTECODE] 0x10 (16) in method method:Set_class>>new:
+[BYTECODE] 0x76 (118) in method method:Set_class>>new:
+[BYTECODE] 0xE0 (224) in method method:Set_class>>new:
+[BYTECODE] 0x80 (128) in method method:Set_class>>new:
+[BYTECODE] 0xD1 (209) in method method:Set_class>>new:
+[BYTECODE] 0x75 (117) in method method:Set>>setTally
+[BYTECODE] 0x60 (96) in method method:Set>>setTally
+[BYTECODE] 0x78 (120) in method method:Set>>setTally
+[BYTECODE] 0x7C (124) in method method:Set_class>>new:
+[BYTECODE] 0x7C (124) in method method:Set_class>>new
+[BYTECODE] 0x80 (128) in method method:File_class>>initialize
+[BYTECODE] 0x40 (64) in method method:File_class>>initialize
+[BYTECODE] 0x22 (34) in method method:File_class>>initialize
+[BYTECODE] 0x76 (118) in method method:File_class>>initialize
+[BYTECODE] 0xC1 (193) in method method:File_class>>initialize
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 3, Initial SP: 0
+  Stack depth: 3 items
+  Context type: MethodContext
+  Top 3 stack items (TOS at bottom):
+    [0] TOS-2: Dictionary(OOP=62058)
+    [1] TOS-1: Symbol(OOP=7440)
+    [2] TOS: SmallInteger(1)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(1)
+  Popped arg[0]: Symbol(OOP=7440)
+  Popped receiver: Dictionary
+
+[at:put: AFTER POP] receiver=Dictionary, arg[0]=OOP(7440), arg[1]=1
+[BYTECODE] 0x70 (112) in method method:Dictionary>>at:put:
+[BYTECODE] 0x10 (16) in method method:Dictionary>>at:put:
+[BYTECODE] 0xE0 (224) in method method:Dictionary>>at:put:
+[BYTECODE] 0x70 (112) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xD0 (208) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x6A (106) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x76 (118) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x6C (108) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x10 (16) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xD1 (209) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x12 (18) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xBA (186) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x76 (118) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xB0 (176) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x69 (105) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x89 (137) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x75 (117) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x89 (137) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x75 (117) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xE5 (229) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0x70 (112) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x11 (17) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xE2 (226) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x80 (128) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x6B (107) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x73 (115) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xC6 (198) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x89 (137) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x75 (117) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xE3 (227) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x7C (124) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0x73 (115) in method method:True>>ifFalse:
+[BYTECODE] 0x7C (124) in method method:True>>ifFalse:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0x80 (128) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x11 (17) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x7C (124) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x6A (106) in method method:Dictionary>>at:put:
+[BYTECODE] 0x70 (112) in method method:Dictionary>>at:put:
+[BYTECODE] 0x12 (18) in method method:Dictionary>>at:put:
+[BYTECODE] 0xE1 (225) in method method:Dictionary>>at:put:
+[BYTECODE] 0x6B (107) in method method:Dictionary>>at:put:
+[BYTECODE] 0x13 (19) in method method:Dictionary>>at:put:
+[BYTECODE] 0x73 (115) in method method:Dictionary>>at:put:
+[BYTECODE] 0xC6 (198) in method method:Dictionary>>at:put:
+[BYTECODE] 0x89 (137) in method method:Dictionary>>at:put:
+[BYTECODE] 0x75 (117) in method method:Dictionary>>at:put:
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>at:put:
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>at:put:
+[BYTECODE] 0x89 (137) in method method:Dictionary>>at:put:
+[BYTECODE] 0x75 (117) in method method:Dictionary>>at:put:
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>at:put:
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>at:put:
+[BYTECODE] 0xF2 (242) in method method:Dictionary>>at:put:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0x70 (112) in method method:Dictionary>>at:put:
+[BYTECODE] 0x12 (18) in method method:Dictionary>>at:put:
+[BYTECODE] 0x45 (69) in method method:Dictionary>>at:put:
+[BYTECODE] 0x10 (16) in method method:Dictionary>>at:put:
+[BYTECODE] 0x11 (17) in method method:Dictionary>>at:put:
+[BYTECODE] 0xF4 (244) in method method:Dictionary>>at:put:
+[BYTECODE] 0x70 (112) in method method:Association_class>>key:value:
+[BYTECODE] 0x10 (16) in method method:Association_class>>key:value:
+[BYTECODE] 0x80 (128) in method method:Association_class>>key:value:
+[SendMessage AFTER CreateMethodContext] _activeContextOOP = oop=62088
+[BYTECODE] 0x70 (112) in method method:LookupKey_class>>key:
+[BYTECODE] 0xCC (204) in method method:LookupKey_class>>key:
+
+[SEND new] receiver=oop=10594, receiver class=Association class (OOP oop=10596)
+[BYTECODE] 0x10 (16) in method method:LookupKey_class>>key:
+[BYTECODE] 0xE0 (224) in method method:LookupKey_class>>key:
+[BYTECODE] 0x7C (124) in method method:LookupKey_class>>key:
+[BYTECODE] 0x11 (17) in method method:Association_class>>key:value:
+[BYTECODE] 0xCA (202) in method method:Association_class>>key:value:
+[BYTECODE] 0x10 (16) in method method:Association>>value:
+[BYTECODE] 0x61 (97) in method method:Association>>value:
+[BYTECODE] 0x78 (120) in method method:Association>>value:
+[BYTECODE] 0x7C (124) in method method:Association_class>>key:value:
+[BYTECODE] 0xF3 (243) in method method:Dictionary>>at:put:
+[BYTECODE] 0x70 (112) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x10 (16) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x11 (17) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0xF0 (240) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x80 (128) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x00 (0) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x76 (118) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0xB0 (176) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x60 (96) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x70 (112) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0xD1 (209) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x70 (112) in method method:Set>>fullCheck
+[BYTECODE] 0xD0 (208) in method method:Set>>fullCheck
+[BYTECODE] 0x70 (112) in method method:Set>>fullCheck
+[BYTECODE] 0xC2 (194) in method method:Set>>fullCheck
+[BYTECODE] 0xB1 (177) in method method:Set>>fullCheck
+[BYTECODE] 0x70 (112) in method method:Set>>fullCheck
+[BYTECODE] 0xD0 (208) in method method:Set>>fullCheck
+[BYTECODE] 0x23 (35) in method method:Set>>fullCheck
+[BYTECODE] 0xBD (189) in method method:Set>>fullCheck
+[BYTECODE] 0xB4 (180) in method method:Set>>fullCheck
+[BYTECODE] 0x89 (137) in method method:Set>>fullCheck
+[BYTECODE] 0x75 (117) in method method:Set>>fullCheck
+[BYTECODE] 0xC8 (200) in method method:Set>>fullCheck
+[BYTECODE] 0xA1 (161) in method method:Set>>fullCheck
+[BYTECODE] 0xE1 (225) in method method:Set>>fullCheck
+[BYTECODE] 0x80 (128) in method method:Set>>fullCheck
+[BYTECODE] 0x78 (120) in method method:Set>>fullCheck
+[BYTECODE] 0x80 (128) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x78 (120) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x7C (124) in method method:Dictionary>>at:put:
+[BYTECODE] 0x7C (124) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0x80 (128) in method method:Dictionary>>at:put:
+[BYTECODE] 0x11 (17) in method method:Dictionary>>at:put:
+[BYTECODE] 0x7C (124) in method method:Dictionary>>at:put:
+[BYTECODE] 0x80 (128) in method method:File_class>>initialize
+[BYTECODE] 0x40 (64) in method method:File_class>>initialize
+[BYTECODE] 0x23 (35) in method method:File_class>>initialize
+[BYTECODE] 0x77 (119) in method method:File_class>>initialize
+[BYTECODE] 0xC1 (193) in method method:File_class>>initialize
+
+[at:put: BEFORE POP] Examining stack state:
+  Stack pointer: 3, Initial SP: 0
+  Stack depth: 3 items
+  Context type: MethodContext
+  Top 3 stack items (TOS at bottom):
+    [0] TOS-2: Dictionary(OOP=62058)
+    [1] TOS-1: Symbol(OOP=10342)
+    [2] TOS: SmallInteger(2)
+  Expected for 'receiver at:put: value':
+    TOS-2 should be: receiver (Array)
+    TOS-1 should be: index (SmallInteger)
+    TOS   should be: value (BlockClosure)
+
+[at:put: POPPING] About to pop 2 args + 1 receiver:
+  Popped arg[1]: SmallInteger(2)
+  Popped arg[0]: Symbol(OOP=10342)
+  Popped receiver: Dictionary
+
+[at:put: AFTER POP] receiver=Dictionary, arg[0]=OOP(10342), arg[1]=2
+[BYTECODE] 0x70 (112) in method method:Dictionary>>at:put:
+[BYTECODE] 0x10 (16) in method method:Dictionary>>at:put:
+[BYTECODE] 0xE0 (224) in method method:Dictionary>>at:put:
+[BYTECODE] 0x70 (112) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xD0 (208) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x6A (106) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x76 (118) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x6C (108) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x10 (16) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xD1 (209) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x12 (18) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xBA (186) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x76 (118) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xB0 (176) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x69 (105) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x89 (137) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x75 (117) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x89 (137) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x75 (117) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xE5 (229) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x70 (112) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0xC9 (201) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0x70 (112) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x11 (17) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xE2 (226) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x80 (128) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x6B (107) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x73 (115) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xC6 (198) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x89 (137) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x75 (117) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0xE3 (227) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x70 (112) in method method:True>>or:
+[BYTECODE] 0x7C (124) in method method:True>>or:
+[BYTECODE] 0x7C (124) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0x73 (115) in method method:True>>ifFalse:
+[BYTECODE] 0x7C (124) in method method:True>>ifFalse:
+[BYTECODE] 0x7C (124) in method method:BlockContext>>whileFalse:
+[BYTECODE] 0x80 (128) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x11 (17) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x7C (124) in method method:Dictionary>>findKeyOrNil:
+[BYTECODE] 0x6A (106) in method method:Dictionary>>at:put:
+[BYTECODE] 0x70 (112) in method method:Dictionary>>at:put:
+[BYTECODE] 0x12 (18) in method method:Dictionary>>at:put:
+[BYTECODE] 0xE1 (225) in method method:Dictionary>>at:put:
+[BYTECODE] 0x6B (107) in method method:Dictionary>>at:put:
+[BYTECODE] 0x13 (19) in method method:Dictionary>>at:put:
+[BYTECODE] 0x73 (115) in method method:Dictionary>>at:put:
+[BYTECODE] 0xC6 (198) in method method:Dictionary>>at:put:
+[BYTECODE] 0x89 (137) in method method:Dictionary>>at:put:
+[BYTECODE] 0x75 (117) in method method:Dictionary>>at:put:
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>at:put:
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>at:put:
+[BYTECODE] 0x89 (137) in method method:Dictionary>>at:put:
+[BYTECODE] 0x75 (117) in method method:Dictionary>>at:put:
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>at:put:
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>at:put:
+[BYTECODE] 0xF2 (242) in method method:Dictionary>>at:put:
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:ifFalse:
+[BYTECODE] 0x70 (112) in method method:Dictionary>>at:put:
+[BYTECODE] 0x12 (18) in method method:Dictionary>>at:put:
+[BYTECODE] 0x45 (69) in method method:Dictionary>>at:put:
+[BYTECODE] 0x10 (16) in method method:Dictionary>>at:put:
+[BYTECODE] 0x11 (17) in method method:Dictionary>>at:put:
+[BYTECODE] 0xF4 (244) in method method:Dictionary>>at:put:
+[BYTECODE] 0x70 (112) in method method:Association_class>>key:value:
+[BYTECODE] 0x10 (16) in method method:Association_class>>key:value:
+[BYTECODE] 0x80 (128) in method method:Association_class>>key:value:
+[SendMessage AFTER CreateMethodContext] _activeContextOOP = oop=62132
+[BYTECODE] 0x70 (112) in method method:LookupKey_class>>key:
+[BYTECODE] 0xCC (204) in method method:LookupKey_class>>key:
+
+[SEND new] receiver=oop=10594, receiver class=Association class (OOP oop=10596)
+[BYTECODE] 0x10 (16) in method method:LookupKey_class>>key:
+[BYTECODE] 0xE0 (224) in method method:LookupKey_class>>key:
+[BYTECODE] 0x10 (16) in method method:LookupKey>>key:
+[BYTECODE] 0x60 (96) in method method:LookupKey>>key:
+[BYTECODE] 0x78 (120) in method method:LookupKey>>key:
+[BYTECODE] 0x7C (124) in method method:LookupKey_class>>key:
+[BYTECODE] 0x11 (17) in method method:Association_class>>key:value:
+[BYTECODE] 0xCA (202) in method method:Association_class>>key:value:
+[BYTECODE] 0x10 (16) in method method:Association>>value:
+[BYTECODE] 0x61 (97) in method method:Association>>value:
+[BYTECODE] 0x78 (120) in method method:Association>>value:
+[BYTECODE] 0x7C (124) in method method:Association_class>>key:value:
+[BYTECODE] 0xF3 (243) in method method:Dictionary>>at:put:
+[BYTECODE] 0x70 (112) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x10 (16) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x11 (17) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0xF0 (240) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x80 (128) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x00 (0) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x76 (118) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0xB0 (176) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x60 (96) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x70 (112) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0xD1 (209) in method method:Set>>atNewIndex:put:
+[BYTECODE] 0x70 (112) in method method:Set>>fullCheck
+[BYTECODE] 0xD0 (208) in method method:Set>>fullCheck
+[BYTECODE] 0x70 (112) in method method:Set>>fullCheck
+[BYTECODE] 0xC2 (194) in method method:Set>>fullCheck
+[BYTECODE] 0x00 (0) in method method:Set>>size
+[BYTECODE] 0x7C (124) in method method:Set>>size
+[BYTECODE] 0xB1 (177) in method method:Set>>fullCheck
+[BYTECODE] 0x70 (112) in method method:Set>>fullCheck
+[BYTECODE] 0xD0 (208) in method method:Set>>fullCheck
+[BYTECODE] 0x23 (35) in method method:Set>>fullCheck
+[BYTECODE] 0xBD (189) in method method:Set>>fullCheck
+[BYTECODE] 0xB4 (180) in method method:Set>>fullCheck
+[BYTECODE] 0x89 (137) in method method:Set>>fullCheck
+[BYTECODE] 0x75 (117) in method method:Set>>fullCheck
+[BYTECODE] 0xC8 (200) in method method:Set>>fullCheck
+[BYTECODE] 0xA1 (161) in method method:Set>>fullCheck
+[BYTECODE] 0xE1 (225) in method method:Set>>fullCheck
+[BYTECODE] 0x10 (16) in method method:True>>ifTrue:
+[BYTECODE] 0xC9 (201) in method method:True>>ifTrue:
+[BYTECODE] 0x70 (112) in method method:Set>>fullCheck
+[BYTECODE] 0xD2 (210) in method method:Set>>fullCheck
+[BYTECODE] 0x70 (112) in method method:Dictionary>>grow
+[BYTECODE] 0xD0 (208) in method method:Dictionary>>grow
+[BYTECODE] 0x70 (112) in method method:Dictionary>>grow
+[BYTECODE] 0xD1 (209) in method method:Dictionary>>grow
+[BYTECODE] 0x70 (112) in method method:Dictionary>>grow
+[BYTECODE] 0xD2 (210) in method method:Dictionary>>grow
+[BYTECODE] 0x70 (112) in method method:Collection>>growSize
+[BYTECODE] 0xD1 (209) in method method:Collection>>growSize
+[BYTECODE] 0x70 (112) in method method:Collection>>growSize
+[BYTECODE] 0xD0 (208) in method method:Collection>>growSize
+[BYTECODE] 0xB1 (177) in method method:Collection>>growSize
+[BYTECODE] 0xE5 (229) in method method:Collection>>growSize
+[BYTECODE] 0x7C (124) in method method:Collection>>growSize
+[BYTECODE] 0xB0 (176) in method method:Dictionary>>grow
+[BYTECODE] 0xCD (205) in method method:Dictionary>>grow
+[BYTECODE] 0x70 (112) in method method:Set_class>>new:
+[BYTECODE] 0x10 (16) in method method:Set_class>>new:
+[BYTECODE] 0x76 (118) in method method:Set_class>>new:
+[BYTECODE] 0xE0 (224) in method method:Set_class>>new:
+[BYTECODE] 0x70 (112) in method method:Magnitude>>max:
+[BYTECODE] 0x10 (16) in method method:Magnitude>>max:
+[BYTECODE] 0xB3 (179) in method method:Magnitude>>max:
+[BYTECODE] 0x89 (137) in method method:Magnitude>>max:
+[BYTECODE] 0x75 (117) in method method:Magnitude>>max:
+[BYTECODE] 0xC8 (200) in method method:Magnitude>>max:
+[BYTECODE] 0xA1 (161) in method method:Magnitude>>max:
+[BYTECODE] 0x89 (137) in method method:Magnitude>>max:
+[BYTECODE] 0x75 (117) in method method:Magnitude>>max:
+[BYTECODE] 0xC8 (200) in method method:Magnitude>>max:
+[BYTECODE] 0xA1 (161) in method method:Magnitude>>max:
+[BYTECODE] 0xF0 (240) in method method:Magnitude>>max:
+[BYTECODE] 0x80 (128) in method method:Set_class>>new:
+[BYTECODE] 0xD1 (209) in method method:Set_class>>new:
+[BYTECODE] 0x75 (117) in method method:Set>>setTally
+[BYTECODE] 0x60 (96) in method method:Set>>setTally
+[BYTECODE] 0x78 (120) in method method:Set>>setTally
+[BYTECODE] 0x7C (124) in method method:Set_class>>new:
+[BYTECODE] 0x68 (104) in method method:Dictionary>>grow
+[BYTECODE] 0x70 (112) in method method:Dictionary>>grow
+[BYTECODE] 0x89 (137) in method method:Dictionary>>grow
+[BYTECODE] 0x76 (118) in method method:Dictionary>>grow
+[BYTECODE] 0xC8 (200) in method method:Dictionary>>grow
+[BYTECODE] 0xA1 (161) in method method:Dictionary>>grow
+[BYTECODE] 0xE3 (227) in method method:Dictionary>>grow
+[BYTECODE] 0x70 (112) in method method:Dictionary>>associationsDo:
+[BYTECODE] 0x10 (16) in method method:Dictionary>>associationsDo:
+[BYTECODE] 0x80 (128) in method method:Dictionary>>associationsDo:
+[SendMessage AFTER CreateMethodContext] _activeContextOOP = oop=62198
+[BYTECODE] 0x00 (0) in method method:Set>>do:
+[BYTECODE] 0x75 (117) in method method:Set>>do:
+[BYTECODE] 0xB6 (182) in method method:Set>>do:
+[BYTECODE] 0x89 (137) in method method:Set>>do:
+[BYTECODE] 0x75 (117) in method method:Set>>do:
+[BYTECODE] 0xC8 (200) in method method:Set>>do:
+[BYTECODE] 0xA1 (161) in method method:Set>>do:
+[BYTECODE] 0xE0 (224) in method method:Set>>do:
+[BYTECODE] 0x73 (115) in method method:False>>ifTrue:
+[BYTECODE] 0x7C (124) in method method:False>>ifTrue:
+[BYTECODE] 0x80 (128) in method method:Set>>do:
+[BYTECODE] 0x76 (118) in method method:Set>>do:
+[BYTECODE] 0x70 (112) in method method:Set>>do:
+[BYTECODE] 0xD2 (210) in method method:Set>>do:
+[BYTECODE] 0x89 (137) in method method:Set>>do:
+[BYTECODE] 0x76 (118) in method method:Set>>do:
+[BYTECODE] 0xC8 (200) in method method:Set>>do:
+[BYTECODE] 0xA1 (161) in method method:Set>>do:
+[BYTECODE] 0xF1 (241) in method method:Set>>do:
+[BYTECODE] 0x70 (112) in method method:Number>>to:do:
+[BYTECODE] 0x6A (106) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:Number>>to:do:
+[BYTECODE] 0x75 (117) in method method:Number>>to:do:
+[BYTECODE] 0xC8 (200) in method method:Number>>to:do:
+[BYTECODE] 0xA1 (161) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:Number>>to:do:
+[BYTECODE] 0x75 (117) in method method:Number>>to:do:
+[BYTECODE] 0xC8 (200) in method method:Number>>to:do:
+[BYTECODE] 0xA1 (161) in method method:Number>>to:do:
+[BYTECODE] 0xE0 (224) in method method:Number>>to:do:
+[BYTECODE] 0x89 (137) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0x75 (117) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xC8 (200) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xA1 (161) in method method:BlockContext>>whileTrue:
+[BYTECODE] 0xE0 (224) in method method:BlockContext>>whileTrue:
+
+❌ METHOD NOT FOUND ERROR
+   Selector: value:
+   Receiver: OOP(3)
+   Receiver class: SmallInteger OOP(11302)
+   Arguments: 1
+
+Smalltalk Context Chain:
+  SENDER CHAIN (showing up to 10 contexts):
+    [0] BlockContext>><error: SmallIntegers don't have object format> (context=OOP(62218), method=OOP(1))
+    [1] MethodContext>><block> (context=OOP(62220), method=method:False>>ifFalse: OOP(22764))
+    [2] BlockContext>><error: SmallIntegers don't have object format> (context=OOP(62204), method=OOP(3))
+    [3] BlockContext>><error: SmallIntegers don't have object format> (context=OOP(62210), method=OOP(1))
+    [4] BlockContext>><error: SmallIntegers don't have object format> (context=OOP(62214), method=OOP(1))
+    [5] MethodContext>><block> (context=OOP(62216), method=method:True>>ifTrue: OOP(33508))
+    [6] MethodContext>>ifTrue: (context=OOP(62212), method=method:BlockContext>>whileTrue: OOP(17912))
+    [7] MethodContext>>whileTrue: (context=OOP(62206), method=method:Number>>to:do: OOP(27332))
+    [8] MethodContext>>ifTrue: (context=OOP(62198), method=method:Set>>do: OOP(30856))
+    [9] MethodContext>>do: (context=OOP(62196), method=method:Dictionary>>associationsDo: OOP(21944))
+    ... (truncated, chain continues)
+
+==========================================
+❌ FIRST FAILURE: [107] File initialize
+==========================================
+Status: FatalError
+
+Error: InvalidOperationException: Method not found: value: in class SmallInteger OOP(11302)
+
+Stack trace:
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2396
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteSendSpecial(Byte bytecode) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 2129
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecode(Byte bytecode, SmalltalkOOP methodOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 1383
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteBytecodeStep() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 624
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.InterpreterLoop() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 508
+   at Smalltalk80.Interpreter.Core.VM.VirtualMachine.ExecuteExistingContext(SmalltalkOOP contextOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs:line 303
+   at Smalltalk80.Interpreter.Core.VM.Primitives.ProcessPrimitives.Resume(SmalltalkOOP processOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Core\VM\Primitives\ProcessPrimitives.cs:line 97
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 350
+   at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 135
+
+✓ Successfully executed 2 expression(s) before this failure
+
+Successful expressions:
+  [30] BinaryChoiceView initialize
+  [72] CompiledMethod initialize
+
+⚠️  Execution stopped at first failure to enable debugging
+⚠️  Enable VM debug output and re-run to diagnose this specific failure

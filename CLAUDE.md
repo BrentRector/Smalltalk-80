@@ -1,8 +1,57 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-10
+**Last Updated**: 2025-01-10
 
-## Recent Work (2025-11-10)
+## Recent Work (2025-01-10)
+
+**File Initialize Debugging - Multiple Compiler & VM Bugs Fixed**:
+
+**Current Status**: File initialize is now the FIRST failure (was 0th before fixes). Multiple critical bugs found and fixed, one compiler bug remains.
+
+### Bugs Fixed (Commit 304f6ff)
+
+1. **Source Files: Duplicate File Initialize Method**
+   - **Files**: `Smalltalk-80 Source/Smalltalk-80.{original,st}`
+   - **Problem**: Second (broken) File initialize lacked `FilePool _ Dictionary new`, causing nil FilePool → infinite recursion
+   - **Fix**: Removed duplicate at line 57147, added initialization at line 16889
+
+2. **Compiler: Symbol Literal Ordering Bug**
+   - **File**: [Smalltalk80.Compiler/BytecodeCompiler.cs](Smalltalk80.Compiler/BytecodeCompiler.cs)
+   - **Problem**: Symbol literals (#Read, #Write, #Shorten) added to selectors list instead of otherLiterals, shifting Association indices
+   - **Fix**: Created `AddNonSelectorLiteral` method, modified `PushLiteralConstant` to route Symbol literals correctly
+   - **Result**: Associations now at correct indices 0-1, Symbols at indices 2-4
+
+3. **VM: BlockContext Home Traversal for Nested Blocks**
+   - **File**: [Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs](Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs#L2168-L2314)
+   - **Problem**: Assumed BlockContext.home always points to MethodContext, but nested blocks have BlockContext → BlockContext → MethodContext chain
+   - **Symptom**: Reading slot 3 from BlockContext got nargs (SmallInteger) instead of method OOP
+   - **Fix**: Use `FindMethodContext()` helper in 3 locations (lines 2168-2314) to properly traverse chain
+
+4. **Compiler: Method Argument Resolution from Nested Blocks (Partial)**
+   - **File**: [Smalltalk80.Compiler/VariableResolver.cs](Smalltalk80.Compiler/VariableResolver.cs#L84-L330)
+   - **Problem**: Nested block [:index | aBlock value: ...] couldn't find outer method parameter aBlock
+   - **Fix**: Added traversal to method level (ScopeDepth==0) in Step 5, fixed CalculateBlockLocalOffset to start with parent
+   - **Status**: ✅ VariableResolver returns MethodArgument type correctly, ❌ BytecodeCompiler ignores it (still generates pushReceiver)
+
+### Remaining Bug
+
+**Problem**: Compiler generates `pushReceiver 0` (bytecode 0x00) instead of `pushTemporary 0` (bytecode 0x10) when nested block accesses outer method parameter.
+
+**Location**: `Set>>do: aBlock` nested block `[:index | aBlock value: ...]`
+- Bytecode[22] = 0x00 (pushReceiver 0) → pushes tally (SmallInteger)
+- Should be 0x10 (pushTemporary 0) → would push aBlock (BlockClosure)
+
+**Next Step**: Fix `BytecodeCompiler.PushVariable` to honor VariableResolver result type and generate correct instruction.
+
+**See**: [RESUME-PROMPT.md](RESUME-PROMPT.md) for detailed debugging notes and next steps.
+
+**Build Status**: ✅ 0 errors, 0 warnings
+**Cold Start**: ✅ Phase 1-6 succeeded
+**Init Expressions**: ⚠️ File initialize now FIRST failure (progress from 0 expressions succeeding)
+
+---
+
+## Previous Work (2025-11-10)
 
 **Init Expression Dependency Analysis & Execution**:
 - Analyzed all 68 class-side initialize methods in Smalltalk-80 system
