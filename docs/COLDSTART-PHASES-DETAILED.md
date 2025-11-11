@@ -4814,7 +4814,7 @@ foreach (var cls in bundle.Classes.Where(c => !c.IsMetaclass))
 **Patch Type 4: Block Owner ID Fixups**
 ```csharp
 // Fix block ownership metadata for proper lexical scoping
-// (Relevant if BlockClosure implementation needs ownership info)
+// (Relevant if BlockContext implementation needs ownership info)
 
 foreach (var method in bundle.Methods)
 {

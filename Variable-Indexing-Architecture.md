@@ -607,7 +607,7 @@ Block [:| ... probe _ probe + 1 ...]
 - [x] **Hierarchical traversal** implemented correctly
 - [x] **blockLocalCount** calculation correct
 - [x] **Context chain traversal** working
-- [ ] **Validate** all context types handled (MethodContext, BlockContext, BlockClosure)
+- [ ] **Validate** all context types handled (MethodContext, BlockContext, BlockContext)
 
 ### 6.3 Test Cases
 
@@ -1582,26 +1582,26 @@ PUSH_TEMP 1 (methodVar):
 
 ---
 
-## 12. BlockClosure homeContext Architecture (CRITICAL)
+## 12. BlockContext homeContext Architecture (CRITICAL)
 
 ### 12.1 The Chicken-and-Egg Problem
 
-**Problem Statement**: BlockClosures are created eagerly (at pushLiteral time) but block execution contexts are created lazily (at invocation time). For nested blocks, the parent block's execution context doesn't exist when the child BlockClosure is created.
+**Problem Statement**: BlockContexts are created eagerly (at pushLiteral time) but block execution contexts are created lazily (at invocation time). For nested blocks, the parent block's execution context doesn't exist when the child BlockContext is created.
 
 **Timeline of Events**:
 ```
 1. Method executes, encounters outer block literal
-   → Creates BlockClosure for outer block (homeContext = method context) ✓
+   → Creates BlockContext for outer block (homeContext = method context) ✓
 
 2. Method continues, encounters NESTED block literal BEFORE outer block is invoked
    → Calls FindNearestBlockExecutionContext(_activeContextOOP)
    → Parent block execution context doesn't exist yet!
-   → Returns method context (WRONG - should return parent BlockClosure)
-   → Creates nested BlockClosure with homeContext = method context ✗
+   → Returns method context (WRONG - should return parent BlockContext)
+   → Creates nested BlockContext with homeContext = method context ✗
 
 3. Later, outer block is invoked
    → Creates execution context for outer block
-   → nested BlockClosure already has WRONG homeContext (can't fix it now)
+   → nested BlockContext already has WRONG homeContext (can't fix it now)
 
 4. Later, nested block is invoked
    → Uses wrong homeContext (method instead of parent block)
@@ -1610,9 +1610,9 @@ PUSH_TEMP 1 (methodVar):
 ```
 
 **Why This is Fundamental**:
-- **Eager creation**: BlockClosures must be created when pushLiteral executes (during method/block body execution)
+- **Eager creation**: BlockContexts must be created when pushLiteral executes (during method/block body execution)
 - **Lazy creation**: Block execution contexts only created when blocks are invoked (via primitive 207)
-- **Result**: Parent block execution context literally doesn't exist when nested BlockClosure is created
+- **Result**: Parent block execution context literally doesn't exist when nested BlockContext is created
 
 **Example**:
 ```smalltalk
@@ -1631,7 +1631,7 @@ BlockContextTest>>test1a1b1i1p_1   "test case 1"
 
 **Diagnostic Evidence**:
 ```
-[CREATE_BLOCKCLOSURE#5] closure=oop=89832, method=block:f55a217d3e6044a5b59d78bd892e52f6,
+[CREATE_BLOCKCONTEXT#5] closure=oop=89832, method=block:f55a217d3e6044a5b59d78bd892e52f6,
                         homeContext=oop=89826, numArgs=0
                                     ↑↑↑↑↑↑↑↑
                         WRONG: This is Integer>>+ method context, not parent block execution context!
@@ -1671,17 +1671,17 @@ private SmalltalkOOP FindNearestBlockExecutionContext(SmalltalkOOP startContextO
 3. `FindNearestBlockExecutionContext` walks sender chain looking for execution contexts in `_blockContextMapping`
 4. Doesn't find parent block execution context (because it doesn't exist yet!)
 5. Returns method context as fallback
-6. Nested BlockClosure created with wrong homeContext
+6. Nested BlockContext created with wrong homeContext
 
-### 12.3 Solution: Store Parent BlockClosure, Not Execution Context
+### 12.3 Solution: Store Parent BlockContext, Not Execution Context
 
-**Key Insight**: BlockClosures form a stable lexical chain, while execution contexts form an ephemeral dynamic chain.
+**Key Insight**: BlockContexts form a stable lexical chain, while execution contexts form an ephemeral dynamic chain.
 
 **Lexical Chain (Stable)**:
 ```
-Method → Outer BlockClosure → Nested BlockClosure
+Method → Outer BlockContext → Nested BlockContext
          (created at line 5)    (created at line 7)
-         homeContext = method   homeContext = outer BlockClosure (stable OOP)
+         homeContext = method   homeContext = outer BlockContext (stable OOP)
 ```
 
 **Execution Chain (Ephemeral)**:
@@ -1696,27 +1696,27 @@ Method context → Outer block execution context → Nested block execution cont
 **Step 1: Change homeContext Semantics**
 ```csharp
 // BEFORE (stores execution context OOP):
-BlockClosure.homeContext = SmalltalkOOP (points to execution MethodContext)
+BlockContext.homeContext = SmalltalkOOP (points to execution MethodContext)
 
-// AFTER (stores parent BlockClosure OOP or method execution context OOP):
-BlockClosure.homeContext = SmalltalkOOP (points to parent BlockClosure OR method execution context)
+// AFTER (stores parent BlockContext OOP or method execution context OOP):
+BlockContext.homeContext = SmalltalkOOP (points to parent BlockContext OR method execution context)
 ```
 
-**Step 2: Modify CreateBlockClosure**
+**Step 2: Modify CreateBlockContext**
 ```csharp
-// VirtualMachine.cs:5043 (CreateBlockClosure method)
-private SmalltalkOOP CreateBlockClosure(SmalltalkOOP blockMethodOOP, int numArgs)
+// VirtualMachine.cs:5043 (CreateBlockContext method)
+private SmalltalkOOP CreateBlockContext(SmalltalkOOP blockMethodOOP, int numArgs)
 {
     SmalltalkOOP homeContextOOP;
 
     // Check if we're currently executing in a block
     if (_blockContextMapping.TryGetValue(_activeContextOOP, out var currentBlockContextOOP))
     {
-        // We're in a block - find the BlockClosure that created this execution context
-        // Option A: Store in _blockContextMapping as (executionContext → BlockClosure)
-        // Option B: Add reverse mapping _executionContextToBlockClosure
-        SmalltalkOOP parentBlockClosureOOP = LookupBlockClosureForExecutionContext(_activeContextOOP);
-        homeContextOOP = parentBlockClosureOOP;  // Store parent BlockClosure (stable)
+        // We're in a block - find the BlockContext that created this execution context
+        // Option A: Store in _blockContextMapping as (executionContext → BlockContext)
+        // Option B: Add reverse mapping _executionContextToBlockContext
+        SmalltalkOOP parentBlockContextOOP = LookupBlockContextForExecutionContext(_activeContextOOP);
+        homeContextOOP = parentBlockContextOOP;  // Store parent BlockContext (stable)
     }
     else
     {
@@ -1724,17 +1724,17 @@ private SmalltalkOOP CreateBlockClosure(SmalltalkOOP blockMethodOOP, int numArgs
         homeContextOOP = FindMethodContext(_activeContextOOP);  // Store method context
     }
 
-    // Create BlockClosure with correct homeContext
-    var closureOOP = _heapManager.AllocateInstanceOf(blockClosureClassOOP);
-    SetInstanceVariable(closureOOP, BLOCKCLOSURE_METHOD_INDEX, blockMethodOOP);
-    SetInstanceVariable(closureOOP, BLOCKCLOSURE_HOMECONTEXT_INDEX, homeContextOOP);
-    SetInstanceVariable(closureOOP, BLOCKCLOSURE_NUMARGS_INDEX, SmalltalkOOP.MakeSmallInteger(numArgs));
+    // Create BlockContext with correct homeContext
+    var closureOOP = _heapManager.AllocateInstanceOf(blockContextClassOOP);
+    SetInstanceVariable(closureOOP, BLOCKCONTEXT_METHOD_INDEX, blockMethodOOP);
+    SetInstanceVariable(closureOOP, BLOCKCONTEXT_HOMECONTEXT_INDEX, homeContextOOP);
+    SetInstanceVariable(closureOOP, BLOCKCONTEXT_NUMARGS_INDEX, SmalltalkOOP.MakeSmallInteger(numArgs));
 
     return closureOOP;
 }
 ```
 
-**Step 3: Modify GetHomeContext to Resolve BlockClosure → Execution Context**
+**Step 3: Modify GetHomeContext to Resolve BlockContext → Execution Context**
 ```csharp
 // VirtualMachine.cs (new helper method)
 private SmalltalkOOP GetHomeContext(SmalltalkOOP contextOOP)
@@ -1742,20 +1742,20 @@ private SmalltalkOOP GetHomeContext(SmalltalkOOP contextOOP)
     int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
     var homeContextOOP = _heapManager.GetInstanceVariable(contextOOP, homeIndex);
 
-    // Check if homeContext is a BlockClosure (not an execution context)
+    // Check if homeContext is a BlockContext (not an execution context)
     var homeClass = GetClass(homeContextOOP);
-    if (homeClass == _vmMetadata.BlockClosureClassOOP)
+    if (homeClass == _vmMetadata.BlockContextClassOOP)
     {
-        // It's a BlockClosure - resolve to its execution context
-        // Lookup in _blockClosureToExecutionContextMapping
-        if (_blockClosureToExecutionContextMapping.TryGetValue(homeContextOOP, out var executionContextOOP))
+        // It's a BlockContext - resolve to its execution context
+        // Lookup in _blockContextToExecutionContextMapping
+        if (_blockContextToExecutionContextMapping.TryGetValue(homeContextOOP, out var executionContextOOP))
         {
             return executionContextOOP;  // Return the execution context
         }
         else
         {
             throw new RuntimeException(
-                $"BlockClosure {homeContextOOP} has no execution context (block not yet invoked?)");
+                $"BlockContext {homeContextOOP} has no execution context (block not yet invoked?)");
         }
     }
     else
@@ -1772,7 +1772,7 @@ private SmalltalkOOP GetHomeContext(SmalltalkOOP contextOOP)
 private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP,
                                          SmalltalkOOP[] blockArgs,
                                          SmalltalkOOP homeContextOOP,
-                                         SmalltalkOOP blockClosureOOP)
+                                         SmalltalkOOP blockContextOOP)
 {
     // Create block execution context...
     var blockExecutionContextOOP = CreateMethodContext(blockMethodOOP, nilOOP, blockArgs);
@@ -1780,8 +1780,8 @@ private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP,
     // CRITICAL: Register bidirectional mapping
     _blockContextMapping[blockExecutionContextOOP] = blockContextOOP;  // Existing mapping
 
-    // NEW: Add reverse mapping from BlockClosure to execution context
-    _blockClosureToExecutionContextMapping[blockClosureOOP] = blockExecutionContextOOP;
+    // NEW: Add reverse mapping from BlockContext to execution context
+    _blockContextToExecutionContextMapping[blockContextOOP] = blockExecutionContextOOP;
 
     // Execute block...
     return result;
@@ -1791,22 +1791,22 @@ private SmalltalkOOP InvokeBlockInternal(SmalltalkOOP blockMethodOOP,
 ### 12.4 Why This Solution Works
 
 **Advantage 1: Stable References**
-- BlockClosures are created once and never destroyed (until GC)
-- BlockClosures form a stable lexical chain mirroring source code structure
-- No timing issues - parent BlockClosure always exists when nested BlockClosure is created
+- BlockContexts are created once and never destroyed (until GC)
+- BlockContexts form a stable lexical chain mirroring source code structure
+- No timing issues - parent BlockContext always exists when nested BlockContext is created
 
 **Advantage 2: Lazy Resolution**
-- homeContext stores **what** to access (BlockClosure or method), not **where** (execution context OOP)
+- homeContext stores **what** to access (BlockContext or method), not **where** (execution context OOP)
 - Execution contexts created on-demand when blocks are invoked
 - Resolution happens at variable access time (when execution contexts exist)
 
 **Advantage 3: Correct Semantics**
-- Lexical scoping: nested block accesses parent block's variables (via BlockClosure chain)
+- Lexical scoping: nested block accesses parent block's variables (via BlockContext chain)
 - Dynamic scoping: execution contexts form call stack (via sender chain)
 - These are DIFFERENT chains with different purposes
 
 **Advantage 4: Debugging**
-- BlockClosure chain visible in debugger (stable OOPs)
+- BlockContext chain visible in debugger (stable OOPs)
 - Execution context chain visible in stack trace (ephemeral OOPs)
 - Clear separation of concerns
 
@@ -1819,8 +1819,8 @@ private Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextMapping;
 // Key: block execution context OOP → Value: BlockContext OOP (legacy data holder)
 
 // NEW: Add reverse mapping
-private Dictionary<SmalltalkOOP, SmalltalkOOP> _blockClosureToExecutionContextMapping;
-// Key: BlockClosure OOP → Value: block execution context OOP
+private Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextToExecutionContextMapping;
+// Key: BlockContext OOP → Value: block execution context OOP
 ```
 
 **Algorithm for Variable Access**:
@@ -1852,9 +1852,9 @@ private SmalltalkOOP TraverseContextChainForRead(int index)
         // Inherited from parent - traverse up
         remainingIndex -= blockLocalCount;
 
-        // CRITICAL: Resolve homeContext (might be BlockClosure or execution context)
+        // CRITICAL: Resolve homeContext (might be BlockContext or execution context)
         currentContext = ResolveHomeContext(currentContext);
-        // ↑↑↑ This method handles both BlockClosure → execution context resolution
+        // ↑↑↑ This method handles both BlockContext → execution context resolution
         //     and direct execution context references
     }
 }
@@ -1864,20 +1864,20 @@ private SmalltalkOOP ResolveHomeContext(SmalltalkOOP blockExecutionContextOOP)
     // Get homeContext field from block execution context
     var homeContextOOP = GetInstanceVariable(blockExecutionContextOOP, BLOCKCONTEXT_HOME_INDEX);
 
-    // Check if it's a BlockClosure or an execution context
+    // Check if it's a BlockContext or an execution context
     var homeClass = GetClass(homeContextOOP);
 
-    if (homeClass == _vmMetadata.BlockClosureClassOOP)
+    if (homeClass == _vmMetadata.BlockContextClassOOP)
     {
-        // It's a BlockClosure - resolve to execution context
-        if (_blockClosureToExecutionContextMapping.TryGetValue(homeContextOOP, out var executionContextOOP))
+        // It's a BlockContext - resolve to execution context
+        if (_blockContextToExecutionContextMapping.TryGetValue(homeContextOOP, out var executionContextOOP))
         {
             return executionContextOOP;
         }
         else
         {
             throw new RuntimeException(
-                $"BlockClosure {homeContextOOP} not yet invoked (no execution context)");
+                $"BlockContext {homeContextOOP} not yet invoked (no execution context)");
         }
     }
     else
@@ -1891,14 +1891,14 @@ private SmalltalkOOP ResolveHomeContext(SmalltalkOOP blockExecutionContextOOP)
 ### 12.6 Migration Path
 
 **Phase 1: Add Reverse Mapping**
-- Add `_blockClosureToExecutionContextMapping` field to VirtualMachine
+- Add `_blockContextToExecutionContextMapping` field to VirtualMachine
 - Update `InvokeBlockInternal` to populate mapping
 - Test: Verify mapping is populated correctly
 
-**Phase 2: Update CreateBlockClosure**
-- Change logic to store parent BlockClosure (not execution context)
-- Add `LookupBlockClosureForExecutionContext` helper
-- Test: Verify nested BlockClosures have correct homeContext
+**Phase 2: Update CreateBlockContext**
+- Change logic to store parent BlockContext (not execution context)
+- Add `LookupBlockContextForExecutionContext` helper
+- Test: Verify nested BlockContexts have correct homeContext
 
 **Phase 3: Update Variable Access**
 - Modify `TraverseContextChainForRead` to call `ResolveHomeContext`
@@ -1906,8 +1906,8 @@ private SmalltalkOOP ResolveHomeContext(SmalltalkOOP blockExecutionContextOOP)
 - Test: Verify nested block variable access works
 
 **Phase 4: Update GetHomeContext Helper**
-- Change to resolve BlockClosure → execution context
-- Add error handling for unresolved BlockClosures
+- Change to resolve BlockContext → execution context
+- Add error handling for unresolved BlockContexts
 - Test: Verify all helper callers work correctly
 
 **Phase 5: Comprehensive Testing**
@@ -1918,27 +1918,27 @@ private SmalltalkOOP ResolveHomeContext(SmalltalkOOP blockExecutionContextOOP)
 
 ### 12.7 Alternative Considered: Store Nothing, Search at Access Time
 
-**Idea**: Don't store homeContext at all. At variable access time, search for parent block by walking the BlockClosure literal chain.
+**Idea**: Don't store homeContext at all. At variable access time, search for parent block by walking the BlockContext literal chain.
 
 **Why Rejected**:
 - **Performance**: Would require searching method literals every variable access
-- **Complexity**: Would need to track which literal index created each BlockClosure
+- **Complexity**: Would need to track which literal index created each BlockContext
 - **Fragility**: Breaks if blocks are passed between methods (literals in different methods)
 
-**Conclusion**: Storing parent BlockClosure OOP is simpler, faster, and more robust.
+**Conclusion**: Storing parent BlockContext OOP is simpler, faster, and more robust.
 
 ### 12.8 Impact on Existing Code
 
 **Files Requiring Changes**:
 1. **VirtualMachine.cs**:
-   - Add `_blockClosureToExecutionContextMapping` field
-   - Modify `CreateBlockClosure` (lines 5043-5102)
+   - Add `_blockContextToExecutionContextMapping` field
+   - Modify `CreateBlockContext` (lines 5043-5102)
    - Modify `InvokeBlockInternal` (lines 3638-3760)
    - Add `ResolveHomeContext` helper method
    - Modify `TraverseContextChainForRead` (lines 3693-3760)
    - Modify `TraverseContextChainForWrite` (similar pattern)
 
-2. **BlockClosurePrimitives.cs**:
+2. **BlockContextPrimitives.cs**:
    - No changes required (homeContext semantics unchanged from Smalltalk perspective)
 
 3. **VMConstants.cs**:
@@ -1954,12 +1954,12 @@ private SmalltalkOOP ResolveHomeContext(SmalltalkOOP blockExecutionContextOOP)
 **Advantages**:
 ✅ Solves chicken-and-egg problem completely
 ✅ Lexical chain stable and always available
-✅ Clear separation of lexical scope (BlockClosure chain) vs execution stack (context sender chain)
-✅ Debuggability improved (can inspect BlockClosure chain separately)
+✅ Clear separation of lexical scope (BlockContext chain) vs execution stack (context sender chain)
+✅ Debuggability improved (can inspect BlockContext chain separately)
 ✅ Correct semantics for nested blocks
 
 **Disadvantages**:
-❌ Requires additional mapping dictionary (`_blockClosureToExecutionContextMapping`)
+❌ Requires additional mapping dictionary (`_blockContextToExecutionContextMapping`)
 ❌ Slight performance overhead for resolution (dictionary lookup at each parent access)
 ❌ More complex logic in `ResolveHomeContext` helper
 
@@ -1969,8 +1969,8 @@ private SmalltalkOOP ResolveHomeContext(SmalltalkOOP blockExecutionContextOOP)
 - **Mitigation**: Could cache resolved contexts in local variable during traversal
 
 **Memory Analysis**:
-- **Cost**: Additional dictionary with N entries (one per active BlockClosure invocation)
-- **Benefit**: BlockClosures themselves become smaller (no need to store stale execution context OOPs)
+- **Cost**: Additional dictionary with N entries (one per active BlockContext invocation)
+- **Benefit**: BlockContexts themselves become smaller (no need to store stale execution context OOPs)
 - **Net**: Roughly neutral (dictionary overhead ~= eliminated stale references)
 
 ---
@@ -1979,7 +1979,7 @@ private SmalltalkOOP ResolveHomeContext(SmalltalkOOP blockExecutionContextOOP)
 
 - **v1.0.0** (2025-11-05): Initial specification based on bug fix for temp variable indexing
 - **v2.0.0** (2025-11-05): Production-complete specification with all variable types, detailed compiler/interpreter instructions, and complete bytecode mapping
-- **v2.1.0** (2025-11-05): Added Section 12 documenting BlockClosure homeContext chicken-and-egg problem and recommended solution architecture
+- **v2.1.0** (2025-11-05): Added Section 12 documenting BlockContext homeContext chicken-and-egg problem and recommended solution architecture
 ---
 
 ## 12. Compiler Implementation: OwnArguments/OwnTemporaries Architecture

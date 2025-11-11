@@ -105,7 +105,7 @@ This plan details the step-by-step implementation of the Single-Context Architec
 2. **Remove obsolete constants**:
    - Comment out or delete all `METHODCONTEXT_*` constants (now unified as `CONTEXT_*`)
    - Comment out or delete all `BLOCKCONTEXT_*` constants (no longer needed)
-   - Comment out or delete all `BLOCKCLOSURE_*` constants (no longer needed)
+   - Comment out or delete all `BLOCKCONTEXT_*` constants (no longer needed)
 
 3. **Verify no compilation errors**:
    ```bash
@@ -303,7 +303,7 @@ This plan details the step-by-step implementation of the Single-Context Architec
 
 **Files**:
 - `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs`
-- `Smalltalk80.Interpreter/Core/VM/Primitives/BlockClosurePrimitives.cs`
+- `Smalltalk80.Interpreter/Core/VM/Primitives/BlockContextPrimitives.cs`
 
 ### Steps
 
@@ -347,13 +347,13 @@ This plan details the step-by-step implementation of the Single-Context Architec
        {
            // ... get literal ...
 
-           // Just push it directly - no BlockClosure wrapping
+           // Just push it directly - no BlockContext wrapping
            Push(literalOOP);
            return true;
        }
    ```
 
-3. **Update Primitive 207** (BlockClosurePrimitives.cs):
+3. **Update Primitive 207** (BlockContextPrimitives.cs):
    ```csharp
    public static SmalltalkOOP Value(
        IPrimitiveContext ctx,
@@ -424,7 +424,7 @@ This plan details the step-by-step implementation of the Single-Context Architec
 5. **Comment out old block invocation code**:
    - `InvokeBlockInternal()`
    - `CreateBlockExecutionContext()`
-   - All BlockClosure/BlockContext creation logic
+   - All BlockContext/BlockContext creation logic
 
 **Deliverable**: Simplified block invocation using unified MethodContext
 
@@ -512,7 +512,7 @@ This plan details the step-by-step implementation of the Single-Context Architec
 
 ## Phase 7: Remove Obsolete Code
 
-**Goal**: Clean up old BlockContext/BlockClosure code
+**Goal**: Clean up old BlockContext/BlockContext code
 
 **Files**: Multiple
 
@@ -522,7 +522,7 @@ This plan details the step-by-step implementation of the Single-Context Architec
    ```csharp
    // REMOVE:
    private Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextMapping;
-   private Dictionary<(SmalltalkOOP, int), SmalltalkOOP> _blockClosureCache;
+   private Dictionary<(SmalltalkOOP, int), SmalltalkOOP> _blockContextCache;
    ```
 
 2. **Remove helper methods**:
@@ -536,12 +536,12 @@ This plan details the step-by-step implementation of the Single-Context Architec
 3. **Remove constants** (VMConstants.cs):
    - All `METHODCONTEXT_*` constants (replaced by `CONTEXT_*`)
    - All `BLOCKCONTEXT_*` constants
-   - All `BLOCKCLOSURE_*` constants
+   - All `BLOCKCONTEXT_*` constants
 
 4. **Search for uses**:
    ```bash
    grep -r "BlockContext" Smalltalk80.Interpreter/
-   grep -r "BlockClosure" Smalltalk80.Interpreter/
+   grep -r "BlockContext" Smalltalk80.Interpreter/
    grep -r "_blockContextMapping" Smalltalk80.Interpreter/
    ```
 
@@ -650,9 +650,9 @@ This plan details the step-by-step implementation of the Single-Context Architec
 
    - Add lexicalParent field to MethodContext
    - Simplify variable access to use hierarchical traversal via lexicalParent
-   - Remove BlockContext/BlockClosure classes and associated complexity
+   - Remove BlockContext/BlockContext classes and associated complexity
    - Update all bytecode handlers to use unified algorithm
-   - Simplify block invocation (no more BlockClosure wrapping)
+   - Simplify block invocation (no more BlockContext wrapping)
    - Update NLR to use lexicalParent chain
    - Remove ~500 lines of obsolete code
 

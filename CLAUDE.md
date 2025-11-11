@@ -39,7 +39,7 @@
 
 **Location**: `Set>>do: aBlock` nested block `[:index | aBlock value: ...]`
 - Bytecode[22] = 0x00 (pushReceiver 0) → pushes tally (SmallInteger)
-- Should be 0x10 (pushTemporary 0) → would push aBlock (BlockClosure)
+- Should be 0x10 (pushTemporary 0) → would push aBlock (BlockContext)
 
 **Next Step**: Fix `BytecodeCompiler.PushVariable` to honor VariableResolver result type and generate correct instruction.
 
@@ -125,19 +125,19 @@
 
 ## Recent Work (2025-11-09)
 
-**CRITICAL CORRECTION: Reverted BlockClosure Mistake - Using Correct BlockContext (2025-11-09)**:
+**CRITICAL CORRECTION: Reverted BlockContext Mistake - Using Correct BlockContext (2025-11-09)**:
 
 1. **Error Discovered**
-   - **Mistake**: I incorrectly believed Smalltalk-80.st used BlockClosure class
-   - **Reality**: BlockClosure was mistakenly added in a prior revision and has been removed
+   - **Mistake**: I incorrectly believed Smalltalk-80.st used BlockContext class
+   - **Reality**: BlockContext was mistakenly added in a prior revision and has been removed
    - **Truth**: Original Smalltalk-80 uses **BlockContext** with primitives 81 and 82
    - **Blue Book Reference**: BlockContext is documented in Blue Book Chapter 29
 
 2. **Corrections Made**
    - **VMConstants.cs**: Removed [Obsolete] attributes from BLOCKCONTEXT_* constants
-   - **ControlPrimitives.cs**: Reverted Primitive 80 to create BlockContext (not BlockClosure)
-   - **VMMetadata.cs**: Changed BlockClosureClassOOP → BlockContextClassOOP
-   - **Loader.cs**: Changed to load BlockContext class instead of BlockClosure
+   - **ControlPrimitives.cs**: Reverted Primitive 80 to create BlockContext (not BlockContext)
+   - **VMMetadata.cs**: Changed BlockContextClassOOP → BlockContextClassOOP
+   - **Loader.cs**: Changed to load BlockContext class instead of BlockContext
    - **VirtualMachine.cs**: GetBlockContextClassOOP() returns BlockContextClassOOP from VMMetadata
 
 3. **Correct BlockContext Structure (Blue Book)**
@@ -165,7 +165,7 @@
 **Files Modified**:
 - `Smalltalk80.Interpreter/Core/VM/VMConstants.cs`: Removed [Obsolete] from BlockContext constants
 - `Smalltalk80.Interpreter/Core/VM/Primitives/ControlPrimitives.cs`: Primitive 80 creates BlockContext
-- `Smalltalk80.Interpreter/Core/VM/VMMetadata.cs`: BlockContextClassOOP (not BlockClosure)
+- `Smalltalk80.Interpreter/Core/VM/VMMetadata.cs`: BlockContextClassOOP (not BlockContext)
 - `Smalltalk80.Interpreter/Engine/Loader.cs`: Loads BlockContext class
 - `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs`: Returns BlockContextClassOOP
 - `Smalltalk80.Interpreter/Program.cs`: Uses BlockContextClassOOP

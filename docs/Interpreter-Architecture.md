@@ -16,7 +16,7 @@ This document provides the canonical architectural documentation for the Smallta
 - **Perfect Garbage Collection**: 0 unreachable objects out of ~30,000 total objects
 - **Hybrid Block Execution**: Supports both Blue Book BlockContext (primitives 80-82) and offline compiler CompiledMethod literals with compatibility layer
 - **High-Performance Variable Access**: 15-25x faster with OOP-based class detection, cycle detection, and bounds checking
-- **BlockClosure.executionContext Architecture**: Direct field storage eliminates bidirectional dictionary lookups
+- **BlockContext.executionContext Architecture**: Direct field storage eliminates bidirectional dictionary lookups
 - **Complete Cold Start**: All 6 phases work correctly with optimized GC roots
 - **100% Compiler Validation**: 10,182 methods validate correctly with temp indexing fixes
 - **Tail Recursion Optimization**: Prevents context accumulation in recursive patterns
@@ -50,7 +50,7 @@ These optimizations work synergistically to enable deep recursion with constant 
 
 ✅ **Hybrid Block Execution**: Seamless support for both Blue Book primitives 80-82 and offline compiler CompiledMethod literals
 ✅ **High-Performance Variable Access**: 15-25x faster IsBlockContext() using OOP comparison instead of string comparison
-✅ **BlockClosure.executionContext Field**: Direct storage eliminates bidirectional dictionary lookups
+✅ **BlockContext.executionContext Field**: Direct storage eliminates bidirectional dictionary lookups
 ✅ **Context Chain Safety**: Cycle detection (HashSet-based) and depth limits (MAX_DEPTH=1000) prevent infinite loops
 ✅ **Comprehensive Bounds Checking**: All field and variable access validated against object bounds
 ✅ **Perfect Garbage Collection**: 0 unreachable objects out of ~30,000 allocated
@@ -111,10 +111,10 @@ dotnet run --project Smalltalk80.Interpreter -- --coldstart bin/Debug/net9.0/col
 
 ### Recent Improvements (2025-11-05 to 2025-11-07)
 
-**2025-11-07: BlockClosure.executionContext Architecture**
-- Added `executionContext` as 5th field in BlockClosure class (Smalltalk-80.st:41840)
-- Eliminated `_blockClosureToExecutionContextMapping` reverse dictionary
-- VMConstants.BLOCKCLOSURE_EXECUTIONCONTEXT_INDEX = 4
+**2025-11-07: BlockContext.executionContext Architecture**
+- Added `executionContext` as 5th field in BlockContext class (Smalltalk-80.st:41840)
+- Eliminated `_blockContextToExecutionContextMapping` reverse dictionary
+- VMConstants.BLOCKCONTEXT_EXECUTIONCONTEXT_INDEX = 4
 - Fixed FindNearestBlockExecutionContext bug: no longer walks sender chain (prevents methods from traversing to parent block scopes)
 
 **2025-11-05: VM Variable Access Performance & Safety**
@@ -176,7 +176,7 @@ dotnet run --project Smalltalk80.Interpreter -- --coldstart bin/Debug/net9.0/col
 **Key Files**:
 - `VirtualMachine.cs` - Main interpreter loop, bytecode execution, block handling
 - `VMMetadata.cs` - Cached class OOPs for fast type detection
-- `VMConstants.cs` - Field indices for BlockContext, BlockClosure, MethodContext
+- `VMConstants.cs` - Field indices for BlockContext, BlockContext, MethodContext
 
 #### 2. Object Memory System
 **Location**: `Smalltalk80.Interpreter/Core/HeapManager/`
@@ -770,7 +770,7 @@ Primitives provide access to VM-level functionality:
 82: BlockContext>>value:value:
 83: performWithArguments:
 84: perform:
-207: BlockClosure>>valueWithArguments:
+207: BlockContext>>valueWithArguments:
 
 // Process Management (primitives 86-89) - Not yet implemented
 86: signal
@@ -867,14 +867,14 @@ public class VMMetadata
 {
     public SmalltalkOOP CompiledMethodClassOOP { get; set; }
     public SmalltalkOOP BlockContextClassOOP { get; set; }
-    public SmalltalkOOP BlockClosureClassOOP { get; set; }
+    public SmalltalkOOP BlockContextClassOOP { get; set; }
 
     // Initialized during VM startup (Loader.cs:229-231)
     public void Initialize(ISmalltalkHeapManager heapManager)
     {
         CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod");
         BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext");
-        BlockClosureClassOOP = GlobalRegistry.Get("class:BlockClosure");
+        BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext");
     }
 }
 ```
@@ -1011,8 +1011,8 @@ public static void Initialize()
     Register(81, ControlPrimitives.BlockContextValueWith1Arg);
     Register(82, ControlPrimitives.BlockContextValueWith2Args);
 
-    // BlockClosure primitives
-    Register(207, BlockClosurePrimitives.ValueWithArguments);
+    // BlockContext primitives
+    Register(207, BlockContextPrimitives.ValueWithArguments);
 }
 ```
 
@@ -1028,17 +1028,17 @@ public static void Initialize()
 8. **Context Switch**: VM switches to block's MethodContext, executes bytecode
 9. **Return**: Block returns, VM restores original context
 
-### BlockClosure Support
+### BlockContext Support
 
 **Status**: ✅ **Implemented with executionContext Field (2025-11-07)**
 
-BlockClosure is a modern block representation with explicit lexical scope capture. Unlike BlockContext (runtime-created wrappers), BlockClosure objects are first-class objects that store execution context directly.
+BlockContext is a modern block representation with explicit lexical scope capture. Unlike BlockContext (runtime-created wrappers), BlockContext objects are first-class objects that store execution context directly.
 
-#### BlockClosure Structure (5 Fields)
+#### BlockContext Structure (5 Fields)
 
-**Smalltalk-80.st:41840** - BlockClosure class definition:
+**Smalltalk-80.st:41840** - BlockContext class definition:
 ```smalltalk
-Object subclass: #BlockClosure
+Object subclass: #BlockContext
     instanceVariableNames: 'method homeContext returnContext numArgs executionContext'
     classVariableNames: ''
     poolDictionaries: ''
@@ -1047,28 +1047,28 @@ Object subclass: #BlockClosure
 
 **VMConstants.cs** - Field indices:
 ```csharp
-// BlockClosure instance variables (5 fields)
-public const int BLOCKCLOSURE_METHOD_INDEX = 0;           // The block's CompiledMethod
-public const int BLOCKCLOSURE_HOMECONTEXT_INDEX = 1;      // Lexical scope context
-public const int BLOCKCLOSURE_RETURNCONTEXT_INDEX = 2;    // Where non-local return goes
-public const int BLOCKCLOSURE_NUMARGS_INDEX = 3;          // Number of block arguments
-public const int BLOCKCLOSURE_EXECUTIONCONTEXT_INDEX = 4; // Execution context (block execution wrapper)
+// BlockContext instance variables (5 fields)
+public const int BLOCKCONTEXT_METHOD_INDEX = 0;           // The block's CompiledMethod
+public const int BLOCKCONTEXT_HOMECONTEXT_INDEX = 1;      // Lexical scope context
+public const int BLOCKCONTEXT_RETURNCONTEXT_INDEX = 2;    // Where non-local return goes
+public const int BLOCKCONTEXT_NUMARGS_INDEX = 3;          // Number of block arguments
+public const int BLOCKCONTEXT_EXECUTIONCONTEXT_INDEX = 4; // Execution context (block execution wrapper)
 ```
 
-#### BlockClosure.executionContext Architecture (2025-11-06)
+#### BlockContext.executionContext Architecture (2025-11-06)
 
-**Major Architectural Improvement**: Eliminated bidirectional dictionary mapping by storing execution context directly in BlockClosure objects.
+**Major Architectural Improvement**: Eliminated bidirectional dictionary mapping by storing execution context directly in BlockContext objects.
 
 **BEFORE** (Dual Dictionaries):
 ```csharp
-private Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextMapping;               // execution context → BlockClosure
-private Dictionary<SmalltalkOOP, SmalltalkOOP> _blockClosureToExecutionContextMapping;  // BlockClosure → execution context
+private Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextMapping;               // execution context → BlockContext
+private Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextToExecutionContextMapping;  // BlockContext → execution context
 ```
 
 **AFTER** (Single Dictionary + Object Field):
 ```csharp
-private Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextMapping;  // execution context → BlockClosure (kept)
-// BlockClosure.executionContext field stores execution context directly (no reverse dictionary needed!)
+private Dictionary<SmalltalkOOP, SmalltalkOOP> _blockContextMapping;  // execution context → BlockContext (kept)
+// BlockContext.executionContext field stores execution context directly (no reverse dictionary needed!)
 ```
 
 **VirtualMachine.cs** - CreateBlockExecutionContext:
@@ -1077,9 +1077,9 @@ private SmalltalkOOP CreateBlockExecutionContext(SmalltalkOOP closureOOP)
 {
     // ... create execution context ...
 
-    // Store execution context directly in BlockClosure's executionContext field
+    // Store execution context directly in BlockContext's executionContext field
     _heapManager.SetInstanceVariable(closureOOP,
-        VMConstants.BLOCKCLOSURE_EXECUTIONCONTEXT_INDEX,
+        VMConstants.BLOCKCONTEXT_EXECUTIONCONTEXT_INDEX,
         executionContextOOP);
 
     // Also maintain forward mapping for reverse lookups
@@ -1093,9 +1093,9 @@ private SmalltalkOOP CreateBlockExecutionContext(SmalltalkOOP closureOOP)
 ```csharp
 private SmalltalkOOP ResolveHomeContext(SmalltalkOOP closureOOP)
 {
-    // Read execution context directly from BlockClosure field (no dictionary lookup!)
+    // Read execution context directly from BlockContext field (no dictionary lookup!)
     var executionContextOOP = _heapManager.GetInstanceVariable(closureOOP,
-        VMConstants.BLOCKCLOSURE_EXECUTIONCONTEXT_INDEX);
+        VMConstants.BLOCKCONTEXT_EXECUTIONCONTEXT_INDEX);
 
     if (executionContextOOP == SpecialObjectsArray.Instance.Nil)
     {
@@ -1113,16 +1113,16 @@ private SmalltalkOOP ResolveHomeContext(SmalltalkOOP closureOOP)
 - ✅ **Better Performance**: No reverse dictionary lookup needed
 - ✅ **Easier Maintenance**: Single source of truth for execution context
 
-#### Primitive 207: BlockClosure Evaluation
+#### Primitive 207: BlockContext Evaluation
 
-**BlockClosurePrimitives.cs**:
+**BlockContextPrimitives.cs**:
 ```csharp
 public static SmalltalkOOP ValueWithArguments(IPrimitiveContext ctx,
     SmalltalkOOP receiver, SmalltalkOOP[] args)
 {
-    // Extract method and homeContext from BlockClosure
-    var methodOOP = ctx.GetInstanceVariable(receiver, BLOCKCLOSURE_METHOD_INDEX);
-    var homeContextOOP = ctx.GetInstanceVariable(receiver, BLOCKCLOSURE_HOMECONTEXT_INDEX);
+    // Extract method and homeContext from BlockContext
+    var methodOOP = ctx.GetInstanceVariable(receiver, BLOCKCONTEXT_METHOD_INDEX);
+    var homeContextOOP = ctx.GetInstanceVariable(receiver, BLOCKCONTEXT_HOMECONTEXT_INDEX);
 
     // Invoke block with captured homeContext
     var result = ctx.InvokeBlock(methodOOP, args, homeContextOOP);
@@ -1131,13 +1131,13 @@ public static SmalltalkOOP ValueWithArguments(IPrimitiveContext ctx,
 }
 ```
 
-### Coexistence: BlockContext and BlockClosure
+### Coexistence: BlockContext and BlockContext
 
 Both models coexist safely:
 
 - **Offline Compiler**: Generates CompiledMethod literals → wrapped in BlockContext
-- **Runtime Compiler**: Could generate BlockClosure objects directly (future)
-- **Primitives**: 80-82 (BlockContext) and 207 (BlockClosure) both supported
+- **Runtime Compiler**: Could generate BlockContext objects directly (future)
+- **Primitives**: 80-82 (BlockContext) and 207 (BlockContext) both supported
 - **VM**: Handles both transparently via method lookup and primitive dispatch
 
 ## Variable Access Architecture
@@ -1161,7 +1161,7 @@ The variable access system provides safe, high-performance access to temporaries
 public class VMMetadata
 {
     public SmalltalkOOP BlockContextClassOOP { get; set; }
-    public SmalltalkOOP BlockClosureClassOOP { get; set; }
+    public SmalltalkOOP BlockContextClassOOP { get; set; }
     public SmalltalkOOP MethodContextClassOOP { get; set; }
 
     // Initialized during VM startup (Loader.cs:229-231)
@@ -1820,7 +1820,7 @@ The interpreter maintains strict Blue Book compliance across all implemented fea
 
 - **Tail Recursion Optimization**: JUMP bytecode (0xA8-0xAF) is an optimization, not a semantic change
 - **Precomputed Layouts**: v1.0.6 bundle format moves layout computation from runtime to compile-time (transparent to VM)
-- **BlockClosure**: Modern extension coexists with Blue Book BlockContext (primitive 207)
+- **BlockContext**: Modern extension coexists with Blue Book BlockContext (primitive 207)
 - **VMMetadata Caching**: Performance optimization with no semantic impact
 
 ### Validation Methods
@@ -2018,7 +2018,7 @@ See [Primitive Operations](#primitive-operations) section for complete primitive
 - 68-69: CompiledMethod access (objectAt:, objectAt:put:)
 - 70-79: Storage management (new, new:, become:, instVarAt:, instVarAt:put:, hash)
 - 80-82: BlockContext evaluation (value, value:, value:value:)
-- 207: BlockClosure evaluation (valueWithArguments:)
+- 207: BlockContext evaluation (valueWithArguments:)
 
 ### Object Format Specifications
 
@@ -2047,13 +2047,13 @@ BLOCKCONTEXT_HOMECONTEXT_INDEX = 3         // MethodContext OOP (lexical scope)
 BLOCKCONTEXT_OUTERCONTEXT_INDEX = 4        // BlockContext OOP or nil
 ```
 
-**BlockClosure** (5 instance variables):
+**BlockContext** (5 instance variables):
 ```csharp
-BLOCKCLOSURE_METHOD_INDEX = 0               // CompiledMethod OOP
-BLOCKCLOSURE_HOMECONTEXT_INDEX = 1          // MethodContext OOP (lexical scope)
-BLOCKCLOSURE_RETURNCONTEXT_INDEX = 2        // MethodContext OOP (non-local return target)
-BLOCKCLOSURE_NUMARGS_INDEX = 3              // SmallInteger (argument count)
-BLOCKCLOSURE_EXECUTIONCONTEXT_INDEX = 4     // Execution context OOP (block wrapper)
+BLOCKCONTEXT_METHOD_INDEX = 0               // CompiledMethod OOP
+BLOCKCONTEXT_HOMECONTEXT_INDEX = 1          // MethodContext OOP (lexical scope)
+BLOCKCONTEXT_RETURNCONTEXT_INDEX = 2        // MethodContext OOP (non-local return target)
+BLOCKCONTEXT_NUMARGS_INDEX = 3              // SmallInteger (argument count)
+BLOCKCONTEXT_EXECUTIONCONTEXT_INDEX = 4     // Execution context OOP (block wrapper)
 ```
 
 ### Perfect GC Statistics (Phase 6)

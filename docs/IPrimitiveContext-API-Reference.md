@@ -167,14 +167,14 @@ SmalltalkOOP ActivateBlockContext(SmalltalkOOP blockContextOop, SmalltalkOOP arg
 
 ### InvokeBlock
 ```csharp
-SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] arguments, SmalltalkOOP homeContextOOP, SmalltalkOOP blockClosureOOP)
+SmalltalkOOP InvokeBlock(SmalltalkOOP blockMethodOOP, SmalltalkOOP[] arguments, SmalltalkOOP homeContextOOP, SmalltalkOOP blockContextOOP)
 ```
-**Purpose**: Invoke BlockClosure (primitive 207)
+**Purpose**: Invoke BlockContext (primitive 207)
 **Parameters**:
 - `blockMethodOOP`: CompiledMethod of block
 - `arguments`: Array of argument OOPs
 - `homeContextOOP`: Home context for lexical scoping
-- `blockClosureOOP`: The BlockClosure being invoked
+- `blockContextOOP`: The BlockContext being invoked
 **Returns**: Result of block execution
 
 ## Object Enumeration

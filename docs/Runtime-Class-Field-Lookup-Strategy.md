@@ -16,7 +16,7 @@ if (!GlobalRegistry.TryGet("class:CompiledMethod", out var compiledMethodClassOO
 ### 2. VirtualMachine.cs (Multiple violations)
 - Line 161: `GlobalRegistry.TryGet("USTable")`
 - Line 303: `GlobalRegistry.TryGet("class:MethodContext")`
-- Lines 1831, 1870, 1909: `GlobalRegistry.TryGet("class:BlockClosure")`
+- Lines 1831, 1870, 1909: `GlobalRegistry.TryGet("class:BlockContext")`
 - Line 3114: `GlobalRegistry.GetObject<Dictionary>("blockOwnerMap")`
 - Line 3447: `GlobalRegistry.GetObject<Dictionary>("objectIdToLocalId")`
 - Multiple uses of `_layoutResolver.GetFieldIndex()` and `_layoutResolver.GetInstanceVariableCount()`
@@ -164,7 +164,7 @@ public class RuntimeSpecialObjects
     private SmalltalkOOP? _byteArrayClass;
     private SmalltalkOOP? _methodContextClass;
     private SmalltalkOOP? _blockContextClass;
-    private SmalltalkOOP? _blockClosureClass;
+    private SmalltalkOOP? _blockContextClass;
 
     public SmalltalkOOP CompiledMethodClass =>
         _compiledMethodClass ??= LookupClassInHeap("CompiledMethod");
@@ -180,7 +180,7 @@ public class RuntimeSpecialObjects
         _byteArrayClass = null;
         _methodContextClass = null;
         _blockContextClass = null;
-        _blockClosureClass = null;
+        _blockContextClass = null;
     }
 }
 ```

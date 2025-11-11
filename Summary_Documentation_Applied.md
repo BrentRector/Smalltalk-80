@@ -112,9 +112,9 @@ Based on the comprehensive **Primitive Comparison Report** (D:\Users\brent\OneDr
 **Primitives to Document:** 79
 - CompiledMethod creation
 
-### ⏳ BlockClosurePrimitives.cs
+### ⏳ BlockContextPrimitives.cs
 **Primitives to Document:** 207
-- BlockClosure value operation (custom extension)
+- BlockContext value operation (custom extension)
 
 ## Documentation Completeness:
 
@@ -126,7 +126,7 @@ Based on the comprehensive **Primitive Comparison Report** (D:\Users\brent\OneDr
 | ControlPrimitives.cs | 80-89 | ⏳ Pending | TBD |
 | IOPrimitives.cs | 90-109 | ⏳ Pending | TBD |
 | CompiledMethodPrimitives.cs | 79 | ⏳ Pending | TBD |
-| BlockClosurePrimitives.cs | 207 | ⏳ Pending | TBD |
+| BlockContextPrimitives.cs | 207 | ⏳ Pending | TBD |
 
 ## Critical Findings Documented:
 

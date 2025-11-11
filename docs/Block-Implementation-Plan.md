@@ -970,7 +970,7 @@ dotnet run -- --coldstart coldstart_with_tests.json \
 **File**: `VirtualMachine.cs`
 
 Based on `DEAD_CODE_REPORT.md`, remove:
-1. Old BlockContext methods (CreateBlockClosure, etc.)
+1. Old BlockContext methods (CreateBlockContext, etc.)
 2. Obsolete _blockContextMapping code
 3. Obsolete VMConstants (BLOCKCONTEXT_STARTPC_INDEX, etc.)
 

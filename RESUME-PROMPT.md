@@ -20,7 +20,7 @@ We are debugging why `File initialize` fails as the first init expression after 
 
 **Root Cause**: Compiler generates wrong bytecode when nested block accesses outer method parameter:
 - **Generates**: `pushReceiver 0` (bytecode 0x00) - pushes `tally` (SmallInteger)
-- **Should Generate**: `pushTemporary 0` (bytecode 0x10) - pushes `aBlock` (BlockClosure parameter)
+- **Should Generate**: `pushTemporary 0` (bytecode 0x10) - pushes `aBlock` (BlockContext parameter)
 
 ## Bugs Fixed in This Session
 
@@ -65,7 +65,7 @@ The nested block `[:index | ... aBlock ...]` needs to access `aBlock` (outer met
 1. VariableResolver.ResolveVariable("aBlock") returns type=MethodArgument, index=0 ✓
 2. BytecodeCompiler.PushVariable receives this result
 3. **BUG**: PushVariable generates `pushReceiver 0` instead of `pushTemporary 0`
-4. At runtime: Pushes receiver.field[0] (tally=SmallInteger) instead of temp[0] (aBlock=BlockClosure)
+4. At runtime: Pushes receiver.field[0] (tally=SmallInteger) instead of temp[0] (aBlock=BlockContext)
 
 ### Verification
 

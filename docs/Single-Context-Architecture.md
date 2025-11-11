@@ -229,7 +229,7 @@ public class VirtualMachine
     private SmalltalkOOP _nlrTargetContext;
     private SmalltalkOOP _nlrReturnValue;
 
-    // That's it! No BlockClosure cache, no block mappings, no complexity.
+    // That's it! No BlockContext cache, no block mappings, no complexity.
 }
 ```
 
@@ -423,7 +423,7 @@ case PUSH_LITERAL:
     }
 ```
 
-**Key Insight**: We don't create BlockClosure objects! We just push literals - whether they're block CompiledMethods or regular values. The VM doesn't need to distinguish between them at push time.
+**Key Insight**: We don't create BlockContext objects! We just push literals - whether they're block CompiledMethods or regular values. The VM doesn't need to distinguish between them at push time.
 
 ### 5.3 Primitive 207 (value, value:, value:value:)
 
@@ -816,7 +816,7 @@ Replace existing handlers:
 
 ### Phase 5: Update Primitive 207 ✓ Ready
 
-**File**: `Smalltalk80.Interpreter/Core/VM/Primitives/BlockClosurePrimitives.cs`
+**File**: `Smalltalk80.Interpreter/Core/VM/Primitives/BlockContextPrimitives.cs`
 
 Replace with implementation from Section 5.3.
 
@@ -825,9 +825,9 @@ Replace with implementation from Section 5.3.
 Delete or comment out:
 
 1. `BlockContext` class references
-2. `BlockClosure` class (if purely VM-internal)
+2. `BlockContext` class (if purely VM-internal)
 3. `_blockContextMapping` dictionary
-4. `_blockClosureCache` dictionary
+4. `_blockContextCache` dictionary
 5. `FindNearestBlockExecutionContext()` function
 6. `ResolveHomeContext()` function
 7. `CreateBlockExecutionContext()` function
@@ -861,13 +861,13 @@ cd bin/Debug/net9.0
 
 ### 9.1 Compatibility Concerns
 
-**Q**: What breaks when we remove BlockContext/BlockClosure?
+**Q**: What breaks when we remove BlockContext/BlockContext?
 
 **A**:
-- If Smalltalk code references BlockContext/BlockClosure directly → Need compatibility stubs
+- If Smalltalk code references BlockContext/BlockContext directly → Need compatibility stubs
 - If only VM uses them → Can delete immediately
 
-**Action**: Search Smalltalk-80.st for references to BlockContext and BlockClosure.
+**Action**: Search Smalltalk-80.st for references to BlockContext and BlockContext.
 
 ### 9.2 Incremental Steps
 
@@ -909,7 +909,7 @@ If implementation fails:
 
 ✅ **Variable access**: O(nesting depth) - typically 1-3 levels
 ✅ **Context creation**: No cache lookups needed
-✅ **Memory**: Fewer objects (no BlockClosure, no BlockContext)
+✅ **Memory**: Fewer objects (no BlockContext, no BlockContext)
 
 ### 10.3 Code Quality
 
@@ -924,7 +924,7 @@ If implementation fails:
 **Core Innovation**: Blocks are just methods with a lexicalParent link.
 
 **Key Simplifications**:
-- ❌ No BlockClosure class
+- ❌ No BlockContext class
 - ❌ No BlockContext class
 - ❌ No block mappings
 - ❌ No block caching

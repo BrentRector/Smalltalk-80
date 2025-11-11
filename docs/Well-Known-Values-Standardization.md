@@ -37,7 +37,7 @@ The codebase currently uses **two different patterns** to reference well-known s
 - `StringPrimitives.cs` - Multiple usages
 - `SystemPrimitives.cs` - Multiple usages
 - `ControlPrimitives.cs` - Multiple usages
-- `BlockClosurePrimitives.cs` - Likely uses
+- `BlockContextPrimitives.cs` - Likely uses
 
 **Example**:
 ```csharp

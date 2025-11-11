@@ -274,17 +274,17 @@ All 17 LargeInteger primitives fully implemented using `System.Numerics.BigInteg
 
 ---
 
-### ✅ BlockClosure Support (Primitive 207)
+### ✅ BlockContext Support (Primitive 207)
 
 **Status**: COMPLETE - Modern block closure implementation
 
 | Primitive | Selector | Status | Notes |
 |-----------|----------|--------|-------|
-| 207 | BlockClosure `value*` | ✅ EXCELLENT | Modern block closure with lexical scoping |
+| 207 | BlockContext `value*` | ✅ EXCELLENT | Modern block closure with lexical scoping |
 
 **Note**: This is an extension beyond Blue Book primitives 80-82, providing proper lexical closure semantics.
 
-**Implementation File**: `BlockClosurePrimitives.cs`
+**Implementation File**: `BlockContextPrimitives.cs`
 
 ---
 
@@ -368,7 +368,7 @@ _primitives[13] = ArithmeticPrimitives.Quo;      // ✅ SmallInteger quo:
 
 **Extensions** (Beyond Blue Book):
 - Primitives 120-139: Modern file system operations
-- Primitive 207: BlockClosure support
+- Primitive 207: BlockContext support
 
 ### Critical Semantic Corrections
 
@@ -501,7 +501,7 @@ catch (OverflowException) {
 | ControlPrimitives.cs | 80-89 | ~650 | Block/Process control |
 | InputOutputPrimitives.cs | 90-109 | ~400 | I/O operations (stubbed) |
 | SystemPrimitives.cs | 110-116 | ~300 | System operations |
-| BlockClosurePrimitives.cs | 207 | ~100 | Modern block closures |
+| BlockContextPrimitives.cs | 207 | ~100 | Modern block closures |
 
 ### Supporting Infrastructure
 
@@ -660,7 +660,7 @@ These primitives require significant computation:
 - 80: `blockCopy:` (create closure)
 - 81: `value*` (evaluate with 0-3 args)
 - 82: `valueWithArguments:` (evaluate with array)
-- 207: BlockClosure `value*` (modern closures)
+- 207: BlockContext `value*` (modern closures)
 
 ---
 

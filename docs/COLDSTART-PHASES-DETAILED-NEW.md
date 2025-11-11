@@ -3382,7 +3382,7 @@ private void PrintValidationSummary()
 - **Association canonicalization**: 85.3% memory reduction (3,745 → 549 objects)
 - **Precomputed layouts**: 80-90% faster layout loading
 - **Comprehensive validation**: 10,950 cross-references checked
-- **BlockClosure support**: Lexical scoping with homeContext capture
+- **BlockContext support**: Lexical scoping with homeContext capture
 
 ---
 

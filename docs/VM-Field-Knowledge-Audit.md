@@ -152,21 +152,21 @@ These represent application-level class structures and should NOT be hardcoded i
 
 **Status**: ✅ **ACCEPTABLE** - Used only during cold start, not during runtime execution
 
-### H. BlockClosure Fields
+### H. BlockContext Fields
 
 **Fields Used**:
-- `class:BlockClosure` → `homeContext`, `returnContext`, `method`, `numArgs`
+- `class:BlockContext` → `homeContext`, `returnContext`, `method`, `numArgs`
 
 **VM Files Using These**:
 - `VirtualMachine.cs` lines 482, 536, 592, 690, 732, 760, 817, 862, 867, 906, 1204, 1243, 1282
 
-**Analysis**: BlockClosure is a modern extension to Smalltalk-80, not part of the original Blue Book. It was added to support proper lexical closures. The Blue Book only specifies BlockContext (primitives 80-82).
+**Analysis**: BlockContext is a modern extension to Smalltalk-80, not part of the original Blue Book. It was added to support proper lexical closures. The Blue Book only specifies BlockContext (primitives 80-82).
 
-**Question**: Should BlockClosure fields be considered VM-level knowledge, or should they be accessed via primitives?
+**Question**: Should BlockContext fields be considered VM-level knowledge, or should they be accessed via primitives?
 
 **Recommendation**:
-- **Option A**: Declare BlockClosure as a VM extension with fixed field indices (like we did for Behavior)
-- **Option B**: Move all BlockClosure access to primitive 207 (BlockClosure>>value)
+- **Option A**: Declare BlockContext as a VM extension with fixed field indices (like we did for Behavior)
+- **Option B**: Move all BlockContext access to primitive 207 (BlockContext>>value)
 
 ---
 
@@ -210,9 +210,9 @@ These represent application-level class structures and should NOT be hardcoded i
    - Review Blue Book Chapter 29 for process primitive specifications
    - Determine if ProcessorScheduler/Process fields are architectural constants
 
-6. **BlockClosure Fields** - Determine VM extension vs primitive approach
-   - Document BlockClosure as VM extension with fixed field indices, OR
-   - Move all BlockClosure logic to primitive 207
+6. **BlockContext Fields** - Determine VM extension vs primitive approach
+   - Document BlockContext as VM extension with fixed field indices, OR
+   - Move all BlockContext logic to primitive 207
 
 ### Future Cleanup (Low Priority)
 
@@ -254,7 +254,7 @@ After implementing fixes:
 **Questionable VM Knowledge** (needs research):
 - Association fields (key, value)
 - Process/ProcessorScheduler fields
-- BlockClosure fields (VM extension)
+- BlockContext fields (VM extension)
 
 **Illegitimate VM Knowledge** (should be eliminated):
 - Point fields (x, y)

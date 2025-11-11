@@ -29,13 +29,13 @@ private bool IsBlockContext(SmalltalkOOP contextOOP)
 {
     var classOOP = _heapManager.GetClassOOP(contextOOP);
     var className = GetClassName(classOOP);
-    return className == "BlockContext" || className == "BlockClosure";
+    return className == "BlockContext" || className == "BlockContext";
 }
 ```
 
 ### Issue 1: Incomplete Type Check
 
-**Problem**: The method only checks for "BlockContext" and "BlockClosure", but doesn't account for:
+**Problem**: The method only checks for "BlockContext" and "BlockContext", but doesn't account for:
 - Subclasses of BlockContext (if any exist in user code)
 - The distinction between execution contexts vs. block literals
 
@@ -78,7 +78,7 @@ private bool IsBlockContext(SmalltalkOOP contextOOP)
     // Fast path: Direct OOP comparison (no string allocation)
     if (classOOP == _metadata.BlockContextClassOOP)
         return true;
-    if (classOOP == _metadata.BlockClosureClassOOP)
+    if (classOOP == _metadata.BlockContextClassOOP)
         return true;
     if (classOOP == _metadata.MethodContextClassOOP)
         return false;
@@ -96,7 +96,7 @@ private bool IsKindOfBlockContext(SmalltalkOOP classOOP)
     while (currentClassOOP != nilOOP)
     {
         if (currentClassOOP == _metadata.BlockContextClassOOP ||
-            currentClassOOP == _metadata.BlockClosureClassOOP)
+            currentClassOOP == _metadata.BlockContextClassOOP)
             return true;
 
         if (currentClassOOP == _metadata.MethodContextClassOOP)
@@ -126,7 +126,7 @@ private bool IsBlockContext(SmalltalkOOP contextOOP)
     // Fast path for known classes
     if (className == "MethodContext")
         return false;
-    if (className == "BlockContext" || className == "BlockClosure")
+    if (className == "BlockContext" || className == "BlockContext")
         return true;
 
     // Slow path: Check if this looks like a block context structurally
@@ -149,7 +149,7 @@ private bool IsBlockContext(SmalltalkOOP contextOOP)
     catch
     {
         // Fall back to string comparison
-        return className == "BlockContext" || className == "BlockClosure";
+        return className == "BlockContext" || className == "BlockContext";
     }
 }
 ```
@@ -175,9 +175,9 @@ private SmalltalkOOP GetHomeContext(SmalltalkOOP blockContextOOP)
     var classOOP = _heapManager.GetClassOOP(blockContextOOP);
     var className = GetClassName(classOOP);
 
-    if (className == "BlockClosure")
+    if (className == "BlockContext")
     {
-        int homeIndex = VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX;
+        int homeIndex = VMConstants.BLOCKCONTEXT_HOMECONTEXT_INDEX;
         return _heapManager.GetInstanceVariable(blockContextOOP, homeIndex);
     }
     else if (className == "BlockContext")
@@ -218,18 +218,18 @@ Slot 5: home         (BlockContext field)  ✅ CORRECT
 
 **VERDICT**: The constant is **CORRECT**. No change needed.
 
-### Issue 2: BlockClosure Field Index
+### Issue 2: BlockContext Field Index
 
-**Problem**: The code uses `BLOCKCLOSURE_HOMECONTEXT_INDEX` (value 1) for BlockClosure.
+**Problem**: The code uses `BLOCKCONTEXT_HOMECONTEXT_INDEX` (value 1) for BlockContext.
 
 **From VMConstants.cs** (line 61):
 ```csharp
-public const int BLOCKCLOSURE_HOMECONTEXT_INDEX = 1;
+public const int BLOCKCONTEXT_HOMECONTEXT_INDEX = 1;
 ```
 
 **From Smalltalk-80.st** (line 41832):
 ```smalltalk
-Object subclass: #BlockClosure
+Object subclass: #BlockContext
     instanceVariableNames: 'method homeContext returnContext numArgs'
 ```
 
@@ -251,11 +251,11 @@ private SmalltalkOOP GetHomeContext(SmalltalkOOP blockContextOOP)
     var classOOP = _heapManager.GetClassOOP(blockContextOOP);
 
     // Fast path: Direct OOP comparison
-    if (classOOP == _metadata.BlockClosureClassOOP)
+    if (classOOP == _metadata.BlockContextClassOOP)
     {
         return _heapManager.GetInstanceVariable(
             blockContextOOP,
-            VMConstants.BLOCKCLOSURE_HOMECONTEXT_INDEX);
+            VMConstants.BLOCKCONTEXT_HOMECONTEXT_INDEX);
     }
     else if (classOOP == _metadata.BlockContextClassOOP)
     {
@@ -315,7 +315,7 @@ private int GetBlockLocalCount(SmalltalkOOP blockContextOOP)
 **This means**:
 1. When executing a block, `_activeContextOOP` points to a **MethodContext**
 2. BlockContext objects are **block literals** (unevaluated blocks)
-3. BlockClosure objects are **closures** (block literals wrapped for execution)
+3. BlockContext objects are **closures** (block literals wrapped for execution)
 
 **Therefore**: `GetBlockLocalCount()` is being called on a **MethodContext** that represents block execution, not a BlockContext data holder.
 
@@ -327,7 +327,7 @@ private int GetBlockLocalCount(SmalltalkOOP blockContextOOP)
 /// IMPORTANT: This works on execution contexts (MethodContext), not block literal data holders.
 /// The method parses the CompiledMethod header to determine local count.
 /// </summary>
-/// <param name="contextOOP">The execution context (must be MethodContext or BlockClosure execution context)</param>
+/// <param name="contextOOP">The execution context (must be MethodContext or BlockContext execution context)</param>
 /// <returns>Number of args + temps for this context's method</returns>
 private int GetBlockLocalCount(SmalltalkOOP contextOOP)
 {
@@ -492,7 +492,7 @@ public class VMMetadata
     // ADD THESE:
     public SmalltalkOOP MethodContextClassOOP { get; set; }
     public SmalltalkOOP BlockContextClassOOP { get; set; }
-    public SmalltalkOOP BlockClosureClassOOP { get; set; }
+    public SmalltalkOOP BlockContextClassOOP { get; set; }
     public SmalltalkOOP ContextPartClassOOP { get; set; }
 }
 ```
@@ -501,7 +501,7 @@ public class VMMetadata
 ```csharp
 _metadata.MethodContextClassOOP = GlobalRegistry.Get("class:MethodContext");
 _metadata.BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext");
-_metadata.BlockClosureClassOOP = GlobalRegistry.Get("class:BlockClosure");
+_metadata.BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext");
 _metadata.ContextPartClassOOP = GlobalRegistry.Get("class:ContextPart");
 ```
 
@@ -509,7 +509,7 @@ _metadata.ContextPartClassOOP = GlobalRegistry.Get("class:ContextPart");
 
 ```csharp
 /// <summary>
-/// Determines if a context is a block execution context (BlockContext or BlockClosure).
+/// Determines if a context is a block execution context (BlockContext or BlockContext).
 /// Uses fast OOP comparison instead of string lookup.
 /// Per Smalltalk-80 semantics: equivalent to "receiver isKindOf: BlockContext".
 /// </summary>
@@ -521,7 +521,7 @@ private bool IsBlockContext(SmalltalkOOP contextOOP)
     // Covers 99.9% of cases
     if (classOOP == _metadata.BlockContextClassOOP)
         return true;
-    if (classOOP == _metadata.BlockClosureClassOOP)
+    if (classOOP == _metadata.BlockContextClassOOP)
         return true;
     if (classOOP == _metadata.MethodContextClassOOP)
         return false;
@@ -532,7 +532,7 @@ private bool IsBlockContext(SmalltalkOOP contextOOP)
 }
 
 /// <summary>
-/// Checks if a class inherits from BlockContext or BlockClosure.
+/// Checks if a class inherits from BlockContext or BlockContext.
 /// Only called for unknown context subclasses (rare).
 /// </summary>
 private bool IsKindOfBlockContext(SmalltalkOOP classOOP)
@@ -544,9 +544,9 @@ private bool IsKindOfBlockContext(SmalltalkOOP classOOP)
 
     while (currentClassOOP != nilOOP && depth < maxDepth)
     {
-        // Check if we've reached BlockContext or BlockClosure
+        // Check if we've reached BlockContext or BlockContext
         if (currentClassOOP == _metadata.BlockContextClassOOP ||
-            currentClassOOP == _metadata.BlockClosureClassOOP)
+            currentClassOOP == _metadata.BlockContextClassOOP)
             return true;
 
         // Check if we've reached MethodContext (not a block)
@@ -648,7 +648,7 @@ receiver isKindOf: ContextPart     "Inheritance check"
 - **RECOMMENDATION**: Replace with OOP comparison (15-25x faster)
 
 ### GetHomeContext()
-- ✅ **Correct field indices**: BLOCKCONTEXT_HOME_INDEX and BLOCKCLOSURE_HOMECONTEXT_INDEX are correct
+- ✅ **Correct field indices**: BLOCKCONTEXT_HOME_INDEX and BLOCKCONTEXT_HOMECONTEXT_INDEX are correct
 - ⚠️ **Performance issue**: String comparison on every call
 - **RECOMMENDATION**: Replace with OOP comparison
 
@@ -670,7 +670,7 @@ receiver isKindOf: ContextPart     "Inheritance check"
 ## 9. Action Items
 
 ### Critical (Fix Immediately)
-1. ✅ **Add VMMetadata fields** for MethodContextClassOOP, BlockContextClassOOP, BlockClosureClassOOP
+1. ✅ **Add VMMetadata fields** for MethodContextClassOOP, BlockContextClassOOP, BlockContextClassOOP
 2. ✅ **Populate fields** during Phase 2 of cold start
 3. ✅ **Replace IsBlockContext()** with OOP comparison implementation
 4. ✅ **Replace GetHomeContext()** string checks with OOP comparison
