@@ -45,6 +45,62 @@ This document provides a step-by-step implementation plan to correctly support b
 
 ---
 
+## CRITICAL UPDATE (2025-11-11): Unified Temp Frame Architecture
+
+**IMPORTANT**: BlockContext has ONLY 5 instance fields (no ntemps field). All temporaries are allocated in the unified temp frame in the MethodContext.
+
+### Key Architectural Points
+
+1. **NO ntemps field**: BlockContext spec is `instanceVariableNames: 'nargs startpc home'` (NOT 'nargs ntemps startpc home')
+2. **Unified temp frame**: ALL temps (method + all blocks) live in MethodContext's indexed slots
+3. **Absolute indexing**: Compiler emits absolute indices (0, 1, 2...) into unified frame
+4. **Slot reuse**: Sequential non-overlapping blocks can REUSE temp slots
+5. **blockCopy: takes 1 argument**: ONLY nargs (NOT nargs + ntemps)
+6. **Simplified VM**: No nargs+ntemps boundary checking, just FindHomeMethodContext + direct access
+
+### Impact on Implementation
+
+**VMConstants.cs** - Remove any BLOCKCONTEXT_NTEMPS_INDEX:
+```csharp
+// WRONG (6 fields):
+public const int BLOCKCONTEXT_NARGS_INDEX = 3;
+public const int BLOCKCONTEXT_NTEMPS_INDEX = 4;  // DELETE THIS!
+public const int BLOCKCONTEXT_STARTPC_INDEX = 5;
+public const int BLOCKCONTEXT_HOME_INDEX = 6;
+
+// CORRECT (5 fields):
+public const int BLOCKCONTEXT_NARGS_INDEX = 3;
+public const int BLOCKCONTEXT_STARTPC_INDEX = 4;  // Was 5
+public const int BLOCKCONTEXT_HOME_INDEX = 5;      // Was 6
+```
+
+**Smalltalk-80.st** - Verify BlockContext has NO ntemps:
+```smalltalk
+ContextPart variableSubclass: #BlockContext
+    instanceVariableNames: 'nargs startpc home'   "NOT 'nargs ntemps startpc home'"
+```
+
+**Compiler** - Must use TempFrameAllocator:
+```csharp
+class TempFrameAllocator {
+    // Allocates ALL temps in unified frame
+    // Reuses slots for sequential blocks
+    // Emits absolute indices
+}
+```
+
+**VM temp access** - Simplified:
+```csharp
+void PushTemporary(int absoluteIndex) {
+    var home = FindHomeMethodContext(_activeContext);
+    Push(home.indexedSlots[absoluteIndex]);  // Direct access!
+}
+```
+
+See `BlueBook-Context-Architecture.md` Section 4.3 and `CRITICAL-Block-Compilation-Discovery.md` "Unified Temp Frame Architecture" for full details.
+
+---
+
 ## Part 1: Interpreter Implementation (Primitives 80-81)
 
 ### Prerequisites

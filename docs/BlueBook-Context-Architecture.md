@@ -268,21 +268,24 @@ const int METHODCONTEXT_TEMP_FRAME_START = 5;  // Indexed slots start
 BlockContext class>>instanceVariableNames
     ^'caller pc stackp nargs initialIP home'
 
-"Indexed slots: arguments, temporaries, and stack"
+"Indexed slots: block arguments during activation (copied by primitiveValue)"
+"NOTE: Block temps are NOT stored here - they live in home MethodContext"
 ```
 
 **C# equivalent**:
 ```csharp
-// BlockContext layout
+// BlockContext layout (Blue Book Chapter 30)
 // Instance variables (fixed slots):
-const int BLOCKCONTEXT_CALLER_INDEX = 0;       // Return point
+const int BLOCKCONTEXT_CALLER_INDEX = 0;       // Return point (sender for block return)
 const int BLOCKCONTEXT_PC_INDEX = 1;           // Program counter
 const int BLOCKCONTEXT_STACKP_INDEX = 2;       // Stack pointer
 const int BLOCKCONTEXT_NARGS_INDEX = 3;        // Argument count
-const int BLOCKCONTEXT_INITIALIP_INDEX = 4;    // Starting bytecode offset
-const int BLOCKCONTEXT_HOME_INDEX = 5;         // Defining MethodContext
+const int BLOCKCONTEXT_INITIALIP_INDEX = 4;    // Starting bytecode offset (startpc)
+const int BLOCKCONTEXT_HOME_INDEX = 5;         // Defining MethodContext (lexical parent)
 
 const int BLOCKCONTEXT_TEMP_FRAME_START = 6;   // Indexed slots start
+// IMPORTANT: Indexed slots store ONLY block arguments (during activation)
+// All block temporaries are stored in the home MethodContext's temp frame
 ```
 
 ### 3.2 Primitive 80: blockCopy: (Blue Book Chapter 29)
@@ -512,94 +515,136 @@ block2   (BlockContext, home → methodC)
 4. Nested blocks create BlockContexts with `home = outer BlockContext`
 5. Variable access uses `home` chain to traverse scopes
 
-### 4.3 Variable Access Algorithm
+### 4.3 Variable Access Algorithm - UNIFIED TEMP FRAME MODEL
 
-**Compiler generates indices based on local scope**:
-```
-Scope:               Index:
-block arg 0     →    0
-block arg 1     →    1
-block temp 0    →    2
-method temp 0   →    3  (requires home traversal)
-method temp 1   →    4  (requires home traversal)
+**CRITICAL: Blue Book uses unified temp frame, NOT per-context frames**
+
+All temporaries (method args/temps + all nested block args/temps) are allocated in the **MethodContext's temp frame** using absolute indices. The compiler performs static analysis to:
+
+1. **Allocate temp slots** in the unified frame (maximum simultaneous need, not sum)
+2. **Reuse slots** for sequential non-overlapping blocks
+3. **Emit absolute indices** (0, 1, 2...) directly into bytecode
+
+**Example: Unified Temp Frame Allocation**
+```smalltalk
+"Method with sequential and nested blocks:"
+myMethod: x
+    | temp1 |                          "temp1 → slot 1 (arg x → slot 0)"
+    temp1 := x + 1.
+    [| btemp1 | btemp1 := temp1].      "btemp1 → slot 2 (reuses after block exits)"
+    [| ctemp1 ctemp2 | ctemp1 + ctemp2]."ctemp1 → slot 2, ctemp2 → slot 3 (reuse slot 2)"
+    [:y | y + temp1]                   "y → slot 2 (reuse slot 2 again)"
 ```
 
-**Interpreter algorithm** (PUSH_TEMP bytecode):
+**Temp Frame Layout** (slots in MethodContext):
+```
+Slot 0: x (method arg)
+Slot 1: temp1 (method temp)
+Slot 2: btemp1 / ctemp1 / y (REUSED for sequential blocks)
+Slot 3: ctemp2 (only when second block active)
+```
+
+**Maximum simultaneous need**: 4 slots (method has 2, can have at most 2 active from one block at a time)
+
+**Compiler algorithm for slot allocation**:
 ```csharp
-void PushTemporary(int index)
+class TempFrameAllocator
 {
-    var context = _activeContext;
+    int _nextSlot = 0;
+    Dictionary<string, int> _allocatedSlots = new();
+    Stack<HashSet<int>> _scopeSlots = new();  // Track slots per scope for reuse
 
-    // Get local count for current context
-    int localCount = GetLocalCount(context);
-
-    if (index < localCount)
+    void EnterScope()
     {
-        // Direct access in current context
-        var value = GetIndexedSlot(context, index);
-        Push(value);
+        _scopeSlots.Push(new HashSet<int>());
     }
-    else
-    {
-        // Access via home chain
-        var homeContext = GetHome(context);
-        if (homeContext == nil)
-            throw new Error("Variable index out of bounds");
 
-        // Recursively push from home context
-        // (adjust index by subtracting our locals)
-        PushTemporaryInContext(homeContext, index - localCount);
+    int AllocateSlot(string varName)
+    {
+        int slot = _nextSlot++;
+        _allocatedSlots[varName] = slot;
+        _scopeSlots.Peek().Add(slot);
+        return slot;
+    }
+
+    void ExitScope()
+    {
+        // Free slots from this scope for reuse
+        var freedSlots = _scopeSlots.Pop();
+        _nextSlot = Math.Min(_nextSlot, freedSlots.Min());
+    }
+
+    int GetSlot(string varName)
+    {
+        // Return absolute index into unified frame
+        return _allocatedSlots[varName];
     }
 }
+```
 
-int GetLocalCount(SmalltalkOOP contextOOP)
+**VM Implementation** (PUSH_TEMP / STORE_TEMP bytecodes):
+```csharp
+void PushTemporary(int absoluteIndex)
 {
-    var classOOP = GetClass(contextOOP);
+    // Find home MethodContext (traverse home chain if in BlockContext)
+    var homeMethodContext = FindHomeMethodContext(_activeContextOOP);
 
-    if (classOOP == ClassMethodContextPointer)
-    {
-        // MethodContext: get numArgs + numTemps from method header
-        var methodOOP = GetInstanceVariable(contextOOP, METHODCONTEXT_METHOD_INDEX);
-        var header = ParseMethodHeader(methodOOP);
-        return header.NumArgs + header.NumTemps;
-    }
-    else // BlockContext
-    {
-        // BlockContext: get numArgs from nargs field
-        var nargsOOP = GetInstanceVariable(contextOOP, BLOCKCONTEXT_NARGS_INDEX);
-        int nargs = SmallIntegerValue(nargsOOP);
+    // Direct access into home's temp frame using absolute index
+    // GetIndexedOOP already handles offset (1 + instanceVarCount) internally
+    var value = _heapManager.GetIndexedOOP(
+        homeMethodContext,
+        absoluteIndex
+    );
 
-        // Get numTemps from home's method header
-        var homeOOP = GetInstanceVariable(contextOOP, BLOCKCONTEXT_HOME_INDEX);
-        var methodOOP = GetMethodFromContext(homeOOP);
-        var header = ParseMethodHeader(methodOOP);
-
-        return nargs + header.NumTemps;
-    }
+    Push(value);
 }
 
-SmalltalkOOP GetHome(SmalltalkOOP contextOOP)
+void StoreTemporary(int absoluteIndex)
 {
-    var classOOP = GetClass(contextOOP);
+    var value = PopStack();
+    var homeMethodContext = FindHomeMethodContext(_activeContextOOP);
 
-    if (classOOP == ClassMethodContextPointer)
+    // SetIndexedOOP already handles offset (1 + instanceVarCount) internally
+    _heapManager.SetIndexedOOP(
+        homeMethodContext,
+        absoluteIndex,
+        value
+    );
+}
+
+SmalltalkOOP FindHomeMethodContext(SmalltalkOOP contextOOP)
+{
+    while (true)
     {
-        // MethodContext has no home
-        return nil;
-    }
-    else // BlockContext
-    {
-        return GetInstanceVariable(contextOOP, BLOCKCONTEXT_HOME_INDEX);
+        var classOOP = _heapManager.GetClassOOP(contextOOP);
+
+        if (classOOP == _metadata.MethodContextClassOOP)
+        {
+            return contextOOP;  // Found the MethodContext
+        }
+
+        // Traverse home chain for BlockContext
+        contextOOP = _heapManager.GetInstanceVariable(
+            contextOOP,
+            VMConstants.BLOCKCONTEXT_HOME_INDEX
+        );
     }
 }
 ```
 
 **Key Points**:
-1. Variable access starts in current context
-2. If index >= localCount, traverse `home` chain
-3. MethodContext has no `home` → terminates chain
-4. BlockContext has `home` → continues chain
-5. Index is **relative to defining scope**, not absolute
+1. **Unified temp frame**: All temps live in MethodContext (slots 5+)
+2. **Absolute indexing**: Compiler emits absolute indices (0, 1, 2...), not relative
+3. **Slot reuse**: Sequential blocks share slots (determined by compiler)
+4. **No nargs+ntemps logic**: VM doesn't need to count locals per context
+5. **Simple VM access**: Direct `homeContext[TempFrameStart + index]`
+6. **BlockContext indexed slots**: Used ONLY for block arguments during activation (primitiveValue copies args there), NOT for variable storage
+
+**Why This Is Correct**:
+- Matches Blue Book implementation (Smalltalk-80.st image behavior)
+- Minimizes temp frame size (reuses slots)
+- Simplifies VM (no home chain traversal with index adjustment)
+- Enables nested blocks to access any outer variable with single lookup
 
 ---
 
@@ -1071,36 +1116,49 @@ if (bytecode >= 0xA8 && bytecode <= 0xAF)
 
 **7.1.1 Update VMConstants.cs**
 
-Add BlockContext field indices:
+Add BlockContext field indices (5 fields, NO ntemps):
 ```csharp
-// BlockContext fields (Blue Book specification)
-public const int BLOCKCONTEXT_CALLER_INDEX = 0;
-public const int BLOCKCONTEXT_PC_INDEX = 1;
-public const int BLOCKCONTEXT_STACKP_INDEX = 2;
-public const int BLOCKCONTEXT_NARGS_INDEX = 3;
-public const int BLOCKCONTEXT_INITIALIP_INDEX = 4;
-public const int BLOCKCONTEXT_HOME_INDEX = 5;
-public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;
+// BlockContext fields (Blue Book specification - Chapter 30)
+// CRITICAL: BlockContext has ONLY 5 instance variables (no ntemps field)
+public const int BLOCKCONTEXT_CALLER_INDEX = 0;        // sender field for block returns
+public const int BLOCKCONTEXT_PC_INDEX = 1;            // program counter
+public const int BLOCKCONTEXT_STACKP_INDEX = 2;        // stack pointer
+public const int BLOCKCONTEXT_NARGS_INDEX = 3;         // block argument count
+public const int BLOCKCONTEXT_STARTPC_INDEX = 4;       // initialIP/startpc - bytecode offset
+public const int BLOCKCONTEXT_HOME_INDEX = 5;          // lexical parent (MethodContext or BlockContext)
+public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;    // First indexed slot
 
-// MethodContext fields
-public const int METHODCONTEXT_SENDER_INDEX = 0;
-public const int METHODCONTEXT_PC_INDEX = 1;
-public const int METHODCONTEXT_STACKP_INDEX = 2;
-public const int METHODCONTEXT_METHOD_INDEX = 3;
-public const int METHODCONTEXT_RECEIVER_INDEX = 4;
-public const int METHODCONTEXT_TEMP_FRAME_START = 5;
+// MethodContext fields (Blue Book specification - Chapter 30)
+public const int METHODCONTEXT_SENDER_INDEX = 0;       // return address for method returns
+public const int METHODCONTEXT_PC_INDEX = 1;           // program counter
+public const int METHODCONTEXT_STACKP_INDEX = 2;       // stack pointer
+public const int METHODCONTEXT_METHOD_INDEX = 3;       // CompiledMethod object
+public const int METHODCONTEXT_RECEIVER_INDEX = 4;     // self
+public const int METHODCONTEXT_TEMP_FRAME_START = 5;   // First indexed slot (unified temp frame)
 ```
+
+**IMPORTANT**: The unified temp frame architecture means:
+- All method args/temps + all block args/temps are stored in MethodContext (slots 5+)
+- BlockContext indexed slots (6+) are used ONLY for arguments during activation
+- Compiler emits absolute indices into unified frame, not per-context relative indices
 
 **7.1.2 Update Smalltalk-80.st**
 
-Verify BlockContext class definition exists around line 4682:
+Verify BlockContext class definition has ONLY 5 fields (NO ntemps) around line 4683:
 ```smalltalk
-Object subclass: #BlockContext
-    instanceVariableNames: 'caller pc stackp nargs initialIP home'
+ContextPart variableSubclass: #BlockContext
+    instanceVariableNames: 'nargs startpc home'
     classVariableNames: ''
     poolDictionaries: ''
     category: 'Kernel-Methods'!
 ```
+
+**Field count**:
+- ContextPart contributes: sender (slot 0), pc (slot 1), stackp (slot 2)
+- BlockContext adds: nargs (slot 3), startpc (slot 4), home (slot 5)
+- Total: 6 fields (NOT 7 - no ntemps!)
+
+**CRITICAL**: If you see `nargs ntemps startpc home`, REMOVE ntemps - it's a VM extension that breaks Blue Book compliance
 
 ### Phase 2: Implement Primitives
 
@@ -1294,109 +1352,226 @@ See implementation in Section 6.3
 
 See implementation in Section 6.4
 
-### Phase 4: Update Variable Access
+### Phase 4: Update Variable Access (UNIFIED TEMP FRAME)
 
-**7.4.1 PUSH_TEMP handler**
+**7.4.1 PUSH_TEMP handler - Simplified with unified frame**
 
 ```csharp
-void PushTemporary(int index)
+void PushTemporary(int absoluteIndex)
 {
-    var contextOOP = _activeContextOOP;
-    var classOOP = GetClass(contextOOP);
+    // Find the home MethodContext (traverse home chain if in BlockContext)
+    var homeMethodContextOOP = FindHomeMethodContext(_activeContextOOP);
 
-    while (true)
-    {
-        // Get local count for this context
-        int localCount = GetLocalCount(contextOOP);
+    // Direct access into unified temp frame using absolute index
+    var value = _heapManager.GetIndexedOOP(
+        homeMethodContextOOP,
+        VMConstants.METHODCONTEXT_TEMP_FRAME_START + absoluteIndex
+    );
 
-        if (index < localCount)
-        {
-            // Found it in this context
-            var value = GetContextIndexedSlot(contextOOP, index);
-            Push(value);
-            return;
-        }
-
-        // Not in this context - traverse home chain
-        if (classOOP == ClassMethodContextPointer)
-        {
-            // MethodContext has no home - error
-            throw new InvalidOperationException(
-                $"Temp index {index} out of bounds in MethodContext"
-            );
-        }
-
-        // Get home
-        index -= localCount;
-        contextOOP = GetInstanceVariable(
-            contextOOP,
-            BLOCKCONTEXT_HOME_INDEX
-        );
-
-        if (contextOOP == nil)
-        {
-            throw new InvalidOperationException("Home chain broken");
-        }
-
-        classOOP = GetClass(contextOOP);
-    }
+    Push(value);
 }
 
-int GetLocalCount(SmalltalkOOP contextOOP)
+void StoreTemporary(int absoluteIndex)
 {
-    var classOOP = GetClass(contextOOP);
+    var value = PopStack();
+    var homeMethodContextOOP = FindHomeMethodContext(_activeContextOOP);
 
-    if (classOOP == ClassMethodContextPointer)
+    _heapManager.SetIndexedOOP(
+        homeMethodContextOOP,
+        VMConstants.METHODCONTEXT_TEMP_FRAME_START + absoluteIndex,
+        value
+    );
+}
+
+SmalltalkOOP FindHomeMethodContext(SmalltalkOOP contextOOP)
+{
+    // Traverse home chain until we find a MethodContext
+    while (true)
     {
-        // MethodContext: numArgs + numTemps from method header
-        var methodOOP = GetInstanceVariable(
-            contextOOP,
-            METHODCONTEXT_METHOD_INDEX
-        );
-        var header = ParseMethodHeader(methodOOP);
-        return header.NumArgs + header.NumTemps;
-    }
-    else // BlockContext
-    {
-        // BlockContext: nargs + numTemps
-        var nargsOOP = GetInstanceVariable(
-            contextOOP,
-            BLOCKCONTEXT_NARGS_INDEX
-        );
-        int nargs = nargsOOP.SmallIntegerValue;
+        var classOOP = _heapManager.GetClassOOP(contextOOP);
 
-        // numTemps comes from method (blocks don't declare temps separately)
-        var homeOOP = GetInstanceVariable(
-            contextOOP,
-            BLOCKCONTEXT_HOME_INDEX
-        );
-        var methodOOP = GetMethodFromContext(homeOOP);
-        var header = ParseMethodHeader(methodOOP);
+        if (classOOP == _metadata.MethodContextClassOOP)
+        {
+            return contextOOP;  // Found it
+        }
 
-        return nargs + header.NumTemps;
+        // Must be BlockContext - follow home link
+        contextOOP = _heapManager.GetInstanceVariable(
+            contextOOP,
+            VMConstants.BLOCKCONTEXT_HOME_INDEX
+        );
+
+        if (contextOOP.IsNil)
+        {
+            throw new InvalidOperationException("Home chain broken - no MethodContext found");
+        }
     }
 }
 ```
 
-### Phase 5: Update Compiler
+**Key Differences from Old Approach**:
+1. **No GetLocalCount()** - don't need to count locals per context
+2. **No index adjustment** - compiler emits absolute indices
+3. **No nargs+ntemps logic** - that was for per-context frames
+4. **Simple traversal** - just find home MethodContext, then direct access
+5. **One lookup** - no recursive calls with index arithmetic
 
-**7.5.1 Modify BytecodeCompiler.cs**
+### Phase 5: Update Compiler (UNIFIED TEMP FRAME)
 
-Replace block compilation:
+**7.5.1 Create TempFrameAllocator class**
+
+New file: `Smalltalk80.Compiler/Analysis/TempFrameAllocator.cs`
+
 ```csharp
+/// <summary>
+/// Allocates temp slots in the unified temp frame with slot reuse for sequential blocks.
+/// All temps (method + all blocks) live in the MethodContext's temp frame.
+/// </summary>
+public class TempFrameAllocator
+{
+    private int _nextSlot = 0;
+    private int _maxSimultaneous = 0;
+    private readonly Dictionary<string, int> _allocatedSlots = new();
+    private readonly Stack<ScopeInfo> _scopeStack = new();
+
+    private class ScopeInfo
+    {
+        public HashSet<int> AllocatedSlots { get; } = new();
+        public int StartSlot { get; set; }
+        public bool IsSequential { get; set; }  // Can reuse slots after exit?
+    }
+
+    public void EnterMethodScope(List<string> argNames, List<string> tempNames)
+    {
+        var scope = new ScopeInfo { StartSlot = _nextSlot, IsSequential = false };
+        _scopeStack.Push(scope);
+
+        // Allocate slots for method args
+        foreach (var argName in argNames)
+        {
+            int slot = _nextSlot++;
+            _allocatedSlots[argName] = slot;
+            scope.AllocatedSlots.Add(slot);
+        }
+
+        // Allocate slots for method temps
+        foreach (var tempName in tempNames)
+        {
+            int slot = _nextSlot++;
+            _allocatedSlots[tempName] = slot;
+            scope.AllocatedSlots.Add(slot);
+        }
+
+        _maxSimultaneous = Math.Max(_maxSimultaneous, _nextSlot);
+    }
+
+    public void EnterBlockScope(List<string> argNames, List<string> tempNames, bool isNested)
+    {
+        var scope = new ScopeInfo
+        {
+            StartSlot = _nextSlot,
+            IsSequential = !isNested  // Sequential blocks can reuse, nested cannot
+        };
+        _scopeStack.Push(scope);
+
+        // Allocate slots for block args
+        foreach (var argName in argNames)
+        {
+            int slot = _nextSlot++;
+            _allocatedSlots[argName] = slot;
+            scope.AllocatedSlots.Add(slot);
+        }
+
+        // Allocate slots for block temps
+        foreach (var tempName in tempNames)
+        {
+            int slot = _nextSlot++;
+            _allocatedSlots[tempName] = slot;
+            scope.AllocatedSlots.Add(slot);
+        }
+
+        _maxSimultaneous = Math.Max(_maxSimultaneous, _nextSlot);
+    }
+
+    public void ExitScope()
+    {
+        var scope = _scopeStack.Pop();
+
+        if (scope.IsSequential && scope.AllocatedSlots.Count > 0)
+        {
+            // Reuse slots from this sequential block
+            int minSlot = scope.AllocatedSlots.Min();
+            _nextSlot = minSlot;
+
+            // Remove variables from allocation map
+            var varsToRemove = _allocatedSlots
+                .Where(kvp => scope.AllocatedSlots.Contains(kvp.Value))
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            foreach (var varName in varsToRemove)
+            {
+                _allocatedSlots.Remove(varName);
+            }
+        }
+    }
+
+    public int GetSlotIndex(string varName)
+    {
+        if (_allocatedSlots.TryGetValue(varName, out int slot))
+        {
+            return slot;
+        }
+
+        throw new InvalidOperationException($"Variable '{varName}' not found in temp frame");
+    }
+
+    public int GetMaxFrameSize()
+    {
+        return _maxSimultaneous;
+    }
+}
+```
+
+**7.5.2 Update BytecodeCompiler.cs to use TempFrameAllocator**
+
+```csharp
+void CompileMethod(MethodNode node)
+{
+    _allocator = new TempFrameAllocator();
+
+    // Enter method scope
+    _allocator.EnterMethodScope(node.Arguments, node.Temporaries);
+
+    // Compile method body
+    foreach (var statement in node.Statements)
+    {
+        CompileStatement(statement);
+    }
+
+    _allocator.ExitScope();
+
+    // Use max frame size for method header
+    int maxFrameSize = _allocator.GetMaxFrameSize();
+    EmitMethodHeader(node.Arguments.Count, maxFrameSize);
+}
+
 void VisitBlockNode(BlockNode node)
 {
-    // OLD: PUSH_LITERAL (wrong)
-    // NEW: Inline block generation
+    // Determine if block is nested (analyze AST)
+    bool isNested = IsNestedBlock(node);
 
+    // Enter block scope
+    _allocator.EnterBlockScope(node.Parameters, node.BlockTemporaries, isNested);
+
+    // Emit blockCopy: with ONLY 1 argument (nargs)
     EmitPushActiveContext();
-    EmitPushConstant(node.Parameters.Count);
+    EmitPushConstant(node.Parameters.Count);  // ONLY nargs, NOT ntemps
     EmitSend("blockCopy:", 1);
 
     int jumpStart = EmitJumpPlaceholder();
-    int blockBodyStart = CurrentOffset;
 
-    // Compile block body
+    // Compile block body with absolute indices
     foreach (var statement in node.Statements)
     {
         CompileStatement(statement);
@@ -1406,8 +1581,27 @@ void VisitBlockNode(BlockNode node)
 
     int blockBodyEnd = CurrentOffset;
     PatchJump(jumpStart, blockBodyEnd - jumpStart);
+
+    // Exit block scope (may reuse slots if sequential)
+    _allocator.ExitScope();
+}
+
+void EmitPushTemporary(string varName)
+{
+    // Get absolute index from allocator
+    int absoluteIndex = _allocator.GetSlotIndex(varName);
+
+    // Emit PUSH_TEMP with absolute index
+    EmitBytecode(PUSH_TEMP, absoluteIndex);
 }
 ```
+
+**Key Changes**:
+1. **TempFrameAllocator** manages unified frame allocation
+2. **Slot reuse** for sequential blocks (IsSequential flag)
+3. **Absolute indices** emitted by compiler (0, 1, 2...)
+4. **Single argument blockCopy:** - only passes nargs, NOT ntemps
+5. **Max frame size** tracked and used in method header
 
 ### Phase 6: Testing
 

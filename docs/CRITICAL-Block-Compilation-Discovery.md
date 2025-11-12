@@ -247,6 +247,103 @@ BlockContext object:
 
 ---
 
+## CRITICAL: Unified Temp Frame Architecture
+
+**Date Added**: 2025-11-11
+**Discovery**: Blue Book uses unified temp frame, NOT per-context temp frames
+
+### The Unified Temp Frame Model
+
+All temporaries (method args/temps + ALL nested block args/temps) are allocated in the **MethodContext's temp frame** using absolute indices. The compiler does NOT generate separate temp frames per context.
+
+**Key Points**:
+1. **Single allocation point**: All temps live in MethodContext indexed slots (slot 5+)
+2. **Absolute indexing**: Compiler emits absolute indices (0, 1, 2...), not per-context relative indices
+3. **Slot reuse**: Sequential non-overlapping blocks can REUSE temp slots
+4. **Simplified VM**: No nargs+ntemps boundary checking, just traverse home chain and direct access
+5. **BlockContext has NO ntemps field**: Blue Book spec has only 5 fields (nargs, startpc, home, plus inherited sender/pc/stackp)
+
+### Example: Slot Allocation with Reuse
+
+```smalltalk
+myMethod: x
+    | temp1 |                          "Slot 0: x, Slot 1: temp1"
+    temp1 := x + 1.
+    [| btemp1 | btemp1 := temp1].      "Slot 2: btemp1 (reuses after block exits)"
+    [| ctemp1 ctemp2 | ctemp1 + ctemp2]."Slot 2: ctemp1, Slot 3: ctemp2 (REUSE slot 2!)"
+    [:y | y + temp1]                   "Slot 2: y (REUSE slot 2 again)"
+```
+
+**Temp frame layout in MethodContext**:
+```
+Slot 0: x (method arg)
+Slot 1: temp1 (method temp)
+Slot 2: btemp1 / ctemp1 / y (REUSED for sequential blocks)
+Slot 3: ctemp2 (only allocated when second block active)
+```
+
+**Maximum simultaneous need**: 4 slots (not sum of all temps!)
+
+### BlockContext Indexed Slots: For Arguments ONLY
+
+**CRITICAL CLARIFICATION**: BlockContext's indexed slots are used ONLY for:
+- Block arguments during activation (primitiveValue copies args there)
+- Expression stack during block execution
+
+**BlockContext indexed slots are NOT used for**:
+- Block temporaries (these live in home MethodContext)
+- Permanent variable storage (compiler allocates in unified frame)
+
+### Compiler Responsibilities
+
+The compiler must:
+1. **Analyze scope**: Determine which blocks are sequential vs nested
+2. **Allocate slots**: Assign absolute indices with reuse for sequential blocks
+3. **Track maximum**: Record maximum simultaneous slot need for method header
+4. **Emit absolute indices**: PUSH_TEMP/STORE_TEMP use absolute indices into unified frame
+5. **NO ntemps emission**: blockCopy: takes ONLY 1 argument (nargs), NOT 2
+
+### VM Simplification
+
+With unified temp frame, the VM temp access is drastically simpler:
+
+**OLD (WRONG) - Per-context frames with nargs+ntemps logic**:
+```csharp
+// Complex home chain traversal with index adjustment
+int GetLocalCount(contextOOP) {
+    if (IsBlockContext) {
+        nargs + ntemps  // Need to read ntemps field
+    } else {
+        method.numArgs + method.numTemps
+    }
+}
+```
+
+**NEW (CORRECT) - Unified frame with direct access**:
+```csharp
+// Simple home traversal, direct access
+SmalltalkOOP FindHomeMethodContext(contextOOP) {
+    while (!IsMethodContext(contextOOP)) {
+        contextOOP = contextOOP.home;
+    }
+    return contextOOP;
+}
+
+void PushTemporary(int absoluteIndex) {
+    var home = FindHomeMethodContext(_activeContext);
+    Push(home.indexedSlots[absoluteIndex]);
+}
+```
+
+### Why This Matters
+
+**Memory efficiency**: Reusing slots reduces method temp frame size
+**VM simplicity**: No complex nargs+ntemps boundary checks
+**Blue Book compliance**: Matches canonical Smalltalk-80 implementation
+**Correctness**: Enables proper nested block variable access
+
+---
+
 ## Key Architectural Points
 
 ### 1. Blocks are NOT Literals
@@ -287,20 +384,52 @@ var blockLocalId = RegisterBlock(blockMethod);
 Emit(PUSH_LITERAL, literalIndex); // Pushes CompiledMethod
 ```
 
-**Required BlockNode Handling** (CORRECT):
+**Required BlockNode Handling** (CORRECT - Unified Temp Frame):
 ```csharp
-// Generate inline bytecode
-Emit(0x89); // LdThisContext (137)
-Emit(PUSH_LITERAL, blockNode.ArgumentCount); // numArgs as SmallInteger
-EmitSend("blockCopy:", 1); // Primitive 80
-int jumpOffset = ReserveJump(); // Will fill in later
+// CRITICAL: Use TempFrameAllocator for unified temp frame allocation
 
-// Emit block body inline
-CompileBlockBody(blockNode);
-Emit(0x7D); // EndRemote (125)
+class TempFrameAllocator {
+    // Allocates ALL temps (method + blocks) in unified frame
+    // Reuses slots for sequential blocks
+    // Emits absolute indices (0, 1, 2...)
+}
 
-// Fill in jump offset
-FillJump(jumpOffset, currentOffset);
+void CompileMethod(MethodNode node) {
+    _allocator = new TempFrameAllocator();
+    _allocator.EnterMethodScope(node.Arguments, node.Temporaries);
+
+    // Compile method body...
+
+    _allocator.ExitScope();
+    int maxFrameSize = _allocator.GetMaxFrameSize();
+    EmitMethodHeader(node.Arguments.Count, maxFrameSize);
+}
+
+void CompileBlockNode(BlockNode node) {
+    bool isNested = IsNestedBlock(node);
+    _allocator.EnterBlockScope(node.Parameters, node.BlockTemps, isNested);
+
+    // Generate inline bytecode
+    Emit(0x89); // LdThisContext (137)
+    EmitPushConstant(node.Parameters.Count); // ONLY nargs (NOT ntemps!)
+    EmitSend("blockCopy:", 1); // Primitive 80 with 1 argument
+    int jumpOffset = ReserveJump(); // Will fill in later
+
+    // Emit block body inline (uses absolute indices from allocator)
+    CompileBlockBody(blockNode);
+    Emit(0x7D); // EndRemote (125)
+
+    // Fill in jump offset
+    FillJump(jumpOffset, currentOffset);
+
+    _allocator.ExitScope();  // May reuse slots if sequential
+}
+
+void EmitPushTemporary(string varName) {
+    // Get absolute index from allocator
+    int absoluteIndex = _allocator.GetSlotIndex(varName);
+    Emit(PUSH_TEMP, absoluteIndex);  // Absolute index into unified frame
+}
 ```
 
 ### Interpreter (Smalltalk80.Interpreter)

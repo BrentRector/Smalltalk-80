@@ -4,6 +4,70 @@
 
 ## Recent Work (2025-11-11)
 
+**VM Extension: Block Temporary Count Tracking**
+
+Implemented compiler and VM support to track and emit block temporary counts, enabling proper population of BlockContext.ntemps field (slot 4).
+
+**Build Status**: ✅ 0 errors, 1 warning (undeclared variables)
+**Cold Start**: ✅ Phase 1-6 all succeeded
+**Cold Start (--skip-init-expressions)**: ✅ All 3 init expressions succeeded
+
+**Files Modified**:
+1. `Smalltalk80.Compiler\BytecodeCompiler.cs` (lines 2113-2134, 2247-2251)
+   - Parse block temporaries BEFORE emitting blockCopy bytecode
+   - Emit tempCount as second argument to blockCopy primitive
+   - Avoid duplicate `blockTemps` variable declaration
+
+2. `Smalltalk80.Interpreter\Core\VM\Primitives\ControlPrimitives.cs` (lines 12-98, 154-158)
+   - Modified `BlockCopy` primitive to accept 2 arguments: (nargs, ntemps)
+   - Added validation for tempCount parameter
+   - Store tempCount in BlockContext.ntemps field instead of hard-coded 0
+
+3. `Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs` (line 1837)
+   - Updated `ExecuteSendSpecial()` to recognize blockCopy as 2-argument primitive
+
+**Key Implementation**:
+```csharp
+// COMPILER (BytecodeCompiler.cs)
+var blockTemps = block.blockTemps();
+int tempCount = 0;
+if (blockTemps != null)
+{
+    tempCount = blockTemps.children
+        .OfType<Smalltalk80Parser.TemporaryNameContext>()
+        .Count();
+}
+
+emitter.EmitByte(0x89); // PUSH_ACTIVE_CONTEXT
+emitter.PushSmallInteger(argCount); // First arg
+emitter.PushSmallInteger(tempCount); // Second arg (VM extension)
+emitter.EmitByte(0xC8); // SEND_SPECIAL_BLOCKCOPY
+
+// PRIMITIVE (ControlPrimitives.cs)
+public static SmalltalkOOP BlockCopy(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
+{
+    if (args.Length != 2) { ... }
+
+    SmalltalkOOP blockArgumentCount = args[0];
+    SmalltalkOOP blockTemporaryCount = args[1]; // VM extension
+
+    ctx.HeapManager.SetInstanceVariable(newBlockContext,
+        VMConstants.BLOCKCONTEXT_NTEMPS_INDEX,
+        blockTemporaryCount); // Was hard-coded to 0
+}
+```
+
+**Benefits**:
+- BlockContext.ntemps field now accurately reflects block's temporary count
+- Enables future optimizations and debugging tools
+- Maintains compatibility with 5-field BlockContext structure
+
+**Note**: This is a VM extension beyond Blue Book specification. The Blue Book's primitive 80 (blockCopy:) takes 1 argument (nargs), but we now pass 2 (nargs, ntemps).
+
+---
+
+## Previous Work (2025-11-11)
+
 **CRITICAL FIX: VM Variable Access Architecture Mismatch**:
 
 Fixed a fundamental architecture mismatch between compiler and VM for block temporary variable access:

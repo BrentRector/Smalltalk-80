@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Smalltalk80.Compiler.Analysis;
 
 namespace Smalltalk80.Compiler
 {
@@ -55,14 +56,61 @@ namespace Smalltalk80.Compiler
         /// </summary>
         /// <param name="varName">Variable name to resolve</param>
         /// <param name="context">Current compilation environment</param>
+        /// <param name="allocator">Optional temp frame allocator for unified temp allocation</param>
         /// <returns>Resolution result with type, index, and assignability</returns>
         /// <exception cref="InvalidOperationException">Thrown if variable not found in any scope</exception>
-        public ResolutionResult ResolveVariable(string varName, CompilationEnvironment context)
+        public ResolutionResult ResolveVariable(string varName, CompilationEnvironment context, TempFrameAllocator? allocator = null)
         {
             // Step 1: Check pseudo-variables first (highest priority, cannot be shadowed)
             var pseudoResult = TryResolvePseudoVariable(varName);
             if (pseudoResult.HasValue)
                 return pseudoResult.Value;
+
+            // Step 2-6: Try to resolve as temp variable using allocator (if provided)
+            // This is the NEW unified temp frame approach
+            if (allocator != null && allocator.TryGetSlotIndex(varName, out int slotIndex))
+            {
+                // Determine variable type based on scope and dictionaries
+                // Check current scope first
+                if (context.OwnArguments.ContainsKey(varName))
+                {
+                    return new ResolutionResult(
+                        context.ScopeDepth > 0 ? VariableType.BlockArgument : VariableType.MethodArgument,
+                        slotIndex,
+                        context.ScopeDepth > 0,  // Block args are assignable, method args are not
+                        varName
+                    );
+                }
+
+                if (context.OwnTemporaries.ContainsKey(varName))
+                {
+                    return new ResolutionResult(
+                        context.ScopeDepth > 0 ? VariableType.BlockTemporary : VariableType.MethodTemporary,
+                        slotIndex,
+                        true,  // All temps are assignable
+                        varName
+                    );
+                }
+
+                // Check parent scopes for the variable
+                var parentContext = context.Parent;
+                while (parentContext != null)
+                {
+                    if (parentContext.OwnArguments.ContainsKey(varName) || parentContext.OwnTemporaries.ContainsKey(varName))
+                    {
+                        return new ResolutionResult(
+                            VariableType.ParentVariable,
+                            slotIndex,
+                            true,  // Parent variables are assignable
+                            varName
+                        );
+                    }
+                    parentContext = parentContext.Parent;
+                }
+            }
+
+            // FALLBACK: Use environment-based resolution (for backward compatibility)
+            // This path is taken when allocator is null or variable not found in allocator
 
             // Step 2: Check block-local variables (if in block)
             if (context.ScopeDepth > 0)

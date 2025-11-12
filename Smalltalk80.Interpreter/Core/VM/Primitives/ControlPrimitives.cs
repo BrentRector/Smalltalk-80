@@ -9,51 +9,51 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// </summary>
 public static class ControlPrimitives
 {
-    // <summary>
-    // Primitive 80: blockCopy: - Creates a new BlockContext for block evaluation.
-    // Blue Book: Pages 1149-1175, Chapter 29, Formal Specification.
-    // </summary>
-    // <remarks>
-    // <para><b>Blue Book Specification:</b></para>
-    // <code>
-    // primitiveBlockCopy
-    //     | context methodContext blockArgumentCount newContext initialIP contextSize |
-    //     blockArgumentCount ← self popStack.
-    //     context ← self popStack.
-    //     (self isBlockContext: context)
-    //         ifTrue: [methodContext ← memory fetchPointer: HomeIndex
-    //                                        ofObject: context]
-    //         ifFalse: [methodContext ← context].
-    //     contextSize ← memory fetchWordLengthOf: methodContext.
-    //     newContext ← memory instantiateClass: ClassBlockContextPointer
-    //                         withPointers: contextSize.
-    //     initialIP ← memory integerObjectOf: instructionPointer + 3.
-    //     memory storePointer: InitialIPIndex ofObject: newContext withValue: initialIP.
-    //     memory storePointer: InstructionPointerIndex ofObject: newContext withValue: initialIP.
-    //     self storeStackPointerValue: 0 inContext: newContext.
-    //     memory storePointer: BlockArgumentCountIndex ofObject: newContext withValue: blockArgumentCount.
-    //     memory storePointer: HomeIndex ofObject: newContext withValue: methodContext.
-    //     self push: newContext
-    // </code>
-    //
-    // <para><b>Implementation Details:</b></para>
-    // <list type="bullet">
-    // <item>Creates BlockContext that captures home context for proper lexical scoping</item>
-    // <item>Sets initial IP to PC + 2 (after blockCopy: bytecode and its argument)</item>
-    // <item>Handles MethodContext vs BlockContext as home (finds ultimate MethodContext)</item>
-    // <item>BlockContext is the Blue Book's standard block implementation</item>
-    // </list>
-    //
-    // <para><b>Analysis:</b></para>
-    // <para>✅ PERFECT CONFORMANCE WITH ABSTRACTION - Correctly captures active context (handles
-    // MethodContext vs BlockContext automatically). Correctly calculates block start PC. Implementation
-    // delegates details to CreateBlockContext, which is correct.</para>
-    //
-    // <para><b>Conformance:</b> ✅ PERFECT CONFORMANCE</para>
-    // </remarks>
+    /// <summary>
+    /// Primitive 80: blockCopy: - Creates a new BlockContext for block evaluation.
+    /// Blue Book: Pages 1149-1175, Chapter 29, Formal Specification.
+    /// VM Extension: Reads ntemps from inline bytecode byte after the blockCopy: send.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Blue Book Specification (with VM Extension):</b></para>
+    /// <code>
+    /// primitiveBlockCopy
+    ///     | context methodContext blockArgumentCount blockTemporaryCount newContext initialIP contextSize |
+    ///     blockArgumentCount ← self popStack.
+    ///     context ← self popStack.
+    ///     blockTemporaryCount ← memory fetchByte: instructionPointer ofObject: method.  // VM EXTENSION: Read from bytecode
+    ///     (self isBlockContext: context)
+    ///         ifTrue: [methodContext ← memory fetchPointer: HomeIndex
+    ///                                        ofObject: context]
+    ///         ifFalse: [methodContext ← context].
+    ///     contextSize ← memory fetchWordLengthOf: methodContext.
+    ///     newContext ← memory instantiateClass: ClassBlockContextPointer
+    ///                         withPointers: contextSize.
+    ///     initialIP ← memory integerObjectOf: instructionPointer + 4.  // VM EXTENSION: Skip ntemps byte + 3-byte jump
+    ///     memory storePointer: InitialIPIndex ofObject: newContext withValue: initialIP.
+    ///     memory storePointer: InstructionPointerIndex ofObject: newContext withValue: initialIP.
+    ///     self storeStackPointerValue: 0 inContext: newContext.
+    ///     memory storePointer: BlockArgumentCountIndex ofObject: newContext withValue: blockArgumentCount.
+    ///     memory storePointer: BlockTemporaryCountIndex ofObject: newContext withValue: blockTemporaryCount.  // VM EXTENSION
+    ///     memory storePointer: HomeIndex ofObject: newContext withValue: methodContext.
+    ///     self push: newContext
+    /// </code>
+    ///
+    /// <para><b>Implementation Details:</b></para>
+    /// <list type="bullet">
+    /// <item>Blue Book compatible: Accepts one argument (nargs) via stack</item>
+    /// <item>VM Extension: Reads ntemps from inline bytecode byte immediately after blockCopy: send (at PC+0)</item>
+    /// <item>Creates BlockContext that captures home context for proper lexical scoping</item>
+    /// <item>Sets initial IP to PC + 4 (skips ntemps byte + 3-byte LONG_JUMP)</item>
+    /// <item>Handles MethodContext vs BlockContext as home (preserves lexical chain for nested blocks)</item>
+    /// <item>Populates ntemps field (slot 4) from compiler-emitted inline byte</item>
+    /// </list>
+    ///
+    /// <para><b>Conformance:</b> ⚠️ VM EXTENSION - ntemps byte added inline, initialIP calculation adjusted</para>
+    /// </remarks>
     public static SmalltalkOOP BlockCopy(IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
-        // Validate single argument expected (the argument count)
+        // Blue Book standard: Accept one argument (nargs)
         if (args.Length != 1)
         {
             ctx.PrimitiveSuccess = false;
@@ -106,13 +106,13 @@ public static class ControlPrimitives
             homeContext = activeContext;
         }
 
-        // Get current PC and calculate startpc
-        // Blue Book pattern: blockCopy: is followed by 3-byte LONG_JUMP, then block body
+        // Get current PC and calculate startpc (Blue Book: initialIP)
+        // Bytecode pattern: blockCopy: is followed by 3-byte LONG_JUMP + block body
         // When primitive executes, PC has already been incremented past the blockCopy: bytecode
-        // So PC points to the first byte of LONG_JUMP
-        // Block body starts 3 bytes later (after the 3-byte LONG_JUMP)
+        // So PC points to the LONG_JUMP opcode (0xA1)
+        // Block body starts 3 bytes later (3-byte LONG_JUMP: opcode + 2 offset bytes)
         int currentPC = ctx.GetInstructionPointer();
-        int blockBodyPC = currentPC + 3;
+        int blockBodyPC = currentPC + 3;  // Skip 3-byte LONG_JUMP
         SmalltalkOOP startPC = SmalltalkOOP.FromSmallInteger(blockBodyPC);
 
         // Allocate BlockContext with indexed slots for temps/stack
@@ -120,7 +120,7 @@ public static class ControlPrimitives
         int indexedSize = 32; // Enough space for block temps and stack
         SmalltalkOOP newBlockContext = ctx.HeapManager.AllocateInstanceOf(blockContextClassOOP, indexedSize);
 
-        // Initialize BlockContext fields (6 fixed instance variables)
+        // Initialize BlockContext fields (6 fixed instance variables: 3 inherited + 3 own)
         // Slot 0: sender/caller - initially nil, set by primitiveValue
         ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, SpecialObjectsArray.Instance.Nil);
 
@@ -133,10 +133,12 @@ public static class ControlPrimitives
         // Slot 3: nargs - number of arguments block expects
         ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX, blockArgumentCount);
 
-        // Slot 4: startpc - saved PC where block bytecode starts
+        // Slot 4: startpc - saved PC where block bytecode starts (Blue Book: initialIP)
         ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, startPC);
 
         // Slot 5: home - lexical parent context (enables nested block variable access)
+        // UNIFIED TEMP FRAME: All temporaries (including block temps) are allocated in the
+        // home MethodContext's temp frame. The compiler uses absolute indices with slot reuse.
         ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContext);
 
         // Return the new BlockContext

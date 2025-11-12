@@ -51,23 +51,34 @@ public static class VMConstants
     //   ContextPart variableSubclass: #BlockContext
     //   instanceVariableNames: 'nargs startpc home'
     //
-    // Complete layout:
+    // UNIFIED TEMP FRAME ARCHITECTURE:
+    // All temporaries (method args/temps + ALL block args/temps) are allocated in the
+    // MethodContext's temp frame using absolute indices. The compiler performs static
+    // analysis to allocate slots with reuse for sequential non-overlapping blocks.
+    // BlockContext has NO ntemps field - it's not needed with unified temp frame.
+    //
+    // Complete layout (Blue Book Chapter 30 specification):
     //   Slot 0: sender (from InstructionStream) - caller field, set by primitiveValue
     //   Slot 1: pc (from InstructionStream) - instruction pointer
     //   Slot 2: stackp (from ContextPart) - stack pointer
     //   Slot 3: nargs (BlockContext field) - block argument count
     //   Slot 4: startpc (BlockContext field) - saved PC (called initialIP in Blue Book)
-    //   Slot 5: home (BlockContext field) - lexical parent MethodContext
-    //   Slot 6+: indexed temps/stack (variable part)
+    //   Slot 5: home (BlockContext field) - lexical parent context (MethodContext or BlockContext)
+    //   Slot 6+: indexed slots (block arguments during activation, expression stack during execution)
+    //
+    // IMPORTANT: BlockContext indexed slots (6+) are used ONLY for:
+    //   - Block arguments during activation (primitiveValue copies args there)
+    //   - Expression stack during block execution
+    // Block temporaries are NOT stored here - they live in home MethodContext's unified temp frame!
     //
     // Blue Book BlockContext - used by primitives 80, 81, 82
     public const int BLOCKCONTEXT_CALLER_INDEX = 0;        // sender field (from InstructionStream)
     public const int BLOCKCONTEXT_PC_INDEX = 1;            // pc field (from InstructionStream)
     public const int BLOCKCONTEXT_STACKP_INDEX = 2;        // stackp field (from ContextPart)
     public const int BLOCKCONTEXT_NARGS_INDEX = 3;         // nargs field (BlockContext)
-    public const int BLOCKCONTEXT_STARTPC_INDEX = 4;       // startpc/initialIP field (BlockContext)
-    public const int BLOCKCONTEXT_HOME_INDEX = 5;          // home field (BlockContext)
-    public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;    // First indexed slot
+    public const int BLOCKCONTEXT_STARTPC_INDEX = 4;       // startpc/initialIP field (BlockContext) - WAS 5
+    public const int BLOCKCONTEXT_HOME_INDEX = 5;          // home field (BlockContext) - WAS 6
+    public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;    // First indexed slot - WAS 7
 
     // ========================================================================
     // Blue Book: Association field indices

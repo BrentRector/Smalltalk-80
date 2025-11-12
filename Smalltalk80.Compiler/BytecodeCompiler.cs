@@ -1090,6 +1090,7 @@ namespace Smalltalk80.Compiler
         private CompilationEnvironment environment = null!;
         private BytecodeEmitter emitter = null!;
         private readonly VariableResolver resolver = new();  // Unified variable resolution
+        private TempFrameAllocator allocator = null!;  // Unified temp frame allocation with slot reuse
         private string selector = "";
         private int primitiveNumber = 0;
         private bool hasPrimitive = false;
@@ -1149,6 +1150,10 @@ namespace Smalltalk80.Compiler
                 // No arguments or temporaries for file-scope expressions
                 environment.ArgumentCount = 0;
                 environment.TemporariesAllocatedInFrame = 0;
+
+                // Initialize temp frame allocator (no args or temps for expressions)
+                allocator = new TempFrameAllocator();
+                allocator.EnterMethodScope(new List<string>(), new List<string>());
                 
                 // Collect literals first (just like in CompileMethod)
                 var visitor = new LiteralCollector(this, emitter, environment);
@@ -1180,7 +1185,7 @@ namespace Smalltalk80.Compiler
             {
                 Selector = selector,
                 ArgumentCount = 0,
-                TemporaryCount = environment.TemporariesAllocatedInFrame,
+                TemporaryCount = allocator.GetMaxFrameSize(),
                 IsPrimitive = false,
                 PrimitiveNumber = 0,
                 Bytecode = emitter.GetBytecodes(),
@@ -1253,6 +1258,11 @@ namespace Smalltalk80.Compiler
                     ProcessTemporaries(methodDef.temporaries());
                 }
 
+                // Initialize temp frame allocator with method args and temps
+                // This must happen AFTER ProcessMethodHeader and ProcessTemporaries
+                allocator = new TempFrameAllocator();
+                allocator.EnterMethodScope(argumentNames, temporaryNames);
+
                 // Process primitive declaration
                 if (methodDef.primitiveDecl() != null)
                 {
@@ -1316,7 +1326,7 @@ namespace Smalltalk80.Compiler
             {
                 Selector = selector,
                 ArgumentCount = environment.ArgumentCount,
-                TemporaryCount = environment.TemporariesAllocatedInFrame,
+                TemporaryCount = allocator.GetMaxFrameSize(),
                 IsPrimitive = hasPrimitive,
                 PrimitiveNumber = primitiveNumber,
                 Bytecode = bytecodeArray,
@@ -2110,13 +2120,27 @@ namespace Smalltalk80.Compiler
                 }
             }
 
-            // Blue Book pattern: blockCopy: + LONG_JUMP + block body
-            // Primitive 80 calculates initialIP = IP + 3 (skips the 3-byte LONG_JUMP)
-            // So block body comes AFTER the blockCopy: send, not before!
+            // Parse block temporaries for unified temp frame allocation
+            // Unified Temp Frame: All temps (method + all blocks) allocated in MethodContext
+            // Compiler will allocate these in the unified frame (Phase 5)
+            var blockTemps = block.blockTemps();
+            int tempCount = 0;
+            if (blockTemps != null)
+            {
+                var tempNodes = (blockTemps.children ?? Enumerable.Empty<IParseTree>())
+                    .OfType<Smalltalk80Parser.TemporaryNameContext>()
+                    .ToList();
+                tempCount = tempNodes.Count;
+            }
 
-            // STEP 1: Emit blockCopy: send first
-            emitter.EmitByte(0x89); // PUSH_ACTIVE_CONTEXT (receiver for blockCopy:)
-            emitter.PushSmallInteger(argCount); // Push argument count
+            // Blue Book bytecode pattern: blockCopy: + LONG_JUMP + block body
+            // Primitive 80 calculates initialIP = PC + 3 (skips 3-byte LONG_JUMP)
+            // Block body comes AFTER the blockCopy: send and jump
+
+            // STEP 1: Emit blockCopy: send (Blue Book standard - 1 argument: nargs)
+            // NOTE: blockCopy: is a SPECIAL operation - it operates on the active context, NOT a receiver from stack
+            // The VM's ExecuteSendSpecial handles it specially WITHOUT popping a receiver
+            emitter.PushSmallInteger(argCount); // Push argument count (only arg)
             emitter.EmitByte(0xC8); // SEND_SPECIAL_BLOCKCOPY ← Primitive executes here
 
             // STEP 2: Emit 3-byte LONG_JUMP to skip over block body
@@ -2127,7 +2151,7 @@ namespace Smalltalk80.Compiler
             emitter.EmitByte(0x00); // Placeholder for offset high byte
             emitter.EmitByte(0x00); // Placeholder for offset low byte
 
-            // STEP 3: Block body starts here (initialIP = IP + 3 points here)
+            // STEP 2: Block body starts here (initialIP = PC + 3 points here)
             int blockStartOffset = emitter.CurrentOffset;
 
             // Blue Book inline blocks: Share parent method's environment (same temp frame)
@@ -2233,7 +2257,6 @@ namespace Smalltalk80.Compiler
             // Parse and register block temporaries in parent environment
             // Block temps are allocated after parent method's temps AND block arguments
             var blockTempNames = new List<string>();
-            var blockTemps = block.blockTemps();
             if (blockTemps != null)
             {
                 var tempNodes = (blockTemps.children ?? Enumerable.Empty<IParseTree>())
@@ -2259,6 +2282,12 @@ namespace Smalltalk80.Compiler
                 }
                 environment.TemporariesAllocatedInFrame += tempNodes.Count;  // Extend parent's temp count
             }
+
+            // Enter block scope in temp frame allocator
+            // Determine if block is nested (cannot reuse slots) or sequential (can reuse)
+            // Simple heuristic: Blocks nested inside other blocks cannot reuse slots
+            bool isNested = (savedScopeDepth > 0);
+            allocator.EnterBlockScope(argumentNames, blockTempNames, isNested);
 
             // Compile block body statements
             var statements = block.statements();
@@ -2289,6 +2318,10 @@ namespace Smalltalk80.Compiler
             byte offsetLow = (byte)(encodedDistance & 0xFF);
             emitter.PatchByteAt(jumpOffsetLocation, offsetHigh);
             emitter.PatchByteAt(jumpOffsetLocation + 1, offsetLow);
+
+            // Exit block scope to allow slot reuse for sequential blocks
+            // CRITICAL: Must happen BEFORE restoring environment to ensure proper slot reuse
+            allocator.ExitScope();
 
             // Restore parent environment state
             // Clear block arguments from environment
@@ -2624,8 +2657,8 @@ namespace Smalltalk80.Compiler
         
         private void PushVariable(string name)
         {
-            // Use unified variable resolver
-            var result = resolver.ResolveVariable(name, environment);
+            // Use unified variable resolver with temp frame allocator
+            var result = resolver.ResolveVariable(name, environment, allocator);
 
             switch (result.Type)
             {
@@ -2688,8 +2721,8 @@ namespace Smalltalk80.Compiler
 
         private void StoreVariable(string name, bool leaveOnStack)
         {
-            // Use unified variable resolver
-            var result = resolver.ResolveVariable(name, environment);
+            // Use unified variable resolver with temp frame allocator
+            var result = resolver.ResolveVariable(name, environment, allocator);
 
             // Check assignment legality
             if (!result.IsAssignable)
