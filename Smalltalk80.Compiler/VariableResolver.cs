@@ -74,9 +74,12 @@ namespace Smalltalk80.Compiler
                 // Check current scope first
                 if (context.OwnArguments.ContainsKey(varName))
                 {
+                    // Unified temp frame: ALL arguments use absolute slotIndex from TempFrameAllocator
+                    // Block arguments are allocated in MethodContext's temp frame, NOT in BlockContext indexed slots
+                    // The VM (GetTemporaryVariable) handles accessing them from the unified frame
                     return new ResolutionResult(
                         context.ScopeDepth > 0 ? VariableType.BlockArgument : VariableType.MethodArgument,
-                        slotIndex,
+                        slotIndex,  // Use absolute index for unified temp frame
                         context.ScopeDepth > 0,  // Block args are assignable, method args are not
                         varName
                     );

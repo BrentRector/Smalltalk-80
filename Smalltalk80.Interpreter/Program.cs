@@ -171,6 +171,7 @@ public static class Program
                     "Character initialize",      // Required for CharacterTable (used by String>>at: primitive 63)
                     "SmallInteger initialize",   // Required for SmallInteger constants/utilities
                     "Float initialize",          // Required for Float constants (Pi, E, etc.)
+                    "BlockContextTest validate",  // Test suite - runs even with --skip-init-expressions
                 };
 
                 // Skip list for init expressions requiring runtime features not available during bootstrap
@@ -245,7 +246,7 @@ public static class Program
                             continue;
                         }
 
-                        // Phase-based execution: ALL initialize expressions, then ALL comments
+                        // Phase-based execution: ALL initialize expressions, then ALL comments, then test expressions
                         if (expr.Source.EndsWith(" initialize"))
                         {
                             phase1Indices.Add(i);
@@ -254,7 +255,12 @@ public static class Program
                         {
                             phase2Indices.Add(i);
                         }
-                        // Skip test expressions (run! messages) in normal mode
+                        else if (expr.Source.Contains("Test "))
+                        {
+                            // Test expressions (e.g., "BlockContextTest validate")
+                            testIndices.Add(i);
+                        }
+                        // Skip other expressions (run! messages) in normal mode
                     }
                 }
 
@@ -408,6 +414,54 @@ public static class Program
                     {
                         Console.WriteLine($"    [{index}] {source}");
                     }
+                }
+
+                // Execute test expressions (if any)
+                if (testIndices.Count > 0)
+                {
+                    Console.WriteLine($"\n=== Executing Test Expressions ===");
+                    Console.WriteLine($"  Total test expressions: {testIndices.Count}");
+                    Console.WriteLine();
+
+                    int testSucceeded = 0;
+                    int testFailed = 0;
+
+                    foreach (int index in testIndices)
+                    {
+                        var expr = bundle.InitExpressions[index];
+                        var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
+
+                        Console.WriteLine($"Executing test: [{index}] {expr.Source}");
+
+                        var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+
+                        if (result.Status == InitStatus.Success)
+                        {
+                            testSucceeded++;
+                            Console.WriteLine($"✓ Test PASSED");
+                        }
+                        else
+                        {
+                            testFailed++;
+                            Console.WriteLine($"❌ Test FAILED");
+                            Console.WriteLine($"Status: {result.Status}");
+                            if (result.Diagnostic?.Message != null)
+                            {
+                                Console.WriteLine($"Error: {result.Diagnostic.Message}");
+                            }
+                            if (result.Diagnostic?.StackTrace != null)
+                            {
+                                Console.WriteLine($"Stack Trace:");
+                                Console.WriteLine(result.Diagnostic.StackTrace);
+                            }
+                        }
+                        Console.WriteLine();
+                    }
+
+                    Console.WriteLine($"=== Test Execution Complete ===");
+                    Console.WriteLine($"  Tests run: {testIndices.Count}");
+                    Console.WriteLine($"  Passed: {testSucceeded}");
+                    Console.WriteLine($"  Failed: {testFailed}");
                 }
 
                 // Only return here if we're NOT skipping init expressions
