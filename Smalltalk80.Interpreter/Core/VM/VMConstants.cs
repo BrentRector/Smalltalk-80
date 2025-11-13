@@ -51,25 +51,27 @@ public static class VMConstants
     //   ContextPart variableSubclass: #BlockContext
     //   instanceVariableNames: 'nargs startpc home'
     //
-    // UNIFIED TEMP FRAME ARCHITECTURE:
-    // All temporaries (method args/temps + ALL block args/temps) are allocated in the
-    // MethodContext's temp frame using absolute indices. The compiler performs static
-    // analysis to allocate slots with reuse for sequential non-overlapping blocks.
-    // BlockContext has NO ntemps field - it's not needed with unified temp frame.
+    // VM EXTENSION - UNIFIED TEMP FRAME ARCHITECTURE:
+    // This VM extends BlockContext with one additional field (argStartIndex) to support
+    // the unified temp frame architecture. All temporaries (method args/temps + ALL block
+    // args/temps) are allocated in the MethodContext's temp frame using absolute indices.
+    // The compiler performs static analysis to allocate slots with reuse for sequential
+    // non-overlapping blocks.
     //
-    // Complete layout (Blue Book Chapter 30 specification):
+    // Complete layout (Blue Book + VM Extension):
     //   Slot 0: sender (from InstructionStream) - caller field, set by primitiveValue
     //   Slot 1: pc (from InstructionStream) - instruction pointer
     //   Slot 2: stackp (from ContextPart) - stack pointer
     //   Slot 3: nargs (BlockContext field) - block argument count
     //   Slot 4: startpc (BlockContext field) - saved PC (called initialIP in Blue Book)
-    //   Slot 5: home (BlockContext field) - lexical parent context (MethodContext or BlockContext)
-    //   Slot 6+: indexed slots (block arguments during activation, expression stack during execution)
+    //   Slot 5: home (BlockContext field) - lexical parent (always the MethodContext in unified frame)
+    //   Slot 6: argStartIndex (VM EXTENSION) - starting index in MethodContext temp frame for block args
+    //   Slot 7+: indexed slots - expression stack ONLY
     //
-    // IMPORTANT: BlockContext indexed slots (6+) are used ONLY for:
-    //   - Block arguments during activation (primitiveValue copies args there)
-    //   - Expression stack during block execution
-    // Block temporaries are NOT stored here - they live in home MethodContext's unified temp frame!
+    // IMPORTANT: BlockContext indexed slots (7+) are used ONLY for the expression stack.
+    // Block arguments are stored in the home MethodContext's unified temp frame at indices
+    // [argStartIndex, argStartIndex+nargs). Block temporaries are also in the unified frame.
+    // See docs/Block-Context-And-Variable-Access-COMPREHENSIVE.md for full architecture details.
     //
     // Blue Book BlockContext - used by primitives 80, 81, 82
     public const int BLOCKCONTEXT_CALLER_INDEX = 0;        // sender field (from InstructionStream)
@@ -78,7 +80,17 @@ public static class VMConstants
     public const int BLOCKCONTEXT_NARGS_INDEX = 3;         // nargs field (BlockContext)
     public const int BLOCKCONTEXT_STARTPC_INDEX = 4;       // startpc/initialIP field (BlockContext) - WAS 5
     public const int BLOCKCONTEXT_HOME_INDEX = 5;          // home field (BlockContext) - WAS 6
-    public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;    // First indexed slot - WAS 7
+
+    // ========================================================================
+    // BlockContext Extension Field (VM Extension for Unified Temp Frame)
+    // ========================================================================
+    /// <summary>
+    /// Extension field: Starting index in MethodContext temp frame where block arguments are stored.
+    /// VM extension beyond Blue Book - enables unified temp frame architecture.
+    /// </summary>
+    public const int BLOCKCONTEXT_ARG_START_INDEX = 6;
+
+    public const int BLOCKCONTEXT_TEMP_FRAME_START = 7;    // First indexed slot (after extension field)
 
     // ========================================================================
     // Blue Book: Association field indices

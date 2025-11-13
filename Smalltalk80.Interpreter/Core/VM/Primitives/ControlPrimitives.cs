@@ -91,20 +91,24 @@ public static class ControlPrimitives
         SmalltalkOOP blockContextClassOOP = ctx.GetBlockContextClassOOP();
 
         // Determine home context for lexical scoping
-        // If active context is a BlockContext, we're creating a nested block
-        // Blue Book: nested blocks have home pointing to outer BlockContext for proper variable access
+        // UNIFIED TEMP FRAME: All blocks in the same method share the SAME MethodContext home.
+        // Nested blocks inherit their parent's home (which points to the MethodContext),
+        // NOT creating a chain through parent blocks.
         SmalltalkOOP homeContext;
         SmalltalkOOP contextClassOOP = ctx.HeapManager.GetClassOOP(activeContext);
-        string contextClassName = ctx.HeapManager.GetClassName(contextClassOOP);
 
-        if (contextClassName == "BlockContext")
+        if (contextClassOOP == ctx.GetBlockContextClassOOP())
         {
-            // Nested block - home points to active BlockContext (creates lexical chain)
-            homeContext = activeContext;
+            // Nested block - inherit the outer block's home
+            // This will be the MethodContext, NOT the outer BlockContext
+            homeContext = ctx.HeapManager.GetInstanceVariable(
+                activeContext,
+                VMConstants.BLOCKCONTEXT_HOME_INDEX
+            );
         }
         else
         {
-            // Top-level block - home points to the MethodContext
+            // Top-level block - active context IS the MethodContext
             homeContext = activeContext;
         }
 
@@ -147,6 +151,44 @@ public static class ControlPrimitives
         // UNIFIED TEMP FRAME: All temporaries (including block temps) are allocated in the
         // home MethodContext's temp frame. The compiler uses absolute indices with slot reuse.
         ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContext);
+
+        // ========================================================================
+        // VM EXTENSION: Store argStartIndex in BlockContext (slot 6)
+        // ========================================================================
+        // TEMPORARY IMPLEMENTATION: Compute argStartIndex from context state
+        // until compiler provides it (Phase 4).
+        //
+        // Strategy: Allocate block arguments at the END of current temp frame.
+        // This is conservative but correct - Phase 4 will optimize.
+        int argStartIndex;
+        var homeMethodContext = homeContext;
+
+        // Ensure we have a MethodContext (should always be true after Phase 1 fix)
+        while (ctx.HeapManager.GetClassOOP(homeMethodContext) == ctx.GetBlockContextClassOOP())
+        {
+            homeMethodContext = ctx.HeapManager.GetInstanceVariable(
+                homeMethodContext,
+                VMConstants.BLOCKCONTEXT_HOME_INDEX
+            );
+        }
+
+        // Allocate args at next available slot in temp frame
+        // This is CONSERVATIVE - may allocate more slots than needed
+        // Phase 4 compiler will provide exact indices
+        int currentFrameSize = ctx.HeapManager.GetIndexedSize(homeMethodContext);
+        argStartIndex = currentFrameSize; // Allocate at end
+
+        if (ctx.VerboseDebug)
+        {
+            Console.WriteLine($"[Primitive 80] BlockCopy: nargs={argCount}, argStartIndex={argStartIndex}, homeSize={currentFrameSize}");
+        }
+
+        // Store in BlockContext extension field (slot 6)
+        ctx.HeapManager.SetInstanceVariable(
+            newBlockContext,
+            VMConstants.BLOCKCONTEXT_ARG_START_INDEX,
+            SmalltalkOOP.FromSmallInteger(argStartIndex)
+        );
 
         // Return the new BlockContext
         Console.WriteLine($"[Primitive 80 BlockCopy] Created BlockContext: oop={newBlockContext}, nargs={argCount}, startPC={blockBodyPC}");
@@ -244,23 +286,50 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Blue Book lines 1186-1191: self success ifTrue: [self transfer: argumentCount
-        //                                                    fromIndex: stackPointer-argumentCount + 1
-        //                                                    ofObject: activeContext
-        //                                                    toIndex: TempFrameStart
-        //                                                    ofObject: blockContext.
-        // Transfer arguments from caller to block's temp frame
+        // ========================================================================
+        // UNIFIED TEMP FRAME: Store arguments in MethodContext at argStartIndex
+        // ========================================================================
+
+        // Read argStartIndex from BlockContext extension field (slot 6)
+        var argStartIndexOOP = ctx.HeapManager.GetInstanceVariable(
+            blockContext,
+            VMConstants.BLOCKCONTEXT_ARG_START_INDEX
+        );
+
+        if (!argStartIndexOOP.IsSmallInteger)
+        {
+            if (ctx.VerboseDebug)
+            {
+                Console.WriteLine($"[Primitive 81] ERROR: argStartIndex not set (got {argStartIndexOOP})");
+            }
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        int argStartIndex = argStartIndexOOP.AsSmallInteger();
+
+        // Get home MethodContext
+        var homeContextOOP = ctx.HeapManager.GetInstanceVariable(
+            blockContext,
+            VMConstants.BLOCKCONTEXT_HOME_INDEX
+        );
+
+        if (ctx.VerboseDebug)
+        {
+            Console.WriteLine($"[Primitive 81] Value: nargs={argumentCount}, argStartIndex={argStartIndex}, home={homeContextOOP}");
+        }
+
+        // Store arguments in MethodContext temp frame at ABSOLUTE indices
         for (int i = 0; i < argumentCount; i++)
         {
-            // Transfer argument from args array to block context's temp frame
-            // TempFrameStart is at indexed slot 0 (after the 6 fixed instance variables)
-            Console.WriteLine($"[Primitive 81] Storing block arg {i}: {args[i]} (isSmallInt={args[i].IsSmallInteger})");
-            Console.WriteLine($"[Primitive 81] blockContext OOP: {blockContext}, RawValue={blockContext.RawValue}");
-            ctx.HeapManager.SetIndexedOOP(blockContext, i, args[i]);
+            int absoluteIndex = argStartIndex + i;
 
-            // Verify it was stored
-            var stored = ctx.HeapManager.GetIndexedOOP(blockContext, i);
-            Console.WriteLine($"[Primitive 81] Verified stored arg {i}: {stored} (match={stored == args[i]})");
+            if (ctx.VerboseDebug)
+            {
+                Console.WriteLine($"[Primitive 81]   Storing arg[{i}] at tempFrame[{absoluteIndex}] = {args[i]}");
+            }
+
+            ctx.HeapManager.SetIndexedOOP(homeContextOOP, absoluteIndex, args[i]);
         }
 
         // Blue Book line 1192: self pop: argumentCount + 1
@@ -379,11 +448,36 @@ public static class ControlPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // Transfer arguments from array to block's temp frame
+        // ========================================================================
+        // UNIFIED TEMP FRAME: Store arguments in MethodContext at argStartIndex
+        // ========================================================================
+
+        // Read argStartIndex from BlockContext extension field (slot 6)
+        var argStartIndexOOP = ctx.HeapManager.GetInstanceVariable(
+            blockContext,
+            VMConstants.BLOCKCONTEXT_ARG_START_INDEX
+        );
+
+        if (!argStartIndexOOP.IsSmallInteger)
+        {
+            ctx.PrimitiveSuccess = false;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+
+        int argStartIndex = argStartIndexOOP.AsSmallInteger();
+
+        // Get home MethodContext
+        var homeContextOOP = ctx.HeapManager.GetInstanceVariable(
+            blockContext,
+            VMConstants.BLOCKCONTEXT_HOME_INDEX
+        );
+
+        // Extract and store arguments from Array
         for (int i = 0; i < arraySize; i++)
         {
-            SmalltalkOOP arg = ctx.GetIndexedOOP(arrayArg, i);
-            ctx.HeapManager.SetIndexedOOP(blockContext, i, arg);
+            var argOOP = ctx.HeapManager.GetIndexedOOP(arrayArg, i);
+            int absoluteIndex = argStartIndex + i;
+            ctx.HeapManager.SetIndexedOOP(homeContextOOP, absoluteIndex, argOOP);
         }
 
         // Get initialIP from blockContext

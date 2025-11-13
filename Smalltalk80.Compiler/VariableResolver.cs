@@ -19,11 +19,10 @@ namespace Smalltalk80.Compiler
         /// </summary>
         public enum VariableType
         {
-            BlockArgument,      // Block args (index: 0-based within block)
-            BlockTemporary,     // Block temps (index: offset from block args)
-            ParentVariable,     // Parent context variable (index: hierarchical offset)
-            MethodArgument,     // Method args (index: 0-based)
-            MethodTemporary,    // Method temps (index: offset from method args)
+            BlockTemporary,     // Block temps (index: absolute in unified frame)
+            ParentVariable,     // Parent context variable (index: absolute in unified frame)
+            MethodArgument,     // Method args (index: absolute in unified frame)
+            MethodTemporary,    // Method temps (index: absolute in unified frame)
             InstanceVariable,   // Instance variable (index: class layout)
             ClassVariable,      // Class variable (literal index)
             PoolVariable,       // Pool dictionary variable (literal index)
@@ -66,24 +65,7 @@ namespace Smalltalk80.Compiler
             if (pseudoResult.HasValue)
                 return pseudoResult.Value;
 
-            // Step 2: Check block arguments FIRST (before allocator check)
-            // Block arguments are NOT in the allocator's _allocatedSlots because they're stored
-            // in BlockContext indexed slots, not in the unified temp frame
-            if (context.ScopeDepth > 0 && context.LocalArgumentIndices.TryGetValue(varName, out int blockArgIndex))
-            {
-                // Block argument: Use 0-based index from LocalArgumentIndices
-                // These are stored in BlockContext indexed slots (set by Primitive 81)
-                // VM routes via "index < nargs" check to BlockContext
-                Console.WriteLine($"[RESOLVER] BlockArgument: name={varName}, index={blockArgIndex}, scopeDepth={context.ScopeDepth}");
-                return new ResolutionResult(
-                    VariableType.BlockArgument,
-                    blockArgIndex,  // 0-based within block (0, 1, 2...)
-                    false,  // Block args are NOT assignable (Blue Book: pseudo-variables like self, super)
-                    varName
-                );
-            }
-
-            // Step 3-6: Try to resolve as temp variable using allocator (if provided)
+            // Step 2-5: Try to resolve as temp variable using allocator (if provided)
             // This is the unified temp frame approach for method args/temps and block temps
             int slotIndex = -1;
             bool allocatorHasVar = allocator != null && allocator.TryGetSlotIndex(varName, out slotIndex);
@@ -134,28 +116,15 @@ namespace Smalltalk80.Compiler
                 // This indicates environment desynchronization during nested compilation
                 // Trust the allocator and infer variable type from scope depth
                 //
-                // BUG FIX: Must check LocalArgumentIndices to distinguish block args from block temps
-                // Block arguments are NOT in unified frame (stored in BlockContext indexed slots)
-                // Block temporaries ARE in unified frame (stored in MethodContext temp frame)
-                //
-                // If variable is in LocalArgumentIndices, it's a block argument (shouldn't reach here!)
-                // Otherwise in block scope, it must be a block temporary
-                // Method scope (depth == 0): Must be method temp (args already checked above)
+                // UNIFIED TEMP FRAME: All variables (including block args) are in unified frame
+                // Infer type based on scope depth:
+                // - Block scope (depth > 0): BlockTemporary (includes former block args)
+                // - Method scope (depth == 0): MethodTemporary
                 VariableType inferredType;
                 if (context.ScopeDepth > 0)
                 {
-                    // Block scope: Check if this is actually a block argument
-                    if (context.LocalArgumentIndices.ContainsKey(varName))
-                    {
-                        // This is a block argument - shouldn't reach here because step 2 checks block args first
-                        // But handle it correctly anyway
-                        inferredType = VariableType.BlockArgument;
-                    }
-                    else
-                    {
-                        // Not a block argument, must be a block temporary
-                        inferredType = VariableType.BlockTemporary;
-                    }
+                    // Block scope: All variables are BlockTemporary (including former block args)
+                    inferredType = VariableType.BlockTemporary;
                 }
                 else
                 {
@@ -296,17 +265,18 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
-        /// Try to resolve a block-local variable (block argument or block temporary).
+        /// Try to resolve a block-local variable (block temporary).
         /// Only matches variables defined IN this block scope, not inherited from method.
-        /// USES OwnArguments/OwnTemporaries - simple and clean!
+        /// UNIFIED TEMP FRAME: Block arguments are now treated as block temporaries.
         /// </summary>
         private ResolutionResult? TryResolveBlockLocal(string varName, CompilationEnvironment context)
         {
-            // Check this block's OWN arguments (no inheritance, no boundary checks needed!)
+            // UNIFIED TEMP FRAME: Block arguments and temps are all BlockTemporary now
+            // Check this block's OWN arguments (now treated as temporaries)
             if (context.LocalArgumentIndices.TryGetValue(varName, out int argIndex))
             {
                 return new ResolutionResult(
-                    VariableType.BlockArgument,
+                    VariableType.BlockTemporary,
                     argIndex,
                     false,  // Block arguments are NOT assignable (Blue Book: pseudo-variables)
                     varName
@@ -334,7 +304,7 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Try to resolve a variable from parent scopes (hierarchical traversal).
         /// Walks up the parent chain accumulating offsets.
-        /// USES OwnArguments/OwnTemporaries - no boundary checks needed!
+        /// UNIFIED TEMP FRAME: All variables use absolute indices from allocator.
         /// </summary>
         private ResolutionResult? TryResolveParentVariable(string varName, CompilationEnvironment context)
         {
@@ -347,6 +317,7 @@ namespace Smalltalk80.Compiler
                 // Check if parent is also a block (not method)
                 if (parentContext.ScopeDepth > 0)
                 {
+                    // UNIFIED TEMP FRAME: Block arguments are now treated as temporaries
                     // Check parent block's OWN arguments (no inheritance, no collisions!)
                     if (parentContext.LocalArgumentIndices.TryGetValue(varName, out int pArgIndex))
                     {

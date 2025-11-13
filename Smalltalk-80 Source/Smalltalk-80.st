@@ -4681,7 +4681,7 @@ locateMagnifiedView: aForm scale: scaleFactor
 BitEditor initialize!
 
 ContextPart variableSubclass: #BlockContext
-	instanceVariableNames: 'nargs startpc home '
+	instanceVariableNames: 'nargs startpc home argStartIndex '
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Kernel-Methods'!
@@ -4691,9 +4691,13 @@ BlockContext comment:
 My instance must hold onto its home in order to work.  This can cause circularities if the home is also pointing (via a temp, perhaps) to the instance.  In the rare event that this happens (as in SortedCollection sortBlock:) the message fixTemps will replace home with a copy of home, thus defeating the sharing of temps but, nonetheless, eliminating the circularity.
 
 Instance Variables: *indexed*
-	nargs	<Integer> number of block arguments
-	startpc	<Integer>
-	home	<Context>
+	nargs		<Integer> number of block arguments
+	startpc		<Integer> initial program counter for block body
+	home		<Context> lexical parent context (MethodContext in unified temp frame)
+	argStartIndex	<Integer> VM EXTENSION - absolute index in MethodContext temp frame where block arguments begin (enables unified temp frame architecture)
+
+VM EXTENSION NOTE:
+The argStartIndex field is a VM extension beyond the Blue Book specification. It enables the unified temp frame architecture where ALL variables (method args/temps + block args/temps) are stored in the MethodContext temp frame with absolute indexing. This field is set by Primitive 80 (blockCopy:) and used by Primitive 81 (value/value:/value:value:) to correctly store block arguments in the home MethodContext.
 '!
 
 
