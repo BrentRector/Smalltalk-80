@@ -1,8 +1,9 @@
 # Block Context and Variable Access - Comprehensive Reference
 
-**Last Updated**: 2025-11-13
+**Last Updated**: 2025-11-13 (Added Advanced Topics section)
 **Status**: CANONICAL REFERENCE
 **Supersedes**: All previous block and variable access documentation
+**Companion Document**: Block-Context-Design-Validation.md (Expert analysis and implementation guidance)
 
 ---
 
@@ -16,8 +17,15 @@
 6. [Variable Access Implementation](#6-variable-access-implementation)
 7. [Block Primitives](#7-block-primitives)
 8. [Complete Examples](#8-complete-examples)
-9. [Common Pitfalls](#9-common-pitfalls)
-10. [Implementation Checklist](#10-implementation-checklist)
+9. [Advanced Topics: Shadowing, Slot Reuse, and Escaping Blocks](#9-advanced-topics-shadowing-slot-reuse-and-escaping-blocks)
+   - 9.1 [Variable Shadowing](#91-variable-shadowing)
+   - 9.2 [Home Context Traversal for Nested Blocks](#92-home-context-traversal-for-nested-blocks)
+   - 9.3 [Slot Reuse with Escaping Blocks](#93-slot-reuse-with-escaping-blocks)
+   - 9.4 [GetBlockArgumentStartIndex Implementation](#94-getblockargumentstartindex-implementation)
+   - 9.5 [Strict Allocator Policy for Nested vs Sequential Blocks](#95-strict-allocator-policy-for-nested-vs-sequential-blocks)
+   - 9.6 [Detecting Escaping Blocks](#96-detecting-escaping-blocks)
+10. [Common Pitfalls](#10-common-pitfalls)
+11. [Implementation Checklist](#11-implementation-checklist)
 
 ---
 
@@ -49,6 +57,15 @@ This document consolidates information from:
 - Compiler-Block-Allocation-Strategy.md (compiler strategy)
 - Variable-Indexing-Architecture.md (indexing details)
 - CRITICAL-Block-Compilation-Discovery.md (historical evolution)
+- **Block-Context-Design-Validation.md** (Expert validation and advanced semantics)
+
+**New in this revision**: Section 9 provides detailed semantic and implementation guidance for:
+- Variable shadowing with unique absolute indices
+- Home context traversal (all blocks point to same MethodContext)
+- Slot reuse policies with escaping block detection
+- BlockContext extension field for argument start indices
+- Strict allocator policies for nested vs sequential blocks
+- Three-tier escaping block detection strategy (compile-time + runtime)
 
 ---
 
@@ -910,9 +927,725 @@ Max frame size: 2
 
 ---
 
-## 9. Common Pitfalls
+## 9. Advanced Topics: Shadowing, Slot Reuse, and Escaping Blocks
 
-### 9.1 Pitfall: Assuming BlockContext Stores Arguments
+### 9.1 Variable Shadowing
+
+**Definition**: Inner scopes can declare variables with the same names as outer scopes, creating distinct bindings.
+
+**Example**:
+```smalltalk
+method
+  | x |
+  x := 1.
+  [:x | x + 1] value: 2.  "Inner x shadows outer x"
+  ^x  "Returns 1 (outer x unchanged)"
+```
+
+**Allocation**:
+- Outer x → index 0
+- Inner x → index 1
+- Both are distinct slots in the unified temp frame
+
+**Blue Book Compliance**: ✅ CORRECT
+
+**Blue Book Chapter 5** (pages 52-53): "Variables in a block may have the same names as variables in enclosing scopes. The block's variables shadow the outer variables during block execution."
+
+#### Implementation in TempFrameAllocator
+
+The allocator's `_allocatedSlots` dictionary is **scope-aware**:
+
+```csharp
+public void EnterBlockScope(List<string> argNames, List<string> tempNames, bool isNested)
+{
+    var scope = new ScopeInfo
+    {
+        StartSlot = _nextSlot,
+        SavedBindings = new Dictionary<string, int>()
+    };
+
+    // Save outer bindings that will be shadowed
+    foreach (var argName in argNames.Concat(tempNames))
+    {
+        if (_allocatedSlots.TryGetValue(argName, out int outerIndex))
+        {
+            scope.SavedBindings[argName] = outerIndex;
+        }
+    }
+    _scopeStack.Push(scope);
+
+    // Allocate new slots (shadows outer bindings in map)
+    foreach (var argName in argNames)
+    {
+        int slot = _nextSlot++;
+        _allocatedSlots[argName] = slot;  // Overwrites outer binding
+        // Outer binding preserved in bytecode already emitted
+    }
+    // ... same for tempNames
+}
+
+public void ExitBlockScope()
+{
+    var scope = _scopeStack.Pop();
+
+    // Restore outer bindings
+    foreach (var (varName, outerIndex) in scope.SavedBindings)
+    {
+        _allocatedSlots[varName] = outerIndex;
+    }
+
+    // ... handle slot reuse if sequential
+}
+```
+
+**Key Insight**:
+1. New binding shadows old binding in the map
+2. Bytecode already emitted for outer scope uses old index
+3. New bytecode for inner scope uses new index
+4. On ExitScope, inner binding removed, outer binding restored
+
+**Compiler Warnings**: NOT RECOMMENDED
+
+Shadowing is intentional in Smalltalk-80. Common patterns:
+- `[:index | ...]` blocks shadow method's `index` temp
+- Generic names like `x`, `each`, `item` for isolation
+- No ambiguity - compiler always resolves correctly
+
+#### Edge Cases
+
+**Triple Nesting**:
+```smalltalk
+method
+  | x |
+  x := 1.
+  [:x |
+    x := 2.
+    [:x | x + 3] value: 0
+  ] value: 0
+```
+
+**Allocation**:
+- Method x → index 0
+- Outer block x → index 1
+- Inner block x → index 2
+
+**Sequential Blocks with Same Names**:
+```smalltalk
+method
+  [:x | x + 1] value: 10.
+  [:x | x + 2] value: 20.
+```
+
+**Allocation** (with slot reuse):
+- First block x → index 0
+- Second block x → index 0 (REUSED)
+
+**Pseudo-Variables** (ILLEGAL):
+```smalltalk
+method
+  [:self | self class]  "COMPILE ERROR: cannot shadow pseudo-variable"
+```
+
+VariableResolver already handles this correctly - pseudo-variables checked BEFORE block argument resolution.
+
+### 9.2 Home Context Traversal for Nested Blocks
+
+**Critical Finding**: All blocks in the same method have `home` pointing to the **SAME MethodContext**, not chained through parent blocks.
+
+**Why**: With unified temp frame, all variables are in MethodContext, so a single home pointer is sufficient.
+
+**Blue Book Primitive 80 `homeContext:` method** (page 1175):
+
+```smalltalk
+homeContext: aContext
+    "If context is a BlockContext, return its home.
+     If context is a MethodContext, return itself."
+
+    (self isBlockContext: aContext)
+        ifTrue: [↑ self fetchPointer: HomeIndex ofObject: aContext]
+        ifFalse: [↑ aContext]
+```
+
+When creating a nested block:
+1. Active context is the outer BlockContext
+2. `homeContext:` returns the outer block's HOME field
+3. This HOME field points to the MethodContext!
+4. Nested blocks inherit the same home
+
+**Correct Architecture**:
+```
+┌──────────────────┐
+│ MethodContext    │◄────────────────┐
+│ temp frame: [a,b,c,d] │          │
+└──────────────────┘          │
+                              │ home
+┌──────────────────┐          │
+│ Outer Block      │          │
+│ home ────────────┼──────────┘
+└──────────────────┘
+         ▲ home
+         │
+┌──────────────────┐
+│ Inner Block      │
+│ home ────────────┘  (points to MethodContext, NOT outer block!)
+└──────────────────┘
+```
+
+#### Current Implementation Bug
+
+**File**: `Smalltalk80.Interpreter/Core/VM/Primitives/ControlPrimitives.cs` (lines 96-109)
+
+**CURRENT (INCORRECT)**:
+```csharp
+if (contextClassName == "BlockContext")
+{
+    // Nested block - home points to active BlockContext (creates lexical chain)
+    homeContext = activeContext;  // BUG!
+}
+```
+
+**CORRECT**:
+```csharp
+if (contextClassOOP == ctx.GetBlockContextClassOOP())
+{
+    // Nested block - inherit the outer block's home
+    // This will be the MethodContext, NOT the outer BlockContext
+    homeContext = ctx.HeapManager.GetInstanceVariable(
+        activeContext,
+        VMConstants.BLOCKCONTEXT_HOME_INDEX
+    );
+}
+else
+{
+    // Top-level block - active context IS the MethodContext
+    homeContext = activeContext;
+}
+```
+
+**Result**: All blocks in the same method share the same home (MethodContext).
+
+#### Why This Works for Variable Access
+
+**Example**:
+```smalltalk
+method: arg1
+  | temp1 |
+  [:arg2 |
+    | temp2 |
+    [:arg3 | arg1 + temp1 + arg2 + temp2 + arg3] value: 3
+  ] value: 2
+```
+
+**Unified Temp Frame** (MethodContext indexed slots):
+- Slot 0: arg1
+- Slot 1: temp1
+- Slot 2: arg2
+- Slot 3: temp2
+- Slot 4: arg3
+
+**Inner block access to arg1**:
+1. Inner BlockContext.home → MethodContext
+2. Read MethodContext.tempFrame[0] → arg1 ✅
+
+**Inner block access to arg2** (outer block argument):
+1. Inner BlockContext.home → MethodContext
+2. Read MethodContext.tempFrame[2] → arg2 ✅
+
+**Key Insight**: No chain traversal needed! All variables in MethodContext, so single home pointer suffices.
+
+### 9.3 Slot Reuse with Escaping Blocks
+
+**Optimization**: Sequential (non-nested) blocks can reuse temp slots.
+
+**Safe to Reuse**:
+```smalltalk
+method
+  [:a | a + 1] value: 1.  "Block dies here"
+  [:b | b + 2] value: 2.  "Safe to reuse slot 0"
+```
+
+**Unsafe to Reuse**:
+```smalltalk
+method
+  | blocks |
+  blocks := Array new: 2.
+  blocks at: 1 put: [:a | a + 1].
+  blocks at: 2 put: [:b | b + 2].
+  ^blocks  "Both blocks alive!"
+```
+
+If block 1's arg 'a' uses slot 0, can block 2's arg 'b' reuse slot 0?
+**Answer**: ❌ NO - blocks escape (stored in array), so both must be live simultaneously.
+
+#### Compile-Time Escape Detection
+
+**Conservative Heuristics**:
+
+1. **Block is returned from method**
+   ```smalltalk
+   method
+     ^[:x | x + 1]  "ESCAPES"
+   ```
+
+2. **Block assigned to instance/class/global variable**
+   ```smalltalk
+   method
+     BlockHolder := [:x | x + 1]  "ESCAPES"
+   ```
+
+3. **Block passed to mutation method**
+   ```smalltalk
+   method
+     | blocks |
+     blocks := Array new.
+     blocks add: [:x | x + 1]  "ESCAPES"
+   ```
+
+4. **Block assigned to temp then returned/stored**
+   ```smalltalk
+   method
+     | block |
+     block := [:x | x + 1].
+     ^block  "ESCAPES"
+   ```
+
+**Safe Patterns** (provably non-escaping):
+
+1. **Immediate evaluation**
+   ```smalltalk
+   [:x | x + 1] value: 5  "Does NOT escape"
+   ```
+
+2. **Control structures**
+   ```smalltalk
+   condition ifTrue: [self doSomething]  "Does NOT escape"
+   ```
+
+3. **Collection iteration**
+   ```smalltalk
+   array do: [:each | each print]  "Does NOT escape"
+   ```
+
+#### Recommended Policy
+
+**CONSERVATIVE APPROACH** (recommended for correctness):
+
+```csharp
+public class TempFrameAllocator
+{
+    private bool _methodMightHaveEscapingBlocks = false;
+
+    public void EnterBlockScope(List<string> argNames, List<string> tempNames,
+                                bool isNested, bool mightEscape)
+    {
+        if (mightEscape)
+        {
+            _methodMightHaveEscapingBlocks = true;
+        }
+
+        // If ANY block might escape, disable ALL slot reuse
+        bool canReuseSlots = !_methodMightHaveEscapingBlocks && !isNested;
+
+        var scope = new ScopeInfo
+        {
+            StartSlot = _nextSlot,
+            IsSequential = canReuseSlots
+        };
+
+        // ... rest of allocation
+    }
+}
+```
+
+**Benefits**:
+- ✅ Guaranteed correctness
+- ✅ Simple to reason about
+- ✅ No runtime overhead
+
+**Drawbacks**:
+- ⚠️ Larger temp frames if method has escaping blocks
+- ⚠️ Missed optimization for provably-safe sequential blocks
+
+**Phase 2 Optimization** (future work):
+```csharp
+bool canReuseSlots = !escapeInfo.ThisBlockMightEscape && !isNested;
+// Per-block escape analysis instead of method-wide flag
+```
+
+### 9.4 GetBlockArgumentStartIndex Implementation
+
+**Problem**: Primitive 81 must store block arguments into the **home MethodContext temp frame** at the correct indices.
+
+**Question**: How does Primitive 81 know where block arguments start in the unified frame?
+
+#### Recommended Solution: BlockContext Extension Field
+
+Add `BLOCKCONTEXT_ARG_START_INDEX = 6` as an extension field to BlockContext.
+
+**VMConstants.cs**:
+```csharp
+// BlockContext fields (Blue Book: 0-5)
+public const int BLOCKCONTEXT_SENDER_INDEX = 0;
+public const int BLOCKCONTEXT_PC_INDEX = 1;
+public const int BLOCKCONTEXT_STACKP_INDEX = 2;
+public const int BLOCKCONTEXT_NARGS_INDEX = 3;
+public const int BLOCKCONTEXT_INITIALIP_INDEX = 4;
+public const int BLOCKCONTEXT_HOME_INDEX = 5;
+
+// Extension field for unified temp frame (beyond Blue Book)
+public const int BLOCKCONTEXT_ARG_START_INDEX = 6;
+```
+
+**Why Extension Field**:
+- ✅ Simpler than metadata in literal frame
+- ✅ No change to Primitive 80 signature
+- ✅ Direct access in Primitive 81
+- ✅ Better encapsulation (metadata travels with block)
+- ⚠️ Acceptable Blue Book deviation (internal optimization)
+
+#### Compiler Modification
+
+**BytecodeCompiler.cs** - Block compilation:
+
+```csharp
+void CompileBlock(BlockNode blockNode)
+{
+    // Allocate slots for block args and temps (unified frame)
+    _allocator.EnterBlockScope(blockNode.Arguments, blockNode.Temporaries, isNested);
+
+    // Get index of first block argument
+    int argStartIndex = blockNode.Arguments.Count > 0
+        ? _allocator.GetSlotIndex(blockNode.Arguments[0])
+        : 0;  // No args
+
+    // Store in metadata for Primitive 80
+    _currentBlockMetadata.ArgumentStartIndex = argStartIndex;
+
+    // ... emit blockCopy: with argCount
+}
+```
+
+#### Primitive 80 Modification
+
+**ControlPrimitives.cs**:
+
+```csharp
+public static SmalltalkOOP BlockCopy(IPrimitiveContext ctx,
+                                      SmalltalkOOP receiver,
+                                      SmalltalkOOP[] args)
+{
+    // ... existing validation and BlockContext creation
+
+    // Calculate argStartIndex from compiler metadata
+    // (Passed via method call or embedded in bytecode)
+    int argStartIndex = GetCompilerProvidedArgStartIndex(ctx);
+
+    // Store in BlockContext extension field
+    ctx.HeapManager.SetInstanceVariable(newBlockContext,
+        VMConstants.BLOCKCONTEXT_ARG_START_INDEX,
+        SmalltalkOOP.FromSmallInteger(argStartIndex));
+
+    // ... rest of initialization
+}
+```
+
+#### Primitive 81 Modification
+
+**ControlPrimitives.cs**:
+
+```csharp
+public static void PrimitiveValue(IPrimitiveContext ctx, int argumentCount)
+{
+    // Get BlockContext receiver
+    var blockContextOOP = ctx.StackValue(argumentCount);
+
+    // Get argument start index from BlockContext extension field
+    var argStartIndexOOP = ctx.HeapManager.GetInstanceVariable(
+        blockContextOOP,
+        VMConstants.BLOCKCONTEXT_ARG_START_INDEX
+    );
+    int argStartIndex = argStartIndexOOP.SmallIntegerValue;
+
+    // Get home MethodContext
+    var homeContextOOP = ctx.HeapManager.GetInstanceVariable(
+        blockContextOOP,
+        VMConstants.BLOCKCONTEXT_HOME_INDEX
+    );
+
+    // CRITICAL: Store arguments into HOME MethodContext temp frame
+    // at compiler-determined indices
+    for (int i = 0; i < argumentCount; i++)
+    {
+        var argOOP = ctx.StackValue(argumentCount - 1 - i);
+        ctx.HeapManager.SetIndexedSlot(
+            homeContextOOP,
+            argStartIndex + i,  // Absolute index in unified frame
+            argOOP
+        );
+    }
+
+    // ... rest of block activation
+}
+```
+
+### 9.5 Strict Allocator Policy for Nested vs Sequential Blocks
+
+**Rules**:
+
+**Nested blocks** (overlapping lifetimes): NEVER reuse slots
+```smalltalk
+[:a | [:b | a + b]]  " a→0, b→1, no reuse "
+```
+
+**Sequential blocks** (non-overlapping): MAY reuse slots
+```smalltalk
+[:a | a + 1] value: 1.
+[:b | b + 2] value: 2.  " a→0, b→0 (reused), safe "
+```
+
+#### Proving Sequential Execution
+
+**AST Patterns that PROVE Sequential Execution**:
+
+1. **Same Statement Sequence**
+   ```smalltalk
+   method
+     stmt1.
+     [:a | ...] value: 1.  "Block 1 executes"
+     stmt2.
+     [:b | ...] value: 2.  "Block 2 executes after Block 1"
+   ```
+
+2. **No Assignments to Temps**
+   ```smalltalk
+   method
+     [:a | ...] value: 1.
+     [:b | ...] value: 2.
+     "Safe because blocks not stored in temps"
+   ```
+
+**AST Patterns that PREVENT Sequential Reuse**:
+
+1. **Nested Blocks** - overlapping lifetimes
+2. **Block Assignment** - might escape
+3. **Conditional Execution** - order unknown
+4. **Loop Bodies** - might be retained
+
+#### Implementation
+
+**TempFrameAllocator.cs**:
+
+```csharp
+public void EnterBlockScope(List<string> argNames,
+                            List<string> tempNames,
+                            BlockAnalysisInfo info)
+{
+    bool isNested = _blockStack.Count > 0;  // Inside another block?
+    bool mightEscape = info.IsAssigned || info.IsReturned || info.IsPassedToMethod;
+    bool canReuseSlots = !isNested && !mightEscape && !_methodHasEscapingBlocks;
+
+    var scope = new ScopeInfo
+    {
+        StartSlot = _nextSlot,
+        IsSequential = canReuseSlots
+    };
+    _scopeStack.Push(scope);
+
+    // ... allocation
+}
+
+public void ExitBlockScope()
+{
+    var scope = _scopeStack.Pop();
+
+    if (scope.IsSequential)
+    {
+        // Reuse slots
+        _nextSlot = scope.StartSlot;
+    }
+}
+```
+
+**Phase 1 Policy**:
+- ✅ Nested blocks: NO reuse
+- ✅ Blocks assigned/returned/passed: NO reuse
+- ✅ Blocks immediately evaluated in sequence: YES reuse
+
+### 9.6 Detecting Escaping Blocks
+
+**Three-Tier Strategy**:
+
+1. **Fast Path** (compile-time proved safe): No runtime checks
+2. **Medium Path** (uncertain): Targeted runtime checks
+3. **Slow Path** (proved escapes): Always retain context
+
+#### Compile-Time Analysis
+
+**BlockEscapeAnalyzer.cs**:
+
+```csharp
+public class BlockEscapeAnalyzer
+{
+    public EscapeInfo AnalyzeBlock(BlockNode blockNode)
+    {
+        var info = new EscapeInfo();
+
+        // Check 1: Block is return value
+        if (IsReturnValue(blockNode))
+        {
+            info.DefinitelyEscapes = true;
+            info.Reason = "Returned from method";
+        }
+
+        // Check 2: Block assigned to non-local variable
+        if (IsAssignedToNonLocal(blockNode))
+        {
+            info.DefinitelyEscapes = true;
+            info.Reason = "Assigned to instance/class/global variable";
+        }
+
+        // Check 3: Block passed to method
+        if (IsMethodArgument(blockNode))
+        {
+            string selector = GetTargetSelector(blockNode);
+
+            // Whitelist of known-safe selectors
+            if (IsSafeIterator(selector))  // do:, select:, collect:, etc.
+            {
+                info.MightEscape = false;
+                info.Reason = "Passed to safe iterator";
+            }
+            else
+            {
+                info.MightEscape = true;
+                info.Reason = $"Passed to method #{selector}";
+            }
+        }
+
+        // Check 4: Block immediately evaluated
+        if (IsImmediateReceiver(blockNode))
+        {
+            info.DefinitelyEscapes = false;
+            info.Reason = "Immediately evaluated (value/value:/etc.)";
+        }
+
+        return info;
+    }
+
+    private bool IsSafeIterator(string selector)
+    {
+        return selector switch
+        {
+            "do:" => true,
+            "select:" => true,
+            "collect:" => true,
+            "reject:" => true,
+            "detect:" => true,
+            "ifTrue:" => true,
+            "ifFalse:" => true,
+            "ifTrue:ifFalse:" => true,
+            "whileTrue:" => true,
+            "whileFalse:" => true,
+            _ => false
+        };
+    }
+}
+```
+
+#### Runtime Detection
+
+**VirtualMachine.cs**:
+
+```csharp
+void HandleMethodReturn(SmalltalkOOP methodContext, SmalltalkOOP returnValue)
+{
+    var method = GetMethod(methodContext);
+    var metadata = GetMethodMetadata(method);
+
+    // Fast path: no blocks at all
+    if (!metadata.HasBlocks)
+    {
+        RecycleContext(methodContext);
+        return;
+    }
+
+    // Fast path: proved safe at compile time
+    if (!metadata.MightHaveEscapingBlocks)
+    {
+        RecycleContext(methodContext);
+        return;
+    }
+
+    // Fast path: always retain
+    if (metadata.DefinitelyHasEscapingBlocks)
+    {
+        MarkContextAsRetained(methodContext);
+        return;
+    }
+
+    // Medium path: targeted runtime checks
+    bool hasEscapingBlocks = false;
+
+    // Check 1: Return value is a block?
+    if (IsBlockContext(returnValue))
+    {
+        var blockHome = GetInstanceVariable(returnValue, BLOCKCONTEXT_HOME_INDEX);
+        if (blockHome == methodContext)
+        {
+            hasEscapingBlocks = true;
+        }
+    }
+
+    // Check 2: Scan instance variables for blocks (if method assigns to ivars)
+    if (!hasEscapingBlocks && metadata.AssignsToInstanceVariables)
+    {
+        SmalltalkOOP receiver = GetInstanceVariable(methodContext, CONTEXT_RECEIVER_INDEX);
+        if (ReceiverContainsBlockReferencingContext(receiver, methodContext))
+        {
+            hasEscapingBlocks = true;
+        }
+    }
+
+    if (hasEscapingBlocks)
+    {
+        MarkContextAsRetained(methodContext);
+    }
+    else
+    {
+        RecycleContext(methodContext);
+    }
+}
+```
+
+#### Compile-Time Metadata
+
+**CompiledMethod metadata**:
+
+```csharp
+public class MethodMetadata
+{
+    public bool HasBlocks { get; set; }
+    public bool MightHaveEscapingBlocks { get; set; }
+    public bool DefinitelyHasEscapingBlocks { get; set; }
+    public bool AssignsToInstanceVariables { get; set; }
+}
+```
+
+**Phase 1 Approach**:
+- Conservative compile-time analysis
+- Simple runtime checks (return value only)
+- NO slot reuse if uncertain
+
+**Phase 2 Optimization** (future):
+- Dataflow analysis for temp escapes
+- Whitelist of safe methods
+- Targeted runtime checks
+
+---
+
+## 10. Common Pitfalls
+
+### 10.1 Pitfall: Assuming BlockContext Stores Arguments
 
 **WRONG**:
 ```csharp
@@ -927,7 +1660,7 @@ MethodContext home = GetHome(blockContext);
 value = ReadIndexedSlot(home, argIndex);
 ```
 
-### 9.2 Pitfall: Using Relative Indices
+### 10.2 Pitfall: Using Relative Indices
 
 **WRONG**:
 ```csharp
@@ -941,7 +1674,7 @@ int relativeIndex = argIndex - blockStartIndex;
 value = ReadIndexedSlot(home, absoluteIndex);
 ```
 
-### 9.3 Pitfall: Special-Casing Block Arguments
+### 10.3 Pitfall: Special-Casing Block Arguments
 
 **WRONG**:
 ```csharp
@@ -958,7 +1691,7 @@ MethodContext varContext = GetVariableContext(activeContext);
 return ReadIndexedSlot(varContext, index);
 ```
 
-### 9.4 Pitfall: Allocating Indexed Slots for BlockContext
+### 10.4 Pitfall: Allocating Indexed Slots for BlockContext
 
 **WRONG**:
 ```csharp
@@ -970,7 +1703,7 @@ InstantiateClass(blockContextClass, indexedSlotCount: nargs);
 InstantiateClass(blockContextClass, indexedSlotCount: 0);
 ```
 
-### 9.5 Pitfall: Not Storing Arguments During Block Activation
+### 10.5 Pitfall: Not Storing Arguments During Block Activation
 
 **WRONG**:
 ```csharp
@@ -988,9 +1721,40 @@ for (int i = 0; i < args.Length; i++)
 
 ---
 
-## 10. Implementation Checklist
+## 11. Implementation Checklist
 
-### 10.1 Compiler (Smalltalk80.Compiler)
+### 11.0 Critical Bug Fixes (IMMEDIATE)
+
+**File**: `Smalltalk80.Interpreter/Core/VM/Primitives/ControlPrimitives.cs` (lines 96-109)
+
+**Bug**: Primitive 80 sets nested block's home to outer BlockContext instead of MethodContext
+
+**Impact**: Variable access from nested blocks will fail
+
+**Fix Required**:
+```csharp
+// CURRENT (WRONG):
+if (contextClassName == "BlockContext")
+{
+    homeContext = activeContext;  // BUG: Creates chain BlockContext → BlockContext
+}
+
+// CORRECT:
+if (contextClassOOP == ctx.GetBlockContextClassOOP())
+{
+    // Inherit outer block's home (which points to MethodContext)
+    homeContext = ctx.HeapManager.GetInstanceVariable(
+        activeContext,
+        VMConstants.BLOCKCONTEXT_HOME_INDEX
+    );
+}
+```
+
+**Verification**: All 194 BlockContextTest tests must pass after fix
+
+---
+
+### 11.1 Compiler (Smalltalk80.Compiler)
 
 **TempFrameAllocator.cs**:
 - [ ] Assigns absolute indices to all variables
@@ -1018,7 +1782,7 @@ for (int i = 0; i < args.Length; i++)
 - [ ] Compiles block body inline with absolute indices
 - [ ] Emits RETURN_STACK_TOP at end of block
 
-### 10.2 Interpreter (Smalltalk80.Interpreter)
+### 11.2 Interpreter (Smalltalk80.Interpreter)
 
 **VirtualMachine.cs**:
 - [ ] `PushTemporaryVariable(index)` - reads from temp frame via home pointer
@@ -1045,7 +1809,7 @@ for (int i = 0; i < args.Length; i++)
 - [ ] GC traces from BlockContext to home MethodContext
 - [ ] Don't recycle retained contexts
 
-### 10.3 Constants (VMConstants.cs)
+### 11.3 Constants (VMConstants.cs)
 
 **MethodContext**:
 - [ ] METHODCONTEXT_SENDER_INDEX = 0
@@ -1064,7 +1828,7 @@ for (int i = 0; i < args.Length; i++)
 - [ ] BLOCKCONTEXT_HOME_INDEX = 5
 - [ ] NO BLOCKCONTEXT_TEMP_FRAME_START (no indexed slots!)
 
-### 10.4 Testing
+### 11.4 Testing
 
 **Unit Tests**:
 - [ ] Method variable access

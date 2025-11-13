@@ -4124,131 +4124,47 @@ public partial class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
-    /// Gets a temporary variable using unified temp frame architecture.
-    /// CRITICAL: Block arguments are stored in BlockContext's indexed slots during execution!
-    /// Block temporaries and method args/temps are in the home MethodContext's temp frame.
-    /// Blue Book Chapter 30: BlueBook-Context-Architecture.md Section 4.3
+    /// Gets a temporary variable using UNIFIED TEMP FRAME architecture.
+    /// ALL variables stored in MethodContext - NO dual routing.
+    ///
+    /// Block arguments and temps are stored in the MethodContext temp frame
+    /// at absolute indices assigned by the compiler. When executing inside a block,
+    /// we traverse to the home MethodContext via the 'home' pointer and use the
+    /// absolute index directly (no adjustment needed).
     /// </summary>
-    /// <param name="contextOOP">Context to access (MethodContext or BlockContext)</param>
-    /// <param name="index">Absolute index into the unified temp frame (0-based)</param>
-    /// <returns>The value of the temporary variable</returns>
+    /// <param name="contextOOP">Current context (MethodContext or BlockContext)</param>
+    /// <param name="index">Absolute index in MethodContext temp frame (0-based)</param>
+    /// <returns>Value of the temporary variable</returns>
     private SmalltalkOOP GetTemporaryVariable(SmalltalkOOP contextOOP, int index)
     {
         var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
         bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
 
-        // Get the home MethodContext to check selector
-        var homeContextOOP = isBlockContext
-            ? _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX)
-            : contextOOP;
-
-        var methodOOP = _heapManager.GetInstanceVariable(homeContextOOP, VMConstants.CONTEXT_METHOD_INDEX);
-
-        // Extract selector string from Symbol object for diagnostics
-        string selector = "";
-        try
-        {
-            if (!methodOOP.IsSmallInteger)
-            {
-                var selectorOOP = _heapManager.GetInstanceVariable(methodOOP, 0); // Selector is at index 0
-                if (!selectorOOP.IsSmallInteger)
-                {
-                    // Symbol has string data in indexed bytes
-                    int selectorLength = _heapManager.GetIndexedSize(selectorOOP);
-                    char[] selectorChars = new char[selectorLength];
-                    for (int i = 0; i < selectorLength; i++)
-                    {
-                        selectorChars[i] = (char)_heapManager.GetIndexedByte(selectorOOP, i);
-                    }
-                    selector = new string(selectorChars);
-                }
-            }
-        }
-        catch
-        {
-            selector = "<unknown>";
-        }
-
-        if (selector == "")
-        {
-            selector = "<no selector>";
-        }
-
-        if (VerboseDebug)
-        {
-            string contextType = isBlockContext ? "BlockContext" : "MethodContext";
-            Console.WriteLine($"\n[GetTemporaryVariable] selector={selector}, context={contextOOP} ({contextType}), index={index}");
-        }
-
-        // Check if we're in a BlockContext
         if (isBlockContext)
         {
-            // Get nargs from BlockContext
-            var nargsOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-            int nargs = nargsOOP.AsSmallInteger();
+            // Traverse to home MethodContext (NO index adjustment!)
+            var homeOOP = _heapManager.GetInstanceVariable(
+                contextOOP,
+                VMConstants.BLOCKCONTEXT_HOME_INDEX
+            );
 
             if (VerboseDebug)
             {
-                Console.WriteLine($"[GetTemporaryVariable] BlockContext nargs={nargs}, checking if index {index} < nargs {nargs}");
-
-                // Dump BlockContext indexed slots (block arguments)
-                int indexedCount = _heapManager.GetIndexedSize(contextOOP);
-                Console.WriteLine($"[GetTemporaryVariable] BlockContext has {indexedCount} indexed slots:");
-                for (int i = 0; i < indexedCount && i < nargs; i++)
-                {
-                    var slotValue = _heapManager.GetIndexedOOP(contextOOP, i);
-                    string valueDesc = FormatOOPValue(slotValue);
-                    Console.WriteLine($"  BlockContext arg[{i}] = {valueDesc}");
-                }
+                Console.WriteLine($"[VM.GetTemporaryVariable] BlockContext → home, index={index}");
             }
 
-            // If index < nargs, it's a block argument stored in THIS BlockContext's indexed slots
-            if (index < nargs)
-            {
-                // Local block argument - stored in THIS BlockContext's indexed slots
-                var result = _heapManager.GetIndexedOOP(contextOOP, index);
-                if (VerboseDebug)
-                {
-                    Console.WriteLine($"[GetTemporaryVariable] Retrieving block arg {index} from BlockContext indexed slot: {FormatOOPValue(result)}");
-                }
-                return result;
-            }
-            else
-            {
-                if (VerboseDebug)
-                {
-                    Console.WriteLine($"[GetTemporaryVariable] index {index} >= nargs {nargs}, traversing to home MethodContext {homeContextOOP}");
-                }
-
-                // Unified temp frame: ALL other temps (block temps, method args/temps) are in MethodContext
-                // Traverse to home MethodContext and use absolute index (NO adjustment!)
-                var homeOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                return GetTemporaryVariable(homeOOP, index);  // Keep same index (absolute indexing)
-            }
+            // Recursive call with SAME index (absolute indexing)
+            return GetTemporaryVariable(homeOOP, index);
         }
         else
         {
-            // MethodContext: Direct access to method's temp frame (base case)
+            // MethodContext: Direct access using absolute index (base case)
             if (VerboseDebug)
             {
-                // Dump ALL temp slots in the MethodContext unified frame
-                int tempCount = _heapManager.GetIndexedSize(contextOOP);
-                Console.WriteLine($"[GetTemporaryVariable] MethodContext unified temp frame has {tempCount} slots:");
-                for (int i = 0; i < tempCount; i++)
-                {
-                    var slotValue = _heapManager.GetIndexedOOP(contextOOP, i);
-                    string valueDesc = FormatOOPValue(slotValue);
-                    string marker = (i == index) ? " <-- REQUESTED" : "";
-                    Console.WriteLine($"  temp[{i}] = {valueDesc}{marker}");
-                }
+                Console.WriteLine($"[VM.GetTemporaryVariable] MethodContext index={index}");
             }
 
-            var result = _heapManager.GetIndexedOOP(contextOOP, index);
-            if (VerboseDebug)
-            {
-                Console.WriteLine($"[GetTemporaryVariable] Returning temp[{index}] = {FormatOOPValue(result)}\n");
-            }
-            return result;
+            return _heapManager.GetIndexedOOP(contextOOP, index);
         }
     }
 
@@ -4278,13 +4194,16 @@ public partial class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
-    /// Sets a temporary variable using unified temp frame architecture.
-    /// CRITICAL: Block arguments are stored in BlockContext's indexed slots during execution!
-    /// Block temporaries and method args/temps are in the home MethodContext's temp frame.
-    /// Blue Book Chapter 30: BlueBook-Context-Architecture.md Section 4.3
+    /// Sets a temporary variable using UNIFIED TEMP FRAME architecture.
+    /// ALL variables stored in MethodContext - NO dual routing.
+    ///
+    /// Block arguments and temps are stored in the MethodContext temp frame
+    /// at absolute indices assigned by the compiler. When executing inside a block,
+    /// we traverse to the home MethodContext via the 'home' pointer and use the
+    /// absolute index directly (no adjustment needed).
     /// </summary>
-    /// <param name="contextOOP">Context to access (MethodContext or BlockContext)</param>
-    /// <param name="index">Absolute index into the unified temp frame (0-based)</param>
+    /// <param name="contextOOP">Current context (MethodContext or BlockContext)</param>
+    /// <param name="index">Absolute index in MethodContext temp frame (0-based)</param>
     /// <param name="valueOOP">Value to store</param>
     private void SetTemporaryVariable(SmalltalkOOP contextOOP, int index, SmalltalkOOP valueOOP)
     {
@@ -4293,26 +4212,28 @@ public partial class VirtualMachine : IPrimitiveContext
 
         if (isBlockContext)
         {
-            // BlockContext: Check if storing to local args or need to traverse home chain
-            var nargsOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-            int nargs = nargsOOP.AsSmallInteger();
+            // Traverse to home MethodContext (NO index adjustment!)
+            var homeOOP = _heapManager.GetInstanceVariable(
+                contextOOP,
+                VMConstants.BLOCKCONTEXT_HOME_INDEX
+            );
 
-            if (index < nargs)
+            if (VerboseDebug)
             {
-                // Local block argument - store to THIS BlockContext's indexed slots
-                _heapManager.SetIndexedOOP(contextOOP, index, valueOOP);
+                Console.WriteLine($"[VM.SetTemporaryVariable] BlockContext → home, index={index}, value={valueOOP}");
             }
-            else
-            {
-                // Unified temp frame: ALL other temps (block temps, method args/temps) are in MethodContext
-                // Traverse to home MethodContext and use absolute index (NO adjustment!)
-                var homeOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                SetTemporaryVariable(homeOOP, index, valueOOP);  // Keep same index (absolute indexing)
-            }
+
+            // Recursive call with SAME index (absolute indexing)
+            SetTemporaryVariable(homeOOP, index, valueOOP);
         }
         else
         {
-            // MethodContext: Direct access to method's temp frame (base case)
+            // MethodContext: Direct write using absolute index (base case)
+            if (VerboseDebug)
+            {
+                Console.WriteLine($"[VM.SetTemporaryVariable] MethodContext index={index}, value={valueOOP}");
+            }
+
             _heapManager.SetIndexedOOP(contextOOP, index, valueOOP);
         }
     }

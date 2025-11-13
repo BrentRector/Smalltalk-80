@@ -2731,17 +2731,11 @@ namespace Smalltalk80.Compiler
 
             switch (result.Type)
             {
-                case VariableResolver.VariableType.BlockArgument:
-                    // Block arguments use 0-based indices within the block
-                    // VariableResolver already returns the correct local index from LocalArgumentIndices
-                    Console.WriteLine($"[BLOCK ARG PUSH] name={name}, result.Index={result.Index}, scopeDepth={environment.ScopeDepth}");
-                    emitter.PushTemporary(result.Index);
-                    break;
-
                 case VariableResolver.VariableType.BlockTemporary:
                 case VariableResolver.VariableType.ParentVariable:
                 case VariableResolver.VariableType.MethodArgument:
                 case VariableResolver.VariableType.MethodTemporary:
+                    // UNIFIED TEMP FRAME: All temps use absolute indices from allocator
                     emitter.PushTemporary(result.Index);
                     break;
 
@@ -2813,24 +2807,11 @@ namespace Smalltalk80.Compiler
 
             switch (result.Type)
             {
-                case VariableResolver.VariableType.BlockArgument:
-                    // CRITICAL FIX: Block arguments MUST use LOCAL indices (0-based within the block)
-                    // The VariableResolver returns ABSOLUTE indices from TempFrameAllocator,
-                    // but BlockContext expects local indices for its indexed instance variables.
-                    // Example: [:x | x := 5] should emit STORE_TEMP 0, not STORE_TEMP 3
-                    if (environment.LocalArgumentIndices.TryGetValue(name, out int localArgIndex))
-                    {
-                        emitter.StoreTemporary(localArgIndex);
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException($"Block argument '{name}' not found in OwnArguments");
-                    }
-                    break;
-
                 case VariableResolver.VariableType.BlockTemporary:
                 case VariableResolver.VariableType.ParentVariable:
+                case VariableResolver.VariableType.MethodArgument:
                 case VariableResolver.VariableType.MethodTemporary:
+                    // UNIFIED TEMP FRAME: All temps use absolute indices from allocator
                     emitter.StoreTemporary(result.Index);
                     break;
 

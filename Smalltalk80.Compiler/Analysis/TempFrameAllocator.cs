@@ -61,43 +61,62 @@ public class TempFrameAllocator
     }
 
     /// <summary>
-    /// Enters a block scope and allocates slots for block temporaries.
-    ///
-    /// IMPORTANT: Block ARGUMENTS are NOT allocated in the unified temp frame!
-    /// - Block arguments exist ONLY in the BlockContext's indexed slots
-    /// - Primitive 81 stores block arguments in BlockContext indexed slots
-    /// - The VM's GetTemporaryVariable routes "index < nargs" to BlockContext
-    /// - Only block TEMPORARIES are allocated in the unified frame
-    ///
-    /// Sequential blocks can reuse slots after they exit.
-    /// Nested blocks cannot reuse slots (they're active simultaneously with parent).
+    /// Enters block scope and allocates slots for block args AND temps.
+    /// UNIFIED TEMP FRAME: Block arguments NOW allocated in MethodContext!
     /// </summary>
-    /// <param name="argNames">Block parameter names (NOT allocated in unified frame!)</param>
-    /// <param name="tempNames">Block temporary variable names</param>
-    /// <param name="isNested">True if block is nested inside another block or will be stored/passed</param>
     public void EnterBlockScope(List<string> argNames, List<string> tempNames, bool isNested)
     {
         var scope = new ScopeInfo
         {
             StartSlot = _nextSlot,
-            IsSequential = !isNested  // Sequential blocks can reuse, nested cannot
+            IsSequential = !isNested
         };
         _scopeStack.Push(scope);
 
-        // CRITICAL: DO NOT allocate unified frame slots for block arguments!
-        // Block arguments exist ONLY in BlockContext indexed slots (set by Primitive 81)
-        // The compiler will emit block-relative indices (0, 1, 2...) for block arguments
+        // CRITICAL CHANGE: Allocate block ARGUMENTS in unified frame
+        // Previously this was skipped - arguments were stored in BlockContext
+        // Now ALL variables go in MethodContext temp frame
+        foreach (var argName in argNames)
+        {
+            int slot = _nextSlot++;
+            _allocatedSlots[argName] = slot;
+            scope.AllocatedSlots.Add(slot);
+            _highestSlotIndex = Math.Max(_highestSlotIndex, slot);
 
-        // Allocate slots for block temps
+            Console.WriteLine($"[TempFrameAllocator] Block arg '{argName}' → slot {slot}");
+        }
+
+        // Allocate block temps (same as before)
         foreach (var tempName in tempNames)
         {
             int slot = _nextSlot++;
             _allocatedSlots[tempName] = slot;
             scope.AllocatedSlots.Add(slot);
             _highestSlotIndex = Math.Max(_highestSlotIndex, slot);
+
+            Console.WriteLine($"[TempFrameAllocator] Block temp '{tempName}' → slot {slot}");
         }
 
         _maxSimultaneous = Math.Max(_maxSimultaneous, _nextSlot);
+    }
+
+    /// <summary>
+    /// Gets the starting index where current block's arguments are allocated.
+    /// Returns -1 if not in block scope or no arguments.
+    /// Used by BytecodeCompiler to pass argStartIndex to Primitive 80.
+    /// </summary>
+    public int GetCurrentBlockArgStartIndex()
+    {
+        if (_scopeStack.Count == 0)
+            return -1;
+
+        var currentScope = _scopeStack.Peek();
+
+        if (currentScope.AllocatedSlots.Count == 0)
+            return -1;
+
+        // First slot allocated in this scope = first block argument
+        return currentScope.AllocatedSlots.Min();
     }
 
     /// <summary>
