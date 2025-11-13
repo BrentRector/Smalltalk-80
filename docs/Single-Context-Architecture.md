@@ -2,8 +2,31 @@
 
 **Document Version**: 3.0
 **Date**: 2025-11-06
-**Status**: DEFINITIVE ARCHITECTURAL SPECIFICATION
+**Status**: ⚠️ **SUPERSEDED** - Alternative Architecture Proposal
 **Author**: Simplified clean-slate design
+
+---
+
+## ⚠️ SUPERSEDED NOTICE
+
+**This document describes an alternative single-context architecture that was NOT implemented.**
+
+**For the actual implemented architecture, see:**
+
+**[Unified-Temp-Frame-Specification.md](./Unified-Temp-Frame-Specification.md)**
+
+**Key Differences**:
+- This document proposes eliminating BlockContext entirely (NOT implemented)
+- This document proposes a single MethodContext type for everything (NOT implemented)
+- Actual implementation uses BOTH MethodContext AND BlockContext (Blue Book compliant)
+- Actual implementation stores variables ONLY in MethodContext unified temp frame
+- BlockContext exists but has NO indexed slots (only instance variables + home pointer)
+
+This document is retained for historical reference as an alternative design approach.
+
+---
+
+## Historical Proposal (Not Implemented)
 
 ---
 

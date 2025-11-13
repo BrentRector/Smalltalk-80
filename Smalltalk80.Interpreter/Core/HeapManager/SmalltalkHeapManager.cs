@@ -488,6 +488,27 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                 $"    - Field layout error causing wrong object to be accessed");
         }
 
+        // DEBUG: Track writes to BlockContext 64034 (the one being corrupted)
+        // OOP display format "oop=64034" means object table index 32017, raw value 64034
+        if (objectOOP.RawValue == 64034)  // Match the raw OOP value directly
+        {
+            var classOOP = GetSlot(objectOOP, 0);
+            string className = GetClassName(classOOP);
+            string valueStr = value.IsSmallInteger ? $"SmallInteger({value.AsSmallInteger()})" : $"{value}";
+            if (!value.IsSmallInteger)
+            {
+                try
+                {
+                    var valueClassOOP = GetSlot(value, 0);
+                    string valueClassName = GetClassName(valueClassOOP);
+                    valueStr = $"{valueClassName} OOP({value})";
+                }
+                catch { }
+            }
+            Console.WriteLine($"[HEAP DEBUG] SetIndexedOOP: object=64034 ({className}), index={index}, value={valueStr}");
+            Console.WriteLine($"[HEAP DEBUG] Stack trace:");
+            Console.WriteLine(System.Environment.StackTrace);
+        }
 
         WriteIndexedOop(entry, index, value);
     }

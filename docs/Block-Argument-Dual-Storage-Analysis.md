@@ -1,8 +1,33 @@
 # Analysis: Why Block Arguments Are Stored in TWO Locations
 
 **Date**: 2025-11-12
-**Status**: ARCHITECTURAL ANALYSIS - Blue Book Compliance
+**Status**: ⚠️ **OBSOLETE** - Describes Discarded Dual-Storage Architecture
 **Author**: Deep Analysis of Smalltalk-80 Specification
+
+---
+
+## ⚠️ OBSOLETE NOTICE
+
+**This document describes a dual-storage architecture that was analyzed but NOT implemented.**
+
+**For the actual implemented architecture, see:**
+
+**[Unified-Temp-Frame-Specification.md](./Unified-Temp-Frame-Specification.md)**
+
+**Why This Analysis Is Obsolete**:
+1. **Block arguments are NOT stored in two locations** (actual implementation)
+2. **BlockContext has NO indexed slots** for variable storage (actual implementation)
+3. **All variables** stored ONLY in MethodContext unified temp frame (actual implementation)
+4. **Expression stack** is in MethodContext, not BlockContext (actual implementation)
+5. **No dual routing** - no `if (index < nargs)` check (actual implementation)
+
+This document analyzed the Blue Book specification which DOES use dual storage (BlockContext indexed slots + MethodContext temp frame). However, our implementation diverges from Blue Book in this specific aspect to achieve a simpler unified model.
+
+**Architectural Decision**: We chose the unified temp frame approach (all variables in MethodContext) over the Blue Book dual-storage approach for simplicity and maintainability.
+
+---
+
+## Historical Analysis (Obsolete Architecture)
 
 ---
 

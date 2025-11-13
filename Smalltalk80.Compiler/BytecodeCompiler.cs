@@ -50,26 +50,30 @@ namespace Smalltalk80.Compiler
         public int ScopeDepth { get; set; }
 
         /// <summary>
-        /// Arguments defined in THIS scope only (no inheritance).
+        /// Maps argument names to their 0-based indices within THIS scope only (no inheritance).
         /// For method scope: method arguments. For block scope: block arguments only.
-        /// Indices are 0-based within this scope.
+        ///
+        /// IMPORTANT: These indices have different meanings depending on scope:
+        /// - Method arguments (scope depth = 0): Used to look up absolute slot index from TempFrameAllocator
+        /// - Block arguments (scope depth > 0): Emitted directly as block-relative indices (0, 1, 2...)
+        ///   because block arguments are stored in BlockContext indexed slots, not unified temp frame
         /// </summary>
-        public Dictionary<string, int> OwnArguments { get; set; } = new();
+        public Dictionary<string, int> LocalArgumentIndices { get; set; } = new();
 
         /// <summary>
-        /// Temporaries defined in THIS scope only (no inheritance).
-        /// Indices are 0-based within this scope.
+        /// Maps temporary variable names to their 0-based indices within THIS scope only (no inheritance).
+        /// These indices are used to look up absolute slot indices from TempFrameAllocator.
         /// </summary>
-        public Dictionary<string, int> OwnTemporaries { get; set; } = new();
+        public Dictionary<string, int> LocalTemporaryIndices { get; set; } = new();
 
         /// <summary>
-        /// [DEPRECATED - Use OwnArguments] Map of argument names to their indices.
+        /// [DEPRECATED - Use LocalArgumentIndices] Map of argument names to their indices.
         /// This property is maintained for backward compatibility but should not be used for new code.
         /// </summary>
         public Dictionary<string, int> Arguments { get; } = new();
 
         /// <summary>
-        /// [DEPRECATED - Use OwnTemporaries] Map of temporary variable names to their indices.
+        /// [DEPRECATED - Use LocalTemporaryIndices] Map of temporary variable names to their indices.
         /// This property is maintained for backward compatibility but should not be used for new code.
         /// </summary>
         public Dictionary<string, int> Temporaries { get; } = new();
@@ -603,10 +607,13 @@ namespace Smalltalk80.Compiler
         {
             if (index <= 15)
             {
+                byte bytecode = (byte)((byte)Bytecode.PUSH_TEMP_0 + index);
+                Console.WriteLine($"[EMIT] PushTemporary: index={index}, bytecode=0x{bytecode:X2} (decimal {bytecode})");
                 EmitWithOffset(Bytecode.PUSH_TEMP_0, index); // 0x10-0x1F
             }
             else
             {
+                Console.WriteLine($"[EMIT] PushTemporary: index={index}, using extended");
                 Emit(Bytecode.EXTENDED_PREFIX); // 0x80
                 Emit(ExtendedSubOp.PUSH_TEMP);
                 Emit((byte)index);
@@ -1375,7 +1382,7 @@ namespace Smalltalk80.Compiler
                 Console.WriteLine($"[COMPILER FIX APPLIED] {selector}: maxTempIndex={maxTempIndex}, allocator.tempCount={tempCount}, actualTempCount={actualTempCount}");
             }
 
-            return new CompiledMethodData
+            var compiledMethod = new CompiledMethodData
             {
                 Selector = selector,
                 ArgumentCount = environment.ArgumentCount,
@@ -1390,6 +1397,14 @@ namespace Smalltalk80.Compiler
                 QuickReturnFieldIndex = quickReturnFieldIndex,
                 VariableSlotMap = allocator.GetAllAllocatedVariables()  // DIAGNOSTIC: Add variable-to-slot mapping
             };
+
+            // DIAGNOSTIC: Print variable slot mapping for hasInterned:ifTrue: specifically
+            if (selector == "hasInterned:ifTrue:" && compiledMethod.VariableSlotMap != null && compiledMethod.VariableSlotMap.Count > 0)
+            {
+                Console.WriteLine($"[VAR SLOTS] {selector}: {string.Join(", ", compiledMethod.VariableSlotMap.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
+            }
+
+            return compiledMethod;
         }
 
         private List<string> argumentNames = new();
@@ -1412,7 +1427,7 @@ namespace Smalltalk80.Compiler
                     var argName = arg.GetText();
                     argumentNames.Add(argName);
                     // Populate OwnArguments for method scope
-                    environment.OwnArguments[argName] = 0;
+                    environment.LocalArgumentIndices[argName] = 0;
                     // Maintain backward compatibility
                     environment.Arguments[argName] = 0;
                     environment.ArgumentCount = 1;
@@ -1434,7 +1449,7 @@ namespace Smalltalk80.Compiler
                         var argText = args[i].GetText();
                         argumentNames.Add(argText);
                         // Populate OwnArguments for method scope
-                        environment.OwnArguments[argText] = i;
+                        environment.LocalArgumentIndices[argText] = i;
                         // Maintain backward compatibility
                         environment.Arguments[argText] = i;
                     }
@@ -1459,7 +1474,7 @@ namespace Smalltalk80.Compiler
                 var name = tempNames[i].GetText();
                 temporaryNames.Add(name);
                 // Populate OwnTemporaries for method scope (0-based, no inheritance)
-                environment.OwnTemporaries[name] = i;
+                environment.LocalTemporaryIndices[name] = i;
                 // Maintain backward compatibility (absolute index including args)
                 environment.Temporaries[name] = environment.ArgumentCount + i;
             }
@@ -2218,8 +2233,8 @@ namespace Smalltalk80.Compiler
             var savedTemporaries = new Dictionary<string, int>(environment.Temporaries);
             // Save OwnArguments and OwnTemporaries to restore after block compilation
             // CRITICAL FIX: Without this, nested blocks lose parent's OwnArguments/OwnTemporaries!
-            var savedOwnArguments = new Dictionary<string, int>(environment.OwnArguments);
-            var savedOwnTemporaries = new Dictionary<string, int>(environment.OwnTemporaries);
+            var savedOwnArguments = new Dictionary<string, int>(environment.LocalArgumentIndices);
+            var savedOwnTemporaries = new Dictionary<string, int>(environment.LocalTemporaryIndices);
             // Save cumulative block arg offset to restore after block compilation
             int savedCumulativeBlockArgOffset = environment.CumulativeBlockArgOffset;
             // Save temporary count to restore after block compilation
@@ -2256,12 +2271,12 @@ namespace Smalltalk80.Compiler
             foreach (var kvp in savedTemporaries)
                 parentSnapshot.Temporaries[kvp.Key] = kvp.Value;
             // Copy OwnArguments and OwnTemporaries from SAVED state (parent scope's own variables)
-            // CRITICAL FIX: Use savedOwnArguments/savedOwnTemporaries, NOT environment.OwnArguments/OwnTemporaries
+            // CRITICAL FIX: Use savedOwnArguments/savedOwnTemporaries, NOT environment.LocalArgumentIndices/OwnTemporaries
             // The environment dictionaries are about to be cleared and repopulated with THIS block's variables
             foreach (var kvp in savedOwnArguments)
-                parentSnapshot.OwnArguments[kvp.Key] = kvp.Value;
+                parentSnapshot.LocalArgumentIndices[kvp.Key] = kvp.Value;
             foreach (var kvp in savedOwnTemporaries)
-                parentSnapshot.OwnTemporaries[kvp.Key] = kvp.Value;
+                parentSnapshot.LocalTemporaryIndices[kvp.Key] = kvp.Value;
             foreach (var kvp in environment.InstanceVariables)
                 parentSnapshot.InstanceVariables[kvp.Key] = kvp.Value;
             foreach (var kvp in environment.ClassVariables)
@@ -2284,10 +2299,10 @@ namespace Smalltalk80.Compiler
 
             // Populate OwnArguments with block arguments (0-based, no inheritance)
             // CRITICAL: Always clear OwnArguments, even if block has 0 arguments
-            environment.OwnArguments.Clear();
+            environment.LocalArgumentIndices.Clear();
             for (int i = 0; i < argumentNames.Count; i++)
             {
-                environment.OwnArguments[argumentNames[i]] = i;
+                environment.LocalArgumentIndices[argumentNames[i]] = i;
             }
 
             // Add block arguments to current environment (they'll be in BlockContext indexed slots)
@@ -2306,7 +2321,7 @@ namespace Smalltalk80.Compiler
             // Populate OwnTemporaries with block temps (0-based, no inheritance)
             // CRITICAL: Always clear OwnTemporaries FIRST, even if block has 0 temps
             // BUG FIX: Was only clearing inside `if (blockTemps != null)`, causing parent temps to leak into block scope
-            environment.OwnTemporaries.Clear();
+            environment.LocalTemporaryIndices.Clear();
 
             // Parse and register block temporaries in parent environment
             // Block temps are allocated after parent method's temps AND block arguments
@@ -2322,7 +2337,7 @@ namespace Smalltalk80.Compiler
                 {
                     var tempName = tempNodes[i].GetText();
                     blockTempNames.Add(tempName);  // Track for later cleanup
-                    environment.OwnTemporaries[tempName] = i;  // 0-based index
+                    environment.LocalTemporaryIndices[tempName] = i;  // 0-based index
                 }
 
                 // Maintain backward compatibility (absolute index)
@@ -2400,15 +2415,15 @@ namespace Smalltalk80.Compiler
 
             // Restore OwnArguments and OwnTemporaries
             // CRITICAL FIX: Without this, nested blocks lose parent's OwnArguments/OwnTemporaries!
-            environment.OwnArguments.Clear();
+            environment.LocalArgumentIndices.Clear();
             foreach (var kvp in savedOwnArguments)
             {
-                environment.OwnArguments[kvp.Key] = kvp.Value;
+                environment.LocalArgumentIndices[kvp.Key] = kvp.Value;
             }
-            environment.OwnTemporaries.Clear();
+            environment.LocalTemporaryIndices.Clear();
             foreach (var kvp in savedOwnTemporaries)
             {
-                environment.OwnTemporaries[kvp.Key] = kvp.Value;
+                environment.LocalTemporaryIndices[kvp.Key] = kvp.Value;
             }
 
             environment.ScopeDepth = savedScopeDepth; // Restore scope depth
@@ -2717,18 +2732,10 @@ namespace Smalltalk80.Compiler
             switch (result.Type)
             {
                 case VariableResolver.VariableType.BlockArgument:
-                    // CRITICAL FIX: Block arguments MUST use LOCAL indices (0-based within the block)
-                    // The VariableResolver returns ABSOLUTE indices from TempFrameAllocator,
-                    // but BlockContext expects local indices for its indexed instance variables.
-                    // Example: [:index | bits at: index] should emit PUSH_TEMP 0, not PUSH_TEMP 3
-                    if (environment.OwnArguments.TryGetValue(name, out int localArgIndex))
-                    {
-                        emitter.PushTemporary(localArgIndex);
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException($"Block argument '{name}' not found in OwnArguments");
-                    }
+                    // Block arguments use 0-based indices within the block
+                    // VariableResolver already returns the correct local index from LocalArgumentIndices
+                    Console.WriteLine($"[BLOCK ARG PUSH] name={name}, result.Index={result.Index}, scopeDepth={environment.ScopeDepth}");
+                    emitter.PushTemporary(result.Index);
                     break;
 
                 case VariableResolver.VariableType.BlockTemporary:
@@ -2811,7 +2818,7 @@ namespace Smalltalk80.Compiler
                     // The VariableResolver returns ABSOLUTE indices from TempFrameAllocator,
                     // but BlockContext expects local indices for its indexed instance variables.
                     // Example: [:x | x := 5] should emit STORE_TEMP 0, not STORE_TEMP 3
-                    if (environment.OwnArguments.TryGetValue(name, out int localArgIndex))
+                    if (environment.LocalArgumentIndices.TryGetValue(name, out int localArgIndex))
                     {
                         emitter.StoreTemporary(localArgIndex);
                     }

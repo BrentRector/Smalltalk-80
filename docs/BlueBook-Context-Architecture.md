@@ -1,9 +1,19 @@
 # Blue Book Context Architecture: Separate MethodContext and BlockContext
 
-**Document Version**: 1.0
-**Date**: 2025-11-08
-**Status**: ARCHITECTURAL SPECIFICATION
+**Document Version**: 2.0
+**Date**: 2025-11-13
+**Status**: ARCHITECTURAL SPECIFICATION - See Canonical Reference Below
 **Author**: Blue Book Compliance Analysis
+
+---
+
+## CANONICAL REFERENCE
+
+**For the authoritative specification of variable access and temp frame architecture, see:**
+
+**[Unified-Temp-Frame-Specification.md](./Unified-Temp-Frame-Specification.md)**
+
+This document provides context-specific implementation details. For conflicts, the Unified Temp Frame Specification takes precedence.
 
 ---
 
@@ -517,134 +527,125 @@ block2   (BlockContext, home → methodC)
 
 ### 4.3 Variable Access Algorithm - UNIFIED TEMP FRAME MODEL
 
-**CRITICAL: Blue Book uses unified temp frame, NOT per-context frames**
+**CANONICAL REFERENCE**: See [Unified-Temp-Frame-Specification.md](./Unified-Temp-Frame-Specification.md) Section 4
 
-All temporaries (method args/temps + all nested block args/temps) are allocated in the **MethodContext's temp frame** using absolute indices. The compiler performs static analysis to:
+**Summary**: All method and block variables (arguments and temporaries) are stored in the MethodContext's unified temp frame using absolute indices assigned at compile time. BlockContext contains NO variable storage - only a `home` pointer to the MethodContext.
 
-1. **Allocate temp slots** in the unified frame (maximum simultaneous need, not sum)
-2. **Reuse slots** for sequential non-overlapping blocks
-3. **Emit absolute indices** (0, 1, 2...) directly into bytecode
+**Key Architectural Points**:
+
+1. **Single Storage Location**: MethodContext indexed slots hold ALL variables
+2. **Absolute Indexing**: Each variable gets unique index (0, 1, 2...) from compiler
+3. **No Dual Routing**: No `if (index < nargs)` checks - all access via home pointer
+4. **BlockContext Structure**: Only instance variables (sender, pc, stackp, argumentCount, initialIP, home)
+5. **No Indexed Slots in BlockContext**: Block has NO indexed slots for variable storage
 
 **Example: Unified Temp Frame Allocation**
 ```smalltalk
 "Method with sequential and nested blocks:"
 myMethod: x
-    | temp1 |                          "temp1 → slot 1 (arg x → slot 0)"
+    | temp1 |                          "x → slot 0, temp1 → slot 1"
     temp1 := x + 1.
-    [| btemp1 | btemp1 := temp1].      "btemp1 → slot 2 (reuses after block exits)"
-    [| ctemp1 ctemp2 | ctemp1 + ctemp2]."ctemp1 → slot 2, ctemp2 → slot 3 (reuse slot 2)"
-    [:y | y + temp1]                   "y → slot 2 (reuse slot 2 again)"
+    [:a | a + temp1]                   "a → slot 2 (block arg in UNIFIED frame)"
+    [:b | b * 2]                       "b → slot 2 (REUSES slot 2)"
 ```
 
-**Temp Frame Layout** (slots in MethodContext):
+**Temp Frame Layout** (ALL in MethodContext indexed slots):
 ```
 Slot 0: x (method arg)
 Slot 1: temp1 (method temp)
-Slot 2: btemp1 / ctemp1 / y (REUSED for sequential blocks)
-Slot 3: ctemp2 (only when second block active)
+Slot 2: a / b (block args - REUSED for sequential blocks)
+
+ALL variables in unified frame - BlockContext has NO variable storage
 ```
 
-**Maximum simultaneous need**: 4 slots (method has 2, can have at most 2 active from one block at a time)
-
-**Compiler algorithm for slot allocation**:
+**VM Implementation**:
 ```csharp
-class TempFrameAllocator
+SmalltalkOOP PushTemporaryVariable(int index)
 {
-    int _nextSlot = 0;
-    Dictionary<string, int> _allocatedSlots = new();
-    Stack<HashSet<int>> _scopeSlots = new();  // Track slots per scope for reuse
+    // Get the context holding variables
+    SmalltalkOOP variableContext;
 
-    void EnterScope()
+    if (activeContext.IsBlockContext)
     {
-        _scopeSlots.Push(new HashSet<int>());
+        // Block execution: traverse home to MethodContext
+        variableContext = GetHome(activeContext);
+    }
+    else
+    {
+        // Method execution: use current context
+        variableContext = activeContext;
     }
 
-    int AllocateSlot(string varName)
-    {
-        int slot = _nextSlot++;
-        _allocatedSlots[varName] = slot;
-        _scopeSlots.Peek().Add(slot);
-        return slot;
-    }
-
-    void ExitScope()
-    {
-        // Free slots from this scope for reuse
-        var freedSlots = _scopeSlots.Pop();
-        _nextSlot = Math.Min(_nextSlot, freedSlots.Min());
-    }
-
-    int GetSlot(string varName)
-    {
-        // Return absolute index into unified frame
-        return _allocatedSlots[varName];
-    }
-}
-```
-
-**VM Implementation** (PUSH_TEMP / STORE_TEMP bytecodes):
-```csharp
-void PushTemporary(int absoluteIndex)
-{
-    // Find home MethodContext (traverse home chain if in BlockContext)
-    var homeMethodContext = FindHomeMethodContext(_activeContextOOP);
-
-    // Direct access into home's temp frame using absolute index
-    // GetIndexedOOP already handles offset (1 + instanceVarCount) internally
-    var value = _heapManager.GetIndexedOOP(
-        homeMethodContext,
-        absoluteIndex
-    );
-
+    // Access temp frame directly with absolute index
+    SmalltalkOOP value = ReadIndexedSlot(variableContext, index);
     Push(value);
-}
-
-void StoreTemporary(int absoluteIndex)
-{
-    var value = PopStack();
-    var homeMethodContext = FindHomeMethodContext(_activeContextOOP);
-
-    // SetIndexedOOP already handles offset (1 + instanceVarCount) internally
-    _heapManager.SetIndexedOOP(
-        homeMethodContext,
-        absoluteIndex,
-        value
-    );
-}
-
-SmalltalkOOP FindHomeMethodContext(SmalltalkOOP contextOOP)
-{
-    while (true)
-    {
-        var classOOP = _heapManager.GetClassOOP(contextOOP);
-
-        if (classOOP == _metadata.MethodContextClassOOP)
-        {
-            return contextOOP;  // Found the MethodContext
-        }
-
-        // Traverse home chain for BlockContext
-        contextOOP = _heapManager.GetInstanceVariable(
-            contextOOP,
-            VMConstants.BLOCKCONTEXT_HOME_INDEX
-        );
-    }
+    return value;
 }
 ```
 
 **Key Points**:
-1. **Unified temp frame**: All temps live in MethodContext (slots 5+)
-2. **Absolute indexing**: Compiler emits absolute indices (0, 1, 2...), not relative
-3. **Slot reuse**: Sequential blocks share slots (determined by compiler)
-4. **No nargs+ntemps logic**: VM doesn't need to count locals per context
-5. **Simple VM access**: Direct `homeContext[TempFrameStart + index]`
-6. **BlockContext indexed slots**: Used ONLY for block arguments during activation (primitiveValue copies args there), NOT for variable storage
+1. **No dual routing**: No `if (index < nargs)` check
+2. **Direct access**: MethodContext temp frame accessed with absolute index
+3. **Simple traversal**: Just find home MethodContext, then direct access
+4. **BlockContext has NO indexed slots**: Only instance variables
 
-**Why This Is Correct**:
-- Matches Blue Book implementation (Smalltalk-80.st image behavior)
-- Minimizes temp frame size (reuses slots)
-- Simplifies VM (no home chain traversal with index adjustment)
-- Enables nested blocks to access any outer variable with single lookup
+### 4.4 Context Retention Requirements
+
+**When MethodContext Must Be Retained:**
+
+A MethodContext must NOT be recycled or garbage collected if:
+1. Any BlockContext has `home` pointing to it
+2. The block is reachable from the stack, instance variables, class variables, or globals
+3. The block may be evaluated in the future
+
+**How Blocks Keep Their Home Context Alive:**
+
+```smalltalk
+makeCounter
+  | count |
+  count := 0.
+  ^[:inc | count := count + inc]  "Block escapes, context retained"
+```
+
+Lifecycle:
+1. `makeCounter` creates MethodContext with `count` at index 0
+2. Block created with `home` → MethodContext
+3. Block returned (escapes method)
+4. Interpreter detects: Block is live, MethodContext must be retained
+5. MethodContext moved to heap (not recycled)
+6. Later: Block activated, accesses `count` via `home` → SUCCESS
+
+**Garbage Collection Implications:**
+
+GC must trace:
+- BlockContext → home MethodContext
+- MethodContext → temp frame variables
+- temp frame variables → contained objects
+
+**Mark Phase:**
+```csharp
+void Mark(SmalltalkOOP oop)
+{
+    if (IsBlockContext(oop))
+    {
+        MarkObject(oop);
+        SmalltalkOOP home = GetHome(oop);
+        Mark(home);  // Recursively mark home context
+    }
+}
+```
+
+**Sweep Phase:**
+- Only reclaim contexts not marked
+- Retained contexts survive GC
+- Blocks keep their home contexts alive indefinitely
+
+**Performance Considerations:**
+
+- Context retention is necessary for correctness
+- May increase memory usage if many blocks escape
+- GC overhead increased (more objects to trace)
+- Pool optimization helps reuse non-retained contexts
 
 ---
 

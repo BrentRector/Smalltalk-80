@@ -1,0 +1,279 @@
+{
+  "metadata": {
+    "version": "1.0.7",
+    "generator": "Smalltalk80.Compiler v1.0.0.0",
+    "generatedAt": "2025-11-13T03:17:12.6802878Z",
+    "sourceFile": "test_hasInterned.st",
+    "sourceChecksum": "multi-file-bundle",
+    "symbolCount": 15,
+    "stringCount": 1,
+    "classCount": 2,
+    "methodCount": 1,
+    "objectCount": 0,
+    "initExpressionCount": 0,
+    "blockContextCount": 0,
+    "undeclaredCount": 0,
+    "blockContexts": []
+  },
+  "symbols": [
+    "ascii",
+    "asciiValue",
+    "aString",
+    "hasInterned:ifTrue:",
+    "i",
+    "ifFalse:",
+    "ifTrue:",
+    "Object",
+    "SingleCharSymbols",
+    "stringhash",
+    "symBlock",
+    "Symbol",
+    "to:do:",
+    "USTable",
+    "v"
+  ],
+  "strings": [
+    "hasInterned: aString ifTrue: symBlock\r\n\t\u0022Answer with false if aString hasnt been interned (into a Symbol),\r\n\totherwise supply the symbol to symBlock and return true\u0022\r\n\r\n\t| v i ascii |\r\n\taString size = 1 ifTrue: [(ascii _ (aString at: 1) asciiValue) \u003C 128\r\n\t\t\tifTrue:\r\n\t\t\t\t[symBlock value: (SingleCharSymbols at: ascii \u002B 1).\r\n\t\t\t\t^true]].\r\n\tv _ USTable at: aString stringhash \\\\ USTable size \u002B 1.\r\n\t1 to: v size do:\r\n\t\t[:i |\r\n\t\t(v at: i) == nil\r\n\t\t\tifFalse: [aString size = (v at: i) size ifTrue: [aString = (v at: i)\r\n\t\t\t\t\t\tifTrue:\r\n\t\t\t\t\t\t\t[symBlock value: (v at: i).\r\n\t\t\t\t\t\t\t^true]]]].\r\n\t^false!"
+  ],
+  "optimizedSelectors": [
+    6,
+    12,
+    5
+  ],
+  "classes": [
+    {
+      "localId": "class:Symbol",
+      "nameIndex": 11,
+      "isMetaclass": false,
+      "format": 4104,
+      "instVarNames": [],
+      "classVarNames": [
+        13,
+        8
+      ],
+      "poolLocalIds": [],
+      "superNameIndex": 7,
+      "category": "",
+      "totalInstanceVarCount": 0,
+      "fieldLayout": []
+    },
+    {
+      "localId": "meta:Symbol",
+      "nameIndex": 11,
+      "isMetaclass": true,
+      "metaclassOfLocalId": "class:Symbol",
+      "format": 4104,
+      "instVarNames": [],
+      "classVarNames": [],
+      "poolLocalIds": [],
+      "superNameIndex": 7,
+      "category": "",
+      "totalInstanceVarCount": 0,
+      "fieldLayout": []
+    }
+  ],
+  "objects": [],
+  "methods": [
+    {
+      "localId": "method:Symbol_class\u003E\u003EhasInterned:ifTrue:",
+      "homeClassLocalId": "meta:Symbol",
+      "selectorIndex": 3,
+      "category": "private",
+      "header": {
+        "word": 9736,
+        "literalCount": 8,
+        "tempCount": 12,
+        "argCount": 2,
+        "primitiveIndex": 0,
+        "largeContext": false
+      },
+      "literals": [
+        {
+          "type": "symbol",
+          "index": 6
+        },
+        {
+          "type": "symbol",
+          "index": 1
+        },
+        {
+          "type": "symbol",
+          "index": 9
+        },
+        {
+          "type": "symbol",
+          "index": 12
+        },
+        {
+          "type": "symbol",
+          "index": 5
+        },
+        {
+          "type": "association",
+          "association": {
+            "keyType": "symbol",
+            "keyIndex": 8,
+            "valueRef": null
+          }
+        },
+        {
+          "type": "association",
+          "association": {
+            "keyType": "symbol",
+            "keyIndex": 13,
+            "valueRef": null
+          }
+        },
+        {
+          "type": "smallInt",
+          "value": 128
+        }
+      ],
+      "bytecodes": [
+        16,
+        194,
+        118,
+        182,
+        117,
+        200,
+        161,
+        0,
+        27,
+        16,
+        118,
+        192,
+        209,
+        128,
+        19,
+        108,
+        39,
+        178,
+        117,
+        200,
+        161,
+        0,
+        11,
+        17,
+        69,
+        20,
+        118,
+        176,
+        192,
+        202,
+        128,
+        18,
+        113,
+        126,
+        124,
+        224,
+        124,
+        224,
+        128,
+        18,
+        70,
+        16,
+        210,
+        70,
+        194,
+        186,
+        118,
+        176,
+        192,
+        106,
+        118,
+        18,
+        194,
+        118,
+        200,
+        161,
+        0,
+        47,
+        18,
+        16,
+        192,
+        115,
+        198,
+        117,
+        200,
+        161,
+        0,
+        35,
+        16,
+        194,
+        18,
+        21,
+        192,
+        194,
+        182,
+        117,
+        200,
+        161,
+        0,
+        21,
+        16,
+        18,
+        21,
+        192,
+        182,
+        117,
+        200,
+        161,
+        0,
+        9,
+        17,
+        18,
+        21,
+        192,
+        202,
+        128,
+        18,
+        113,
+        126,
+        124,
+        224,
+        124,
+        224,
+        124,
+        228,
+        124,
+        243,
+        128,
+        18,
+        114,
+        124
+      ],
+      "source": "hasInterned: aString ifTrue: symBlock\r\n\t\u0022Answer with false if aString hasnt been interned (into a Symbol),\r\n\totherwise supply the symbol to symBlock and return true\u0022\r\n\r\n\t| v i ascii |\r\n\taString size = 1 ifTrue: [(ascii _ (aString at: 1) asciiValue) \u003C 128\r\n\t\t\tifTrue:\r\n\t\t\t\t[symBlock value: (SingleCharSymbols at: ascii \u002B 1).\r\n\t\t\t\t^true]].\r\n\tv _ USTable at: aString stringhash \\\\ USTable size \u002B 1.\r\n\t1 to: v size do:\r\n\t\t[:i |\r\n\t\t(v at: i) == nil\r\n\t\t\tifFalse: [aString size = (v at: i) size ifTrue: [aString = (v at: i)\r\n\t\t\t\t\t\tifTrue:\r\n\t\t\t\t\t\t\t[symBlock value: (v at: i).\r\n\t\t\t\t\t\t\t^true]]]].\r\n\t^false!",
+      "argNames": [
+        "aString",
+        "symBlock"
+      ],
+      "tempNames": [
+        "v",
+        "i",
+        "ascii"
+      ]
+    }
+  ],
+  "initExpressions": [],
+  "installOrder": {
+    "phases": [
+      {
+        "name": "Core Classes",
+        "kind": "classes",
+        "localIds": [
+          "class:Symbol",
+          "meta:Symbol"
+        ]
+      },
+      {
+        "name": "Methods",
+        "kind": "methods",
+        "localIds": [
+          "method:Symbol_class\u003E\u003EhasInterned:ifTrue:"
+        ]
+      }
+    ]
+  },
+  "patches": [],
+  "undeclared": []
+}

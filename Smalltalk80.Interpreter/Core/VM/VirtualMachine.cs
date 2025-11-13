@@ -554,19 +554,6 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             byte bytecode = bytecodes[ip++];
 
-            // DIAGNOSTIC: Log first bytecode execution in BlockContext
-            if (isBlockContext)
-            {
-                var nargsOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-                int nargs = nargsOOP.AsSmallInteger();
-                Console.WriteLine($"[ExecuteBytecodeStep BlockContext] About to execute bytecode 0x{bytecode:X2}, ip={ip-1}, nargs={nargs}, sp={sp}");
-                if (nargs > 0)
-                {
-                    var arg0 = _heapManager.GetIndexedOOP(_activeContextOOP, 0);
-                    Console.WriteLine($"  Block argument [0] = {arg0} (isSmallInt={arg0.IsSmallInteger})");
-                }
-            }
-
             // Update IP
             _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
@@ -4148,15 +4135,53 @@ public partial class VirtualMachine : IPrimitiveContext
     private SmalltalkOOP GetTemporaryVariable(SmalltalkOOP contextOOP, int index)
     {
         var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
+        bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
+
+        // Get the home MethodContext to check selector
+        var homeContextOOP = isBlockContext
+            ? _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX)
+            : contextOOP;
+
+        var methodOOP = _heapManager.GetInstanceVariable(homeContextOOP, VMConstants.CONTEXT_METHOD_INDEX);
+
+        // Extract selector string from Symbol object for diagnostics
+        string selector = "";
+        try
+        {
+            if (!methodOOP.IsSmallInteger)
+            {
+                var selectorOOP = _heapManager.GetInstanceVariable(methodOOP, 0); // Selector is at index 0
+                if (!selectorOOP.IsSmallInteger)
+                {
+                    // Symbol has string data in indexed bytes
+                    int selectorLength = _heapManager.GetIndexedSize(selectorOOP);
+                    char[] selectorChars = new char[selectorLength];
+                    for (int i = 0; i < selectorLength; i++)
+                    {
+                        selectorChars[i] = (char)_heapManager.GetIndexedByte(selectorOOP, i);
+                    }
+                    selector = new string(selectorChars);
+                }
+            }
+        }
+        catch
+        {
+            selector = "<unknown>";
+        }
+
+        if (selector == "")
+        {
+            selector = "<no selector>";
+        }
 
         if (VerboseDebug)
         {
-            string contextType = (contextClassOOP == _metadata.BlockContextClassOOP) ? "BlockContext" : "MethodContext";
-            Console.WriteLine($"[GetTemporaryVariable] context={contextOOP} ({contextType}), index={index}");
+            string contextType = isBlockContext ? "BlockContext" : "MethodContext";
+            Console.WriteLine($"\n[GetTemporaryVariable] selector={selector}, context={contextOOP} ({contextType}), index={index}");
         }
 
         // Check if we're in a BlockContext
-        if (contextClassOOP == _metadata.BlockContextClassOOP)
+        if (isBlockContext)
         {
             // Get nargs from BlockContext
             var nargsOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
@@ -4164,7 +4189,17 @@ public partial class VirtualMachine : IPrimitiveContext
 
             if (VerboseDebug)
             {
-                Console.WriteLine($"[GetTemporaryVariable] BlockContext nargs={nargs}");
+                Console.WriteLine($"[GetTemporaryVariable] BlockContext nargs={nargs}, checking if index {index} < nargs {nargs}");
+
+                // Dump BlockContext indexed slots (block arguments)
+                int indexedCount = _heapManager.GetIndexedSize(contextOOP);
+                Console.WriteLine($"[GetTemporaryVariable] BlockContext has {indexedCount} indexed slots:");
+                for (int i = 0; i < indexedCount && i < nargs; i++)
+                {
+                    var slotValue = _heapManager.GetIndexedOOP(contextOOP, i);
+                    string valueDesc = FormatOOPValue(slotValue);
+                    Console.WriteLine($"  BlockContext arg[{i}] = {valueDesc}");
+                }
             }
 
             // If index < nargs, it's a block argument stored in THIS BlockContext's indexed slots
@@ -4172,11 +4207,19 @@ public partial class VirtualMachine : IPrimitiveContext
             {
                 // Local block argument - stored in THIS BlockContext's indexed slots
                 var result = _heapManager.GetIndexedOOP(contextOOP, index);
-                Console.WriteLine($"[GetTemporaryVariable] Retrieving block arg {index} from BlockContext indexed slot: {result}");
+                if (VerboseDebug)
+                {
+                    Console.WriteLine($"[GetTemporaryVariable] Retrieving block arg {index} from BlockContext indexed slot: {FormatOOPValue(result)}");
+                }
                 return result;
             }
             else
             {
+                if (VerboseDebug)
+                {
+                    Console.WriteLine($"[GetTemporaryVariable] index {index} >= nargs {nargs}, traversing to home MethodContext {homeContextOOP}");
+                }
+
                 // Unified temp frame: ALL other temps (block temps, method args/temps) are in MethodContext
                 // Traverse to home MethodContext and use absolute index (NO adjustment!)
                 var homeOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
@@ -4186,7 +4229,51 @@ public partial class VirtualMachine : IPrimitiveContext
         else
         {
             // MethodContext: Direct access to method's temp frame (base case)
-            return _heapManager.GetIndexedOOP(contextOOP, index);
+            if (VerboseDebug)
+            {
+                // Dump ALL temp slots in the MethodContext unified frame
+                int tempCount = _heapManager.GetIndexedSize(contextOOP);
+                Console.WriteLine($"[GetTemporaryVariable] MethodContext unified temp frame has {tempCount} slots:");
+                for (int i = 0; i < tempCount; i++)
+                {
+                    var slotValue = _heapManager.GetIndexedOOP(contextOOP, i);
+                    string valueDesc = FormatOOPValue(slotValue);
+                    string marker = (i == index) ? " <-- REQUESTED" : "";
+                    Console.WriteLine($"  temp[{i}] = {valueDesc}{marker}");
+                }
+            }
+
+            var result = _heapManager.GetIndexedOOP(contextOOP, index);
+            if (VerboseDebug)
+            {
+                Console.WriteLine($"[GetTemporaryVariable] Returning temp[{index}] = {FormatOOPValue(result)}\n");
+            }
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Helper method to format an OOP value for debugging
+    /// </summary>
+    private string FormatOOPValue(SmalltalkOOP oop)
+    {
+        if (oop.IsSmallInteger)
+            return $"SmallInteger({oop.AsSmallInteger()})";
+        if (oop == SpecialObjectsArray.Instance.Nil)
+            return "nil";
+        if (oop == SpecialObjectsArray.Instance.True)
+            return "true";
+        if (oop == SpecialObjectsArray.Instance.False)
+            return "false";
+
+        try
+        {
+            string className = _heapManager.GetClassName(oop);
+            return $"{className} OOP({oop})";
+        }
+        catch
+        {
+            return $"OOP({oop})";
         }
     }
 

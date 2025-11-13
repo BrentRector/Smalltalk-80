@@ -1,8 +1,19 @@
 # Compiler Block Allocation Strategy
 
 **Date**: 2025-11-12
-**Status**: ✅ IMPLEMENTED (Conservative Strategy)
+**Status**: ✅ IMPLEMENTED (Conservative Strategy) - See Also Canonical Reference
 **Component**: TempFrameAllocator + BytecodeCompiler
+
+---
+
+## CANONICAL REFERENCE
+
+For the complete variable allocation and indexing architecture, see:
+
+**[Unified-Temp-Frame-Specification.md](./Unified-Temp-Frame-Specification.md)**
+**[Variable-Indexing-Architecture.md](./Variable-Indexing-Architecture.md)**
+
+This document provides compiler-specific implementation details and optimization strategies.
 
 ---
 
@@ -402,6 +413,86 @@ Could improve memory usage by distinguishing:
 - **Sequential peer** blocks (siblings that run sequentially) → Can reuse
 
 But current strategy is correct and sufficient for now.
+
+---
+
+## 5. blockCopy: Emission Strategy
+
+### 5.1 Block Literal Detection
+
+Parser identifies `[:args | body]` syntax and creates BlockNode AST.
+
+### 5.2 Offset Calculation
+
+**Algorithm:**
+```csharp
+int CalculateBlockBodyOffset(BlockNode block)
+{
+    // Offset is relative to METHOD bytecode start
+    int methodStart = 0;
+    int currentPosition = _emitter.CurrentBytecodePosition;
+
+    // Account for blockCopy: send size
+    int sendSize = 1 + 2 + 3;  // PUSH_SELF + PUSH_CONST + SEND
+
+    return currentPosition + sendSize;
+}
+```
+
+**For Nested Blocks:**
+- Outer block offset: relative to method start
+- Inner block offset: ALSO relative to method start (NOT outer block start)
+- Each block calculates its own absolute offset
+
+### 5.3 Emission Sequence
+
+```csharp
+void EmitBlockLiteral(BlockNode block)
+{
+    int offset = CalculateBlockBodyOffset(block);
+
+    // Emit blockCopy: send
+    Emit(Bytecode.PUSH_SELF);
+    EmitPushConstant(offset);
+    EmitSend("blockCopy:", 1);
+
+    // Emit block body at calculated offset
+    foreach (var stmt in block.Body)
+    {
+        EmitStatement(stmt);
+    }
+
+    EmitReturnStackTop();
+}
+```
+
+### 5.4 Nested Block Handling
+
+**Example:**
+```smalltalk
+[:a | [:b | a + b]]
+```
+
+**Emission:**
+```
+0: PUSH_SELF
+1: PUSH_CONST 8      ; Outer block body offset
+3: SEND blockCopy: 1
+
+; === Outer block body (offset 8) ===
+6: PUSH_SELF
+7: PUSH_CONST 14     ; Inner block body offset (from method start!)
+9: SEND blockCopy: 1
+12: RETURN_STACK_TOP
+
+; === Inner block body (offset 14) ===
+13: PUSH_TEMP 0      ; a
+14: PUSH_TEMP 1      ; b
+15: SEND + 1
+18: RETURN_STACK_TOP
+```
+
+**Key Point:** Inner block offset (14) is calculated from METHOD start (0), not from outer block start (6).
 
 ---
 

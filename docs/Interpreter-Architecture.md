@@ -1144,56 +1144,75 @@ Both models coexist safely:
 
 ### Overview
 
-**Status**: ✅ **High-Performance with Safety Guarantees (2025-11-05)**
+**Status**: ✅ **Unified Temp Frame Model (2025-11-13)** - See Canonical Reference
 
-The variable access system provides safe, high-performance access to temporaries, arguments, and instance variables with:
+**CANONICAL REFERENCE**: See [Unified-Temp-Frame-Specification.md](../docs/Unified-Temp-Frame-Specification.md) and [Variable-Indexing-Architecture.md](../docs/Variable-Indexing-Architecture.md)
 
-- **15-25x faster class detection** using OOP comparison
-- **Cycle detection** prevents infinite loops in corrupted context chains
-- **Depth limits** (MAX_DEPTH=1000) with clear error messages
-- **Comprehensive bounds checking** on all field and variable access
-- **Slot validation** ensures method slots contain valid OOPs before parsing
+**Summary**: All variables (method args/temps + block args/temps) are stored in MethodContext's unified temp frame using absolute indices. BlockContext contains NO variable storage - only a `home` pointer to the MethodContext.
 
-### Fast Class Detection with VMMetadata
+**Key Points**:
+- **Single storage location**: MethodContext indexed slots
+- **Absolute indexing**: Each variable gets unique index from compiler
+- **No dual routing**: No `if (index < nargs)` checks
+- **Simple traversal**: Find home MethodContext, access with absolute index
+- **Safety**: Cycle detection, depth limits, bounds checking
 
-**VMMetadata.cs** - Cached class OOPs:
+### Unified Variable Access Implementation
+
+**VirtualMachine.cs** - Variable access with home traversal:
 ```csharp
-public class VMMetadata
+private SmalltalkOOP GetTemporaryVariable(int index)
 {
-    public SmalltalkOOP BlockContextClassOOP { get; set; }
-    public SmalltalkOOP BlockContextClassOOP { get; set; }
-    public SmalltalkOOP MethodContextClassOOP { get; set; }
+    // Find the home MethodContext (traverse if in BlockContext)
+    SmalltalkOOP contextOOP = _activeContextOOP;
 
-    // Initialized during VM startup (Loader.cs:229-231)
+    // Traverse to home if in BlockContext
+    while (IsBlockContext(contextOOP))
+    {
+        contextOOP = _heapManager.GetInstanceVariable(
+            contextOOP,
+            VMConstants.BLOCKCONTEXT_HOME_INDEX
+        );
+    }
+
+    // Direct access with absolute index
+    return _heapManager.GetIndexedOOP(contextOOP, index);
 }
-```
 
-**VirtualMachine.cs** - Fast IsBlockContext() check:
-```csharp
+private void SetTemporaryVariable(int index, SmalltalkOOP value)
+{
+    // Find home MethodContext
+    SmalltalkOOP contextOOP = _activeContextOOP;
+
+    while (IsBlockContext(contextOOP))
+    {
+        contextOOP = _heapManager.GetInstanceVariable(
+            contextOOP,
+            VMConstants.BLOCKCONTEXT_HOME_INDEX
+        );
+    }
+
+    // Direct write with absolute index
+    _heapManager.SetIndexedOOP(contextOOP, index, value);
+}
+
 private bool IsBlockContext(SmalltalkOOP contextOOP)
 {
     if (contextOOP.IsSmallInteger)
         return false;
 
     var classOOP = _heapManager.GetClassOOP(contextOOP);
-
-    // FAST: Direct OOP comparison (15-25x faster than string comparison!)
     return classOOP == _metadata.BlockContextClassOOP;
 }
 ```
 
-**Before** (SLOW):
-```csharp
-var className = _heapManager.GetClassName(classOOP);
-return className == "BlockContext";  // String allocation + comparison overhead
-```
+**Key Architectural Points**:
+1. **No index adjustment**: Absolute index used directly from bytecode
+2. **Simple traversal**: Just find home MethodContext via home pointer
+3. **No dual routing**: No `if (index < nargs)` check
+4. **Uniform access**: All variables accessed identically
 
-**After** (FAST):
-```csharp
-return classOOP == _metadata.BlockContextClassOOP;  // Direct integer comparison
-```
-
-### Context Chain Traversal with Cycle Detection
+### Safety Features
 
 **VirtualMachine.cs** - `TraverseContextChainForRead` (lines 3693-3760):
 ```csharp

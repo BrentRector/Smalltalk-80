@@ -1,0 +1,166 @@
+{
+  "metadata": {
+    "version": "1.0.7",
+    "generator": "Smalltalk80.Compiler v1.0.0.0",
+    "generatedAt": "2025-11-13T06:49:47.8167637Z",
+    "sourceFile": "test_block_arg.st",
+    "sourceChecksum": "multi-file-bundle",
+    "symbolCount": 8,
+    "stringCount": 1,
+    "classCount": 2,
+    "methodCount": 1,
+    "objectCount": 0,
+    "initExpressionCount": 0,
+    "blockContextCount": 0,
+    "undeclaredCount": 1,
+    "blockContexts": []
+  },
+  "symbols": [
+    "BlockArgTest",
+    "i",
+    "printString",
+    "show:",
+    "test",
+    "TestClass",
+    "to:do:",
+    "Transcript"
+  ],
+  "strings": [
+    "test\r\n\t\u0022Test block argument access\u0022\r\n\t1 to: 3 do: [:i | Transcript show: i printString]\r\n!"
+  ],
+  "optimizedSelectors": [
+    6,
+    3,
+    2
+  ],
+  "classes": [
+    {
+      "localId": "class:BlockArgTest",
+      "nameIndex": 0,
+      "isMetaclass": false,
+      "format": 4104,
+      "instVarNames": [],
+      "classVarNames": [],
+      "poolLocalIds": [],
+      "superNameIndex": 5,
+      "category": "",
+      "totalInstanceVarCount": 0,
+      "fieldLayout": []
+    },
+    {
+      "localId": "meta:BlockArgTest",
+      "nameIndex": 0,
+      "isMetaclass": true,
+      "metaclassOfLocalId": "class:BlockArgTest",
+      "format": 4104,
+      "instVarNames": [],
+      "classVarNames": [],
+      "poolLocalIds": [],
+      "superNameIndex": 5,
+      "category": "",
+      "totalInstanceVarCount": 0,
+      "fieldLayout": []
+    }
+  ],
+  "objects": [],
+  "methods": [
+    {
+      "localId": "method:BlockArgTest_class\u003E\u003Etest",
+      "homeClassLocalId": "meta:BlockArgTest",
+      "selectorIndex": 4,
+      "category": "testing",
+      "header": {
+        "word": 134,
+        "literalCount": 6,
+        "tempCount": 1,
+        "argCount": 0,
+        "primitiveIndex": 0,
+        "largeContext": false
+      },
+      "literals": [
+        {
+          "type": "symbol",
+          "index": 6
+        },
+        {
+          "type": "symbol",
+          "index": 3
+        },
+        {
+          "type": "symbol",
+          "index": 2
+        },
+        {
+          "type": "association",
+          "association": {
+            "keyType": "symbol",
+            "keyIndex": 7,
+            "valueRef": null
+          }
+        },
+        {
+          "type": "association",
+          "association": {
+            "keyType": "symbol",
+            "keyIndex": 1,
+            "valueRef": null
+          }
+        },
+        {
+          "type": "smallInt",
+          "value": 3
+        }
+      ],
+      "bytecodes": [
+        118,
+        37,
+        118,
+        200,
+        161,
+        0,
+        4,
+        67,
+        16,
+        210,
+        225,
+        124,
+        240,
+        128,
+        18,
+        120
+      ],
+      "source": "test\r\n\t\u0022Test block argument access\u0022\r\n\t1 to: 3 do: [:i | Transcript show: i printString]\r\n!",
+      "argNames": [],
+      "tempNames": []
+    }
+  ],
+  "initExpressions": [],
+  "installOrder": {
+    "phases": [
+      {
+        "name": "Core Classes",
+        "kind": "classes",
+        "localIds": [
+          "class:BlockArgTest",
+          "meta:BlockArgTest"
+        ]
+      },
+      {
+        "name": "Methods",
+        "kind": "methods",
+        "localIds": [
+          "method:BlockArgTest_class\u003E\u003Etest"
+        ]
+      }
+    ]
+  },
+  "patches": [],
+  "undeclared": [
+    {
+      "key": "Transcript",
+      "references": [
+        "test"
+      ]
+    }
+  ]
+}

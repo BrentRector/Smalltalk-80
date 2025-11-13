@@ -1,9 +1,34 @@
 # Block Temporary Variable Architecture - FINAL SPECIFICATION
 
 **Date**: 2025-11-12
-**Status**: ✅ IMPLEMENTED AND VERIFIED
+**Status**: ⚠️ **SUPERSEDED** - See Canonical Reference Below
 
-This document provides the authoritative specification for how block temporary variables (arguments and temps) are stored and accessed in the Smalltalk-80 interpreter.
+---
+
+## ⚠️ SUPERSEDED NOTICE
+
+**This document describes an obsolete dual-storage architecture.**
+
+**For the current authoritative specification, see:**
+
+**[Unified-Temp-Frame-Specification.md](./Unified-Temp-Frame-Specification.md)**
+
+The information below is retained for historical reference but should NOT be used for implementation guidance.
+
+---
+
+## Historical Context
+
+This document previously described a dual-storage model where block arguments were stored in both BlockContext indexed slots and MethodContext unified temp frame. This approach has been replaced with the simpler unified temp frame model where:
+
+1. **ALL variables** (method args/temps + block args/temps) are stored in MethodContext indexed slots
+2. **BlockContext has NO indexed slots** for variable storage (only instance variables)
+3. **All access** uses absolute indices via home pointer traversal
+4. **No dual routing** - no `if (index < nargs)` checks
+
+---
+
+## Legacy Documentation (Obsolete)
 
 ---
 

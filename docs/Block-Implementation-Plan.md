@@ -1,8 +1,29 @@
 # Block Implementation Plan - Primitives 80-81 + Compiler Changes
 
 **Date**: 2025-11-06
-**Status**: PLANNING - Implementation not yet started
-**Priority**: CRITICAL - Required for basic block functionality
+**Status**: ⚠️ **SUPERSEDED** - See Canonical Reference
+**Priority**: HISTORICAL REFERENCE
+
+---
+
+## ⚠️ SUPERSEDED NOTICE
+
+**This implementation plan describes an obsolete approach.**
+
+**For the current authoritative specification, see:**
+
+**[Unified-Temp-Frame-Specification.md](./Unified-Temp-Frame-Specification.md)**
+
+Key changes from this document:
+1. **NO BlockContext indexed slots** for variable storage
+2. **All variables** stored in MethodContext unified temp frame
+3. **Primitive 80** takes 1 argument (nargs), NOT 2 (nargs + ntemps)
+4. **Primitive 81** stores arguments into MethodContext, not BlockContext
+5. **No dual routing** in variable access
+
+---
+
+## Legacy Documentation (Obsolete)
 
 ---
 
