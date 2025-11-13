@@ -342,6 +342,21 @@ void PushTemporary(int absoluteIndex) {
 **Blue Book compliance**: Matches canonical Smalltalk-80 implementation
 **Correctness**: Enables proper nested block variable access
 
+### CRITICAL FIX (2025-11-12)
+
+**Bug**: VM was doing hierarchical index adjustment (`index - nargs`) when traversing to MethodContext, but compiler emits absolute indices via TempFrameAllocator.
+
+**Fix**: Changed VirtualMachine.cs lines 4147 and 4187 to use absolute indexing:
+```csharp
+// BEFORE (WRONG):
+return GetTemporaryVariable(homeOOP, index - nargs);
+
+// AFTER (CORRECT):
+return GetTemporaryVariable(homeOOP, index);  // NO adjustment!
+```
+
+**See**: `Block-Temp-Architecture-FINAL.md` for complete specification and `Block-Argument-Dual-Storage-Analysis.md` for why dual storage is required.
+
 ---
 
 ## Key Architectural Points

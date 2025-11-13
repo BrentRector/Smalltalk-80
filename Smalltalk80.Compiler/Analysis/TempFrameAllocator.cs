@@ -17,6 +17,7 @@ public class TempFrameAllocator
 {
     private int _nextSlot = 0;
     private int _maxSimultaneous = 0;
+    private int _highestSlotIndex = -1;  // Track highest slot index ever allocated (0-based)
     private readonly Dictionary<string, int> _allocatedSlots = new();
     private readonly Stack<ScopeInfo> _scopeStack = new();
 
@@ -44,6 +45,7 @@ public class TempFrameAllocator
             int slot = _nextSlot++;
             _allocatedSlots[argName] = slot;
             scope.AllocatedSlots.Add(slot);
+            _highestSlotIndex = Math.Max(_highestSlotIndex, slot);
         }
 
         // Allocate slots for method temps
@@ -52,6 +54,7 @@ public class TempFrameAllocator
             int slot = _nextSlot++;
             _allocatedSlots[tempName] = slot;
             scope.AllocatedSlots.Add(slot);
+            _highestSlotIndex = Math.Max(_highestSlotIndex, slot);
         }
 
         _maxSimultaneous = Math.Max(_maxSimultaneous, _nextSlot);
@@ -80,6 +83,7 @@ public class TempFrameAllocator
             int slot = _nextSlot++;
             _allocatedSlots[argName] = slot;
             scope.AllocatedSlots.Add(slot);
+            _highestSlotIndex = Math.Max(_highestSlotIndex, slot);
         }
 
         // Allocate slots for block temps
@@ -88,6 +92,7 @@ public class TempFrameAllocator
             int slot = _nextSlot++;
             _allocatedSlots[tempName] = slot;
             scope.AllocatedSlots.Add(slot);
+            _highestSlotIndex = Math.Max(_highestSlotIndex, slot);
         }
 
         _maxSimultaneous = Math.Max(_maxSimultaneous, _nextSlot);
@@ -157,13 +162,17 @@ public class TempFrameAllocator
 
     /// <summary>
     /// Gets the maximum frame size needed for this method.
-    /// This is the maximum simultaneous slot usage, not the sum of all temps.
+    /// This is the highest slot index ever allocated + 1 (to convert 0-based index to count).
+    /// NOTE: We must return the HIGHEST index ever used, not max simultaneous, because:
+    /// - Sequential blocks can reuse slots (reset _nextSlot on ExitScope)
+    /// - But bytecode contains absolute indices emitted BEFORE slot reuse
+    /// - MethodContext must have slots for the HIGHEST index in the bytecode
     /// Used in method header to allocate the MethodContext's indexed slot array.
     /// </summary>
-    /// <returns>Maximum number of temp slots needed simultaneously</returns>
+    /// <returns>Highest slot index + 1 (number of slots needed)</returns>
     public int GetMaxFrameSize()
     {
-        return _maxSimultaneous;
+        return _highestSlotIndex + 1;  // Convert 0-based index to count
     }
 
     /// <summary>
@@ -181,4 +190,14 @@ public class TempFrameAllocator
     /// Method scope = 1, nested block = 2+
     /// </summary>
     public int ScopeDepth => _scopeStack.Count;
+
+    /// <summary>
+    /// Gets a snapshot of all currently allocated variables and their slot indices.
+    /// This is for diagnostic purposes only - returns a copy of the internal mapping.
+    /// </summary>
+    /// <returns>Dictionary mapping variable names to absolute slot indices</returns>
+    public Dictionary<string, int> GetAllAllocatedVariables()
+    {
+        return new Dictionary<string, int>(_allocatedSlots);
+    }
 }

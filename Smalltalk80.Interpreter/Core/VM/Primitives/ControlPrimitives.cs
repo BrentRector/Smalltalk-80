@@ -246,7 +246,12 @@ public static class ControlPrimitives
         {
             // Transfer argument from args array to block context's temp frame
             // TempFrameStart is at indexed slot 0 (after the 6 fixed instance variables)
+            Console.WriteLine($"[Primitive 81] Storing block arg {i}: {args[i]} (isSmallInt={args[i].IsSmallInteger})");
             ctx.HeapManager.SetIndexedOOP(blockContext, i, args[i]);
+
+            // Verify it was stored
+            var stored = ctx.HeapManager.GetIndexedOOP(blockContext, i);
+            Console.WriteLine($"[Primitive 81] Verified stored arg {i}: {stored} (match={stored == args[i]})");
         }
 
         // Blue Book line 1192: self pop: argumentCount + 1
@@ -276,8 +281,10 @@ public static class ControlPrimitives
         // Switch to the BlockContext - the VM will continue execution in the new context
         // This is a trampoline: primitive succeeds, signals context switch, and returns nil
         // The actual block execution happens when the VM continues in the new context
+        Console.WriteLine($"[Primitive 81] Switching to BlockContext: {blockContext}, PC={initialIP}, stackp={argumentCount}");
         ctx.SetActiveContext(blockContext);
 
+        Console.WriteLine($"[Primitive 81] Context switch complete, returning nil");
         // Return value doesn't matter - context switch will be detected by VM
         return SpecialObjectsArray.Instance.Nil;
     }

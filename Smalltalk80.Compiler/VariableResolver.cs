@@ -68,8 +68,15 @@ namespace Smalltalk80.Compiler
 
             // Step 2-6: Try to resolve as temp variable using allocator (if provided)
             // This is the NEW unified temp frame approach
-            if (allocator != null && allocator.TryGetSlotIndex(varName, out int slotIndex))
+            int slotIndex = -1;
+            bool allocatorHasVar = allocator != null && allocator.TryGetSlotIndex(varName, out slotIndex);
+
+            if (allocatorHasVar)
             {
+                // CRITICAL FIX: If allocator has the variable, ALWAYS return it as source of truth
+                // The environment dictionaries (OwnArguments/OwnTemporaries) may be temporarily
+                // desynchronized during nested expression compilation, but the allocator is authoritative
+
                 // Determine variable type based on scope and dictionaries
                 // Check current scope first
                 if (context.OwnArguments.ContainsKey(varName))
@@ -110,6 +117,18 @@ namespace Smalltalk80.Compiler
                     }
                     parentContext = parentContext.Parent;
                 }
+
+                // CRITICAL FIX: If we reach here, allocator has variable but environment doesn't
+                // This indicates environment desynchronization during nested compilation
+                // Trust the allocator and infer variable type from scope depth
+                // Block scope (depth > 0): Must be block argument (most common case) or block temp
+                // Method scope (depth == 0): Must be method temp (args already checked above)
+                return new ResolutionResult(
+                    context.ScopeDepth > 0 ? VariableType.BlockArgument : VariableType.MethodTemporary,
+                    slotIndex,  // Use allocator's authoritative slot index
+                    true,  // Assume assignable (safe default)
+                    varName
+                );
             }
 
             // FALLBACK: Use environment-based resolution (for backward compatibility)

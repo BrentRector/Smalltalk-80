@@ -68,8 +68,18 @@ public static class ObjectPrimitives
         // Index must be a positive SmallInteger
         if (!args[0].IsSmallInteger)
         {
-            ctx.PrimitiveSuccess = false;
-            return SpecialObjectsArray.Instance.Nil;
+            // FAST-FAIL for debugging: Throw exception to see what's being passed as index
+            var recvClassName = ctx.GetClassNameForObject(receiver);
+            var indexClassName = ctx.GetClassNameForObject(args[0]);
+            throw new InvalidOperationException(
+                $"NON-INTEGER INDEX ERROR: {recvClassName}>>at: with non-integer index\n" +
+                $"  receiver={receiver} (class={recvClassName})\n" +
+                $"  index={args[0]} (class={indexClassName})\n" +
+                $"  Expected SmallInteger but got {indexClassName}");
+
+            // Normal behavior (commented out for fast-fail debugging):
+            // ctx.PrimitiveSuccess = false;
+            // return SpecialObjectsArray.Instance.Nil;
         }
 
         // Blue Book: array ← self popStack

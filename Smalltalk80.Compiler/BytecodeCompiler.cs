@@ -1180,18 +1180,46 @@ namespace Smalltalk80.Compiler
                 emitter.PushNil();
                 emitter.ReturnTop();
             }
-            
+
+            // Get bytecode for scanning
+            byte[] bytecodeArray = emitter.GetBytecodes();
+            int tempCount = allocator.GetMaxFrameSize();
+
+            // CRITICAL FIX: Scan bytecode to find the highest temp index actually referenced
+            // This is necessary because blocks can reference parent scope variables, and those
+            // indices may be higher than what TempFrameAllocator allocated for THIS scope.
+            int maxTempIndex = -1;
+            for (int i = 0; i < bytecodeArray.Length; i++)
+            {
+                byte bc = bytecodeArray[i];
+                if (bc >= 16 && bc <= 31 && (i == 0 || bytecodeArray[i-1] != 128))  // PUSH_TEMP
+                {
+                    int tempIndex = bc - 16;
+                    maxTempIndex = Math.Max(maxTempIndex, tempIndex);
+                }
+            }
+
+            // Use the maximum of allocated and referenced indices
+            // (maxTempIndex is 0-based, so +1 converts to count)
+            int actualTempCount = Math.Max(tempCount, maxTempIndex + 1);
+
+            if (maxTempIndex >= tempCount)
+            {
+                Console.WriteLine($"[COMPILER FIX APPLIED] {selector}: maxTempIndex={maxTempIndex}, allocator.tempCount={tempCount}, actualTempCount={actualTempCount}");
+            }
+
             return new CompiledMethodData
             {
                 Selector = selector,
                 ArgumentCount = 0,
-                TemporaryCount = allocator.GetMaxFrameSize(),
+                TemporaryCount = actualTempCount,
                 IsPrimitive = false,
                 PrimitiveNumber = 0,
-                Bytecode = emitter.GetBytecodes(),
+                Bytecode = bytecodeArray,
                 Literals = emitter.GetLiterals(),
                 ArgumentNames = new List<string>(),
-                TemporaryNames = new List<string>(temporaryNames)
+                TemporaryNames = new List<string>(temporaryNames),
+                VariableSlotMap = allocator.GetAllAllocatedVariables()  // DIAGNOSTIC: Add variable-to-slot mapping
             };
         }
 
@@ -1322,11 +1350,36 @@ namespace Smalltalk80.Compiler
             // Get bytecode array
             var bytecodeArray = emitter.GetBytecodes();
 
+            int tempCount = allocator.GetMaxFrameSize();
+
+            // CRITICAL FIX: Scan bytecode to find the highest temp index actually referenced
+            // This is necessary because blocks can reference parent scope variables, and those
+            // indices may be higher than what TempFrameAllocator allocated for THIS scope.
+            int maxTempIndex = -1;
+            for (int i = 0; i < bytecodeArray.Length; i++)
+            {
+                byte bc = bytecodeArray[i];
+                if (bc >= 16 && bc <= 31 && (i == 0 || bytecodeArray[i-1] != 128))  // PUSH_TEMP
+                {
+                    int tempIndex = bc - 16;
+                    maxTempIndex = Math.Max(maxTempIndex, tempIndex);
+                }
+            }
+
+            // Use the maximum of allocated and referenced indices
+            // (maxTempIndex is 0-based, so +1 converts to count)
+            int actualTempCount = Math.Max(tempCount, maxTempIndex + 1);
+
+            if (maxTempIndex >= tempCount)
+            {
+                Console.WriteLine($"[COMPILER FIX APPLIED] {selector}: maxTempIndex={maxTempIndex}, allocator.tempCount={tempCount}, actualTempCount={actualTempCount}");
+            }
+
             return new CompiledMethodData
             {
                 Selector = selector,
                 ArgumentCount = environment.ArgumentCount,
-                TemporaryCount = allocator.GetMaxFrameSize(),
+                TemporaryCount = actualTempCount,
                 IsPrimitive = hasPrimitive,
                 PrimitiveNumber = primitiveNumber,
                 Bytecode = bytecodeArray,
@@ -1334,7 +1387,8 @@ namespace Smalltalk80.Compiler
                 ArgumentNames = new List<string>(argumentNames),
                 TemporaryNames = new List<string>(temporaryNames),
                 IsQuickReturnSelf = isQuickReturnSelf,
-                QuickReturnFieldIndex = quickReturnFieldIndex
+                QuickReturnFieldIndex = quickReturnFieldIndex,
+                VariableSlotMap = allocator.GetAllAllocatedVariables()  // DIAGNOSTIC: Add variable-to-slot mapping
             };
         }
 
@@ -2663,6 +2717,20 @@ namespace Smalltalk80.Compiler
             switch (result.Type)
             {
                 case VariableResolver.VariableType.BlockArgument:
+                    // CRITICAL FIX: Block arguments MUST use LOCAL indices (0-based within the block)
+                    // The VariableResolver returns ABSOLUTE indices from TempFrameAllocator,
+                    // but BlockContext expects local indices for its indexed instance variables.
+                    // Example: [:index | bits at: index] should emit PUSH_TEMP 0, not PUSH_TEMP 3
+                    if (environment.OwnArguments.TryGetValue(name, out int localArgIndex))
+                    {
+                        emitter.PushTemporary(localArgIndex);
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException($"Block argument '{name}' not found in OwnArguments");
+                    }
+                    break;
+
                 case VariableResolver.VariableType.BlockTemporary:
                 case VariableResolver.VariableType.ParentVariable:
                 case VariableResolver.VariableType.MethodArgument:
@@ -2738,6 +2806,21 @@ namespace Smalltalk80.Compiler
 
             switch (result.Type)
             {
+                case VariableResolver.VariableType.BlockArgument:
+                    // CRITICAL FIX: Block arguments MUST use LOCAL indices (0-based within the block)
+                    // The VariableResolver returns ABSOLUTE indices from TempFrameAllocator,
+                    // but BlockContext expects local indices for its indexed instance variables.
+                    // Example: [:x | x := 5] should emit STORE_TEMP 0, not STORE_TEMP 3
+                    if (environment.OwnArguments.TryGetValue(name, out int localArgIndex))
+                    {
+                        emitter.StoreTemporary(localArgIndex);
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException($"Block argument '{name}' not found in OwnArguments");
+                    }
+                    break;
+
                 case VariableResolver.VariableType.BlockTemporary:
                 case VariableResolver.VariableType.ParentVariable:
                 case VariableResolver.VariableType.MethodTemporary:

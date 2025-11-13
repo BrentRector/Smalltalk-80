@@ -1,6 +1,35 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-11
+**Last Updated**: 2025-11-12
+
+## Recent Work (2025-11-12)
+
+**Critical Bug Fix**: Block argument bytecode emission
+
+**Problem**: The compiler was emitting block arguments with absolute indices from the unified temp frame instead of local indices within the block. For example, `[:index | bits at: index]` was emitting `PUSH_TEMP 3` instead of `PUSH_TEMP 0`.
+
+**Root Cause**: The `VariableResolver.ResolveVariable()` method returns absolute indices from `TempFrameAllocator` for all variables, but block arguments must use local indices (0-based within the block) because they are stored in BlockContext's indexed instance variables.
+
+**Fix Applied**:
+1. Modified `BytecodeCompiler.PushVariable()` to check if a variable is a block argument and use the local index from `environment.OwnArguments` instead of the absolute index from `result.Index`
+2. Added the missing `BlockArgument` case to `BytecodeCompiler.StoreVariable()` switch statement with the same local index logic
+
+**Files Modified**:
+- `D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler\BytecodeCompiler.cs` (lines 2665-2678, 2755-2768)
+
+**Verification**:
+- Build succeeded with 0 errors
+- Tested with multiple block scenarios:
+  - Single argument: `[:index | index]` → Correctly emits `PUSH_TEMP 0`
+  - Multiple arguments: `[:a :b | a + b]` → Correctly emits `PUSH_TEMP 0`, `PUSH_TEMP 1`
+  - Assignment: `[:x | x := x + 1]` → Correctly emits `PUSH_TEMP 0`, `STORE_TEMP 0`
+  - Nested blocks: `[:x | [:y | x + y]]` → Inner block correctly uses `PUSH_TEMP 0` for 'y'
+
+**Impact**: This fix ensures that block arguments are correctly accessed at runtime, preventing incorrect variable lookups and enabling proper block execution.
+
+---
+
+## Previous Work (2025-11-11)
 
 ## Running Tests
 
@@ -74,7 +103,44 @@ dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_tests.json \
 
 ---
 
-## Recent Work (2025-11-11)
+## Recent Work (2025-11-12)
+
+**Critical Fix: Block Argument Indexing Bug**
+
+Fixed architectural mismatch between compiler and VM that was causing block argument access failures.
+
+**The Bug**:
+- Compiler changed to emit ABSOLUTE indices via TempFrameAllocator (unified temp frame)
+- VM still had HIERARCHICAL logic: `GetTemporaryVariable(homeOOP, index - nargs)`
+- This created index mismatch when accessing block temps from unified frame
+
+**The Fix**:
+- Changed `VirtualMachine.cs` lines 4147 and 4187 to use ABSOLUTE indexing
+- Removed `index - nargs` adjustment when traversing to MethodContext
+- Now correctly implements Unified Temp Frame architecture
+
+**Architecture Clarification** (via smalltalk-interpreter-expert agent):
+- Block arguments stored in TWO locations for different purposes:
+  1. **BlockContext indexed slots [0..nargs-1]**: For expression stack + shadowing support
+  2. **MethodContext unified frame**: Persistent storage with absolute indices
+- The `if (index < nargs)` check supports variable shadowing (correctness, not optimization)
+- Expression stack grows AFTER block arguments in BlockContext indexed slots
+
+**Build Status**: ✅ 0 errors, 0 warnings
+**Cold Start**: ✅ Phase 1-6 all succeeded
+
+**Files Modified**:
+1. `Smalltalk80.Interpreter\Core\VM\VirtualMachine.cs` (lines 4147, 4187)
+   - Fixed GetTemporaryVariable: Use absolute index when traversing to MethodContext
+   - Fixed SetTemporaryVariable: Use absolute index when traversing to MethodContext
+   - Removed incorrect `index - nargs` adjustment (hierarchical → absolute indexing)
+
+**Documentation Created**:
+- `docs/Block-Argument-Dual-Storage-Analysis.md` - Comprehensive analysis of dual storage architecture
+
+---
+
+## Previous Work (2025-11-11)
 
 **VM Extension: Block Temporary Count Tracking**
 

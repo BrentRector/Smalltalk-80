@@ -554,6 +554,19 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             byte bytecode = bytecodes[ip++];
 
+            // DIAGNOSTIC: Log first bytecode execution in BlockContext
+            if (isBlockContext)
+            {
+                var nargsOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
+                int nargs = nargsOOP.AsSmallInteger();
+                Console.WriteLine($"[ExecuteBytecodeStep BlockContext] About to execute bytecode 0x{bytecode:X2}, ip={ip-1}, nargs={nargs}, sp={sp}");
+                if (nargs > 0)
+                {
+                    var arg0 = _heapManager.GetIndexedOOP(_activeContextOOP, 0);
+                    Console.WriteLine($"  Block argument [0] = {arg0} (isSmallInt={arg0.IsSmallInteger})");
+                }
+            }
+
             // Update IP
             _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
@@ -1886,12 +1899,33 @@ public partial class VirtualMachine : IPrimitiveContext
         // Pop arguments
         var args = new SmalltalkOOP[argCount];
 
+        // DIAGNOSTIC: Log what we're about to pop for at:
+        if (selectorIndex == 0) // at:
+        {
+            int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
+            var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+            int sp = spOOP.AsSmallInteger();
+            Console.WriteLine($"[ExecuteSendSpecial at:] About to pop, sp={sp}");
+            if (sp > 0)
+            {
+                var topValue = _heapManager.GetIndexedOOP(_activeContextOOP, sp - 1);
+                Console.WriteLine($"  Stack top (sp-1): {topValue} (isSmallInt={topValue.IsSmallInteger})");
+            }
+            if (sp > 1)
+            {
+                var nextValue = _heapManager.GetIndexedOOP(_activeContextOOP, sp - 2);
+                Console.WriteLine($"  Stack (sp-2): {nextValue}");
+            }
+        }
+
         for (int i = argCount - 1; i >= 0; i--)
         {
             args[i] = Pop();
+            if (selectorIndex == 0) Console.WriteLine($"  Popped arg[{i}]: {args[i]} (isSmallInt={args[i].IsSmallInteger})");
         }
 
         var receiverOOP = Pop();
+        if (selectorIndex == 0) Console.WriteLine($"  Popped receiver: {receiverOOP}");
 
         // Handle special cases
         if (selectorIndex == 6) // ==
@@ -4137,7 +4171,9 @@ public partial class VirtualMachine : IPrimitiveContext
             if (index < nargs)
             {
                 // Local block argument - stored in THIS BlockContext's indexed slots
-                return _heapManager.GetIndexedOOP(contextOOP, index);
+                var result = _heapManager.GetIndexedOOP(contextOOP, index);
+                Console.WriteLine($"[GetTemporaryVariable] Retrieving block arg {index} from BlockContext indexed slot: {result}");
+                return result;
             }
             else
             {

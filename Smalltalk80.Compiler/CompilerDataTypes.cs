@@ -96,6 +96,13 @@ namespace Smalltalk80.Compiler
         public int MaxStackDepth { get; set; }
 
         /// <summary>
+        /// DIAGNOSTIC: Variable name to temp frame slot index mapping.
+        /// This is for debugging and validation purposes only - not used at runtime.
+        /// Key: variable name, Value: absolute slot index in the unified temp frame
+        /// </summary>
+        public Dictionary<string, int>? VariableSlotMap { get; set; }
+
+        /// <summary>
         /// Identifies whether this CompiledMethodData represents a block.
         ///
         /// Blue Book Spec:

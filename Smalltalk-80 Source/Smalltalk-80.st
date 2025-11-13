@@ -40433,6 +40433,9 @@ storeOn: aStream
 	aStream nextPutAll: 'nil'! !
 
 !UndefinedObject methodsFor: 'testing'!
+inheritsFrom: aClass
+	"Nil does not inherit from anything."
+	^false!
 isNil
 	^true!
 notNil
