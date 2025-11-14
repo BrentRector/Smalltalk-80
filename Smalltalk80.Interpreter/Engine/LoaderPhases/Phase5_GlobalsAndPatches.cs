@@ -1174,8 +1174,7 @@ public class Phase5_GlobalsAndPatches
             // Update the Association's value (instance variable 1) to point to our TextStyle
             _allocator.SetInstanceVariable(defaultTextStyleAssoc, 1, textStyleOOP);
             _initializedFields.Add((defaultTextStyleAssoc, 1));
-// Console.WriteLine($"  ✓ Created DefaultTextStyle (oop={textStyleOOP.RawValue}) with stub StrikeFont");
-// Console.WriteLine($"    Updated existing Association (oop={defaultTextStyleAssoc.RawValue})");
+            Console.WriteLine($"  ✓ Created DefaultTextStyle (oop={textStyleOOP.RawValue}) with stub StrikeFont");
         }
         else
         {
@@ -1325,7 +1324,7 @@ public class Phase5_GlobalsAndPatches
         // Register in GlobalRegistry for direct access
         GlobalRegistry.Register("Display", displayScreenOOP);
 
-// Console.WriteLine($"  ✓ Created Display (640x480, stub bitmap) as DisplayScreen OOP({displayScreenOOP.RawValue})");
+        Console.WriteLine($"  ✓ Created Display (640x480, stub bitmap) as DisplayScreen OOP({displayScreenOOP.RawValue})");
     }
 
     #endregion
