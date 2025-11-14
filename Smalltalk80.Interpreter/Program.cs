@@ -38,7 +38,7 @@ public static class Program
                 Console.Error.WriteLine("\nUsage: Smalltalk80.Interpreter [options]");
                 Console.Error.WriteLine("Options:");
                 Console.Error.WriteLine("  --coldstart <file>     Specify the cold start bundle file to load");
-                Console.Error.WriteLine("                         (default: coldstart.json in executable directory)");
+                Console.Error.WriteLine("                         (default: coldstart.json in compiler output directory)");
                 Console.Error.WriteLine("  --dump-class <name>    Dump comprehensive information about a class");
                 Console.Error.WriteLine("                         after cold start completes");
                 Console.Error.WriteLine("  --test-filter <pattern> Run only init expressions matching pattern");
@@ -673,11 +673,6 @@ public static class Program
     }
 
     /// <summary>
-    /// Parses command line arguments and returns the cold start file path and optional class name to dump.
-    /// Supports: --coldstart path, --dump-class ClassName
-    /// Default: coldstart.json in the same directory as the executable
-    /// </summary>
-    /// <summary>
     /// Counts the number of bytecode instructions (not bytes, since some are multi-byte).
     /// </summary>
     private static int CountInstructions(byte[] bytecodes)
@@ -1120,6 +1115,11 @@ public static class Program
         }
     }
 
+    /// <summary>
+    /// Parses command line arguments and returns the cold start file path and optional class name to dump.
+    /// Supports: --coldstart path, --dump-class ClassName, --verbose, --skip-init-expressions, etc.
+    /// Default: coldstart.json in the compiler output directory (../net9.0/coldstart.json)
+    /// </summary>
     private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.DebugOptions debugOptions, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
@@ -1203,11 +1203,25 @@ public static class Program
             }
         }
 
-        // Default: coldstart.json in the executable directory
+        // Default: coldstart.json in the compiler's output directory
+        // Interpreter outputs to bin/Debug/net9.0-windows/, compiler to bin/Debug/net9.0/
         if (coldStartFile == null)
         {
             string exeDir = AppContext.BaseDirectory;
-            coldStartFile = Path.Combine(exeDir, "coldstart.json");
+
+            // Try compiler's output directory first (../net9.0/coldstart.json)
+            string compilerDir = Path.Combine(Path.GetDirectoryName(exeDir)!, "net9.0");
+            string compilerColdStart = Path.Combine(compilerDir, "coldstart.json");
+
+            if (File.Exists(compilerColdStart))
+            {
+                coldStartFile = compilerColdStart;
+            }
+            else
+            {
+                // Fallback to executable directory
+                coldStartFile = Path.Combine(exeDir, "coldstart.json");
+            }
         }
 
         return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions, skipInitExpressions, executeExpression);
