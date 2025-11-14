@@ -13,7 +13,6 @@ public class WinFormsDisplayProvider : Form, IDisposable
 {
     private readonly byte[] _displayBuffer;
     private readonly Bitmap _backBuffer;
-    private readonly Graphics _backBufferGraphics;
     private readonly object _bufferLock = new();
     private readonly Queue<int> _inputQueue = new();
     private bool _disposed = false;
@@ -40,8 +39,8 @@ public class WinFormsDisplayProvider : Form, IDisposable
         _displayBuffer = new byte[bufferSize];
 
         // Create back buffer for double-buffered rendering
-        _backBuffer = new Bitmap(width, height, PixelFormat.Format1bppIndexed);
-        _backBufferGraphics = Graphics.FromImage(_backBuffer);
+        // Use 32bpp ARGB format (Graphics.FromImage doesn't support indexed formats)
+        _backBuffer = new Bitmap(width, height, PixelFormat.Format32bppArgb);
 
         // Configure form
         Text = title;
@@ -51,9 +50,6 @@ public class WinFormsDisplayProvider : Form, IDisposable
         StartPosition = FormStartPosition.CenterScreen;
         DoubleBuffered = true;
 
-        // Set up palette (0 = white, 1 = black for Smalltalk convention)
-        SetupMonochromePalette();
-
         // Event handlers
         Paint += OnPaint;
         MouseDown += OnMouseDown;
@@ -61,18 +57,6 @@ public class WinFormsDisplayProvider : Form, IDisposable
         MouseMove += OnMouseMove;
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
-    }
-
-    /// <summary>
-    /// Sets up the monochrome palette: 0 = white (background), 1 = black (foreground).
-    /// This matches Smalltalk-80 convention where 1 bits are black pixels.
-    /// </summary>
-    private void SetupMonochromePalette()
-    {
-        ColorPalette palette = _backBuffer.Palette;
-        palette.Entries[0] = Color.White;  // 0 = white (background)
-        palette.Entries[1] = Color.Black;  // 1 = black (foreground)
-        _backBuffer.Palette = palette;
     }
 
     /// <summary>
@@ -120,28 +104,36 @@ public class WinFormsDisplayProvider : Form, IDisposable
 
     /// <summary>
     /// Copies the Smalltalk display buffer to the Windows bitmap.
-    /// Smalltalk format: MSB first (bit 7 = leftmost pixel).
+    /// Smalltalk format: MSB first (bit 7 = leftmost pixel), 1 = black, 0 = white.
+    /// Converts from 1bpp to 32bpp ARGB format.
     /// </summary>
     private void CopyBufferToBitmap()
     {
         BitmapData bmpData = _backBuffer.LockBits(
             new Rectangle(0, 0, Width, Height),
             ImageLockMode.WriteOnly,
-            PixelFormat.Format1bppIndexed);
+            PixelFormat.Format32bppArgb);
 
         try
         {
             unsafe
             {
-                byte* ptr = (byte*)bmpData.Scan0;
+                int* ptr = (int*)bmpData.Scan0;
                 int rowStride = (Width + 7) / 8;
 
                 for (int y = 0; y < Height; y++)
                 {
-                    for (int x = 0; x < rowStride; x++)
+                    for (int x = 0; x < Width; x++)
                     {
-                        // Copy byte directly - Smalltalk and Windows both use MSB first for 1bpp
-                        ptr[y * bmpData.Stride + x] = _displayBuffer[y * rowStride + x];
+                        // Get byte and bit position
+                        int byteIndex = y * rowStride + (x / 8);
+                        int bitIndex = 7 - (x % 8); // MSB first
+
+                        // Extract bit: 1 = black, 0 = white
+                        int bit = (_displayBuffer[byteIndex] >> bitIndex) & 1;
+
+                        // Set pixel: 1 = black (0xFF000000), 0 = white (0xFFFFFFFF)
+                        ptr[y * (bmpData.Stride / 4) + x] = bit == 1 ? unchecked((int)0xFF000000) : unchecked((int)0xFFFFFFFF);
                     }
                 }
             }
@@ -259,7 +251,6 @@ public class WinFormsDisplayProvider : Form, IDisposable
         {
             if (disposing)
             {
-                _backBufferGraphics?.Dispose();
                 _backBuffer?.Dispose();
             }
             _disposed = true;
