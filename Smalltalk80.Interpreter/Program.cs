@@ -1204,13 +1204,18 @@ public static class Program
         }
 
         // Default: coldstart.json in the compiler's output directory
-        // Interpreter outputs to bin/Debug/net9.0-windows/, compiler to bin/Debug/net9.0/
+        // Directory.Build.props sets BaseOutputPath to solution-level bin/
+        // Compiler outputs to: Smalltalk-80/bin/Debug/net9.0/coldstart.json
+        // Interpreter outputs to: Smalltalk-80/bin/Debug/net9.0-windows/
         if (coldStartFile == null)
         {
             string exeDir = AppContext.BaseDirectory;
+            // exeDir = .../Smalltalk-80/bin/Debug/net9.0-windows/
 
-            // Try compiler's output directory first (../net9.0/coldstart.json)
-            string compilerDir = Path.Combine(Path.GetDirectoryName(exeDir)!, "net9.0");
+            // Try compiler's output directory first (sibling directory)
+            // GetDirectoryName removes 'net9.0-windows', leaving .../bin/Debug/
+            string debugDir = Path.GetDirectoryName(exeDir)!; // .../bin/Debug/
+            string compilerDir = Path.Combine(debugDir, "net9.0"); // .../bin/Debug/net9.0/
             string compilerColdStart = Path.Combine(compilerDir, "coldstart.json");
 
             if (File.Exists(compilerColdStart))
