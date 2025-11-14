@@ -204,7 +204,7 @@ public static class Program
                     
                     // All remaining failures documented:
                     "Object initialize",                  // ❌ Method not found: Sensor cursorPoint (GUI required)
-                    // "Text initialize",                 // ✅ FIXED: Display now implemented (was: width in UndefinedObject)
+                    "Text initialize",                    // ❌ Method not found: aNumber in class Symbol (21K instructions)
                     "TextList initialize",                // ❌ Infinite loop (500K+ instructions)
                     "VariableNode initialize",            // ❌ Infinite loop (500K+ instructions)
                 };
