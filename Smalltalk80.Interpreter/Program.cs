@@ -1213,8 +1213,9 @@ public static class Program
             // exeDir = .../Smalltalk-80/bin/Debug/net9.0-windows/
 
             // Try compiler's output directory first (sibling directory)
-            // GetDirectoryName removes 'net9.0-windows', leaving .../bin/Debug/
-            string debugDir = Path.GetDirectoryName(exeDir)!; // .../bin/Debug/
+            // AppContext.BaseDirectory includes trailing slash, so we need to go up to parent
+            // Use Path.Combine with ".." to navigate to parent directory
+            string debugDir = Path.GetFullPath(Path.Combine(exeDir, "..")); // .../bin/Debug/
             string compilerDir = Path.Combine(debugDir, "net9.0"); // .../bin/Debug/net9.0/
             string compilerColdStart = Path.Combine(compilerDir, "coldstart.json");
 
