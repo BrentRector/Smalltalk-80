@@ -18,16 +18,12 @@
   <!-- CLI and GUI files -->
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="Core\VM\Graphics\WinFormsDisplayProvider.cs" />
+    <Compile Include="WinFormsDisplayProvider.cs" />
   </ItemGroup>
 
   <!-- Windows Forms and Graphics packages -->
   <ItemGroup>
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
   </ItemGroup>
   
   <!-- Preserve existing compiler integration -->
