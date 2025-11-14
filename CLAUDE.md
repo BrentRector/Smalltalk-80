@@ -4,12 +4,13 @@
 
 ## Project Status
 
-**Interpreter Status**: ✅ **FULLY VALIDATED AND OPERATIONAL**
+**Interpreter Status**: ✅ **FULLY OPERATIONAL**
 
-- **Build**: 0 errors, 3 warnings (non-critical: XML doc duplicates, undeclared variables)
+- **Build**: 0 errors, 2 warnings (non-critical: XML doc duplicate param tags)
 - **Cold Start**: Phase 1-6 all succeed
 - **Init Expressions**: 29/29 attempted succeed (100% success rate)
-- **VM Core**: Fully functional, no bugs found
+- **Instruction Counter**: ✅ Fixed to count bytecode opcodes (was counting interpreter loop iterations)
+- **VM Core**: Fully functional, verified operational
 
 ## Block Context Architecture - IMPORTANT
 
@@ -64,26 +65,33 @@ Runs only 3 essential init expressions:
 - Float initialize  
 - SmallInteger initialize
 
-### Running BlockContext Tests
+### Building and Testing
 
+**Full rebuild with BlockContext tests**:
 ```bash
-cd "Smalltalk-80 Source"
+# Build interpreter (auto-regenerates coldstart.json)
+cd Smalltalk80.Interpreter
+dotnet build
 
-# Combine source files
+# Generate test bundle (combines Smalltalk-80.st + BlockContextTest.st)
+cd "../Smalltalk-80 Source"
 cat Smalltalk-80.st Tests/BlockContextTest.st > Smalltalk-80-with-tests.st
-
-# Compile combined source
 dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80-with-tests.st"
-
-# Copy to test bundle location
 cp bin/Debug/net9.0/coldstart.json bin/Debug/net9.0/coldstart_with_tests.json
 
-# Run tests
+# Run BlockContext test suite (194 tests)
 cd ../Smalltalk80.Interpreter
 dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_tests.json --skip-init-expressions
 ```
 
-**Test Suite**: 194 comprehensive BlockContext tests covering nested blocks, variable access, control flow, non-local returns.
+**Quick rebuild (standard bundle only)**:
+```bash
+cd Smalltalk80.Interpreter
+dotnet build
+dotnet run
+```
+
+**Test Suite**: 194 comprehensive BlockContext tests covering nested blocks, variable access, mutations, control flow, non-local returns, exception handling, and real-world patterns.
 
 ## Init Expression Validation Results (2025-01-14)
 
@@ -130,6 +138,32 @@ dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_tests.json --skip-i
 
 **Files Modified**:
 - `Smalltalk80.Interpreter/Program.cs:1972` - Added InputSensor to dependency order
+
+---
+
+## Recent Work (2025-01-14)
+
+### Fixed Instruction Counter to Count Bytecode Opcodes
+
+**Problem**: Instruction counter was counting interpreter loop iterations instead of bytecode opcodes executed. Float initialize showed "2 instructions" when it actually executed 39 bytecodes.
+
+**Root Cause**: Counter was incremented in `InterpreterLoop()` (once per context switch) instead of in `ExecuteBytecodeStep()` (once per bytecode opcode).
+
+**The Fix**:
+- **File**: `VirtualMachine.cs`
+- **Removed**: `_instructionCount++` from `InterpreterLoop()` (line 469)
+- **Added**: `_instructionCount++` inside bytecode dispatch loop in `ExecuteBytecodeStep()` (line 582)
+- **Added**: `_instructionCount++` for primitive execution (line 2183)
+
+**Result**: Instruction counter now correctly reflects bytecode opcodes executed:
+- Float initialize: 39 opcodes (was 2)
+- Character initialize: 3,594 opcodes (was 3,594 - happened to be same due to many message sends)
+- Each bytecode opcode = 1 instruction
+- Each primitive execution = 1 instruction
+
+**Configuration**: MAX_INSTRUCTIONS raised from 100K to 500K to allow more complex init expressions to run.
+
+---
 
 ## Architecture Notes
 

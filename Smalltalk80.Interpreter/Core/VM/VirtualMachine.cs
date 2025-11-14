@@ -41,7 +41,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
     // Instruction execution counter for debugging infinite loops
     private long _instructionCount = 0;
-    private const long MAX_INSTRUCTIONS = 100000;  // Halt at 100K instructions (infinite loop threshold)
+    private const long MAX_INSTRUCTIONS = 500000;  // Halt at 500K instructions (infinite loop threshold)
 
     /// <summary>Gets the total number of instructions executed by this VM instance.</summary>
     public long InstructionCount => _instructionCount;
@@ -307,9 +307,6 @@ public partial class VirtualMachine : IPrimitiveContext
         // Each init expression should start with depth=0
         _activeContextCount = 0;
 
-        // DEBUG: Show which method is being executed
-
-        // Console.WriteLine($"[ExecuteExistingContext] Starting execution of context {contextOOP}");
         _activeContextOOP = contextOOP;
         var result = InterpreterLoop();
         // Console.WriteLine($"[ExecuteExistingContext] Finished with result {result}");
@@ -462,15 +459,6 @@ public partial class VirtualMachine : IPrimitiveContext
 
         while (true)
         {
-            // Increment and check instruction counter
-            _instructionCount++;
-
-            // Halt if we exceed the infinite loop threshold
-            if (_instructionCount >= MAX_INSTRUCTIONS)
-            {
-                throw new InvalidOperationException($"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
-            }
-
             // Execute bytecodes in current context
             InterpreterStatus status = ExecuteBytecodeStep();
 
@@ -577,6 +565,13 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // Update IP
             _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+
+            // Increment and check instruction counter (one count per bytecode executed)
+            _instructionCount++;
+            if (_instructionCount >= MAX_INSTRUCTIONS)
+            {
+                throw new InvalidOperationException($"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
+            }
 
             // Execute the bytecode
             bool continueExecution = ExecuteBytecode(bytecode, methodOOP);
@@ -2166,6 +2161,13 @@ public partial class VirtualMachine : IPrimitiveContext
 
         if (primitiveNumber > 0)
         {
+            // Count primitive execution as one instruction
+            _instructionCount++;
+            if (_instructionCount >= MAX_INSTRUCTIONS)
+            {
+                throw new InvalidOperationException($"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
+            }
+
             // Try to execute the primitive
             var primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiverOOP, args);
 
@@ -3173,10 +3175,10 @@ public partial class VirtualMachine : IPrimitiveContext
         while (currentClassOOP != SpecialObjectsArray.Instance.Nil && depth < maxDepth)
         {
             string currentClassName = GetClassName(currentClassOOP);
-            if (selectorName == "initialize")
-            {
-                Console.WriteLine($"  [GetMethod] depth={depth}, class={currentClassName}, looking for '{selectorName}'");
-            }
+            // if (_debugOptions.ShouldDebugMethodLookup)
+            // {
+            //     Console.WriteLine($"  [GetMethod] depth={depth}, class={currentClassName}, looking for '{selectorName}'");
+            // }
 
             // Get the method dictionary from the class
             // Use Blue Book architectural constants: methodDict is ALWAYS at index 1 in Behavior
@@ -3323,10 +3325,6 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     // Found it! Get the method from the valuesArray at the same index
                     var methodOOP = _heapManager.GetIndexedOOP(valuesArrayOOP, i);
-                    if (selectorName == "initialize")
-                    {
-                        Console.WriteLine($"  [GetMethod] FOUND '{selectorName}' in {currentClassName}, methodOOP={methodOOP}");
-                    }
                     return new MethodInfo { MethodOOP = methodOOP };
                 }
             }
@@ -3335,18 +3333,18 @@ public partial class VirtualMachine : IPrimitiveContext
             // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
             var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
 
-            if (selectorName == "initialize")
-            {
-                if (nextSuperclassOOP == SpecialObjectsArray.Instance.Nil)
-                {
-                    Console.WriteLine($"  '{selectorName}' not found in {currentClassName}, superclass is nil (reached root)");
-                }
-                else
-                {
-                    string nextSuperclassName = GetClassName(nextSuperclassOOP);
-                    Console.WriteLine($"  '{selectorName}' not found in {currentClassName}, trying superclass={nextSuperclassName}");
-                }
-            }
+            // if (_debugOptions.ShouldDebugMethodLookup)
+            // {
+            //     if (nextSuperclassOOP == SpecialObjectsArray.Instance.Nil)
+            //     {
+            //         Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root)");
+            //     }
+            //     else
+            //     {
+            //         string nextSuperclassName = GetClassName(nextSuperclassOOP);
+            //         Console.WriteLine($"  '{selectorName}' not found, trying superclass={nextSuperclassName}");
+            //     }
+            // }
 
             currentClassOOP = nextSuperclassOOP;
             depth++;
