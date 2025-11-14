@@ -4133,15 +4133,6 @@ public partial class VirtualMachine : IPrimitiveContext
     }
 
     /// <summary>
-    /// Gets a temporary variable using Blue Book block argument architecture.
-    ///
-    /// Block arguments are stored in BlockContext indexed slots [0..nargs-1].
-    /// Other variables traverse to home MethodContext.
-    /// </summary>
-    /// <param name="contextOOP">Current context (MethodContext or BlockContext)</param>
-    /// <param name="index">Local index (0-based within current scope)</param>
-    /// <returns>Value of the temporary variable</returns>
-    /// <summary>
     /// Gets a temporary variable using unified temp frame architecture.
     /// All variables (method args/temps, block args/temps) are stored in MethodContext
     /// temp frame using absolute indices assigned by compiler.

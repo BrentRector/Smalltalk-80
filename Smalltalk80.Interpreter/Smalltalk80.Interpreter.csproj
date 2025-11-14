@@ -2,10 +2,12 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net9.0-windows</TargetFramework>
     <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   
   <!-- Reference to Engine (which references Core) -->
@@ -13,33 +15,45 @@
     <ProjectReference Include="Engine\Smalltalk80.Interpreter.Engine.csproj" />
   </ItemGroup>
   
-  <!-- Only CLI files -->
+  <!-- CLI and GUI files -->
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="WinFormsDisplayProvider.cs" />
+  </ItemGroup>
+
+  <!-- Windows Forms and Graphics packages -->
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
   </ItemGroup>
   
   <!-- Preserve existing compiler integration -->
   <ItemGroup>
     <ProjectReference Include="..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
     </ProjectReference>
   </ItemGroup>
   
   <!-- Verify coldstart.json exists after build -->
+  <!-- Note: Shared bin directory is configured in Directory.Build.props -->
+  <!-- Compiler outputs to: Smalltalk-80/bin/Debug/net9.0/coldstart.json -->
+  <!-- Interpreter outputs to: Smalltalk-80/bin/Debug/net9.0-windows/ -->
   <Target Name="VerifyColdStartJson" AfterTargets="Build">
     <PropertyGroup>
-      <!-- Both Compiler and Interpreter output to shared bin directory: bin/Debug/net9.0/ -->
-      <ColdStartFile>$(OutDir)coldstart.json</ColdStartFile>
+      <!-- BaseOutputPath is set by Directory.Build.props to solution-level bin/ -->
+      <!-- Compiler outputs to ../bin/Debug/net9.0/, Interpreter to bin/Debug/net9.0-windows/ -->
+      <CompilerOutputDir>$(BaseOutputPath)Debug\net9.0\</CompilerOutputDir>
+      <ColdStartFile>$(CompilerOutputDir)coldstart.json</ColdStartFile>
     </PropertyGroup>
 
-    <!-- Check if coldstart.json exists in output directory -->
+    <!-- Check if coldstart.json exists in compiler output directory -->
     <Message
       Text="✓ coldstart.json found: $(ColdStartFile)"
       Importance="high"
       Condition="Exists('$(ColdStartFile)')" />
 
     <Warning
-      Text="⚠ coldstart.json not found: $(ColdStartFile) - Compiler should have generated it"
+      Text="⚠ coldstart.json not found: $(ColdStartFile) - Run 'dotnet build' from solution root to generate it"
       Condition="!Exists('$(ColdStartFile)')" />
   </Target>
 

@@ -149,12 +149,14 @@ file sealed class Program
             Console.WriteLine($"  Methods: {stats.MethodCount}");
             Console.WriteLine($"  Init expressions: {stats.InitExpressionCount}");
 
-            // Report undeclared variables
+            // Report undeclared variables (suppressed - this is expected during bootstrap)
+            // 353 undeclared variables are known/documented in CLAUDE.md
+            // These are references to GUI primitives, system objects not available at bootstrap
             var undeclared = BytecodeCompiler.GetUndeclaredVariables();
-            if (undeclared.Count > 0)
+            if (undeclared.Count > 0 && args.Any(a => a == "--verbose" || a == "--show-undeclared"))
             {
                 Console.WriteLine();
-                Console.WriteLine($"Warning: {undeclared.Count} undeclared variable(s) found during compilation:");
+                Console.WriteLine($"Info: {undeclared.Count} undeclared variable(s) found during compilation:");
                 foreach (var kvp in undeclared.OrderBy(x => x.Key))
                 {
                     Console.WriteLine($"  - {kvp.Key} (referenced in {kvp.Value.Count} method(s))");
