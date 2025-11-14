@@ -81,8 +81,6 @@ public static class ControlPrimitives
         SmalltalkOOP argStartIndexOOP = args[1];
         int argStartIndex = argStartIndexOOP.AsSmallInteger();
 
-        Console.WriteLine($"[Primitive 80 BlockCopy] argCount={argCount}, argStartIndex={argStartIndex}");
-
         // Argument count must be non-negative
         if (argCount < 0 || argStartIndex < 0)
         {
@@ -147,12 +145,7 @@ public static class ControlPrimitives
         ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SpecialObjectsArray.Instance.Nil);
 
         // Slot 3: nargs - number of arguments block expects
-        Console.WriteLine($"[Primitive 80 BlockCopy] Storing nargs: blockArgumentCount={blockArgumentCount} (raw=0x{blockArgumentCount.RawValue:X4}), argCount={argCount}");
         ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX, blockArgumentCount);
-
-        // VERIFY what was stored
-        var storedNargs = ctx.HeapManager.GetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-        Console.WriteLine($"[Primitive 80 BlockCopy] Verified stored nargs: {storedNargs} (raw=0x{storedNargs.RawValue:X4}), asInt={storedNargs.AsSmallInteger()}");
 
         // Slot 4: startpc - saved PC where block bytecode starts (Blue Book: initialIP)
         ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, startPC);
@@ -168,7 +161,6 @@ public static class ControlPrimitives
         ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, argStartIndexOOP);
 
         // Return the new BlockContext
-        Console.WriteLine($"[Primitive 80 BlockCopy] Created BlockContext: oop={newBlockContext}, nargs={argCount}, startPC={blockBodyPC}");
         return newBlockContext;
     }
 
@@ -300,17 +292,9 @@ public static class ControlPrimitives
         // Blue Book lines 1198-1199: self storeStackPointerValue: argumentCount
         //                                  inContext: blockContext
 
-        // DEBUG: Check nargs BEFORE setting stackp
-        var nargsBeforeStackp = ctx.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-        Console.WriteLine($"[Primitive 81] BEFORE SetStackp: nargs={nargsBeforeStackp} (asInt={nargsBeforeStackp.AsSmallInteger()})");
-
+        // Blue Book line 1198: Set stackPointer field to number of arguments
         SmalltalkOOP stackPointerValue = SmalltalkOOP.FromSmallInteger(argumentCount);
-        Console.WriteLine($"[Primitive 81] Setting stackp to {stackPointerValue} at index {VMConstants.BLOCKCONTEXT_STACKP_INDEX}");
         ctx.HeapManager.SetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, stackPointerValue);
-
-        // DEBUG: Check nargs AFTER setting stackp
-        var nargsAfterStackp = ctx.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-        Console.WriteLine($"[Primitive 81] AFTER SetStackp: nargs={nargsAfterStackp} (asInt={nargsAfterStackp.AsSmallInteger()})");
 
         // Blue Book lines 1200-1202: memory storePointer: CallerIndex
         //                                    ofObject: blockContext
@@ -322,10 +306,8 @@ public static class ControlPrimitives
         // Switch to the BlockContext - the VM will continue execution in the new context
         // This is a trampoline: primitive succeeds, signals context switch, and returns nil
         // The actual block execution happens when the VM continues in the new context
-        Console.WriteLine($"[Primitive 81] Switching to BlockContext: {blockContext}, PC={initialIP}, stackp={argumentCount}");
         ctx.SetActiveContext(blockContext);
 
-        Console.WriteLine($"[Primitive 81] Context switch complete, returning nil");
         // Return value doesn't matter - context switch will be detected by VM
         return SpecialObjectsArray.Instance.Nil;
     }
