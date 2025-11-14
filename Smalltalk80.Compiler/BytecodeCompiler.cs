@@ -607,13 +607,10 @@ namespace Smalltalk80.Compiler
         {
             if (index <= 15)
             {
-                byte bytecode = (byte)((byte)Bytecode.PUSH_TEMP_0 + index);
-                Console.WriteLine($"[EMIT] PushTemporary: index={index}, bytecode=0x{bytecode:X2} (decimal {bytecode})");
                 EmitWithOffset(Bytecode.PUSH_TEMP_0, index); // 0x10-0x1F
             }
             else
             {
-                Console.WriteLine($"[EMIT] PushTemporary: index={index}, using extended");
                 Emit(Bytecode.EXTENDED_PREFIX); // 0x80
                 Emit(ExtendedSubOp.PUSH_TEMP);
                 Emit((byte)index);
@@ -1210,11 +1207,6 @@ namespace Smalltalk80.Compiler
             // (maxTempIndex is 0-based, so +1 converts to count)
             int actualTempCount = Math.Max(tempCount, maxTempIndex + 1);
 
-            if (maxTempIndex >= tempCount)
-            {
-                Console.WriteLine($"[COMPILER FIX APPLIED] {selector}: maxTempIndex={maxTempIndex}, allocator.tempCount={tempCount}, actualTempCount={actualTempCount}");
-            }
-
             return new CompiledMethodData
             {
                 Selector = selector,
@@ -1376,11 +1368,6 @@ namespace Smalltalk80.Compiler
             // Use the maximum of allocated and referenced indices
             // (maxTempIndex is 0-based, so +1 converts to count)
             int actualTempCount = Math.Max(tempCount, maxTempIndex + 1);
-
-            if (maxTempIndex >= tempCount)
-            {
-                Console.WriteLine($"[COMPILER FIX APPLIED] {selector}: maxTempIndex={maxTempIndex}, allocator.tempCount={tempCount}, actualTempCount={actualTempCount}");
-            }
 
             var compiledMethod = new CompiledMethodData
             {
@@ -2202,27 +2189,6 @@ namespace Smalltalk80.Compiler
                 tempCount = tempNodes.Count;
             }
 
-            // Blue Book bytecode pattern: blockCopy: + LONG_JUMP + block body
-            // Primitive 80 calculates initialIP = PC + 3 (skips 3-byte LONG_JUMP)
-            // Block body comes AFTER the blockCopy: send and jump
-
-            // STEP 1: Emit blockCopy: send (Blue Book standard - 1 argument: nargs)
-            // NOTE: blockCopy: is a SPECIAL operation - it operates on the active context, NOT a receiver from stack
-            // The VM's ExecuteSendSpecial handles it specially WITHOUT popping a receiver
-            emitter.PushSmallInteger(argCount); // Push argument count (only arg)
-            emitter.EmitByte(0xC8); // SEND_SPECIAL_BLOCKCOPY ← Primitive executes here
-
-            // STEP 2: Emit 3-byte LONG_JUMP to skip over block body
-            // 0xA1 = long jump forward with 2-byte offset
-            int jumpBytecodeOffset = emitter.CurrentOffset;
-            emitter.EmitByte(0xA1); // LONG_JUMP_FORWARD (3 bytes total: opcode + 2 offset bytes)
-            int jumpOffsetLocation = emitter.CurrentOffset;
-            emitter.EmitByte(0x00); // Placeholder for offset high byte
-            emitter.EmitByte(0x00); // Placeholder for offset low byte
-
-            // STEP 2: Block body starts here (initialIP = PC + 3 points here)
-            int blockStartOffset = emitter.CurrentOffset;
-
             // Blue Book inline blocks: Share parent method's environment (same temp frame)
             // Block arguments are added to the EXISTING environment temporarily
             // Save current argument mappings to restore later
@@ -2357,6 +2323,32 @@ namespace Smalltalk80.Compiler
             // Simple heuristic: Blocks nested inside other blocks cannot reuse slots
             bool isNested = (savedScopeDepth > 0);
             allocator.EnterBlockScope(argumentNames, blockTempNames, isNested);
+
+            // UNIFIED TEMP FRAME: Get the starting index where block arguments are stored
+            // This is needed by Primitive 80 to initialize BlockContext.argStartIndex field
+            int argStartIndex = argCount > 0 ? allocator.GetCurrentBlockArgStartIndex() : 0;
+
+            // Blue Book bytecode pattern: blockCopy: + LONG_JUMP + block body
+            // Primitive 80 calculates initialIP = PC + 3 (skips 3-byte LONG_JUMP)
+            // Block body comes AFTER the blockCopy: send and jump
+
+            // STEP 1: Emit blockCopy: send (VM EXTENSION - 2 arguments: nargs, argStartIndex)
+            // NOTE: blockCopy: is a SPECIAL operation - it operates on the active context, NOT a receiver from stack
+            // The VM's ExecuteSendSpecial handles it specially WITHOUT popping a receiver
+            emitter.PushSmallInteger(argCount); // First arg: block argument count
+            emitter.PushSmallInteger(argStartIndex); // Second arg: argStartIndex in unified frame (VM extension)
+            emitter.EmitByte(0xC8); // SEND_SPECIAL_BLOCKCOPY ← Primitive executes here
+
+            // STEP 2: Emit 3-byte LONG_JUMP to skip over block body
+            // 0xA1 = long jump forward with 2-byte offset
+            int jumpBytecodeOffset = emitter.CurrentOffset;
+            emitter.EmitByte(0xA1); // LONG_JUMP_FORWARD (3 bytes total: opcode + 2 offset bytes)
+            int jumpOffsetLocation = emitter.CurrentOffset;
+            emitter.EmitByte(0x00); // Placeholder for offset high byte
+            emitter.EmitByte(0x00); // Placeholder for offset low byte
+
+            // STEP 3: Block body starts here (initialIP = PC + 3 points here)
+            int blockStartOffset = emitter.CurrentOffset;
 
             // Compile block body statements
             var statements = block.statements();

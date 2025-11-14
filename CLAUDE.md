@@ -1,31 +1,34 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-12
+**Last Updated**: 2025-11-14
 
-## Recent Work (2025-11-12)
+## Block Context Architecture - IMPORTANT
 
-**Critical Bug Fix**: Block argument bytecode emission
+⚠️ **CANONICAL REFERENCE**: `docs/Block-Context-And-Variable-Access-COMPREHENSIVE.md`
 
-**Problem**: The compiler was emitting block arguments with absolute indices from the unified temp frame instead of local indices within the block. For example, `[:index | bits at: index]` was emitting `PUSH_TEMP 3` instead of `PUSH_TEMP 0`.
+**DO NOT** rely on historical information in this file about block contexts. Always refer to the comprehensive documentation for current architecture.
 
-**Root Cause**: The `VariableResolver.ResolveVariable()` method returns absolute indices from `TempFrameAllocator` for all variables, but block arguments must use local indices (0-based within the block) because they are stored in BlockContext's indexed instance variables.
+### Unified Temp Frame Architecture (Current Design)
 
-**Fix Applied**:
-1. Modified `BytecodeCompiler.PushVariable()` to check if a variable is a block argument and use the local index from `environment.OwnArguments` instead of the absolute index from `result.Index`
-2. Added the missing `BlockArgument` case to `BytecodeCompiler.StoreVariable()` switch statement with the same local index logic
+**Core Principle**: All method and block variables (arguments and temporaries) are stored in the **MethodContext's unified temp frame** using absolute indices assigned at compile time.
 
-**Files Modified**:
-- `D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler\BytecodeCompiler.cs` (lines 2665-2678, 2755-2768)
+**Key Points**:
+1. **Single Storage**: ALL variables stored in MethodContext indexed slots
+2. **Absolute Indexing**: Compiler assigns unique absolute index (0, 1, 2...) to each variable
+3. **BlockContext**: Contains execution state + `home` pointer to MethodContext, NO variable storage
+4. **Extension Field**: BlockContext slot 6 (`BLOCKCONTEXT_ARG_START_INDEX`) stores metadata for Primitive 81
+5. **Variable Access**: Get/SetTemporaryVariable traverse to MethodContext via `home` pointer, use absolute index
 
-**Verification**:
-- Build succeeded with 0 errors
-- Tested with multiple block scenarios:
-  - Single argument: `[:index | index]` → Correctly emits `PUSH_TEMP 0`
-  - Multiple arguments: `[:a :b | a + b]` → Correctly emits `PUSH_TEMP 0`, `PUSH_TEMP 1`
-  - Assignment: `[:x | x := x + 1]` → Correctly emits `PUSH_TEMP 0`, `STORE_TEMP 0`
-  - Nested blocks: `[:x | [:y | x + y]]` → Inner block correctly uses `PUSH_TEMP 0` for 'y'
+**Data Structures**:
+```
+MethodContext:
+  Fixed fields [0-4]: sender, pc, stackp, method, receiver
+  Indexed slots: [0..n] ALL variables (method args/temps, block args/temps, stack)
 
-**Impact**: This fix ensures that block arguments are correctly accessed at runtime, preventing incorrect variable lookups and enabling proper block execution.
+BlockContext:
+  Fixed fields [0-5]: sender, pc, stackp, argumentCount, initialIP, home
+  Extension field [6]: argStartIndex (VM extension for Primitive 81)
+  Indexed slots: Expression stack only (NO variables)
 
 ---
 

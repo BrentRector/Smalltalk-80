@@ -439,7 +439,12 @@ public static class Program
                         if (result.Status == InitStatus.Success)
                         {
                             testSucceeded++;
-                            Console.WriteLine($"✓ Test PASSED");
+                            string returnValueStr = result.ReturnValueOop.HasValue
+                                ? (result.ReturnValueOop.Value.IsSmallInteger
+                                    ? $"SmallInteger({result.ReturnValueOop.Value.AsSmallInteger()})"
+                                    : result.ReturnValueOop.Value.ToString())
+                                : "nil";
+                            Console.WriteLine($"✓ Test PASSED - Returned: {returnValueStr}");
                         }
                         else
                         {

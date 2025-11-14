@@ -82,8 +82,6 @@ public class TempFrameAllocator
             _allocatedSlots[argName] = slot;
             scope.AllocatedSlots.Add(slot);
             _highestSlotIndex = Math.Max(_highestSlotIndex, slot);
-
-            Console.WriteLine($"[TempFrameAllocator] Block arg '{argName}' → slot {slot}");
         }
 
         // Allocate block temps (same as before)
@@ -93,8 +91,6 @@ public class TempFrameAllocator
             _allocatedSlots[tempName] = slot;
             scope.AllocatedSlots.Add(slot);
             _highestSlotIndex = Math.Max(_highestSlotIndex, slot);
-
-            Console.WriteLine($"[TempFrameAllocator] Block temp '{tempName}' → slot {slot}");
         }
 
         _maxSimultaneous = Math.Max(_maxSimultaneous, _nextSlot);

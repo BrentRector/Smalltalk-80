@@ -392,18 +392,6 @@ namespace Smalltalk80.Compiler.AST
             var charStart = start.StartIndex;
             var charStop = stop?.StopIndex ?? charStart;
             var sourceText = charStream.GetText(new Interval(charStart, charStop));
-
-            // DIAGNOSTIC: Check Set>>do: bytecode BEFORE conversion
-            if ((_currentClass == "Set" || _currentClass == "Set class") && compiledData.Selector == "do:")
-            {
-                Console.WriteLine($"[FileInFormatAstBuilder] Converting {_currentClass}>>{compiledData.Selector}");
-                Console.WriteLine($"  Bytecode array length: {compiledData.Bytecode.Length}");
-                if (compiledData.Bytecode.Length > 22)
-                {
-                    Console.WriteLine($"  Bytecode[20-25]: {string.Join(", ", compiledData.Bytecode.Skip(20).Take(5).Select(b => $"0x{b:X2}"))}");
-                }
-            }
-
             // Create method definition with the expected format
             var method = new MethodDefinitionNode
             {
