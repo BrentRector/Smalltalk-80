@@ -97,6 +97,11 @@ public static class Program
 
             Console.WriteLine("Cold start completed successfully!");
 
+            // Run GC immediately after cold start to verify heap integrity
+            Console.WriteLine("\n=== Running GC after cold start ===");
+            var gcStatsBefore = heapManager.GarbageCollect();
+            Console.WriteLine($"  {gcStatsBefore.GetSummary()}");
+
             // DIAGNOSTIC: Inspect ClassDescription.instanceVariables field (slot 4)
             if (debugOptions.ShouldDebugDiagnostics)
             {
@@ -188,7 +193,7 @@ public static class Program
                     "ScreenController initialize",           // Requires PopUpMenu → TextStyle/Font infrastructure
                     "StandardSystemController initialize",   // Requires PopUpMenu → TextStyle/Font infrastructure
                     "StringHolderController initialize",     // Requires PopUpMenu → TextStyle/Font infrastructure
-                    "File initialize",                       // Infinite loop in Dictionary creation (1M+ instructions)
+                    // "File initialize",                       // DEBUGGING: Temporarily enabled to debug Dictionary issue
                     "Form initialize",                       // Infinite loop (4M+ instructions, cycling through multiple methods)
                     // NOW PASSING (enabled after compiler fix):
                     // ✅ InstructionStream initialize - FIXED by hierarchical temp indexing
@@ -358,19 +363,22 @@ public static class Program
                     // Show what we're executing
                     Console.Write($"  [{index}] {expr.Source}... ");
 
+                    // Reset instruction count before each expression
+                    vm.ResetInstructionCount();
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+                    long instructionCount = vm.InstructionCount;
 
                     if (result.Status == InitStatus.Success)
                     {
                         succeeded++;
                         successfulExpressions.Add((index, expr.Source ?? ""));
-                        Console.WriteLine("✓ SUCCESS");
+                        Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS");
                     }
                     else
                     {
                         // FAIL FAST: Stop on first failure with full diagnostics
                         failed++;
-                        Console.WriteLine("❌ FAILED");
+                        Console.WriteLine($"{instructionCount:N0} instructions  ❌ FAILED");
                         Console.WriteLine();
                         Console.WriteLine("==========================================");
                         Console.WriteLine($"❌ FIRST FAILURE: [{index}] {expr.Source}");
@@ -417,6 +425,15 @@ public static class Program
                     {
                         Console.WriteLine($"    [{index}] {source}");
                     }
+                }
+
+                // Run GC after init expressions to collect temporary objects
+                Console.WriteLine($"\n=== Running GC after init expressions ===");
+                var gcStatsAfter = heapManager.GarbageCollect();
+                Console.WriteLine($"  {gcStatsAfter.GetSummary()}");
+                if (gcStatsAfter.CollectedObjects > 0)
+                {
+                    Console.WriteLine($"  {gcStatsAfter.GetFormatBreakdown()}");
                 }
 
                 // Execute test expressions (if any)

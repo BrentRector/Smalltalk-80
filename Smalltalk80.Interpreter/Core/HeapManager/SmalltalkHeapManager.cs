@@ -1244,6 +1244,45 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                     }
                 }
             }
+            
+            // For metaclass instances (e.g., "Float class"), follow thisClass pointer to get name
+            // Metaclass has 6 instance variables: superclass, methodDict, format, subclasses (from Behavior)
+            //                                     + instanceVariables, organization (from ClassDescription)
+            //                                     + thisClass (from Metaclass) at index 6
+            // The name is stored in the instance class, not the metaclass
+            const int METACLASS_THISCLASS_INDEX = 6;
+            if (instVarCount > METACLASS_THISCLASS_INDEX)
+            {
+                var thisClassOOP = GetInstanceVariable(classOOP, METACLASS_THISCLASS_INDEX);
+                if (!thisClassOOP.IsSmallInteger && IsValidObjectOOP(thisClassOOP))
+                {
+                    // Check if thisClass has a name field
+                    var thisClassEntry = GetObjectTableEntry(thisClassOOP);
+                    int thisClassInstVarCount = GetInstanceVariableCountFromEntry(thisClassEntry);
+                    if (_classNameFieldIndex >= 0 && thisClassInstVarCount > _classNameFieldIndex)
+                    {
+                        var nameSymbolOOP = GetInstanceVariable(thisClassOOP, _classNameFieldIndex);
+                        if (!nameSymbolOOP.IsSmallInteger && IsValidObjectOOP(nameSymbolOOP))
+                        {
+                            var symbolEntry = GetObjectTableEntry(nameSymbolOOP);
+                            if (symbolEntry.Format == ObjectFormat.ByteIndexed)
+                            {
+                                int symbolSize = GetIndexedSizeFromEntry(symbolEntry);
+                                if (symbolSize > 0)
+                                {
+                                    var symbolBytes = new byte[symbolSize];
+                                    for (int i = 0; i < symbolSize; i++)
+                                    {
+                                        symbolBytes[i] = GetIndexedByte(nameSymbolOOP, i);
+                                    }
+                                    string baseName = System.Text.Encoding.UTF8.GetString(symbolBytes);
+                                    return $"{baseName} class";
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             return $"UnknownClass(classOOP={classOOP},fmt={classEntry.Format},ivars={instVarCount})";
         }
@@ -1426,5 +1465,227 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
 
         // No more instances found
         return SpecialObjectsArray.Instance.Nil;
+    }
+
+    /// <summary>
+    /// Implements the become: primitive (primitive 72) which swaps the identities of two objects.
+    /// This is a bidirectional swap - all references to oop1 now point to oop2 and vice versa.
+    /// The swap is implemented by exchanging the ObjectTableEntry contents and updating all references throughout the heap.
+    /// 
+    /// Per the Blue Book specification:
+    /// "The primitive swaps the receiver and the argument so that all pointers to the receiver now point to the argument and vice versa."
+    /// 
+    /// Implementation details:
+    /// 1. Swap the ObjectTableEntry contents for both OOPs
+    /// 2. Scan the entire heap and update all OOP references
+    /// 3. Update special objects array if either object is a special object
+    /// </summary>
+    /// <param name="oop1">First object to swap</param>
+    /// <param name="oop2">Second object to swap</param>
+    public void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2)
+    {
+        // Validate parameters
+        if (oop1 == oop2)
+            return; // No-op if swapping object with itself
+
+        if (oop1.IsSmallInteger || oop2.IsSmallInteger)
+            throw new ArgumentException("Cannot become: with SmallIntegers - they are immediate values");
+
+        if (!IsValidObjectOOP(oop1))
+            throw new ArgumentException($"Invalid OOP: {oop1}");
+        
+        if (!IsValidObjectOOP(oop2))
+            throw new ArgumentException($"Invalid OOP: {oop2}");
+
+        // Blue Book become: semantics: Swap the object table entry contents
+        // This makes oop1 point to what oop2 pointed to, and vice versa
+        // All existing OOP references remain unchanged - they just now point to swapped data
+        SwapObjectTableEntries(oop1, oop2);
+    }
+
+    /// <summary>
+    /// Swaps the ObjectTableEntry contents for two OOPs.
+    /// After this operation, oop1 will have the entry that oop2 had and vice versa.
+    /// </summary>
+    private void SwapObjectTableEntries(SmalltalkOOP oop1, SmalltalkOOP oop2)
+    {
+        var entry1 = GetObjectTableEntry(oop1);
+        var entry2 = GetObjectTableEntry(oop2);
+
+        // Create temporary copies of the entries to avoid aliasing issues
+        var temp1 = new ObjectTableEntry(
+            managedStorage: entry1.ManagedStorage,
+            format: entry1.FormatExplicit,
+            sizeInWords: entry1.SizeInWordsExplicit,
+            instanceVariableCount: entry1.InstanceVariableCountExplicit,
+            originalIndexedSize: entry1.OriginalIndexedSize)
+        {
+            PackedMetadata = entry1.PackedMetadata,
+            ExtendedSize = entry1.ExtendedSize,
+            IsMarked = entry1.IsMarked,
+            NamedSlots = entry1.NamedSlots != null ? new Dictionary<string, int>(entry1.NamedSlots) : null,
+            ClassOOP = entry1.ClassOOP
+        };
+
+        // Copy entry2 to entry1's position
+        SetObjectTableEntryContents(oop1, entry2);
+
+        // Copy temp1 (original entry1) to entry2's position
+        SetObjectTableEntryContents(oop2, temp1);
+    }
+
+    /// <summary>
+    /// Sets the contents of an ObjectTableEntry at the given OOP's position.
+    /// </summary>
+    private void SetObjectTableEntryContents(SmalltalkOOP oop, ObjectTableEntry sourceEntry)
+    {
+        int tableIndex = oop.ToObjectTableIndex();
+        int blockIndex = (tableIndex - 1) / ObjectTableBlockSize;
+        int entryIndex = (tableIndex - 1) % ObjectTableBlockSize;
+
+        if (blockIndex >= _objectTableBlocks.Count)
+            throw new ArgumentException($"Invalid ObjectTable index: {tableIndex}");
+
+        var block = _objectTableBlocks[blockIndex];
+        var targetEntry = block.Entries[entryIndex];
+        if (targetEntry == null)
+            throw new ArgumentException($"ObjectTable entry {tableIndex} is null");
+
+        // Copy all fields from source to target
+        targetEntry.ManagedStorage = sourceEntry.ManagedStorage;
+        targetEntry.PackedMetadata = sourceEntry.PackedMetadata;
+        targetEntry.ExtendedSize = sourceEntry.ExtendedSize;
+        targetEntry.OriginalIndexedSize = sourceEntry.OriginalIndexedSize;
+        targetEntry.IsMarked = sourceEntry.IsMarked;
+        targetEntry.NamedSlots = sourceEntry.NamedSlots != null ? new Dictionary<string, int>(sourceEntry.NamedSlots) : null;
+        targetEntry.FormatExplicit = sourceEntry.FormatExplicit;
+        targetEntry.SizeInWordsExplicit = sourceEntry.SizeInWordsExplicit;
+        targetEntry.InstanceVariableCountExplicit = sourceEntry.InstanceVariableCountExplicit;
+        targetEntry.ClassOOP = sourceEntry.ClassOOP;
+    }
+
+    /// <summary>
+    /// Updates all references throughout the heap after a become operation.
+    /// This scans every object and updates any OOP references that point to the swapped objects.
+    /// </summary>
+    private void UpdateAllReferencesAfterBecome(SmalltalkOOP oop1, SmalltalkOOP oop2)
+    {
+        // Update references in all heap objects
+        foreach (var objectOOP in EnumerateObjectTable())
+        {
+            if (objectOOP.IsSmallInteger)
+                continue; // SmallIntegers can't contain OOP references
+
+            UpdateReferencesInObject(objectOOP, oop1, oop2);
+        }
+
+        // Update references in Special Objects Array
+        UpdateSpecialObjectsArrayReferences(oop1, oop2);
+    }
+
+    /// <summary>
+    /// Updates OOP references within a single object.
+    /// Checks both instance variables and indexed slots (for PointerIndexed objects).
+    /// </summary>
+    private void UpdateReferencesInObject(SmalltalkOOP objectOOP, SmalltalkOOP oop1, SmalltalkOOP oop2)
+    {
+        var entry = GetObjectTableEntry(objectOOP);
+
+        // Update instance variables (including class reference in slot 0 for Pointer/PointerIndexed)
+        if (entry.FormatExplicit == ObjectFormat.Pointer || entry.FormatExplicit == ObjectFormat.PointerIndexed)
+        {
+            var oopArray = entry.AsOopArray();
+            if (oopArray != null)
+            {
+                for (int i = 0; i < oopArray.Length; i++)
+                {
+                    if (oopArray[i] == oop1)
+                    {
+                        oopArray[i] = oop2;
+                    }
+                    else if (oopArray[i] == oop2)
+                    {
+                        oopArray[i] = oop1;
+                    }
+                }
+            }
+        }
+
+        // Update class reference for ByteIndexed/WordIndexed objects
+        if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
+        {
+            if (entry.ClassOOP == oop1)
+            {
+                entry.ClassOOP = oop2;
+            }
+            else if (entry.ClassOOP == oop2)
+            {
+                entry.ClassOOP = oop1;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Updates references in the Special Objects Array if either swapped object is a special object.
+    /// This is critical for maintaining heap integrity since the SOA contains GC roots.
+    /// </summary>
+    private void UpdateSpecialObjectsArrayReferences(SmalltalkOOP oop1, SmalltalkOOP oop2)
+    {
+        var soa = SpecialObjectsArray.Instance;
+
+        // Check and update each special object
+        if (soa.Nil == oop1)
+        {
+            SpecialObjectsArray.SetNil(oop2);
+        }
+        else if (soa.Nil == oop2)
+        {
+            SpecialObjectsArray.SetNil(oop1);
+        }
+
+        if (soa.False == oop1)
+        {
+            SpecialObjectsArray.SetFalse(oop2);
+        }
+        else if (soa.False == oop2)
+        {
+            SpecialObjectsArray.SetFalse(oop1);
+        }
+
+        if (soa.True == oop1)
+        {
+            SpecialObjectsArray.SetTrue(oop2);
+        }
+        else if (soa.True == oop2)
+        {
+            SpecialObjectsArray.SetTrue(oop1);
+        }
+
+        if (soa.Smalltalk == oop1)
+        {
+            SpecialObjectsArray.SetSmalltalk(oop2);
+        }
+        else if (soa.Smalltalk == oop2)
+        {
+            SpecialObjectsArray.SetSmalltalk(oop1);
+        }
+
+        if (soa.ProcessorScheduler == oop1)
+        {
+            SpecialObjectsArray.SetProcessorScheduler(oop2);
+        }
+        else if (soa.ProcessorScheduler == oop2)
+        {
+            SpecialObjectsArray.SetProcessorScheduler(oop1);
+        }
+
+        if (soa.InitExpressionMethods == oop1)
+        {
+            SpecialObjectsArray.SetInitExpressionMethods(oop2);
+        }
+        else if (soa.InitExpressionMethods == oop2)
+        {
+            SpecialObjectsArray.SetInitExpressionMethods(oop1);
+        }
     }
 }

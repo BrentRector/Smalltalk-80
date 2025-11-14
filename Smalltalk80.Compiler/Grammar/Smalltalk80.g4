@@ -183,8 +183,9 @@ classDefChunk
     ;
 
 // Class header specifies superclass relationship
+// Smalltalk-80 syntax: SuperclassName subclass: #NewClassName
 classHeader
-    : className subclassKind symbolConst
+    : superclassName subclassKind symbolConst
     ;
 
 // Types of subclass relationships
@@ -586,8 +587,13 @@ separatorChunk
     : SEPARATOR_LINE BANG
     ;
 
-// Class name
+// Class name  
 className
+    : IDENTIFIER
+    ;
+
+// Superclass name
+superclassName
     : IDENTIFIER
     ;
 

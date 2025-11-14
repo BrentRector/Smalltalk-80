@@ -459,6 +459,12 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitClassName([NotNull] Smalltalk80Parser.ClassNameContext context);
 	/// <summary>
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.superclassName"/>.
+	/// </summary>
+	/// <param name="context">The parse tree.</param>
+	/// <return>The visitor result.</return>
+	Result VisitSuperclassName([NotNull] Smalltalk80Parser.SuperclassNameContext context);
+	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.argumentName"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>

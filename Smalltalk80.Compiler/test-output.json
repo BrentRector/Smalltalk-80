@@ -1,0 +1,165 @@
+{
+  "metadata": {
+    "version": "1.0.7",
+    "generator": "Smalltalk80.Compiler v1.0.0.0",
+    "generatedAt": "2025-11-14T07:21:27.5456703Z",
+    "sourceFile": "test-float.st",
+    "sourceChecksum": "multi-file-bundle",
+    "symbolCount": 8,
+    "stringCount": 1,
+    "classCount": 2,
+    "methodCount": 1,
+    "objectCount": 0,
+    "initExpressionCount": 0,
+    "blockContextCount": 0,
+    "undeclaredCount": 0,
+    "blockContexts": []
+  },
+  "symbols": [
+    "Float",
+    "Halfpi",
+    "initialize",
+    "Ln2",
+    "Number",
+    "Pi",
+    "Sqrt2",
+    "Twopi"
+  ],
+  "strings": [
+    "initialize\n\tPi _ 3.14159265358979323846264338327950288.\n\tHalfpi _ Pi / 2.0.\n\tLn2 _ 0.693147!"
+  ],
+  "optimizedSelectors": [],
+  "classes": [
+    {
+      "localId": "class:Float",
+      "nameIndex": 0,
+      "isMetaclass": false,
+      "format": 8216,
+      "instVarNames": [],
+      "classVarNames": [
+        5,
+        1,
+        7,
+        3,
+        6
+      ],
+      "poolLocalIds": [],
+      "superNameIndex": 4,
+      "category": "",
+      "classSideInitMethodLocalId": "method:Float_class\u003E\u003Einitialize",
+      "totalInstanceVarCount": 0,
+      "fieldLayout": []
+    },
+    {
+      "localId": "meta:Float",
+      "nameIndex": 0,
+      "isMetaclass": true,
+      "metaclassOfLocalId": "class:Float",
+      "format": 4104,
+      "instVarNames": [],
+      "classVarNames": [],
+      "poolLocalIds": [],
+      "superNameIndex": 4,
+      "category": "",
+      "totalInstanceVarCount": 0,
+      "fieldLayout": []
+    }
+  ],
+  "objects": [],
+  "methods": [
+    {
+      "localId": "method:Float_class\u003E\u003Einitialize",
+      "homeClassLocalId": "meta:Float",
+      "selectorIndex": 2,
+      "category": "class initialization",
+      "header": {
+        "word": 6,
+        "literalCount": 6,
+        "tempCount": 0,
+        "argCount": 0,
+        "primitiveIndex": 0,
+        "largeContext": false
+      },
+      "literals": [
+        {
+          "type": "association",
+          "association": {
+            "keyType": "symbol",
+            "keyIndex": 5,
+            "valueRef": null
+          }
+        },
+        {
+          "type": "association",
+          "association": {
+            "keyType": "symbol",
+            "keyIndex": 1,
+            "valueRef": null
+          }
+        },
+        {
+          "type": "association",
+          "association": {
+            "keyType": "symbol",
+            "keyIndex": 3,
+            "valueRef": null
+          }
+        },
+        {
+          "type": "float",
+          "value": 3.141592653589793
+        },
+        {
+          "type": "float",
+          "value": 2
+        },
+        {
+          "type": "float",
+          "value": 0.693147
+        }
+      ],
+      "bytecodes": [
+        35,
+        128,
+        9,
+        0,
+        64,
+        36,
+        185,
+        128,
+        9,
+        1,
+        37,
+        128,
+        9,
+        2,
+        120
+      ],
+      "source": "initialize\n\tPi _ 3.14159265358979323846264338327950288.\n\tHalfpi _ Pi / 2.0.\n\tLn2 _ 0.693147!",
+      "argNames": [],
+      "tempNames": []
+    }
+  ],
+  "initExpressions": [],
+  "installOrder": {
+    "phases": [
+      {
+        "name": "Core Classes",
+        "kind": "classes",
+        "localIds": [
+          "class:Float",
+          "meta:Float"
+        ]
+      },
+      {
+        "name": "Methods",
+        "kind": "methods",
+        "localIds": [
+          "method:Float_class\u003E\u003Einitialize"
+        ]
+      }
+    ]
+  },
+  "patches": [],
+  "undeclared": []
+}

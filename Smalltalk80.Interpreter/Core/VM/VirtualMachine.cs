@@ -41,7 +41,13 @@ public partial class VirtualMachine : IPrimitiveContext
 
     // Instruction execution counter for debugging infinite loops
     private long _instructionCount = 0;
-    private const long INSTRUCTION_REPORT_INTERVAL = 100000;  // Report every 100K instructions
+    private const long MAX_INSTRUCTIONS = 100000;  // Halt at 100K instructions (infinite loop threshold)
+
+    /// <summary>Gets the total number of instructions executed by this VM instance.</summary>
+    public long InstructionCount => _instructionCount;
+
+    /// <summary>Resets the instruction counter to zero. Used before executing init expressions.</summary>
+    public void ResetInstructionCount() => _instructionCount = 0;
 
     // Cursor creation loop diagnostics
 
@@ -301,6 +307,8 @@ public partial class VirtualMachine : IPrimitiveContext
         // Each init expression should start with depth=0
         _activeContextCount = 0;
 
+        // DEBUG: Show which method is being executed
+
         // Console.WriteLine($"[ExecuteExistingContext] Starting execution of context {contextOOP}");
         _activeContextOOP = contextOOP;
         var result = InterpreterLoop();
@@ -456,11 +464,11 @@ public partial class VirtualMachine : IPrimitiveContext
         {
             // Increment and check instruction counter
             _instructionCount++;
-            if (_instructionCount % INSTRUCTION_REPORT_INTERVAL == 0)
+
+            // Halt if we exceed the infinite loop threshold
+            if (_instructionCount >= MAX_INSTRUCTIONS)
             {
-                var methodContext = FindMethodContext(_activeContextOOP);
-                var methodOOP = _heapManager.GetInstanceVariable(methodContext, VMConstants.CONTEXT_METHOD_INDEX);
-                Console.WriteLine($"[VM] {_instructionCount / 1000}K instructions executed. Method OOP: {methodOOP}");
+                throw new InvalidOperationException($"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
             }
 
             // Execute bytecodes in current context
@@ -3165,10 +3173,10 @@ public partial class VirtualMachine : IPrimitiveContext
         while (currentClassOOP != SpecialObjectsArray.Instance.Nil && depth < maxDepth)
         {
             string currentClassName = GetClassName(currentClassOOP);
-            // if (_debugOptions.ShouldDebugMethodLookup)
-            // {
-            //     Console.WriteLine($"  [GetMethod] depth={depth}, {currentClassName}, looking for '{selectorName}'");
-            // }
+            if (selectorName == "initialize")
+            {
+                Console.WriteLine($"  [GetMethod] depth={depth}, class={currentClassName}, looking for '{selectorName}'");
+            }
 
             // Get the method dictionary from the class
             // Use Blue Book architectural constants: methodDict is ALWAYS at index 1 in Behavior
@@ -3315,6 +3323,10 @@ public partial class VirtualMachine : IPrimitiveContext
                 {
                     // Found it! Get the method from the valuesArray at the same index
                     var methodOOP = _heapManager.GetIndexedOOP(valuesArrayOOP, i);
+                    if (selectorName == "initialize")
+                    {
+                        Console.WriteLine($"  [GetMethod] FOUND '{selectorName}' in {currentClassName}, methodOOP={methodOOP}");
+                    }
                     return new MethodInfo { MethodOOP = methodOOP };
                 }
             }
@@ -3323,18 +3335,18 @@ public partial class VirtualMachine : IPrimitiveContext
             // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
             var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
 
-            // if (_debugOptions.ShouldDebugMethodLookup)
-            // {
-            //     if (nextSuperclassOOP == SpecialObjectsArray.Instance.Nil)
-            //     {
-            //         Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root)");
-            //     }
-            //     else
-            //     {
-            //         string nextSuperclassName = GetClassName(nextSuperclassOOP);
-            //         Console.WriteLine($"  '{selectorName}' not found, trying superclass={nextSuperclassName}");
-            //     }
-            // }
+            if (selectorName == "initialize")
+            {
+                if (nextSuperclassOOP == SpecialObjectsArray.Instance.Nil)
+                {
+                    Console.WriteLine($"  '{selectorName}' not found in {currentClassName}, superclass is nil (reached root)");
+                }
+                else
+                {
+                    string nextSuperclassName = GetClassName(nextSuperclassOOP);
+                    Console.WriteLine($"  '{selectorName}' not found in {currentClassName}, trying superclass={nextSuperclassName}");
+                }
+            }
 
             currentClassOOP = nextSuperclassOOP;
             depth++;
@@ -3881,8 +3893,12 @@ public partial class VirtualMachine : IPrimitiveContext
 
     void IPrimitiveContext.BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2)
     {
-        // TODO: Implement BecomeTwoWay in heap manager
-        // This needs to swap all references between oop1 and oop2
+        // Implement two-way become: swap the identities of oop1 and oop2
+        // This requires:
+        // 1. Swapping the object table entries
+        // 2. Updating ALL references in the heap to point to the swapped objects
+        
+        _heapManager.BecomeTwoWay(oop1, oop2);
     }
 
 

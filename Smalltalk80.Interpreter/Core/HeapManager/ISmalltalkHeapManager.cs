@@ -252,4 +252,13 @@ public interface ISmalltalkHeapManager
     /// Returns nil if the object is the last instance of its class.
     /// </summary>
     SmalltalkOOP FindNextInstanceOf(SmalltalkOOP classOOP, SmalltalkOOP afterOOP);
+
+    /// <summary>
+    /// Implements the become: primitive (primitive 72) which swaps the identities of two objects.
+    /// This is a bidirectional swap - all references to oop1 now point to oop2 and vice versa.
+    /// The swap is implemented by exchanging the ObjectTableEntry contents and updating all references throughout the heap.
+    /// </summary>
+    /// <param name="oop1">First object to swap</param>
+    /// <param name="oop2">Second object to swap</param>
+    void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2);
 }

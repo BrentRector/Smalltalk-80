@@ -101,6 +101,7 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitClassDefChunk(Smalltalk80Parser.ClassDefChunkContext context)
         {
+            Console.WriteLine("[AST] DEBUG: VisitClassDefChunk called");
             var classHeader = context.classHeader();
             var classBody = context.classBody();
 
@@ -109,10 +110,10 @@ namespace Smalltalk80.Compiler.AST
             string superclassName = "Object";
             string subclassKind = "subclass:";  // Default to fixed pointer
 
-            // Get superclass name from className()
-            if (classHeader.className() != null)
+            // Get superclass name from superclassName()
+            if (classHeader.superclassName() != null)
             {
-                superclassName = classHeader.className().IDENTIFIER().GetText();
+                superclassName = classHeader.superclassName().IDENTIFIER().GetText();
             }
 
             // Get subclass kind from subclassKind()
@@ -208,6 +209,8 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitMethodCategoryChunk(Smalltalk80Parser.MethodCategoryChunkContext context)
         {
+            Console.WriteLine($"[AST] DEBUG: VisitMethodCategoryChunk called, collectingClassesOnly={_collectingClassesOnly}");
+            
             // Skip method compilation during pass 1 (class collection phase)
             if (_collectingClassesOnly)
                 return null;
@@ -229,6 +232,12 @@ namespace Smalltalk80.Compiler.AST
             
             // Check if this is a class-side method category using the cls token
             bool isClassSide = context.cls != null;
+            
+            // DEBUG: Report class-side method detection
+            if (isClassSide)
+            {
+                Console.WriteLine($"[AST] Found class-side method category: {_currentClass} class methodsFor: '{_currentCategory}'");
+            }
             
             // Set the metaclass flag for this entire category
             _isMetaclass = isClassSide;
@@ -311,6 +320,7 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitExpressionChunk(Smalltalk80Parser.ExpressionChunkContext context)
         {
+            Console.WriteLine($"[AST] DEBUG: VisitExpressionChunk called with: {context.GetText()}");
             // Skip init expression compilation during pass 1 (class collection phase)
             if (_collectingClassesOnly)
                 return null;
