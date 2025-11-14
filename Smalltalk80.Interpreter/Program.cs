@@ -449,12 +449,7 @@ public static class Program
                 // Note: Test expressions already executed as init expressions above
                 // No need to re-run them here
 
-                // Only return here if we're NOT skipping init expressions
-                // When --skip-init-expressions is used, we want to continue to execute user code
-                if (!skipInitExpressions)
-                {
-                    return;
-                }
+                // Continue to GUI display window (don't exit after init expressions)
 
                 #if false  // Phase 2 disabled - unreachable code preserved for reference
                 // Phase 2: Execute all comment: expressions (DISABLED - not running)
