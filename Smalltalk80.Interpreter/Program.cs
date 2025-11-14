@@ -198,7 +198,7 @@ public static class Program
                     
                     // All remaining failures documented:
                     "Object initialize",                  // ❌ Method not found: Sensor cursorPoint (GUI required)
-                    "Text initialize",                    // ⚠️  Different issue: Method not found: width in UndefinedObject (nil StrikeFont)
+                    // "Text initialize",                 // ✅ FIXED: Display now implemented (was: width in UndefinedObject)
                     "TextList initialize",                // ❌ Infinite loop (500K+ instructions)
                     "VariableNode initialize",            // ❌ Infinite loop (500K+ instructions)
                 };
