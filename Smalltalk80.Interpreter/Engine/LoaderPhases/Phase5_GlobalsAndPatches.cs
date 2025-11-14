@@ -1256,7 +1256,8 @@ public class Phase5_GlobalsAndPatches
 
         // Step 2: Create empty DisplayBitmap (WordArray subclass)
         // For bootstrap, we use a zero-sized bitmap since init expressions only read width/height
-        var displayBitmapOOP = _allocator.AllocateWordArray("DisplayBitmap", 0);
+        // WordArray uses WordIndexed format (16-bit words)
+        var displayBitmapOOP = _allocator.AllocateObject("DisplayBitmap", ObjectFormat.WordIndexed, 0);
         var displayBitmapClassOOP = GlobalRegistry.LookupClassOOP("DisplayBitmap");
         _allocator.SetObjectClass(displayBitmapOOP, displayBitmapClassOOP);
 
