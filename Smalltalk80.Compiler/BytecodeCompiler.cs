@@ -607,13 +607,10 @@ namespace Smalltalk80.Compiler
         {
             if (index <= 15)
             {
-                byte bytecode = (byte)((byte)Bytecode.PUSH_TEMP_0 + index);
-                Console.WriteLine($"[EMIT] PushTemporary: index={index}, bytecode=0x{bytecode:X2} (decimal {bytecode})");
                 EmitWithOffset(Bytecode.PUSH_TEMP_0, index); // 0x10-0x1F
             }
             else
             {
-                Console.WriteLine($"[EMIT] PushTemporary: index={index}, using extended");
                 Emit(Bytecode.EXTENDED_PREFIX); // 0x80
                 Emit(ExtendedSubOp.PUSH_TEMP);
                 Emit((byte)index);
@@ -1210,11 +1207,6 @@ namespace Smalltalk80.Compiler
             // (maxTempIndex is 0-based, so +1 converts to count)
             int actualTempCount = Math.Max(tempCount, maxTempIndex + 1);
 
-            if (maxTempIndex >= tempCount)
-            {
-                Console.WriteLine($"[COMPILER FIX APPLIED] {selector}: maxTempIndex={maxTempIndex}, allocator.tempCount={tempCount}, actualTempCount={actualTempCount}");
-            }
-
             return new CompiledMethodData
             {
                 Selector = selector,
@@ -1376,11 +1368,6 @@ namespace Smalltalk80.Compiler
             // Use the maximum of allocated and referenced indices
             // (maxTempIndex is 0-based, so +1 converts to count)
             int actualTempCount = Math.Max(tempCount, maxTempIndex + 1);
-
-            if (maxTempIndex >= tempCount)
-            {
-                Console.WriteLine($"[COMPILER FIX APPLIED] {selector}: maxTempIndex={maxTempIndex}, allocator.tempCount={tempCount}, actualTempCount={actualTempCount}");
-            }
 
             var compiledMethod = new CompiledMethodData
             {
