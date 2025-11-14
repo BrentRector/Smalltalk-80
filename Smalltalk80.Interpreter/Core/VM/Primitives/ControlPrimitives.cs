@@ -178,11 +178,6 @@ public static class ControlPrimitives
         int currentFrameSize = ctx.HeapManager.GetIndexedSize(homeMethodContext);
         argStartIndex = currentFrameSize; // Allocate at end
 
-        if (ctx.VerboseDebug)
-        {
-            Console.WriteLine($"[Primitive 80] BlockCopy: nargs={argCount}, argStartIndex={argStartIndex}, homeSize={currentFrameSize}");
-        }
-
         // Store in BlockContext extension field (slot 6)
         ctx.HeapManager.SetInstanceVariable(
             newBlockContext,
@@ -298,10 +293,6 @@ public static class ControlPrimitives
 
         if (!argStartIndexOOP.IsSmallInteger)
         {
-            if (ctx.VerboseDebug)
-            {
-                Console.WriteLine($"[Primitive 81] ERROR: argStartIndex not set (got {argStartIndexOOP})");
-            }
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -314,21 +305,10 @@ public static class ControlPrimitives
             VMConstants.BLOCKCONTEXT_HOME_INDEX
         );
 
-        if (ctx.VerboseDebug)
-        {
-            Console.WriteLine($"[Primitive 81] Value: nargs={argumentCount}, argStartIndex={argStartIndex}, home={homeContextOOP}");
-        }
-
         // Store arguments in MethodContext temp frame at ABSOLUTE indices
         for (int i = 0; i < argumentCount; i++)
         {
             int absoluteIndex = argStartIndex + i;
-
-            if (ctx.VerboseDebug)
-            {
-                Console.WriteLine($"[Primitive 81]   Storing arg[{i}] at tempFrame[{absoluteIndex}] = {args[i]}");
-            }
-
             ctx.HeapManager.SetIndexedOOP(homeContextOOP, absoluteIndex, args[i]);
         }
 
