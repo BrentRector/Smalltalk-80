@@ -1172,3 +1172,6 @@ validate
 
 "Global test - Self-validating"
 BlockContextTest validate!
+
+"Test single method"
+BlockContextTest new s00!
