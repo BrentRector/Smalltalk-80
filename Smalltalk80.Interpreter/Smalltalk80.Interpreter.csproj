@@ -36,11 +36,13 @@
   <!-- Verify coldstart.json exists after build -->
   <Target Name="VerifyColdStartJson" AfterTargets="Build">
     <PropertyGroup>
-      <!-- Both Compiler and Interpreter output to shared bin directory: bin/Debug/net9.0/ -->
-      <ColdStartFile>$(OutDir)coldstart.json</ColdStartFile>
+      <!-- Compiler outputs to bin/Debug/net9.0/, Interpreter to bin/Debug/net9.0-windows/ -->
+      <!-- Check in compiler's output directory -->
+      <CompilerOutputDir>$(MSBuildProjectDirectory)\..\bin\Debug\net9.0\</CompilerOutputDir>
+      <ColdStartFile>$(CompilerOutputDir)coldstart.json</ColdStartFile>
     </PropertyGroup>
 
-    <!-- Check if coldstart.json exists in output directory -->
+    <!-- Check if coldstart.json exists in compiler output directory -->
     <Message
       Text="✓ coldstart.json found: $(ColdStartFile)"
       Importance="high"

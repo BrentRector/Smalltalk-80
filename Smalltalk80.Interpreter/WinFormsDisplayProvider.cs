@@ -18,8 +18,8 @@ public class WinFormsDisplayProvider : Form, IDisposable
     private readonly Queue<int> _inputQueue = new();
     private bool _disposed = false;
 
-    public int Width { get; }
-    public int Height { get; }
+    public new int Width { get; }
+    public new int Height { get; }
 
     /// <summary>
     /// Gets direct access to the display buffer (1-bit monochrome bitmap).
