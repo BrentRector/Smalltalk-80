@@ -1253,12 +1253,27 @@ public class Phase5_GlobalsAndPatches
             _initializedFields.Add((pointOOP, yIndex));
         }
 
-        // Step 2: Create empty DisplayBitmap (WordArray subclass)
-        // For bootstrap, we use a zero-sized bitmap since init expressions only read width/height
+        // Step 2: Create DisplayBitmap (WordArray subclass) with real bitmap buffer
+        // 640x480 monochrome: (640 / 8) * 480 = 38,400 bytes = 19,200 words (16-bit)
+        int displayWidth = 640;
+        int displayHeight = 480;
+        int bytesPerRow = displayWidth / 8;  // 80 bytes per row
+        int totalBytes = bytesPerRow * displayHeight;  // 38,400 bytes
+        int totalWords = totalBytes / 2;  // 19,200 words (16-bit)
+
         // WordArray uses WordIndexed format (16-bit words)
-        var displayBitmapOOP = _allocator.AllocateObject("DisplayBitmap", ObjectFormat.WordIndexed, 0);
+        var displayBitmapOOP = _allocator.AllocateObject("DisplayBitmap", ObjectFormat.WordIndexed, totalWords);
         var displayBitmapClassOOP = GlobalRegistry.LookupClassOOP("DisplayBitmap");
         _allocator.SetObjectClass(displayBitmapOOP, displayBitmapClassOOP);
+
+        // Initialize bitmap to all zeros (white background in Smalltalk convention)
+        for (int i = 0; i < totalWords; i++)
+        {
+            _heapManager.SetIndexedWord(displayBitmapOOP, i, 0);
+        }
+
+        // Register the Display bitmap OOP globally so it can be accessed by GUI
+        GlobalRegistry.Register("DisplayBitmap", displayBitmapOOP);
 
         // Step 3: Create DisplayScreen object
         var displayScreenOOP = _allocator.AllocateFixedObject("DisplayScreen");
@@ -1324,7 +1339,7 @@ public class Phase5_GlobalsAndPatches
         // Register in GlobalRegistry for direct access
         GlobalRegistry.Register("Display", displayScreenOOP);
 
-        Console.WriteLine($"  ✓ Created Display (640x480, stub bitmap) as DisplayScreen OOP({displayScreenOOP.RawValue})");
+        Console.WriteLine($"  ✓ Created Display (640x480, {totalBytes} byte bitmap) as DisplayScreen OOP({displayScreenOOP.RawValue})");
     }
 
     #endregion
