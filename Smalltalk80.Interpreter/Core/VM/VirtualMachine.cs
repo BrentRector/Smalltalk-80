@@ -39,6 +39,10 @@ public partial class VirtualMachine : IPrimitiveContext
     private int _activeContextCount = 0;
     private const int MAX_CONTEXT_DEPTH = 5000;  // Increased for init expressions with deep dependencies
 
+    // Instruction execution counter for debugging infinite loops
+    private long _instructionCount = 0;
+    private const long INSTRUCTION_REPORT_INTERVAL = 100000;  // Report every 100K instructions
+
     // Cursor creation loop diagnostics
 
     // Call outcome used for NLR propagation and context switching in trampoline interpreter
@@ -450,6 +454,15 @@ public partial class VirtualMachine : IPrimitiveContext
 
         while (true)
         {
+            // Increment and check instruction counter
+            _instructionCount++;
+            if (_instructionCount % INSTRUCTION_REPORT_INTERVAL == 0)
+            {
+                var methodContext = FindMethodContext(_activeContextOOP);
+                var methodOOP = _heapManager.GetInstanceVariable(methodContext, VMConstants.CONTEXT_METHOD_INDEX);
+                Console.WriteLine($"[VM] {_instructionCount / 1000}K instructions executed. Method OOP: {methodOOP}");
+            }
+
             // Execute bytecodes in current context
             InterpreterStatus status = ExecuteBytecodeStep();
 
@@ -3403,7 +3416,7 @@ public partial class VirtualMachine : IPrimitiveContext
             throw new InvalidOperationException($"Class {classNameClean} not found in heap");
         }
 
-        Console.WriteLine($"[AllocateObject] className={classNameClean}, classOOP={classOOP}, indexedSize={indexedSize}");
+        // Console.WriteLine($"[AllocateObject] className={classNameClean}, classOOP={classOOP}, indexedSize={indexedSize}");
 
         // Read the format field from the class object to determine the proper ObjectFormat
         // Classes have instance variable "format" which contains encoding per ColdStartJsonGenerator:
@@ -4259,4 +4272,5 @@ public partial class VirtualMachine : IPrimitiveContext
             return contextOOP;
         }
     }
+
 }

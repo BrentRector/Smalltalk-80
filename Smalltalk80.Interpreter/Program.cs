@@ -188,17 +188,19 @@ public static class Program
                     "ScreenController initialize",           // Requires PopUpMenu → TextStyle/Font infrastructure
                     "StandardSystemController initialize",   // Requires PopUpMenu → TextStyle/Font infrastructure
                     "StringHolderController initialize",     // Requires PopUpMenu → TextStyle/Font infrastructure
+                    "File initialize",                       // Infinite loop in Dictionary creation (1M+ instructions)
+                    "Form initialize",                       // Infinite loop (4M+ instructions, cycling through multiple methods)
                     // NOW PASSING (enabled after compiler fix):
                     // ✅ InstructionStream initialize - FIXED by hierarchical temp indexing
                     // ✅ Scanner initialize - FIXED by hierarchical temp indexing
 
                     // Still failing - need investigation:
                     // "Form initialize",                    // Context depth limit exceeded (infinite recursion)
-                    // "Object initialize",                  // Method not found: value: in SmallInteger
-                    // "Text initialize",                    // Method not found: value: in String
-                    // "TextList initialize",                // Context depth limit exceeded (infinite loop)
+                    "Object initialize",                  // Requires GUI: calls confirm: which needs Sensor cursorPoint (interactive)
+                    "Text initialize",                    // Method not found: value in class 0 (classId corruption)
+                    "TextList initialize",                // Infinite loop (100K+ instructions)
                     "VariableNode initialize",               // Context depth limit exceeded (fixed GetIndexedOOP bug, but still has infinite recursion)
-                    "InputSensor initialize",                // Method not found: cursorPoint in UndefinedObject
+                    // "InputSensor initialize",                // Trying again - may have been circular dependency with Object
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -1967,6 +1969,7 @@ public static class Program
             "FormButtonView class",
             "FormEditor class",
             "FormView class",
+            "InputSensor class",       // REQUIRED BEFORE Object: Object>>confirm: uses Sensor cursorPoint
             "InputState class",
             "Inspector class",
             "InspectorView class",
