@@ -1888,33 +1888,13 @@ public partial class VirtualMachine : IPrimitiveContext
         // Pop arguments
         var args = new SmalltalkOOP[argCount];
 
-        // DIAGNOSTIC: Log what we're about to pop for at:
-        if (selectorIndex == 0) // at:
-        {
-            int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-            var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
-            int sp = spOOP.AsSmallInteger();
-            Console.WriteLine($"[ExecuteSendSpecial at:] About to pop, sp={sp}");
-            if (sp > 0)
-            {
-                var topValue = _heapManager.GetIndexedOOP(_activeContextOOP, sp - 1);
-                Console.WriteLine($"  Stack top (sp-1): {topValue} (isSmallInt={topValue.IsSmallInteger})");
-            }
-            if (sp > 1)
-            {
-                var nextValue = _heapManager.GetIndexedOOP(_activeContextOOP, sp - 2);
-                Console.WriteLine($"  Stack (sp-2): {nextValue}");
-            }
-        }
-
+        // Pop arguments
         for (int i = argCount - 1; i >= 0; i--)
         {
             args[i] = Pop();
-            if (selectorIndex == 0) Console.WriteLine($"  Popped arg[{i}]: {args[i]} (isSmallInt={args[i].IsSmallInteger})");
         }
 
         var receiverOOP = Pop();
-        if (selectorIndex == 0) Console.WriteLine($"  Popped receiver: {receiverOOP}");
 
         // Handle special cases
         if (selectorIndex == 6) // ==
