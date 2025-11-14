@@ -66,6 +66,9 @@ public class Phase5_GlobalsAndPatches
         // Step 4: Create DefaultTextStyle (after AssociationRegistry is populated)
         CreateDefaultTextStyle();
 
+        // Step 5: Create Display global (required by init expressions)
+        CreateDisplay();
+
         // Freeze AssociationRegistry after all globals installed
         AssociationRegistry.Freeze();
 // Console.WriteLine($"[AssociationRegistry] Frozen with {AssociationRegistry.Count} associations");
@@ -1209,6 +1212,119 @@ public class Phase5_GlobalsAndPatches
         _allocator.SetObjectClass(stringOOP, stringClassOOP);
 
         return stringOOP;
+    }
+
+    #endregion
+
+    #region Display Creation
+
+    /// <summary>
+    /// Creates the Display global as an instance of DisplayScreen (Form subclass).
+    /// Display is required by several init expressions that call Display width/height.
+    /// Creates a minimal stub Display object (640x480, empty bitmap) sufficient for bootstrap.
+    ///
+    /// DisplayScreen instance variables (inherited from Form):
+    ///   - bits: DisplayBitmap (WordArray subclass) - storage for pixel data
+    ///   - width: SmallInteger - width in pixels
+    ///   - height: SmallInteger - height in pixels
+    ///   - offset: Point - display origin (typically 0@0)
+    /// </summary>
+    private void CreateDisplay()
+    {
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Step 1: Create offset Point (0@0)
+        var pointOOP = _allocator.AllocateFixedObject("Point");
+        var pointClassOOP = GlobalRegistry.LookupClassOOP("Point");
+        _allocator.SetObjectClass(pointOOP, pointClassOOP);
+
+        // Point instance variables: x, y
+        int xIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Point", "x", _bundle);
+        int yIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Point", "y", _bundle);
+
+        if (xIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(pointOOP, xIndex, SmalltalkOOP.FromSmallInteger(0));
+            _initializedFields.Add((pointOOP, xIndex));
+        }
+
+        if (yIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(pointOOP, yIndex, SmalltalkOOP.FromSmallInteger(0));
+            _initializedFields.Add((pointOOP, yIndex));
+        }
+
+        // Step 2: Create empty DisplayBitmap (WordArray subclass)
+        // For bootstrap, we use a zero-sized bitmap since init expressions only read width/height
+        var displayBitmapOOP = _allocator.AllocateWordArray("DisplayBitmap", 0);
+        var displayBitmapClassOOP = GlobalRegistry.LookupClassOOP("DisplayBitmap");
+        _allocator.SetObjectClass(displayBitmapOOP, displayBitmapClassOOP);
+
+        // Step 3: Create DisplayScreen object
+        var displayScreenOOP = _allocator.AllocateFixedObject("DisplayScreen");
+        var displayScreenClassOOP = GlobalRegistry.LookupClassOOP("DisplayScreen");
+        _allocator.SetObjectClass(displayScreenOOP, displayScreenClassOOP);
+
+        // Get Form instance variable indices (DisplayScreen inherits from Form)
+        // Form instance variables: bits, width, height, offset
+        int bitsIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Form", "bits", _bundle);
+        int widthIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Form", "width", _bundle);
+        int heightIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Form", "height", _bundle);
+        int offsetIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Form", "offset", _bundle);
+
+        // Set Form instance variables
+        if (bitsIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(displayScreenOOP, bitsIndex, displayBitmapOOP);
+            _initializedFields.Add((displayScreenOOP, bitsIndex));
+        }
+
+        if (widthIndex >= 0)
+        {
+            // Standard VGA resolution: 640 pixels wide
+            _allocator.SetInstanceVariable(displayScreenOOP, widthIndex, SmalltalkOOP.FromSmallInteger(640));
+            _initializedFields.Add((displayScreenOOP, widthIndex));
+        }
+
+        if (heightIndex >= 0)
+        {
+            // Standard VGA resolution: 480 pixels high
+            _allocator.SetInstanceVariable(displayScreenOOP, heightIndex, SmalltalkOOP.FromSmallInteger(480));
+            _initializedFields.Add((displayScreenOOP, heightIndex));
+        }
+
+        if (offsetIndex >= 0)
+        {
+            _allocator.SetInstanceVariable(displayScreenOOP, offsetIndex, pointOOP);
+            _initializedFields.Add((displayScreenOOP, offsetIndex));
+        }
+
+        // Initialize remaining DisplayScreen instance variables to nil
+        int displayScreenInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("DisplayScreen", _bundle);
+        for (int i = 0; i < displayScreenInstVarCount; i++)
+        {
+            if (!_initializedFields.Contains((displayScreenOOP, i)))
+            {
+                _allocator.SetInstanceVariable(displayScreenOOP, i, nilOOP);
+                _initializedFields.Add((displayScreenOOP, i));
+            }
+        }
+
+        // Step 4: Install Display as a global variable in SystemDictionary
+        // Get or create canonical Association for Display
+        var associationOOP = GetOrCreateCanonicalAssociation("Display");
+
+        // Set Association value to DisplayScreen object
+        _allocator.SetInstanceVariable(associationOOP, 1, displayScreenOOP);
+        _initializedFields.Add((associationOOP, 1));
+
+        // Install in SystemDictionary
+        InstallAssociationInSystemDictionary(associationOOP, "Display");
+
+        // Register in GlobalRegistry for direct access
+        GlobalRegistry.Register("Display", displayScreenOOP);
+
+// Console.WriteLine($"  ✓ Created Display (640x480, stub bitmap) as DisplayScreen OOP({displayScreenOOP.RawValue})");
     }
 
     #endregion
