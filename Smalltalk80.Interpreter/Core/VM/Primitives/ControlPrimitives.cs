@@ -153,37 +153,9 @@ public static class ControlPrimitives
         ctx.HeapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContext);
 
         // ========================================================================
-        // VM EXTENSION: Store argStartIndex in BlockContext (slot 6)
-        // ========================================================================
-        // TEMPORARY IMPLEMENTATION: Compute argStartIndex from context state
-        // until compiler provides it (Phase 4).
-        //
-        // Strategy: Allocate block arguments at the END of current temp frame.
-        // This is conservative but correct - Phase 4 will optimize.
-        int argStartIndex;
-        var homeMethodContext = homeContext;
-
-        // Ensure we have a MethodContext (should always be true after Phase 1 fix)
-        while (ctx.HeapManager.GetClassOOP(homeMethodContext) == ctx.GetBlockContextClassOOP())
-        {
-            homeMethodContext = ctx.HeapManager.GetInstanceVariable(
-                homeMethodContext,
-                VMConstants.BLOCKCONTEXT_HOME_INDEX
-            );
-        }
-
-        // Allocate args at next available slot in temp frame
-        // This is CONSERVATIVE - may allocate more slots than needed
-        // Phase 4 compiler will provide exact indices
-        int currentFrameSize = ctx.HeapManager.GetIndexedSize(homeMethodContext);
-        argStartIndex = currentFrameSize; // Allocate at end
-
-        // Store in BlockContext extension field (slot 6)
-        ctx.HeapManager.SetInstanceVariable(
-            newBlockContext,
-            VMConstants.BLOCKCONTEXT_ARG_START_INDEX,
-            SmalltalkOOP.FromSmallInteger(argStartIndex)
-        );
+        // Blue Book: Block arguments are stored in BlockContext indexed slots [0..nargs-1]
+        // The compiler emits local indices (PUSH_TEMP 0, PUSH_TEMP 1, etc.)
+        // No argStartIndex needed - arguments are always at indices 0..nargs-1
 
         // Return the new BlockContext
         Console.WriteLine($"[Primitive 80 BlockCopy] Created BlockContext: oop={newBlockContext}, nargs={argCount}, startPC={blockBodyPC}");
@@ -282,34 +254,18 @@ public static class ControlPrimitives
         }
 
         // ========================================================================
-        // UNIFIED TEMP FRAME: Store arguments in MethodContext at argStartIndex
+        // Blue Book: Store arguments in BlockContext indexed slots [0..nargs-1]
         // ========================================================================
 
-        // Read argStartIndex from BlockContext extension field (slot 6)
-        var argStartIndexOOP = ctx.HeapManager.GetInstanceVariable(
-            blockContext,
-            VMConstants.BLOCKCONTEXT_ARG_START_INDEX
-        );
-
-        if (!argStartIndexOOP.IsSmallInteger)
-        {
-            ctx.PrimitiveSuccess = false;
-            return SpecialObjectsArray.Instance.Nil;
-        }
-
-        int argStartIndex = argStartIndexOOP.AsSmallInteger();
-
-        // Get home MethodContext
-        var homeContextOOP = ctx.HeapManager.GetInstanceVariable(
-            blockContext,
-            VMConstants.BLOCKCONTEXT_HOME_INDEX
-        );
-
-        // Store arguments in MethodContext temp frame at ABSOLUTE indices
+        // Transfer arguments from stack to block's indexed slots
+        // Blue Book lines 1188-1191: self transfer: argumentCount
+        //                                  fromIndex: stackPointer-argumentCount + 1
+        //                                  ofObject: activeContext
+        //                                  toIndex: TempFrameStart
+        //                                  ofObject: blockContext
         for (int i = 0; i < argumentCount; i++)
         {
-            int absoluteIndex = argStartIndex + i;
-            ctx.HeapManager.SetIndexedOOP(homeContextOOP, absoluteIndex, args[i]);
+            ctx.HeapManager.SetIndexedOOP(blockContext, i, args[i]);
         }
 
         // Blue Book line 1192: self pop: argumentCount + 1
@@ -429,35 +385,14 @@ public static class ControlPrimitives
         }
 
         // ========================================================================
-        // UNIFIED TEMP FRAME: Store arguments in MethodContext at argStartIndex
+        // Blue Book: Store arguments in BlockContext indexed slots [0..nargs-1]
         // ========================================================================
 
-        // Read argStartIndex from BlockContext extension field (slot 6)
-        var argStartIndexOOP = ctx.HeapManager.GetInstanceVariable(
-            blockContext,
-            VMConstants.BLOCKCONTEXT_ARG_START_INDEX
-        );
-
-        if (!argStartIndexOOP.IsSmallInteger)
-        {
-            ctx.PrimitiveSuccess = false;
-            return SpecialObjectsArray.Instance.Nil;
-        }
-
-        int argStartIndex = argStartIndexOOP.AsSmallInteger();
-
-        // Get home MethodContext
-        var homeContextOOP = ctx.HeapManager.GetInstanceVariable(
-            blockContext,
-            VMConstants.BLOCKCONTEXT_HOME_INDEX
-        );
-
-        // Extract and store arguments from Array
+        // Extract arguments from Array and store in block's indexed slots
         for (int i = 0; i < arraySize; i++)
         {
             var argOOP = ctx.HeapManager.GetIndexedOOP(arrayArg, i);
-            int absoluteIndex = argStartIndex + i;
-            ctx.HeapManager.SetIndexedOOP(homeContextOOP, absoluteIndex, argOOP);
+            ctx.HeapManager.SetIndexedOOP(blockContext, i, argOOP);
         }
 
         // Get initialIP from blockContext

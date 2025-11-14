@@ -505,9 +505,6 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                 }
                 catch { }
             }
-            Console.WriteLine($"[HEAP DEBUG] SetIndexedOOP: object=64034 ({className}), index={index}, value={valueStr}");
-            Console.WriteLine($"[HEAP DEBUG] Stack trace:");
-            Console.WriteLine(System.Environment.StackTrace);
         }
 
         WriteIndexedOop(entry, index, value);
