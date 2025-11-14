@@ -1,155 +1,262 @@
-# Resume Prompt for Next Session
+# Resume Prompt - Smalltalk-80 Interpreter Development
 
-**Date**: 2025-01-14  
-**Status**: ✅ All tested functionality working perfectly
+**Last Updated**: 2025-11-14
 
-## Current State
+## Current Status
 
-### What's Working
-- ✅ **Build**: 0 errors, 2 warnings (non-critical XML doc duplicate param tags)
-- ✅ **Cold Start**: Phase 1-6 all succeed
-- ✅ **Init Expressions**: 29/29 attempted succeed (100% success rate)
-- ✅ **Instruction Counter**: Fixed to count bytecode opcodes (was counting loop iterations)
-- ✅ **BlockContext**: 194 comprehensive tests pass (nested blocks, variable access, control flow)
-- ✅ **VM Core**: Fully functional and verified
+**Interpreter**: ✅ Fully operational - 30/46 init expressions pass (65% success rate)
 
-### Recent Fix (2025-01-14)
+**Latest Achievement**: ✅ **Fixed Association Class Pointer Bug**
+- Successfully resolved classOOP=0 corruption affecting runtime-allocated Associations
+- Text initialize now runs 21K+ instructions (was failing at 98)
+- All existing 30 passing init expressions still pass
 
-**Instruction Counter Bug**:
-- **Problem**: Counter showed Float initialize as "2 instructions" when it executed 39 bytecodes
-- **Cause**: Was counting interpreter loop iterations (context switches) instead of bytecode opcodes
-- **Fix**: Moved counter increment from `InterpreterLoop()` to inside `ExecuteBytecodeStep()` bytecode loop
-- **Result**: Now correctly counts each bytecode opcode and primitive as 1 instruction
-- **Config**: MAX_INSTRUCTIONS raised from 100K to 500K
+---
+
+## Completed Work (2025-11-14)
+
+### ✅ Association Class Pointer Bug - FIXED
+
+**Problem**:
+- Text class>>initialize failed with "Method not found: value in class 0"
+- OOP 13508 (Undeclared Association) had classOOP=0 instead of valid Association class pointer
+- Runtime-allocated Associations in Phase 3 never had class pointers set
+
+**Root Cause**:
+1. Phase 3 creates runtime Associations via `AllocateAssociationWithSemanticAllocator()`:
+   - Undeclared Association (line 229)
+   - DefaultTextStyle Association (line 348)  
+   - Pool dictionary Associations (line 386)
+2. `AllocateFixedObject()` allocates but doesn't set class pointers (intentional during cold start)
+3. `SetClassReferencesForAllObjects()` only scanned `_localIdToObjectId` (bundle objects)
+4. Runtime Associations not in `_localIdToObjectId` → class pointers remained OOP(0)
+
+**Solution Implemented**:
+- **File**: `Phase3_ObjectAllocation.cs:648-704`
+- **Method**: `SetAssociationClassReferences()` 
+- **Approach**: 
+  - Scans entire heap via `_heapManager.EnumerateObjectTable()`
+  - Identifies Associations: Pointer format + 2 instance vars + 0 indexed size
+  - Sets classOOP to Association class for all unset class pointers
 
 **Files Modified**:
-- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` (lines 469, 582, 2183, 44)
+1. `Smalltalk80.Interpreter/Engine/LoaderPhases/Phase3_ObjectAllocation.cs:648-704`
+2. `Smalltalk80.Interpreter/Core/HeapManager/SmalltalkHeapManager.cs:109-110, 162-163` (removed debug code)
+3. `Smalltalk80.Interpreter/Program.cs:201` (updated Text comment)
+4. `CLAUDE.md:94-119, 261-309` (documented fix)
 
-### Init Expression Status
+**Verification**:
+- ✅ All 30 passing init expressions still pass
+- ✅ Text initialize progresses to 21,611 instructions (new failure point)
+- ✅ No regressions
 
-**Successfully Running (29)**:
-- Character, Float, SmallInteger (essential)
-- BinaryChoiceView, ClassOrganizer, CompiledMethod
-- Cursor, Date, Debugger, Decompiler
-- Explainer, FileDirectory, InputSensor, InputState, InstructionStream
-- LargeNegativeInteger, LargePositiveInteger
-- MessageNode, Paragraph, ParseNode
-- ProcessorScheduler, Project
-- Scanner, StringHolder, Symbol
-- SystemDictionary, SystemTracer
-- WindowsFileDirectory, WindowsFileSystem
+---
 
-**Disabled (5)** - Known issues:
-1. `File initialize` - Infinite loop in Dictionary creation (1M+ instructions)
-2. `Form initialize` - Infinite loop (4M+ instructions)
-3. `TextList initialize` - Infinite loop (100K+ instructions)
-4. `Object initialize` - Requires interactive GUI (`confirm:` → `Sensor cursorPoint`)
-5. `Text initialize` - Corrupt OOP (classId 0, method lookup fails)
+## Current Issue: Display Global Not Initialized
 
-## Next Steps for Tomorrow
+### Problem Statement
 
-### Goal: Test Disabled Init Expressions
+Text class>>initialize now fails with:
+```
+Error: Method not found: width in class UndefinedObject OOP(11424)
+Receiver: OOP(13498) 
+Context: Text_class>>initTextConstants (line 39136)
+```
 
-**Priority 1: Investigate Infinite Loops**
-- Debug `File initialize` - why does Dictionary creation loop?
-- Debug `Form initialize` - what's causing 4M+ instruction loop?
-- Debug `TextList initialize` - identify 100K+ instruction cause
-- These likely share a common root cause in Dictionary implementation
+### Analysis
 
-**Priority 2: Fix Remaining Issues**
-- `Text initialize` - investigate corrupt OOP (classId 0)
-- `Object initialize` - either mock Sensor cursorPoint or skip gracefully
+**Code Location**: `Smalltalk-80.st:39136`
+```smalltalk
+tempArray _ Array new: Display width // DefaultTab.
+```
 
-### How to Start
+**Failure Chain**:
+1. Text class>>initialize calls `self initTextConstants`
+2. initTextConstants line 39136: `Display width`
+3. Display global is **nil** (UndefinedObject OOP(11424))
+4. Sending `width` to nil → "Method not found: width in class UndefinedObject"
 
-1. **Build and verify current state**:
-   ```bash
-   cd Smalltalk80.Interpreter
-   dotnet build
-   dotnet run
-   ```
-   Should show: "29/29 init expressions succeeded"
+**Investigation Results**:
+- ✅ DefaultTextStyle **IS** created in Phase5_GlobalsAndPatches.cs:1057-1188
+- ✅ StrikeFont stub **IS** created with minimal properties (name, ascent, descent, maxWidth)
+- ❌ Display Form object **NOT** created during cold start
+- ❌ Display global never registered in GlobalRegistry or SystemDictionary
 
-2. **Enable verbose tracing for File initialize**:
-   - Temporarily re-enable File initialize in Program.cs
-   - Add instruction counter reporting every 10K instructions
-   - Examine bytecode execution to find loop
+**Display Usage in Text Initialize**:
+```smalltalk
+tempArray _ Array new: Display width // DefaultTab.
+1 to: tempArray size do:
+    [:i | tempArray at: i put: DefaultTab * i].
+TextConstants at: #DefaultTabsArray put: tempArray.
 
-3. **Common debugging pattern**:
-   ```bash
-   # For any init expression issue:
-   cd Smalltalk80.Interpreter
-   dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart.json --skip-init-expressions
-   # Then manually trace the problematic initialize method
-   ```
+tempArray _ Array new: (Display width // DefaultTab) // 2.
+1 to: tempArray size do:
+    [:i | tempArray at: i put: (Array with: (DefaultTab*i) with: (DefaultTab*i))].
+TextConstants at: #DefaultMarginTabsArray put: tempArray.
+```
 
-## Key Architecture Notes
+Purpose: Creates tab stop arrays for text layout based on display width.
 
-### Instruction Counter
-- Located in `VirtualMachine.cs:44`
-- `MAX_INSTRUCTIONS = 500000` (500K threshold)
-- Incremented at line 582 (bytecode dispatch) and line 2183 (primitive execution)
-- Counts actual work done, not context switches
+---
 
-### BlockContext Tests
-To regenerate and run full test suite:
+## Next Steps: Options
+
+### Option 1: Create Display Form During Cold Start (RECOMMENDED)
+
+**Goal**: Initialize Display global with a minimal Form object before Text initialize
+
+**Implementation Plan**:
+1. Add `CreateDisplayForm()` method in Phase 3 or Phase 5
+2. Create Form object with reasonable defaults:
+   - width: 1024 (standard display width)
+   - height: 768 (standard display height)
+   - bits: ByteArray (or nil for stub)
+3. Register Display global in SystemDictionary
+4. Ensure Display initialization runs before Text initialize
+
+**Files to Modify**:
+- `Phase3_ObjectAllocation.cs` or `Phase5_GlobalsAndPatches.cs` - Add CreateDisplayForm()
+- Potentially update dependency order if needed
+
+**Form Class Definition Location**: Search for "Object subclass: #Form" in Smalltalk-80.st
+
+**Pros**: 
+- Enables Text initialize to complete
+- Provides foundation for future GUI work
+- Follows Smalltalk-80 architecture
+
+**Cons**: 
+- Need to understand Form instance variables and minimal setup
+- May expose more dependencies
+
+---
+
+### Option 2: Skip Text Initialize (TEMPORARY)
+
+**Goal**: Document Display dependency and skip Text for now
+
+**Implementation**:
+- Add "Text initialize" back to skip list in Program.cs:201
+- Document: "Requires Display global (Form) - not yet initialized"
+
+**Pros**: Quick, allows focusing on other init expressions
+
+**Cons**: Doesn't solve the problem, just defers it
+
+---
+
+### Option 3: Investigate Other Failures First
+
+**Goal**: Work on infinite loop issues (Form, TextList, VariableNode)
+
+**Reasoning**: 
+- May discover more fundamental missing dependencies
+- Form initialize might create Display (worth checking)
+
+**Approach**:
+1. Enable VM instruction tracing for Form initialize
+2. Identify what causes 4M+ instruction infinite loop
+3. Fix and retry
+
+---
+
+## Recommended Approach
+
+**Priority 1**: Implement Option 1 (Create Display Form)
+- Most complete solution
+- Required for any GUI-related init expressions
+- Natural next step in system bootstrap
+
+**Steps**:
+1. Search Form class definition to understand instance variables
+2. Check if Form has initialize method (might be another dependency)
+3. Create minimal Display Form in Phase 5 (after associations, before Text)
+4. Test Text initialize
+5. Document Display creation in CLAUDE.md
+
+---
+
+## Current Init Expression Status
+
+**Passing (30/46 - 65%)**:
+- Character, Float, SmallInteger (numeric/character)
+- BinaryChoiceView (GUI foundation)
+- ClassOrganizer, CompiledMethod (system infrastructure)
+- Cursor, Date, Debugger, Decompiler, Explainer (utilities)
+- File, FileDirectory, WindowsFileDirectory, WindowsFileSystem (file system)
+- InputSensor, InputState (input handling)
+- InstructionStream, Scanner, MessageNode, ParseNode (compiler)
+- Paragraph, StringHolder, Symbol (text/string)
+- ProcessorScheduler, Project (process management)
+- SystemDictionary, SystemTracer (system globals)
+- LargePositiveInteger, LargeNegativeInteger (large integers)
+
+**Failing - GUI/PopUpMenu (10)**:
+- BitEditor, ChangeListController, FormEditor, NotifierController
+- ParagraphEditor, ProjectController, ScreenController
+- StandardSystemController, StringHolderController
+- FormMenuView
+
+**Failing - Process/Threading (1)**:
+- Delay (forkAt: infinite loop)
+
+**Failing - Missing Display (1)**:
+- Text (Display width - Display is nil) ← **Current Focus**
+
+**Failing - Infinite Loops (3)**:
+- Form (4M+ instructions)
+- TextList (500K+ instructions)
+- VariableNode (500K+ instructions)
+
+**Failing - GUI Dependencies (1)**:
+- Object (Sensor cursorPoint - GUI required)
+
+---
+
+## Key Files Reference
+
+**Cold Start Phases**:
+- `Smalltalk80.Interpreter/Engine/LoaderPhases/Phase3_ObjectAllocation.cs` - Object allocation, class references
+- `Smalltalk80.Interpreter/Engine/LoaderPhases/Phase5_GlobalsAndPatches.cs` - Globals, DefaultTextStyle creation
+
+**Init Expression Execution**:
+- `Smalltalk80.Interpreter/Program.cs:183-204` - Skip list with failure reasons
+- `Smalltalk80.Interpreter/Engine/InitExecution/InitExpressionExecutor.cs` - Execution logic
+
+**Smalltalk Source**:
+- `Smalltalk-80 Source/Smalltalk-80.st` - Complete Smalltalk source
+  - Text class: lines 39060-39212
+  - Text initialize: lines 39068-39097
+  - Text initTextConstants: lines 39098-39148
+  - StrikeFont class: lines 35882-36099
+  - Form class: Search for "Object subclass: #Form"
+
+---
+
+## Quick Start Commands
+
+**Build and Run**:
+```bash
+cd Smalltalk80.Interpreter
+dotnet build
+dotnet run
+```
+
+**Build with BlockContext Tests**:
 ```bash
 cd "Smalltalk-80 Source"
 cat Smalltalk-80.st Tests/BlockContextTest.st > Smalltalk-80-with-tests.st
 dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80-with-tests.st"
-cp bin/Debug/net9.0/coldstart.json bin/Debug/net9.0/coldstart_with_tests.json
+cp ../bin/Debug/net9.0/coldstart.json ../bin/Debug/net9.0/coldstart_with_tests.json
+
 cd ../Smalltalk80.Interpreter
 dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_tests.json --skip-init-expressions
 ```
 
-### Unified Temp Frame Architecture
-- All variables stored in MethodContext with absolute indices
-- BlockContext has NO variable storage (only execution state)
-- BlockContext.home points to MethodContext (or parent BlockContext for nested blocks)
-- See `docs/Block-Context-And-Variable-Access-COMPREHENSIVE.md` for details
+**Expected Output**: 194/194 BlockContext tests pass ✅
 
-## Files to Review for Init Expression Debugging
+---
 
-1. **Init Expression Execution**:
-   - `Smalltalk80.Interpreter/Program.cs` (lines 1686-1810) - dependency-ordered execution
-   - `Smalltalk80.Interpreter/Program.cs` (lines 257-273) - init expression runner
+## Model Selection
 
-2. **Instruction Counter**:
-   - `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` (lines 42-50, 582, 2183)
-
-3. **Source Files with Init Methods**:
-   - `Smalltalk-80 Source/Smalltalk-80.st` - search for `initialize` class methods
-   - File initialize at approximately line 16889
-   - Form initialize (location TBD)
-   - TextList initialize (location TBD)
-
-## Quick Reference Commands
-
-```bash
-# Standard run
-cd Smalltalk80.Interpreter && dotnet run
-
-# Skip problematic init expressions
-cd Smalltalk80.Interpreter && dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart.json --skip-init-expressions
-
-# Full rebuild with tests
-cd Smalltalk80.Interpreter && dotnet build
-cd "../Smalltalk-80 Source" && cat Smalltalk-80.st Tests/BlockContextTest.st > Smalltalk-80-with-tests.st
-dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80-with-tests.st"
-cp bin/Debug/net9.0/coldstart.json bin/Debug/net9.0/coldstart_with_tests.json
-cd ../Smalltalk80.Interpreter && dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_tests.json --skip-init-expressions
-```
-
-## Success Criteria for Tomorrow
-
-- [ ] Identify root cause of infinite loops in File/Form/TextList initialize
-- [ ] Fix at least one of the infinite loop cases
-- [ ] Document findings in CLAUDE.md
-- [ ] All previously working init expressions still pass (regression test)
-
-## Notes
-
-- Instruction counter fix was critical - revealed that Float initialize WAS executing correctly
-- All 29 tested init expressions work perfectly
-- VM core is solid - issues are likely in standard library code (Dictionary, etc.)
-- BlockContext architecture fully validated with 194 comprehensive tests
+Always use model: **claude-sonnet-4-5**

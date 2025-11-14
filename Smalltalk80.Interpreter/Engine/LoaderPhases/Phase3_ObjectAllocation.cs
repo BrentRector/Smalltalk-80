@@ -644,6 +644,63 @@ public class Phase3_ObjectAllocation
             var arrayClassOOP = arrayClassId;
             _allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
         }
+        
+        // CRITICAL FIX: Set class references for Associations created in Phase 3
+        // These include:
+        // - Undeclared Association (line 229)
+        // - DefaultTextStyle Association (line 348)
+        // - Pool dictionary Associations (line 386)
+        SetAssociationClassReferences();
+    }
+    
+    /// <summary>
+    /// Sets class references for all Association objects allocated in Phase 3.
+    /// Associations are created during sentinel object allocation and special object allocation,
+    /// but their class pointers are not set until this method runs.
+    /// IMPORTANT: This scans the ENTIRE heap, not just _localIdToObjectId, because some Associations
+    /// are created at runtime (e.g., Undeclared Association at line 229).
+    /// </summary>
+    private void SetAssociationClassReferences()
+    {
+        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
+        int associationsFixed = 0;
+        
+        // Scan through ALL allocated objects in the heap (including runtime-allocated ones)
+        foreach (var objectOOP in _heapManager.EnumerateObjectTable())
+        {
+            try
+            {
+                // Skip SmallIntegers
+                if (objectOOP.IsSmallInteger)
+                    continue;
+                
+                // Check if class pointer is unset (OOP(0) or nil)
+                var currentClassOOP = _allocator.GetSlot(objectOOP, 0);
+                
+                // Skip if class pointer already set to a non-zero/non-nil value
+                if (currentClassOOP != default(SmalltalkOOP) && currentClassOOP != SpecialObjectsArray.Instance.Nil)
+                    continue;
+                
+                // Check if this looks like an Association (2 instance variables, Pointer format, no indexed data)
+                var format = _allocator.GetObjectFormat(objectOOP);
+                int instVarCount = _allocator.GetInstanceVariableCount(objectOOP);
+                int indexedSize = _allocator.GetIndexedSize(objectOOP);
+                
+                if (format == ObjectFormat.Pointer && instVarCount == 2 && indexedSize == 0)
+                {
+                    // This is likely an Association - set its class pointer
+                    _allocator.SetSlot(objectOOP, 0, associationClassOOP);
+                    associationsFixed++;
+                }
+            }
+            catch
+            {
+                // Skip objects that can't be inspected
+                continue;
+            }
+        }
+        
+        // Console.WriteLine($"  Fixed {associationsFixed} Association class references");
     }
 
     private string GetClassNameFromLocalId(string localId)

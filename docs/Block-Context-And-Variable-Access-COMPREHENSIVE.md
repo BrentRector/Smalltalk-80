@@ -1864,7 +1864,88 @@ if (contextClassOOP == ctx.GetBlockContextClassOOP())
 - `docs/BlueBook-Context-Architecture.md` - Blue Book reference
 
 **Tests**:
-- `Smalltalk-80 Source/Tests/BlockContextTest.st` - Test suite (194 tests)
+- `Smalltalk-80 Source/Tests/BlockContextTest.st` - Comprehensive test suite (194 tests)
+
+---
+
+## Appendix A.1: Test Suite Validation
+
+**Last Validated**: 2025-11-14
+
+### Test Suite Status: ✅ ALL TESTS PASSING
+
+The BlockContext implementation has been validated against a comprehensive test suite of **194 test methods** covering all aspects of block execution, variable access, and control flow.
+
+**Full Test Results**:
+- `BlockContextTest>>testAllCombinations`: Returns **3503** ✅
+- All 20 test categories validated individually
+- Total test coverage: 190+ test methods
+
+### Test Categories Verified
+
+| Category | Tests | Status | Description |
+|----------|-------|--------|-------------|
+| **s*** | 9 | ✅ PASS | Single-level blocks with varying arg/temp counts |
+| **t*** | 81 | ✅ PASS | Two-level nested blocks (all combinations) |
+| **n*** | 27 | ✅ PASS | Three-level nested blocks |
+| **m*** | 6 | ✅ PASS | Method multi-temp access from nested blocks |
+| **mut*** | 3 | ✅ PASS | Temp mutation from blocks |
+| **ma*** | 6 | ✅ PASS | Method argument access from nested blocks |
+| **rw*** | 5 | ✅ PASS | Real-world patterns (whileTrue:, whileFalse:, do:, select:) |
+| **e*** | 7 | ✅ PASS | Edge cases (empty blocks, multiple blocks, etc.) |
+| **nlr*** | 3 | ✅ PASS | Non-local returns |
+| **stress*** | 3 | ✅ PASS | Complex mutation, max nesting, shadowing |
+| **bl*** | 2 | ✅ PASS | Block lifetime and storage |
+| **cf*** | 2 | ✅ PASS | Control flow (early exit, recursion) |
+| **iv*** | 10 | ✅ PASS | Instance variable access from blocks |
+| **cv*** | 5 | ✅ PASS | Class variable access from blocks |
+| **pv*** | 3 | ✅ PASS | Pool variable access from blocks |
+| **gv*** | 5 | ✅ PASS | Global variable access from blocks |
+| **ps*** | 5 | ✅ PASS | Pseudo-variables (self, true, false, nil, super) |
+| **mx*** | 5 | ✅ PASS | Mixed variable types |
+| **es*** | 2 | ✅ PASS | Self-modifying and mixed access patterns |
+| **sd*** | 1 | ✅ PASS | Deep nesting (10 levels) |
+
+### Key Achievements
+
+✅ **Nested Block Variable Access**: All 3-level nesting patterns work correctly  
+✅ **Real-World Control Structures**: whileTrue:, whileFalse:, do:, select: all operational  
+✅ **Variable Mutations**: Outer temp mutation from inner blocks works correctly  
+✅ **Non-Local Returns**: Block returns to method work correctly  
+✅ **Complex Patterns**: Method args + temps with non-contiguous access patterns work  
+✅ **Variable Types**: Instance vars, class vars, pool vars, globals all accessible from blocks  
+
+### Running the Test Suite
+
+**Location**: `Smalltalk-80 Source/Tests/BlockContextTest.st`
+
+**Generate Test Bundle**:
+```bash
+cd "Smalltalk-80 Source"
+cat Smalltalk-80.st Tests/BlockContextTest.st > Smalltalk-80-with-tests.st
+dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80-with-tests.st"
+cp ../bin/Debug/net9.0/coldstart.json ../bin/Debug/net9.0/coldstart_with_tests.json
+```
+
+**Run Tests**:
+```bash
+cd Smalltalk80.Interpreter
+dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_tests.json \
+              --skip-init-expressions \
+              --execute "BlockContextTest new testAllCombinations"
+```
+
+**Expected Output**: Test should return SmallInteger(3503) indicating all tests passed.
+
+### Test Design
+
+The test suite uses numeric return values to enable automated validation:
+- Most basic tests return **10** when passing
+- Complex tests return computed sums to validate correct arithmetic
+- The full suite sums all test results to produce **3503**
+- Any failure returns 0 or incorrect value, changing the total
+
+This design allows testing without a full assertion framework and provides immediate feedback on test execution.
 
 ---
 

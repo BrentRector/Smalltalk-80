@@ -182,30 +182,25 @@ public static class Program
                 // Skip list for init expressions requiring runtime features not available during bootstrap
                 var skipList = new HashSet<string>
                 {
-                    "Delay initialize",                      // Requires process/threading primitives (forkAt:)
-                    "BitEditor initialize",                  // Requires PopUpMenu → TextStyle/Font infrastructure
-                    "FormMenuView initialize",               // Requires file I/O primitives (Form readFrom:) not available
-                    "ChangeListController initialize",       // Requires PopUpMenu → TextStyle/Font infrastructure
-                    "FormEditor initialize",                 // Requires PopUpMenu → TextStyle/Font infrastructure
-                    "NotifierController initialize",         // Requires PopUpMenu → TextStyle/Font infrastructure
-                    "ParagraphEditor initialize",            // Requires PopUpMenu → TextStyle/Font infrastructure
-                    "ProjectController initialize",          // Requires PopUpMenu → TextStyle/Font infrastructure
-                    "ScreenController initialize",           // Requires PopUpMenu → TextStyle/Font infrastructure
-                    "StandardSystemController initialize",   // Requires PopUpMenu → TextStyle/Font infrastructure
-                    "StringHolderController initialize",     // Requires PopUpMenu → TextStyle/Font infrastructure
-                    // "File initialize",                       // DEBUGGING: Temporarily enabled to debug Dictionary issue
-                    "Form initialize",                       // Infinite loop (4M+ instructions, cycling through multiple methods)
-                    // NOW PASSING (enabled after compiler fix):
-                    // ✅ InstructionStream initialize - FIXED by hierarchical temp indexing
-                    // ✅ Scanner initialize - FIXED by hierarchical temp indexing
-
-                    // Still failing - need investigation:
-                    // "Form initialize",                    // Context depth limit exceeded (infinite recursion)
-                    "Object initialize",                  // Requires GUI: calls confirm: which needs Sensor cursorPoint (interactive)
-                    "Text initialize",                    // Method not found: value in class 0 (classId corruption)
-                    "TextList initialize",                // Infinite loop (100K+ instructions)
-                    "VariableNode initialize",               // Context depth limit exceeded (fixed GetIndexedOOP bug, but still has infinite recursion)
-                    // "InputSensor initialize",                // Trying again - may have been circular dependency with Object
+                    // Known failures - require features not available during bootstrap:
+                    "Delay initialize",                      // ❌ Infinite loop - forkAt: creates process with [true] whileTrue
+                    "BitEditor initialize",                  // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "FormMenuView initialize",               // ❌ Infinite loop - Form readFrom: (file I/O)
+                    "ChangeListController initialize",       // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "FormEditor initialize",                 // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "NotifierController initialize",         // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "ParagraphEditor initialize",            // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "ProjectController initialize",          // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "ScreenController initialize",           // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "StandardSystemController initialize",   // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "StringHolderController initialize",     // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "Form initialize",                       // ❌ Infinite loop (4M+ instructions, cycling through multiple methods)
+                    
+                    // All remaining failures documented:
+                    "Object initialize",                  // ❌ Method not found: Sensor cursorPoint (GUI required)
+                    "Text initialize",                    // ⚠️  Different issue: Method not found: width in UndefinedObject (nil StrikeFont)
+                    "TextList initialize",                // ❌ Infinite loop (500K+ instructions)
+                    "VariableNode initialize",            // ❌ Infinite loop (500K+ instructions)
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -372,7 +367,25 @@ public static class Program
                     {
                         succeeded++;
                         successfulExpressions.Add((index, expr.Source ?? ""));
-                        Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS");
+                        
+                        // For Block test classes, show the actual return value
+                        if (expr.Source != null && (expr.Source.Contains("Block") && expr.Source.Contains("Test")))
+                        {
+                            var returnOOP = result.ReturnValueOop;
+                            if (returnOOP.HasValue && returnOOP.Value.IsSmallInteger)
+                            {
+                                int value = returnOOP.Value.AsSmallInteger();
+                                Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS - Returned: {value}");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS - Returned: {returnOOP}");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS");
+                        }
                     }
                     else
                     {
@@ -418,15 +431,6 @@ public static class Program
                 Console.WriteLine($"  Skipped: {skippedIndices.Count} (require runtime features)");
                 Console.WriteLine($"  Comment expressions: {phase2Indices.Count} (not executed)");
 
-                if (successfulExpressions.Count > 0)
-                {
-                    Console.WriteLine($"\n✓ Successfully executed expressions:");
-                    foreach (var (index, source) in successfulExpressions)
-                    {
-                        Console.WriteLine($"    [{index}] {source}");
-                    }
-                }
-
                 // Run GC after init expressions to collect temporary objects
                 Console.WriteLine($"\n=== Running GC after init expressions ===");
                 var gcStatsAfter = heapManager.GarbageCollect();
@@ -436,58 +440,8 @@ public static class Program
                     Console.WriteLine($"  {gcStatsAfter.GetFormatBreakdown()}");
                 }
 
-                // Execute test expressions (if any)
-                if (testIndices.Count > 0)
-                {
-                    Console.WriteLine($"\n=== Executing Test Expressions ===");
-                    Console.WriteLine($"  Total test expressions: {testIndices.Count}");
-                    Console.WriteLine();
-
-                    int testSucceeded = 0;
-                    int testFailed = 0;
-
-                    foreach (int index in testIndices)
-                    {
-                        var expr = bundle.InitExpressions[index];
-                        var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
-
-                        Console.WriteLine($"Executing test: [{index}] {expr.Source}");
-
-                        var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
-
-                        if (result.Status == InitStatus.Success)
-                        {
-                            testSucceeded++;
-                            string returnValueStr = result.ReturnValueOop.HasValue
-                                ? (result.ReturnValueOop.Value.IsSmallInteger
-                                    ? $"SmallInteger({result.ReturnValueOop.Value.AsSmallInteger()})"
-                                    : result.ReturnValueOop.Value.ToString())
-                                : "nil";
-                            Console.WriteLine($"✓ Test PASSED - Returned: {returnValueStr}");
-                        }
-                        else
-                        {
-                            testFailed++;
-                            Console.WriteLine($"❌ Test FAILED");
-                            Console.WriteLine($"Status: {result.Status}");
-                            if (result.Diagnostic?.Message != null)
-                            {
-                                Console.WriteLine($"Error: {result.Diagnostic.Message}");
-                            }
-                            if (result.Diagnostic?.StackTrace != null)
-                            {
-                                Console.WriteLine($"Stack Trace:");
-                                Console.WriteLine(result.Diagnostic.StackTrace);
-                            }
-                        }
-                        Console.WriteLine();
-                    }
-
-                    Console.WriteLine($"=== Test Execution Complete ===");
-                    Console.WriteLine($"  Tests run: {testIndices.Count}");
-                    Console.WriteLine($"  Passed: {testSucceeded}");
-                    Console.WriteLine($"  Failed: {testFailed}");
-                }
+                // Note: Test expressions already executed as init expressions above
+                // No need to re-run them here
 
                 // Only return here if we're NOT skipping init expressions
                 // When --skip-init-expressions is used, we want to continue to execute user code
