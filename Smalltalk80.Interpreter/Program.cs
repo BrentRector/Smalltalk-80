@@ -7,6 +7,7 @@ using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
 using ClassHierarchyUtils = Smalltalk80.Interpreter.Core.ClassHierarchyUtils;
+using System.Windows.Forms;
 
 namespace Smalltalk80.Interpreter;
 
@@ -16,8 +17,13 @@ namespace Smalltalk80.Interpreter;
 /// </summary>
 public static class Program
 {
+    [STAThread]
     public static void Main(string[] args)
     {
+        // Enable Windows Forms visual styles
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+
         Console.WriteLine("Smalltalk-80 Interpreter");
         Console.WriteLine("========================\n");
 
@@ -32,7 +38,7 @@ public static class Program
                 Console.Error.WriteLine("\nUsage: Smalltalk80.Interpreter [options]");
                 Console.Error.WriteLine("Options:");
                 Console.Error.WriteLine("  --coldstart <file>     Specify the cold start bundle file to load");
-                Console.Error.WriteLine("                         (default: coldstart.json in executable directory)");
+                Console.Error.WriteLine("                         (default: coldstart.json in compiler output directory)");
                 Console.Error.WriteLine("  --dump-class <name>    Dump comprehensive information about a class");
                 Console.Error.WriteLine("                         after cold start completes");
                 Console.Error.WriteLine("  --test-filter <pattern> Run only init expressions matching pattern");
@@ -198,7 +204,7 @@ public static class Program
                     
                     // All remaining failures documented:
                     "Object initialize",                  // ❌ Method not found: Sensor cursorPoint (GUI required)
-                    "Text initialize",                    // ⚠️  Different issue: Method not found: width in UndefinedObject (nil StrikeFont)
+                    "Text initialize",                    // ❌ Method not found: aNumber in class Symbol (21K instructions)
                     "TextList initialize",                // ❌ Infinite loop (500K+ instructions)
                     "VariableNode initialize",            // ❌ Infinite loop (500K+ instructions)
                 };
@@ -443,12 +449,7 @@ public static class Program
                 // Note: Test expressions already executed as init expressions above
                 // No need to re-run them here
 
-                // Only return here if we're NOT skipping init expressions
-                // When --skip-init-expressions is used, we want to continue to execute user code
-                if (!skipInitExpressions)
-                {
-                    return;
-                }
+                // Continue to GUI display window (don't exit after init expressions)
 
                 #if false  // Phase 2 disabled - unreachable code preserved for reference
                 // Phase 2: Execute all comment: expressions (DISABLED - not running)
@@ -644,7 +645,19 @@ public static class Program
                 Console.WriteLine($"\n⚠️  --dump-class not yet implemented (ClassPrettyPrinter not migrated to new heap manager)");
             }
 
-            // TODO: Start REPL or execute user code
+            // Create and show the GUI display window
+            Console.WriteLine("\n=== Starting GUI Display ===");
+            var displayProvider = new WinFormsDisplayProvider(640, 480, "Smalltalk-80 Display");
+
+            // TODO: Connect Display object bitmap to displayProvider.DisplayBuffer
+            // This will be done in the next step
+
+            Console.WriteLine("Display window created - showing now...");
+            displayProvider.Show();
+
+            // Run the Windows Forms event loop
+            Console.WriteLine("Entering GUI event loop...\n");
+            Application.Run(displayProvider);
         }
         catch (Exception ex)
         {
@@ -654,11 +667,6 @@ public static class Program
         }
     }
 
-    /// <summary>
-    /// Parses command line arguments and returns the cold start file path and optional class name to dump.
-    /// Supports: --coldstart path, --dump-class ClassName
-    /// Default: coldstart.json in the same directory as the executable
-    /// </summary>
     /// <summary>
     /// Counts the number of bytecode instructions (not bytes, since some are multi-byte).
     /// </summary>
@@ -1102,6 +1110,11 @@ public static class Program
         }
     }
 
+    /// <summary>
+    /// Parses command line arguments and returns the cold start file path and optional class name to dump.
+    /// Supports: --coldstart path, --dump-class ClassName, --verbose, --skip-init-expressions, etc.
+    /// Default: coldstart.json in the compiler output directory (../net9.0/coldstart.json)
+    /// </summary>
     private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.DebugOptions debugOptions, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
@@ -1185,11 +1198,31 @@ public static class Program
             }
         }
 
-        // Default: coldstart.json in the executable directory
+        // Default: coldstart.json in the compiler's output directory
+        // Directory.Build.props sets BaseOutputPath to solution-level bin/
+        // Compiler outputs to: Smalltalk-80/bin/Debug/net9.0/coldstart.json
+        // Interpreter outputs to: Smalltalk-80/bin/Debug/net9.0-windows/
         if (coldStartFile == null)
         {
             string exeDir = AppContext.BaseDirectory;
-            coldStartFile = Path.Combine(exeDir, "coldstart.json");
+            // exeDir = .../Smalltalk-80/bin/Debug/net9.0-windows/
+
+            // Try compiler's output directory first (sibling directory)
+            // AppContext.BaseDirectory includes trailing slash, so we need to go up to parent
+            // Use Path.Combine with ".." to navigate to parent directory
+            string debugDir = Path.GetFullPath(Path.Combine(exeDir, "..")); // .../bin/Debug/
+            string compilerDir = Path.Combine(debugDir, "net9.0"); // .../bin/Debug/net9.0/
+            string compilerColdStart = Path.Combine(compilerDir, "coldstart.json");
+
+            if (File.Exists(compilerColdStart))
+            {
+                coldStartFile = compilerColdStart;
+            }
+            else
+            {
+                // Fallback to executable directory
+                coldStartFile = Path.Combine(exeDir, "coldstart.json");
+            }
         }
 
         return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions, skipInitExpressions, executeExpression);
