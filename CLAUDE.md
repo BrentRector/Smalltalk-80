@@ -87,7 +87,7 @@ All essential system classes initialize successfully:
 *Complex initialization issues (4)*:
 - Form (infinite loop 4M+ instructions)
 - Object (GUI: confirm: needs Sensor cursorPoint)
-- Text (❌ **REAL BUG**: classId 0 corruption when sending value to block)
+- Text (❌ Method not found: aNumber in class Symbol at 21K instructions)
 - TextList (infinite loop 500K+ instructions)
 - VariableNode (infinite loop 500K+ instructions)
 
@@ -312,25 +312,60 @@ Successfully implemented Display global as an instance of DisplayScreen (Form su
 - `Phase5_GlobalsAndPatches.cs:70` - Added CreateDisplay() call
 - `CLAUDE.md` - Documented implementation
 
-**Expected Impact**:
-- **Text initialize**: Should now pass Display width check (was failing at line 39136)
-- **Other init expressions**: Potentially 1-2 more init expressions may now succeed
-- **Predicted Success Rate**: 31-33/46 passing (67-72%) - awaiting verification
+**Actual Impact**:
+- **Display global**: ✅ Created successfully with 640x480 DisplayBitmap (38,400 bytes)
+- **Text initialize**: Display width check passed, but exposed new bug at 21K instructions
+- **New Error**: "Method not found: aNumber in class Symbol" (method lookup issue in Symbol class)
+- **Success Rate**: Remains 30/46 passing (Text re-disabled to allow GUI to appear)
 
-**Verification Required**:
-Build and run interpreter to verify:
-1. Display global is created successfully
-2. Text initialize now progresses past Display width check
-3. No regressions in existing 30 passing init expressions
+**Files Modified**:
+- `Phase5_GlobalsAndPatches.cs:1216-1327` - Added CreateDisplay() method
+- `Phase5_GlobalsAndPatches.cs:70` - Added CreateDisplay() call
+- `Program.cs:207` - Re-added Text initialize to skip list after discovering aNumber bug
+- `CLAUDE.md` - Documented implementation
 
-**Init Expression Testing Results**: 30/46 passing (65% success rate - before Display implementation)
+**Next Steps**:
+- Investigate Symbol class method lookup for "aNumber" (required by Text initialize)
+- GUI window should now appear successfully with 30/46 init expressions passing
 
-**Categories of Failures**:
-1. **GUI/PopUpMenu (10)**: All call `PopUpMenu labels:` which requires GUI infrastructure
-2. **Process/Threading (1)**: Delay calls `forkAt:` creating infinite `[true] whileTrue:` loop
-3. **Missing Display (1)**: Text initialize fails at `Display width` - ✅ **FIXED**
-4. **Infinite Loops (3)**: Form (4M+ instructions), TextList (500K+), VariableNode (500K+)
-5. **GUI Dependencies (1)**: Object initialize requires `Sensor cursorPoint`
+---
+
+**✅ COMPLETED: Windows Forms GUI Implementation (2025-11-14)**
+
+Successfully implemented Windows Forms display window to visualize the Smalltalk-80 display buffer.
+
+**Implementation Details**:
+- **Framework**: Windows Forms (net9.0-windows)
+- **Display Size**: 640x480 pixels
+- **Bitmap Format**: 1-bit monochrome (38,400 bytes)
+- **Architecture**: Double-buffered rendering with MSB-first encoding
+- **Files Created**:
+  - `WinFormsDisplayProvider.cs` - Display window implementation
+  - Modified `Smalltalk80.Interpreter.csproj` - Windows Forms support
+  - Modified `Program.cs` - [STAThread], Application.Run() integration
+
+**Key Features**:
+- Real-time bitmap rendering from Smalltalk Display.bits
+- Monochrome palette (0=white, 1=black)
+- Double-buffered graphics for smooth updates
+- DisplayBuffer exposed as Memory<byte> for VM integration
+
+**Project Configuration**:
+- Target framework: net9.0-windows
+- Output type: Exe (console + GUI)
+- Windows Forms enabled
+- System.Drawing.Common package reference
+
+**Status**: ✅ Build successful (0 errors, 0 warnings)
+
+**Expected Behavior**:
+After init expressions complete (30/46 passing), the 640x480 Smalltalk-80 Display window will appear and enter the Windows Forms event loop.
+
+**Files Modified**:
+- `Smalltalk80.Interpreter.csproj` - Changed to net9.0-windows, added Windows Forms
+- `Smalltalk80.Interpreter.Tests.csproj` - Updated to net9.0-windows for compatibility
+- `WinFormsDisplayProvider.cs` - Created display window implementation
+- `Program.cs:1-30, 654-666` - Added [STAThread] and Windows Forms initialization
 
 ---
 
