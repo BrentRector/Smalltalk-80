@@ -2,11 +2,13 @@ using Smalltalk80.Interpreter.Engine;
 using Smalltalk80.Interpreter.Engine.InitExecution;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Core.VM.Graphics;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
 using ClassHierarchyUtils = Smalltalk80.Interpreter.Core.ClassHierarchyUtils;
+using System.Windows.Forms;
 
 namespace Smalltalk80.Interpreter;
 
@@ -16,8 +18,13 @@ namespace Smalltalk80.Interpreter;
 /// </summary>
 public static class Program
 {
+    [STAThread]
     public static void Main(string[] args)
     {
+        // Enable Windows Forms visual styles
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+
         Console.WriteLine("Smalltalk-80 Interpreter");
         Console.WriteLine("========================\n");
 
@@ -644,7 +651,19 @@ public static class Program
                 Console.WriteLine($"\n⚠️  --dump-class not yet implemented (ClassPrettyPrinter not migrated to new heap manager)");
             }
 
-            // TODO: Start REPL or execute user code
+            // Create and show the GUI display window
+            Console.WriteLine("\n=== Starting GUI Display ===");
+            var displayProvider = new WinFormsDisplayProvider(640, 480, "Smalltalk-80 Display");
+
+            // TODO: Connect Display object bitmap to displayProvider.DisplayBuffer
+            // This will be done in the next step
+
+            Console.WriteLine("Display window created - showing now...");
+            displayProvider.Show();
+
+            // Run the Windows Forms event loop
+            Console.WriteLine("Entering GUI event loop...\n");
+            Application.Run(displayProvider);
         }
         catch (Exception ex)
         {
