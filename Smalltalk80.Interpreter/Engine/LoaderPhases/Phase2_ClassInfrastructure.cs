@@ -392,6 +392,10 @@ public class Phase2_ClassInfrastructure
         // Field [7]: classPool - Dictionary of class variables
         int classVarCount = cls.ClassVarNames?.Length ?? 0;
         var classPoolOOP = AllocateEmptyDictionary(classVarCount);
+
+        // DEBUG: Log ALL classPool allocations so we can identify which are 6747/6748
+        Console.WriteLine($"[Phase2] Allocated classPool {classPoolOOP} for {className} (classVarCount={classVarCount})");
+
         SetAndTrackInstanceVariable(classOOP, 7, classPoolOOP);
 
         // Field [8]: sharedPools - Array of shared pool Dictionaries
