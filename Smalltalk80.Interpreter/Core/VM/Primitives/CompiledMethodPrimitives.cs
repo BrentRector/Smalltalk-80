@@ -57,6 +57,17 @@ public static class CompiledMethodPrimitives
         // homeClass identifies which class this method belongs to
         // Critical for super message sends to find the correct superclass
         heapManager.SetInstanceVariable(methodOOP, 0, homeClassOOP);
+        
+        // DEBUG: Verify homeClass was set correctly
+        int methodOopInt = methodOOP.ToObjectTableIndex();
+        if ((methodOopInt >= 18140 && methodOopInt <= 18400) || (methodOopInt >= 18990 && methodOopInt <= 19000))
+        {
+            var readBack = heapManager.GetInstanceVariable(methodOOP, 0);
+            if (readBack != homeClassOOP)
+            {
+                Console.WriteLine($"[COMPILEDMETHOD BUG] Method OOP {methodOOP}: SetInstanceVariable(0, {homeClassOOP}) but readback={readBack}!");
+            }
+        }
 
         // Step 4: Populate indexed slots
         // Smalltalk objectAt: 1 → our indexed slot 0 (method header)

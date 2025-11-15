@@ -142,11 +142,11 @@ namespace Smalltalk80.Compiler
     }
     
     /// <summary>
-    /// Represents a Smalltalk Association (key-value pair) used for global and pool variables.
-    /// According to the Blue Book, global and pool variables are stored as Associations in the literal frame.
-    /// Pool variables reference specific dictionaries (e.g., TextConstants), while globals reference the Smalltalk dictionary.
+    /// Represents a Smalltalk global variable reference.
+    /// According to the Blue Book, global variables are stored as Associations in the literal frame.
+    /// Globals reference the Smalltalk SystemDictionary.
     /// </summary>
-    public class Association
+    public class GlobalVariable
     {
         /// <summary>
         /// The key (variable name as a Symbol).
@@ -159,17 +159,111 @@ namespace Smalltalk80.Compiler
         public object? Value { get; set; }
         
         /// <summary>
-        /// The pool dictionary name for pool variables (e.g., "TextConstants").
-        /// Null for global variables that reference the Smalltalk dictionary.
-        /// </summary>
-        public string? PoolDictionaryName { get; }
-        
-        /// <summary>
-        /// Initializes a new instance of the Association class.
+        /// Initializes a new instance of the GlobalVariable class.
         /// </summary>
         /// <param name="key">The key (variable name as a Symbol).</param>
         /// <param name="value">The value (typically null for global variables).</param>
-        /// <param name="poolDictionaryName">The pool dictionary name for pool variables, or null for globals.</param>
+        public GlobalVariable(Symbol key, object? value = null)
+        {
+            Key = key;
+            Value = value;
+        }
+        
+        /// <summary>
+        /// Initializes a new instance of the GlobalVariable class with a string key.
+        /// </summary>
+        /// <param name="keyName">The key as a string (will be converted to Symbol).</param>
+        /// <param name="value">The value (typically null for global variables).</param>
+        public GlobalVariable(string keyName, object? value = null)
+        {
+            Key = new Symbol(keyName);
+            Value = value;
+        }
+        
+        public override bool Equals(object? obj)
+        {
+            return obj is GlobalVariable other && Key.Equals(other.Key);
+        }
+        
+        public override int GetHashCode()
+        {
+            return Key.GetHashCode();
+        }
+        
+        public override string ToString()
+        {
+            return $"GlobalVariable(key: {Key}, value: {Value ?? "null"})";
+        }
+    }
+    
+    /// <summary>
+    /// Represents a Smalltalk pool variable binding metadata.
+    /// Pool variables are NOT stored as Associations - they're binding metadata
+    /// that tells the VM which pool dictionary to search and what key to look up.
+    /// At runtime, the VM creates a 2-element Array: (#PoolDictionaryName, #Key).
+    /// </summary>
+    public class PoolVariable
+    {
+        /// <summary>
+        /// The key (variable name as a Symbol).
+        /// </summary>
+        public Symbol Key { get; }
+        
+        /// <summary>
+        /// The pool dictionary name (e.g., "TextConstants").
+        /// </summary>
+        public string PoolDictionaryName { get; }
+        
+        /// <summary>
+        /// Initializes a new instance of the PoolVariable class.
+        /// </summary>
+        /// <param name="key">The key (variable name as a Symbol).</param>
+        /// <param name="poolDictionaryName">The pool dictionary name.</param>
+        public PoolVariable(Symbol key, string poolDictionaryName)
+        {
+            Key = key;
+            PoolDictionaryName = poolDictionaryName;
+        }
+        
+        /// <summary>
+        /// Initializes a new instance of the PoolVariable class with a string key.
+        /// </summary>
+        /// <param name="keyName">The key as a string (will be converted to Symbol).</param>
+        /// <param name="poolDictionaryName">The pool dictionary name.</param>
+        public PoolVariable(string keyName, string poolDictionaryName)
+        {
+            Key = new Symbol(keyName);
+            PoolDictionaryName = poolDictionaryName;
+        }
+        
+        public override bool Equals(object? obj)
+        {
+            return obj is PoolVariable other && Key.Equals(other.Key) && PoolDictionaryName == other.PoolDictionaryName;
+        }
+        
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Key.GetHashCode(), PoolDictionaryName.GetHashCode());
+        }
+        
+        public override string ToString()
+        {
+            return $"PoolVariable(key: {Key}, poolDictionary: {PoolDictionaryName})";
+        }
+    }
+    
+    /// <summary>
+    /// LEGACY: Represents a Smalltalk Association (key-value pair).
+    /// DEPRECATED: Use GlobalVariable or PoolVariable instead.
+    /// This class conflates two separate semantics and should not be used for new code.
+    /// </summary>
+    [Obsolete("Use GlobalVariable or PoolVariable instead")]
+    public class Association
+    {
+        public Symbol Key { get; }
+        public object? Value { get; set; }
+        public string? PoolDictionaryName { get; }
+        
         public Association(Symbol key, object? value = null, string? poolDictionaryName = null)
         {
             Key = key;
@@ -177,12 +271,6 @@ namespace Smalltalk80.Compiler
             PoolDictionaryName = poolDictionaryName;
         }
         
-        /// <summary>
-        /// Initializes a new instance of the Association class with a string key.
-        /// </summary>
-        /// <param name="keyName">The key as a string (will be converted to Symbol).</param>
-        /// <param name="value">The value (typically null for global variables).</param>
-        /// <param name="poolDictionaryName">The pool dictionary name for pool variables, or null for globals.</param>
         public Association(string keyName, object? value = null, string? poolDictionaryName = null)
         {
             Key = new Symbol(keyName);

@@ -519,11 +519,21 @@ namespace Smalltalk80.Compiler
             if (a is Symbol symA && b is Symbol symB)
                 return symA.Value == symB.Value;
 
-            // Compare Associations by their Key's Value AND pool dictionary name
-            // Two associations are equal only if they have the same key AND the same pool dictionary
+            // Compare GlobalVariables by their Key's Value
+            if (a is GlobalVariable globalA && b is GlobalVariable globalB)
+                return globalA.Key.Value == globalB.Key.Value;
+            
+            // Compare PoolVariables by their Key's Value AND pool dictionary name
+            if (a is PoolVariable poolA && b is PoolVariable poolB)
+                return poolA.Key.Value == poolB.Key.Value && 
+                       poolA.PoolDictionaryName == poolB.PoolDictionaryName;
+            
+            // LEGACY: Compare Associations by their Key's Value AND pool dictionary name
+            #pragma warning disable CS0618 // Type is obsolete
             if (a is Association assocA && b is Association assocB)
                 return assocA.Key.Value == assocB.Key.Value && 
                        assocA.PoolDictionaryName == assocB.PoolDictionaryName;
+            #pragma warning restore CS0618
 
             // Compare arrays element by element
             if (a is object[] arrayA && b is object[] arrayB)
@@ -659,15 +669,23 @@ namespace Smalltalk80.Compiler
         
         public void PushLiteralVariable(string name, string? poolDictionaryName = null)
         {
-            // Find or add the Association for this variable
+            // Find or add the PoolVariable/GlobalVariable for this variable
             int index = -1;
 
-            // Search in otherLiterals for existing Association with matching name and pool dictionary
+            // Search in otherLiterals for existing PoolVariable/GlobalVariable with matching name and pool dictionary
             for (int i = 0; i < otherLiterals.Count; i++)
             {
-                if (otherLiterals[i] is Association assoc && 
-                    assoc.Key.Value == name && 
-                    assoc.PoolDictionaryName == poolDictionaryName)
+                bool matches = false;
+                if (poolDictionaryName != null && otherLiterals[i] is PoolVariable pool)
+                {
+                    matches = pool.Key.Value == name && pool.PoolDictionaryName == poolDictionaryName;
+                }
+                else if (poolDictionaryName == null && otherLiterals[i] is GlobalVariable global)
+                {
+                    matches = global.Key.Value == name;
+                }
+                
+                if (matches)
                 {
                     // Found - calculate final index (after selectors)
                     index = selectors.Count + i;
@@ -677,9 +695,11 @@ namespace Smalltalk80.Compiler
 
             if (index == -1)
             {
-                // Not found - add new Association with pool dictionary information
-                var association = new Association(new Symbol(name), new NilObject(), poolDictionaryName);
-                index = AddLiteral(association);
+                // Not found - add new PoolVariable or GlobalVariable literal
+                object variable = poolDictionaryName != null
+                    ? new PoolVariable(new Symbol(name), poolDictionaryName)
+                    : new GlobalVariable(new Symbol(name), null);
+                index = AddLiteral(variable);
             }
 
             if (index <= 31)
@@ -775,15 +795,23 @@ namespace Smalltalk80.Compiler
         
         public void StoreLiteralVariable(string name, string? poolDictionaryName = null)
         {
-            // Find or add the Association for this variable
+            // Find or add the PoolVariable/GlobalVariable for this variable
             int index = -1;
 
-            // Search in otherLiterals for existing Association with matching name and pool dictionary
+            // Search in otherLiterals for existing PoolVariable/GlobalVariable with matching name and pool dictionary
             for (int i = 0; i < otherLiterals.Count; i++)
             {
-                if (otherLiterals[i] is Association assoc && 
-                    assoc.Key.Value == name && 
-                    assoc.PoolDictionaryName == poolDictionaryName)
+                bool matches = false;
+                if (poolDictionaryName != null && otherLiterals[i] is PoolVariable pool)
+                {
+                    matches = pool.Key.Value == name && pool.PoolDictionaryName == poolDictionaryName;
+                }
+                else if (poolDictionaryName == null && otherLiterals[i] is GlobalVariable global)
+                {
+                    matches = global.Key.Value == name;
+                }
+                
+                if (matches)
                 {
                     // Found - calculate final index (after selectors)
                     index = selectors.Count + i;
@@ -793,9 +821,11 @@ namespace Smalltalk80.Compiler
 
             if (index == -1)
             {
-                // Not found - add new Association with pool dictionary information
-                var association = new Association(new Symbol(name), new NilObject(), poolDictionaryName);
-                index = AddLiteral(association);
+                // Not found - add new PoolVariable or GlobalVariable literal
+                object variable = poolDictionaryName != null
+                    ? new PoolVariable(new Symbol(name), poolDictionaryName)
+                    : new GlobalVariable(new Symbol(name), null);
+                index = AddLiteral(variable);
             }
 
             Emit(Bytecode.EXTENDED_PREFIX); // 0x80
@@ -3198,8 +3228,8 @@ namespace Smalltalk80.Compiler
                     // Add literal for the store operation (but don't visit the variable node)
                     if (needsAssociation)
                     {
-                        // Always use Association for global variables
-                        var literalValue = new Association(new Symbol(varName), null);
+                        // Always use GlobalVariable for global variables
+                        var literalValue = new GlobalVariable(new Symbol(varName), null);
                         emitter.AddLiteral(literalValue);
                     }
                     
@@ -3304,9 +3334,11 @@ namespace Smalltalk80.Compiler
                         Console.WriteLine($"[LiteralCollector] Pool variable '{name}' -> '{poolDictionaryName}'");
                     }
                     
-                    // Create Association with pool dictionary name if applicable
-                    var literalValue = new Association(new Symbol(name), null, poolDictionaryName);
-                    Console.WriteLine($"[Association created] key={name}, poolName={poolDictionaryName}");
+                    // Create PoolVariable or GlobalVariable based on context
+                    object literalValue = poolDictionaryName != null
+                        ? new PoolVariable(new Symbol(name), poolDictionaryName)
+                        : new GlobalVariable(new Symbol(name), null);
+                    Console.WriteLine($"[{literalValue.GetType().Name} created] key={name}" + (poolDictionaryName != null ? $", poolName={poolDictionaryName}" : ""));
                     emitter.AddLiteral(literalValue);
                 }
                 

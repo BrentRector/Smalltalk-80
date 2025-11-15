@@ -61,11 +61,25 @@ public class Phase6_ValidationAndGC
 // Console.WriteLine("Step 1: Comprehensive Heap Validation...");
         RunComprehensiveValidation();
 // Console.WriteLine("✓");
+        
+        // DEBUG: Check class pointer after validation
+        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP_afterValidation))
+        {
+            var slot0_afterValidation = _heapManager.GetSlot(browserOOP_afterValidation, 0);
+            Console.WriteLine($"[After Validation] class:Browser slot[0]={slot0_afterValidation}");
+        }
 
         // Step 2: Set up GC roots (from Loader Phase 14)
 // Console.WriteLine("Step 2: GC Root Setup...");
         SetupGCRoots();
 // Console.WriteLine("✓");
+        
+        // DEBUG: Check class pointer after GC root setup
+        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP_afterGCRoots))
+        {
+            var slot0_afterGCRoots = _heapManager.GetSlot(browserOOP_afterGCRoots, 0);
+            Console.WriteLine($"[After GC Roots] class:Browser slot[0]={slot0_afterGCRoots}");
+        }
 
         // Step 3: Run GC verification (from Loader Phase 15)
 // Console.WriteLine("Step 3: GC Verification...");
@@ -717,9 +731,30 @@ public class Phase6_ValidationAndGC
 
     private void RunGCVerification()
     {
+        // DEBUG: Check before GetActiveObjectCount
+        if (_localIdToObjectId.TryGetValue("class:Browser", out var oop1))
+        {
+            var s1 = _heapManager.GetSlot(oop1, 0);
+            Console.WriteLine($"[Before GetActiveObjectCount] class:Browser slot[0]={s1}");
+        }
+        
+        // Log object counts before GC
+        Console.WriteLine($"[Phase6] Objects before GC:");
+        Console.WriteLine($"  Total objects: {_heapManager.GetActiveObjectCount()}");
+        
+        // DEBUG: Check after GetActiveObjectCount
+        if (_localIdToObjectId.TryGetValue("class:Browser", out var oop2))
+        {
+            var s2 = _heapManager.GetSlot(oop2, 0);
+            Console.WriteLine($"[After GetActiveObjectCount] class:Browser OOP={oop2}, slot[0]={s2}");
+        }
+        
         var gcStats = _heapManager.GarbageCollect();
 
-        // Print GC statistics (silent)
+        // Print GC statistics
+        Console.WriteLine($"[Phase6] GC Results:");
+        Console.WriteLine($"  Live objects: {gcStats.LiveObjects}");
+        Console.WriteLine($"  Collected: {gcStats.CollectedObjects}");
 
         // Update report metrics
         _report.Metrics.TotalObjectsAllocated = gcStats.TotalObjects;
@@ -729,11 +764,104 @@ public class Phase6_ValidationAndGC
         // Cold start fails if ANY objects were collected
         if (gcStats.CollectedObjects > 0)
         {
-// Console.WriteLine($"\n✗ COLD START FAILED: GC collected {gcStats.CollectedObjects} objects!");
-// Console.WriteLine($"  All objects must be reachable from GC roots for cold start to pass.");
-
-            // TODO: Add unreachable samples to report if needed
-            // _report.AddGCUnreachableSample(...);
+            Console.WriteLine($"\n✗ COLD START FAILED: GC collected {gcStats.CollectedObjects} objects!");
+            Console.WriteLine($"  All objects must be reachable from GC roots for cold start to pass.");
+            Console.WriteLine($"\n  Collected Objects (first 50):");
+            
+            // Group by class name
+            var byClass = gcStats.CollectedObjectDetails
+                .GroupBy(x => x.className ?? "<null>")
+                .OrderByDescending(g => g.Count())
+                .ToList();
+            
+            foreach (var group in byClass)
+            {
+                Console.WriteLine($"    {group.Key}: {group.Count()} objects");
+                
+                // Show ALL collected objects if <= 50
+                int showCount = Math.Min(group.Count(), 50);
+                foreach (var obj in group.Take(showCount))
+                {
+                    // Try to read the array elements to identify what it contains
+                    string elementsInfo = "";
+                    string slot0Info = "";
+                    try
+                    {
+                        if (obj.format == ObjectFormat.PointerIndexed)
+                        {
+                            var arrayOOP = new SmalltalkOOP(obj.oop);
+                            
+                            // Check slot 0 (class pointer) to see what class this REALLY is
+                            var classOOP = _heapManager.GetSlot(arrayOOP, 0);
+                            string actualClassName = "?";
+                            string homeClassInfo = "";
+                            try
+                            {
+                                actualClassName = _heapManager.GetClassName(arrayOOP);
+                                
+                                // If this is a CompiledMethod, check its homeClass (instance variable 0)
+                                if (actualClassName == "CompiledMethod")
+                                {
+                                    var homeClassOOP = _heapManager.GetInstanceVariable(arrayOOP, 0);
+                                    if (homeClassOOP == SpecialObjectsArray.Instance.Nil)
+                                    {
+                                        homeClassInfo = " [homeClass=NIL!]";
+                                    }
+                                    else
+                                    {
+                                        var homeClassName = _heapManager.GetClassName(homeClassOOP);
+                                        var homeClassClass = _heapManager.GetSlot(homeClassOOP, 0);
+                                        var homeClassClassClass = _heapManager.GetClassName(homeClassClass);
+                                        homeClassInfo = $" [homeClass={homeClassOOP}:{homeClassName}, homeClass.class={homeClassClass}:{homeClassClassClass}]";
+                                    }
+                                }
+                            }
+                            catch { }
+                            slot0Info = $" [slot0={classOOP}, actualClass={actualClassName}{homeClassInfo}]";
+                            
+                            int indexedSize = _heapManager.GetIndexedSize(arrayOOP);
+                            
+                            // Show all elements for arrays up to size 10
+                            if (indexedSize <= 10)
+                            {
+                                var elements = new List<string>();
+                                for (int i = 0; i < indexedSize; i++)
+                                {
+                                    var elem = _heapManager.GetIndexedOOP(arrayOOP, i);
+                                    string elemStr;
+                                    if (elem.IsSmallInteger)
+                                        elemStr = elem.AsSmallInteger().ToString();
+                                    else if (elem == SpecialObjectsArray.Instance.Nil)
+                                        elemStr = "nil";
+                                    else if (TryGetSymbolName(elem, out var name))
+                                        elemStr = $"#{name}";
+                                    else
+                                    {
+                                        var elemClass = _heapManager.GetClassName(elem);
+                                        elemStr = $"{elem}:{elemClass}";
+                                    }
+                                    elements.Add(elemStr);
+                                }
+                                elementsInfo = $" = ({string.Join(", ", elements)})";
+                            }
+                            else
+                            {
+                                elementsInfo = $" = Array[{indexedSize}] (too large to display)";
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        elementsInfo = $" <error: {ex.Message}>";
+                    }
+                    
+                    Console.WriteLine($"      OOP={obj.oop}, Format={obj.format}, Size={obj.size} words, Class={obj.className}{slot0Info}{elementsInfo}");
+                }
+                if (group.Count() > showCount)
+                {
+                    Console.WriteLine($"      ... and {group.Count() - showCount} more");
+                }
+            }
 
             throw new InvalidOperationException(
                 $"COLD START BUG: GC collected {gcStats.CollectedObjects} objects. " +
@@ -750,6 +878,33 @@ public class Phase6_ValidationAndGC
     private string GetClassName(ClassDescriptor classDesc)
     {
         return _symbols[classDesc.NameIndex];
+    }
+
+    private bool TryGetSymbolName(SmalltalkOOP symbolOOP, out string name)
+    {
+        name = "";
+        try
+        {
+            if (symbolOOP.IsSmallInteger || !_heapManager.IsValidObjectOOP(symbolOOP))
+                return false;
+                
+            var className = _heapManager.GetClassName(symbolOOP);
+            if (className != "Symbol")
+                return false;
+                
+            int byteCount = _heapManager.GetIndexedSize(symbolOOP);
+            byte[] bytes = new byte[byteCount];
+            for (int i = 0; i < byteCount; i++)
+            {
+                bytes[i] = _heapManager.GetIndexedByte(symbolOOP, i);
+            }
+            name = System.Text.Encoding.UTF8.GetString(bytes);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private int CalculateExpectedInstanceVariables(ClassDescriptor classDesc)

@@ -164,13 +164,22 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                     symbols.Add(symbol.Value);
                     break;
 
-                case Association assoc:
-                    // Association object - extract the key
-                    if (assoc.Key is Symbol keySymbol)
-                    {
-                        symbols.Add(keySymbol.Value);
-                    }
+                case GlobalVariable global:
+                    // GlobalVariable object - extract the key
+                    symbols.Add(global.Key.Value);
                     break;
+                
+                case PoolVariable pool:
+                    // PoolVariable object - extract the key
+                    symbols.Add(pool.Key.Value);
+                    break;
+
+                #pragma warning disable CS0618
+                case Association assoc:
+                    // LEGACY: Association object - extract the key
+                    symbols.Add(assoc.Key.Value);
+                    break;
+                #pragma warning restore CS0618
 
                 case CompiledMethodData block when block.IsBlock:
                     // Recursively extract symbols from block literals
@@ -1034,8 +1043,16 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                 ["index"] = _symbolTable.GetValueOrDefault(symbol.Value, -1)
             },
 
-            // Association object
+            // GlobalVariable object
+            GlobalVariable global => GenerateGlobalLiteral(global),
+            
+            // PoolVariable object
+            PoolVariable pool => GeneratePoolLiteral(pool),
+
+            // LEGACY: Association object (deprecated)
+            #pragma warning disable CS0618
             Association association => GenerateAssociationLiteral(association),
+            #pragma warning restore CS0618
 
             // Symbol literal in "#symbolName" format
             string str when str.StartsWith("#") => new Dictionary<string, object>
@@ -1044,7 +1061,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                 ["index"] = _symbolTable.GetValueOrDefault(str[1..], -1)
             },
 
-            // Association literal
+            // Association literal (deprecated format)
             string str when str.StartsWith("Association(") => ConvertAssociation(str),
 
             // Regular string
@@ -1229,6 +1246,37 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
         };
     }
 
+    private Dictionary<string, object> GenerateGlobalLiteral(GlobalVariable global)
+    {
+        return new Dictionary<string, object>
+        {
+            ["type"] = "association",
+            ["association"] = new Dictionary<string, object?>
+            {
+                ["keyType"] = "symbol",
+                ["keyIndex"] = _symbolTable.GetValueOrDefault(global.Key.Value, -1),
+                ["valueRef"] = null,
+                ["poolDictionaryName"] = null // GlobalVariable never has pool dictionary
+            }
+        };
+    }
+    
+    private Dictionary<string, object> GeneratePoolLiteral(PoolVariable pool)
+    {
+        return new Dictionary<string, object>
+        {
+            ["type"] = "association",
+            ["association"] = new Dictionary<string, object?>
+            {
+                ["keyType"] = "symbol",
+                ["keyIndex"] = _symbolTable.GetValueOrDefault(pool.Key.Value, -1),
+                ["valueRef"] = null,
+                ["poolDictionaryName"] = pool.PoolDictionaryName // PoolVariable always has pool dictionary
+            }
+        };
+    }
+
+    #pragma warning disable CS0618
     private Dictionary<string, object> GenerateAssociationLiteral(Association assoc)
     {
         return new Dictionary<string, object>
@@ -1243,6 +1291,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             }
         };
     }
+    #pragma warning restore CS0618
     
     /// <summary>
     /// Converts initialization expressions from the AST to the cold-start format.

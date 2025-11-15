@@ -33,6 +33,11 @@ public class Phase4_MethodCompilation
     private readonly IReadOnlyList<string> _symbols;
     private readonly IReadOnlyList<string> _strings;
     private readonly ColdstartReport _report;
+    
+    // Pool variable binding Array deduplication registry
+    // Key: "PoolDictionaryName:KeySymbol", Value: 2-element Array OOP (#PoolName, #Key)
+    // These are NOT Associations - they are binding metadata for VM runtime resolution
+    private readonly Dictionary<string, SmalltalkOOP> _poolVariableBindings = new();
 
     public Phase4_MethodCompilation(
         ColdStartBundle bundle,
@@ -56,6 +61,13 @@ public class Phase4_MethodCompilation
 
     public void Run()
     {
+        // DEBUG: Check class:Browser OOP before Phase 4
+        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOPBefore))
+        {
+            var browserClassBefore = _heapManager.GetClassName(browserOOPBefore);
+            Console.WriteLine($"[Phase4 START] class:Browser = {browserOOPBefore}, class={browserClassBefore}");
+        }
+        
         // ====================================================================
         // STEP 1: ALLOCATE METHOD DICTIONARIES (from Phase7)
         // ====================================================================
@@ -74,11 +86,69 @@ public class Phase4_MethodCompilation
         // Update report metrics
         _report.Metrics.InitMethodCount = _bundle.InitExpressions.Length;
         _report.Metrics.CanonicalAssociationCount = AssociationRegistry.Count;
+        
+        // Log pool variable binding Array deduplication stats  
+        int totalReferences = 0;
+        int regularMethodRefs = 0;
+        int blockRefs = 0;
+        int initExprRefs = 0;
+        
+        foreach (var method in _bundle.Methods)
+        {
+            int methodPoolRefs = 0;
+            foreach (var lit in method.Literals)
+            {
+                if (lit.Type == "association" && lit.Association?.PoolDictionaryName != null)
+                {
+                    totalReferences++;
+                    methodPoolRefs++;
+                }
+            }
+            
+            if (methodPoolRefs > 0)
+            {
+                if (string.IsNullOrEmpty(method.HomeClassLocalId))
+                    blockRefs += methodPoolRefs;
+                else
+                    regularMethodRefs += methodPoolRefs;
+            }
+        }
+        
+        foreach (var expr in _bundle.InitExpressions)
+        {
+            foreach (var lit in expr.Literals)
+            {
+                if (lit.Type == "association" && lit.Association?.PoolDictionaryName != null)
+                {
+                    totalReferences++;
+                    initExprRefs++;
+                }
+            }
+        }
+        
+        Console.WriteLine($"[Phase4] Pool variable binding Arrays: {_poolVariableBindings.Count} unique from {totalReferences} total references");
+        Console.WriteLine($"[Phase4] Pool variable references: {regularMethodRefs} in methods, {blockRefs} in blocks, {initExprRefs} in init expressions");
+        Console.WriteLine($"[Phase4] First 15 pool variable bindings:");
+        foreach (var (key, oop) in _poolVariableBindings.Take(15))
+        {
+            Console.WriteLine($"  {oop} = {key}");
+        }
+        if (_poolVariableBindings.Count > 15)
+        {
+            Console.WriteLine($"  ... and {_poolVariableBindings.Count - 15} more");
+        }
 
         // ====================================================================
         // STEP 4: INSTALL METHODS INTO DICTIONARIES (from Phase9)
         // ====================================================================
         InstallMethodsIntoDictionaries();
+        
+        // DEBUG: Check class:Browser OOP after Phase 4
+        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOPAfter))
+        {
+            var browserClassAfter = _heapManager.GetClassName(browserOOPAfter);
+            Console.WriteLine($"[Phase4 END] class:Browser = {browserOOPAfter}, class={browserClassAfter}");
+        }
     }
 
     // ====================================================================
@@ -238,6 +308,13 @@ public class Phase4_MethodCompilation
 
             _localIdToObjectId[method.LocalId] = methodOOP;
             objectIdToLocalId[methodOOP] = method.LocalId;
+            
+            // DEBUG: Log specific OOPs
+            if (methodOOP.RawValue == 18144 || methodOOP.RawValue == 18336 || methodOOP.RawValue == 18380 || methodOOP.RawValue == 18996)
+            {
+                Console.WriteLine($"[Phase4] Allocated method OOP {methodOOP}: {method.LocalId}, homeClass={method.HomeClassLocalId}");
+            }
+            
             methodsCreated++;
         }
 
@@ -417,6 +494,13 @@ public class Phase4_MethodCompilation
             {
                 throw new InvalidOperationException($"Cannot find home class '{method.HomeClassLocalId}' for method '{method.LocalId}'");
             }
+            
+            // DEBUG: Check specific metaclasses
+            if (method.HomeClassLocalId == "meta:Browser" || method.HomeClassLocalId == "meta:Metaclass")
+            {
+                var homeClassName = _heapManager.GetClassName(homeClassOOP);
+                Console.WriteLine($"[Phase4 DEBUG] Method {method.LocalId} homeClass lookup: '{method.HomeClassLocalId}' → OOP {homeClassOOP} (class={homeClassName})");
+            }
         }
 
         // Use AllocateCompiledMethod which handles all the setup including homeClass fixed slot
@@ -450,7 +534,7 @@ public class Phase4_MethodCompilation
             "compiledMethod" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP2) ? objOOP2 : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),
             "character" => AllocateCharacter(literal.CodePoint!.Value),
             "bytes" => AllocateByteArray(literal.Encoding!, literal.Data!),
-            "association" => ResolveAssociation(literal.Association!),
+            "association" => ResolveVariableLiteral(literal.Association!),
             "array" => AllocateArray(literal.Elements!.Select(l => ResolveLiteralValueAsOOP(l)).ToArray()),
             _ => throw new InvalidOperationException($"Unknown literal type: {literal.Type}")
         };
@@ -459,28 +543,42 @@ public class Phase4_MethodCompilation
     }
 
     /// <summary>
-    /// Resolves an association literal (key/value pair) with canonicalization.
+    /// Resolves a variable literal - either a pool variable Array or global Association.
     /// 
-    /// POOL VARIABLES: For pool variables (assoc.PoolDictionaryName != null), we create
-    /// a 2-element Array containing (#PoolDictionaryName, #Key). At runtime, the VM will:
+    /// POOL VARIABLES: Creates a 2-element Array (#PoolDictionaryName, #Key).
+    /// These are NOT Associations - they are binding metadata for runtime resolution.
+    /// At runtime, the VM will:
     /// 1. Resolve pool dictionary name to actual dictionary object
     /// 2. Look up key in that dictionary  
-    /// 3. Patch the literal to (dictionaryOOP, #Key) for fast subsequent access
     /// 
-    /// GLOBALS: For global variables, we create an Association with key and nil value.
+    /// GLOBAL VARIABLES: Creates an Association with key and nil value.
     /// The AssociationRegistry ensures canonicalization.
     /// </summary>
-    private SmalltalkOOP ResolveAssociation(AssociationLiteral assoc)
+    private SmalltalkOOP ResolveVariableLiteral(AssociationLiteral assoc)
     {
         var keyOOP = InternSymbol(_symbols[assoc.KeyIndex]);
         string keyName = _symbols[assoc.KeyIndex];
 
-        // POOL VARIABLES: Create (#PoolName, #Key) literal array
+        // POOL VARIABLES: Create 2-element Array (#PoolName, #Key) - NOT an Association
         if (assoc.PoolDictionaryName != null)
         {
+            // Deduplication key: "PoolDictionaryName:KeySymbol"
+            string dedupKey = $"{assoc.PoolDictionaryName}:{keyName}";
+            
+            if (_poolVariableBindings.TryGetValue(dedupKey, out var existingArrayOOP))
+            {
+                // Reuse existing pool variable binding Array
+                return existingArrayOOP;
+            }
+            
+            // Create new pool variable binding Array: (#PoolDictionaryName, #Key)
             var poolNameSymbol = InternSymbol(assoc.PoolDictionaryName);
-            var poolLiteralArray = AllocateArray(new[] { poolNameSymbol, keyOOP });
-            return poolLiteralArray;
+            var poolBindingArray = AllocateArray(new[] { poolNameSymbol, keyOOP });
+            
+            // Register for deduplication
+            _poolVariableBindings[dedupKey] = poolBindingArray;
+            
+            return poolBindingArray;
         }
 
         // GLOBAL VARIABLES: Use AssociationRegistry for canonicalization
@@ -526,11 +624,11 @@ public class Phase4_MethodCompilation
                 var literal = method.Literals[i];
                 if (literal.Type != "association") continue;
 
-                // POOL VARIABLES: Skip validation for pool variable Arrays
-                // Pool variables are stored as (#PoolName, #Key) Arrays, not Associations
+                // POOL VARIABLES: Skip - these are binding Arrays, NOT Associations
+                // Pool variable bindings are 2-element Arrays (#PoolName, #Key)
                 if (literal.Association!.PoolDictionaryName != null)
                 {
-                    continue; // Pool variable literal - no validation needed
+                    continue; // Pool variable binding - not an Association
                 }
 
                 totalAssociations++;
@@ -848,22 +946,22 @@ public class Phase4_MethodCompilation
     private void InstallMethodsIntoDictionaries()
     {
         int installedMethods = 0;
-        int installedBlocks = 0;
+        int skippedBlocks = 0;
         int skippedMethods = 0;
 
         foreach (var method in _bundle.Methods)
         {
-            // Skip blocks - they are not installed in method dictionaries
+            // Skip blocks - blocks are compiled inline in method bytecode, not separate CompiledMethods
             if (string.IsNullOrEmpty(method.HomeClassLocalId))
             {
-                installedBlocks++;
+                skippedBlocks++;
                 continue;
             }
 
             // Get the CompiledMethod object created earlier
             if (!_localIdToObjectId.TryGetValue(method.LocalId, out SmalltalkOOP methodOOP))
             {
-// Console.WriteLine($"WARNING: Method not found in localIdToObjectId: {method.LocalId}");
+                Console.WriteLine($"[Phase4] WARNING: Method not found in localIdToObjectId: {method.LocalId}");
                 skippedMethods++;
                 continue;
             }
@@ -871,17 +969,19 @@ public class Phase4_MethodCompilation
             // Resolve the home class object
             if (!_localIdToObjectId.TryGetValue(method.HomeClassLocalId, out SmalltalkOOP classOOP))
             {
-// Console.WriteLine($"WARNING: Home class not found: {method.HomeClassLocalId}");
+                Console.WriteLine($"[Phase4] WARNING: Home class not found: {method.HomeClassLocalId}");
                 skippedMethods++;
                 continue;
             }
 
-            // Get the class's method dictionary (instance variable 1 in Behavior)
-            var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1); // methodDict is at index 1
+            // Get the class's method dictionary (instance variable index 1, slot 2 in Behavior)
+            // Instance variable indexing: index N = slot N+1 (slot 0 is class pointer)
+            // Behavior instance variables: [0]=superclass, [1]=methodDict, [2]=format, [3]=subclasses
+            var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1); // methodDict is at instance var index 1
 
             if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
             {
-// Console.WriteLine($"WARNING: Class {method.HomeClassLocalId} has nil methodDict");
+                Console.WriteLine($"[Phase4] WARNING: Class {method.HomeClassLocalId} has nil methodDict");
                 skippedMethods++;
                 continue;
             }
@@ -892,8 +992,17 @@ public class Phase4_MethodCompilation
 
             // Install the method in the method dictionary
             InstallMethodInDictionary(methodDictOOP, selectorSymbolOOP, methodOOP);
+            
+            // DEBUG: Log specific method installations
+            if (methodOOP.RawValue == 18144 || methodOOP.RawValue == 18336 || methodOOP.RawValue == 18380 || methodOOP.RawValue == 18996)
+            {
+                Console.WriteLine($"[Phase4] Installed method OOP {methodOOP} ({selectorName}) into methodDict {methodDictOOP} of class {method.HomeClassLocalId}");
+            }
+            
             installedMethods++;
         }
+        
+        Console.WriteLine($"[Phase4] Method installation: {installedMethods} installed, {skippedBlocks} blocks skipped, {skippedMethods} methods skipped");
     }
 
     /// <summary>

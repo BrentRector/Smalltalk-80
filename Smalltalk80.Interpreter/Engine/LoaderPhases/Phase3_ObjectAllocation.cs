@@ -378,14 +378,9 @@ public class Phase3_ObjectAllocation
 
             // Note: Field initialization moved to Step 4 (PhaseY logic) after nil exists
 
-            // Add pool dictionaries to SystemDictionary using semantic lookup
-            if (obj.LocalId.StartsWith("pool:"))
-            {
-                string poolName = obj.LocalId.Substring(5); // Remove "pool:" prefix
-                SmalltalkOOP poolNameSymbol = InternSymbol(poolName);
-                SmalltalkOOP association = AllocateAssociationWithSemanticAllocator(poolNameSymbol, objectOOP);
-                InstallAssociationInSystemDictionary(association, poolName);
-            }
+            // REMOVED OBSOLETE CODE: Pool dictionaries are no longer installed as Associations in SystemDictionary.
+            // Pool variables are now resolved via 2-element Arrays (#PoolName, #Key) created in Phase 4.
+            // Pool dictionaries themselves are stored in Class>>classPool instance variable.
 
             objectsAllocated++;
         }

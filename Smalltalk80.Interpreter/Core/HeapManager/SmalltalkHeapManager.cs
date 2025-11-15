@@ -928,8 +928,17 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     {
         var stopwatch = Stopwatch.StartNew();
         
+        // DEBUG
+        var test1 = GetSlot(SmalltalkOOP.FromObjectTableIndex(10632), 0);
+        Console.WriteLine($"[GC Entry] OOP 10632 slot[0]={test1}");
+        
         // Phase 1: Count objects before collection
         int objectsBeforeCollection = GetActiveObjectCount();
+        
+        // DEBUG
+        var test2 = GetSlot(SmalltalkOOP.FromObjectTableIndex(10632), 0);
+        Console.WriteLine($"[After count] OOP 10632 slot[0]={test2}");
+
         
         // Phase 2: Clear all mark bits
         foreach (var block in _objectTableBlocks)
@@ -943,11 +952,21 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         
         double markStartTime = stopwatch.Elapsed.TotalMilliseconds;
         
+        // DEBUG: Check class pointer before marking
+        var testOOP = SmalltalkOOP.FromObjectTableIndex(10632);
+        var testSlot0 = GetSlot(testOOP, 0);
+        Console.WriteLine($"[GC START] Before marking: OOP 10632 slot[0]={testSlot0}");
+        
         // Phase 3: Mark from configured roots
         foreach (var rootOOP in _gcRoots)
         {
             MarkObjectRecursively(rootOOP);
         }
+        
+        // DEBUG: Check class pointer after marking
+        var testSlot0After = GetSlot(testOOP, 0);
+        Console.WriteLine($"[GC END] After marking: OOP 10632 slot[0]={testSlot0After}");
+
         
         double markEndTime = stopwatch.Elapsed.TotalMilliseconds;
         double markTime = markEndTime - markStartTime;
@@ -958,6 +977,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         int objectsCollected = 0;
         
         var firstCollectedIds = new List<int>();
+        var collectedObjectDetails = new List<(int oop, ObjectFormat format, int size, string? className)>();
         
         for (int blockIndex = 0; blockIndex < _objectTableBlocks.Count; blockIndex++)
         {
@@ -977,6 +997,22 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                     if (firstCollectedIds.Count < 20)
                     {
                         firstCollectedIds.Add(objectId);
+                    }
+                    
+                    // Track detailed info about collected objects
+                    if (collectedObjectDetails.Count < 50)
+                    {
+                        var oop = SmalltalkOOP.FromObjectTableIndex(objectId);
+                        string? className = null;
+                        try
+                        {
+                            className = GetClassName(oop);
+                        }
+                        catch
+                        {
+                            className = "<unknown>";
+                        }
+                        collectedObjectDetails.Add((objectId, entry.FormatExplicit, entry.SizeInWordsExplicit, className));
                     }
 
                     // Clear managed storage (allows .NET GC to reclaim memory)
@@ -1010,7 +1046,8 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             TotalTimeMs = stopwatch.Elapsed.TotalMilliseconds,
             EstimatedBytesFreed = estimatedBytesFreed,
             CollectedByFormat = collectedByFormat,
-            FreeObjectTableEntries = freeEntries
+            FreeObjectTableEntries = freeEntries,
+            CollectedObjectDetails = collectedObjectDetails
         };
     }
 
@@ -1028,6 +1065,14 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             return;
 
         entry.IsMarked = true;
+        
+        // DEBUG: Log marking of specific OOPs we're tracking
+        int oop = objectOOP.ToObjectTableIndex();
+        if (oop == 10632 || oop == 10670 || oop == 14098 || oop == 14174)
+        {
+            var rawClassOOP = GetSlot(objectOOP, 0);
+            Console.WriteLine($"[GC DEBUG] Marking OOP {oop}, raw slot[0]={rawClassOOP}");
+        }
 
         // Traverse pointer fields based on format
         if (entry.FormatExplicit == ObjectFormat.Pointer || entry.FormatExplicit == ObjectFormat.PointerIndexed)
@@ -1036,14 +1081,23 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             if (oopArray != null)
             {
                 // Mark all OOPs in the array (header, instance vars, indexed elements)
+                // INCLUDES slot 0 (class pointer) for Pointer/PointerIndexed objects
                 foreach (var childOOP in oopArray)
                 {
                     MarkObjectRecursively(childOOP);
                 }
             }
         }
-
-        // ByteIndexed and WordIndexed objects contain no OOPs, skip traversal
+        // ALSO mark the class pointer for ByteIndexed/WordIndexed objects
+        // (they store class in separate ClassOOP field, not in OOP array)
+        else if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
+        {
+            var classOOP = entry.ClassOOP;
+            if (classOOP != SmalltalkOOP.Null)
+            {
+                MarkObjectRecursively(classOOP);
+            }
+        }
     }
 
 

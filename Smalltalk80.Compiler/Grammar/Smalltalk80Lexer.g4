@@ -152,9 +152,39 @@ SYMBOL_IDENTIFIER
     : LETTER (LETTER | DIGIT)* -> type(IDENTIFIER), popMode
     ;
 
-// Binary selector symbols - emit correct token types for parser
-// Examples: #+, #-, #<=, #~~
-// Multi-character operators MUST come before single-character
+// =============================================================================
+// Binary Operator Symbol Rules (SYMBOL_MODE)
+// =============================================================================
+// Examples: #+, #-, #<=, #~~, #*, #/
+//
+// DESIGN RATIONALE: Why 25 separate rules instead of consolidation?
+//
+// The type() command in ANTLR4 lexer rules performs TOKEN TYPE REMAPPING:
+//   SYMBOL_PLUS: '+' -> type(PLUS), popMode;
+// This means: "When you match '+' in SYMBOL_MODE, emit a PLUS token (not SYMBOL_PLUS)"
+//
+// This allows the parser to use the SAME token vocabulary for both:
+//   - Symbol literals: #+ → PLUS token in symbol context
+//   - Actual operators: 3 + 4 → PLUS token in expression context
+//
+// ANTLR4 LIMITATION: The type() command requires LITERAL token type names.
+// We cannot use:
+//   - Fragments that reference token names
+//   - Programmatic type mapping (would require embedded code)
+//   - Dynamic token type selection based on matched text
+//
+// ALTERNATIVE CONSIDERED: Single rule emitting SYMBOL_BINARY tokens
+//   SYMBOL_BINARY: ('<<'|'>>'|'+' ...) -> popMode;
+// This would require:
+//   - Parser changes to accept SYMBOL_BINARY instead of specific tokens
+//   - Loss of parser token vocabulary consistency
+//   - Additional semantic analysis to distinguish #+, #-, etc.
+//
+// CONCLUSION: The 25 explicit rules are the cleanest ANTLR4 solution.
+// The apparent redundancy ensures correct token type mapping without
+// requiring embedded code or parser modifications.
+//
+// Multi-character operators MUST come before single-character (lexer precedence)
 SYMBOL_BIT_SHIFT_LEFT: '<<' -> type(BIT_SHIFT_LEFT), popMode;
 SYMBOL_BIT_SHIFT_RIGHT: '>>' -> type(BIT_SHIFT_RIGHT), popMode;
 SYMBOL_INTEGER_DIVIDE: '\\\\' -> type(INTEGER_DIVIDE), popMode;

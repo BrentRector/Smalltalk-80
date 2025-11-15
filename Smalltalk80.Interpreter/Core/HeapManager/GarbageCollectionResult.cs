@@ -33,6 +33,9 @@ public sealed class GCStatistics
 
     /// <summary>Number of ObjectTable entries freed after collection.</summary>
     public int FreeObjectTableEntries { get; init; }
+    
+    /// <summary>Detailed info about collected objects (OOP, format, size, className).</summary>
+    public List<(int oop, ObjectFormat format, int size, string? className)> CollectedObjectDetails { get; init; } = new();
 
     /// <summary>Collection efficiency as percentage of total objects collected.</summary>
     public double CollectionEfficiency => TotalObjects > 0 

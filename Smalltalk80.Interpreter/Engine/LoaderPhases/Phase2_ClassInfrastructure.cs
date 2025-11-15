@@ -103,6 +103,12 @@ public class Phase2_ClassInfrastructure
             string classOfClassName = cls.IsMetaclass ? "Metaclass" : "Class";
             var classOOP = _allocator.AllocateFixedObject(classOfClassName);
             _localIdToObjectId[cls.LocalId] = classOOP;
+            
+            // DEBUG: Log Browser class allocation
+            if (cls.LocalId == "class:Browser" || cls.LocalId == "meta:Browser")
+            {
+                Console.WriteLine($"[Phase2] Allocated {cls.LocalId} (isMetaclass={cls.IsMetaclass}) → OOP {classOOP}");
+            }
 
             // Register class in GlobalRegistry
             // For instance classes (class:Name), register as "Name"
@@ -316,116 +322,127 @@ public class Phase2_ClassInfrastructure
     #region Class Metadata Resolution
 
     /// <summary>
-    /// Populates class objects with their name, format, superclass, and other metadata.
+    /// Populates class and metaclass objects with their metadata.
+    /// CRITICAL: Class and Metaclass have different instance variable layouts!
     /// </summary>
     private void ResolveClassMetadata()
     {
         var symbols = _bundle.Symbols;
         var strings = _bundle.Strings;
 
-        foreach (var cls in _bundle.Classes)
+        // Process instance classes and metaclasses separately for clarity
+        foreach (var cls in _bundle.Classes.Where(c => !c.IsMetaclass))
         {
-            SmalltalkOOP classOOP = _localIdToObjectId[cls.LocalId];
-            string className = symbols[cls.NameIndex];
+            InitializeClassObject(cls, symbols, strings);
+        }
 
-            // Determine the template class for this object from JSON data
-            string templateClassName = GetTemplateClassNameFromBundle(cls);
+        foreach (var cls in _bundle.Classes.Where(c => c.IsMetaclass))
+        {
+            InitializeMetaclassObject(cls, symbols, strings);
+        }
+    }
 
-            // Set name instance variable (all Class objects have this)
-            if (ClassHierarchyUtils.HasInstanceVariable(templateClassName, "name", _bundle))
+    /// <summary>
+    /// Initializes a Class object (instance of Class).
+    /// 
+    /// Class instance variable layout (9 fields total):
+    ///   [0] superclass      - reference to superclass (Class object)
+    ///   [1] methodDict      - MethodDictionary of instance-side methods (set in Phase 4)
+    ///   [2] format          - SmallInteger encoding object format
+    ///   [3] subclasses      - Set of subclasses (not set during cold start)
+    ///   [4] instanceVariables - Array of instance variable name Strings (set in PopulateInstanceVariablesField)
+    ///   [5] organization    - ClassOrganizer (not set during cold start)
+    ///   [6] name            - Symbol with class name (e.g., #Browser)
+    ///   [7] classPool       - Dictionary of class variables
+    ///   [8] sharedPools     - Array of shared pool Dictionaries
+    /// </summary>
+    private void InitializeClassObject(ClassDescriptor cls, string[] symbols, string[] strings)
+    {
+        SmalltalkOOP classOOP = _localIdToObjectId[cls.LocalId];
+        string className = symbols[cls.NameIndex];
+
+        // Field [0]: superclass - reference to superclass Class object
+        if (cls.SuperNameIndex is int superIdx)
+        {
+            string superName = symbols[superIdx];
+            string superLocalId = $"class:{superName}";
+            if (!_localIdToObjectId.TryGetValue(superLocalId, out SmalltalkOOP superOOP))
             {
-                int nameIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "name", _bundle);
-                if (nameIndex >= 0)
-                {
-                    SetAndTrackInstanceVariable(classOOP, nameIndex, InternSymbol(className));
-                }
+                throw new InvalidOperationException($"Superclass '{superName}' not found for class '{className}'");
             }
+            SetAndTrackInstanceVariable(classOOP, 0, superOOP);
+        }
+        // else: Object class has no superclass (nil set in Phase Y)
 
-            // Set format field (encode as SmallInteger for AllocateInstance)
-            int format = cls.Format;
+        // Field [1]: methodDict - set in Phase 4 (method compilation)
 
-            // NOTE: MethodContext and BlockContext use instanceSpec=2 with hasPointers=true and isIndexable=true
-            // This correctly maps to ObjectFormat.PointerIndexed, allowing them to store both fixed fields
-            // (sender, pc, stackp, method, etc.) and indexed slots for arguments/temps/stack.
+        // Field [2]: format - SmallInteger encoding object format
+        var formatOOP = SmalltalkOOP.FromSmallInteger(cls.Format);
+        SetAndTrackInstanceVariable(classOOP, 2, formatOOP);
 
-            if (ClassHierarchyUtils.HasInstanceVariable(templateClassName, "format", _bundle))
+        // Field [3]: subclasses - not set during cold start (populated at runtime)
+
+        // Field [4]: instanceVariables - Array of Strings, set in PopulateInstanceVariablesField()
+
+        // Field [5]: organization - ClassOrganizer, not set during cold start
+
+        // Field [6]: name - Symbol with class name
+        SetAndTrackInstanceVariable(classOOP, 6, InternSymbol(className));
+
+        // Field [7]: classPool - Dictionary of class variables
+        int classVarCount = cls.ClassVarNames?.Length ?? 0;
+        var classPoolOOP = AllocateEmptyDictionary(classVarCount);
+        SetAndTrackInstanceVariable(classOOP, 7, classPoolOOP);
+
+        // Field [8]: sharedPools - Array of shared pool Dictionaries
+        // TODO: Implement proper Array allocation with all pool dictionaries
+        // For now, set first pool only (incorrect - needs Array of all pools)
+        foreach (var poolId in cls.PoolLocalIds)
+        {
+            if (_localIdToObjectId.TryGetValue(poolId, out SmalltalkOOP poolOOP))
             {
-                int formatIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "format", _bundle);
-                if (formatIndex >= 0)
-                {
-                    var formatOOP = SmalltalkOOP.FromSmallInteger(format);
-                    SetAndTrackInstanceVariable(classOOP, formatIndex, formatOOP);
-                }
-            }
-
-            // Set superclass reference
-            // IMPORTANT: Skip for metaclasses - their superclass chain is already wired in WireFundamentalMetaclassCircle
-            if (!cls.IsMetaclass && cls.SuperNameIndex is int superIdx &&
-                ClassHierarchyUtils.HasInstanceVariable(templateClassName, "superclass", _bundle))
-            {
-                string superName = symbols[superIdx];
-
-                // Look up superclass OOP from localIdToObjectId mapping (not using GlobalRegistry)
-                string superLocalId = $"class:{superName}";
-                if (!_localIdToObjectId.TryGetValue(superLocalId, out SmalltalkOOP superOOP))
-                {
-                    throw new InvalidOperationException($"Superclass '{superName}' not found in localIdToObjectId mapping");
-                }
-
-                int superclassIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "superclass", _bundle);
-                if (superclassIndex >= 0)
-                {
-                    // Debug Number class specifically
-                    if (className == "Number")
-                    {
-// Console.WriteLine($"[Phase2] Setting Number.superclass = {superName}");
-                    }
-                    SetAndTrackInstanceVariable(classOOP, superclassIndex, superOOP);
-                }
-            }
-
-            // Set class comment (if instanceVariables field exists for ClassDescription)
-            if (cls.CommentStringIndex is int commentIdx)
-            {
-                string comment = strings[commentIdx];
-                // Comments are typically stored in 'organization' or similar field
-                // For now, skip setting comments until we understand the field mapping better
-                // TODO: Determine correct field for class comments in Smalltalk-80
-            }
-
-            // Allocate empty classPool dictionary for class variables (entries created lazily on access)
-            if (!cls.IsMetaclass &&
-                ClassHierarchyUtils.HasInstanceVariable(templateClassName, "classPool", _bundle))
-            {
-                int classPoolIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "classPool", _bundle);
-                if (classPoolIndex >= 0)
-                {
-                    // Size the dictionary based on the number of class variables for this class
-                    int classVarCount = cls.ClassVarNames?.Length ?? 0;
-                    var classPoolOOP = AllocateEmptyDictionary(classVarCount);
-                    SetAndTrackInstanceVariable(classOOP, classPoolIndex, classPoolOOP);
-                }
-            }
-
-            // Set pool dictionaries (skip if not yet allocated - will be patched later)
-            foreach (var poolId in cls.PoolLocalIds)
-            {
-                if (_localIdToObjectId.TryGetValue(poolId, out SmalltalkOOP poolOOP))
-                {
-                    // Pool dictionaries are typically stored in sharedPools field
-                    if (ClassHierarchyUtils.HasInstanceVariable(templateClassName, "sharedPools", _bundle))
-                    {
-                        int sharedPoolsIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "sharedPools", _bundle);
-                        if (sharedPoolsIndex >= 0)
-                        {
-                            // TODO: This should append to an array, not replace - needs proper implementation
-                            SetAndTrackInstanceVariable(classOOP, sharedPoolsIndex, poolOOP);
-                        }
-                    }
-                }
-                // else: pool not yet allocated, will be wired in patch phase
+                SetAndTrackInstanceVariable(classOOP, 8, poolOOP);
+                break; // Only set first pool (TEMPORARY - needs fix)
             }
         }
+    }
+
+    /// <summary>
+    /// Initializes a Metaclass object (instance of Metaclass).
+    /// 
+    /// Metaclass instance variable layout (7 fields total):
+    ///   [0] superclass        - reference to superclass Metaclass (set in WireMetaclassSuperclasses)
+    ///   [1] methodDict        - MethodDictionary of class-side methods (set in Phase 4)
+    ///   [2] format            - SmallInteger encoding object format
+    ///   [3] subclasses        - Set of subclasses (not set during cold start)
+    ///   [4] instanceVariables - NOT populated for metaclasses (inherited but unused)
+    ///   [5] organization      - ClassOrganizer (not set during cold start)
+    ///   [6] thisClass         - reference to instance class (set in WireMetaclassThisClass)
+    /// 
+    /// CRITICAL: Metaclass does NOT have name, classPool, or sharedPools fields!
+    /// </summary>
+    private void InitializeMetaclassObject(ClassDescriptor cls, string[] symbols, string[] strings)
+    {
+        SmalltalkOOP metaclassOOP = _localIdToObjectId[cls.LocalId];
+        string className = symbols[cls.NameIndex];
+
+        // Field [0]: superclass - set in WireFundamentalMetaclassCircle() and WireMetaclassSuperclasses()
+
+        // Field [1]: methodDict - set in Phase 4 (method compilation)
+
+        // Field [2]: format - SmallInteger encoding object format
+        var formatOOP = SmalltalkOOP.FromSmallInteger(cls.Format);
+        SetAndTrackInstanceVariable(metaclassOOP, 2, formatOOP);
+
+        // Field [3]: subclasses - not set during cold start
+
+        // Field [4]: instanceVariables - NOT populated for metaclasses
+
+        // Field [5]: organization - not set during cold start
+
+        // Field [6]: thisClass - set in WireMetaclassThisClass()
+
+        // NO name, classPool, or sharedPools fields for Metaclass!
     }
 
     /// <summary>

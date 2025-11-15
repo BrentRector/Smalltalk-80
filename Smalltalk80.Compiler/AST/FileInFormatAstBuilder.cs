@@ -1154,11 +1154,23 @@ namespace Smalltalk80.Compiler.AST
                     // Convert Symbol to the format expected by the interpreter: "#symbolName"
                     result.Add($"#{symbol.Value}");
                 }
+                else if (literal is GlobalVariable globalVar)
+                {
+                    // Preserve GlobalVariable object for JSON generation stage
+                    result.Add(globalVar);
+                }
+                else if (literal is PoolVariable poolVar)
+                {
+                    // Preserve PoolVariable object for JSON generation stage to handle pool dictionaries correctly
+                    result.Add(poolVar);
+                }
+                #pragma warning disable CS0618 // Type is obsolete
                 else if (literal is Association assoc)
                 {
-                    // Preserve Association object for JSON generation stage to handle pool dictionaries correctly
+                    // LEGACY: Preserve Association object for backwards compatibility
                     result.Add(assoc);
                 }
+                #pragma warning restore CS0618
                 else if (literal is string s)
                 {
                     result.Add(s);
