@@ -358,6 +358,7 @@ public class Loader
 
     /// <summary>
     /// Runs a GC checkpoint to verify all objects are reachable at this point in cold start.
+    /// NOTE: This is READ-ONLY - it reports unreachable objects but does NOT collect them.
     /// </summary>
     /// <param name="checkpointName">Name of the checkpoint for diagnostics.</param>
     private void RunGCCheckpoint(string checkpointName)
@@ -381,28 +382,44 @@ public class Loader
         if (SpecialObjectsArray.Instance.InitExpressionMethods != default)
             gcRootsList.Add(SpecialObjectsArray.Instance.InitExpressionMethods);
 
-        // Set GC roots and run collection
+        // Set GC roots and get unreachable objects (READ-ONLY - does not collect)
         _heapManager.SetGCRoots(gcRootsList.ToArray());
-        var gcStats = _heapManager.GarbageCollect();
+        var unreachableOOPs = _heapManager.GetUnreachableObjects();
 
         // Report results
-        if (gcStats.CollectedObjects == 0)
+        if (unreachableOOPs.Length == 0)
         {
-            Console.WriteLine($"  [GC Checkpoint {checkpointName}] ✓ All {gcStats.LiveObjects} objects reachable");
+            int totalObjects = _heapManager.GetActiveObjectCount();
+            Console.WriteLine($"  [GC Checkpoint {checkpointName}] ✓ All {totalObjects} objects reachable");
         }
         else
         {
-            Console.WriteLine($"  [GC Checkpoint {checkpointName}] ⚠ {gcStats.CollectedObjects} unreachable objects:");
+            Console.WriteLine($"  [GC Checkpoint {checkpointName}] ⚠ {unreachableOOPs.Length} unreachable objects:");
 
             // Group by class
-            var byClass = gcStats.CollectedObjectDetails
-                .GroupBy(x => x.className ?? "<null>")
+            var byClass = unreachableOOPs
+                .GroupBy(oop =>
+                {
+                    try
+                    {
+                        return _heapManager.GetClassName(oop);
+                    }
+                    catch
+                    {
+                        return "<error>";
+                    }
+                })
                 .OrderByDescending(g => g.Count())
                 .ToList();
 
-            foreach (var group in byClass)
+            foreach (var group in byClass.Take(10))  // Show top 10 classes
             {
                 Console.WriteLine($"    {group.Key}: {group.Count()} objects");
+            }
+
+            if (byClass.Count > 10)
+            {
+                Console.WriteLine($"    ... and {byClass.Count - 10} more classes");
             }
         }
     }
