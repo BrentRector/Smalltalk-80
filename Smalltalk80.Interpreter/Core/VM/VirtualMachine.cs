@@ -1092,14 +1092,6 @@ public partial class VirtualMachine : IPrimitiveContext
             // slot 0 = key, slot 1 = value
             var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
             var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-            
-            // DEBUG: Log when pushing Smalltalk global
-            var keyName = GetSymbolName(keyOOP);
-            if (keyName == "Smalltalk" || keyName == "TextConstants")
-            {
-                Console.WriteLine($"[PUSH_LITERAL_VAR] Pushing global '{keyName}': assoc={associationOOP}, value={valueOOP}");
-            }
-
             Push(valueOOP);
             return true;
         }
