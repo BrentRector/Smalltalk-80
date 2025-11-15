@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-14
+**Last Updated**: 2025-11-15
 
 ## Project Status
 
@@ -255,6 +255,49 @@ Completed exhaustive validation of the BlockContext implementation against a 194
 - `CLAUDE.md` - Updated project status to reflect test validation
 
 **Architecture Validation**: The unified temp frame architecture is **proven correct** and fully operational for all block and variable access patterns.
+
+---
+
+## Recent Work (2025-11-15)
+
+**✅ COMPLETED: Optimized Windows Forms Window Creation Timing**
+
+Successfully moved the Windows Forms display window creation to occur immediately after cold start Phase 6, before init expressions execute. This improves the user experience by preparing the window early while still showing it after init expressions complete.
+
+**Changes Made**:
+1. **Early Window Creation**: Window now created after Phase 6 (line 106-109 in Program.cs)
+2. **Delayed Display**: Window shown after init expressions complete (line 529-530)
+3. **Event Loop**: Application.Run() moved to end (line 657-660)
+
+**Architecture Flow**:
+```
+Cold Start Phases 1-6
+  ↓
+Create WinFormsDisplayProvider (hidden)
+  ↓
+Run GC after cold start
+  ↓
+Execute 30 init expressions (Display global available)
+  ↓
+Show window (displayProvider.Show())
+  ↓
+Execute user expression (if --execute flag)
+  ↓
+Enter Windows Forms event loop (Application.Run())
+```
+
+**Files Modified**:
+- `Smalltalk80.Interpreter/Program.cs:106-109` - Early window creation
+- `Smalltalk80.Interpreter/Program.cs:529-530` - Show window after init expressions
+- `Smalltalk80.Interpreter/Program.cs:657-660` - Event loop at end
+
+**Testing Results**:
+- ✅ Window creation succeeds
+- ✅ 30/46 init expressions still pass (no regressions)
+- ❌ Text initialize still fails with "Method not found: aNumber in class Symbol" (Display global did NOT fix this)
+- ❌ Other disabled init expressions remain disabled (still require GUI/process primitives)
+
+**Impact**: Display global exists during init expressions, but does NOT enable any new init expressions to pass. Text initialize failure is NOT related to Display missing - it's a separate method lookup bug in Symbol class.
 
 ---
 

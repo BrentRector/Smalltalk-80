@@ -103,6 +103,11 @@ public static class Program
 
             Console.WriteLine("Cold start completed successfully!");
 
+            // Create display window immediately after cold start
+            Console.WriteLine("\n=== Creating Display Window ===");
+            var displayProvider = new WinFormsDisplayProvider(640, 480, "Smalltalk-80 Display");
+            Console.WriteLine("Display window created - will show after init expressions complete...");
+
             // Run GC immediately after cold start to verify heap integrity
             Console.WriteLine("\n=== Running GC after cold start ===");
             var gcStatsBefore = heapManager.GarbageCollect();
@@ -204,7 +209,7 @@ public static class Program
                     
                     // All remaining failures documented:
                     "Object initialize",                  // ❌ Method not found: Sensor cursorPoint (GUI required)
-                    "Text initialize",                    // ❌ Method not found: aNumber in class Symbol (21K instructions)
+                    // "Text initialize",                    // ⚠️ DEBUG - enable to test Association OOP
                     "TextList initialize",                // ❌ Infinite loop (500K+ instructions)
                     "VariableNode initialize",            // ❌ Infinite loop (500K+ instructions)
                 };
@@ -520,6 +525,10 @@ public static class Program
             Console.WriteLine("\n✓ All systems ready!");
             Console.WriteLine("Virtual machine initialized successfully.");
 
+            // Show the display window now that init expressions have completed
+            Console.WriteLine("\n=== Showing Display Window ===");
+            displayProvider.Show();
+
             // Execute user-specified expression if provided
             if (executeExpression != null)
             {
@@ -645,18 +654,9 @@ public static class Program
                 Console.WriteLine($"\n⚠️  --dump-class not yet implemented (ClassPrettyPrinter not migrated to new heap manager)");
             }
 
-            // Create and show the GUI display window
-            Console.WriteLine("\n=== Starting GUI Display ===");
-            var displayProvider = new WinFormsDisplayProvider(640, 480, "Smalltalk-80 Display");
-
-            // TODO: Connect Display object bitmap to displayProvider.DisplayBuffer
-            // This will be done in the next step
-
-            Console.WriteLine("Display window created - showing now...");
-            displayProvider.Show();
-
             // Run the Windows Forms event loop
-            Console.WriteLine("Entering GUI event loop...\n");
+            Console.WriteLine("\n=== Entering GUI Event Loop ===");
+            Console.WriteLine("Display window is visible. Close window to exit.\n");
             Application.Run(displayProvider);
         }
         catch (Exception ex)
