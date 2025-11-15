@@ -128,6 +128,9 @@ public class Loader
             LayoutResolver = phase2.LayoutResolver;
         });
 
+        // GC checkpoint after Phase 2
+        RunGCCheckpoint("After Phase 2");
+
         // Phase 3: Object Allocation
         // Allocates all remaining objects (globals, singletons, strings, etc.)
         RunPhase("Phase 3: Object Allocation", () =>
@@ -138,6 +141,9 @@ public class Loader
             var phase = new Phase3_ObjectAllocation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
             phase.Run();
         });
+
+        // GC checkpoint after Phase 3
+        RunGCCheckpoint("After Phase 3");
 
         // DEBUG: Verify class structure after Phase 3 (after Phase 2 allocates classes, after Phase 3 allocates objects)
         if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP))
@@ -167,6 +173,9 @@ public class Loader
             // Init expressions array is set in SpecialObjectsArray by Phase4
         });
 
+        // GC checkpoint after Phase 4
+        RunGCCheckpoint("After Phase 4");
+
         // DEBUG: Check class structure after Phase 4
         if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP2))
         {
@@ -185,6 +194,9 @@ public class Loader
             var phase = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _debugOptions);
             phase.Run();
         });
+
+        // GC checkpoint after Phase 5
+        RunGCCheckpoint("After Phase 5");
 
         // DEBUG: Check class structure after Phase 5
         if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP3))
@@ -341,6 +353,57 @@ public class Loader
             }
 
             throw new InvalidOperationException($"Cold start failed at {phaseName}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Runs a GC checkpoint to verify all objects are reachable at this point in cold start.
+    /// </summary>
+    /// <param name="checkpointName">Name of the checkpoint for diagnostics.</param>
+    private void RunGCCheckpoint(string checkpointName)
+    {
+        // Setup GC roots
+        var gcRootsList = new List<SmalltalkOOP>();
+
+        // Add fundamental sentinels if they exist
+        if (SpecialObjectsArray.Instance.Nil != default)
+            gcRootsList.Add(SpecialObjectsArray.Instance.Nil);
+        if (SpecialObjectsArray.Instance.True != default)
+            gcRootsList.Add(SpecialObjectsArray.Instance.True);
+        if (SpecialObjectsArray.Instance.False != default)
+            gcRootsList.Add(SpecialObjectsArray.Instance.False);
+
+        // Add Smalltalk SystemDictionary if it exists
+        if (GlobalRegistry.SystemDictionaryOOP != default)
+            gcRootsList.Add(GlobalRegistry.SystemDictionaryOOP);
+
+        // Add init expression methods if they exist
+        if (SpecialObjectsArray.Instance.InitExpressionMethods != default)
+            gcRootsList.Add(SpecialObjectsArray.Instance.InitExpressionMethods);
+
+        // Set GC roots and run collection
+        _heapManager.SetGCRoots(gcRootsList.ToArray());
+        var gcStats = _heapManager.GarbageCollect();
+
+        // Report results
+        if (gcStats.CollectedObjects == 0)
+        {
+            Console.WriteLine($"  [GC Checkpoint {checkpointName}] ✓ All {gcStats.LiveObjects} objects reachable");
+        }
+        else
+        {
+            Console.WriteLine($"  [GC Checkpoint {checkpointName}] ⚠ {gcStats.CollectedObjects} unreachable objects:");
+
+            // Group by class
+            var byClass = gcStats.CollectedObjectDetails
+                .GroupBy(x => x.className ?? "<null>")
+                .OrderByDescending(g => g.Count())
+                .ToList();
+
+            foreach (var group in byClass)
+            {
+                Console.WriteLine($"    {group.Key}: {group.Count()} objects");
+            }
         }
     }
 }
