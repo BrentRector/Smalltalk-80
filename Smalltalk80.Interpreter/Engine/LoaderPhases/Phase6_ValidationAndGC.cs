@@ -746,9 +746,15 @@ public class Phase6_ValidationAndGC
         if (_localIdToObjectId.TryGetValue("class:Browser", out var oop2))
         {
             var s2 = _heapManager.GetSlot(oop2, 0);
-            Console.WriteLine($"[After GetActiveObjectCount] class:Browser OOP={oop2}, slot[0]={s2}");
+            Console.WriteLine($"[After GetActiveObjectCount] class:Browser OOP={oop2} (raw={oop2.RawValue}, tableIndex={oop2.ToObjectTableIndex()}), slot[0]={s2}");
         }
-        
+
+        // DEBUG: Compare with FromObjectTableIndex
+        var oop3 = SmalltalkOOP.FromObjectTableIndex(10632);
+        Console.WriteLine($"[FromObjectTableIndex(10632)] created OOP={oop3} (raw={oop3.RawValue})");
+        var s3 = _heapManager.GetSlot(oop3, 0);
+        Console.WriteLine($"[FromObjectTableIndex(10632)] slot[0]={s3}");
+
         var gcStats = _heapManager.GarbageCollect();
 
         // Print GC statistics
