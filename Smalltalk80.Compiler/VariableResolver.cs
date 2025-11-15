@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Smalltalk80.Compiler.Analysis;
 
 namespace Smalltalk80.Compiler
@@ -31,7 +32,7 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
-        /// Result of variable resolution containing type, index, and assignability.
+        /// Result of variable resolution containing type, index, assignability, and pool dictionary information.
         /// </summary>
         public struct ResolutionResult
         {
@@ -39,13 +40,15 @@ namespace Smalltalk80.Compiler
             public int Index { get; set; }              // Bytecode index (temp index, literal index, etc.)
             public bool IsAssignable { get; set; }      // Can this variable be assigned to?
             public string Name { get; set; }            // Original variable name
+            public string? PoolDictionaryName { get; set; }  // Pool dictionary name for pool variables, null otherwise
 
-            public ResolutionResult(VariableType type, int index, bool isAssignable, string name)
+            public ResolutionResult(VariableType type, int index, bool isAssignable, string name, string? poolDictionaryName = null)
             {
                 Type = type;
                 Index = index;
                 IsAssignable = isAssignable;
                 Name = name;
+                PoolDictionaryName = poolDictionaryName;
             }
         }
 
@@ -60,6 +63,8 @@ namespace Smalltalk80.Compiler
         /// <exception cref="InvalidOperationException">Thrown if variable not found in any scope</exception>
         public ResolutionResult ResolveVariable(string varName, CompilationEnvironment context, TempFrameAllocator? allocator = null)
         {
+            Console.WriteLine($"[RESOLVE] Resolving variable: {varName}, PoolVars.Count={context.PoolVariables.Count}");
+            
             // Step 1: Check pseudo-variables first (highest priority, cannot be shadowed)
             var pseudoResult = TryResolvePseudoVariable(varName);
             if (pseudoResult.HasValue)
@@ -224,19 +229,44 @@ namespace Smalltalk80.Compiler
             }
 
             // Step 9: Check pool dictionary variables
-            if (context.PoolVariables.ContainsKey(varName))
+            if (context.PoolVariables.TryGetValue(varName, out object? poolDictName))
             {
                 // Pool variables are resolved via literal associations
                 // The actual literal index will be added by the caller
+                // Extract the pool dictionary name from the stored value
+                string? poolDictionaryName = poolDictName as string;
+                
                 return new ResolutionResult(
                     VariableType.PoolVariable,
                     -1,  // Literal index assigned by caller
                     true,  // Pool variables are assignable (via Association value:)
-                    varName
+                    varName,
+                    poolDictionaryName
                 );
             }
 
-            // Step 10: Assume global variable (will be resolved at runtime)
+            // Step 10: Check if this is a pool variable (undeclared but class has pool dictionaries)
+            // If the class declares pool dictionaries, treat undeclared variables as pool variables
+            if (context.PoolVariables.Count > 0)
+            {
+                // Undeclared variable in a class that declares pool dictionaries
+                // Treat it as a pool variable from the first declared pool dictionary
+                var firstPoolDictName = context.PoolVariables.Keys.First();
+                
+                Console.WriteLine($"[POOL VAR DEBUG] Variable '{varName}' resolved as pool variable in dictionary '{firstPoolDictName}'");
+                
+                return new ResolutionResult(
+                    VariableType.PoolVariable,
+                    -1,  // Literal index assigned by caller
+                    true,  // Pool variables are assignable
+                    varName,
+                    firstPoolDictName  // Use first pool dictionary name
+                );
+            }
+            
+            Console.WriteLine($"[POOL VAR DEBUG] Variable '{varName}' falling through to global (PoolVariables.Count={context.PoolVariables.Count})");
+            
+            // Step 11: Assume global variable (will be resolved at runtime)
             // Global variables are stored as Associations in Smalltalk dictionary
             return new ResolutionResult(
                 VariableType.Global,

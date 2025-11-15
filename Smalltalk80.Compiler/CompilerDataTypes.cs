@@ -142,8 +142,9 @@ namespace Smalltalk80.Compiler
     }
     
     /// <summary>
-    /// Represents a Smalltalk Association (key-value pair) used for global variables.
-    /// According to the Blue Book, global variables are stored as Associations in the literal frame.
+    /// Represents a Smalltalk Association (key-value pair) used for global and pool variables.
+    /// According to the Blue Book, global and pool variables are stored as Associations in the literal frame.
+    /// Pool variables reference specific dictionaries (e.g., TextConstants), while globals reference the Smalltalk dictionary.
     /// </summary>
     public class Association
     {
@@ -158,14 +159,22 @@ namespace Smalltalk80.Compiler
         public object? Value { get; set; }
         
         /// <summary>
+        /// The pool dictionary name for pool variables (e.g., "TextConstants").
+        /// Null for global variables that reference the Smalltalk dictionary.
+        /// </summary>
+        public string? PoolDictionaryName { get; }
+        
+        /// <summary>
         /// Initializes a new instance of the Association class.
         /// </summary>
         /// <param name="key">The key (variable name as a Symbol).</param>
         /// <param name="value">The value (typically null for global variables).</param>
-        public Association(Symbol key, object? value = null)
+        /// <param name="poolDictionaryName">The pool dictionary name for pool variables, or null for globals.</param>
+        public Association(Symbol key, object? value = null, string? poolDictionaryName = null)
         {
             Key = key;
             Value = value;
+            PoolDictionaryName = poolDictionaryName;
         }
         
         /// <summary>
@@ -173,24 +182,30 @@ namespace Smalltalk80.Compiler
         /// </summary>
         /// <param name="keyName">The key as a string (will be converted to Symbol).</param>
         /// <param name="value">The value (typically null for global variables).</param>
-        public Association(string keyName, object? value = null)
+        /// <param name="poolDictionaryName">The pool dictionary name for pool variables, or null for globals.</param>
+        public Association(string keyName, object? value = null, string? poolDictionaryName = null)
         {
             Key = new Symbol(keyName);
             Value = value;
+            PoolDictionaryName = poolDictionaryName;
         }
         
         public override bool Equals(object? obj)
         {
-            return obj is Association other && Key.Equals(other.Key);
+            return obj is Association other && Key.Equals(other.Key) && PoolDictionaryName == other.PoolDictionaryName;
         }
         
         public override int GetHashCode()
         {
-            return Key.GetHashCode();
+            return HashCode.Combine(Key.GetHashCode(), PoolDictionaryName?.GetHashCode() ?? 0);
         }
         
         public override string ToString()
         {
+            if (PoolDictionaryName != null)
+            {
+                return $"Association(key: {Key}, value: {Value ?? "null"}, poolDictionary: {PoolDictionaryName})";
+            }
             return $"Association(key: {Key}, value: {Value ?? "null"})";
         }
     }

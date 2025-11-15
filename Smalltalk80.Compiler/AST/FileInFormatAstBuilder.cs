@@ -15,7 +15,7 @@ namespace Smalltalk80.Compiler.AST
     /// Processes the file-out format and builds a complete AST that generates
     /// the expected JSON format for the interpreter.
     /// </summary>
-    public class FileInFormatAstBuilder : Smalltalk80BaseVisitor<object?>
+    public class FileInFormatAstBuilder : Smalltalk80ParserBaseVisitor<object?>
     {
         private readonly ITokenStream _tokenStream;
         private readonly CompilationResult _result;
@@ -179,7 +179,8 @@ namespace Smalltalk80.Compiler.AST
                         case "poolDictionaries:":
                             if (spec.stringConst() != null)
                             {
-                                var poolNames = StripQuotes(spec.stringConst().STRING().GetText());
+                                var rawStringConst = spec.stringConst().STRING()?.GetText();
+                                var poolNames = StripQuotes(rawStringConst ?? "");
                                 if (!string.IsNullOrWhiteSpace(poolNames))
                                 {
                                     classNode.PoolDictionaries = poolNames.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -383,7 +384,23 @@ namespace Smalltalk80.Compiler.AST
 
             // Get class and pool variables
             var classVars = GetClassVariables(classNode);
-            var poolVars = GetPoolVariables(classNode);
+            
+            // For class methods, pool variables are inherited from the BASE class (not the metaclass)
+            // Pool dictionaries are declared on the instance-side class definition, not the metaclass
+            ClassDefinitionNode poolNode = classNode;
+            if (_isMetaclass)
+            {
+                // For class methods, look up pool variables from the instance-side class
+                // _currentClass is the base class name (e.g., "Text")
+                // classNode is the metaclass (has no pool dictionaries)
+                if (_classes.ContainsKey(_currentClass))
+                {
+                    poolNode = _classes[_currentClass];
+                    Console.WriteLine($"[POOL DEBUG] Class method in '{_currentClass}', using instance-side class for pools");
+                }
+            }
+            var poolVars = GetPoolVariables(poolNode);
+            Console.WriteLine($"[POOL DEBUG] Pool vars for {_currentClass}: {poolVars.Count} dictionaries");
 
             // Compile the method using BytecodeCompiler
             var compiledData = _bytecodeCompiler.CompileMethodFromTree(
@@ -684,12 +701,16 @@ namespace Smalltalk80.Compiler.AST
             {
                 value = symbolName.binarySelector().GetText();
             }
-            else if (symbolName.keywordSymbolSelector() != null)
+            else if (symbolName.SYMBOL_KEYWORD_SELECTOR() != null)
             {
-                // Use IDENTIFIER() and COLON() arrays
-                var identifiers = symbolName.keywordSymbolSelector().IDENTIFIER();
-                var colons = symbolName.keywordSymbolSelector().COLON();
-                
+                // SYMBOL_KEYWORD_SELECTOR token from lexer mode contains complete text (e.g., "at:put:", "quo:")
+                value = symbolName.SYMBOL_KEYWORD_SELECTOR().GetText();
+            }
+            else if (symbolName.keywordSymbolInArray() != null)
+            {
+                // Keyword symbol in array context - reconstruct from IDENTIFIER COLON pairs
+                var identifiers = symbolName.keywordSymbolInArray().IDENTIFIER();
+                var colons = symbolName.keywordSymbolInArray().COLON();
                 var parts = new List<string>();
                 for (int i = 0; i < identifiers.Length; i++)
                 {
@@ -925,12 +946,16 @@ namespace Smalltalk80.Compiler.AST
                 {
                     return symbolName.binarySelector().GetText();
                 }
-                else if (symbolName.keywordSymbolSelector() != null)
+                else if (symbolName.SYMBOL_KEYWORD_SELECTOR() != null)
                 {
-                    // Use IDENTIFIER() and COLON() arrays
-                    var identifiers = symbolName.keywordSymbolSelector().IDENTIFIER();
-                    var colons = symbolName.keywordSymbolSelector().COLON();
-                    
+                    // SYMBOL_KEYWORD_SELECTOR token from lexer mode contains complete text (e.g., "at:put:", "quo:")
+                    return symbolName.SYMBOL_KEYWORD_SELECTOR().GetText();
+                }
+                else if (symbolName.keywordSymbolInArray() != null)
+                {
+                    // Keyword symbol in array context - reconstruct from IDENTIFIER COLON pairs
+                    var identifiers = symbolName.keywordSymbolInArray().IDENTIFIER();
+                    var colons = symbolName.keywordSymbolInArray().COLON();
                     var parts = new List<string>();
                     for (int i = 0; i < identifiers.Length; i++)
                     {
@@ -1007,9 +1032,11 @@ namespace Smalltalk80.Compiler.AST
         private Dictionary<string, object> GetPoolVariables(ClassDefinitionNode classNode)
         {
             var poolVars = new Dictionary<string, object>();
+            Console.WriteLine($"[GetPoolVariables] Class: {classNode.Name}, Pool count: {classNode.PoolDictionaries.Count}");
             foreach (var poolName in classNode.PoolDictionaries)
             {
-                poolVars[poolName] = new { type = "PoolDictionary", name = poolName };
+                Console.WriteLine($"[GetPoolVariables] Adding pool: {poolName}");
+                poolVars[poolName] = poolName; // Store pool dictionary NAME as the value
             }
             return poolVars;
         }
@@ -1129,8 +1156,8 @@ namespace Smalltalk80.Compiler.AST
                 }
                 else if (literal is Association assoc)
                 {
-                    // Convert Association to the format expected by the interpreter
-                    result.Add($"Association(key:{assoc.Key.Value},value:{assoc.Value ?? "nil"})");
+                    // Preserve Association object for JSON generation stage to handle pool dictionaries correctly
+                    result.Add(assoc);
                 }
                 else if (literal is string s)
                 {

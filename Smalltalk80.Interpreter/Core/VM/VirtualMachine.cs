@@ -1056,42 +1056,100 @@ public partial class VirtualMachine : IPrimitiveContext
         }
 
         // Push literal variable 0-31 (0x40-0x5F)
-        // CRITICAL: Add +1 to skip header at lit[0]
+        // 
+        // CRITICAL: This bytecode is used for BOTH pool variables AND global variables.
+        // The literal frame entry type determines which:
+        // - 2-element Array: Pool variable binding metadata (NOT a user array)
+        // - Association object: Global variable
+        // 
+        // User-level array literals use pushLiteral: bytecode, NOT pushLiteralVariable:,
+        // so there is no risk of accidental dereferencing.
+        //
+        // Pool Variable Resolution Algorithm:
+        // 1. Check if literal is 2-element Array
+        // 2. Check element[0] type:
+        //    - Symbol: First execution → resolve dictionary, lookup value, patch
+        //    - Dictionary: Subsequent → direct lookup (fast path)
+        // 3. Return value from Association inside dictionary
         if (BytecodeUtil.IsPushLiteralVar(bytecode))
         {
             int index = BytecodeUtil.PushLiteralVarIndex(bytecode);
-            var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-
+            var literalOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
             // TODO: Handle blocks with nil literals using lexicalParent (Single-Context Architecture)
-            if (associationOOP == SpecialObjectsArray.Instance.Nil)
+            if (literalOOP == SpecialObjectsArray.Instance.Nil)
             {
                 Push(SpecialObjectsArray.Instance.Nil);
                 return true;
             }
 
+            // POOL VARIABLES: Check if this is a 2-element Array (binding metadata)
+            var classOOP = _heapManager.GetClassOOP(literalOOP);
+            var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+            
+            if (classOOP == arrayClassOOP)
+            {
+                int arraySize = _heapManager.GetIndexedSize(literalOOP);
+                if (arraySize == 2)
+                {
+                    // This is a pool variable literal: (#PoolName, #Key)
+                    var element0 = _heapManager.GetIndexedOOP(literalOOP, 0);
+                    var element1 = _heapManager.GetIndexedOOP(literalOOP, 1);
+                    
+                    // Check if element 0 is a Symbol (pool name) or an OOP (already patched to dictionary)
+                    var element0Class = _heapManager.GetClassOOP(element0);
+                    var symbolClass = GlobalRegistry.LookupClassOOP("Symbol");
+                    
+                    if (element0Class == symbolClass)
+                    {
+                        // First execution: element0 is pool dictionary name symbol
+                        // Resolve pool dictionary and patch
+                        var poolValueOOP = ResolveAndPatchPoolVariable(literalOOP, methodOOP, index + 1, element0, element1);
+                        Push(poolValueOOP);
+                        return true;
+                    }
+                    else
+                    {
+                        // Already patched: element0 is pool dictionary OOP (fast path)
+                        // Verify element0 is a Dictionary (should always be true after patching)
+                        var dictionaryClassOOP = GlobalRegistry.LookupClassOOP("Dictionary");
+                        if (element0Class != dictionaryClassOOP)
+                        {
+                            throw new InvalidOperationException(
+                                $"Pool variable literal has invalid patched entry. " +
+                                $"Expected Dictionary OOP, got class {element0Class}");
+                        }
+                        
+                        // Look up element1 (key symbol) in the dictionary
+                        var keySymbol = element1;
+                        var patchedValueOOP = LookupInDictionary(element0, keySymbol);
+                        Push(patchedValueOOP);
+                        return true;
+                    }
+                }
+            }
+
+            // GLOBAL VARIABLES: Standard Association handling
             // Association has layout: [key, value]
-            // DEFENSIVE: Check if this is actually an Association
-            var classOOP = _heapManager.GetClassOOP(associationOOP);
-            int instVarCount = _heapManager.GetInstanceVariableCount(associationOOP);
+            int instVarCount = _heapManager.GetInstanceVariableCount(literalOOP);
 
             if (instVarCount < 2)
             {
-                Console.WriteLine($"[PUSH_LITERAL_VAR] ERROR: Expected Association, got object with {instVarCount} instance variables");
-                Console.WriteLine($"  associationOOP: {associationOOP}");
+                Console.WriteLine($"[PUSH_LITERAL_VAR] ERROR: Expected Association or pool variable array, got object with {instVarCount} instance variables");
+                Console.WriteLine($"  literalOOP: {literalOOP}");
                 Console.WriteLine($"  classOOP: {classOOP}");
                 Console.WriteLine($"  methodOOP: {methodOOP}");
                 Console.WriteLine($"  literal index: {index}");
 
                 // This might be a Symbol or other object that should be pushed directly
-                Push(associationOOP);
+                Push(literalOOP);
                 return true;
             }
 
             // Association has a fixed layout per Smalltalk-80 specification:
             // slot 0 = key, slot 1 = value
-            var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+            var keyOOP = _heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            var valueOOP = _heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
             Push(valueOOP);
             return true;
         }
@@ -4276,6 +4334,100 @@ public partial class VirtualMachine : IPrimitiveContext
             // Must be MethodContext (or some other context) - return it
             return contextOOP;
         }
+    }
+
+    /// <summary>
+    /// Resolves a pool variable on first execution and patches the literal for fast subsequent access.
+    /// Pool variable format: (#PoolName, #Key) -> (PoolDictOOP, #Key)
+    /// </summary>
+    private SmalltalkOOP ResolveAndPatchPoolVariable(SmalltalkOOP poolLiteralOOP, SmalltalkOOP methodOOP, int literalIndex, SmalltalkOOP poolNameSymbol, SmalltalkOOP keySymbol)
+    {
+        // 1. Resolve pool dictionary name to actual dictionary object
+        var smalltalkDict = SpecialObjectsArray.Instance.Smalltalk;
+        var poolDictOOP = LookupInDictionary(smalltalkDict, poolNameSymbol);
+        
+        if (poolDictOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            // Pool dictionary not found in Smalltalk globals
+            var poolNameString = GetSymbolString(poolNameSymbol);
+            throw new InvalidOperationException($"Pool dictionary not found: {poolNameString}");
+        }
+        
+        // 2. Look up key in pool dictionary
+        var resolvedValueOOP = LookupInDictionary(poolDictOOP, keySymbol);
+        
+        if (resolvedValueOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            // Key not found in pool dictionary - this is an error
+            var poolNameString = GetSymbolString(poolNameSymbol);
+            var keyString = GetSymbolString(keySymbol);
+            throw new InvalidOperationException($"Pool variable '{keyString}' not found in pool dictionary '{poolNameString}'");
+        }
+        
+        // 3. Patch literal: Replace poolNameSymbol with poolDictOOP
+        // This makes subsequent executions faster (no name lookup)
+        _heapManager.SetIndexedOOP(poolLiteralOOP, 0, poolDictOOP);
+        
+        return resolvedValueOOP;
+    }
+
+    /// <summary>
+    /// Looks up a key (Symbol) in a Dictionary and returns the value.
+    /// Returns nil if key not found.
+    /// </summary>
+    private SmalltalkOOP LookupInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbol)
+    {
+        // Dictionary has instance variables: tally, array
+        // array is an Array of Associations
+        var arrayOOP = _heapManager.GetInstanceVariable(dictionaryOOP, 1); // array is at index 1
+        
+        if (arrayOOP == SpecialObjectsArray.Instance.Nil)
+        {
+            return SpecialObjectsArray.Instance.Nil;
+        }
+        
+        int arraySize = _heapManager.GetIndexedSize(arrayOOP);
+        
+        // Linear search through dictionary array
+        for (int i = 0; i < arraySize; i++)
+        {
+            var elementOOP = _heapManager.GetIndexedOOP(arrayOOP, i);
+            
+            if (elementOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                continue; // Empty slot
+            }
+            
+            // Element should be an Association
+            var assocKeyOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            
+            if (assocKeyOOP == keySymbol)
+            {
+                // Found it - return the value
+                var assocValueOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                return assocValueOOP;
+            }
+        }
+        
+        // Not found
+        return SpecialObjectsArray.Instance.Nil;
+    }
+
+    /// <summary>
+    /// Gets the string value of a Symbol OOP.
+    /// </summary>
+    private string GetSymbolString(SmalltalkOOP symbolOOP)
+    {
+        int size = _heapManager.GetIndexedSize(symbolOOP);
+        var chars = new char[size];
+        
+        for (int i = 0; i < size; i++)
+        {
+            byte b = _heapManager.GetIndexedByte(symbolOOP, i);
+            chars[i] = (char)b;
+        }
+        
+        return new string(chars);
     }
 
 }

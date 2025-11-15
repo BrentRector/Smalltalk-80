@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80.Compiler/Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from Smalltalk80Parser.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -43,8 +43,9 @@ public partial class Smalltalk80Parser : Parser {
 		EQUAL=20, LT=21, GT=22, AT=23, QUESTION=24, COMMA=25, CARET=26, HASH=27, 
 		BANG=28, COLON=29, LEFT_BRACKET=30, RIGHT_BRACKET=31, LEFT_PAREN=32, RIGHT_PAREN=33, 
 		LEFT_BRACE=34, RIGHT_BRACE=35, SEMICOLON=36, PERIOD=37, PRIMITIVE_DECL=38, 
-		NUMBER=39, COMMENT=40, STRING=41, QUOTED_SYMBOL=42, CHAR_LITERAL=43, SEPARATOR_LINE=44, 
-		IDENTIFIER=45, DIGITS=46, NEW_LINE=47, WS=48;
+		NUMBER=39, COMMENT=40, STRING=41, CHAR_LITERAL=42, SEPARATOR_LINE=43, 
+		IDENTIFIER=44, NEW_LINE=45, WS=46, SYMBOL_KEYWORD_SELECTOR=47, SYMBOL_WS=48, 
+		SYMBOL_OTHER=49, DIGITS=50, QUOTED_SYMBOL=51;
 	public const int
 		RULE_fileIn = 0, RULE_expressionEntry = 1, RULE_statementsEntry = 2, RULE_methodEntry = 3, 
 		RULE_classEntry = 4, RULE_blockEntry = 5, RULE_selectorEntry = 6, RULE_selector = 7, 
@@ -66,7 +67,7 @@ public partial class Smalltalk80Parser : Parser {
 		RULE_unarySelector = 56, RULE_binarySelector = 57, RULE_variable = 58, 
 		RULE_literal = 59, RULE_numberLiteral = 60, RULE_stringConst = 61, RULE_characterLiteral = 62, 
 		RULE_byteArrayLiteral = 63, RULE_arrayLiteral = 64, RULE_arrayElement = 65, 
-		RULE_symbolConst = 66, RULE_symbolName = 67, RULE_keywordSymbolSelector = 68, 
+		RULE_symbolConst = 66, RULE_symbolName = 67, RULE_keywordSymbolInArray = 68, 
 		RULE_separatorChunk = 69, RULE_className = 70, RULE_superclassName = 71, 
 		RULE_argumentName = 72, RULE_identifierColon = 73;
 	public static readonly string[] ruleNames = {
@@ -84,15 +85,15 @@ public partial class Smalltalk80Parser : Parser {
 		"blockTemps", "parenthesizedExpr", "dynamicArray", "unarySelector", "binarySelector", 
 		"variable", "literal", "numberLiteral", "stringConst", "characterLiteral", 
 		"byteArrayLiteral", "arrayLiteral", "arrayElement", "symbolConst", "symbolName", 
-		"keywordSymbolSelector", "separatorChunk", "className", "superclassName", 
+		"keywordSymbolInArray", "separatorChunk", "className", "superclassName", 
 		"argumentName", "identifierColon"
 	};
 
 	private static readonly string[] _LiteralNames = {
-		null, null, "'<<'", "'>>'", "'\\\\'", "'//'", "'=='", "'~~'", "'<='", 
-		"'>='", "'~='", "'+'", "'-'", "'*'", "'/'", "'%'", "'\\'", "'~'", "'|'", 
-		"'&'", "'='", "'<'", "'>'", "'@'", "'?'", "','", "'^'", "'#'", "'!'", 
-		"':'", "'['", "']'", "'('", "')'", "'{'", "'}'", "';'", "'.'"
+		null, null, null, null, null, null, null, null, null, null, null, null, 
+		null, null, null, null, null, null, null, null, null, null, null, null, 
+		null, null, "'^'", "'#'", "'!'", "':'", null, "']'", null, "')'", "'{'", 
+		"'}'", "';'", "'.'"
 	};
 	private static readonly string[] _SymbolicNames = {
 		null, "ASSIGN", "BIT_SHIFT_LEFT", "BIT_SHIFT_RIGHT", "INTEGER_DIVIDE", 
@@ -101,8 +102,9 @@ public partial class Smalltalk80Parser : Parser {
 		"EQUAL", "LT", "GT", "AT", "QUESTION", "COMMA", "CARET", "HASH", "BANG", 
 		"COLON", "LEFT_BRACKET", "RIGHT_BRACKET", "LEFT_PAREN", "RIGHT_PAREN", 
 		"LEFT_BRACE", "RIGHT_BRACE", "SEMICOLON", "PERIOD", "PRIMITIVE_DECL", 
-		"NUMBER", "COMMENT", "STRING", "QUOTED_SYMBOL", "CHAR_LITERAL", "SEPARATOR_LINE", 
-		"IDENTIFIER", "DIGITS", "NEW_LINE", "WS"
+		"NUMBER", "COMMENT", "STRING", "CHAR_LITERAL", "SEPARATOR_LINE", "IDENTIFIER", 
+		"NEW_LINE", "WS", "SYMBOL_KEYWORD_SELECTOR", "SYMBOL_WS", "SYMBOL_OTHER", 
+		"DIGITS", "QUOTED_SYMBOL"
 	};
 	public static readonly IVocabulary DefaultVocabulary = new Vocabulary(_LiteralNames, _SymbolicNames);
 
@@ -115,7 +117,7 @@ public partial class Smalltalk80Parser : Parser {
 		}
 	}
 
-	public override string GrammarFileName { get { return "Smalltalk80.g4"; } }
+	public override string GrammarFileName { get { return "Smalltalk80Parser.g4"; } }
 
 	public override string[] RuleNames { get { return ruleNames; } }
 
@@ -187,7 +189,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_fileIn; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitFileIn(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -244,7 +246,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_expressionEntry; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitExpressionEntry(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -286,7 +288,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_statementsEntry; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitStatementsEntry(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -337,7 +339,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_methodEntry; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMethodEntry(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -405,7 +407,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_classEntry; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitClassEntry(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -449,7 +451,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_blockEntry; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitBlockEntry(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -491,7 +493,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_selectorEntry; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitSelectorEntry(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -538,7 +540,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_selector; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitSelector(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -602,7 +604,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_keywordSelector; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitKeywordSelector(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -660,7 +662,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_temporariesEntry; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitTemporariesEntry(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -713,7 +715,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_cascadeEntry; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitCascadeEntry(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -755,7 +757,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_literalEntry; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitLiteralEntry(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -818,7 +820,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_chunk; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitChunk(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -925,7 +927,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_simpleMethodChunk; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitSimpleMethodChunk(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -981,7 +983,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_expressionChunk; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitExpressionChunk(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1026,7 +1028,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_classDefChunk; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitClassDefChunk(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1075,7 +1077,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_classHeader; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitClassHeader(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1119,7 +1121,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_subclassKind; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitSubclassKind(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1169,7 +1171,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_classBody; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitClassBody(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1229,7 +1231,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_classSlotSpec; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitClassSlotSpec(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1283,7 +1285,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_categoryDecl; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitCategoryDecl(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1340,7 +1342,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_classCommentChunk; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitClassCommentChunk(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1413,7 +1415,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_metaclassDefinitionChunk; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMetaclassDefinitionChunk(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1485,7 +1487,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_metaclassCommentChunk; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMetaclassCommentChunk(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1563,7 +1565,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_methodDef; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMethodDef(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1677,7 +1679,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_methodBody; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMethodBody(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1762,7 +1764,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_methodBodyNoBang; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMethodBodyNoBang(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1848,7 +1850,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_methodCategoryChunk; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMethodCategoryChunk(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -1888,7 +1890,7 @@ public partial class Smalltalk80Parser : Parser {
 			State = 347;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 35184439197692L) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 17592253153276L) != 0)) {
 				{
 				{
 				State = 344;
@@ -1944,7 +1946,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_methodHeader; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMethodHeader(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2026,7 +2028,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_formalArg; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitFormalArg(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2063,7 +2065,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_primitiveDecl; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitPrimitiveDecl(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2110,7 +2112,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_temporaries; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitTemporaries(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2174,7 +2176,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_temporaryName; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitTemporaryName(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2220,7 +2222,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_statements; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitStatements(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2324,7 +2326,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_statement; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitStatement(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2352,9 +2354,9 @@ public partial class Smalltalk80Parser : Parser {
 			case LEFT_BRACE:
 			case NUMBER:
 			case STRING:
-			case QUOTED_SYMBOL:
 			case CHAR_LITERAL:
 			case IDENTIFIER:
+			case QUOTED_SYMBOL:
 				EnterOuterAlt(_localctx, 2);
 				{
 				State = 407;
@@ -2389,7 +2391,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_returnStatement; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitReturnStatement(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2440,7 +2442,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_expressionStatement; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitExpressionStatement(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2479,7 +2481,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_expression; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitExpression(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2525,7 +2527,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_assignmentExpr; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitAssignmentExpr(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2591,7 +2593,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_cascadeExpr; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitCascadeExpr(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2650,7 +2652,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_messageExpr; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMessageExpr(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2706,7 +2708,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_binaryExpr; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitBinaryExpr(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2766,7 +2768,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_unaryExpr; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitUnaryExpr(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2837,7 +2839,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_messageBase; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMessageBase(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2854,8 +2856,8 @@ public partial class Smalltalk80Parser : Parser {
 			case HASH:
 			case NUMBER:
 			case STRING:
-			case QUOTED_SYMBOL:
 			case CHAR_LITERAL:
+			case QUOTED_SYMBOL:
 				EnterOuterAlt(_localctx, 1);
 				{
 				State = 452;
@@ -2924,7 +2926,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_negativeNumber; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitNegativeNumber(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -2971,7 +2973,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_messagePart; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitMessagePart(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3030,7 +3032,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_unaryMessage; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitUnaryMessage(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3072,7 +3074,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_binaryMessage; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitBinaryMessage(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3116,7 +3118,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_keywordMessage; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitKeywordMessage(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3170,7 +3172,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_keywordPart; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitKeywordPart(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3213,7 +3215,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_nonKeywordExpr; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitNonKeywordExpr(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3260,7 +3262,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_block; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitBlock(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3299,7 +3301,7 @@ public partial class Smalltalk80Parser : Parser {
 			State = 492;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 51287479554048L) != 0)) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 2276699014172672L) != 0)) {
 				{
 				State = 491;
 				statements();
@@ -3340,7 +3342,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_blockArgs; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitBlockArgs(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3411,7 +3413,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_blockTemps; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitBlockTemps(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3469,7 +3471,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_parenthesizedExpr; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitParenthesizedExpr(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3521,7 +3523,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_dynamicArray; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitDynamicArray(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3540,7 +3542,7 @@ public partial class Smalltalk80Parser : Parser {
 			State = 526;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 51149973491712L) != 0)) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 2276561508110336L) != 0)) {
 				{
 				State = 518;
 				expression();
@@ -3587,7 +3589,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_unarySelector; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitUnarySelector(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3647,7 +3649,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_binarySelector; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitBinarySelector(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3692,7 +3694,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_variable; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitVariable(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3746,7 +3748,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_literal; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitLiteral(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3824,7 +3826,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_numberLiteral; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitNumberLiteral(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3861,7 +3863,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_stringConst; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitStringConst(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3898,7 +3900,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_characterLiteral; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitCharacterLiteral(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -3941,7 +3943,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_byteArrayLiteral; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitByteArrayLiteral(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -4005,7 +4007,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_arrayLiteral; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitArrayLiteral(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -4026,7 +4028,7 @@ public partial class Smalltalk80Parser : Parser {
 			State = 565;
 			ErrorHandler.Sync(this);
 			_la = TokenStream.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 51131786985468L) != 0)) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 2417280809959420L) != 0)) {
 				{
 				{
 				State = 562;
@@ -4074,7 +4076,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_arrayElement; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitArrayElement(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -4092,8 +4094,8 @@ public partial class Smalltalk80Parser : Parser {
 			case HASH:
 			case NUMBER:
 			case STRING:
-			case QUOTED_SYMBOL:
 			case CHAR_LITERAL:
+			case QUOTED_SYMBOL:
 				EnterOuterAlt(_localctx, 1);
 				{
 				State = 570;
@@ -4125,6 +4127,7 @@ public partial class Smalltalk80Parser : Parser {
 			case QUESTION:
 			case COMMA:
 			case IDENTIFIER:
+			case SYMBOL_KEYWORD_SELECTOR:
 				EnterOuterAlt(_localctx, 2);
 				{
 				State = 571;
@@ -4139,7 +4142,7 @@ public partial class Smalltalk80Parser : Parser {
 				State = 576;
 				ErrorHandler.Sync(this);
 				_la = TokenStream.LA(1);
-				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 51131786985468L) != 0)) {
+				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 2417280809959420L) != 0)) {
 					{
 					{
 					State = 573;
@@ -4182,7 +4185,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_symbolConst; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitSymbolConst(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -4235,8 +4238,9 @@ public partial class Smalltalk80Parser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode] public BinarySelectorContext binarySelector() {
 			return GetRuleContext<BinarySelectorContext>(0);
 		}
-		[System.Diagnostics.DebuggerNonUserCode] public KeywordSymbolSelectorContext keywordSymbolSelector() {
-			return GetRuleContext<KeywordSymbolSelectorContext>(0);
+		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode SYMBOL_KEYWORD_SELECTOR() { return GetToken(Smalltalk80Parser.SYMBOL_KEYWORD_SELECTOR, 0); }
+		[System.Diagnostics.DebuggerNonUserCode] public KeywordSymbolInArrayContext keywordSymbolInArray() {
+			return GetRuleContext<KeywordSymbolInArrayContext>(0);
 		}
 		public SymbolNameContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
@@ -4245,7 +4249,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_symbolName; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitSymbolName(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -4256,7 +4260,7 @@ public partial class Smalltalk80Parser : Parser {
 		SymbolNameContext _localctx = new SymbolNameContext(Context, State);
 		EnterRule(_localctx, 134, RULE_symbolName);
 		try {
-			State = 591;
+			State = 592;
 			ErrorHandler.Sync(this);
 			switch ( Interpreter.AdaptivePredict(TokenStream,56,Context) ) {
 			case 1:
@@ -4284,7 +4288,14 @@ public partial class Smalltalk80Parser : Parser {
 				EnterOuterAlt(_localctx, 4);
 				{
 				State = 590;
-				keywordSymbolSelector();
+				Match(SYMBOL_KEYWORD_SELECTOR);
+				}
+				break;
+			case 5:
+				EnterOuterAlt(_localctx, 5);
+				{
+				State = 591;
+				keywordSymbolInArray();
 				}
 				break;
 			}
@@ -4300,7 +4311,7 @@ public partial class Smalltalk80Parser : Parser {
 		return _localctx;
 	}
 
-	public partial class KeywordSymbolSelectorContext : ParserRuleContext {
+	public partial class KeywordSymbolInArrayContext : ParserRuleContext {
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode[] IDENTIFIER() { return GetTokens(Smalltalk80Parser.IDENTIFIER); }
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode IDENTIFIER(int i) {
 			return GetToken(Smalltalk80Parser.IDENTIFIER, i);
@@ -4309,28 +4320,28 @@ public partial class Smalltalk80Parser : Parser {
 		[System.Diagnostics.DebuggerNonUserCode] public ITerminalNode COLON(int i) {
 			return GetToken(Smalltalk80Parser.COLON, i);
 		}
-		public KeywordSymbolSelectorContext(ParserRuleContext parent, int invokingState)
+		public KeywordSymbolInArrayContext(ParserRuleContext parent, int invokingState)
 			: base(parent, invokingState)
 		{
 		}
-		public override int RuleIndex { get { return RULE_keywordSymbolSelector; } }
+		public override int RuleIndex { get { return RULE_keywordSymbolInArray; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
-			if (typedVisitor != null) return typedVisitor.VisitKeywordSymbolSelector(this);
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
+			if (typedVisitor != null) return typedVisitor.VisitKeywordSymbolInArray(this);
 			else return visitor.VisitChildren(this);
 		}
 	}
 
 	[RuleVersion(0)]
-	public KeywordSymbolSelectorContext keywordSymbolSelector() {
-		KeywordSymbolSelectorContext _localctx = new KeywordSymbolSelectorContext(Context, State);
-		EnterRule(_localctx, 136, RULE_keywordSymbolSelector);
+	public KeywordSymbolInArrayContext keywordSymbolInArray() {
+		KeywordSymbolInArrayContext _localctx = new KeywordSymbolInArrayContext(Context, State);
+		EnterRule(_localctx, 136, RULE_keywordSymbolInArray);
 		try {
 			int _alt;
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 595;
+			State = 596;
 			ErrorHandler.Sync(this);
 			_alt = 1;
 			do {
@@ -4338,9 +4349,9 @@ public partial class Smalltalk80Parser : Parser {
 				case 1:
 					{
 					{
-					State = 593;
-					Match(IDENTIFIER);
 					State = 594;
+					Match(IDENTIFIER);
+					State = 595;
 					Match(COLON);
 					}
 					}
@@ -4348,7 +4359,7 @@ public partial class Smalltalk80Parser : Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				State = 597;
+				State = 598;
 				ErrorHandler.Sync(this);
 				_alt = Interpreter.AdaptivePredict(TokenStream,57,Context);
 			} while ( _alt!=2 && _alt!=global::Antlr4.Runtime.Atn.ATN.INVALID_ALT_NUMBER );
@@ -4375,7 +4386,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_separatorChunk; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitSeparatorChunk(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -4388,9 +4399,9 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 599;
-			Match(SEPARATOR_LINE);
 			State = 600;
+			Match(SEPARATOR_LINE);
+			State = 601;
 			Match(BANG);
 			}
 		}
@@ -4414,7 +4425,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_className; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitClassName(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -4427,7 +4438,7 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 602;
+			State = 603;
 			Match(IDENTIFIER);
 			}
 		}
@@ -4451,7 +4462,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_superclassName; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitSuperclassName(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -4464,7 +4475,7 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 604;
+			State = 605;
 			Match(IDENTIFIER);
 			}
 		}
@@ -4488,7 +4499,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_argumentName; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitArgumentName(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -4501,7 +4512,7 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 606;
+			State = 607;
 			Match(IDENTIFIER);
 			}
 		}
@@ -4526,7 +4537,7 @@ public partial class Smalltalk80Parser : Parser {
 		public override int RuleIndex { get { return RULE_identifierColon; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override TResult Accept<TResult>(IParseTreeVisitor<TResult> visitor) {
-			ISmalltalk80Visitor<TResult> typedVisitor = visitor as ISmalltalk80Visitor<TResult>;
+			ISmalltalk80ParserVisitor<TResult> typedVisitor = visitor as ISmalltalk80ParserVisitor<TResult>;
 			if (typedVisitor != null) return typedVisitor.VisitIdentifierColon(this);
 			else return visitor.VisitChildren(this);
 		}
@@ -4539,9 +4550,9 @@ public partial class Smalltalk80Parser : Parser {
 		try {
 			EnterOuterAlt(_localctx, 1);
 			{
-			State = 608;
-			Match(IDENTIFIER);
 			State = 609;
+			Match(IDENTIFIER);
+			State = 610;
 			Match(COLON);
 			}
 		}
@@ -4591,7 +4602,7 @@ public partial class Smalltalk80Parser : Parser {
 	}
 
 	private static int[] _serializedATN = {
-		4,1,48,612,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,6,2,7,
+		4,1,51,613,2,0,7,0,2,1,7,1,2,2,7,2,2,3,7,3,2,4,7,4,2,5,7,5,2,6,7,6,2,7,
 		7,7,2,8,7,8,2,9,7,9,2,10,7,10,2,11,7,11,2,12,7,12,2,13,7,13,2,14,7,14,
 		2,15,7,15,2,16,7,16,2,17,7,17,2,18,7,18,2,19,7,19,2,20,7,20,2,21,7,21,
 		2,22,7,22,2,23,7,23,2,24,7,24,2,25,7,25,2,26,7,26,2,27,7,27,2,28,7,28,
@@ -4637,28 +4648,28 @@ public partial class Smalltalk80Parser : Parser {
 		8,63,10,63,12,63,557,9,63,1,63,1,63,1,64,1,64,1,64,5,64,564,8,64,10,64,
 		12,64,567,9,64,1,64,1,64,1,65,1,65,1,65,1,65,5,65,575,8,65,10,65,12,65,
 		578,9,65,1,65,3,65,581,8,65,1,66,1,66,1,66,3,66,586,8,66,1,67,1,67,1,67,
-		1,67,3,67,592,8,67,1,68,1,68,4,68,596,8,68,11,68,12,68,597,1,69,1,69,1,
-		69,1,70,1,70,1,71,1,71,1,72,1,72,1,73,1,73,1,73,1,73,0,0,74,0,2,4,6,8,
-		10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,
-		58,60,62,64,66,68,70,72,74,76,78,80,82,84,86,88,90,92,94,96,98,100,102,
-		104,106,108,110,112,114,116,118,120,122,124,126,128,130,132,134,136,138,
-		140,142,144,146,0,1,1,0,2,25,617,0,151,1,0,0,0,2,156,1,0,0,0,4,159,1,0,
-		0,0,6,162,1,0,0,0,8,172,1,0,0,0,10,176,1,0,0,0,12,179,1,0,0,0,14,185,1,
-		0,0,0,16,189,1,0,0,0,18,194,1,0,0,0,20,199,1,0,0,0,22,202,1,0,0,0,24,214,
-		1,0,0,0,26,216,1,0,0,0,28,224,1,0,0,0,30,227,1,0,0,0,32,231,1,0,0,0,34,
-		235,1,0,0,0,36,241,1,0,0,0,38,246,1,0,0,0,40,250,1,0,0,0,42,254,1,0,0,
-		0,44,265,1,0,0,0,46,276,1,0,0,0,48,288,1,0,0,0,50,322,1,0,0,0,52,332,1,
-		0,0,0,54,334,1,0,0,0,56,364,1,0,0,0,58,366,1,0,0,0,60,368,1,0,0,0,62,370,
-		1,0,0,0,64,380,1,0,0,0,66,385,1,0,0,0,68,408,1,0,0,0,70,410,1,0,0,0,72,
-		415,1,0,0,0,74,417,1,0,0,0,76,424,1,0,0,0,78,426,1,0,0,0,80,434,1,0,0,
-		0,82,438,1,0,0,0,84,445,1,0,0,0,86,458,1,0,0,0,88,460,1,0,0,0,90,466,1,
-		0,0,0,92,468,1,0,0,0,94,470,1,0,0,0,96,474,1,0,0,0,98,478,1,0,0,0,100,
+		1,67,1,67,3,67,593,8,67,1,68,1,68,4,68,597,8,68,11,68,12,68,598,1,69,1,
+		69,1,69,1,70,1,70,1,71,1,71,1,72,1,72,1,73,1,73,1,73,1,73,0,0,74,0,2,4,
+		6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,
+		54,56,58,60,62,64,66,68,70,72,74,76,78,80,82,84,86,88,90,92,94,96,98,100,
+		102,104,106,108,110,112,114,116,118,120,122,124,126,128,130,132,134,136,
+		138,140,142,144,146,0,1,1,0,2,25,619,0,151,1,0,0,0,2,156,1,0,0,0,4,159,
+		1,0,0,0,6,162,1,0,0,0,8,172,1,0,0,0,10,176,1,0,0,0,12,179,1,0,0,0,14,185,
+		1,0,0,0,16,189,1,0,0,0,18,194,1,0,0,0,20,199,1,0,0,0,22,202,1,0,0,0,24,
+		214,1,0,0,0,26,216,1,0,0,0,28,224,1,0,0,0,30,227,1,0,0,0,32,231,1,0,0,
+		0,34,235,1,0,0,0,36,241,1,0,0,0,38,246,1,0,0,0,40,250,1,0,0,0,42,254,1,
+		0,0,0,44,265,1,0,0,0,46,276,1,0,0,0,48,288,1,0,0,0,50,322,1,0,0,0,52,332,
+		1,0,0,0,54,334,1,0,0,0,56,364,1,0,0,0,58,366,1,0,0,0,60,368,1,0,0,0,62,
+		370,1,0,0,0,64,380,1,0,0,0,66,385,1,0,0,0,68,408,1,0,0,0,70,410,1,0,0,
+		0,72,415,1,0,0,0,74,417,1,0,0,0,76,424,1,0,0,0,78,426,1,0,0,0,80,434,1,
+		0,0,0,82,438,1,0,0,0,84,445,1,0,0,0,86,458,1,0,0,0,88,460,1,0,0,0,90,466,
+		1,0,0,0,92,468,1,0,0,0,94,470,1,0,0,0,96,474,1,0,0,0,98,478,1,0,0,0,100,
 		482,1,0,0,0,102,484,1,0,0,0,104,498,1,0,0,0,106,505,1,0,0,0,108,513,1,
 		0,0,0,110,517,1,0,0,0,112,530,1,0,0,0,114,532,1,0,0,0,116,534,1,0,0,0,
 		118,542,1,0,0,0,120,544,1,0,0,0,122,546,1,0,0,0,124,548,1,0,0,0,126,550,
-		1,0,0,0,128,560,1,0,0,0,130,580,1,0,0,0,132,585,1,0,0,0,134,591,1,0,0,
-		0,136,595,1,0,0,0,138,599,1,0,0,0,140,602,1,0,0,0,142,604,1,0,0,0,144,
-		606,1,0,0,0,146,608,1,0,0,0,148,150,3,24,12,0,149,148,1,0,0,0,150,153,
+		1,0,0,0,128,560,1,0,0,0,130,580,1,0,0,0,132,585,1,0,0,0,134,592,1,0,0,
+		0,136,596,1,0,0,0,138,600,1,0,0,0,140,603,1,0,0,0,142,605,1,0,0,0,144,
+		607,1,0,0,0,146,609,1,0,0,0,148,150,3,24,12,0,149,148,1,0,0,0,150,153,
 		1,0,0,0,151,149,1,0,0,0,151,152,1,0,0,0,152,154,1,0,0,0,153,151,1,0,0,
 		0,154,155,5,0,0,1,155,1,1,0,0,0,156,157,3,74,37,0,157,158,5,0,0,1,158,
 		3,1,0,0,0,159,160,3,66,33,0,160,161,5,0,0,1,161,5,1,0,0,0,162,164,3,56,
@@ -4668,7 +4679,7 @@ public partial class Smalltalk80Parser : Parser {
 		3,36,18,0,174,175,5,0,0,1,175,9,1,0,0,0,176,177,3,102,51,0,177,178,5,0,
 		0,1,178,11,1,0,0,0,179,180,3,14,7,0,180,181,5,0,0,1,181,13,1,0,0,0,182,
 		186,3,112,56,0,183,186,3,114,57,0,184,186,3,16,8,0,185,182,1,0,0,0,185,
-		183,1,0,0,0,185,184,1,0,0,0,186,15,1,0,0,0,187,188,5,45,0,0,188,190,5,
+		183,1,0,0,0,185,184,1,0,0,0,186,15,1,0,0,0,187,188,5,44,0,0,188,190,5,
 		29,0,0,189,187,1,0,0,0,190,191,1,0,0,0,191,189,1,0,0,0,191,192,1,0,0,0,
 		192,17,1,0,0,0,193,195,3,62,31,0,194,193,1,0,0,0,194,195,1,0,0,0,195,196,
 		1,0,0,0,196,197,3,66,33,0,197,198,5,0,0,1,198,19,1,0,0,0,199,200,3,78,
@@ -4678,7 +4689,7 @@ public partial class Smalltalk80Parser : Parser {
 		215,3,138,69,0,213,215,5,28,0,0,214,205,1,0,0,0,214,206,1,0,0,0,214,207,
 		1,0,0,0,214,208,1,0,0,0,214,209,1,0,0,0,214,210,1,0,0,0,214,211,1,0,0,
 		0,214,212,1,0,0,0,214,213,1,0,0,0,215,25,1,0,0,0,216,219,3,140,70,0,217,
-		218,5,45,0,0,218,220,6,13,-1,0,219,217,1,0,0,0,219,220,1,0,0,0,220,221,
+		218,5,44,0,0,218,220,6,13,-1,0,219,217,1,0,0,0,219,220,1,0,0,0,220,221,
 		1,0,0,0,221,222,5,3,0,0,222,223,3,48,24,0,223,27,1,0,0,0,224,225,3,74,
 		37,0,225,226,5,28,0,0,226,29,1,0,0,0,227,228,3,32,16,0,228,229,3,36,18,
 		0,229,230,5,28,0,0,230,31,1,0,0,0,231,232,3,142,71,0,232,233,3,34,17,0,
@@ -4688,16 +4699,16 @@ public partial class Smalltalk80Parser : Parser {
 		0,245,37,1,0,0,0,246,247,3,146,73,0,247,248,3,122,61,0,248,249,6,19,-1,
 		0,249,39,1,0,0,0,250,251,3,146,73,0,251,252,3,122,61,0,252,253,6,20,-1,
 		0,253,41,1,0,0,0,254,255,4,21,0,0,255,256,5,28,0,0,256,257,3,140,70,0,
-		257,259,3,146,73,0,258,260,5,47,0,0,259,258,1,0,0,0,259,260,1,0,0,0,260,
+		257,259,3,146,73,0,258,260,5,45,0,0,259,258,1,0,0,0,259,260,1,0,0,0,260,
 		261,1,0,0,0,261,262,3,122,61,0,262,263,5,28,0,0,263,264,6,21,-1,0,264,
-		43,1,0,0,0,265,266,4,22,1,0,266,267,3,140,70,0,267,268,5,45,0,0,268,270,
+		43,1,0,0,0,265,266,4,22,1,0,266,267,3,140,70,0,267,268,5,44,0,0,268,270,
 		6,22,-1,0,269,271,3,38,19,0,270,269,1,0,0,0,271,272,1,0,0,0,272,270,1,
 		0,0,0,272,273,1,0,0,0,273,274,1,0,0,0,274,275,5,28,0,0,275,45,1,0,0,0,
-		276,277,4,23,2,0,277,278,3,140,70,0,278,279,5,45,0,0,279,280,6,23,-1,0,
-		280,282,3,146,73,0,281,283,5,47,0,0,282,281,1,0,0,0,282,283,1,0,0,0,283,
+		276,277,4,23,2,0,277,278,3,140,70,0,278,279,5,44,0,0,279,280,6,23,-1,0,
+		280,282,3,146,73,0,281,283,5,45,0,0,282,281,1,0,0,0,282,283,1,0,0,0,283,
 		284,1,0,0,0,284,285,3,122,61,0,285,286,5,28,0,0,286,287,6,23,-1,0,287,
 		47,1,0,0,0,288,290,3,56,28,0,289,291,3,122,61,0,290,289,1,0,0,0,290,291,
-		1,0,0,0,291,293,1,0,0,0,292,294,5,47,0,0,293,292,1,0,0,0,293,294,1,0,0,
+		1,0,0,0,291,293,1,0,0,0,292,294,5,45,0,0,293,292,1,0,0,0,293,294,1,0,0,
 		0,294,305,1,0,0,0,295,297,3,62,31,0,296,298,3,60,30,0,297,296,1,0,0,0,
 		297,298,1,0,0,0,298,306,1,0,0,0,299,301,3,60,30,0,300,299,1,0,0,0,300,
 		301,1,0,0,0,301,303,1,0,0,0,302,304,3,62,31,0,303,302,1,0,0,0,303,304,
@@ -4710,7 +4721,7 @@ public partial class Smalltalk80Parser : Parser {
 		5,37,0,0,326,325,1,0,0,0,327,330,1,0,0,0,328,326,1,0,0,0,328,329,1,0,0,
 		0,329,333,1,0,0,0,330,328,1,0,0,0,331,333,3,70,35,0,332,324,1,0,0,0,332,
 		331,1,0,0,0,333,53,1,0,0,0,334,335,4,27,3,0,335,336,5,28,0,0,336,339,3,
-		140,70,0,337,338,5,45,0,0,338,340,6,27,-1,0,339,337,1,0,0,0,339,340,1,
+		140,70,0,337,338,5,44,0,0,338,340,6,27,-1,0,339,337,1,0,0,0,339,340,1,
 		0,0,0,340,341,1,0,0,0,341,342,3,146,73,0,342,343,3,122,61,0,343,347,5,
 		28,0,0,344,346,3,48,24,0,345,344,1,0,0,0,346,349,1,0,0,0,347,345,1,0,0,
 		0,347,348,1,0,0,0,348,350,1,0,0,0,349,347,1,0,0,0,350,351,5,28,0,0,351,
@@ -4721,8 +4732,8 @@ public partial class Smalltalk80Parser : Parser {
 		365,57,1,0,0,0,366,367,3,144,72,0,367,59,1,0,0,0,368,369,5,38,0,0,369,
 		61,1,0,0,0,370,372,5,18,0,0,371,373,3,64,32,0,372,371,1,0,0,0,373,374,
 		1,0,0,0,374,372,1,0,0,0,374,375,1,0,0,0,375,376,1,0,0,0,376,378,5,18,0,
-		0,377,379,5,47,0,0,378,377,1,0,0,0,378,379,1,0,0,0,379,63,1,0,0,0,380,
-		381,5,45,0,0,381,65,1,0,0,0,382,384,5,37,0,0,383,382,1,0,0,0,384,387,1,
+		0,377,379,5,45,0,0,378,377,1,0,0,0,378,379,1,0,0,0,379,63,1,0,0,0,380,
+		381,5,44,0,0,381,65,1,0,0,0,382,384,5,37,0,0,383,382,1,0,0,0,384,387,1,
 		0,0,0,385,383,1,0,0,0,385,386,1,0,0,0,386,388,1,0,0,0,387,385,1,0,0,0,
 		388,397,3,68,34,0,389,391,5,37,0,0,390,389,1,0,0,0,391,392,1,0,0,0,392,
 		390,1,0,0,0,392,393,1,0,0,0,393,394,1,0,0,0,394,396,3,68,34,0,395,390,
@@ -4749,7 +4760,7 @@ public partial class Smalltalk80Parser : Parser {
 		464,1,0,0,0,466,465,1,0,0,0,467,91,1,0,0,0,468,469,3,112,56,0,469,93,1,
 		0,0,0,470,471,3,114,57,0,471,472,3,84,42,0,472,95,1,0,0,0,473,475,3,98,
 		49,0,474,473,1,0,0,0,475,476,1,0,0,0,476,474,1,0,0,0,476,477,1,0,0,0,477,
-		97,1,0,0,0,478,479,5,45,0,0,479,480,5,29,0,0,480,481,3,82,41,0,481,99,
+		97,1,0,0,0,478,479,5,44,0,0,479,480,5,29,0,0,480,481,3,82,41,0,481,99,
 		1,0,0,0,482,483,3,82,41,0,483,101,1,0,0,0,484,486,5,30,0,0,485,487,3,104,
 		52,0,486,485,1,0,0,0,486,487,1,0,0,0,487,489,1,0,0,0,488,490,3,106,53,
 		0,489,488,1,0,0,0,489,490,1,0,0,0,490,492,1,0,0,0,491,493,3,66,33,0,492,
@@ -4763,12 +4774,12 @@ public partial class Smalltalk80Parser : Parser {
 		3,74,37,0,519,520,5,37,0,0,520,522,3,74,37,0,521,519,1,0,0,0,522,525,1,
 		0,0,0,523,521,1,0,0,0,523,524,1,0,0,0,524,527,1,0,0,0,525,523,1,0,0,0,
 		526,518,1,0,0,0,526,527,1,0,0,0,527,528,1,0,0,0,528,529,5,35,0,0,529,111,
-		1,0,0,0,530,531,5,45,0,0,531,113,1,0,0,0,532,533,7,0,0,0,533,115,1,0,0,
-		0,534,535,5,45,0,0,535,117,1,0,0,0,536,543,3,120,60,0,537,543,3,122,61,
+		1,0,0,0,530,531,5,44,0,0,531,113,1,0,0,0,532,533,7,0,0,0,533,115,1,0,0,
+		0,534,535,5,44,0,0,535,117,1,0,0,0,536,543,3,120,60,0,537,543,3,122,61,
 		0,538,543,3,132,66,0,539,543,3,128,64,0,540,543,3,126,63,0,541,543,3,124,
 		62,0,542,536,1,0,0,0,542,537,1,0,0,0,542,538,1,0,0,0,542,539,1,0,0,0,542,
 		540,1,0,0,0,542,541,1,0,0,0,543,119,1,0,0,0,544,545,5,39,0,0,545,121,1,
-		0,0,0,546,547,5,41,0,0,547,123,1,0,0,0,548,549,5,43,0,0,549,125,1,0,0,
+		0,0,0,546,547,5,41,0,0,547,123,1,0,0,0,548,549,5,42,0,0,549,125,1,0,0,
 		0,550,551,5,27,0,0,551,555,5,30,0,0,552,554,5,39,0,0,553,552,1,0,0,0,554,
 		557,1,0,0,0,555,553,1,0,0,0,555,556,1,0,0,0,556,558,1,0,0,0,557,555,1,
 		0,0,0,558,559,5,31,0,0,559,127,1,0,0,0,560,561,5,27,0,0,561,565,5,32,0,
@@ -4777,18 +4788,19 @@ public partial class Smalltalk80Parser : Parser {
 		0,0,0,570,581,3,118,59,0,571,581,3,134,67,0,572,576,5,32,0,0,573,575,3,
 		130,65,0,574,573,1,0,0,0,575,578,1,0,0,0,576,574,1,0,0,0,576,577,1,0,0,
 		0,577,579,1,0,0,0,578,576,1,0,0,0,579,581,5,33,0,0,580,570,1,0,0,0,580,
-		571,1,0,0,0,580,572,1,0,0,0,581,131,1,0,0,0,582,586,5,42,0,0,583,584,5,
+		571,1,0,0,0,580,572,1,0,0,0,581,131,1,0,0,0,582,586,5,51,0,0,583,584,5,
 		27,0,0,584,586,3,134,67,0,585,582,1,0,0,0,585,583,1,0,0,0,586,133,1,0,
-		0,0,587,592,5,45,0,0,588,592,3,112,56,0,589,592,3,114,57,0,590,592,3,136,
-		68,0,591,587,1,0,0,0,591,588,1,0,0,0,591,589,1,0,0,0,591,590,1,0,0,0,592,
-		135,1,0,0,0,593,594,5,45,0,0,594,596,5,29,0,0,595,593,1,0,0,0,596,597,
-		1,0,0,0,597,595,1,0,0,0,597,598,1,0,0,0,598,137,1,0,0,0,599,600,5,44,0,
-		0,600,601,5,28,0,0,601,139,1,0,0,0,602,603,5,45,0,0,603,141,1,0,0,0,604,
-		605,5,45,0,0,605,143,1,0,0,0,606,607,5,45,0,0,607,145,1,0,0,0,608,609,
-		5,45,0,0,609,610,5,29,0,0,610,147,1,0,0,0,58,151,164,167,185,191,194,214,
-		219,241,259,272,282,290,293,297,300,303,305,313,322,328,332,339,347,362,
-		364,374,378,385,392,397,403,408,413,424,431,436,442,449,458,466,476,486,
-		489,492,500,503,509,523,526,542,555,565,576,580,585,591,597
+		0,0,587,593,5,44,0,0,588,593,3,112,56,0,589,593,3,114,57,0,590,593,5,47,
+		0,0,591,593,3,136,68,0,592,587,1,0,0,0,592,588,1,0,0,0,592,589,1,0,0,0,
+		592,590,1,0,0,0,592,591,1,0,0,0,593,135,1,0,0,0,594,595,5,44,0,0,595,597,
+		5,29,0,0,596,594,1,0,0,0,597,598,1,0,0,0,598,596,1,0,0,0,598,599,1,0,0,
+		0,599,137,1,0,0,0,600,601,5,43,0,0,601,602,5,28,0,0,602,139,1,0,0,0,603,
+		604,5,44,0,0,604,141,1,0,0,0,605,606,5,44,0,0,606,143,1,0,0,0,607,608,
+		5,44,0,0,608,145,1,0,0,0,609,610,5,44,0,0,610,611,5,29,0,0,611,147,1,0,
+		0,0,58,151,164,167,185,191,194,214,219,241,259,272,282,290,293,297,300,
+		303,305,313,322,328,332,339,347,362,364,374,378,385,392,397,403,408,413,
+		424,431,436,442,449,458,466,476,486,489,492,500,503,509,523,526,542,555,
+		565,576,580,585,592,598
 	};
 
 	public static readonly ATN _ATN =

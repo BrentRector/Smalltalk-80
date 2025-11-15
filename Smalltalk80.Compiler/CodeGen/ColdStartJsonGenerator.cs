@@ -899,69 +899,21 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     }
 
     /// <summary>
-    /// Creates BlockContext metadata entries for each block method.
-    /// v1.0.4: BlockContext objects are now METADATA-ONLY (not runtime objects).
-    ///
-    /// These metadata entries are used by:
-    /// - Validators: to check closure graph integrity and lexical scoping
-    /// - Debuggers: to inspect block closure structure without execution
-    /// - Tooling: to analyze block relationships and homeContext chains
-    ///
-    /// Loader does NOT allocate these as runtime objects during cold start.
+    /// Creates an empty pool dependency graph for schema v1.0.8 compatibility.
+    /// This is a placeholder implementation - actual pool variable detection will be implemented later.
     /// </summary>
-    private List<BlockContextMetadata> CreateBlockContextMetadata()
+    private PoolDependencyGraph CreateEmptyPoolDependencyGraph()
     {
-        var blockContexts = new List<BlockContextMetadata>();
-
-        // Iterate through all methods and create metadata for blocks (selectorIndex == -1)
-        foreach (var method in _methods.Where(m => m.SelectorIndex == -1))
+        return new PoolDependencyGraph
         {
-            // Look up the homeContext for this block
-            string? homeContextLocalId = _blockToHomeMethod.GetValueOrDefault(method.LocalId);
-
-            // Find the outermost method in the closure chain
-            string? outerContextLocalId = FindOutermostMethod(method.LocalId);
-
-            // Create BlockContext metadata (NOT a runtime object)
-            blockContexts.Add(new BlockContextMetadata
-            {
-                BlockMethodId = method.LocalId,
-                InitialIP = 0, // Blocks always start at IP 0
-                BlockArgumentCount = method.Header.ArgCount ?? 0,
-                HomeContext = homeContextLocalId,
-                OuterContext = outerContextLocalId
-            });
-        }
-
-        return blockContexts;
+            Producers = new List<Producer>(),
+            Consumers = new List<Consumer>(),
+            Edges = new List<Edge>(),
+            ExecutionOrder = _initExprs.Select(e => e.LocalId).ToList(),
+            Diagnostics = null
+        };
     }
 
-    /// <summary>
-    /// Finds the outermost method in the closure chain by following homeContext links.
-    /// Returns the localId of the root method, or null if no homeContext exists.
-    /// </summary>
-    private string? FindOutermostMethod(string blockLocalId)
-    {
-        string? current = blockLocalId;
-        string? outermost = null;
-
-        // Follow the homeContext chain to the root
-        while (current != null && _blockToHomeMethod.TryGetValue(current, out string? parent))
-        {
-            outermost = parent;
-
-            // If the parent is a method (starts with "method:"), we've reached the root
-            if (parent.StartsWith("method:"))
-            {
-                break;
-            }
-
-            // Otherwise, the parent is another block, keep following the chain
-            current = parent;
-        }
-
-        return outermost;
-    }
 
     /// <summary>
     /// Calculates the Blue Book method header word with quick-return optimization support.
@@ -1068,6 +1020,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     /// </summary>
     private object ConvertLiteral(object literal)
     {
+        
         return literal switch
         {
             // Block (CompiledMethodData with null selector)
@@ -1082,16 +1035,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             },
 
             // Association object
-            Association assoc => new Dictionary<string, object>
-            {
-                ["type"] = "association",
-                ["association"] = new Dictionary<string, object?>
-                {
-                    ["keyType"] = "symbol",
-                    ["keyIndex"] = _symbolTable.GetValueOrDefault(((Symbol)assoc.Key).Value, -1),
-                    ["valueRef"] = null // Will be patched later
-                }
-            },
+            Association association => GenerateAssociationLiteral(association),
 
             // Symbol literal in "#symbolName" format
             string str when str.StartsWith("#") => new Dictionary<string, object>
@@ -1249,13 +1193,28 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
 
     /// <summary>
     /// Converts an Association string to the cold-start format.
+    /// Handles both regular associations "Association(key:X,value:Y)" and 
+    /// pool variable associations "Association(key:X,value:Y,poolDictionary:Z)".
     /// </summary>
     private object ConvertAssociation(string assocStr)
     {
-        // Parse "Association(key:X,value:Y)" format
+        // Parse "Association(key:X,value:Y)" or "Association(key:X,value:Y,poolDictionary:Z)" format
         var keyStart = assocStr.IndexOf("key:") + 4;
         var keyEnd = assocStr.IndexOf(',', keyStart);
-        var key = keyEnd > keyStart ? assocStr[keyStart..keyEnd] : "";
+        var key = keyEnd > keyStart ? assocStr[keyStart..keyEnd].Trim() : "";
+
+        // Check for pool dictionary information
+        string? poolDictionaryName = null;
+        var poolStart = assocStr.IndexOf("poolDictionary:");
+        if (poolStart > 0)
+        {
+            poolStart += 15; // Length of "poolDictionary:"
+            var poolEnd = assocStr.IndexOf(')', poolStart);
+            if (poolEnd > poolStart)
+            {
+                poolDictionaryName = assocStr[poolStart..poolEnd].Trim();
+            }
+        }
 
         return new Dictionary<string, object>
         {
@@ -1264,11 +1223,27 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             {
                 ["keyType"] = "symbol",
                 ["keyIndex"] = _symbolTable.GetValueOrDefault(key, -1),
-                ["valueRef"] = null // Will be patched later
+                ["valueRef"] = null, // Will be patched later
+                ["poolDictionaryName"] = poolDictionaryName // Include pool dictionary name for pool variables
             }
         };
     }
 
+    private Dictionary<string, object> GenerateAssociationLiteral(Association assoc)
+    {
+        return new Dictionary<string, object>
+        {
+            ["type"] = "association",
+            ["association"] = new Dictionary<string, object?>
+            {
+                ["keyType"] = "symbol",
+                ["keyIndex"] = _symbolTable.GetValueOrDefault(assoc.Key.Value, -1),
+                ["valueRef"] = null,
+                ["poolDictionaryName"] = assoc.PoolDictionaryName
+            }
+        };
+    }
+    
     /// <summary>
     /// Converts initialization expressions from the AST to the cold-start format.
     /// </summary>
@@ -1460,16 +1435,6 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     /// </summary>
     private ColdStartBundle BuildColdStartBundle(List<int> optimizedSelectors)
     {
-        // Collect undeclared variables from compiler
-        var undeclaredVars = BytecodeCompiler.GetUndeclaredVariables()
-            .Select(kvp => new UndeclaredVariable
-            {
-                Key = kvp.Key,
-                References = kvp.Value.ToList()
-            })
-            .OrderBy(x => x.Key)
-            .ToList();
-
         return new ColdStartBundle
         {
             Metadata = GenerateMetadata(),
@@ -1482,7 +1447,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             InitExpressions = _initExprs,
             InstallOrder = new InstallOrder { Phases = _installPhases },
             Patches = _patches,
-            Undeclared = undeclaredVars
+            PoolDependencyGraph = CreateEmptyPoolDependencyGraph()
         };
     }
 
@@ -1497,12 +1462,9 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
 
         var version = GetType().Assembly.GetName().Version;
 
-        // Count BlockContext metadata entries (one per block method)
-        var blockContexts = CreateBlockContextMetadata();
-
         return new Metadata
         {
-            Version = "1.0.7",
+            Version = "1.0.8",
             Generator = $"Smalltalk80.Compiler v{version}",
             GeneratedAt = DateTime.UtcNow.ToString("O"),
             SourceFile = _sourceFileDescription,
@@ -1512,10 +1474,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             ClassCount = _classes.Count,
             MethodCount = _methods.Count,
             ObjectCount = _objects.Count,
-            InitExpressionCount = _initExprs.Count,
-            BlockContextCount = blockContexts.Count,
-            UndeclaredCount = BytecodeCompiler.GetUndeclaredVariables().Count,
-            BlockContexts = blockContexts
+            InitExpressionCount = _initExprs.Count
         };
     }
 }
@@ -1534,7 +1493,7 @@ internal sealed record ColdStartBundle
     public required List<JsonInitExpr> InitExpressions { get; init; }
     public required InstallOrder InstallOrder { get; init; }
     public required List<PatchDescriptor> Patches { get; init; }
-    public List<UndeclaredVariable>? Undeclared { get; init; }  // v1.0.7: Compiler-tracked undeclared variables
+    public required PoolDependencyGraph PoolDependencyGraph { get; init; }  // v1.0.8: Pool variable dependency analysis
 }
 
 internal sealed record Metadata
@@ -1550,18 +1509,167 @@ internal sealed record Metadata
     public required int MethodCount { get; init; }
     public required int ObjectCount { get; init; }
     public required int InitExpressionCount { get; init; }
-    public int? BlockContextCount { get; init; }
-    public int? UndeclaredCount { get; init; }  // v1.0.7: Count of undeclared variables
-    public List<BlockContextMetadata>? BlockContexts { get; init; }
 }
 
-internal sealed record BlockContextMetadata
+/// <summary>
+/// v1.0.8: Represents a pool variable dependency graph for initialization expression ordering.
+/// </summary>
+internal sealed record PoolDependencyGraph
 {
-    public required string BlockMethodId { get; init; }
-    public required int InitialIP { get; init; }
-    public required int BlockArgumentCount { get; init; }
-    public string? HomeContext { get; init; }
-    public string? OuterContext { get; init; }
+    /// <summary>
+    /// Classes that produce pool variable values (typically via initialize methods).
+    /// </summary>
+    public required List<Producer> Producers { get; init; }
+
+    /// <summary>
+    /// Classes that consume pool variable values.
+    /// </summary>
+    public required List<Consumer> Consumers { get; init; }
+
+    /// <summary>
+    /// Dependency edges representing producer-consumer relationships.
+    /// </summary>
+    public required List<Edge> Edges { get; init; }
+
+    /// <summary>
+    /// Topologically sorted execution order for initialization expressions.
+    /// </summary>
+    public required List<string> ExecutionOrder { get; init; }
+
+    /// <summary>
+    /// Optional diagnostic information about the dependency analysis.
+    /// </summary>
+    public Diagnostics? Diagnostics { get; init; }
+}
+
+/// <summary>
+/// v1.0.8: Represents a class that produces pool variable values.
+/// </summary>
+internal sealed record Producer
+{
+    /// <summary>
+    /// Local ID of the producing class.
+    /// </summary>
+    public required string ClassLocalId { get; init; }
+
+    /// <summary>
+    /// Local ID of the pool dictionary being produced.
+    /// </summary>
+    public required string PoolLocalId { get; init; }
+
+    /// <summary>
+    /// Symbol indices of the variables being produced.
+    /// </summary>
+    public required List<int> Symbols { get; init; }
+
+    /// <summary>
+    /// Optional local ID of the specific method that produces the variables.
+    /// </summary>
+    public string? MethodLocalId { get; init; }
+
+    /// <summary>
+    /// Optional notes about the production relationship.
+    /// </summary>
+    public string? Notes { get; init; }
+}
+
+/// <summary>
+/// v1.0.8: Represents a class that consumes pool variable values.
+/// </summary>
+internal sealed record Consumer
+{
+    /// <summary>
+    /// Local ID of the consuming class.
+    /// </summary>
+    public required string ClassLocalId { get; init; }
+
+    /// <summary>
+    /// Local ID of the pool dictionary being consumed.
+    /// </summary>
+    public required string PoolLocalId { get; init; }
+
+    /// <summary>
+    /// Symbol indices of the variables being consumed.
+    /// </summary>
+    public required List<int> Symbols { get; init; }
+
+    /// <summary>
+    /// Optional local ID of the specific method that consumes the variables.
+    /// </summary>
+    public string? MethodLocalId { get; init; }
+
+    /// <summary>
+    /// Optional notes about the consumption relationship.
+    /// </summary>
+    public string? Notes { get; init; }
+}
+
+/// <summary>
+/// v1.0.8: Represents a dependency edge between a consumer and producer.
+/// </summary>
+internal sealed record Edge
+{
+    /// <summary>
+    /// Local ID of the consumer class that depends on the producer.
+    /// </summary>
+    public required string From { get; init; }
+
+    /// <summary>
+    /// Local ID of the producer class that the consumer depends on.
+    /// </summary>
+    public required string To { get; init; }
+
+    /// <summary>
+    /// Optional symbol indices that are part of this dependency.
+    /// </summary>
+    public List<int>? Symbols { get; init; }
+
+    /// <summary>
+    /// Optional notes about the dependency.
+    /// </summary>
+    public string? Notes { get; init; }
+}
+
+/// <summary>
+/// v1.0.8: Diagnostic information about pool dependency analysis.
+/// </summary>
+internal sealed record Diagnostics
+{
+    /// <summary>
+    /// General diagnostic messages.
+    /// </summary>
+    public List<string>? Messages { get; init; }
+
+    /// <summary>
+    /// Error messages from the analysis.
+    /// </summary>
+    public List<string>? Errors { get; init; }
+
+    /// <summary>
+    /// Additional notes about the analysis.
+    /// </summary>
+    public string? Notes { get; init; }
+}
+
+/// <summary>
+/// v1.0.8: Represents a reference to a pool variable within a method or init expression.
+/// </summary>
+internal sealed record PoolReference
+{
+    /// <summary>
+    /// Local ID of the pool dictionary being referenced.
+    /// </summary>
+    public required string PoolLocalId { get; init; }
+
+    /// <summary>
+    /// Symbol index of the variable being referenced.
+    /// </summary>
+    public required int SymbolIndex { get; init; }
+
+    /// <summary>
+    /// Usage type: "consume" for reading, "produce" for writing.
+    /// </summary>
+    public required string Usage { get; init; }
 }
 
 /// <summary>
@@ -1616,6 +1724,10 @@ internal sealed record JsonMethod
     public string? Source { get; init; }
     public string[]? ArgNames { get; init; }
     public string[]? TempNames { get; init; }
+    /// <summary>
+    /// v1.0.8: Optional pool variable references in this method.
+    /// </summary>
+    public List<PoolReference>? PoolReferences { get; init; }
 }
 
 internal sealed record JsonInitExpr
@@ -1625,6 +1737,10 @@ internal sealed record JsonInitExpr
     public required List<object> Literals { get; init; }
     public required List<int> Bytecodes { get; init; }
     public string? Source { get; init; }
+    /// <summary>
+    /// v1.0.8: Optional pool variable references in this init expression.
+    /// </summary>
+    public List<PoolReference>? PoolReferences { get; init; }
 }
 
 internal sealed record MethodHeader
@@ -1649,19 +1765,6 @@ internal sealed record InstallPhase
     public required List<string> LocalIds { get; init; }
 }
 
-/// <summary>
-/// Represents an undeclared variable found during compilation (v1.0.7).
-/// The compiler tracks all references to variables that couldn't be resolved.
-/// These will be added to the Undeclared dictionary during cold start.
-/// </summary>
-internal sealed record UndeclaredVariable
-{
-    [JsonPropertyName("key")]
-    public required string Key { get; init; }
-
-    [JsonPropertyName("references")]
-    public required List<string> References { get; init; }
-}
 
 /// <summary>
 /// Patch descriptor matching the interpreter's PatchDescriptor schema.

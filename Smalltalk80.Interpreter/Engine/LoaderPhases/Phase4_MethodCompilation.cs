@@ -460,13 +460,30 @@ public class Phase4_MethodCompilation
 
     /// <summary>
     /// Resolves an association literal (key/value pair) with canonicalization.
-    /// Ensures only one Association object exists per variable name across all methods.
+    /// 
+    /// POOL VARIABLES: For pool variables (assoc.PoolDictionaryName != null), we create
+    /// a 2-element Array containing (#PoolDictionaryName, #Key). At runtime, the VM will:
+    /// 1. Resolve pool dictionary name to actual dictionary object
+    /// 2. Look up key in that dictionary  
+    /// 3. Patch the literal to (dictionaryOOP, #Key) for fast subsequent access
+    /// 
+    /// GLOBALS: For global variables, we create an Association with key and nil value.
+    /// The AssociationRegistry ensures canonicalization.
     /// </summary>
     private SmalltalkOOP ResolveAssociation(AssociationLiteral assoc)
     {
         var keyOOP = InternSymbol(_symbols[assoc.KeyIndex]);
         string keyName = _symbols[assoc.KeyIndex];
 
+        // POOL VARIABLES: Create (#PoolName, #Key) literal array
+        if (assoc.PoolDictionaryName != null)
+        {
+            var poolNameSymbol = InternSymbol(assoc.PoolDictionaryName);
+            var poolLiteralArray = AllocateArray(new[] { poolNameSymbol, keyOOP });
+            return poolLiteralArray;
+        }
+
+        // GLOBAL VARIABLES: Use AssociationRegistry for canonicalization
         // VALUE MIGRATION POLICY: Validate that incoming Association has nil value
         var incomingValueOOP = assoc.ValueRef?.LocalId != null
             ? _localIdToObjectId[assoc.ValueRef.LocalId]
@@ -508,6 +525,13 @@ public class Phase4_MethodCompilation
             {
                 var literal = method.Literals[i];
                 if (literal.Type != "association") continue;
+
+                // POOL VARIABLES: Skip validation for pool variable Arrays
+                // Pool variables are stored as (#PoolName, #Key) Arrays, not Associations
+                if (literal.Association!.PoolDictionaryName != null)
+                {
+                    continue; // Pool variable literal - no validation needed
+                }
 
                 totalAssociations++;
 

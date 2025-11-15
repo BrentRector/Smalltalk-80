@@ -38932,7 +38932,8 @@ writeCloneWithout: aSet
 	"! !
 
 SystemTracer initialize!
-ArrayedCollection subclass: #Text
+
+ArrayedCollection subclass: #Text
 	instanceVariableNames: 'string runs '
 	classVariableNames: ''
 	poolDictionaries: 'TextConstants '

@@ -519,9 +519,11 @@ namespace Smalltalk80.Compiler
             if (a is Symbol symA && b is Symbol symB)
                 return symA.Value == symB.Value;
 
-            // Compare Associations by their Key's Value
+            // Compare Associations by their Key's Value AND pool dictionary name
+            // Two associations are equal only if they have the same key AND the same pool dictionary
             if (a is Association assocA && b is Association assocB)
-                return assocA.Key.Value == assocB.Key.Value;
+                return assocA.Key.Value == assocB.Key.Value && 
+                       assocA.PoolDictionaryName == assocB.PoolDictionaryName;
 
             // Compare arrays element by element
             if (a is object[] arrayA && b is object[] arrayB)
@@ -655,15 +657,17 @@ namespace Smalltalk80.Compiler
             PushLiteralConstant(literal);
         }
         
-        public void PushLiteralVariable(string name)
+        public void PushLiteralVariable(string name, string? poolDictionaryName = null)
         {
             // Find or add the Association for this variable
             int index = -1;
 
-            // Search in otherLiterals for existing Association
+            // Search in otherLiterals for existing Association with matching name and pool dictionary
             for (int i = 0; i < otherLiterals.Count; i++)
             {
-                if (otherLiterals[i] is Association assoc && assoc.Key.Value == name)
+                if (otherLiterals[i] is Association assoc && 
+                    assoc.Key.Value == name && 
+                    assoc.PoolDictionaryName == poolDictionaryName)
                 {
                     // Found - calculate final index (after selectors)
                     index = selectors.Count + i;
@@ -673,8 +677,8 @@ namespace Smalltalk80.Compiler
 
             if (index == -1)
             {
-                // Not found - add new Association
-                var association = new Association(new Symbol(name), new NilObject());
+                // Not found - add new Association with pool dictionary information
+                var association = new Association(new Symbol(name), new NilObject(), poolDictionaryName);
                 index = AddLiteral(association);
             }
 
@@ -769,15 +773,17 @@ namespace Smalltalk80.Compiler
             }
         }
         
-        public void StoreLiteralVariable(string name)
+        public void StoreLiteralVariable(string name, string? poolDictionaryName = null)
         {
             // Find or add the Association for this variable
             int index = -1;
 
-            // Search in otherLiterals for existing Association
+            // Search in otherLiterals for existing Association with matching name and pool dictionary
             for (int i = 0; i < otherLiterals.Count; i++)
             {
-                if (otherLiterals[i] is Association assoc && assoc.Key.Value == name)
+                if (otherLiterals[i] is Association assoc && 
+                    assoc.Key.Value == name && 
+                    assoc.PoolDictionaryName == poolDictionaryName)
                 {
                     // Found - calculate final index (after selectors)
                     index = selectors.Count + i;
@@ -787,8 +793,8 @@ namespace Smalltalk80.Compiler
 
             if (index == -1)
             {
-                // Not found - add new Association
-                var association = new Association(new Symbol(name), new NilObject());
+                // Not found - add new Association with pool dictionary information
+                var association = new Association(new Symbol(name), new NilObject(), poolDictionaryName);
                 index = AddLiteral(association);
             }
 
@@ -2747,7 +2753,8 @@ namespace Smalltalk80.Compiler
                             RecordUndeclaredVariable(name, currentMethodIdentifier);
                         }
                     }
-                    emitter.PushLiteralVariable(name);
+                    // Pass pool dictionary name for pool variables, null for class variables and globals
+                    emitter.PushLiteralVariable(name, result.PoolDictionaryName);
                     break;
 
                 case VariableResolver.VariableType.PseudoVariable:
@@ -2820,7 +2827,8 @@ namespace Smalltalk80.Compiler
                         // Record undeclared variables for reporting
                         RecordUndeclaredVariable(name, currentMethodIdentifier);
                     }
-                    emitter.StoreLiteralVariable(name);
+                    // Pass pool dictionary name for pool variables, null for class variables and globals
+                    emitter.StoreLiteralVariable(name, result.PoolDictionaryName);
                     break;
 
                 default:
@@ -3148,7 +3156,7 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Helper class to collect literals in first pass.
         /// </summary>
-        private class LiteralCollector : Smalltalk80BaseVisitor<object?>
+        private class LiteralCollector : Smalltalk80ParserBaseVisitor<object?>
         {
             private readonly BytecodeEmitter emitter;
             private readonly CompilationEnvironment? environment;
@@ -3283,8 +3291,22 @@ namespace Smalltalk80.Compiler
                 // add the appropriate literal for PushLiteralVariable
                 if (needsAssociation)
                 {
-                    // Always use Association for global variables
-                    var literalValue = new Association(new Symbol(name), null);
+                    // Check if it's a pool variable
+                    // Pool variables: undeclared variables in classes that declare pool dictionaries
+                    string? poolDictionaryName = null;
+                    if (environment != null && 
+                        environment.PoolVariables.Count > 0 && 
+                        !environment.ClassVariables.ContainsKey(name))
+                    {
+                        // Undeclared variable in a class that declares pool dictionaries
+                        // Treat it as a pool variable from the first declared pool dictionary
+                        poolDictionaryName = environment.PoolVariables.Keys.First();
+                        Console.WriteLine($"[LiteralCollector] Pool variable '{name}' -> '{poolDictionaryName}'");
+                    }
+                    
+                    // Create Association with pool dictionary name if applicable
+                    var literalValue = new Association(new Symbol(name), null, poolDictionaryName);
+                    Console.WriteLine($"[Association created] key={name}, poolName={poolDictionaryName}");
                     emitter.AddLiteral(literalValue);
                 }
                 

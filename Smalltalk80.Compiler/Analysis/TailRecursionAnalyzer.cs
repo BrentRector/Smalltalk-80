@@ -23,7 +23,7 @@ namespace Smalltalk80.Compiler.Analysis;
 /// - No code after the call (no subsequent statements)
 /// - No assignments using call result
 /// </remarks>
-public sealed class TailRecursionAnalyzer : Smalltalk80BaseVisitor<object?>
+public sealed class TailRecursionAnalyzer : Smalltalk80ParserBaseVisitor<object?>
 {
     private readonly List<string> _diagnosticMessages = [];
     private readonly Dictionary<IParseTree, TailCallInfo> _detectedTailCalls = [];

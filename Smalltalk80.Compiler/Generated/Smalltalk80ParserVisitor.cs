@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/Users/brent/OneDrive/Src/Smalltalk-80/Smalltalk80.Compiler/Grammar/Smalltalk80.g4 by ANTLR 4.13.2
+// Generated from Smalltalk80Parser.g4 by ANTLR 4.13.2
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -31,7 +31,7 @@ using IToken = Antlr4.Runtime.IToken;
 /// <typeparam name="Result">The return type of the visit operation.</typeparam>
 [System.CodeDom.Compiler.GeneratedCode("ANTLR", "4.13.2")]
 [System.CLSCompliant(false)]
-public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
+public interface ISmalltalk80ParserVisitor<Result> : IParseTreeVisitor<Result> {
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.fileIn"/>.
 	/// </summary>
@@ -441,11 +441,11 @@ public interface ISmalltalk80Visitor<Result> : IParseTreeVisitor<Result> {
 	/// <return>The visitor result.</return>
 	Result VisitSymbolName([NotNull] Smalltalk80Parser.SymbolNameContext context);
 	/// <summary>
-	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordSymbolSelector"/>.
+	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.keywordSymbolInArray"/>.
 	/// </summary>
 	/// <param name="context">The parse tree.</param>
 	/// <return>The visitor result.</return>
-	Result VisitKeywordSymbolSelector([NotNull] Smalltalk80Parser.KeywordSymbolSelectorContext context);
+	Result VisitKeywordSymbolInArray([NotNull] Smalltalk80Parser.KeywordSymbolInArrayContext context);
 	/// <summary>
 	/// Visit a parse tree produced by <see cref="Smalltalk80Parser.separatorChunk"/>.
 	/// </summary>
