@@ -395,16 +395,11 @@ public class Phase2_ClassInfrastructure
         SetAndTrackInstanceVariable(classOOP, 7, classPoolOOP);
 
         // Field [8]: sharedPools - Array of shared pool Dictionaries
-        // TODO: Implement proper Array allocation with all pool dictionaries
-        // For now, set first pool only (incorrect - needs Array of all pools)
-        foreach (var poolId in cls.PoolLocalIds)
-        {
-            if (_localIdToObjectId.TryGetValue(poolId, out SmalltalkOOP poolOOP))
-            {
-                SetAndTrackInstanceVariable(classOOP, 8, poolOOP);
-                break; // Only set first pool (TEMPORARY - needs fix)
-            }
-        }
+        // IMPORTANT: Do NOT set sharedPools here! Phase 5 will create the proper Array structure
+        // and populate it with all pool dictionaries. Setting it here causes the Dictionary
+        // to become unreachable when Phase 5 replaces it with an Array, leading to GC failures.
+        //
+        // Phase 5's InstallPoolDictionaryInClasses() creates an Array and installs all pools correctly.
     }
 
     /// <summary>
