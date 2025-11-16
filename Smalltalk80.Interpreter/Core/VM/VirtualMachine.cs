@@ -4463,9 +4463,25 @@ public partial class VirtualMachine : IPrimitiveContext
         
         if (poolDictOOP == SpecialObjectsArray.Instance.Nil)
         {
-            // Pool dictionary not found in Smalltalk globals
+            // Pool dictionary not found - fall back to Undeclared
+            // This handles cases where the pool dictionary is created by an initialize method
             var poolNameString = GetSymbolString(poolNameSymbol);
-            throw new InvalidOperationException($"Pool dictionary not found: {poolNameString}");
+            Console.WriteLine($"[POOL VAR FALLBACK] Pool dictionary '{poolNameString}' not found, checking Undeclared");
+            
+            // Look up in Undeclared dictionary
+            var undeclaredOOP = GlobalRegistry.Get("Undeclared");
+            if (undeclaredOOP != SmalltalkOOP.Null)
+            {
+                var undeclaredValueOOP = LookupInDictionary(undeclaredOOP, keySymbol);
+                if (undeclaredValueOOP != SpecialObjectsArray.Instance.Nil)
+                {
+                    Console.WriteLine($"[POOL VAR FALLBACK] Found '{GetSymbolString(keySymbol)}' in Undeclared");
+                    // Return the Association from Undeclared (don't patch, as pool dict may be created later)
+                    return undeclaredValueOOP;
+                }
+            }
+            
+            throw new InvalidOperationException($"Pool dictionary not found: {poolNameString}, and variable '{GetSymbolString(keySymbol)}' not in Undeclared");
         }
         
         // 2. Look up key in pool dictionary

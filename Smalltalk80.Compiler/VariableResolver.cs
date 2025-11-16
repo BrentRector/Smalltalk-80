@@ -305,10 +305,77 @@ namespace Smalltalk80.Compiler
                 }
             }
             
-            Console.WriteLine($"[POOL VAR DEBUG] Variable '{varName}' falling through to global (PoolVariables.Count={context.PoolVariables.Count})");
+            Console.WriteLine($"[POOL VAR DEBUG] Variable '{varName}' falling through to Step 11");
             
-            // Step 11: Assume global variable (will be resolved at runtime)
+            if (varName == "DefaultTab")
+            {
+                Console.WriteLine($"[DEFAULT_TAB DEBUG] At Step 11, PoolVariables.ContainsKey('__HAS_POOLS__')={context.PoolVariables.ContainsKey("__HAS_POOLS__")}");
+            }
+            
+            // Step 10c: Check for well-known system globals that should never be pool variables
+            // These are created during cold start and should always be treated as globals
+            HashSet<string> wellKnownGlobals = new HashSet<string> 
+            { 
+                "Smalltalk", "Processor", "Display", "Transcript", 
+                "Sensor", "ScheduledControllers", "Undeclared"
+            };
+            
+            if (wellKnownGlobals.Contains(varName))
+            {
+                Console.WriteLine($"[WELL-KNOWN GLOBAL] Variable '{varName}' is a well-known system global");
+                return new ResolutionResult(
+                    VariableType.Global,
+                    -1,  // Literal index assigned by caller
+                    false,  // System globals are generally read-only
+                    varName
+                );
+            }
+            
+            // Step 11: Check if class has pool dictionaries and assume undefined variables are pool variables
+            // For offline compiler: if the class declares pool dictionaries, undefined variables
+            // should be treated as pool variable references (they'll be resolved at runtime)
+            // IMPORTANT: The pool dictionary NAME itself (e.g., "TextConstants") should be treated as
+            // a global variable, NOT as a pool variable!
+            if (context.PoolVariables.TryGetValue("__HAS_POOLS__", out object? poolNamesObj))
+            {
+                // Extract pool dictionary names from the marker
+                string poolNames = poolNamesObj as string ?? "";
+                string[] pools = poolNames.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                
+                // Check if this variable is actually a pool dictionary name itself
+                if (pools.Contains(varName))
+                {
+                    // This is a pool dictionary name - treat as global, not pool variable
+                    Console.WriteLine($"[POOL DICT REFERENCE] Variable '{varName}' is a pool dictionary name, treating as global");
+                    return new ResolutionResult(
+                        VariableType.Global,
+                        -1,  // Literal index assigned by caller
+                        true,  // Pool dictionaries are assignable globals
+                        varName
+                    );
+                }
+                
+                if (pools.Length > 0)
+                {
+                    // Assume the variable is from the first pool dictionary
+                    // (In reality, it could be from any of them, but we don't know at compile time)
+                    string assumedPoolDict = pools[0];
+                    
+                    Console.WriteLine($"[POOL VAR ASSUMPTION] Variable '{varName}' assumed to be pool variable from '{assumedPoolDict}' (class has {pools.Length} pool(s): {poolNames})");
+                    
+                    return new ResolutionResult(
+                        VariableType.PoolVariable,
+                        -1,  // Literal index assigned by caller
+                        true,  // Pool variables are assignable (via Association value:)
+                        varName,
+                        assumedPoolDict  // Pool dictionary name
+                    );
+                }
+            }
+            
+            // Step 12: Fallback - assume global variable (will be resolved at runtime)
             // Global variables are stored as Associations in Smalltalk dictionary
+            Console.WriteLine($"[GLOBAL FALLBACK] Variable '{varName}' assumed to be global (no pool dictionaries)");
             return new ResolutionResult(
                 VariableType.Global,
                 -1,  // Literal index assigned by caller
