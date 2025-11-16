@@ -556,7 +556,7 @@ public class Phase4_MethodCompilation
     /// </summary>
     private SmalltalkOOP ResolveVariableLiteral(AssociationLiteral assoc)
     {
-        var keyOOP = InternSymbol(_symbols[assoc.KeyIndex]);
+        var keySymbol = InternSymbol(_symbols[assoc.KeyIndex]);
         string keyName = _symbols[assoc.KeyIndex];
 
         // POOL VARIABLES: Create 2-element Array (#PoolName, #Key) - NOT an Association
@@ -564,20 +564,20 @@ public class Phase4_MethodCompilation
         {
             // Deduplication key: "PoolDictionaryName:KeySymbol"
             string dedupKey = $"{assoc.PoolDictionaryName}:{keyName}";
-            
+
             if (_poolVariableBindings.TryGetValue(dedupKey, out var existingArrayOOP))
             {
                 // Reuse existing pool variable binding Array
                 return existingArrayOOP;
             }
-            
+
             // Create new pool variable binding Array: (#PoolDictionaryName, #Key)
             var poolNameSymbol = InternSymbol(assoc.PoolDictionaryName);
-            var poolBindingArray = AllocateArray(new[] { poolNameSymbol, keyOOP });
-            
+            var poolBindingArray = AllocateArray(new[] { poolNameSymbol, keySymbol });
+
             // Register for deduplication
             _poolVariableBindings[dedupKey] = poolBindingArray;
-            
+
             return poolBindingArray;
         }
 
@@ -595,7 +595,7 @@ public class Phase4_MethodCompilation
         {
             // Create new Association: key=Symbol, value=nil
             // Always use nil value per VALUE MIGRATION POLICY
-            var assocOOP = AllocateAssociation(keyOOP, SpecialObjectsArray.Instance.Nil);
+            var assocOOP = AllocateAssociation(keySymbol, SpecialObjectsArray.Instance.Nil);
 
             return assocOOP;
         });
