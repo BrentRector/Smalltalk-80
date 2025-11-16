@@ -73,6 +73,11 @@ public class Phase3_ObjectAllocation
         InitializeUnsetInstanceVariables();
         LogInitializationCheckpoint();
 
+        // Section 5: Pre-create Associations for Undeclared Variables (Phase 3.5)
+        // CRITICAL: This runs BEFORE Phase 4 (method compilation) to ensure
+        // method literals get the same Association objects that Phase 5 will use
+        PreCreateUndeclaredAssociations();
+
         // DEBUG: Check SystemDictionary tally at END of Phase 3
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         var tallyEnd = _allocator.GetInstanceVariable(systemDictOOP, 0);
@@ -1209,6 +1214,81 @@ public class Phase3_ObjectAllocation
     {
         _allocator.SetInstanceVariable(oop, slot, value);
         _initializedFields.Add((oop, slot));
+    }
+
+    #endregion
+
+    #region Phase 3.5: Association Pre-Creation
+
+    /// <summary>
+    /// Pre-creates canonical Association objects for undeclared variables (Phase 3.5).
+    /// CRITICAL: This runs BEFORE Phase 4 (method compilation) to ensure method literals
+    /// reference the same Association objects that Phase 5 will install in Undeclared.
+    ///
+    /// Architecture:
+    /// 1. Phase 3.5 (this method): Creates Associations and registers in AssociationRegistry
+    /// 2. Phase 4: Calls AssociationRegistry.GetOrCreate() → gets SAME Associations
+    /// 3. Phase 5: Calls AssociationRegistry.GetOrCreate() → gets SAME Associations
+    /// 4. Phase 5: Adds these Associations to Undeclared dictionary
+    ///
+    /// Result: ONE Association object per global variable name, ensuring the canonical
+    /// Association pattern required by Blue Book semantics.
+    /// </summary>
+    private void PreCreateUndeclaredAssociations()
+    {
+        if (_bundle.Undeclared == null || _bundle.Undeclared.Length == 0)
+        {
+            Console.WriteLine("[Phase3.5] No undeclared variables in bundle - skipping Association pre-creation");
+            return;
+        }
+
+        Console.WriteLine($"[Phase3.5] Pre-creating canonical Associations for undeclared variables...");
+
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        int createdCount = 0;
+        int skippedClasses = 0;
+
+        // Build set of class names to exclude (these will be installed in SystemDictionary by Phase 5)
+        var classNames = new HashSet<string>(_bundle.Classes.Select(c => _symbols[c.NameIndex]));
+
+        foreach (var undeclaredVar in _bundle.Undeclared)
+        {
+            // CRITICAL: Skip class names - they will be installed directly in SystemDictionary by Phase 5
+            // We only pre-create Associations for non-class undeclared variables (like pool dictionaries)
+            if (classNames.Contains(undeclaredVar.Key))
+            {
+                skippedClasses++;
+                continue;
+            }
+
+            // Get symbol OOP for the key
+            SmalltalkOOP keySymbolOOP = InternSymbol(undeclaredVar.Key);
+
+            // Use AssociationRegistry to create canonical Association
+            // This ensures Phase 4 and Phase 5 will get the SAME Association object
+            AssociationRegistry.GetOrCreate(undeclaredVar.Key, () =>
+            {
+                // Create new Association with key and nil value
+                return AllocateAssociationWithSemanticAllocator(keySymbolOOP, nilOOP);
+            });
+
+            createdCount++;
+        }
+
+        Console.WriteLine($"  ✓ Pre-created {createdCount} canonical Associations");
+        Console.WriteLine($"  ✓ Skipped {skippedClasses} class names (will be installed directly in SystemDictionary)");
+        Console.WriteLine($"  ✓ AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations");
+
+        // Show sample
+        if (createdCount > 0)
+        {
+            var nonClassUndeclared = _bundle.Undeclared.Where(u => !classNames.Contains(u.Key)).Take(5);
+            Console.WriteLine($"  Sample non-class undeclared variables:");
+            foreach (var uv in nonClassUndeclared)
+            {
+                Console.WriteLine($"    - {uv.Key} ({uv.References.Length} reference(s))");
+            }
+        }
     }
 
     #endregion
