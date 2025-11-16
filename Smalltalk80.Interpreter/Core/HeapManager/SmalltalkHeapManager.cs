@@ -927,19 +927,10 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     public GCStatistics GarbageCollect()
     {
         var stopwatch = Stopwatch.StartNew();
-        
-        // DEBUG
-        var test1 = GetSlot(SmalltalkOOP.FromObjectTableIndex(10632), 0);
-        Console.WriteLine($"[GC Entry] OOP 10632 slot[0]={test1}");
-        
+
         // Phase 1: Count objects before collection
         int objectsBeforeCollection = GetActiveObjectCount();
-        
-        // DEBUG
-        var test2 = GetSlot(SmalltalkOOP.FromObjectTableIndex(10632), 0);
-        Console.WriteLine($"[After count] OOP 10632 slot[0]={test2}");
 
-        
         // Phase 2: Clear all mark bits
         foreach (var block in _objectTableBlocks)
         {
@@ -949,25 +940,15 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                     block.Entries[i]!.IsMarked = false;
             }
         }
-        
+
         double markStartTime = stopwatch.Elapsed.TotalMilliseconds;
-        
-        // DEBUG: Check class pointer before marking
-        var testOOP = SmalltalkOOP.FromObjectTableIndex(10632);
-        var testSlot0 = GetSlot(testOOP, 0);
-        Console.WriteLine($"[GC START] Before marking: OOP 10632 slot[0]={testSlot0}");
-        
+
         // Phase 3: Mark from configured roots
         foreach (var rootOOP in _gcRoots)
         {
             MarkObjectRecursively(rootOOP);
         }
-        
-        // DEBUG: Check class pointer after marking
-        var testSlot0After = GetSlot(testOOP, 0);
-        Console.WriteLine($"[GC END] After marking: OOP 10632 slot[0]={testSlot0After}");
 
-        
         double markEndTime = stopwatch.Elapsed.TotalMilliseconds;
         double markTime = markEndTime - markStartTime;
         
@@ -1065,14 +1046,6 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             return;
 
         entry.IsMarked = true;
-        
-        // DEBUG: Log marking of specific OOPs we're tracking
-        int oop = objectOOP.ToObjectTableIndex();
-        if (oop == 10632 || oop == 10670 || oop == 14098 || oop == 14174)
-        {
-            var rawClassOOP = GetSlot(objectOOP, 0);
-            Console.WriteLine($"[GC DEBUG] Marking OOP {oop}, raw slot[0]={rawClassOOP}");
-        }
 
         // Traverse pointer fields based on format
         if (entry.FormatExplicit == ObjectFormat.Pointer || entry.FormatExplicit == ObjectFormat.PointerIndexed)

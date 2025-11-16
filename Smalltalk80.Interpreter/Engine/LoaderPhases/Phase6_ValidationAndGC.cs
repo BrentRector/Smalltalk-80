@@ -58,33 +58,13 @@ public class Phase6_ValidationAndGC
     public void Run()
     {
         // Step 1: Comprehensive heap validation (from Phase13)
-// Console.WriteLine("Step 1: Comprehensive Heap Validation...");
         RunComprehensiveValidation();
-// Console.WriteLine("✓");
-        
-        // DEBUG: Check class pointer after validation
-        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP_afterValidation))
-        {
-            var slot0_afterValidation = _heapManager.GetSlot(browserOOP_afterValidation, 0);
-            Console.WriteLine($"[After Validation] class:Browser slot[0]={slot0_afterValidation}");
-        }
 
         // Step 2: Set up GC roots (from Loader Phase 14)
-// Console.WriteLine("Step 2: GC Root Setup...");
         SetupGCRoots();
-// Console.WriteLine("✓");
-        
-        // DEBUG: Check class pointer after GC root setup
-        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP_afterGCRoots))
-        {
-            var slot0_afterGCRoots = _heapManager.GetSlot(browserOOP_afterGCRoots, 0);
-            Console.WriteLine($"[After GC Roots] class:Browser slot[0]={slot0_afterGCRoots}");
-        }
 
         // Step 3: Run GC verification (from Loader Phase 15)
-// Console.WriteLine("Step 3: GC Verification...");
         RunGCVerification();
-// Console.WriteLine("✓");
     }
 
     // ========================================================================================
@@ -731,24 +711,10 @@ public class Phase6_ValidationAndGC
 
     private void RunGCVerification()
     {
-        // DEBUG: Check before GetActiveObjectCount
-        if (_localIdToObjectId.TryGetValue("class:Browser", out var oop1))
-        {
-            var s1 = _heapManager.GetSlot(oop1, 0);
-            Console.WriteLine($"[Before GetActiveObjectCount] class:Browser slot[0]={s1}");
-        }
-        
         // Log object counts before GC
         Console.WriteLine($"[Phase6] Objects before GC:");
         Console.WriteLine($"  Total objects: {_heapManager.GetActiveObjectCount()}");
-        
-        // DEBUG: Check after GetActiveObjectCount
-        if (_localIdToObjectId.TryGetValue("class:Browser", out var oop2))
-        {
-            var s2 = _heapManager.GetSlot(oop2, 0);
-            Console.WriteLine($"[After GetActiveObjectCount] class:Browser OOP={oop2}, slot[0]={s2}");
-        }
-        
+
         var gcStats = _heapManager.GarbageCollect();
 
         // Print GC statistics

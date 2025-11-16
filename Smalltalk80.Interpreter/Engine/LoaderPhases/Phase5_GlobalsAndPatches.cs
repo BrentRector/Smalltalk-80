@@ -116,11 +116,13 @@ public class Phase5_GlobalsAndPatches
     {
         if (_bundle.Patches == null || _bundle.Patches.Length == 0)
         {
-// Console.WriteLine($"  No patches to apply");
+            Console.WriteLine($"[Phase5] No patches to apply");
             return;
         }
 
-// Console.WriteLine($"  Applying {_bundle.Patches.Length} patches...");
+        int setInstanceVarCount = 0;
+        int replaceLiteralCount = 0;
+        int installMethodDictCount = 0;
 
         foreach (var patch in _bundle.Patches)
         {
@@ -128,14 +130,17 @@ public class Phase5_GlobalsAndPatches
             {
                 case "SetInstanceVariable":
                     ApplySetInstanceVariablePatch(patch);
+                    setInstanceVarCount++;
                     break;
 
                 case "InstallMethodDictionary":
                     ApplyInstallMethodDictionaryPatch(patch);
+                    installMethodDictCount++;
                     break;
 
                 case "ReplaceLiteral":
                     ApplyReplaceLiteralPatch(patch);
+                    replaceLiteralCount++;
                     break;
 
                 default:
@@ -182,6 +187,9 @@ public class Phase5_GlobalsAndPatches
         }
     }
 
+    private int _replacedArrayCount = 0;
+    private int _skippedPoolBindingCount = 0;
+
     private void ApplyReplaceLiteralPatch(PatchDescriptor patch)
     {
         var methodOOP = _localIdToObjectId[patch.MethodLocalId!];
@@ -211,7 +219,34 @@ public class Phase5_GlobalsAndPatches
         }
         else
         {
-            // Not an Association - replace the literal itself
+            // Not an Association - check if it's a pool binding Array before replacing
+
+            var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+            if (literalClassOOP == arrayClassOOP)
+            {
+                // Check if this is a pool binding Array: 2-element Array of Symbols
+                int arraySize = _heapManager.GetIndexedSize(literalOOP);
+                if (arraySize == 2)
+                {
+                    var elem0 = _heapManager.GetIndexedOOP(literalOOP, 0);
+                    var elem1 = _heapManager.GetIndexedOOP(literalOOP, 1);
+                    var symbolClassOOP = GlobalRegistry.LookupClassOOP("Symbol");
+                    var elem0ClassOOP = _heapManager.GetSlot(elem0, 0);
+                    var elem1ClassOOP = _heapManager.GetSlot(elem1, 0);
+
+                    if (elem0ClassOOP == symbolClassOOP && elem1ClassOOP == symbolClassOOP)
+                    {
+                        // This is a pool binding Array - DO NOT REPLACE IT
+                        // Pool bindings are resolved at runtime by the VM
+                        _skippedPoolBindingCount++;
+                        return; // Skip this patch
+                    }
+                }
+
+                // Not a pool binding - replace the Array
+                _replacedArrayCount++;
+            }
+
             _heapManager.SetIndexedOOP(methodOOP, patch.LiteralIndex.Value + 1, newValueOOP);
 
             if (_debugOptions.ShouldDebugPatches)
@@ -420,18 +455,11 @@ public class Phase5_GlobalsAndPatches
     {
         var systemDictionaryOOP = GlobalRegistry.SystemDictionaryOOP;
 
-        // Get or create canonical Association  
-        Console.WriteLine($"[InstallSmalltalkGlobal] Before GetOrCreate: AssociationRegistry has {AssociationRegistry.Count} associations");
+        // Get or create canonical Association
         var associationOOP = GetOrCreateCanonicalAssociation("Smalltalk");
-        Console.WriteLine($"[InstallSmalltalkGlobal] Got Association {associationOOP} for 'Smalltalk'");
-        Console.WriteLine($"[InstallSmalltalkGlobal] After GetOrCreate: AssociationRegistry has {AssociationRegistry.Count} associations");
 
         // Set Association value to SystemDictionary
         _allocator.SetInstanceVariable(associationOOP, 1, systemDictionaryOOP);
-
-        // DEBUG: Verify the Association value was set correctly
-        var verifyValue = _allocator.GetInstanceVariable(associationOOP, 1);
-        Console.WriteLine($"[InstallSmalltalkGlobal] Association {associationOOP} -> value={verifyValue} (SystemDict={systemDictionaryOOP})");
 
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationOOP, "Smalltalk");
@@ -664,23 +692,37 @@ public class Phase5_GlobalsAndPatches
         // Initialize each discovered pool dictionary
         foreach (var (poolName, declaringClasses) in poolToClasses)
         {
-            // Create empty Dictionary with reasonable initial size
-            // Most pools have just a handful of constants, so 8 slots is sufficient
-            int initialSize = 8;
+            SmalltalkOOP dictionaryOOP;
 
-            var dictionaryOOP = _allocator.AllocateObject("Dictionary", ObjectFormat.PointerIndexed, initialSize);
-            _allocator.SetObjectClass(dictionaryOOP, dictionaryClassOOP);
-
-            // Initialize tally to 0
-            if (tallyIndex >= 0)
+            // Check if this pool dictionary was pre-allocated in the bundle (Phase 3)
+            string poolLocalId = $"pool:{poolName}";
+            if (_localIdToObjectId.TryGetValue(poolLocalId, out var existingPoolOOP))
             {
-                _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
+                // Use the pre-allocated pool dictionary from the bundle
+                dictionaryOOP = existingPoolOOP;
+// Console.WriteLine($"    Using pre-allocated pool dictionary: {poolName} (OOP={dictionaryOOP})");
             }
-
-            // Initialize all indexed slots to nil
-            for (int i = 0; i < initialSize; i++)
+            else
             {
-                _allocator.SetIndexedOOP(dictionaryOOP, i, nilOOP);
+                // Create empty Dictionary with reasonable initial size
+                // Most pools have just a handful of constants, so 8 slots is sufficient
+                int initialSize = 8;
+
+                dictionaryOOP = _allocator.AllocateObject("Dictionary", ObjectFormat.PointerIndexed, initialSize);
+                _allocator.SetObjectClass(dictionaryOOP, dictionaryClassOOP);
+
+                // Initialize tally to 0
+                if (tallyIndex >= 0)
+                {
+                    _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
+                }
+
+                // Initialize all indexed slots to nil
+                for (int i = 0; i < initialSize; i++)
+                {
+                    _allocator.SetIndexedOOP(dictionaryOOP, i, nilOOP);
+                }
+// Console.WriteLine($"    Created new pool dictionary: {poolName} (OOP={dictionaryOOP})");
             }
 
             // Create Association and install as global
