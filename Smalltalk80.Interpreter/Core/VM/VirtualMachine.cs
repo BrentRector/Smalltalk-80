@@ -584,8 +584,8 @@ public partial class VirtualMachine : IPrimitiveContext
             // Increment and check instruction counter (one count per bytecode executed)
             _instructionCount++;
             
-            // Report progress every 10K instructions during potential infinite loops
-            if (_instructionCount % 10000 == 0)
+            // Report progress every 10K instructions during potential infinite loops (only when tracing is enabled)
+            if (_selectorTraceEnabled && _instructionCount % 10000 == 0)
             {
                 var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
                 var ctxReceiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.CONTEXT_RECEIVER_INDEX);
@@ -3056,7 +3056,43 @@ public partial class VirtualMachine : IPrimitiveContext
             _pushTraceCounter++;
             if (_pushTraceCounter <= 10)
             {
-                Console.WriteLine($"[PUSH #{_pushTraceCounter}] Pushing OOP={valueOOP} onto stack");
+                // Format: "oop=#### (ClassName)" for objects, "SmallInteger(#)" for small integers
+                string valueStr;
+                if (valueOOP.IsSmallInteger)
+                {
+                    valueStr = $"SmallInteger({valueOOP.AsSmallInteger()})";
+                }
+                else
+                {
+                    try
+                    {
+                        string className = GetClassName(valueOOP);
+                        valueStr = $"{valueOOP} ({className})";
+                        
+                        // If Symbol, show value
+                        if (className == "Symbol")
+                        {
+                            try
+                            {
+                                int byteSize = _heapManager.GetIndexedSize(valueOOP);
+                                var bytes = new byte[byteSize];
+                                for (int i = 0; i < byteSize; i++)
+                                {
+                                    bytes[i] = _heapManager.GetIndexedByte(valueOOP, i);
+                                }
+                                string symbolValue = System.Text.Encoding.Latin1.GetString(bytes);
+                                valueStr = $"{valueOOP} (Symbol) = #{symbolValue}";
+                            }
+                            catch { }
+                        }
+                    }
+                    catch
+                    {
+                        // If GetClassName fails, just show the OOP
+                        valueStr = valueOOP.ToString();
+                    }
+                }
+                Console.WriteLine($"[PUSH #{_pushTraceCounter}] Pushing {valueStr} onto stack");
             }
         }
         

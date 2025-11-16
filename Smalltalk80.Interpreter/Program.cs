@@ -369,19 +369,10 @@ public static class Program
                     // Show what we're executing
                     Console.Write($"  [{index}] {expr.Source}... ");
 
-                    // DEBUG: Check Smalltalk Association before Text initialize
+                    // DEBUG: Dump Text class>>initialize method literals before execution
                     if (expr.Source != null && expr.Source.Contains("Text"))
                     {
-                        var smalltalkAssocOOP = new SmalltalkOOP(34404); // Known from Phase 5 output
-                        var smalltalkValue = heapManager.GetInstanceVariable(smalltalkAssocOOP, 1);
                         Console.WriteLine();
-                        Console.WriteLine($"[PRE-TEXT DEBUG] Smalltalk Association OOP=34404, value={smalltalkValue}");
-                        
-                        // Check Undeclared Association (should be OOP=13492 from Phase 3)
-                        var undeclaredAssocOOP = new SmalltalkOOP(13492);
-                        var undeclaredKey = heapManager.GetInstanceVariable(undeclaredAssocOOP, 0);
-                        var undeclaredValue = heapManager.GetInstanceVariable(undeclaredAssocOOP, 1);
-                        Console.WriteLine($"[PRE-TEXT DEBUG] Undeclared Association OOP=13492, key={undeclaredKey}, value={undeclaredValue}");
                         
                         // Dump Text class>>initialize method literals (known OOP 32872 from stack trace)
                         var textInitMethodOOP = new SmalltalkOOP(32872);
@@ -390,19 +381,86 @@ public static class Program
                         for (int i = 0; i < literalCount && i < 10; i++)
                         {
                             var literalOOP = heapManager.GetIndexedOOP(textInitMethodOOP, i);
-                            Console.WriteLine($"  Literal[{i}] = {literalOOP}");
                             
-                            // If it's an Association, show key and value
-                            if (literalOOP == smalltalkAssocOOP)
+                            // Get class name for the literal
+                            string literalStr = literalOOP.ToString();
+                            string extraInfo = "";
+                            
+                            if (!literalOOP.IsSmallInteger && literalOOP != SmalltalkOOP.Null)
                             {
-                                Console.WriteLine($"    ^^^ THIS IS THE SMALLTALK ASSOCIATION!");
+                                try
+                                {
+                                    // Get class name of the literal object
+                                    string className = heapManager.GetClassName(literalOOP);
+                                    literalStr = $"{literalOOP} ({className})";
+                                    
+                                    // If it's a Symbol, extract and show the symbol value
+                                    if (className == "Symbol")
+                                    {
+                                        try
+                                        {
+                                            int byteSize = heapManager.GetIndexedSize(literalOOP);
+                                            var symbolBytes = new byte[byteSize];
+                                            for (int b = 0; b < byteSize; b++)
+                                            {
+                                                symbolBytes[b] = heapManager.GetIndexedByte(literalOOP, b);
+                                            }
+                                            string symbolValue = System.Text.Encoding.Latin1.GetString(symbolBytes);
+                                            extraInfo = $" = #{symbolValue}";
+                                        }
+                                        catch
+                                        {
+                                            // Silently ignore extraction failures
+                                        }
+                                    }
+                                    // If it's an Association, show key and value
+                                    else if (className == "Association")
+                                    {
+                                        try
+                                        {
+                                            var keyOOP = heapManager.GetInstanceVariable(literalOOP, 0);
+                                            var valueOOP = heapManager.GetInstanceVariable(literalOOP, 1);
+                                            
+                                            // Try to get readable key (usually a Symbol)
+                                            string keyStr = keyOOP.ToString();
+                                            if (!keyOOP.IsSmallInteger && keyOOP != SmalltalkOOP.Null)
+                                            {
+                                                string keyClassName = heapManager.GetClassName(keyOOP);
+                                                if (keyClassName == "Symbol")
+                                                {
+                                                    int keySize = heapManager.GetIndexedSize(keyOOP);
+                                                    var keyBytes = new byte[keySize];
+                                                    for (int b = 0; b < keySize; b++)
+                                                    {
+                                                        keyBytes[b] = heapManager.GetIndexedByte(keyOOP, b);
+                                                    }
+                                                    keyStr = "#" + System.Text.Encoding.Latin1.GetString(keyBytes);
+                                                }
+                                            }
+                                            
+                                            // Get value class name
+                                            string valueStr = valueOOP.ToString();
+                                            if (!valueOOP.IsSmallInteger && valueOOP != SmalltalkOOP.Null)
+                                            {
+                                                string valueClassName = heapManager.GetClassName(valueOOP);
+                                                valueStr = $"{valueOOP} ({valueClassName})";
+                                            }
+                                            
+                                            extraInfo = $" -> {keyStr} => {valueStr}";
+                                        }
+                                        catch
+                                        {
+                                            // Silently ignore extraction failures
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                    // If we can't get the class name, just use the OOP
+                                }
                             }
                             
-                            // Check if this is the Undeclared Association
-                            if (literalOOP == undeclaredAssocOOP)
-                            {
-                                Console.WriteLine($"    ^^^ THIS IS THE UNDECLARED ASSOCIATION!");
-                            }
+                            Console.WriteLine($"  Literal[{i}] = {literalStr}{extraInfo}");
                         }
                         
                         Console.WriteLine($"[PRE-TEXT DEBUG] Enabling VM bytecode tracing for Text initialize...");
