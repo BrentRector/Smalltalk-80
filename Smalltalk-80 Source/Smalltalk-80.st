@@ -8816,7 +8816,7 @@ declare: varString
 		ifTrue: 
 			[classPool _ self classPool.
 			"in case it was nil"
-			newVars do: [:var | classPool declare: var from: #Undeclared]].
+			newVars do: [:var | classPool declare: var from: Undeclared]].
 	^conflicts!
 obsolete
 	"Change the receiver to an obsolete class by changing its name to have the prefix -AnObsolete-, and nilling the fields of any instances."
@@ -25494,7 +25494,7 @@ name: newName inEnvironment: environ subclassOf: sup and: others instanceVariabl
 	commentString == nil ifFalse: [newClass comment: commentString].
 	(environ includesKey: newName)
 		ifFalse: 
-			[environ declare: newName from: #Undeclared.
+			[environ declare: newName from: Undeclared.
 			environ at: newName put: newClass].
 	SystemOrganization classify: newClass name under: categoryName asSymbol.
 	newClass
@@ -25548,7 +25548,7 @@ name: newName inEnvironment: environ subclassOf: sup instanceVariableNames: inst
 	commentString == nil ifFalse: [newClass comment: commentString].
 	(environ includesKey: newName)
 		ifFalse: 
-			[environ declare: newName from: #Undeclared.
+			[environ declare: newName from: Undeclared.
 			environ at: newName put: newClass].
 	SystemOrganization classify: newClass name under: categoryName asSymbol.
 	newClass
@@ -37592,7 +37592,7 @@ at: aKey put: anObject
 				valueAtNewKey: aKey
 				put: anObject
 				atIndex: index
-				declareFrom: #Undeclared]
+				declareFrom: Undeclared]
 		ifFalse: 
 			[element value: anObject].
 	^anObject!

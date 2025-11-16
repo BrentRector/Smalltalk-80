@@ -659,7 +659,9 @@ public class Phase3_ObjectAllocation
     private void SetAssociationClassReferences()
     {
         var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
+        var dictionaryClassOOP = GlobalRegistry.LookupClassOOP("Dictionary");
         int associationsFixed = 0;
+        int dictionariesFixed = 0;
         
         // Scan through ALL allocated objects in the heap (including runtime-allocated ones)
         foreach (var objectOOP in _heapManager.EnumerateObjectTable())
@@ -677,16 +679,22 @@ public class Phase3_ObjectAllocation
                 if (currentClassOOP != default(SmalltalkOOP) && currentClassOOP != SpecialObjectsArray.Instance.Nil)
                     continue;
                 
-                // Check if this looks like an Association (2 instance variables, Pointer format, no indexed data)
+                // Check object format to determine class
                 var format = _allocator.GetObjectFormat(objectOOP);
                 int instVarCount = _allocator.GetInstanceVariableCount(objectOOP);
                 int indexedSize = _allocator.GetIndexedSize(objectOOP);
                 
+                // Association: 2 instance vars, Pointer format, no indexed data
                 if (format == ObjectFormat.Pointer && instVarCount == 2 && indexedSize == 0)
                 {
-                    // This is likely an Association - set its class pointer
                     _allocator.SetSlot(objectOOP, 0, associationClassOOP);
                     associationsFixed++;
+                }
+                // Dictionary: 1 instance var (tally), PointerIndexed format, indexed data
+                else if (format == ObjectFormat.PointerIndexed && instVarCount == 1 && indexedSize > 0)
+                {
+                    _allocator.SetSlot(objectOOP, 0, dictionaryClassOOP);
+                    dictionariesFixed++;
                 }
             }
             catch
@@ -696,7 +704,7 @@ public class Phase3_ObjectAllocation
             }
         }
         
-        // Console.WriteLine($"  Fixed {associationsFixed} Association class references");
+        Console.WriteLine($"  Fixed {associationsFixed} Association + {dictionariesFixed} Dictionary class references");
     }
 
     private string GetClassNameFromLocalId(string localId)

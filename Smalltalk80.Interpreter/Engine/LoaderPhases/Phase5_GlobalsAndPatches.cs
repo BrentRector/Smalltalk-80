@@ -1041,7 +1041,7 @@ public class Phase5_GlobalsAndPatches
             return;
         }
 
-// Console.WriteLine($"[Phase5] Populating Undeclared dictionary with {_bundle.Undeclared.Length} variables...");
+Console.WriteLine($"[Phase5] Populating Undeclared dictionary with {_bundle.Undeclared.Length} variables...");
 
         var undeclaredOOP = GlobalRegistry.Get("Undeclared");
         var nilOOP = SpecialObjectsArray.Instance.Nil;
@@ -1067,16 +1067,26 @@ public class Phase5_GlobalsAndPatches
 
 // Console.WriteLine($"  ✓ Added {addedCount} Associations to Undeclared dictionary");
 
+        // CRITICAL FIX: Set the value of the "Undeclared" Association to point to the Undeclared dictionary
+        // This allows bare identifier "Undeclared" in source code to resolve to the dictionary object
+        var allAssociations = AssociationRegistry.GetAll();
+        if (allAssociations.TryGetValue("Undeclared", out var undeclaredAssoc))
+        {
+            // Set Association value field (slot 1) to the Undeclared dictionary OOP
+            _allocator.SetInstanceVariable(undeclaredAssoc, 1, undeclaredOOP);
+Console.WriteLine($"  ✓ Set Undeclared Association value to dictionary OOP={undeclaredOOP}");
+        }
+
         // Show sample of undeclared variables
         if (addedCount > 0)
         {
             var sampleCount = Math.Min(5, _bundle.Undeclared.Length);
-// Console.WriteLine($"  Sample undeclared variables:");
+Console.WriteLine($"  Sample undeclared variables:");
             for (int i = 0; i < sampleCount; i++)
             {
                 var varName = _bundle.Undeclared[i].Key;
                 var refCount = _bundle.Undeclared[i].References.Length;
-// Console.WriteLine($"    - {varName} ({refCount} reference(s))");
+Console.WriteLine($"    - {varName} ({refCount} reference(s))");
             }
         }
     }

@@ -1480,8 +1480,27 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             InitExpressions = _initExprs,
             InstallOrder = new InstallOrder { Phases = _installPhases },
             Patches = _patches,
-            PoolDependencyGraph = CreateEmptyPoolDependencyGraph()
+            PoolDependencyGraph = CreateEmptyPoolDependencyGraph(),
+            Undeclared = ConvertUndeclaredVariables()
         };
+    }
+
+    /// <summary>
+    /// Converts the undeclared variables dictionary from BytecodeCompiler to the bundle format.
+    /// </summary>
+    private List<UndeclaredVariable>? ConvertUndeclaredVariables()
+    {
+        var undeclared = BytecodeCompiler.GetUndeclaredVariables();
+        if (undeclared.Count == 0)
+        {
+            return null;
+        }
+
+        return undeclared.Select(kvp => new UndeclaredVariable
+        {
+            Key = kvp.Key,
+            References = kvp.Value
+        }).ToList();
     }
 
     /// <summary>
@@ -1507,7 +1526,8 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             ClassCount = _classes.Count,
             MethodCount = _methods.Count,
             ObjectCount = _objects.Count,
-            InitExpressionCount = _initExprs.Count
+            InitExpressionCount = _initExprs.Count,
+            UndeclaredCount = BytecodeCompiler.GetUndeclaredVariables().Count
         };
     }
 }
@@ -1526,6 +1546,7 @@ internal sealed record ColdStartBundle
     public required List<JsonInitExpr> InitExpressions { get; init; }
     public required InstallOrder InstallOrder { get; init; }
     public required List<PatchDescriptor> Patches { get; init; }
+    public List<UndeclaredVariable>? Undeclared { get; init; }  // v1.0.8: Compiler-tracked undeclared variables
     public required PoolDependencyGraph PoolDependencyGraph { get; init; }  // v1.0.8: Pool variable dependency analysis
 }
 
@@ -1542,6 +1563,24 @@ internal sealed record Metadata
     public required int MethodCount { get; init; }
     public required int ObjectCount { get; init; }
     public required int InitExpressionCount { get; init; }
+    public int? UndeclaredCount { get; init; }
+}
+
+/// <summary>
+/// v1.0.8: Represents an undeclared variable found during compilation.
+/// </summary>
+internal sealed record UndeclaredVariable
+{
+    /// <summary>
+    /// Name of the undeclared variable.
+    /// </summary>
+    public required string Key { get; init; }
+
+    /// <summary>
+    /// List of method identifiers that reference this variable.
+    /// Format: "ClassName>>selector" or "class:ClassName>>selector"
+    /// </summary>
+    public required List<string> References { get; init; }
 }
 
 /// <summary>

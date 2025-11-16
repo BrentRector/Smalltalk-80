@@ -573,6 +573,27 @@
                 "additionalProperties": false
             }
         },
+        "undeclared": {
+            "type": "array",
+            "description": "Compiler-tracked undeclared variable references. For each variable name that couldn't be resolved during compilation, records the variable name and list of methods that reference it. The loader creates Association objects (key -> nil) for each entry and populates the Undeclared dictionary, which is used by SystemDictionary>>at:put: to migrate variables when they become defined.",
+            "items": {
+                "type": "object",
+                "required": ["key", "references"],
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Name of the undeclared variable (e.g., 'Display', 'Processor', 'Transcript', 'Undeclared')"
+                    },
+                    "references": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "List of method identifiers that reference this variable. Format: 'ClassName>>selector' or 'class:ClassName>>selector'. Used for diagnostics and debugging."
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
         "poolDependencyGraph": {
             "type": "object",
             "description": "Canonical pool dependency metadata used for deterministic init ordering and validation.",
