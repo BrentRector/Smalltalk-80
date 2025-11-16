@@ -713,23 +713,37 @@ public class Phase5_GlobalsAndPatches
         // Initialize each discovered pool dictionary
         foreach (var (poolName, declaringClasses) in poolToClasses)
         {
-            // Create empty Dictionary with reasonable initial size
-            // Most pools have just a handful of constants, so 8 slots is sufficient
-            int initialSize = 8;
+            SmalltalkOOP dictionaryOOP;
 
-            var dictionaryOOP = _allocator.AllocateObject("Dictionary", ObjectFormat.PointerIndexed, initialSize);
-            _allocator.SetObjectClass(dictionaryOOP, dictionaryClassOOP);
-
-            // Initialize tally to 0
-            if (tallyIndex >= 0)
+            // Check if this pool dictionary was pre-allocated in the bundle (Phase 3)
+            string poolLocalId = $"pool:{poolName}";
+            if (_localIdToObjectId.TryGetValue(poolLocalId, out var existingPoolOOP))
             {
-                _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
+                // Use the pre-allocated pool dictionary from the bundle
+                dictionaryOOP = existingPoolOOP;
+// Console.WriteLine($"    Using pre-allocated pool dictionary: {poolName} (OOP={dictionaryOOP})");
             }
-
-            // Initialize all indexed slots to nil
-            for (int i = 0; i < initialSize; i++)
+            else
             {
-                _allocator.SetIndexedOOP(dictionaryOOP, i, nilOOP);
+                // Create empty Dictionary with reasonable initial size
+                // Most pools have just a handful of constants, so 8 slots is sufficient
+                int initialSize = 8;
+
+                dictionaryOOP = _allocator.AllocateObject("Dictionary", ObjectFormat.PointerIndexed, initialSize);
+                _allocator.SetObjectClass(dictionaryOOP, dictionaryClassOOP);
+
+                // Initialize tally to 0
+                if (tallyIndex >= 0)
+                {
+                    _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
+                }
+
+                // Initialize all indexed slots to nil
+                for (int i = 0; i < initialSize; i++)
+                {
+                    _allocator.SetIndexedOOP(dictionaryOOP, i, nilOOP);
+                }
+// Console.WriteLine($"    Created new pool dictionary: {poolName} (OOP={dictionaryOOP})");
             }
 
             // Create Association and install as global
