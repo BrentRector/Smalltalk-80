@@ -89,6 +89,12 @@ public class Phase2_ClassInfrastructure
         var systemDictOOP = _allocator.AllocateArray("SystemDictionary", totalEntries);
         _localIdToObjectId["object:Smalltalk"] = systemDictOOP;
 
+        // CRITICAL: Initialize 'tally' instance variable (inherited from Set) to 0
+        // Set has 1 instance variable: tally (a SmallInteger counting elements)
+        // SystemDictionary starts empty, so tally = 0
+        _allocator.SetInstanceVariable(systemDictOOP, 0, new SmalltalkOOP(1)); // SmallInteger(0) = OOP(1)
+        Console.WriteLine($"[Phase2] Initialized SystemDictionary tally to SmallInteger(0) = OOP(1)");
+
         GlobalRegistry.Register("Smalltalk", systemDictOOP);
 
         // Now allocate all class shells

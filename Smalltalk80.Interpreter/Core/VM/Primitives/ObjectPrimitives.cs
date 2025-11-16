@@ -186,6 +186,16 @@ public static class ObjectPrimitives
         // Index must be a positive SmallInteger
         if (!args[0].IsSmallInteger)
         {
+            // DEBUG: Log non-integer index
+            var indexClassName = ctx.GetClassNameForObject(args[0]);
+            var recvClassName = ctx.GetClassNameForObject(receiver);
+            var valueClassName = ctx.GetClassNameForObject(args[1]);
+            
+            Console.WriteLine($"[AtPut PRIMITIVE FAIL] Non-integer index:");
+            Console.WriteLine($"  receiver={receiver} (class={recvClassName})");
+            Console.WriteLine($"  index={args[0]} (class={indexClassName})");
+            Console.WriteLine($"  value={args[1]} (class={valueClassName})");
+            
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }

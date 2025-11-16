@@ -229,7 +229,8 @@ public class Phase3_ObjectAllocation
         var undeclaredAssoc = AllocateAssociationWithSemanticAllocator(undeclaredSymbol, undeclaredOOP);
         InstallAssociationInSystemDictionary(undeclaredAssoc, "Undeclared");
 
-// Console.WriteLine($"  Created Undeclared dictionary (capacity={initialCapacity}, undeclared count={undeclaredCount})");
+        Console.WriteLine($"  Created Undeclared dictionary (OOP={undeclaredOOP}, capacity={initialCapacity}, undeclared count={undeclaredCount})");
+        Console.WriteLine($"  Undeclared Association: key={undeclaredSymbol}, value={undeclaredOOP}, assoc={undeclaredAssoc}");
     }
 
     /// <summary>

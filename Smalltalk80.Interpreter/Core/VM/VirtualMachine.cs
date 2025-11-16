@@ -584,13 +584,20 @@ public partial class VirtualMachine : IPrimitiveContext
             // Increment and check instruction counter (one count per bytecode executed)
             _instructionCount++;
             
-            // Report progress every 50K instructions during potential infinite loops
-            if (_instructionCount % 50000 == 0)
+            // Report progress every 10K instructions during potential infinite loops
+            if (_instructionCount % 10000 == 0)
             {
                 var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
                 var ctxReceiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.CONTEXT_RECEIVER_INDEX);
                 var className = GetClassName(GetClass(ctxReceiverOOP));
                 Console.WriteLine($"[{_instructionCount / 1000}K instructions] In: {className}>>{methodLocalId}, IP={ip-1}");
+            }
+            
+            // Special trace around the critical range
+            if (_selectorTraceEnabled && _instructionCount >= 2020 && _instructionCount <= 2045)
+            {
+                var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
+                Console.WriteLine($"[BYTECODE #{_instructionCount}] IP={ip-1}, opcode=0x{bytecode:X2}, method={methodLocalId}");
             }
             
             if (_instructionCount >= MAX_INSTRUCTIONS)
@@ -2183,11 +2190,39 @@ public partial class VirtualMachine : IPrimitiveContext
         int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
         if (primitiveNumber > 0)
         {
+            if (_selectorTraceEnabled && _instructionCount >= 2000 && _instructionCount < 2100)
+            {
+                Console.WriteLine($"[PRIMITIVE #{_instructionCount}] Trying primitive {primitiveNumber} in {GetLocalId(methodInfo.MethodOOP)}");
+            }
+            
             var primitiveResult = PrimitiveTable.Execute(primitiveNumber, this, receiverOOP, args);
 
             if (_primitiveSuccess)
             {
+                if (_selectorTraceEnabled && _instructionCount >= 2000 && _instructionCount < 2100)
+                {
+                    Console.WriteLine($"[PRIMITIVE #{_instructionCount}] Primitive {primitiveNumber} succeeded");
+                }
                 return CallOutcome.Normal(primitiveResult);
+            }
+            else if (_selectorTraceEnabled && _instructionCount < 50000)
+            {
+                // Log primitive failures during tracing
+                Console.WriteLine($"[PRIMITIVE FAILED] Primitive {primitiveNumber} failed in {GetLocalId(methodInfo.MethodOOP)}");
+            }
+        }
+        
+        // Log method sends during tracing
+        if (_selectorTraceEnabled && _instructionCount < 5000)
+        {
+            var recvClass = GetClassName(GetClass(receiverOOP));
+            var currentMethod = GetLocalId(_heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.CONTEXT_METHOD_INDEX)) ?? "unknown";
+            Console.WriteLine($"[SEND #{_instructionCount}] {recvClass}>>{selectorName} (from {currentMethod})");
+            
+            // Special alert for error: sends
+            if (selectorName == "error:")
+            {
+                Console.WriteLine($"  *** ERROR BEING RAISED ***");
             }
         }
 

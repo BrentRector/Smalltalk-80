@@ -976,6 +976,10 @@ public class Phase5_GlobalsAndPatches
 
         var associationOOP = _allocator.AllocateFixedObject("Association");
 
+        // Set Association class reference (CRITICAL - was missing!)
+        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
+        _allocator.SetObjectClass(associationOOP, associationClassOOP);
+
         // Set instance variables: [0] = key, [1] = value
         _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
         _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);

@@ -377,6 +377,12 @@ public static class Program
                         Console.WriteLine();
                         Console.WriteLine($"[PRE-TEXT DEBUG] Smalltalk Association OOP=34404, value={smalltalkValue}");
                         
+                        // Check Undeclared Association (should be OOP=13492 from Phase 3)
+                        var undeclaredAssocOOP = new SmalltalkOOP(13492);
+                        var undeclaredKey = heapManager.GetInstanceVariable(undeclaredAssocOOP, 0);
+                        var undeclaredValue = heapManager.GetInstanceVariable(undeclaredAssocOOP, 1);
+                        Console.WriteLine($"[PRE-TEXT DEBUG] Undeclared Association OOP=13492, key={undeclaredKey}, value={undeclaredValue}");
+                        
                         // Dump Text class>>initialize method literals (known OOP 32872 from stack trace)
                         var textInitMethodOOP = new SmalltalkOOP(32872);
                         Console.WriteLine($"[PRE-TEXT DEBUG] Dumping Text class>>initialize (OOP={textInitMethodOOP}) literals:");
@@ -390,6 +396,12 @@ public static class Program
                             if (literalOOP == smalltalkAssocOOP)
                             {
                                 Console.WriteLine($"    ^^^ THIS IS THE SMALLTALK ASSOCIATION!");
+                            }
+                            
+                            // Check if this is the Undeclared Association
+                            if (literalOOP == undeclaredAssocOOP)
+                            {
+                                Console.WriteLine($"    ^^^ THIS IS THE UNDECLARED ASSOCIATION!");
                             }
                         }
                         
