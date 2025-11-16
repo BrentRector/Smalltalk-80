@@ -101,6 +101,20 @@ namespace Smalltalk80.Compiler
         public Dictionary<string, object> PoolVariables { get; } = new();
         
         /// <summary>
+        /// Set of all known class names in the system (for distinguishing class names from pool variables).
+        /// Populated during compilation to allow proper variable resolution.
+        /// Class names should be treated as globals, not pool variables.
+        /// </summary>
+        public HashSet<string>? KnownClassNames { get; set; }
+        
+        /// <summary>
+        /// Set of all pool dictionary names declared across all classes (e.g., 'FilePool', 'TextConstants').
+        /// Pool dictionary names are global variables that contain Dictionary instances.
+        /// They should be treated as globals during assignment, not as pool variables.
+        /// </summary>
+        public HashSet<string>? KnownPoolDictionaryNames { get; set; }
+        
+        /// <summary>
         /// Total number of arguments.
         /// </summary>
         public int ArgumentCount { get; set; }
@@ -1266,7 +1280,9 @@ namespace Smalltalk80.Compiler
             List<string> instanceVars,
             Dictionary<string, object>? classVars = null,
             Dictionary<string, object>? poolVars = null,
-            CompilerOptions? options = null)
+            CompilerOptions? options = null,
+            HashSet<string>? knownClassNames = null,
+            HashSet<string>? knownPoolDictionaryNames = null)
         {
             // Use default options if not specified
             options ??= CompilerOptions.Default;
@@ -1287,6 +1303,16 @@ namespace Smalltalk80.Compiler
             for (int i = 0; i < instanceVars.Count; i++)
             {
                 environment.InstanceVariables[instanceVars[i]] = i;
+            }
+            
+            // Set up known class names for proper variable resolution
+            environment.KnownClassNames = knownClassNames;
+            
+            // Set up known pool dictionary names for proper variable resolution
+            environment.KnownPoolDictionaryNames = knownPoolDictionaryNames;
+            if (knownPoolDictionaryNames != null && knownPoolDictionaryNames.Count > 0)
+            {
+                Console.WriteLine($"[BYTECODE COMPILER] Set KnownPoolDictionaryNames: [{string.Join(", ", knownPoolDictionaryNames)}]");
             }
             
             // Set up class variables
@@ -2265,7 +2291,10 @@ namespace Smalltalk80.Compiler
                 Parent = savedParent,
                 MethodArgumentCount = environment.MethodArgumentCount,
                 MethodTemporaryCount = environment.MethodTemporaryCount,
-                CumulativeBlockArgOffset = savedCumulativeBlockArgOffset
+                CumulativeBlockArgOffset = savedCumulativeBlockArgOffset,
+                // Inherit known identifiers from parent scope
+                KnownClassNames = environment.KnownClassNames,
+                KnownPoolDictionaryNames = environment.KnownPoolDictionaryNames
             };
             // Copy dictionary contents (can't assign to get-only properties)
             foreach (var kvp in savedArguments)
@@ -3321,24 +3350,10 @@ namespace Smalltalk80.Compiler
                 // add the appropriate literal for PushLiteralVariable
                 if (needsAssociation)
                 {
-                    // Check if it's a pool variable
-                    // Pool variables: undeclared variables in classes that declare pool dictionaries
-                    string? poolDictionaryName = null;
-                    if (environment != null && 
-                        environment.PoolVariables.Count > 0 && 
-                        !environment.ClassVariables.ContainsKey(name))
-                    {
-                        // Undeclared variable in a class that declares pool dictionaries
-                        // Treat it as a pool variable from the first declared pool dictionary
-                        poolDictionaryName = environment.PoolVariables.Keys.First();
-                        Console.WriteLine($"[LiteralCollector] Pool variable '{name}' -> '{poolDictionaryName}'");
-                    }
-                    
-                    // Create PoolVariable or GlobalVariable based on context
-                    object literalValue = poolDictionaryName != null
-                        ? new PoolVariable(new Symbol(name), poolDictionaryName)
-                        : new GlobalVariable(new Symbol(name), null);
-                    Console.WriteLine($"[{literalValue.GetType().Name} created] key={name}" + (poolDictionaryName != null ? $", poolName={poolDictionaryName}" : ""));
+                    // Create GlobalVariable literal
+                    // Pool variables are handled by VariableResolver during resolution phase
+                    object literalValue = new GlobalVariable(new Symbol(name), null);
+                    Console.WriteLine($"[{literalValue.GetType().Name} created] key={name}");
                     emitter.AddLiteral(literalValue);
                 }
                 

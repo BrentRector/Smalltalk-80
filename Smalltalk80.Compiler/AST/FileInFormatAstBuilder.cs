@@ -402,12 +402,37 @@ namespace Smalltalk80.Compiler.AST
             var poolVars = GetPoolVariables(poolNode);
             Console.WriteLine($"[POOL DEBUG] Pool vars for {_currentClass}: {poolVars.Count} dictionaries");
 
+            // Collect all known class names for proper variable resolution
+            var knownClassNames = new HashSet<string>(_classes.Keys);
+            
+            // Collect all known pool dictionary names across all classes
+            var knownPoolDictionaryNames = new HashSet<string>();
+            foreach (var cls in _classes.Values)
+            {
+                if (cls.PoolDictionaries != null)
+                {
+                    foreach (var poolName in cls.PoolDictionaries)
+                    {
+                        knownPoolDictionaryNames.Add(poolName);
+                    }
+                }
+            }
+            
+            // Debug: Show pool dictionary names when compiling File class methods
+            if (_currentClass != null && _currentClass.Contains("File") && _isMetaclass)
+            {
+                Console.WriteLine($"[POOL DICT] Compiling {_currentClass} (metaclass={_isMetaclass}) method, collected {knownPoolDictionaryNames.Count} pool dict names: [{string.Join(", ", knownPoolDictionaryNames.OrderBy(x => x))}]");
+            }
+            
             // Compile the method using BytecodeCompiler
             var compiledData = _bytecodeCompiler.CompileMethodFromTree(
                 context,
                 instanceVars,
                 classVars,
-                poolVars);
+                poolVars,
+                options: null,
+                knownClassNames: knownClassNames,
+                knownPoolDictionaryNames: knownPoolDictionaryNames);
 
             // Calculate stack depth
             var stackDepth = BytecodeEmitter.CalculateMaxStackDepth(compiledData.Bytecode);
@@ -422,7 +447,7 @@ namespace Smalltalk80.Compiler.AST
             // Create method definition with the expected format
             var method = new MethodDefinitionNode
             {
-                Class = _isMetaclass ? $"{_currentClass} class" : _currentClass,
+                Class = _isMetaclass ? $"{_currentClass} class" : _currentClass ?? string.Empty,
                 Selector = compiledData.Selector ?? string.Empty,
                 Source = sourceText,
                 Bytecode = compiledData.Bytecode.Select(b => (int)b).ToList(),
@@ -1028,16 +1053,27 @@ namespace Smalltalk80.Compiler.AST
 
         /// <summary>
         /// Gets pool variables for a class.
+        /// For an offline compiler, this returns an EMPTY dictionary because we don't know
+        /// what variables are IN the pool dictionaries at compile time.
+        /// The pool dictionary NAMES are tracked separately in KnownPoolDictionaryNames.
+        /// This empty dictionary signals to VariableResolver that the class HAS pool dictionaries,
+        /// so undefined variables should be treated as pool variables (from the first declared pool).
         /// </summary>
         private Dictionary<string, object> GetPoolVariables(ClassDefinitionNode classNode)
         {
             var poolVars = new Dictionary<string, object>();
             Console.WriteLine($"[GetPoolVariables] Class: {classNode.Name}, Pool count: {classNode.PoolDictionaries.Count}");
-            foreach (var poolName in classNode.PoolDictionaries)
+            
+            // For offline compiler: return EMPTY dictionary if class has pools
+            // The count > 0 tells VariableResolver to treat undefined vars as pool variables
+            // Pool dictionary names are passed separately via KnownPoolDictionaryNames
+            if (classNode.PoolDictionaries.Count > 0)
             {
-                Console.WriteLine($"[GetPoolVariables] Adding pool: {poolName}");
-                poolVars[poolName] = poolName; // Store pool dictionary NAME as the value
+                // Add a marker entry so PoolVariables.Count > 0 (triggers pool variable resolution)
+                // Use a special key that will never match a real variable name
+                poolVars["__HAS_POOLS__"] = string.Join(",", classNode.PoolDictionaries);
             }
+            
             return poolVars;
         }
 

@@ -437,29 +437,13 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
 
             _classes.Add(metaclass);
 
-            // Create pool dictionary objects if needed
-            foreach (var poolName in classNode.PoolDictionaries)
-            {
-                if (!_objects.Any(o => o.LocalId == $"pool:{poolName}"))
-                {
-                    _objects.Add(new JsonObject
-                    {
-                        LocalId = $"pool:{poolName}",
-                        ClassNameIndex = _symbolTable.GetValueOrDefault("Dictionary", -1),
-                        FormatHint = "pointers",
-                        Fields =
-                        [
-                            // Field 0: tally (inherited from Set) - initialized to 0
-                            new Dictionary<string, object>
-                            {
-                                ["type"] = "smallInt",
-                                ["value"] = 0
-                            }
-                        ],
-                        IndexedFields = []
-                    });
-                }
-            }
+            // NOTE: Pool dictionary OBJECTS are NO LONGER emitted here.
+            // Phase 5 creates global variables (Associations) for pool dictionary names with value = nil.
+            // User code (init expressions like File class>>initialize) allocates Dictionary objects
+            // and assigns them to the globals.
+            //
+            // The class metadata (poolLocalIds) is sufficient to tell the interpreter which pool
+            // dictionary names to create as globals during Phase 5.
         }
     }
 

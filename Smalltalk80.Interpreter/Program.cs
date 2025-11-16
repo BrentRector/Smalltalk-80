@@ -369,9 +369,46 @@ public static class Program
                     // Show what we're executing
                     Console.Write($"  [{index}] {expr.Source}... ");
 
+                    // DEBUG: Check Smalltalk Association before Text initialize
+                    if (expr.Source != null && expr.Source.Contains("Text"))
+                    {
+                        var smalltalkAssocOOP = new SmalltalkOOP(34404); // Known from Phase 5 output
+                        var smalltalkValue = heapManager.GetInstanceVariable(smalltalkAssocOOP, 1);
+                        Console.WriteLine();
+                        Console.WriteLine($"[PRE-TEXT DEBUG] Smalltalk Association OOP=34404, value={smalltalkValue}");
+                        
+                        // Dump Text class>>initialize method literals (known OOP 32872 from stack trace)
+                        var textInitMethodOOP = new SmalltalkOOP(32872);
+                        Console.WriteLine($"[PRE-TEXT DEBUG] Dumping Text class>>initialize (OOP={textInitMethodOOP}) literals:");
+                        int literalCount = heapManager.GetIndexedSize(textInitMethodOOP);
+                        for (int i = 0; i < literalCount && i < 10; i++)
+                        {
+                            var literalOOP = heapManager.GetIndexedOOP(textInitMethodOOP, i);
+                            Console.WriteLine($"  Literal[{i}] = {literalOOP}");
+                            
+                            // If it's an Association, show key and value
+                            if (literalOOP == smalltalkAssocOOP)
+                            {
+                                Console.WriteLine($"    ^^^ THIS IS THE SMALLTALK ASSOCIATION!");
+                            }
+                        }
+                        
+                        Console.WriteLine($"[PRE-TEXT DEBUG] Enabling VM bytecode tracing for Text initialize...");
+                        Console.Write($"  [{index}] {expr.Source}... ");
+                        
+                        // Enable bytecode tracing for Text initialize only
+                        vm.EnableBytecodeTracing = true;
+                    }
+
                     // Reset instruction count before each expression
                     vm.ResetInstructionCount();
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+                    
+                    // Disable tracing after Text initialize
+                    if (expr.Source != null && expr.Source.Contains("Text"))
+                    {
+                        vm.EnableBytecodeTracing = false;
+                    }
                     long instructionCount = vm.InstructionCount;
 
                     if (result.Status == InitStatus.Success)

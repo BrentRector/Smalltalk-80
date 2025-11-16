@@ -117,6 +117,21 @@ public partial class VirtualMachine : IPrimitiveContext
 
     // Selector trace mechanism - shows nested method calls and returns
     private bool _selectorTraceEnabled = false;
+    
+    // Public property to enable bytecode tracing from outside
+    public bool EnableBytecodeTracing
+    {
+        get => _selectorTraceEnabled;
+        set
+        {
+            _selectorTraceEnabled = value;
+            _bytecodeInstructionCounter = 0; // Reset counters when enabling
+            _pushTraceCounter = 0;
+        }
+    }
+    
+    private int _bytecodeInstructionCounter = 0;
+    private int _pushTraceCounter = 0;
     private int _selectorTraceDepth = 0;
     private readonly Stack<(string className, string selector, int depth)> _selectorTraceStack = new();
 
@@ -568,6 +583,16 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // Increment and check instruction counter (one count per bytecode executed)
             _instructionCount++;
+            
+            // Report progress every 50K instructions during potential infinite loops
+            if (_instructionCount % 50000 == 0)
+            {
+                var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
+                var ctxReceiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.CONTEXT_RECEIVER_INDEX);
+                var className = GetClassName(GetClass(ctxReceiverOOP));
+                Console.WriteLine($"[{_instructionCount / 1000}K instructions] In: {className}>>{methodLocalId}, IP={ip-1}");
+            }
+            
             if (_instructionCount >= MAX_INSTRUCTIONS)
             {
                 throw new InvalidOperationException($"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
@@ -916,6 +941,34 @@ public partial class VirtualMachine : IPrimitiveContext
         while (ip < bytecodes.Length)
         {
             byte bytecode = bytecodes[ip++];
+            
+            // DEBUG: Trace first 100 bytecodes when tracing is enabled
+            if (_selectorTraceEnabled && _bytecodeInstructionCounter < 100)
+            {
+                _bytecodeInstructionCounter++;
+                
+                // Peek ahead for extended opcodes
+                string opcodeDesc = $"0x{bytecode:X2}";
+                if (bytecode == 0x80 && ip < bytecodes.Length)
+                {
+                    byte subOp = bytecodes[ip];
+                    string[] extNames = new[] {
+                        "PUSH_IVAR", "STORE_IVAR", "POP_STORE_IVAR", "PUSH_TEMP", "STORE_TEMP", "POP_STORE_TEMP",
+                        "PUSH_LITERAL", "PUSH_LITERAL_VAR", "STORE_LITERAL_VAR", "POP_STORE_LITERAL_VAR",
+                        "SEND_0", "SEND_1", "SEND_2", "SEND_N", "SEND_SUPER_0", "SEND_SUPER_1",
+                        "SEND_SUPER_2", "SEND_SUPER_N", "POP", "DUP", "JUMP_TRUE", "JUMP_FALSE",
+                        "JUMP", "JUMP_LONG_TRUE", "JUMP_LONG_FALSE", "JUMP_LONG"
+                    };
+                    string extName = subOp < extNames.Length ? extNames[subOp] : $"UNKNOWN";
+                    opcodeDesc = $"0x{bytecode:X2} 0x{subOp:X2} ({extName})";
+                }
+                else
+                {
+                    opcodeDesc = BytecodeDisassembler.GetOpcodeName(bytecode) ?? opcodeDesc;
+                }
+                
+                Console.WriteLine($"[BYTECODE #{_bytecodeInstructionCounter}] IP={(ip-1)}, {opcodeDesc}");
+            }
 
             // For extended opcodes, peek ahead and show the full instruction
             string opcodeName;
@@ -1556,8 +1609,25 @@ public partial class VirtualMachine : IPrimitiveContext
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
+                    // DEBUG: Check if this is even an Association
+                    var assocClass = GetClassName(GetClass(associationOOP));
+                    if (assocClass != "Association")
+                    {
+                        Console.WriteLine($"[PUSH_LITERAL_VAR] ERROR: literal[{index}] is NOT an Association! It's a {assocClass}, OOP={associationOOP}");
+                        Push(associationOOP); // Push it anyway
+                        return true;
+                    }
+
                     var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
                     var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+
+                    // DEBUG: Log EVERY push of a 'Smalltalk' Association
+                    var keySymbol = GetSymbolName(keyOOP);
+                    if (keySymbol == "Smalltalk")
+                    {
+                        Console.WriteLine($"[PUSH_LITERAL_VAR] Pushing Smalltalk: assoc={associationOOP}, key={keyOOP}, value={valueOOP}");
+                        Console.WriteLine($"[PUSH_LITERAL_VAR] Expected Association OOP=34404, actual={associationOOP}, match={associationOOP == new SmalltalkOOP(34404)}");
+                    }
 
                     Push(valueOOP);
                     return true;
@@ -2945,6 +3015,16 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private void Push(SmalltalkOOP valueOOP)
     {
+        // DEBUG: Trace ALL stack pushes when tracing is enabled
+        if (_selectorTraceEnabled)
+        {
+            _pushTraceCounter++;
+            if (_pushTraceCounter <= 10)
+            {
+                Console.WriteLine($"[PUSH #{_pushTraceCounter}] Pushing OOP={valueOOP} onto stack");
+            }
+        }
+        
         // DIAGNOSTIC: Validate _activeContextOOP is a valid context (MethodContext or BlockContext)
         var activeContextFormat = _heapManager.GetObjectFormat(_activeContextOOP);
         var activeContextClass = GetClassName(GetClass(_activeContextOOP));
@@ -4377,21 +4457,16 @@ public partial class VirtualMachine : IPrimitiveContext
     /// </summary>
     private SmalltalkOOP LookupInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbol)
     {
-        // Dictionary has instance variables: tally, array
-        // array is an Array of Associations
-        var arrayOOP = _heapManager.GetInstanceVariable(dictionaryOOP, 1); // array is at index 1
+        // Dictionary is a variableSubclass of Set with:
+        //   Instance variable [0]: tally (inherited from Set)
+        //   Indexed slots [0..N]: Association array
+        // The indexed portion IS the dictionary array, not a separate instance variable
+        int arraySize = _heapManager.GetIndexedSize(dictionaryOOP);
         
-        if (arrayOOP == SpecialObjectsArray.Instance.Nil)
-        {
-            return SpecialObjectsArray.Instance.Nil;
-        }
-        
-        int arraySize = _heapManager.GetIndexedSize(arrayOOP);
-        
-        // Linear search through dictionary array
+        // Linear search through dictionary indexed slots
         for (int i = 0; i < arraySize; i++)
         {
-            var elementOOP = _heapManager.GetIndexedOOP(arrayOOP, i);
+            var elementOOP = _heapManager.GetIndexedOOP(dictionaryOOP, i);
             
             if (elementOOP == SpecialObjectsArray.Instance.Nil)
             {

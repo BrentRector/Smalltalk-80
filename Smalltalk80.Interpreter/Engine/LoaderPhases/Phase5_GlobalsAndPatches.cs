@@ -455,14 +455,81 @@ public class Phase5_GlobalsAndPatches
     {
         var systemDictionaryOOP = GlobalRegistry.SystemDictionaryOOP;
 
+        // DEBUG: Check how many "Smalltalk" Associations exist in AssociationRegistry
+        var allAssociations = AssociationRegistry.GetAll();
+        var smalltalkAssocs = allAssociations.Where(kvp => kvp.Key == "Smalltalk").ToList();
+        Console.WriteLine($"[InstallSmalltalkGlobal] Found {smalltalkAssocs.Count} 'Smalltalk' Associations in registry");
+        foreach (var kvp in smalltalkAssocs)
+        {
+            var oop = kvp.Value;
+            var key = _allocator.GetInstanceVariable(oop, 0);
+            var value = _allocator.GetInstanceVariable(oop, 1);
+            Console.WriteLine($"  Registry entry: key={key}, value={value}, oop={oop}");
+        }
+
+        // DEBUG: Scan heap for ALL Associations with key "Smalltalk"
+        var smalltalkSymbolOOP = GetSymbolOOP("Smalltalk");
+        Console.WriteLine($"[InstallSmalltalkGlobal] Smalltalk symbol OOP = {smalltalkSymbolOOP}");
+        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
+        int foundInHeap = 0;
+        for (int i = 0; i < 100000; i += 2)
+        {
+            try
+            {
+                var objOOP = new SmalltalkOOP(i);
+                var classOOP = _heapManager.GetSlot(objOOP, 0);
+                if (classOOP == associationClassOOP)
+                {
+                    var keyOOP = _allocator.GetInstanceVariable(objOOP, 0);
+                    if (keyOOP == smalltalkSymbolOOP)
+                    {
+                        var valueOOP = _allocator.GetInstanceVariable(objOOP, 1);
+                        Console.WriteLine($"  HEAP SCAN: Found Smalltalk Association OOP={objOOP}, value={valueOOP}");
+                        foundInHeap++;
+                    }
+                }
+            }
+            catch { }
+        }
+        Console.WriteLine($"[InstallSmalltalkGlobal] Total 'Smalltalk' Associations found in heap: {foundInHeap}");
+
         // Get or create canonical Association
         var associationOOP = GetOrCreateCanonicalAssociation("Smalltalk");
+
+        // DEBUG: Check current value before setting
+        var currentValue = _allocator.GetInstanceVariable(associationOOP, 1);
+        Console.WriteLine($"[InstallSmalltalkGlobal] Association OOP={associationOOP}, current value={currentValue}, setting to SystemDict={systemDictionaryOOP}");
 
         // Set Association value to SystemDictionary
         _allocator.SetInstanceVariable(associationOOP, 1, systemDictionaryOOP);
 
+        // DEBUG: Verify value was set
+        var newValue = _allocator.GetInstanceVariable(associationOOP, 1);
+        Console.WriteLine($"[InstallSmalltalkGlobal] After setting, Association value={newValue}");
+
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationOOP, "Smalltalk");
+
+        // DEBUG: Final verification - scan heap again AFTER update
+        Console.WriteLine($"[InstallSmalltalkGlobal] FINAL VERIFICATION - scanning heap after update:");
+        for (int i = 0; i < 100000; i += 2)
+        {
+            try
+            {
+                var objOOP = new SmalltalkOOP(i);
+                var classOOP = _heapManager.GetSlot(objOOP, 0);
+                if (classOOP == associationClassOOP)
+                {
+                    var keyOOP = _allocator.GetInstanceVariable(objOOP, 0);
+                    if (keyOOP == smalltalkSymbolOOP)
+                    {
+                        var valueOOP = _allocator.GetInstanceVariable(objOOP, 1);
+                        Console.WriteLine($"  FINAL: Found Smalltalk Association OOP={objOOP}, value={valueOOP}");
+                    }
+                }
+            }
+            catch { }
+        }
     }
 
     /// <summary>
@@ -635,24 +702,18 @@ public class Phase5_GlobalsAndPatches
     }
 
     /// <summary>
-    /// Initializes ALL shared pool dictionaries declared in the system.
-    /// Discovers pool dictionaries from bundle metadata, creates empty Dictionary for each,
-    /// installs as global variable, and installs reference in each declaring class's sharedPools field.
+    /// Creates global variables for all pool dictionary names declared in the system.
+    /// Discovers pool dictionary names from bundle metadata and creates Association with value = nil.
+    /// User code (init expressions) will allocate Dictionary objects and assign them.
     ///
     /// Examples:
-    ///   - FilePool: Used by File, FileDirectory, FilePage, FileStream
-    ///   - TextConstants: Used by CharacterBlock, CharacterScanner, DisplayText, Paragraph, etc.
+    ///   - Smalltalk at: #FilePool put: nil (cold start)
+    ///   - FilePool _ Dictionary new (File class>>initialize)
+    ///   - TextConstants _ Dictionary new: 32 (Text class>>initialize)
     /// </summary>
     private void InitializeAllPoolDictionaries()
     {
-        // Look up Dictionary class once
-        if (!GlobalRegistry.TryGet("class:Dictionary", out SmalltalkOOP dictionaryClassOOP))
-        {
-            throw new InvalidOperationException("Dictionary class not found during pool dictionary initialization");
-        }
-
         var nilOOP = SpecialObjectsArray.Instance.Nil;
-        int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
 
         // Discover all unique pool dictionaries from bundle
         // PoolLocalIds format: "pool:PoolName" (e.g., "pool:FilePool", "pool:TextConstants")
@@ -692,51 +753,21 @@ public class Phase5_GlobalsAndPatches
         // Initialize each discovered pool dictionary
         foreach (var (poolName, declaringClasses) in poolToClasses)
         {
-            SmalltalkOOP dictionaryOOP;
-
-            // Check if this pool dictionary was pre-allocated in the bundle (Phase 3)
-            string poolLocalId = $"pool:{poolName}";
-            if (_localIdToObjectId.TryGetValue(poolLocalId, out var existingPoolOOP))
-            {
-                // Use the pre-allocated pool dictionary from the bundle
-                dictionaryOOP = existingPoolOOP;
-// Console.WriteLine($"    Using pre-allocated pool dictionary: {poolName} (OOP={dictionaryOOP})");
-            }
-            else
-            {
-                // Create empty Dictionary with reasonable initial size
-                // Most pools have just a handful of constants, so 8 slots is sufficient
-                int initialSize = 8;
-
-                dictionaryOOP = _allocator.AllocateObject("Dictionary", ObjectFormat.PointerIndexed, initialSize);
-                _allocator.SetObjectClass(dictionaryOOP, dictionaryClassOOP);
-
-                // Initialize tally to 0
-                if (tallyIndex >= 0)
-                {
-                    _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
-                }
-
-                // Initialize all indexed slots to nil
-                for (int i = 0; i < initialSize; i++)
-                {
-                    _allocator.SetIndexedOOP(dictionaryOOP, i, nilOOP);
-                }
-// Console.WriteLine($"    Created new pool dictionary: {poolName} (OOP={dictionaryOOP})");
-            }
-
-            // Create Association and install as global
+            // IMPORTANT: Cold start creates the GLOBAL VARIABLE with value = nil
+            // User code (init expressions) will allocate Dictionary and assign it
+            // Example: FilePool _ Dictionary new. (in File class>>initialize)
+            
+            // Create Association: #PoolName → nil
             var associationOOP = GetOrCreateCanonicalAssociation(poolName);
-            _allocator.SetInstanceVariable(associationOOP, 1, dictionaryOOP);
+            _allocator.SetInstanceVariable(associationOOP, 1, nilOOP);  // value = nil
+            
+            // Install as global in Smalltalk dictionary
             InstallAssociationInSystemDictionary(associationOOP, poolName);
+            
+            // Register in GlobalRegistry (value = nil for now)
+            GlobalRegistry.Register(poolName, nilOOP);
 
-            // Register in GlobalRegistry
-            GlobalRegistry.Register(poolName, dictionaryOOP);
-
-            // Install in all declaring classes' sharedPools fields
-            InstallPoolDictionaryInClasses(dictionaryOOP, poolName, declaringClasses.ToArray());
-
-// Console.WriteLine($"    {poolName}: global created, installed in {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")}");
+            Console.WriteLine($"  Created pool dictionary global: {poolName} (value = nil, used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})");
         }
     }
 
