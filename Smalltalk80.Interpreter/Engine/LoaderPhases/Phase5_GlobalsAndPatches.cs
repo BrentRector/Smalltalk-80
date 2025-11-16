@@ -150,7 +150,7 @@ public class Phase5_GlobalsAndPatches
             }
         }
 
-        Console.WriteLine($"[Phase5] Patches applied: {setInstanceVarCount} SetInstanceVariable, {replaceLiteralCount} ReplaceLiteral ({_replacedArrayCount} replaced Arrays), {installMethodDictCount} InstallMethodDict");
+        Console.WriteLine($"[Phase5] Patches applied: {setInstanceVarCount} SetInstanceVariable, {replaceLiteralCount} ReplaceLiteral ({_replacedArrayCount} replaced Arrays, {_skippedPoolBindingCount} skipped pool bindings), {installMethodDictCount} InstallMethodDict");
     }
 
     private void ApplySetInstanceVariablePatch(PatchDescriptor patch)
@@ -192,6 +192,7 @@ public class Phase5_GlobalsAndPatches
     }
 
     private int _replacedArrayCount = 0;
+    private int _skippedPoolBindingCount = 0;
 
     private void ApplyReplaceLiteralPatch(PatchDescriptor patch)
     {
@@ -222,12 +223,35 @@ public class Phase5_GlobalsAndPatches
         }
         else
         {
-            // Not an Association - replace the literal itself
+            // Not an Association - check if it's a pool binding Array before replacing
 
-            // DEBUG: Log if we're replacing an Array (likely a pool binding)
             var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
             if (literalClassOOP == arrayClassOOP)
             {
+                // Check if this is a pool binding Array: 2-element Array of Symbols
+                int arraySize = _heapManager.GetIndexedSize(literalOOP);
+                if (arraySize == 2)
+                {
+                    var elem0 = _heapManager.GetIndexedOOP(literalOOP, 0);
+                    var elem1 = _heapManager.GetIndexedOOP(literalOOP, 1);
+                    var symbolClassOOP = GlobalRegistry.LookupClassOOP("Symbol");
+                    var elem0ClassOOP = _heapManager.GetSlot(elem0, 0);
+                    var elem1ClassOOP = _heapManager.GetSlot(elem1, 0);
+
+                    if (elem0ClassOOP == symbolClassOOP && elem1ClassOOP == symbolClassOOP)
+                    {
+                        // This is a pool binding Array - DO NOT REPLACE IT
+                        // Pool bindings are resolved at runtime by the VM
+                        _skippedPoolBindingCount++;
+                        if (_skippedPoolBindingCount <= 5)
+                        {
+                            Console.WriteLine($"[Phase5 PATCH] SKIPPING pool binding Array: method={patch.MethodLocalId}, literal[{patch.LiteralIndex}], oop={literalOOP} (pool bindings resolved at runtime)");
+                        }
+                        return; // Skip this patch
+                    }
+                }
+
+                // Not a pool binding - log the replacement
                 _replacedArrayCount++;
                 if (_replacedArrayCount <= 5)
                 {
