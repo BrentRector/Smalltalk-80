@@ -380,7 +380,27 @@ public class Loader
 
         // Add init expression methods if they exist
         if (SpecialObjectsArray.Instance.InitExpressionMethods != default)
-            gcRootsList.Add(SpecialObjectsArray.Instance.InitExpressionMethods);
+        {
+            var initMethodsOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
+            gcRootsList.Add(initMethodsOOP);
+
+            // DEBUG: Log InitExpressionMethods details
+            try
+            {
+                int arraySize = _heapManager.GetIndexedSize(initMethodsOOP);
+                Console.WriteLine($"  [GC Checkpoint {checkpointName}] DEBUG: InitExpressionMethods OOP={initMethodsOOP}, size={arraySize}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  [GC Checkpoint {checkpointName}] DEBUG: Error reading InitExpressionMethods: {ex.Message}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"  [GC Checkpoint {checkpointName}] DEBUG: InitExpressionMethods is not set (default)");
+        }
+
+        Console.WriteLine($"  [GC Checkpoint {checkpointName}] DEBUG: {gcRootsList.Count} GC roots registered");
 
         // Set GC roots and get unreachable objects (READ-ONLY - does not collect)
         _heapManager.SetGCRoots(gcRootsList.ToArray());
@@ -414,12 +434,39 @@ public class Loader
 
             foreach (var group in byClass.Take(10))  // Show top 10 classes
             {
-                Console.WriteLine($"    {group.Key}: {group.Count()} objects");
+                // Show first 5 OOPs from this class
+                var sampleOOPs = group.Take(5).Select(oop => oop.ToString()).ToList();
+                string sampleStr = sampleOOPs.Count > 0 ? $" (sample OOPs: {string.Join(", ", sampleOOPs)})" : "";
+                Console.WriteLine($"    {group.Key}: {group.Count()} objects{sampleStr}");
             }
 
             if (byClass.Count > 10)
             {
                 Console.WriteLine($"    ... and {byClass.Count - 10} more classes");
+            }
+
+            // DEBUG: If InitExpressionMethods exists, check if any of its elements are in the unreachable list
+            if (SpecialObjectsArray.Instance.InitExpressionMethods != default)
+            {
+                try
+                {
+                    var initMethodsOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
+                    int arraySize = _heapManager.GetIndexedSize(initMethodsOOP);
+                    int unreachableInArray = 0;
+
+                    for (int i = 0; i < arraySize; i++)
+                    {
+                        var elementOOP = _heapManager.GetIndexedOOP(initMethodsOOP, i);
+                        if (unreachableOOPs.Contains(elementOOP))
+                            unreachableInArray++;
+                    }
+
+                    Console.WriteLine($"    DEBUG: {unreachableInArray}/{arraySize} init expression methods are unreachable");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"    DEBUG: Error checking init methods: {ex.Message}");
+                }
             }
         }
     }
