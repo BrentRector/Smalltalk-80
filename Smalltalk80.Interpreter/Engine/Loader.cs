@@ -128,9 +128,6 @@ public class Loader
             LayoutResolver = phase2.LayoutResolver;
         });
 
-        // GC checkpoint after Phase 2
-        RunGCCheckpoint("After Phase 2");
-
         // Phase 3: Object Allocation
         // Allocates all remaining objects (globals, singletons, strings, etc.)
         RunPhase("Phase 3: Object Allocation", () =>
@@ -141,9 +138,6 @@ public class Loader
             var phase = new Phase3_ObjectAllocation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
             phase.Run();
         });
-
-        // GC checkpoint after Phase 3
-        RunGCCheckpoint("After Phase 3");
 
         // Phase 4: Method Compilation
         // Compiles all methods, installs in dictionaries, prepares init expressions
@@ -157,9 +151,6 @@ public class Loader
             // Init expressions array is set in SpecialObjectsArray by Phase4
         });
 
-        // GC checkpoint after Phase 4
-        RunGCCheckpoint("After Phase 4");
-
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches
         RunPhase("Phase 5: Globals + Patches", () =>
@@ -170,9 +161,6 @@ public class Loader
             var phase = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _debugOptions);
             phase.Run();
         });
-
-        // GC checkpoint after Phase 5
-        RunGCCheckpoint("After Phase 5");
 
         // Phase 6: Validation + GC Verification
         // Comprehensive validation and GC verification to ensure cold start correctness

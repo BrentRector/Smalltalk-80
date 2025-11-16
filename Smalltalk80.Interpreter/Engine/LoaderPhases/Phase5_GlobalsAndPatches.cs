@@ -120,8 +120,6 @@ public class Phase5_GlobalsAndPatches
             return;
         }
 
-        Console.WriteLine($"[Phase5] Applying {_bundle.Patches.Length} patches...");
-
         int setInstanceVarCount = 0;
         int replaceLiteralCount = 0;
         int installMethodDictCount = 0;
@@ -149,8 +147,6 @@ public class Phase5_GlobalsAndPatches
                     throw new InvalidOperationException($"Unknown patch type: {patch.Type}");
             }
         }
-
-        Console.WriteLine($"[Phase5] Patches applied: {setInstanceVarCount} SetInstanceVariable, {replaceLiteralCount} ReplaceLiteral ({_replacedArrayCount} replaced Arrays, {_skippedPoolBindingCount} skipped pool bindings), {installMethodDictCount} InstallMethodDict");
     }
 
     private void ApplySetInstanceVariablePatch(PatchDescriptor patch)
@@ -243,22 +239,12 @@ public class Phase5_GlobalsAndPatches
                         // This is a pool binding Array - DO NOT REPLACE IT
                         // Pool bindings are resolved at runtime by the VM
                         _skippedPoolBindingCount++;
-                        if (_skippedPoolBindingCount <= 5)
-                        {
-                            Console.WriteLine($"[Phase5 PATCH] SKIPPING pool binding Array: method={patch.MethodLocalId}, literal[{patch.LiteralIndex}], oop={literalOOP} (pool bindings resolved at runtime)");
-                        }
                         return; // Skip this patch
                     }
                 }
 
-                // Not a pool binding - log the replacement
+                // Not a pool binding - replace the Array
                 _replacedArrayCount++;
-                if (_replacedArrayCount <= 5)
-                {
-                    var oldClassName = _allocator.GetClassName(literalClassOOP);
-                    var newClassName = _allocator.GetClassName(_heapManager.GetSlot(newValueOOP, 0));
-                    Console.WriteLine($"[Phase5 PATCH] Replacing Array literal: method={patch.MethodLocalId}, literal[{patch.LiteralIndex}], old={literalOOP}:{oldClassName}, new={newValueOOP}:{newClassName}");
-                }
             }
 
             _heapManager.SetIndexedOOP(methodOOP, patch.LiteralIndex.Value + 1, newValueOOP);
