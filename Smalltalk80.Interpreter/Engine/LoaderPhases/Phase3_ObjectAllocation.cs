@@ -1269,6 +1269,16 @@ public class Phase3_ObjectAllocation
         Console.WriteLine($"  ✓ Added {addedCount} canonical Associations to Undeclared dictionary");
         Console.WriteLine($"  ✓ AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations");
 
+        // CRITICAL: Set the "Undeclared" Association's value to point to the Undeclared dictionary
+        // This allows bare identifier "Undeclared" in source code to resolve to the dictionary object
+        var allAssociations = AssociationRegistry.GetAll();
+        if (allAssociations.TryGetValue("Undeclared", out var undeclaredAssoc))
+        {
+            // Set Association value field (slot 1) to the Undeclared dictionary OOP
+            _allocator.SetInstanceVariable(undeclaredAssoc, 1, undeclaredOOP);
+            Console.WriteLine($"  ✓ Set Undeclared Association value to dictionary OOP={undeclaredOOP}");
+        }
+
         // Show sample of undeclared variables
         if (addedCount > 0)
         {
