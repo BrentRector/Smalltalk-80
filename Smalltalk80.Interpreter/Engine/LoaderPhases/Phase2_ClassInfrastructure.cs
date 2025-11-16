@@ -103,12 +103,6 @@ public class Phase2_ClassInfrastructure
             string classOfClassName = cls.IsMetaclass ? "Metaclass" : "Class";
             var classOOP = _allocator.AllocateFixedObject(classOfClassName);
             _localIdToObjectId[cls.LocalId] = classOOP;
-            
-            // DEBUG: Log Browser class allocation
-            if (cls.LocalId == "class:Browser" || cls.LocalId == "meta:Browser")
-            {
-                Console.WriteLine($"[Phase2] Allocated {cls.LocalId} (isMetaclass={cls.IsMetaclass}) → OOP {classOOP}");
-            }
 
             // Register class in GlobalRegistry
             // For instance classes (class:Name), register as "Name"

@@ -469,18 +469,11 @@ public class Phase5_GlobalsAndPatches
     {
         var systemDictionaryOOP = GlobalRegistry.SystemDictionaryOOP;
 
-        // Get or create canonical Association  
-        Console.WriteLine($"[InstallSmalltalkGlobal] Before GetOrCreate: AssociationRegistry has {AssociationRegistry.Count} associations");
+        // Get or create canonical Association
         var associationOOP = GetOrCreateCanonicalAssociation("Smalltalk");
-        Console.WriteLine($"[InstallSmalltalkGlobal] Got Association {associationOOP} for 'Smalltalk'");
-        Console.WriteLine($"[InstallSmalltalkGlobal] After GetOrCreate: AssociationRegistry has {AssociationRegistry.Count} associations");
 
         // Set Association value to SystemDictionary
         _allocator.SetInstanceVariable(associationOOP, 1, systemDictionaryOOP);
-
-        // DEBUG: Verify the Association value was set correctly
-        var verifyValue = _allocator.GetInstanceVariable(associationOOP, 1);
-        Console.WriteLine($"[InstallSmalltalkGlobal] Association {associationOOP} -> value={verifyValue} (SystemDict={systemDictionaryOOP})");
 
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationOOP, "Smalltalk");

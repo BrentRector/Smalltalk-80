@@ -145,22 +145,6 @@ public class Loader
         // GC checkpoint after Phase 3
         RunGCCheckpoint("After Phase 3");
 
-        // DEBUG: Verify class structure after Phase 3 (after Phase 2 allocates classes, after Phase 3 allocates objects)
-        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP))
-        {
-            var browserClass = _heapManager.GetSlot(browserOOP, 0);
-            var browserClassName = _heapManager.GetClassName(browserClass);
-            var browserName = _heapManager.GetInstanceVariable(browserOOP, 6); // name field (should be Symbol "Browser")
-            Console.WriteLine($"[After Phase 3] class:Browser OOP={browserOOP}, class={browserClass}:{browserClassName}, name slot 6={browserName}");
-        }
-        if (_localIdToObjectId.TryGetValue("meta:Browser", out var metaBrowserOOP))
-        {
-            var metaBrowserClass = _heapManager.GetSlot(metaBrowserOOP, 0);
-            var metaBrowserClassName = _heapManager.GetClassName(metaBrowserClass);
-            var metaBrowserName = _heapManager.GetInstanceVariable(metaBrowserOOP, 6); // name field (should be Symbol "Browser class")
-            Console.WriteLine($"[After Phase 3] meta:Browser OOP={metaBrowserOOP}, class={metaBrowserClass}:{metaBrowserClassName}, name slot 6={metaBrowserName}");
-        }
-
         // Phase 4: Method Compilation
         // Compiles all methods, installs in dictionaries, prepares init expressions
         RunPhase("Phase 4: Method Compilation", () =>
@@ -176,14 +160,6 @@ public class Loader
         // GC checkpoint after Phase 4
         RunGCCheckpoint("After Phase 4");
 
-        // DEBUG: Check class structure after Phase 4
-        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP2))
-        {
-            var browserClass2 = _heapManager.GetSlot(browserOOP2, 0);
-            var browserClassName2 = _heapManager.GetClassName(browserClass2);
-            Console.WriteLine($"[After Phase 4] class:Browser OOP={browserOOP2}, class={browserClass2}:{browserClassName2}");
-        }
-
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches
         RunPhase("Phase 5: Globals + Patches", () =>
@@ -197,27 +173,6 @@ public class Loader
 
         // GC checkpoint after Phase 5
         RunGCCheckpoint("After Phase 5");
-
-        // DEBUG: Check class structure after Phase 5
-        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP3))
-        {
-            var browserClass3 = _heapManager.GetSlot(browserOOP3, 0);
-            var browserClassName3 = _heapManager.GetClassName(browserClass3);
-            Console.WriteLine($"[After Phase 5] class:Browser OOP={browserOOP3}, class slot 0={browserClass3}:{browserClassName3}");
-        }
-
-        // DEBUG: Check class structure BEFORE Phase 6
-        Console.WriteLine("\n[BEFORE PHASE 6] Checking OOP 10632 structure:");
-        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOP4))
-        {
-            var slot0 = _heapManager.GetSlot(browserOOP4, 0);
-            var slot1 = _heapManager.GetSlot(browserOOP4, 1);
-            var slot2 = _heapManager.GetSlot(browserOOP4, 2);
-            Console.WriteLine($"  class:Browser OOP={browserOOP4}");
-            Console.WriteLine($"    slot[0] (class pointer) = {slot0}");
-            Console.WriteLine($"    slot[1] (inst var 0 = superclass) = {slot1}");
-            Console.WriteLine($"    slot[2] (inst var 1 = methodDict) = {slot2}");
-        }
 
         // Phase 6: Validation + GC Verification
         // Comprehensive validation and GC verification to ensure cold start correctness
@@ -383,24 +338,7 @@ public class Loader
         {
             var initMethodsOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
             gcRootsList.Add(initMethodsOOP);
-
-            // DEBUG: Log InitExpressionMethods details
-            try
-            {
-                int arraySize = _heapManager.GetIndexedSize(initMethodsOOP);
-                Console.WriteLine($"  [GC Checkpoint {checkpointName}] DEBUG: InitExpressionMethods OOP={initMethodsOOP}, size={arraySize}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"  [GC Checkpoint {checkpointName}] DEBUG: Error reading InitExpressionMethods: {ex.Message}");
-            }
         }
-        else
-        {
-            Console.WriteLine($"  [GC Checkpoint {checkpointName}] DEBUG: InitExpressionMethods is not set (default)");
-        }
-
-        Console.WriteLine($"  [GC Checkpoint {checkpointName}] DEBUG: {gcRootsList.Count} GC roots registered");
 
         // Set GC roots and get unreachable objects (READ-ONLY - does not collect)
         _heapManager.SetGCRoots(gcRootsList.ToArray());
@@ -443,30 +381,6 @@ public class Loader
             if (byClass.Count > 10)
             {
                 Console.WriteLine($"    ... and {byClass.Count - 10} more classes");
-            }
-
-            // DEBUG: If InitExpressionMethods exists, check if any of its elements are in the unreachable list
-            if (SpecialObjectsArray.Instance.InitExpressionMethods != default)
-            {
-                try
-                {
-                    var initMethodsOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
-                    int arraySize = _heapManager.GetIndexedSize(initMethodsOOP);
-                    int unreachableInArray = 0;
-
-                    for (int i = 0; i < arraySize; i++)
-                    {
-                        var elementOOP = _heapManager.GetIndexedOOP(initMethodsOOP, i);
-                        if (unreachableOOPs.Contains(elementOOP))
-                            unreachableInArray++;
-                    }
-
-                    Console.WriteLine($"    DEBUG: {unreachableInArray}/{arraySize} init expression methods are unreachable");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"    DEBUG: Error checking init methods: {ex.Message}");
-                }
             }
         }
     }

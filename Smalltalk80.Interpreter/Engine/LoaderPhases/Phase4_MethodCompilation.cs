@@ -61,13 +61,6 @@ public class Phase4_MethodCompilation
 
     public void Run()
     {
-        // DEBUG: Check class:Browser OOP before Phase 4
-        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOPBefore))
-        {
-            var browserClassBefore = _heapManager.GetClassName(browserOOPBefore);
-            Console.WriteLine($"[Phase4 START] class:Browser = {browserOOPBefore}, class={browserClassBefore}");
-        }
-        
         // ====================================================================
         // STEP 1: ALLOCATE METHOD DICTIONARIES (from Phase7)
         // ====================================================================
@@ -86,69 +79,11 @@ public class Phase4_MethodCompilation
         // Update report metrics
         _report.Metrics.InitMethodCount = _bundle.InitExpressions.Length;
         _report.Metrics.CanonicalAssociationCount = AssociationRegistry.Count;
-        
-        // Log pool variable binding Array deduplication stats  
-        int totalReferences = 0;
-        int regularMethodRefs = 0;
-        int blockRefs = 0;
-        int initExprRefs = 0;
-        
-        foreach (var method in _bundle.Methods)
-        {
-            int methodPoolRefs = 0;
-            foreach (var lit in method.Literals)
-            {
-                if (lit.Type == "association" && lit.Association?.PoolDictionaryName != null)
-                {
-                    totalReferences++;
-                    methodPoolRefs++;
-                }
-            }
-            
-            if (methodPoolRefs > 0)
-            {
-                if (string.IsNullOrEmpty(method.HomeClassLocalId))
-                    blockRefs += methodPoolRefs;
-                else
-                    regularMethodRefs += methodPoolRefs;
-            }
-        }
-        
-        foreach (var expr in _bundle.InitExpressions)
-        {
-            foreach (var lit in expr.Literals)
-            {
-                if (lit.Type == "association" && lit.Association?.PoolDictionaryName != null)
-                {
-                    totalReferences++;
-                    initExprRefs++;
-                }
-            }
-        }
-        
-        Console.WriteLine($"[Phase4] Pool variable binding Arrays: {_poolVariableBindings.Count} unique from {totalReferences} total references");
-        Console.WriteLine($"[Phase4] Pool variable references: {regularMethodRefs} in methods, {blockRefs} in blocks, {initExprRefs} in init expressions");
-        Console.WriteLine($"[Phase4] First 15 pool variable bindings:");
-        foreach (var (key, oop) in _poolVariableBindings.Take(15))
-        {
-            Console.WriteLine($"  {oop} = {key}");
-        }
-        if (_poolVariableBindings.Count > 15)
-        {
-            Console.WriteLine($"  ... and {_poolVariableBindings.Count - 15} more");
-        }
 
         // ====================================================================
         // STEP 4: INSTALL METHODS INTO DICTIONARIES (from Phase9)
         // ====================================================================
         InstallMethodsIntoDictionaries();
-        
-        // DEBUG: Check class:Browser OOP after Phase 4
-        if (_localIdToObjectId.TryGetValue("class:Browser", out var browserOOPAfter))
-        {
-            var browserClassAfter = _heapManager.GetClassName(browserOOPAfter);
-            Console.WriteLine($"[Phase4 END] class:Browser = {browserOOPAfter}, class={browserClassAfter}");
-        }
     }
 
     // ====================================================================
@@ -308,13 +243,6 @@ public class Phase4_MethodCompilation
 
             _localIdToObjectId[method.LocalId] = methodOOP;
             objectIdToLocalId[methodOOP] = method.LocalId;
-            
-            // DEBUG: Log specific OOPs
-            if (methodOOP.RawValue == 18144 || methodOOP.RawValue == 18336 || methodOOP.RawValue == 18380 || methodOOP.RawValue == 18996)
-            {
-                Console.WriteLine($"[Phase4] Allocated method OOP {methodOOP}: {method.LocalId}, homeClass={method.HomeClassLocalId}");
-            }
-            
             methodsCreated++;
         }
 
@@ -493,13 +421,6 @@ public class Phase4_MethodCompilation
             if (!_localIdToObjectId.TryGetValue(method.HomeClassLocalId, out homeClassOOP))
             {
                 throw new InvalidOperationException($"Cannot find home class '{method.HomeClassLocalId}' for method '{method.LocalId}'");
-            }
-            
-            // DEBUG: Check specific metaclasses
-            if (method.HomeClassLocalId == "meta:Browser" || method.HomeClassLocalId == "meta:Metaclass")
-            {
-                var homeClassName = _heapManager.GetClassName(homeClassOOP);
-                Console.WriteLine($"[Phase4 DEBUG] Method {method.LocalId} homeClass lookup: '{method.HomeClassLocalId}' → OOP {homeClassOOP} (class={homeClassName})");
             }
         }
 
@@ -992,17 +913,8 @@ public class Phase4_MethodCompilation
 
             // Install the method in the method dictionary
             InstallMethodInDictionary(methodDictOOP, selectorSymbolOOP, methodOOP);
-            
-            // DEBUG: Log specific method installations
-            if (methodOOP.RawValue == 18144 || methodOOP.RawValue == 18336 || methodOOP.RawValue == 18380 || methodOOP.RawValue == 18996)
-            {
-                Console.WriteLine($"[Phase4] Installed method OOP {methodOOP} ({selectorName}) into methodDict {methodDictOOP} of class {method.HomeClassLocalId}");
-            }
-            
             installedMethods++;
         }
-        
-        Console.WriteLine($"[Phase4] Method installation: {installedMethods} installed, {skippedBlocks} blocks skipped, {skippedMethods} methods skipped");
     }
 
     /// <summary>
