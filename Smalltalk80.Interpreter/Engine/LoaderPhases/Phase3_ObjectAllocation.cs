@@ -1246,9 +1246,21 @@ public class Phase3_ObjectAllocation
         var undeclaredOOP = GlobalRegistry.Get("Undeclared");
         var nilOOP = SpecialObjectsArray.Instance.Nil;
         int addedCount = 0;
+        int skippedClasses = 0;
+
+        // Build set of class names to exclude (these will be installed in SystemDictionary by Phase 5)
+        var classNames = new HashSet<string>(_bundle.Classes.Select(c => _symbols[c.NameIndex]));
 
         foreach (var undeclaredVar in _bundle.Undeclared)
         {
+            // CRITICAL: Skip class names - they will be installed in SystemDictionary by Phase 5
+            // If we add them to Undeclared now, the same Association will be in BOTH dictionaries!
+            if (classNames.Contains(undeclaredVar.Key))
+            {
+                skippedClasses++;
+                continue; // Don't add to Undeclared - Phase 5 will handle it
+            }
+
             // Get or create canonical Association for this variable
             // This uses AssociationRegistry to ensure canonicalization
             var associationOOP = GetOrCreateCanonicalAssociation(undeclaredVar.Key);
@@ -1267,6 +1279,7 @@ public class Phase3_ObjectAllocation
         }
 
         Console.WriteLine($"  ✓ Added {addedCount} canonical Associations to Undeclared dictionary");
+        Console.WriteLine($"  ✓ Skipped {skippedClasses} class names (will be installed in SystemDictionary by Phase 5)");
         Console.WriteLine($"  ✓ AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations");
 
         // CRITICAL: Set the "Undeclared" Association's value to point to the Undeclared dictionary
