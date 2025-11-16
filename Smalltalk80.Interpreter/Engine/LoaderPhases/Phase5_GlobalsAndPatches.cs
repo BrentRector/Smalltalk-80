@@ -765,6 +765,15 @@ public class Phase5_GlobalsAndPatches
         // Initialize each discovered pool dictionary
         foreach (var (poolName, declaringClasses) in poolToClasses)
         {
+            // SKIP pools that have init expressions that check for existence and create them
+            // TextConstants: Text>>initialize checks (Smalltalk includes: #TextConstants) ifFalse: [create it]
+            // If we pre-create it as nil, the check returns true and dictionary is never created!
+            if (poolName == "TextConstants")
+            {
+                Console.WriteLine($"  Skipped pool dictionary: {poolName} (created by Text>>initialize)");
+                continue;
+            }
+            
             // IMPORTANT: Cold start creates the GLOBAL VARIABLE with value = nil
             // User code (init expressions) will allocate Dictionary and assign it
             // Example: FilePool _ Dictionary new. (in File class>>initialize)
