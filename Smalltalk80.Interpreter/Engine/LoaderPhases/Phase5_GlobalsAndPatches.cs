@@ -116,11 +116,15 @@ public class Phase5_GlobalsAndPatches
     {
         if (_bundle.Patches == null || _bundle.Patches.Length == 0)
         {
-// Console.WriteLine($"  No patches to apply");
+            Console.WriteLine($"[Phase5] No patches to apply");
             return;
         }
 
-// Console.WriteLine($"  Applying {_bundle.Patches.Length} patches...");
+        Console.WriteLine($"[Phase5] Applying {_bundle.Patches.Length} patches...");
+
+        int setInstanceVarCount = 0;
+        int replaceLiteralCount = 0;
+        int installMethodDictCount = 0;
 
         foreach (var patch in _bundle.Patches)
         {
@@ -128,20 +132,25 @@ public class Phase5_GlobalsAndPatches
             {
                 case "SetInstanceVariable":
                     ApplySetInstanceVariablePatch(patch);
+                    setInstanceVarCount++;
                     break;
 
                 case "InstallMethodDictionary":
                     ApplyInstallMethodDictionaryPatch(patch);
+                    installMethodDictCount++;
                     break;
 
                 case "ReplaceLiteral":
                     ApplyReplaceLiteralPatch(patch);
+                    replaceLiteralCount++;
                     break;
 
                 default:
                     throw new InvalidOperationException($"Unknown patch type: {patch.Type}");
             }
         }
+
+        Console.WriteLine($"[Phase5] Patches applied: {setInstanceVarCount} SetInstanceVariable, {replaceLiteralCount} ReplaceLiteral ({_replacedArrayCount} replaced Arrays), {installMethodDictCount} InstallMethodDict");
     }
 
     private void ApplySetInstanceVariablePatch(PatchDescriptor patch)
@@ -182,6 +191,8 @@ public class Phase5_GlobalsAndPatches
         }
     }
 
+    private int _replacedArrayCount = 0;
+
     private void ApplyReplaceLiteralPatch(PatchDescriptor patch)
     {
         var methodOOP = _localIdToObjectId[patch.MethodLocalId!];
@@ -212,6 +223,20 @@ public class Phase5_GlobalsAndPatches
         else
         {
             // Not an Association - replace the literal itself
+
+            // DEBUG: Log if we're replacing an Array (likely a pool binding)
+            var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+            if (literalClassOOP == arrayClassOOP)
+            {
+                _replacedArrayCount++;
+                if (_replacedArrayCount <= 5)
+                {
+                    var oldClassName = _allocator.GetClassName(literalClassOOP);
+                    var newClassName = _allocator.GetClassName(_heapManager.GetSlot(newValueOOP, 0));
+                    Console.WriteLine($"[Phase5 PATCH] Replacing Array literal: method={patch.MethodLocalId}, literal[{patch.LiteralIndex}], old={literalOOP}:{oldClassName}, new={newValueOOP}:{newClassName}");
+                }
+            }
+
             _heapManager.SetIndexedOOP(methodOOP, patch.LiteralIndex.Value + 1, newValueOOP);
 
             if (_debugOptions.ShouldDebugPatches)

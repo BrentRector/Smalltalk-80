@@ -63,14 +63,6 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (indexedSize < 0)
             throw new ArgumentOutOfRangeException(nameof(indexedSize), "Indexed size must be non-negative");
 
-        // DEBUG: Trace allocation of suspicious Pointer objects with 2 fixed slots and no indexed
-        if (format == ObjectFormat.Pointer && fixedSlots == 2 && indexedSize == 0)
-        {
-            Console.WriteLine($"\n[HEAP DEBUG] Allocating Format=Pointer, fixedSlots=2, indexedSize=0");
-            Console.WriteLine($"Stack trace:");
-            Console.WriteLine(Environment.StackTrace);
-        }
-
         // Calculate total size for metadata tracking
         int headerWords = 1; // Header slot
         int indexedWords = CalculateIndexedWords(format, indexedSize);
