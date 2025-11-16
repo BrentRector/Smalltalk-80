@@ -49,7 +49,34 @@ public static class ClassHierarchyUtils
             throw new InvalidOperationException($"Class '{className}' not found in bundle");
         }
         
-        return CalculateTotalInstanceVariableCount(classDefinition, bundle);
+        var result = CalculateTotalInstanceVariableCount(classDefinition, bundle);
+        
+        // DEBUG: Log SystemDictionary instance variable count calculation
+        if (className == "SystemDictionary")
+        {
+            Console.WriteLine($"[CalculateInstanceVarCount] {className} total count: {result}");
+            
+            // Show hierarchy
+            var currentClass = classDefinition;
+            while (currentClass != null)
+            {
+                string currentClassName = bundle.Symbols[currentClass.NameIndex];
+                Console.WriteLine($"  - {currentClassName}: {currentClass.InstVarNames.Length} vars");
+                
+                if (currentClass.SuperNameIndex.HasValue)
+                {
+                    string superName = bundle.Symbols[currentClass.SuperNameIndex.Value];
+                    currentClass = bundle.Classes.FirstOrDefault(c => 
+                        !c.IsMetaclass && bundle.Symbols[c.NameIndex] == superName);
+                }
+                else
+                {
+                    currentClass = null;
+                }
+            }
+        }
+        
+        return result;
     }
 
     /// <summary>

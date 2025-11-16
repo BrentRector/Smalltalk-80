@@ -93,7 +93,11 @@ public class Phase2_ClassInfrastructure
         // Set has 1 instance variable: tally (a SmallInteger counting elements)
         // SystemDictionary starts empty, so tally = 0
         _allocator.SetInstanceVariable(systemDictOOP, 0, new SmalltalkOOP(1)); // SmallInteger(0) = OOP(1)
-        Console.WriteLine($"[Phase2] Initialized SystemDictionary tally to SmallInteger(0) = OOP(1)");
+        
+        // CRITICAL: Mark tally as initialized so Phase 3 won't overwrite it with nil
+        _initializedFields.Add((systemDictOOP, 0));
+        
+        Console.WriteLine($"[Phase2] ✓ Initialized SystemDictionary tally to SmallInteger(0) and marked as initialized");
 
         GlobalRegistry.Register("Smalltalk", systemDictOOP);
 

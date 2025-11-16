@@ -51,6 +51,18 @@ public class Phase5_GlobalsAndPatches
 
     public void Run()
     {
+        // DEBUG: Check SystemDictionary tally at START of Phase 5
+        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
+        try
+        {
+            var tallyAtStart = _allocator.GetInstanceVariable(systemDictOOP, 0);
+            Console.WriteLine($"[Phase5 START] SystemDictionary tally: {tallyAtStart}, IsSmallInteger={tallyAtStart.IsSmallInteger}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Phase5 START] ERROR reading SystemDictionary tally: {ex.Message}");
+        }
+        
         // Step 1: Apply patches (from Phase10)
         ApplyPatches();
 
@@ -935,6 +947,26 @@ public class Phase5_GlobalsAndPatches
             {
                 // Found empty slot - handle both nil and any uninitialized cases during architectural transition
                 _allocator.SetIndexedOOP(systemDictOOP, i, associationOOP);
+                
+                // CRITICAL: Increment tally to reflect the new association
+                // SystemDictionary inherits 'tally' instance variable from Set (index 0)
+                var currentTallyOOP = _allocator.GetInstanceVariable(systemDictOOP, 0);
+                
+                // DEBUG: Check what we're reading
+                if (!currentTallyOOP.IsSmallInteger)
+                {
+                    Console.WriteLine($"[TALLY ERROR] Installing '{globalName}': tally is not a SmallInteger!");
+                    Console.WriteLine($"  SystemDict OOP: {systemDictOOP}");
+                    Console.WriteLine($"  Tally OOP: {currentTallyOOP}");
+                    Console.WriteLine($"  Tally is SmallInteger: {currentTallyOOP.IsSmallInteger}");
+                    Console.WriteLine($"  Tally is ObjectPointer: {currentTallyOOP.IsObjectPointer}");
+                    throw new InvalidOperationException($"SystemDictionary tally is not a SmallInteger when installing '{globalName}'. Tally OOP: {currentTallyOOP}");
+                }
+                
+                int currentTally = currentTallyOOP.AsSmallInteger();
+                int newTally = currentTally + 1;
+                _allocator.SetInstanceVariable(systemDictOOP, 0, SmalltalkOOP.FromSmallInteger(newTally));
+                
                 return;
             }
             else
