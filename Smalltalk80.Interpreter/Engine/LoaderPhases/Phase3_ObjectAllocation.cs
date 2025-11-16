@@ -73,6 +73,11 @@ public class Phase3_ObjectAllocation
         InitializeUnsetInstanceVariables();
         LogInitializationCheckpoint();
 
+        // Section 5: Populate Undeclared Dictionary
+        // CRITICAL: Must happen BEFORE Phase 4 (method literal processing)
+        // This ensures all method literals reference the canonical Associations from Undeclared
+        PopulateUndeclaredDictionary();
+
         // DEBUG: Check SystemDictionary tally at END of Phase 3
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         var tallyEnd = _allocator.GetInstanceVariable(systemDictOOP, 0);
@@ -208,8 +213,8 @@ public class Phase3_ObjectAllocation
 
     /// <summary>
     /// Creates the Undeclared Dictionary and registers it as a global (v1.0.7).
-    /// The Undeclared dictionary is initially empty - it will be populated during Phase 5
-    /// with Association objects for each variable found in bundle.Undeclared[].
+    /// The Undeclared dictionary is initially empty - it will be populated later in Phase 3 (Section 5)
+    /// with canonical Association objects for each variable found in bundle.Undeclared[].
     /// </summary>
     private void CreateUndeclaredDictionary(SmalltalkOOP nilOOP)
     {
@@ -1209,6 +1214,131 @@ public class Phase3_ObjectAllocation
     {
         _allocator.SetInstanceVariable(oop, slot, value);
         _initializedFields.Add((oop, slot));
+    }
+
+    #endregion
+
+    #region Undeclared Dictionary Population
+
+    /// <summary>
+    /// Populates the Undeclared dictionary with canonical Association objects.
+    /// CRITICAL: This must run in Phase 3 (BEFORE Phase 4 method literal processing).
+    ///
+    /// Architecture:
+    /// 1. Creates canonical Associations via AssociationRegistry for each undeclared variable
+    /// 2. Adds these Associations to the Undeclared dictionary
+    /// 3. Phase 4 will use AssociationRegistry.GetOrCreate() to get the SAME Associations for method literals
+    /// 4. Phase 5 will use AssociationRegistry.GetOrCreate() to get the SAME Associations for global installation
+    ///
+    /// This ensures ONE Association object per global variable name, enabling the
+    /// Undeclared → SystemDictionary migration pattern specified in the Blue Book.
+    /// </summary>
+    private void PopulateUndeclaredDictionary()
+    {
+        if (_bundle.Undeclared == null || _bundle.Undeclared.Length == 0)
+        {
+            Console.WriteLine("[Phase3] No undeclared variables in bundle - skipping Undeclared population");
+            return;
+        }
+
+        Console.WriteLine($"[Phase3] Populating Undeclared dictionary with {_bundle.Undeclared.Length} canonical Associations...");
+
+        var undeclaredOOP = GlobalRegistry.Get("Undeclared");
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        int addedCount = 0;
+
+        foreach (var undeclaredVar in _bundle.Undeclared)
+        {
+            // Get or create canonical Association for this variable
+            // This uses AssociationRegistry to ensure canonicalization
+            var associationOOP = GetOrCreateCanonicalAssociation(undeclaredVar.Key);
+
+            // Add Association to Undeclared dictionary
+            AddAssociationToUndeclaredDictionary(undeclaredOOP, associationOOP);
+            addedCount++;
+        }
+
+        // Update tally
+        int tallyIndex = _layoutResolver.GetFieldIndex("class:Dictionary", "tally");
+        if (tallyIndex >= 0)
+        {
+            var tallyOOP = SmalltalkOOP.FromSmallInteger(addedCount);
+            _allocator.SetInstanceVariable(undeclaredOOP, tallyIndex, tallyOOP);
+        }
+
+        Console.WriteLine($"  ✓ Added {addedCount} canonical Associations to Undeclared dictionary");
+        Console.WriteLine($"  ✓ AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations");
+
+        // Show sample of undeclared variables
+        if (addedCount > 0)
+        {
+            var sampleCount = Math.Min(5, _bundle.Undeclared.Length);
+            Console.WriteLine($"  Sample undeclared variables:");
+            for (int i = 0; i < sampleCount; i++)
+            {
+                var varName = _bundle.Undeclared[i].Key;
+                var refCount = _bundle.Undeclared[i].References.Length;
+                Console.WriteLine($"    - {varName} ({refCount} reference(s))");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or creates a canonical Association for a global variable name.
+    /// Uses AssociationRegistry to ensure exactly one Association per name.
+    /// </summary>
+    private SmalltalkOOP GetOrCreateCanonicalAssociation(string keyName)
+    {
+        // Get symbol OOP for the key
+        SmalltalkOOP keySymbolOOP = InternSymbol(keyName);
+
+        // Use AssociationRegistry to get or create
+        return AssociationRegistry.GetOrCreate(keyName, () =>
+        {
+            // Create new Association with key and nil value
+            return AllocateAssociationWithSemanticAllocator(keySymbolOOP, SpecialObjectsArray.Instance.Nil);
+        });
+    }
+
+    /// <summary>
+    /// Adds an Association to the Undeclared dictionary using open-addressing hash table.
+    /// Matches Dictionary>>at:put: implementation in Smalltalk-80.
+    /// </summary>
+    private void AddAssociationToUndeclaredDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP)
+    {
+        int capacity = _allocator.GetIndexedSize(dictionaryOOP);
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Get the key from the Association (slot 0 = key, slot 1 = value)
+        var keyOOP = _allocator.GetInstanceVariable(associationOOP, 0);
+
+        // Compute hash for the key (simple identity hash using OOP value)
+        int hash = Math.Abs(keyOOP.RawValue) % capacity;
+
+        // Linear probe to find empty slot
+        for (int probe = 0; probe < capacity; probe++)
+        {
+            int slotIndex = (hash + probe) % capacity;
+            var slotOOP = _allocator.GetIndexedOOP(dictionaryOOP, slotIndex);
+
+            if (slotOOP == nilOOP)
+            {
+                // Found empty slot - install Association
+                _allocator.SetIndexedOOP(dictionaryOOP, slotIndex, associationOOP);
+                return;
+            }
+
+            // Check if Association already exists (shouldn't happen, but handle it)
+            var existingKeyOOP = _allocator.GetInstanceVariable(slotOOP, 0);
+            if (existingKeyOOP == keyOOP)
+            {
+                // Association already in dictionary - replace it
+                _allocator.SetIndexedOOP(dictionaryOOP, slotIndex, associationOOP);
+                return;
+            }
+        }
+
+        throw new InvalidOperationException($"Undeclared dictionary is full - cannot add Association for key={keyOOP}");
     }
 
     #endregion

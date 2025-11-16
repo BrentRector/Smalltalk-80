@@ -69,8 +69,9 @@ public class Phase5_GlobalsAndPatches
         // Step 2: Create and populate USTable (from Phase11)
         CreateAndPopulateUSTable();
 
-        // Step 2b: Populate Undeclared dictionary (v1.0.7)
-        PopulateUndeclaredDictionary();
+        // Step 2b: Populate Undeclared dictionary - MOVED TO PHASE 3
+        // PopulateUndeclaredDictionary(); // Now runs in Phase3 BEFORE Phase4 method literal processing
+        // This ensures all method literals reference the canonical Associations from Undeclared
 
         // Step 3: Create and populate SystemDictionary (from Phase12)
         CreateAndPopulateSystemDictionary();
