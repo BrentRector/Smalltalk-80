@@ -3353,7 +3353,7 @@ namespace Smalltalk80.Compiler
                     // Create GlobalVariable literal
                     // Pool variables are handled by VariableResolver during resolution phase
                     object literalValue = new GlobalVariable(new Symbol(name), null);
-                    Console.WriteLine($"[{literalValue.GetType().Name} created] key={name}");
+                    // Console.WriteLine($"[{literalValue.GetType().Name} created] key={name}");
                     emitter.AddLiteral(literalValue);
                 }
                 
