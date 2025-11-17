@@ -26,7 +26,25 @@ internal interface IVMHelpers
 
     /// <summary>
     /// Parses a CompiledMethod header to extract argument count, temporary count, etc.
-    /// Returns a MethodHeaderInfo record (defined in VirtualMachine.cs).
     /// </summary>
     MethodHeaderInfo ParseMethodHeader(SmalltalkOOP methodOOP);
 }
+
+/// <summary>
+/// Parsed information from a CompiledMethod header.
+/// Smalltalk-80 method headers encode metadata in a 15-bit field:
+///   Bits 0-5   (6 bits): numLiterals (0-63)
+///   Bit  6     (1 bit):  needsLargeFrame flag
+///   Bits 7-11  (5 bits): numTemps (0-31)
+///   Bits 12-14 (3 bits): flags field
+/// </summary>
+internal record MethodHeaderInfo(
+    int NumLiterals,
+    bool NeedsLargeFrame,
+    int NumTemps,
+    int Flags,
+    int NumArgs,
+    int Primitive,
+    bool IsQuickReturnSelf,
+    bool IsQuickReturnField,
+    int QuickReturnFieldIndex);

@@ -2980,31 +2980,8 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
 
     /// <summary>
     /// Parses a CompiledMethod header word according to the Smalltalk-80 specification.
-    ///
-    /// Header format (16 bits):
-    ///   Bits 0-5   (6 bits): numLiterals (0-63)
-    ///   Bit  6     (1 bit):  needsLargeFrame flag
-    ///   Bits 7-11  (5 bits): numTemps (0-31)
-    ///   Bits 12-14 (3 bits): flags field
-    ///
-    /// Flags field interpretation:
-    ///   0-4: Simple method, flags = numArgs (0-4 args, no primitive)
-    ///   5:   Quick-return-self (returns receiver without bytecode execution)
-    ///   6:   Quick-return-field (returns instance variable at index numTemps)
-    ///   7:   Extended form (numArgs and primitive in last literal)
+    /// MethodHeaderInfo record is defined in IVMHelpers.cs.
     /// </summary>
-    private record MethodHeaderInfo(
-        int NumLiterals,
-        bool NeedsLargeFrame,
-        int NumTemps,
-        int Flags,
-        int NumArgs,
-        int Primitive,
-        bool IsQuickReturnSelf,
-        bool IsQuickReturnField,
-        int QuickReturnFieldIndex
-    );
-
     private MethodHeaderInfo ParseMethodHeader(SmalltalkOOP methodOOP)
     {
         var headerOop = GetMethodLiteral(methodOOP, 0);
