@@ -5,7 +5,7 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Engine;
 
-namespace Smalltalk80.Interpreter;
+namespace Smalltalk80.Interpreter.Tests.Integration;
 
 /// <summary>
 /// Minimal test harness to validate cold start loader execution and heap correctness.

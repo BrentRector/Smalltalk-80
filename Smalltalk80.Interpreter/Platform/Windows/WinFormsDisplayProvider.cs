@@ -2,7 +2,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
 
-namespace Smalltalk80.Interpreter;
+namespace Smalltalk80.Interpreter.Platform.Windows;
 
 /// <summary>
 /// Windows Forms implementation of IDisplayProvider.
