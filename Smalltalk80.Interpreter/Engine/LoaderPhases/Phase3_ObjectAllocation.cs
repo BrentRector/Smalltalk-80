@@ -515,10 +515,35 @@ public class Phase3_ObjectAllocation
         {
             var probe = _allocator.GetIndexedOOP(dictionaryOOP, location);
 
+            // Debug: Log every access to slot 33
+            if (location == 33)
+            {
+                string probeDesc = probe == nilOOP ? "nil" : $"{probe}";
+                if (probe != nilOOP && !probe.IsSmallInteger)
+                {
+                    var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+                    int probeKeySize = _allocator.GetIndexedSize(probeKeyOOP);
+                    var probeKeyBytes = new byte[probeKeySize];
+                    for (int i = 0; i < probeKeySize; i++)
+                    {
+                        probeKeyBytes[i] = _allocator.GetIndexedByte(probeKeyOOP, i);
+                    }
+                    string probeKeyName = System.Text.Encoding.ASCII.GetString(probeKeyBytes);
+                    probeDesc += $" (key=#{probeKeyName})";
+                }
+                Console.WriteLine($"[PHASE3-SLOT33] Installing '{name}': slot 33 currently has {probeDesc}");
+            }
+
             if (probe == nilOOP)
             {
                 // Found empty slot - install association
                 _allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
+
+                // Debug: Log installation at slot 33
+                if (location == 33)
+                {
+                    Console.WriteLine($"[PHASE3-SLOT33] INSTALLED '{name}' at slot 33: assoc={associationOOP}");
+                }
 
                 // Increment tally field
                 if (incrementTally)
@@ -541,6 +566,13 @@ public class Phase3_ObjectAllocation
             {
                 // Update existing Association
                 _allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
+
+                // Debug: Log replacement at slot 33
+                if (location == 33)
+                {
+                    Console.WriteLine($"[PHASE3-SLOT33] REPLACED '{name}' at slot 33: old={probe}, new={associationOOP}");
+                }
+
                 incrementTally = false;
                 return;
             }
