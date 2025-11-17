@@ -1312,7 +1312,7 @@ namespace Smalltalk80.Compiler
             environment.KnownPoolDictionaryNames = knownPoolDictionaryNames;
             if (knownPoolDictionaryNames != null && knownPoolDictionaryNames.Count > 0)
             {
-                Console.WriteLine($"[BYTECODE COMPILER] Set KnownPoolDictionaryNames: [{string.Join(", ", knownPoolDictionaryNames)}]");
+                // Console.WriteLine($"[BYTECODE COMPILER] Set KnownPoolDictionaryNames: [{string.Join(", ", knownPoolDictionaryNames)}]");
             }
             
             // Set up class variables

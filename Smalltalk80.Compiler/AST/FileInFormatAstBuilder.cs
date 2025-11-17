@@ -101,7 +101,7 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitClassDefChunk(Smalltalk80Parser.ClassDefChunkContext context)
         {
-            Console.WriteLine("[AST] DEBUG: VisitClassDefChunk called");
+            // Console.WriteLine("[AST] DEBUG: VisitClassDefChunk called");
             var classHeader = context.classHeader();
             var classBody = context.classBody();
 
@@ -210,8 +210,8 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitMethodCategoryChunk(Smalltalk80Parser.MethodCategoryChunkContext context)
         {
-            Console.WriteLine($"[AST] DEBUG: VisitMethodCategoryChunk called, collectingClassesOnly={_collectingClassesOnly}");
-            
+            // Console.WriteLine($"[AST] DEBUG: VisitMethodCategoryChunk called, collectingClassesOnly={_collectingClassesOnly}");
+
             // Skip method compilation during pass 1 (class collection phase)
             if (_collectingClassesOnly)
                 return null;
@@ -237,7 +237,7 @@ namespace Smalltalk80.Compiler.AST
             // DEBUG: Report class-side method detection
             if (isClassSide)
             {
-                Console.WriteLine($"[AST] Found class-side method category: {_currentClass} class methodsFor: '{_currentCategory}'");
+                // Console.WriteLine($"[AST] Found class-side method category: {_currentClass} class methodsFor: '{_currentCategory}'");
             }
             
             // Set the metaclass flag for this entire category
@@ -321,7 +321,7 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitExpressionChunk(Smalltalk80Parser.ExpressionChunkContext context)
         {
-            Console.WriteLine($"[AST] DEBUG: VisitExpressionChunk called with: {context.GetText()}");
+            // Console.WriteLine($"[AST] DEBUG: VisitExpressionChunk called with: {context.GetText()}");
             // Skip init expression compilation during pass 1 (class collection phase)
             if (_collectingClassesOnly)
                 return null;
@@ -396,11 +396,11 @@ namespace Smalltalk80.Compiler.AST
                 if (_classes.ContainsKey(_currentClass))
                 {
                     poolNode = _classes[_currentClass];
-                    Console.WriteLine($"[POOL DEBUG] Class method in '{_currentClass}', using instance-side class for pools");
+                    // Console.WriteLine($"[POOL DEBUG] Class method in '{_currentClass}', using instance-side class for pools");
                 }
             }
             var poolVars = GetPoolVariables(poolNode);
-            Console.WriteLine($"[POOL DEBUG] Pool vars for {_currentClass}: {poolVars.Count} dictionaries");
+            // Console.WriteLine($"[POOL DEBUG] Pool vars for {_currentClass}: {poolVars.Count} dictionaries");
 
             // Collect all known class names for proper variable resolution
             var knownClassNames = new HashSet<string>(_classes.Keys);
@@ -421,7 +421,7 @@ namespace Smalltalk80.Compiler.AST
             // Debug: Show pool dictionary names when compiling File class methods
             if (_currentClass != null && _currentClass.Contains("File") && _isMetaclass)
             {
-                Console.WriteLine($"[POOL DICT] Compiling {_currentClass} (metaclass={_isMetaclass}) method, collected {knownPoolDictionaryNames.Count} pool dict names: [{string.Join(", ", knownPoolDictionaryNames.OrderBy(x => x))}]");
+                // Console.WriteLine($"[POOL DICT] Compiling {_currentClass} (metaclass={_isMetaclass}) method, collected {knownPoolDictionaryNames.Count} pool dict names: [{string.Join(", ", knownPoolDictionaryNames.OrderBy(x => x))}]");
             }
             
             // Compile the method using BytecodeCompiler
@@ -1062,8 +1062,8 @@ namespace Smalltalk80.Compiler.AST
         private Dictionary<string, object> GetPoolVariables(ClassDefinitionNode classNode)
         {
             var poolVars = new Dictionary<string, object>();
-            Console.WriteLine($"[GetPoolVariables] Class: {classNode.Name}, Pool count: {classNode.PoolDictionaries.Count}");
-            
+            // Console.WriteLine($"[GetPoolVariables] Class: {classNode.Name}, Pool count: {classNode.PoolDictionaries.Count}");
+
             // For offline compiler: return EMPTY dictionary if class has pools
             // The count > 0 tells VariableResolver to treat undefined vars as pool variables
             // Pool dictionary names are passed separately via KnownPoolDictionaryNames

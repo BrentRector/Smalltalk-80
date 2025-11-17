@@ -63,10 +63,10 @@ namespace Smalltalk80.Compiler
         /// <exception cref="InvalidOperationException">Thrown if variable not found in any scope</exception>
         public ResolutionResult ResolveVariable(string varName, CompilationEnvironment context, TempFrameAllocator? allocator = null)
         {
-            Console.WriteLine($"[RESOLVE] Resolving variable: {varName}, PoolVars.Count={context.PoolVariables.Count}");
+            // Console.WriteLine($"[RESOLVE] Resolving variable: {varName}, PoolVars.Count={context.PoolVariables.Count}");
             if (varName == "FilePool")
             {
-                Console.WriteLine($"[FILEPOOL START] Starting resolution for FilePool");
+                // Console.WriteLine($"[FILEPOOL START] Starting resolution for FilePool");
             }
             
             // Step 1: Check pseudo-variables first (highest priority, cannot be shadowed)
