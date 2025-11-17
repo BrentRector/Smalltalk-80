@@ -766,14 +766,21 @@ public class Phase5_GlobalsAndPatches
         // Initialize each discovered pool dictionary
         foreach (var (poolName, declaringClasses) in poolToClasses)
         {
-            // SKIP pools that have init expressions that check for existence and create them
-            // TextConstants: Text>>initialize checks (Smalltalk includes: #TextConstants) ifFalse: [create it]
-            // If we pre-create it as nil, the check returns true and dictionary is never created!
-            if (poolName == "TextConstants")
-            {
-                Console.WriteLine($"  Skipped pool dictionary: {poolName} (created by Text>>initialize)");
-                continue;
-            }
+            // NOTE: We used to skip TextConstants here, but that caused global variable lookup to fail.
+            //
+            // ARCHITECTURE: Pool dictionary names are compiled as global variable references in Phase 4.
+            // The compiled bytecode contains Association literals created during compilation.
+            // Phase 3.5 creates these Associations (with value=nil) and registers them in AssociationRegistry.
+            // Phase 5 (here) MUST install the same Associations in SystemDictionary.
+            //
+            // When Text>>initialize executes "Smalltalk at: #TextConstants put: (Dictionary new: 32)":
+            // - SystemDictionary>>at:put: finds the EXISTING Association (created here)
+            // - Calls "element value: anObject" to UPDATE the Association's value
+            // - Now the Association has value=Dictionary instead of nil
+            // - All compiled bytecode referencing TextConstants now works correctly
+            //
+            // If we skip creating the Association here, Text>>initialize creates a NEW Association,
+            // but compiled bytecode still references the OLD Association from Phase 3.5 (value=nil).
             
             // IMPORTANT: Cold start creates the GLOBAL VARIABLE with value = nil
             // User code (init expressions) will allocate Dictionary and assign it
