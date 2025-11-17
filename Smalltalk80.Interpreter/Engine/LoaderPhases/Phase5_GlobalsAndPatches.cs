@@ -687,40 +687,20 @@ public class Phase5_GlobalsAndPatches
 
 // Console.WriteLine($"  [Phase5] Initializing {poolToClasses.Count} pool dictionar{(poolToClasses.Count == 1 ? "y" : "ies")}:");
 
-        // Initialize each discovered pool dictionary
+        // DON'T create pool dictionaries in Phase 5!
+        // Pool dictionaries should be created by init expressions and migrated from Undeclared.
+        //
+        // CORRECT FLOW:
+        // 1. Phase 3.5: Creates Association for TextConstants in Undeclared (undeclared variable)
+        // 2. Phase 4: Compiles methods referencing TextConstants - uses Association from Undeclared
+        // 3. Text initialize: Executes "Smalltalk at: #TextConstants put: (Dictionary new: 32)"
+        // 4. Runtime: SystemDictionary>>at:put: migrates Association from Undeclared to SystemDictionary
+        //
+        // If we pre-create in SystemDictionary, we bypass the migration mechanism.
+
         foreach (var (poolName, declaringClasses) in poolToClasses)
         {
-            // NOTE: We used to skip TextConstants here, but that caused global variable lookup to fail.
-            //
-            // ARCHITECTURE: Pool dictionary names are compiled as global variable references in Phase 4.
-            // The compiled bytecode contains Association literals created during compilation.
-            // Phase 3.5 creates these Associations (with value=nil) and registers them in AssociationRegistry.
-            // Phase 5 (here) MUST install the same Associations in SystemDictionary.
-            //
-            // When Text>>initialize executes "Smalltalk at: #TextConstants put: (Dictionary new: 32)":
-            // - SystemDictionary>>at:put: finds the EXISTING Association (created here)
-            // - Calls "element value: anObject" to UPDATE the Association's value
-            // - Now the Association has value=Dictionary instead of nil
-            // - All compiled bytecode referencing TextConstants now works correctly
-            //
-            // If we skip creating the Association here, Text>>initialize creates a NEW Association,
-            // but compiled bytecode still references the OLD Association from Phase 3.5 (value=nil).
-            
-            // IMPORTANT: Cold start creates the GLOBAL VARIABLE with value = nil
-            // User code (init expressions) will allocate Dictionary and assign it
-            // Example: FilePool _ Dictionary new. (in File class>>initialize)
-            
-            // Create Association: #PoolName → nil
-            var associationOOP = GetOrCreateCanonicalAssociation(poolName);
-            _allocator.SetInstanceVariable(associationOOP, 1, nilOOP);  // value = nil
-
-            // Install as global in Smalltalk dictionary
-            InstallAssociationInSystemDictionary(associationOOP, poolName);
-
-            // Register in GlobalRegistry (value = nil for now)
-            GlobalRegistry.Register(poolName, nilOOP);
-
-            Console.WriteLine($"  Created pool dictionary global: {poolName} (value = nil, used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})");
+            Console.WriteLine($"  Pool dictionary {poolName} will be created by init expressions (used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})");
         }
     }
 
