@@ -46,6 +46,9 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     /// <summary>Gets the total number of instructions executed by this VM instance.</summary>
     public long InstructionCount => _instructionCount;
 
+    /// <summary>Gets the runtime debug options for this VM instance.</summary>
+    public RuntimeDebugOptions DebugOptions => _debugOptions;
+
     /// <summary>Resets the instruction counter to zero. Used before executing init expressions.</summary>
     public void ResetInstructionCount() => _instructionCount = 0;
 
