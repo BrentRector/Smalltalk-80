@@ -500,6 +500,12 @@ public class Phase3_ObjectAllocation
         int hash = GetSymbolHash(keySymbolOOP);
         int location = (hash % dictSize + dictSize) % dictSize;
 
+        // Debug TextConstants installation
+        if (name == "TextConstants")
+        {
+            Console.WriteLine($"[PHASE3-INSTALL] TextConstants: assoc={associationOOP}, key={keySymbolOOP}, hash={hash}, dictSize={dictSize}, location={location}");
+        }
+
         // Linear probing
         int pass = 1;
         int startLocation = location;

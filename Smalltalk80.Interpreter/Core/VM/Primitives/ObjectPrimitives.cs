@@ -1979,6 +1979,18 @@ public static class ObjectPrimitives
         // OOP format: object pointer = (objectTableIndex << 1) | 0
         // Half of object pointer = objectTableIndex
         int hashValue = VMUtilities.ComputeIdentityHash(receiver);
+
+        // Debug TextConstants Symbol hash
+        var className = ctx.GetClassName(ctx.GetClass(receiver));
+        if (className == "Symbol")
+        {
+            var symbolName = ctx.GetSymbolName(receiver);
+            if (symbolName == "TextConstants")
+            {
+                Console.WriteLine($"[PRIM75-HASH] Symbol #TextConstants: oop={receiver}, hash={hashValue}");
+            }
+        }
+
         return SmalltalkOOP.FromSmallInteger(hashValue);
     }
 
