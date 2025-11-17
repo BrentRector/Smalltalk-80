@@ -18,7 +18,7 @@
   <!-- CLI and GUI files -->
   <ItemGroup>
     <Compile Include="Program.cs" />
-    <Compile Include="WinFormsDisplayProvider.cs" />
+    <Compile Include="Platform\Windows\WinFormsDisplayProvider.cs" />
   </ItemGroup>
 
   <!-- Windows Forms and Graphics packages -->
