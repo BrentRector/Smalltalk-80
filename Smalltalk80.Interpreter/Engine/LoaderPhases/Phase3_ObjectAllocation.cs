@@ -258,7 +258,7 @@ public class Phase3_ObjectAllocation
 
         // CRITICAL: Register in AssociationRegistry so Phase 4 method literals can reference it
         // This ensures method literals that reference "Undeclared" get the correct Association (not a new one with nil value)
-        AssociationRegistry.Register("Undeclared", undeclaredAssoc);
+        AssociationRegistry.GetOrCreate("Undeclared", () => undeclaredAssoc);
 
         Console.WriteLine($"  Created Undeclared dictionary (OOP={undeclaredOOP}, capacity={initialCapacity}, undeclared count={undeclaredCount})");
         Console.WriteLine($"  Undeclared Association: key={undeclaredSymbol}, value={undeclaredOOP}, assoc={undeclaredAssoc}");
