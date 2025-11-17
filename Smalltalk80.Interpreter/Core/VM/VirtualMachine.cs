@@ -1145,7 +1145,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // POOL VARIABLES: Check if this is a 2-element Array (binding metadata)
             var classOOP = _heapManager.GetClassOOP(literalOOP);
-            var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+            var arrayClassOOP = _runtimeHeapAccess.GetClass("Array");
             
             if (classOOP == arrayClassOOP)
             {
@@ -1158,7 +1158,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     
                     // Check if element 0 is a Symbol (pool name) or an OOP (already patched to dictionary)
                     var element0Class = _heapManager.GetClassOOP(element0);
-                    var symbolClass = GlobalRegistry.LookupClassOOP("Symbol");
+                    var symbolClass = _runtimeHeapAccess.GetClass("Symbol");
                     
                     if (element0Class == symbolClass)
                     {
@@ -1172,7 +1172,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     {
                         // Already patched: element0 is pool dictionary OOP (fast path)
                         // Verify element0 is a Dictionary (should always be true after patching)
-                        var dictionaryClassOOP = GlobalRegistry.LookupClassOOP("Dictionary");
+                        var dictionaryClassOOP = _runtimeHeapAccess.GetClass("Dictionary");
                         if (element0Class != dictionaryClassOOP)
                         {
                             throw new InvalidOperationException(
@@ -4503,10 +4503,11 @@ public partial class VirtualMachine : IPrimitiveContext
             // This handles cases where the pool dictionary is created by an initialize method
             var poolNameString = GetSymbolString(poolNameSymbol);
             Console.WriteLine($"[POOL VAR FALLBACK] Pool dictionary '{poolNameString}' not found, checking Undeclared");
-            
+
             // Look up in Undeclared dictionary
-            var undeclaredOOP = GlobalRegistry.Get("Undeclared");
-            if (undeclaredOOP != SmalltalkOOP.Null)
+            var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+            var undeclaredOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, "Undeclared");
+            if (undeclaredOOP != SpecialObjectsArray.Instance.Nil)
             {
                 var undeclaredValueOOP = LookupInDictionary(undeclaredOOP, keySymbol);
                 if (undeclaredValueOOP != SpecialObjectsArray.Instance.Nil)
