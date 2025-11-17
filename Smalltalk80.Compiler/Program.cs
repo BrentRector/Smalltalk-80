@@ -185,7 +185,7 @@ file sealed class Program
     /// <exception cref="InvalidOperationException">Thrown when parsing fails.</exception>
     private static CompilationResult ParseSmalltalkSource(string inputFile)
     {
-        // Read the input file
+        // Read the input file (preserve original for error reporting)
         string input = File.ReadAllText(inputFile);
 
         // Create ANTLR input stream
@@ -200,8 +200,8 @@ file sealed class Program
         // Create parser
         var parser = new Smalltalk80Parser(tokenStream);
 
-        // Add error listener
-        var errorListener = new ConsoleErrorListener();
+        // Add enhanced error listener with source context
+        var errorListener = new ConsoleErrorListener(inputFile, input);
         parser.RemoveErrorListeners();
         parser.AddErrorListener(errorListener);
 
@@ -224,17 +224,105 @@ file sealed class Program
 }
 
 /// <summary>
-/// Custom error listener for ANTLR parser errors.
+/// Custom error listener for ANTLR parser errors with enhanced source context display.
+/// Shows the actual source line(s) with proper whitespace and a caret pointing to the error.
 /// </summary>
 file sealed class ConsoleErrorListener : BaseErrorListener
 {
+    private readonly string _fileName;
+    private readonly string[] _sourceLines;
+    private const int ContextLinesBefore = 1;
+    private const int ContextLinesAfter = 1;
+
+    /// <summary>
+    /// Creates a new error listener with access to the original source.
+    /// </summary>
+    /// <param name="fileName">Name of the file being parsed (for display purposes).</param>
+    /// <param name="sourceText">Original source text with all whitespace intact.</param>
+    public ConsoleErrorListener(string fileName, string sourceText)
+    {
+        _fileName = Path.GetFileName(fileName);
+        _sourceLines = sourceText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+    }
+
     /// <summary>
     /// Handles syntax errors from the ANTLR parser.
+    /// Displays error with source context, line numbers, and caret position.
     /// </summary>
     public override void SyntaxError(TextWriter output, IRecognizer recognizer, IToken offendingSymbol,
         int line, int charPositionInLine, string msg, RecognitionException e)
     {
         // Write to stdout instead of stderr so errors are visible in MSBuild output
-        Console.WriteLine($"Line {line}:{charPositionInLine} - {msg}");
+        Console.WriteLine();
+        Console.WriteLine($"=== PARSE ERROR in {_fileName} ===");
+        Console.WriteLine();
+
+        // Show context lines
+        int startLine = Math.Max(1, line - ContextLinesBefore);
+        int endLine = Math.Min(_sourceLines.Length, line + ContextLinesAfter);
+
+        // Calculate line number width for alignment
+        int lineNumWidth = endLine.ToString().Length;
+
+        for (int i = startLine; i <= endLine; i++)
+        {
+            // Get the source line (adjust for 0-based indexing)
+            string sourceLine = i <= _sourceLines.Length ? _sourceLines[i - 1] : "";
+
+            // Format line number with padding
+            string lineNumPrefix = i.ToString().PadLeft(lineNumWidth);
+
+            // Mark the error line with an arrow
+            string marker = (i == line) ? " -> " : "    ";
+
+            Console.WriteLine($"{marker}{lineNumPrefix}: {sourceLine}");
+
+            // If this is the error line, show the caret
+            if (i == line)
+            {
+                // Calculate caret position (account for line number prefix)
+                int caretOffset = marker.Length + lineNumWidth + 2 + charPositionInLine; // +2 for ": "
+                string caretLine = new string(' ', caretOffset) + "^";
+
+                Console.WriteLine(caretLine);
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Error: {msg}");
+
+        // Show the offending token with original text from source
+        if (offendingSymbol != null)
+        {
+            // Get the actual text from the source using token's start/stop indices
+            string tokenText = GetTokenSourceText(offendingSymbol);
+            Console.WriteLine($"Token: '{tokenText}' at position {charPositionInLine}");
+        }
+
+        Console.WriteLine();
+    }
+
+    /// <summary>
+    /// Extracts the original source text for a token, preserving all whitespace.
+    /// Uses the token's character stream interval to get the exact original text.
+    /// </summary>
+    private string GetTokenSourceText(IToken token)
+    {
+        if (token.TokenSource == null)
+            return token.Text;
+
+        ICharStream inputStream = token.TokenSource.InputStream;
+        if (inputStream == null)
+            return token.Text;
+
+        // Use ANTLR's Interval to get exact source text
+        int start = token.StartIndex;
+        int stop = token.StopIndex;
+
+        if (start < 0 || stop < 0 || stop >= inputStream.Size)
+            return token.Text;
+
+        // Get text directly from the character stream (preserves original formatting)
+        return inputStream.GetText(new Antlr4.Runtime.Misc.Interval(start, stop));
     }
 }
