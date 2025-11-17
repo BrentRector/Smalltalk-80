@@ -120,6 +120,29 @@ public static class ObjectPrimitives
         // Arrays use PointerIndexed format - get OOP directly
         var result = ctx.HeapManager.GetIndexedOOP(receiver, index - 1);
 
+        // Debug TextConstants lookup in dictionaries
+        try
+        {
+            if (result != SpecialObjectsArray.Instance.Nil && !result.IsSmallInteger)
+            {
+                // Check if this is an Association
+                var classOOP = ctx.HeapManager.GetClassOOP(result);
+                var className = ctx.GetClassNameForObject(classOOP);
+                if (className == "Association")
+                {
+                    var keyOOP = ctx.HeapManager.GetInstanceVariable(result, 0);
+                    string keyName = GetSymbolName(ctx, keyOOP);
+                    if (keyName == "TextConstants")
+                    {
+                        var valueOOP = ctx.HeapManager.GetInstanceVariable(result, 1);
+                        var valueClass = ctx.GetClassNameForObject(valueOOP);
+                        Console.WriteLine($"[PRIM60-AT] Found TextConstants Association: assoc={result}, value={valueOOP} (class={valueClass}), index={index} (1-based), receiver={receiver}");
+                    }
+                }
+            }
+        }
+        catch { }
+
         // Blue Book: self push: result
         return result;
     }
