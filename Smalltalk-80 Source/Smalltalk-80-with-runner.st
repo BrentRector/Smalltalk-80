@@ -42375,3 +42375,5 @@ initialize
 	tester := BlockContextTest new.
 	result := tester testAllCombinations.
 	^ result! !
+
+BlockContextTestRunner initialize!
