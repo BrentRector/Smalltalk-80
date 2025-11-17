@@ -120,25 +120,42 @@ public static class ObjectPrimitives
         // Arrays use PointerIndexed format - get OOP directly
         var result = ctx.HeapManager.GetIndexedOOP(receiver, index - 1);
 
-        // Debug TextConstants lookup in dictionaries
+        // Debug dictionary access for Undeclared during Text initialize
         try
         {
-            if (result != SpecialObjectsArray.Instance.Nil && !result.IsSmallInteger)
+            // Check if receiver is Undeclared dictionary (oop=13778 based on Phase 3 output)
+            if (receiver.Value == 13778)
             {
-                // Check if this is an Association
-                var classOOP = ctx.HeapManager.GetClassOOP(result);
-                var className = ctx.GetClassNameForObject(classOOP);
-                if (className == "Association")
+                string resultDesc;
+                if (result == SpecialObjectsArray.Instance.Nil)
                 {
-                    var keyOOP = ctx.HeapManager.GetInstanceVariable(result, 0);
-                    string keyName = GetSymbolName(ctx, keyOOP);
-                    if (keyName == "TextConstants")
+                    resultDesc = "nil";
+                }
+                else if (result.IsSmallInteger)
+                {
+                    resultDesc = $"SmallInteger({result.AsSmallInteger()})";
+                }
+                else
+                {
+                    var resultClass = ctx.GetClassNameForObject(result);
+                    resultDesc = $"{result} (class={resultClass})";
+
+                    // If it's an Association, show the key
+                    if (resultClass == "Association")
                     {
-                        var valueOOP = ctx.HeapManager.GetInstanceVariable(result, 1);
-                        var valueClass = ctx.GetClassNameForObject(valueOOP);
-                        Console.WriteLine($"[PRIM60-AT] Found TextConstants Association: assoc={result}, value={valueOOP} (class={valueClass}), index={index} (1-based), receiver={receiver}");
+                        try
+                        {
+                            var keyOOP = ctx.HeapManager.GetInstanceVariable(result, 0);
+                            string keyName = GetSymbolName(ctx, keyOOP);
+                            var valueOOP = ctx.HeapManager.GetInstanceVariable(result, 1);
+                            var valueClass = ctx.GetClassNameForObject(valueOOP);
+                            resultDesc += $", key=#{keyName}, value={valueOOP} (class={valueClass})";
+                        }
+                        catch { }
                     }
                 }
+
+                Console.WriteLine($"[PRIM60-UNDECLARED] Undeclared basicAt: {index} (1-based) / {index - 1} (0-based) → {resultDesc}");
             }
         }
         catch { }
