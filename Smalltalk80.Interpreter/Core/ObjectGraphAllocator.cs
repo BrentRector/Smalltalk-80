@@ -8,20 +8,20 @@ using Smalltalk80.Interpreter.Core.Attributes;
 namespace Smalltalk80.Interpreter.Core;
 
 /// <summary>
-/// Semantic allocator that wraps the semantic-agnostic heap manager.
-/// Provides high-level allocation methods with knowledge of Smalltalk object structure.
-/// This layer handles all semantic knowledge about object formats, slot calculations, etc.
+/// Object graph allocator that coordinates the allocation of complex Smalltalk object structures.
+/// Wraps the low-level heap manager with knowledge of Smalltalk semantics (object formats, slot calculations, etc.).
+/// Used during cold start to build the initial object graph from ColdStartBundle.
 ///
 /// COLD START ONLY: This class uses ColdStartBundle which is stale after cold start completes.
 /// Runtime code must NOT use this allocator.
 /// </summary>
 [ColdStartOnly(Reason = "Uses ColdStartBundle which is stale after cold start")]
-public class SemanticAllocator
+public class ObjectGraphAllocator
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly ColdStartBundle _bundle;
 
-    public SemanticAllocator(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    public ObjectGraphAllocator(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
     {
         _heapManager = heapManager;
         _bundle = bundle;

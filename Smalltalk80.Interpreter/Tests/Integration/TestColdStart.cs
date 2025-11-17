@@ -17,7 +17,7 @@ public class TestColdStart
     {
         try
         {
-            Console.WriteLine("=== Cold Start Loader Test ===\n");
+            Console.WriteLine("=== Cold Start ColdStartOrchestrator Test ===\n");
 
             // Parse command line arguments
             string coldStartPath = "bin/Debug/net9.0/coldstart.json";
@@ -61,10 +61,10 @@ public class TestColdStart
             Console.WriteLine("Heap manager created");
 
             // Create and run loader
-            var loader = new Loader(bundle, heapManager);
+            var loader = new ColdStartOrchestrator(bundle, heapManager);
             loader.Run();
 
-            // Success - message already printed by Loader
+            // Success - message already printed by ColdStartOrchestrator
             
             return 0;
         }

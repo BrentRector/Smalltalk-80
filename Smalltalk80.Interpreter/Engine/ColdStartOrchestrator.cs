@@ -10,7 +10,8 @@ using System.Diagnostics;
 namespace Smalltalk80.Interpreter.Engine;
 
 /// <summary>
-/// New 6-phase cold start loader orchestrator.
+/// 6-phase cold start orchestrator.
+/// Coordinates the loading of a Smalltalk-80 image from ColdStartBundle into the heap.
 /// Implements a streamlined architecture that consolidates related operations
 /// and establishes clear data flow between phases.
 ///
@@ -18,11 +19,11 @@ namespace Smalltalk80.Interpreter.Engine;
 /// Runtime code must NOT use this class.
 /// </summary>
 [ColdStartOnly(Reason = "Builds heap from ColdStartBundle, modifies frozen registries")]
-public class Loader
+public class ColdStartOrchestrator
 {
     private readonly ColdStartBundle _bundle;
     private readonly ISmalltalkHeapManager _heapManager;
-    private readonly SemanticAllocator _allocator;
+    private readonly ObjectGraphAllocator _allocator;
     private readonly ColdstartReport _report;
     private readonly string _bundlePath;
     private readonly ColdStartDebugOptions _debugOptions;
@@ -52,7 +53,7 @@ public class Loader
     /// <summary>
     /// Gets the semantic allocator.
     /// </summary>
-    public SemanticAllocator Allocator => _allocator;
+    public ObjectGraphAllocator Allocator => _allocator;
 
     /// <summary>
     /// Gets the coldstart execution report.
@@ -62,17 +63,17 @@ public class Loader
     // InitExpressionsArrayOOP removed - accessible via SpecialObjectsArray.Instance.InitExpressionMethods
 
     /// <summary>
-    /// Initializes a new instance of the Loader class.
+    /// Initializes a new instance of the ColdStartOrchestrator class.
     /// </summary>
     /// <param name="bundle">The cold start bundle containing the Smalltalk image data.</param>
     /// <param name="heapManager">The heap manager for allocating objects.</param>
     /// <param name="bundlePath">Optional path to the bundle file for diagnostics.</param>
     /// <param name="debugOptions">Optional debug options for diagnostic output.</param>
-    public Loader(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, string? bundlePath = null, ColdStartDebugOptions? debugOptions = null)
+    public ColdStartOrchestrator(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, string? bundlePath = null, ColdStartDebugOptions? debugOptions = null)
     {
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
         _heapManager = heapManager ?? throw new ArgumentNullException(nameof(heapManager));
-        _allocator = new SemanticAllocator(heapManager, bundle);
+        _allocator = new ObjectGraphAllocator(heapManager, bundle);
         _bundlePath = bundlePath ?? "coldstart.json";
         _debugOptions = debugOptions ?? ColdStartDebugOptions.None;
 

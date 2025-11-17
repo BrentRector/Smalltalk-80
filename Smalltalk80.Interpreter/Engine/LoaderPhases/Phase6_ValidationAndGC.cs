@@ -25,7 +25,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 public class Phase6_ValidationAndGC
 {
     private readonly ColdStartBundle _bundle;
-    private readonly SemanticAllocator _allocator;
+    private readonly ObjectGraphAllocator _allocator;
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly LayoutResolver _layoutResolver;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
@@ -34,7 +34,7 @@ public class Phase6_ValidationAndGC
 
     public Phase6_ValidationAndGC(
         ColdStartBundle bundle,
-        SemanticAllocator allocator,
+        ObjectGraphAllocator allocator,
         ISmalltalkHeapManager heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,

@@ -5,18 +5,19 @@ using System.Text;
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
-/// Provides runtime access to Smalltalk heap data structures.
-/// This class replaces GlobalRegistry and LayoutResolver for runtime use.
+/// Accessor for runtime heap data structures.
+/// Provides safe, read-only access to Smalltalk objects and metadata during VM execution.
+/// Replaces GlobalRegistry and LayoutResolver for runtime use.
 /// All methods access ONLY the Smalltalk heap, never cold-start proxy data.
 /// </summary>
-public class RuntimeHeapAccess
+public class RuntimeHeapAccessor
 {
     private readonly ISmalltalkHeapManager _heapManager;
 
     // Caching layer (invalidated by primitive 89)
     private readonly RuntimeClassCache _classCache;
 
-    public RuntimeHeapAccess(ISmalltalkHeapManager heapManager)
+    public RuntimeHeapAccessor(ISmalltalkHeapManager heapManager)
     {
         _heapManager = heapManager;
         _classCache = new RuntimeClassCache(this, heapManager);

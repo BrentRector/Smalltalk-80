@@ -18,7 +18,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 public partial class VirtualMachine : IPrimitiveContext
 {
     private readonly ISmalltalkHeapManager _heapManager;
-    private readonly RuntimeHeapAccess _runtimeHeapAccess;
+    private readonly RuntimeHeapAccessor _runtimeHeapAccess;
     private readonly LayoutResolver _layoutResolver;
     private readonly VMMetadata _metadata;
     private readonly IPlatformBridge? _platformBridge;
@@ -138,7 +138,7 @@ public partial class VirtualMachine : IPrimitiveContext
     {
         _heapManager = heapManager;
         _layoutResolver = layoutResolver;
-        _runtimeHeapAccess = new RuntimeHeapAccess(heapManager);
+        _runtimeHeapAccess = new RuntimeHeapAccessor(heapManager);
         RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
         _metadata = metadata;
         _platformBridge = platformBridge;
