@@ -70,13 +70,13 @@
   </Target>
 
   <!-- Auto-generate coldstart.json after build -->
+  <!-- TEMPORARILY DISABLED to debug parser issues
   <Target Name="GenerateColdStart" AfterTargets="Build">
     <PropertyGroup>
       <SmalltalkSourceFile>$(MSBuildProjectDirectory)\..\Smalltalk-80 Source\Smalltalk-80.st</SmalltalkSourceFile>
       <ColdStartOutputFile>$(OutDir)coldstart.json</ColdStartOutputFile>
     </PropertyGroup>
 
-    <!-- Check if source file exists before attempting generation -->
     <Message Text="Checking for Smalltalk source: $(SmalltalkSourceFile)" Importance="high" />
     <Error Text="Smalltalk source file not found: $(SmalltalkSourceFile)" Condition="!Exists('$(SmalltalkSourceFile)')" />
 
@@ -85,12 +85,12 @@
     <Message Text="  Target: $(ColdStartOutputFile)" Importance="high" />
     <Message Text="  Compiler: $(TargetPath)" Importance="high" />
 
-    <!-- Run the compiler to generate coldstart.json -->
     <Exec Command="dotnet &quot;$(TargetPath)&quot; &quot;$(SmalltalkSourceFile)&quot; &quot;$(ColdStartOutputFile)&quot;"
           WorkingDirectory="$(OutDir)"
           ContinueOnError="false" />
 
     <Message Text="coldstart.json generated: $(ColdStartOutputFile)" Importance="high" />
   </Target>
+  -->
 
 </Project>
