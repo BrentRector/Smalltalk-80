@@ -1623,8 +1623,9 @@ public partial class VirtualMachine : IPrimitiveContext
                         Console.WriteLine($"[PUSH_LITERAL_VAR] ERROR: literal[{index}] is NOT an Association! It's a {assocClass}, OOP={associationOOP}");
 
                         // Dump method info
-                        var methodClass = GetMethodClassName(methodOOP);
-                        var methodSelector = GetMethodSelector(methodOOP);
+                        var methodClass = GetClassName(GetClass(methodOOP));
+                        var selectorOOP = GetMethodLiteral(methodOOP, 1);
+                        var methodSelector = GetSymbolName(selectorOOP);
                         Console.WriteLine($"  Method: {methodClass}>>{methodSelector} (OOP={methodOOP})");
 
                         // Dump the Array contents if it's an Array
