@@ -492,37 +492,72 @@ public class Phase3_ObjectAllocation
     }
 
     /// <summary>
-    /// Installs an Association in any Dictionary object (including pool dictionaries).
-    /// Similar to InstallAssociationInSystemDictionary but works with any dictionary OOP.
+    /// Installs an Association in any Dictionary object (including pool dictionaries and Undeclared).
+    /// Uses hash-based lookup to match Dictionary>>findKeyOrNil: algorithm.
     /// </summary>
     private void InstallAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string name)
     {
         int dictSize = _allocator.GetIndexedSize(dictionaryOOP);
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // Find first available nil slot
-        for (int i = 0; i < dictSize; i++)
+        // Get the key symbol from the Association (slot 0)
+        var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
+
+        // Use hash-based lookup (same algorithm as Dictionary>>findKeyOrNil:)
+        int hash = GetSymbolHash(keySymbolOOP);
+        int location = (hash % dictSize + dictSize) % dictSize;
+
+        // Linear probing
+        int pass = 1;
+        int startLocation = location;
+        bool incrementTally = true;
+
+        while (true)
         {
-            var slotOOP = _allocator.GetIndexedOOP(dictionaryOOP, i);
-            if (slotOOP == nilOOP)
+            var probe = _allocator.GetIndexedOOP(dictionaryOOP, location);
+
+            if (probe == nilOOP)
             {
                 // Found empty slot - install association
-                _allocator.SetIndexedOOP(dictionaryOOP, i, associationOOP);
+                _allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
 
-                // Increment tally field (field 0 for Dictionary)
-                int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
-                if (tallyIndex >= 0)
+                // Increment tally field
+                if (incrementTally)
                 {
-                    var currentTallyOOP = _allocator.GetInstanceVariable(dictionaryOOP, tallyIndex);
-                    int currentTally = currentTallyOOP.IsSmallInteger ? currentTallyOOP.AsSmallInteger() : 0;
-                    _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(currentTally + 1));
+                    int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
+                    if (tallyIndex >= 0)
+                    {
+                        var currentTallyOOP = _allocator.GetInstanceVariable(dictionaryOOP, tallyIndex);
+                        int currentTally = currentTallyOOP.IsSmallInteger ? currentTallyOOP.AsSmallInteger() : 0;
+                        _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(currentTally + 1));
+                    }
                 }
 
                 return;
             }
-        }
 
-        throw new InvalidOperationException($"Dictionary is full - cannot install {name} association");
+            // Check if Association with same key already exists
+            var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+            if (probeKeyOOP == keySymbolOOP)
+            {
+                // Update existing Association
+                _allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
+                incrementTally = false;
+                return;
+            }
+
+            // Linear probe
+            location = (location + 1) % dictSize;
+
+            if (location == startLocation)
+            {
+                pass++;
+                if (pass > 2)
+                {
+                    throw new InvalidOperationException($"Dictionary is full - cannot install {name} association after 2 passes");
+                }
+            }
+        }
     }
 
     /// <summary>
