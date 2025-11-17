@@ -1018,13 +1018,14 @@ public class Phase5_GlobalsAndPatches
 
     private int GetSymbolHash(SmalltalkOOP symbolOOP)
     {
-        // Get symbol string for hashing
-        var symbolChars = _heapManager.GetIndexedBytes(symbolOOP);
+        // Get symbol bytes for hashing
+        int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
 
-        // Smalltalk-80 hash algorithm for strings (simplified)
+        // Smalltalk-80 hash algorithm for strings
         int hash = 0;
-        foreach (byte b in symbolChars)
+        for (int i = 0; i < symbolLength; i++)
         {
+            byte b = _heapManager.GetIndexedByte(symbolOOP, i);
             hash = (hash + b) & 0x0FFFFFFF; // Keep in SmallInteger range
         }
         return hash;

@@ -479,13 +479,14 @@ public class Phase3_ObjectAllocation
 
     private int GetSymbolHash(SmalltalkOOP symbolOOP)
     {
-        // Get symbol string for hashing
-        var symbolChars = _heapManager.GetIndexedBytes(symbolOOP);
+        // Get symbol bytes for hashing
+        int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
 
-        // Smalltalk-80 hash algorithm for strings (simplified)
+        // Smalltalk-80 hash algorithm for strings
         int hash = 0;
-        foreach (byte b in symbolChars)
+        for (int i = 0; i < symbolLength; i++)
         {
+            byte b = _heapManager.GetIndexedByte(symbolOOP, i);
             hash = (hash + b) & 0x0FFFFFFF; // Keep in SmallInteger range
         }
         return hash;
@@ -1357,8 +1358,8 @@ public class Phase3_ObjectAllocation
 
         foreach (var undeclaredVar in _bundle.Undeclared)
         {
-            // Get the canonical Association from AssociationRegistry
-            var associationOOP = AssociationRegistry.Get(undeclaredVar.Key);
+            // Get the canonical Association from AssociationRegistry (already created in first loop)
+            var associationOOP = AssociationRegistry.GetAll()[undeclaredVar.Key];
 
             // Install in Undeclared dictionary using hash-based insertion
             InstallAssociationInDictionary(undeclaredOOP, associationOOP, undeclaredVar.Key);
