@@ -1643,52 +1643,33 @@ public partial class VirtualMachine : IPrimitiveContext
                             }
 
                             // Look up pool dictionary in Smalltalk SystemDictionary
+                            // NOTE: LookupGlobalByName returns the VALUE, not the Association
                             var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
-                            var poolDictAssocOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, poolDictName);
-
-                            if (poolDictAssocOOP == SpecialObjectsArray.Instance.Nil)
-                            {
-                                throw new InvalidOperationException($"Pool dictionary Association not found: {poolDictName}");
-                            }
-
-                            // Verify it's an Association
-                            var poolDictAssocClass = GetClassName(GetClass(poolDictAssocOOP));
-                            var poolDictAssocInstVars = _heapManager.GetInstanceVariableCount(poolDictAssocOOP);
-                            if (poolDictAssocClass != "Association")
-                            {
-                                throw new InvalidOperationException(
-                                    $"PUSH_LITERAL_VAR: LookupGlobalByName returned {poolDictAssocClass} for '{poolDictName}', expected Association " +
-                                    $"(OOP={poolDictAssocOOP}, {poolDictAssocInstVars} instance vars)");
-                            }
-
-                            // Get the pool dictionary value from the Association
-                            var poolDictOOP = _heapManager.GetInstanceVariable(poolDictAssocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                            var poolDictOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, poolDictName);
 
                             if (poolDictOOP == SpecialObjectsArray.Instance.Nil)
                             {
-                                throw new InvalidOperationException($"Pool dictionary is nil: {poolDictName}");
+                                throw new InvalidOperationException($"Pool dictionary not found: {poolDictName}");
                             }
 
-                            // Look up variable Association in pool dictionary by variable name
-                            var variableAssocOOP = _runtimeHeapAccess.LookupGlobalByName(poolDictOOP, varName);
+                            // Verify it's a Dictionary
+                            var poolDictClass = GetClassName(GetClass(poolDictOOP));
+                            if (poolDictClass != "Dictionary")
+                            {
+                                throw new InvalidOperationException(
+                                    $"PUSH_LITERAL_VAR: Expected Dictionary for pool '{poolDictName}', got {poolDictClass} (OOP={poolDictOOP})");
+                            }
 
-                            if (variableAssocOOP == SpecialObjectsArray.Instance.Nil)
+                            // Look up variable value in pool dictionary by variable name
+                            // NOTE: LookupGlobalByName returns the VALUE, not the Association
+                            var valueOOP = _runtimeHeapAccess.LookupGlobalByName(poolDictOOP, varName);
+
+                            if (valueOOP == SpecialObjectsArray.Instance.Nil)
                             {
                                 throw new InvalidOperationException($"Variable not found in pool dictionary {poolDictName}: {varName}");
                             }
 
-                            // Verify it's actually an Association
-                            var varAssocClass = GetClassName(GetClass(variableAssocOOP));
-                            var instanceVarCount = _heapManager.GetInstanceVariableCount(variableAssocOOP);
-                            if (varAssocClass != "Association")
-                            {
-                                throw new InvalidOperationException(
-                                    $"PUSH_LITERAL_VAR: Expected Association for {poolDictName}>>{varName}, got {varAssocClass} " +
-                                    $"(OOP={variableAssocOOP}, {instanceVarCount} instance vars)");
-                            }
-
-                            // Push the Association value
-                            var valueOOP = _heapManager.GetInstanceVariable(variableAssocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                            // Push the variable value
                             Push(valueOOP);
                             return true;
                         }
