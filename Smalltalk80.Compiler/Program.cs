@@ -234,6 +234,7 @@ file sealed class ConsoleErrorListener : BaseErrorListener
     public override void SyntaxError(TextWriter output, IRecognizer recognizer, IToken offendingSymbol,
         int line, int charPositionInLine, string msg, RecognitionException e)
     {
-        Console.Error.WriteLine($"Line {line}:{charPositionInLine} - {msg}");
+        // Write to stdout instead of stderr so errors are visible in MSBuild output
+        Console.WriteLine($"Line {line}:{charPositionInLine} - {msg}");
     }
 }
