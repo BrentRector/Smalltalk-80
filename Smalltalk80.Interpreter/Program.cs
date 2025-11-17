@@ -268,9 +268,9 @@ public static class Program
                         {
                             phase2Indices.Add(i);
                         }
-                        else if (expr.Source.Contains("Test "))
+                        else if (expr.Source.Contains("Test ") || expr.Source.StartsWith("BlockContextTest"))
                         {
-                            // Test expressions (e.g., "BlockContextTest validate")
+                            // Test expressions (e.g., "BlockContextTest validate", "BlockContextTest new testAllCombinations!")
                             testIndices.Add(i);
                         }
                         // Skip other expressions (run! messages) in normal mode
