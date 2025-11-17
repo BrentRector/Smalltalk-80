@@ -22,7 +22,7 @@ public partial class VirtualMachine : IPrimitiveContext
     private readonly LayoutResolver _layoutResolver;
     private readonly VMMetadata _metadata;
     private readonly IPlatformBridge? _platformBridge;
-    private readonly DebugOptions _debugOptions;
+    private readonly RuntimeDebugOptions _debugOptions;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -134,7 +134,7 @@ public partial class VirtualMachine : IPrimitiveContext
     private int _selectorTraceDepth = 0;
     private readonly Stack<(string className, string selector, int depth)> _selectorTraceStack = new();
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, DebugOptions? debugOptions = null)
+    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, RuntimeDebugOptions? debugOptions = null)
     {
         _heapManager = heapManager;
         _layoutResolver = layoutResolver;
@@ -142,7 +142,7 @@ public partial class VirtualMachine : IPrimitiveContext
         RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
         _metadata = metadata;
         _platformBridge = platformBridge;
-        _debugOptions = debugOptions ?? DebugOptions.Default;
+        _debugOptions = debugOptions ?? RuntimeDebugOptions.Default;
     }
 
     /// <summary>

@@ -25,7 +25,7 @@ public class Phase5_GlobalsAndPatches
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
     private readonly IReadOnlyList<string> _symbols;
     private readonly ColdstartReport _report;
-    private readonly DebugOptions _debugOptions;
+    private readonly ColdStartDebugOptions _debugOptions;
 
     public Phase5_GlobalsAndPatches(
         ColdStartBundle bundle,
@@ -35,7 +35,7 @@ public class Phase5_GlobalsAndPatches
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
         ColdstartReport report,
-        DebugOptions? debugOptions = null)
+        ColdStartDebugOptions? debugOptions = null)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -45,7 +45,7 @@ public class Phase5_GlobalsAndPatches
         _initializedFields = initializedFields;
         _symbols = bundle.Symbols;
         _report = report ?? throw new ArgumentNullException(nameof(report));
-        _debugOptions = debugOptions ?? DebugOptions.None;
+        _debugOptions = debugOptions ?? ColdStartDebugOptions.None;
     }
 
     public void Run()

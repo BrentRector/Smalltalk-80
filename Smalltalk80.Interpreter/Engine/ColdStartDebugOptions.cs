@@ -4,7 +4,7 @@ namespace Smalltalk80.Interpreter.Engine;
 /// Holds debug flags that control verbose diagnostic output during cold start.
 /// These options are intended for debugging loader phases, not for runtime execution.
 /// </summary>
-public class DebugOptions
+public class ColdStartDebugOptions
 {
     /// <summary>
     /// Enable patch application debug output (SetInstanceVariable, ReplaceLiteral, etc.)
@@ -61,14 +61,14 @@ public class DebugOptions
     public bool DebugAll { get; set; }
 
     /// <summary>
-    /// Returns a default DebugOptions instance with all flags disabled.
+    /// Returns a default ColdStartDebugOptions instance with all flags disabled.
     /// </summary>
-    public static DebugOptions None => new DebugOptions();
+    public static ColdStartDebugOptions None => new ColdStartDebugOptions();
 
     /// <summary>
-    /// Returns a DebugOptions instance with all flags enabled.
+    /// Returns a ColdStartDebugOptions instance with all flags enabled.
     /// </summary>
-    public static DebugOptions All => new DebugOptions
+    public static ColdStartDebugOptions All => new ColdStartDebugOptions
     {
         DebugAll = true,
         DebugPatches = true,

@@ -25,7 +25,7 @@ public class Loader
     private readonly SemanticAllocator _allocator;
     private readonly ColdstartReport _report;
     private readonly string _bundlePath;
-    private readonly DebugOptions _debugOptions;
+    private readonly ColdStartDebugOptions _debugOptions;
 
     /// <summary>
     /// Maps localId strings to allocated OOP values.
@@ -68,13 +68,13 @@ public class Loader
     /// <param name="heapManager">The heap manager for allocating objects.</param>
     /// <param name="bundlePath">Optional path to the bundle file for diagnostics.</param>
     /// <param name="debugOptions">Optional debug options for diagnostic output.</param>
-    public Loader(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, string? bundlePath = null, DebugOptions? debugOptions = null)
+    public Loader(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, string? bundlePath = null, ColdStartDebugOptions? debugOptions = null)
     {
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
         _heapManager = heapManager ?? throw new ArgumentNullException(nameof(heapManager));
         _allocator = new SemanticAllocator(heapManager, bundle);
         _bundlePath = bundlePath ?? "coldstart.json";
-        _debugOptions = debugOptions ?? DebugOptions.None;
+        _debugOptions = debugOptions ?? ColdStartDebugOptions.None;
 
         // Initialize SpecialObjectsArray (will be populated during Phase 3)
         SpecialObjectsArray.Initialize();

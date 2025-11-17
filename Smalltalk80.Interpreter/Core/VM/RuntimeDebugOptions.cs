@@ -4,7 +4,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// Debug output configuration for VirtualMachine.
 /// All options default to false for clean production output.
 /// </summary>
-public class DebugOptions
+public class RuntimeDebugOptions
 {
     /// <summary>
     /// Enable bytecode execution trace output (shows each bytecode as it executes)
@@ -24,5 +24,5 @@ public class DebugOptions
     /// <summary>
     /// Default instance with all debugging disabled
     /// </summary>
-    public static readonly DebugOptions Default = new();
+    public static readonly RuntimeDebugOptions Default = new();
 }

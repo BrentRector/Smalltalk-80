@@ -145,8 +145,8 @@ public static class Program
 
                 var vmMetadata = BuildVMMetadata(layoutResolver);
 
-                // Convert Engine.DebugOptions to Core.VM.DebugOptions for the VirtualMachine
-                var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.DebugOptions
+                // Convert Engine.ColdStartDebugOptions to Core.VM.RuntimeDebugOptions for the VirtualMachine
+                var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.RuntimeDebugOptions
                 {
                     ShouldDebugBytecode = debugOptions.ShouldDebugBytecode,
                     ShouldDebugMessages = debugOptions.ShouldDebugMessages,
@@ -563,8 +563,8 @@ public static class Program
 
                     var vmMetadata = BuildVMMetadata(layoutResolver);
 
-                    // Convert Engine.DebugOptions to Core.VM.DebugOptions for the VirtualMachine
-                    var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.DebugOptions
+                    // Convert Engine.ColdStartDebugOptions to Core.VM.RuntimeDebugOptions for the VirtualMachine
+                    var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.RuntimeDebugOptions
                     {
                         ShouldDebugBytecode = debugOptions.ShouldDebugBytecode,
                         ShouldDebugMessages = debugOptions.ShouldDebugMessages,
@@ -1114,7 +1114,7 @@ public static class Program
     /// Supports: --coldstart path, --dump-class ClassName, --verbose, --skip-init-expressions, etc.
     /// Default: coldstart.json in the compiler output directory (../net9.0/coldstart.json)
     /// </summary>
-    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.DebugOptions debugOptions, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.ColdStartDebugOptions debugOptions, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
@@ -1123,7 +1123,7 @@ public static class Program
         string? reportOutput = null;
         bool skipInitExpressions = false;
         string? executeExpression = null;
-        var debugOptions = new Smalltalk80.Interpreter.Engine.DebugOptions();
+        var debugOptions = new Smalltalk80.Interpreter.Engine.ColdStartDebugOptions();
 
         for (int i = 0; i < args.Length; i++)
         {
