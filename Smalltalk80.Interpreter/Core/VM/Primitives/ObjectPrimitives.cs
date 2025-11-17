@@ -124,7 +124,8 @@ public static class ObjectPrimitives
         try
         {
             // Check if receiver is Undeclared dictionary (oop=13778 based on Phase 3 output)
-            if (receiver.Value == 13778)
+            var undeclaredOOP = new SmalltalkOOP(13778);
+            if (receiver == undeclaredOOP)
             {
                 string resultDesc;
                 if (result == SpecialObjectsArray.Instance.Nil)
