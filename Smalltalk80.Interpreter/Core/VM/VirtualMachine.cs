@@ -15,7 +15,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// NO access to cold start proxy data (_symbols[], ColdStartBundle, unfrozen registries).
 /// </summary>
 [RuntimeOnly(Reason = "Executes Smalltalk bytecode at runtime, must use heap-only access")]
-public partial class VirtualMachine : IPrimitiveContext
+public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly RuntimeHeapAccessor _runtimeHeapAccess;
@@ -23,6 +23,7 @@ public partial class VirtualMachine : IPrimitiveContext
     private readonly VMMetadata _metadata;
     private readonly IPlatformBridge? _platformBridge;
     private readonly RuntimeDebugOptions _debugOptions;
+    private readonly IStackManager _stackManager;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -143,6 +144,16 @@ public partial class VirtualMachine : IPrimitiveContext
         _metadata = metadata;
         _platformBridge = platformBridge;
         _debugOptions = debugOptions ?? RuntimeDebugOptions.Default;
+
+        _stackManager = new StackManager(
+            heapManager,
+            metadata,
+            this, // IVMHelpers
+            () => _activeContextOOP,
+            () => _selectorTraceEnabled,
+            () => _pushTraceCounter,
+            () => _pushTraceCounter++
+        );
     }
 
     /// <summary>
@@ -3078,6 +3089,13 @@ public partial class VirtualMachine : IPrimitiveContext
         );
     }
 
+    // Explicit interface implementations for IVMHelpers
+    // These delegate to the existing private methods while maintaining encapsulation
+    SmalltalkOOP IVMHelpers.GetClass(SmalltalkOOP objectOOP) => GetClass(objectOOP);
+    string IVMHelpers.GetClassName(SmalltalkOOP classOOP) => GetClassName(classOOP);
+    SmalltalkOOP IVMHelpers.FindMethodContext(SmalltalkOOP contextOOP) => FindMethodContext(contextOOP);
+    MethodHeaderInfo IVMHelpers.ParseMethodHeader(SmalltalkOOP methodOOP) => ParseMethodHeader(methodOOP);
+
     /// <summary>
     /// Extracts the primitive number from a method's header.
     /// Returns 0 if the method has no primitive.
@@ -3090,191 +3108,21 @@ public partial class VirtualMachine : IPrimitiveContext
 
     /// <summary>
     /// Pushes a value onto the operand stack.
+    /// Delegates to StackManager for implementation.
     /// </summary>
-    private void Push(SmalltalkOOP valueOOP)
-    {
-        // DEBUG: Trace ALL stack pushes when tracing is enabled
-        if (_selectorTraceEnabled)
-        {
-            _pushTraceCounter++;
-            if (_pushTraceCounter <= 10)
-            {
-                // Format: "oop=#### (ClassName)" for objects, "SmallInteger(#)" for small integers
-                string valueStr;
-                if (valueOOP.IsSmallInteger)
-                {
-                    valueStr = $"SmallInteger({valueOOP.AsSmallInteger()})";
-                }
-                else
-                {
-                    try
-                    {
-                        string className = GetClassName(valueOOP);
-                        valueStr = $"{valueOOP} ({className})";
-                        
-                        // If Symbol, show value
-                        if (className == "Symbol")
-                        {
-                            try
-                            {
-                                int byteSize = _heapManager.GetIndexedSize(valueOOP);
-                                var bytes = new byte[byteSize];
-                                for (int i = 0; i < byteSize; i++)
-                                {
-                                    bytes[i] = _heapManager.GetIndexedByte(valueOOP, i);
-                                }
-                                string symbolValue = System.Text.Encoding.Latin1.GetString(bytes);
-                                valueStr = $"{valueOOP} (Symbol) = #{symbolValue}";
-                            }
-                            catch { }
-                        }
-                    }
-                    catch
-                    {
-                        // If GetClassName fails, just show the OOP
-                        valueStr = valueOOP.ToString();
-                    }
-                }
-                Console.WriteLine($"[PUSH #{_pushTraceCounter}] Pushing {valueStr} onto stack");
-            }
-        }
-        
-        // DIAGNOSTIC: Validate _activeContextOOP is a valid context (MethodContext or BlockContext)
-        var activeContextFormat = _heapManager.GetObjectFormat(_activeContextOOP);
-        var activeContextClass = GetClassName(GetClass(_activeContextOOP));
-
-        // Both MethodContext (PointerIndexed) and BlockContext (should be PointerIndexed but may be Pointer due to allocation bug) are valid
-        bool isValidContext = (activeContextFormat == ObjectFormat.PointerIndexed) ||
-                             (activeContextFormat == ObjectFormat.Pointer && (activeContextClass == "MethodContext" || activeContextClass == "BlockContext"));
-
-        if (!isValidContext)
-        {
-            var valueClass = valueOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(valueOOP));
-            Console.WriteLine($"[ERROR Push] _activeContextOOP is not a valid context!");
-            Console.WriteLine($"  _activeContextOOP: {_activeContextOOP}");
-            Console.WriteLine($"  Expected: MethodContext or BlockContext");
-            Console.WriteLine($"  Actual format: {activeContextFormat}");
-            Console.WriteLine($"  Actual class: {activeContextClass}");
-            Console.WriteLine($"  Trying to push value: {valueOOP}");
-            Console.WriteLine($"  Value class: {valueClass}");
-            throw new InvalidOperationException($"Push() called with invalid context: {_activeContextOOP}, format={activeContextFormat}, class={activeContextClass}");
-        }
-
-        int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
-        int sp = spOOP.AsSmallInteger();
-
-        // Check for stack overflow
-        int stackSize = _heapManager.GetIndexedSize(_activeContextOOP);
-        if (sp >= stackSize)
-        {
-            throw new InvalidOperationException(
-                $"Stack overflow: sp={sp}, allocated size={stackSize}, context={_activeContextOOP}");
-        }
-
-        _heapManager.SetIndexedOOP(_activeContextOOP, sp, valueOOP);
-        _heapManager.SetInstanceVariable(_activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp + 1));
-    }
+    private void Push(SmalltalkOOP valueOOP) => _stackManager.Push(valueOOP);
 
     /// <summary>
     /// Pops a value from the operand stack.
+    /// Delegates to StackManager for implementation.
     /// </summary>
-    private SmalltalkOOP Pop()
-    {
-        int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
-        int sp = spOOP.AsSmallInteger();
-
-        // Get method to determine where execution stack starts
-        // sp is absolute index: [0..numArgs-1][numArgs..numArgs+numTemps-1][numArgs+numTemps..stackSize-1]
-        //                        ^--arguments--^------temporaries--------^-------execution stack----------^
-        // Execution stack empty when sp == (numArgs + numTemps)
-        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
-
-        // Check if this is a BlockContext - they retrieve method from home MethodContext
-        var contextClassOOP = _heapManager.GetClassOOP(_activeContextOOP);
-        bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
-
-        int initialSP;
-        SmalltalkOOP methodOOP;
-
-        if (isBlockContext)
-        {
-            // BlockContext: execution stack starts after block arguments
-            // Block's indexed area: [0..nargs-1] = args, [nargs..] = execution stack
-            var nargsOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-            initialSP = nargsOOP.AsSmallInteger();
-
-            // Get method from home context (needed for diagnostic messages)
-            // For nested blocks, home might be another BlockContext
-            // Must traverse the home chain to find the ultimate MethodContext
-            var methodContextOOP = FindMethodContext(_activeContextOOP);
-            methodOOP = _heapManager.GetInstanceVariable(methodContextOOP, methodIndex);
-        }
-        else
-        {
-            // MethodContext: execution stack starts after args + temps
-            // Method's indexed area: [0..numArgs-1] = args, [numArgs..numArgs+numTemps-1] = temps, [numArgs+numTemps..] = execution stack
-            methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
-            var header = ParseMethodHeader(methodOOP);
-            initialSP = header.NumArgs + header.NumTemps;
-        }
-
-        if (sp <= initialSP)
-        {
-            // Diagnostic: show what context we're in
-            var contextClass = GetClassName(GetClass(_activeContextOOP));
-            var methodClass = methodOOP.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(methodOOP));
-            Console.WriteLine($"[Pop ERROR] Stack underflow diagnostics:");
-            Console.WriteLine($"  activeContext: {_activeContextOOP}, class: {contextClass}");
-            Console.WriteLine($"  methodOOP: {methodOOP}, class: {methodClass}");
-            Console.WriteLine($"  sp={sp}, initialSP={initialSP}");
-
-            if (isBlockContext)
-            {
-                var nargsOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-                Console.WriteLine($"  BlockContext: nargs={nargsOOP.AsSmallInteger()}");
-            }
-            else
-            {
-                var header = ParseMethodHeader(methodOOP);
-                Console.WriteLine($"  MethodContext: numArgs={header.NumArgs}, numTemps={header.NumTemps}, numLiterals={header.NumLiterals}");
-            }
-
-            throw new InvalidOperationException(
-                $"Stack underflow: sp={sp}, initialSP={initialSP} in {contextClass}");
-        }
-
-        sp--;
-        // if (_verboseDebugMode)
-        //     Console.WriteLine($"[Pop] context={_activeContextOOP}, sp before={sp+1}, sp after={sp}");
-
-        _heapManager.SetInstanceVariable(_activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp));
-        var value = _heapManager.GetIndexedOOP(_activeContextOOP, sp);
-
-        // if (_verboseDebugMode)
-        //     Console.WriteLine($"[Pop] popped value={value}");
-
-        return value;
-    }
+    private SmalltalkOOP Pop() => _stackManager.Pop();
 
     /// <summary>
     /// Peeks at the top value on the operand stack without removing it.
+    /// Delegates to StackManager for implementation.
     /// </summary>
-    private SmalltalkOOP Peek()
-    {
-        int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
-        int sp = spOOP.AsSmallInteger();
-
-        if (sp <= 0)
-        {
-            throw new InvalidOperationException("Stack underflow in Peek()");
-        }
-
-        var value = _heapManager.GetIndexedOOP(_activeContextOOP, sp - 1);
-        return value;
-    }
+    private SmalltalkOOP Peek() => _stackManager.Peek();
 
 
     /// <summary>
