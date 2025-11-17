@@ -211,6 +211,35 @@ cp ../bin/Debug/net9.0/coldstart.json ../bin/Debug/net9.0/coldstart_with_runner.
 
 ## Recent Work (2025-11-17)
 
+**🔴 CRITICAL FIX: Hash Algorithm Modulo vs Bitwise AND (2025-11-17)**
+
+Fixed catastrophic bug where our hash algorithm used bitwise AND instead of modulo, causing hash mismatches with Smalltalk-80 and creating duplicate Associations.
+
+**The Bug:**
+- **Our C# code**: `hash = (hash + b) & 0x0FFFFFFF;` (bitwise AND)
+- **Smalltalk-80**: `hash := (hash + char) \\ 16r0FFFFFFF.` (modulo)
+- Since 0x0FFFFFFF (268435455) is NOT a power of 2, these give **different results**!
+- Example: hash=268435456 → AND gives 0, modulo gives 1
+
+**Impact on Text Initialize Failure:**
+1. Phase 5 installed TextConstants Association at WRONG slot (using AND hash)
+2. Runtime `Smalltalk at: #TextConstants put: dict` couldn't find it (using modulo hash)
+3. Created DUPLICATE Association → original stayed nil
+4. `TextConstants at: put:` read pool variable literal (Association #1, value=nil) → CRASH
+
+**The Fix:**
+Changed all three hash implementations from `& 0x0FFFFFFF` to `% 0x0FFFFFFF`:
+- Phase3_ObjectAllocation.cs:492 - `hash = (hash + b) % HashModulus;`
+- Phase5_GlobalsAndPatches.cs:1031 - `hash = (hash + b) % HashModulus;`
+- RuntimeHeapAccess.cs:229 - `hash = (hash + b) % HashModulus;`
+
+**Expected Result:**
+Text initialize should now succeed - dictionary operations will find the correct Associations.
+
+**Commit**: `2a1d5b5` - "CRITICAL FIX: Use modulo (%) instead of bitwise AND (&) in hash algorithm"
+
+---
+
 **✅ COMPLETED: Runtime GlobalRegistry Violations Fixed**
 
 Successfully identified and eliminated all runtime GlobalRegistry access violations, ensuring clean separation between cold start infrastructure and runtime execution.
@@ -228,15 +257,16 @@ Successfully identified and eliminated all runtime GlobalRegistry access violati
    - Line 1175: `GlobalRegistry.LookupClassOOP("Dictionary")` → `_runtimeHeapAccess.GetClass("Dictionary")`
    - Line 4508: `GlobalRegistry.Get("Undeclared")` → `_runtimeHeapAccess.LookupGlobalByName(systemDictOOP, "Undeclared")`
 
-**Hash Algorithm Implementation**:
+**Hash Algorithm Implementation** (CORRECTED to use modulo):
 ```csharp
 private int ComputeSymbolHashFromString(string symbolName)
 {
     byte[] bytes = Encoding.Latin1.GetBytes(symbolName);
+    const int HashModulus = 0x0FFFFFFF; // 268435455 = 2^28 - 1
     int hash = 0;
     foreach (byte b in bytes)
     {
-        hash = (hash + b) & 0x0FFFFFFF;
+        hash = (hash + b) % HashModulus; // Modulo, NOT bitwise AND!
     }
     return hash;
 }
