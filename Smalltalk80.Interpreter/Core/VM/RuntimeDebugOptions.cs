@@ -22,6 +22,11 @@ public class RuntimeDebugOptions
     public bool ShouldDebugMethodLookup { get; set; } = false;
 
     /// <summary>
+    /// Enable TextConstants-specific debug output (dictionary operations)
+    /// </summary>
+    public bool ShouldDebugTextConstants { get; set; } = false;
+
+    /// <summary>
     /// Default instance with all debugging disabled
     /// </summary>
     public static readonly RuntimeDebugOptions Default = new();
