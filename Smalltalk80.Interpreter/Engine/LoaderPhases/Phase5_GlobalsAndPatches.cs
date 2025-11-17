@@ -966,6 +966,12 @@ public class Phase5_GlobalsAndPatches
             var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
             if (probeKeyOOP == keySymbolOOP)
             {
+                // Debug: Log removal
+                if (keyName == "TextConstants" || location == 33)
+                {
+                    Console.WriteLine($"[PHASE5-REMOVE] Removing '{keyName}' from Undeclared slot {location} (0-based), assoc={probe}");
+                }
+
                 // Found it - remove by setting slot to nil
                 _allocator.SetIndexedOOP(undeclaredOOP, location, nilOOP);
 
