@@ -712,10 +712,38 @@ public class Phase5_GlobalsAndPatches
             
             // Create Association: #PoolName → nil
             var associationOOP = GetOrCreateCanonicalAssociation(poolName);
+
+            // DEBUG: Check if Association already has a value before overwriting
+            var existingValue = _allocator.GetInstanceVariable(associationOOP, 1);
+            if (existingValue != nilOOP)
+            {
+                Console.WriteLine($"    WARNING: {poolName} Association already has value {existingValue}, overwriting to nil");
+            }
+
             _allocator.SetInstanceVariable(associationOOP, 1, nilOOP);  // value = nil
-            
+
+            // DEBUG: Verify the Association was created correctly
+            var keySymbol = _allocator.GetInstanceVariable(associationOOP, 0);
+            Console.WriteLine($"    DEBUG: {poolName} Association OOP={associationOOP}, key={keySymbol}, value={nilOOP}");
+
             // Install as global in Smalltalk dictionary
             InstallAssociationInSystemDictionary(associationOOP, poolName);
+
+            // DEBUG: Verify it was installed correctly by looking it up
+            var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
+            var lookedUpValue = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, poolName);
+            if (lookedUpValue == nilOOP)
+            {
+                Console.WriteLine($"    ✓ Verified {poolName} lookup returns nil (correct)");
+            }
+            else if (lookedUpValue == SpecialObjectsArray.Instance.Nil)
+            {
+                Console.WriteLine($"    ❌ ERROR: {poolName} NOT FOUND in SystemDictionary after installation!");
+            }
+            else
+            {
+                Console.WriteLine($"    ❌ ERROR: {poolName} lookup returned unexpected value: {lookedUpValue}");
+            }
             
             // Register in GlobalRegistry (value = nil for now)
             GlobalRegistry.Register(poolName, nilOOP);
