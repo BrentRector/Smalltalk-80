@@ -1637,18 +1637,6 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                         // Unqualified variable reference: push Association value directly
                         var valueOOP = _heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
 
-                        // Debug TextConstants access
-                        if (_debugOptions.ShouldDebugTextConstants)
-                        {
-                            var keyOOP = _heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                            var keyName = GetSymbolName(keyOOP);
-                            if (keyName == "TextConstants")
-                            {
-                                var valueClass = GetClassName(GetClass(valueOOP));
-                                Console.WriteLine($"[TC-READ] TextConstants Association read: assoc={literalOOP}, value={valueOOP} (class={valueClass})");
-                            }
-                        }
-
                         Push(valueOOP);
                         return true;
                     }
@@ -1668,25 +1656,10 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                                 throw new InvalidOperationException($"PUSH_LITERAL_VAR: Qualified pool variable Array must contain Symbols");
                             }
 
-                            // Debug TextConstants access via qualified pool variable
-                            if (_debugOptions.ShouldDebugTextConstants && poolDictName == "TextConstants")
-                            {
-                                Console.WriteLine($"[TC-POOL-LOOKUP] Looking up TextConstants pool dictionary in SystemDictionary");
-                            }
-
                             // Look up pool dictionary in Smalltalk SystemDictionary
                             // NOTE: LookupGlobalByName returns the VALUE, not the Association
                             var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
                             var poolDictOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, poolDictName);
-
-                            // Debug result
-                            if (_debugOptions.ShouldDebugTextConstants && poolDictName == "TextConstants")
-                            {
-                                var poolDictClass = poolDictOOP != SpecialObjectsArray.Instance.Nil
-                                    ? GetClassName(GetClass(poolDictOOP))
-                                    : "nil";
-                                Console.WriteLine($"[TC-POOL-RESULT] TextConstants pool dict: {poolDictOOP} (class={poolDictClass})");
-                            }
 
                             if (poolDictOOP == SpecialObjectsArray.Instance.Nil)
                             {
@@ -1704,15 +1677,6 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                             // Look up variable value in pool dictionary by variable name
                             // NOTE: LookupGlobalByName returns the VALUE, not the Association
                             var valueOOP = _runtimeHeapAccess.LookupGlobalByName(poolDictOOP, varName);
-
-                            // Debug pool variable value
-                            if (_debugOptions.ShouldDebugTextConstants && poolDictName == "TextConstants")
-                            {
-                                var valueClass = valueOOP != SpecialObjectsArray.Instance.Nil
-                                    ? GetClassName(GetClass(valueOOP))
-                                    : "nil";
-                                Console.WriteLine($"[TC-POOL-VAR] TextConstants->{varName}: {valueOOP} (class={valueClass})");
-                            }
 
                             if (valueOOP == SpecialObjectsArray.Instance.Nil)
                             {

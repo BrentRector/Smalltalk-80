@@ -120,47 +120,6 @@ public static class ObjectPrimitives
         // Arrays use PointerIndexed format - get OOP directly
         var result = ctx.HeapManager.GetIndexedOOP(receiver, index - 1);
 
-        // Debug dictionary access for Undeclared during Text initialize
-        try
-        {
-            // Check if receiver is Undeclared dictionary (oop=13778 based on Phase 3 output)
-            var undeclaredOOP = new SmalltalkOOP(13778);
-            if (receiver == undeclaredOOP)
-            {
-                string resultDesc;
-                if (result == SpecialObjectsArray.Instance.Nil)
-                {
-                    resultDesc = "nil";
-                }
-                else if (result.IsSmallInteger)
-                {
-                    resultDesc = $"SmallInteger({result.AsSmallInteger()})";
-                }
-                else
-                {
-                    var resultClass = ctx.GetClassNameForObject(result);
-                    resultDesc = $"{result} (class={resultClass})";
-
-                    // If it's an Association, show the key
-                    if (resultClass == "Association")
-                    {
-                        try
-                        {
-                            var keyOOP = ctx.HeapManager.GetInstanceVariable(result, 0);
-                            string keyName = GetSymbolName(ctx, keyOOP);
-                            var valueOOP = ctx.HeapManager.GetInstanceVariable(result, 1);
-                            var valueClass = ctx.GetClassNameForObject(valueOOP);
-                            resultDesc += $", key=#{keyName}, value={valueOOP} (class={valueClass})";
-                        }
-                        catch { }
-                    }
-                }
-
-                Console.WriteLine($"[PRIM60-UNDECLARED] Undeclared basicAt: {index} (1-based) / {index - 1} (0-based) → {resultDesc}");
-            }
-        }
-        catch { }
-
         // Blue Book: self push: result
         return result;
     }
@@ -2020,20 +1979,6 @@ public static class ObjectPrimitives
         // OOP format: object pointer = (objectTableIndex << 1) | 0
         // Half of object pointer = objectTableIndex
         int hashValue = VMUtilities.ComputeIdentityHash(receiver);
-
-        // Debug TextConstants Symbol hash
-        try
-        {
-            string symbolName = GetSymbolName(ctx, receiver);
-            if (symbolName == "TextConstants")
-            {
-                Console.WriteLine($"[PRIM75-HASH] Symbol #TextConstants: oop={receiver}, hash={hashValue}");
-            }
-        }
-        catch
-        {
-            // Not a symbol, ignore
-        }
 
         return SmalltalkOOP.FromSmallInteger(hashValue);
     }

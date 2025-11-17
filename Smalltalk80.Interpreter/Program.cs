@@ -369,24 +369,10 @@ public static class Program
                     // Show what we're executing
                     Console.Write($"  [{index}] {expr.Source}... ");
 
-                    // Enable TextConstants debug output for Text initialize
-                    bool wasDebuggingTextConstants = vm.DebugOptions.ShouldDebugTextConstants;
-                    if (expr.Source != null && expr.Source.Contains("Text initialize"))
-                    {
-                        vm.DebugOptions.ShouldDebugTextConstants = true;
-                        Console.WriteLine("\n[DEBUG] Enabling TextConstants tracking for Text initialize");
-                    }
-
                     // Reset instruction count before each expression
                     vm.ResetInstructionCount();
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
                     long instructionCount = vm.InstructionCount;
-
-                    // Restore debug flag
-                    if (expr.Source != null && expr.Source.Contains("Text initialize"))
-                    {
-                        vm.DebugOptions.ShouldDebugTextConstants = wasDebuggingTextConstants;
-                    }
 
                     if (result.Status == InitStatus.Success)
                     {

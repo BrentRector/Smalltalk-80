@@ -966,12 +966,6 @@ public class Phase5_GlobalsAndPatches
             var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
             if (probeKeyOOP == keySymbolOOP)
             {
-                // Debug: Log removal
-                if (keyName == "TextConstants" || location == 33)
-                {
-                    Console.WriteLine($"[PHASE5-REMOVE] Removing '{keyName}' from Undeclared slot {location} (0-based), assoc={probe}");
-                }
-
                 // Found it - remove by setting slot to nil
                 _allocator.SetIndexedOOP(undeclaredOOP, location, nilOOP);
 
@@ -1079,13 +1073,6 @@ public class Phase5_GlobalsAndPatches
             // (Smalltalk: nextIndex = oldIndex ifFalse: [...])
             if (nextIndex != oldIndex)
             {
-                // Debug logging for slot 33
-                if (oldIndex == 33 || nextIndex == 33)
-                {
-                    var keyName = GetSymbolNameFromOOP(keyOOP);
-                    Console.WriteLine($"[PHASE5-FIX] Moving Association #{keyName} from slot {oldIndex} to slot {nextIndex}");
-                }
-
                 // Move Association to correct slot
                 // (Smalltalk: self basicAt: nextIndex put: nextObject)
                 _allocator.SetIndexedOOP(dictionaryOOP, nextIndex, nextObject);
