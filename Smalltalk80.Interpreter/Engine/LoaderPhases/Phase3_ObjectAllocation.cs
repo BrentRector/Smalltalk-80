@@ -482,7 +482,7 @@ public class Phase3_ObjectAllocation
         // Symbol>>hash uses Primitive 75: returns half the object pointer
         // Blue Book: "Answer with a SmallInteger whose value is half of the receiver's object pointer"
         // This is an IDENTITY hash based on OOP, NOT a string content hash!
-        return (int)(symbolOOP.Value >> 1);
+        return VMUtilities.ComputeIdentityHash(symbolOOP);
     }
 
     /// <summary>

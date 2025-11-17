@@ -1975,14 +1975,12 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // For objects: return half the object table index as a SmallInteger
-        // OOP format: object table index shifted left 1 bit (bit 0 = 0 for object pointers)
-        // Hash = (index >> 1) / 2 = index >> 2
-        int objectIndex = receiver.RawValue >> 1;  // Extract object table index
-        int hashValue = objectIndex / 2;           // Half of the index
-        var result = SmalltalkOOP.FromSmallInteger(hashValue);
-
-        return result;
+        // For objects: return half the object pointer as a SmallInteger
+        // Blue Book: "half of the receiver's object pointer"
+        // OOP format: object pointer = (objectTableIndex << 1) | 0
+        // Half of object pointer = objectTableIndex
+        int hashValue = VMUtilities.ComputeIdentityHash(receiver);
+        return SmalltalkOOP.FromSmallInteger(hashValue);
     }
 
     // <summary>
