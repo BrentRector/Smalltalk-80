@@ -149,6 +149,13 @@ public class RuntimeHeapAccessor
         byte[] searchBytes = Encoding.Latin1.GetBytes(globalName);
         int size = _heapManager.GetIndexedSize(dictOOP);
 
+        // Debug TextConstants lookups
+        bool debugTextConstants = (globalName == "TextConstants");
+        if (debugTextConstants)
+        {
+            Console.WriteLine($"[TC-DICT-SEARCH] Searching for '{globalName}' in dictionary {dictOOP} (size={size})");
+        }
+
         // Linear search through entire dictionary (cannot use hash - Symbol>>hash is OOP-based!)
         for (int i = 0; i < size; i++)
         {
@@ -181,9 +188,22 @@ public class RuntimeHeapAccessor
                 if (match)
                 {
                     // Return the value from the Association (slot 1)
-                    return _heapManager.GetInstanceVariable(associationOOP, 1);
+                    var valueOOP = _heapManager.GetInstanceVariable(associationOOP, 1);
+
+                    if (debugTextConstants)
+                    {
+                        string valueDesc = valueOOP == SpecialObjectsArray.Instance.Nil ? "nil" : valueOOP.ToString();
+                        Console.WriteLine($"[TC-DICT-FOUND] Found '{globalName}' at slot {i}: assoc={associationOOP}, value={valueDesc}");
+                    }
+
+                    return valueOOP;
                 }
             }
+        }
+
+        if (debugTextConstants)
+        {
+            Console.WriteLine($"[TC-DICT-NOTFOUND] '{globalName}' not found in dictionary {dictOOP}");
         }
 
         return SpecialObjectsArray.Instance.Nil;  // Not found
