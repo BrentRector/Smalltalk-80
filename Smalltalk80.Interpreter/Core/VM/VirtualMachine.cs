@@ -1667,6 +1667,16 @@ public partial class VirtualMachine : IPrimitiveContext
                                 throw new InvalidOperationException($"Variable not found in pool dictionary {poolDictName}: {varName}");
                             }
 
+                            // Verify it's actually an Association
+                            var varAssocClass = GetClassName(GetClass(variableAssocOOP));
+                            var instanceVarCount = _heapManager.GetInstanceSize(variableAssocOOP);
+                            if (varAssocClass != "Association")
+                            {
+                                throw new InvalidOperationException(
+                                    $"PUSH_LITERAL_VAR: Expected Association for {poolDictName}>>{varName}, got {varAssocClass} " +
+                                    $"(OOP={variableAssocOOP}, {instanceVarCount} instance vars)");
+                            }
+
                             // Push the Association value
                             var valueOOP = _heapManager.GetInstanceVariable(variableAssocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
                             Push(valueOOP);
