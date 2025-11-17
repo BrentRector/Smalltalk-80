@@ -482,12 +482,14 @@ public class Phase3_ObjectAllocation
         // Get symbol bytes for hashing
         int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
 
-        // Smalltalk-80 hash algorithm for strings
+        // Smalltalk-80 hash algorithm: hash := (hash + char) \\ 16r0FFFFFFF
+        // CRITICAL: Must use MODULO (%), not bitwise AND (&), to match Smalltalk Symbol>>hash
+        const int HashModulus = 0x0FFFFFFF; // 268435455 = 2^28 - 1
         int hash = 0;
         for (int i = 0; i < symbolLength; i++)
         {
             byte b = _heapManager.GetIndexedByte(symbolOOP, i);
-            hash = (hash + b) & 0x0FFFFFFF; // Keep in SmallInteger range
+            hash = (hash + b) % HashModulus; // Modulo, NOT bitwise AND!
         }
         return hash;
     }

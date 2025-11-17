@@ -211,16 +211,22 @@ public class RuntimeHeapAccess
     }
 
     /// <summary>
-    /// Computes hash for a symbol string using Smalltalk's hash algorithm.
-    /// Matches the algorithm used in Dictionary>>findKeyOrNil:
+    /// Computes hash for a symbol string using Smalltalk-80's Symbol>>hash algorithm.
+    /// CRITICAL: Must match exactly: hash := (hash + char) \\ 16r0FFFFFFF
     /// </summary>
     private int ComputeSymbolHashFromString(string symbolName)
     {
         byte[] bytes = Encoding.Latin1.GetBytes(symbolName);
+
+        // Smalltalk-80: hash := (hash + char) \\ 16r0FFFFFFF
+        // CRITICAL: Must use MODULO (%), not bitwise AND (&)
+        // For non-power-of-2 modulus, % and & give different results!
+        const int HashModulus = 0x0FFFFFFF; // 268435455 = 2^28 - 1
+
         int hash = 0;
         foreach (byte b in bytes)
         {
-            hash = (hash + b) & 0x0FFFFFFF;
+            hash = (hash + b) % HashModulus; // Modulo, NOT bitwise AND!
         }
         return hash;
     }
