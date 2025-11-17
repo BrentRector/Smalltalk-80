@@ -396,12 +396,12 @@ public class RuntimeHeapAccessor
 /// </summary>
 public class RuntimeClassCache
 {
-    private readonly RuntimeHeapAccess _heapAccess;
+    private readonly RuntimeHeapAccessor _heapAccess;
     private readonly ISmalltalkHeapManager _heapManager;
     private Dictionary<string, SmalltalkOOP> _classCache = new();
     private bool _cacheValid = true;
 
-    public RuntimeClassCache(RuntimeHeapAccess heapAccess, ISmalltalkHeapManager heapManager)
+    public RuntimeClassCache(RuntimeHeapAccessor heapAccess, ISmalltalkHeapManager heapManager)
     {
         _heapAccess = heapAccess;
         _heapManager = heapManager;
@@ -445,9 +445,9 @@ public class RuntimeSpecialObjects
     private SmalltalkOOP? _associationClass;
 
     // Reference to heap access for lookups
-    private RuntimeHeapAccess? _heapAccess;
+    private RuntimeHeapAccessor? _heapAccess;
 
-    public void Initialize(RuntimeHeapAccess heapAccess)
+    public void Initialize(RuntimeHeapAccessor heapAccess)
     {
         _heapAccess = heapAccess;
     }
