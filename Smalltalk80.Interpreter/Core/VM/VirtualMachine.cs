@@ -1621,6 +1621,25 @@ public partial class VirtualMachine : IPrimitiveContext
                     if (assocClass != "Association")
                     {
                         Console.WriteLine($"[PUSH_LITERAL_VAR] ERROR: literal[{index}] is NOT an Association! It's a {assocClass}, OOP={associationOOP}");
+
+                        // Dump method info
+                        var methodClass = GetMethodClassName(methodOOP);
+                        var methodSelector = GetMethodSelector(methodOOP);
+                        Console.WriteLine($"  Method: {methodClass}>>{methodSelector} (OOP={methodOOP})");
+
+                        // Dump the Array contents if it's an Array
+                        if (assocClass == "Array")
+                        {
+                            int size = _heapManager.GetIndexedSize(associationOOP);
+                            Console.WriteLine($"  Array size: {size}");
+                            for (int i = 0; i < Math.Min(size, 5); i++)
+                            {
+                                var elem = _heapManager.GetIndexedOOP(associationOOP, i);
+                                var elemClass = elem.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(elem));
+                                Console.WriteLine($"    [{i}] = {elem} ({elemClass})");
+                            }
+                        }
+
                         Push(associationOOP); // Push it anyway
                         return true;
                     }
