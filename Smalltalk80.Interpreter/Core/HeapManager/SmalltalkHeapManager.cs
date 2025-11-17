@@ -673,19 +673,6 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // Calculate offset: header (1) + instance variables
         int offset = 1 + entry.InstanceVariableCountExplicit;
         int indexedSize = oopArray.Length - offset;
-        
-        // DEBUG: Log ALL writes to SystemDictionary (OOP 10490)
-        // Use oopArray as a sentinel - SystemDictionary has length 502 (500 indexed + 1 header + 1 tally)
-        if (oopArray.Length == 502 && index == 0)
-        {
-            Console.WriteLine($"[WriteIndexedOop SYSDICT] Writing to SystemDictionary indexed slot 0:");
-            Console.WriteLine($"  instanceVarCount={entry.InstanceVariableCountExplicit}");
-            Console.WriteLine($"  offset={offset}");
-            Console.WriteLine($"  Physical slot will be: {offset + index}");
-            Console.WriteLine($"  oopArray.Length={oopArray.Length}");
-            Console.WriteLine($"  value={value}");
-            Console.WriteLine($"  TALLY IS AT SLOT 1 - if offset={offset}, this CORRUPTS tally!");
-        }
 
         if (index < 0 || index >= indexedSize)
             throw new ArgumentOutOfRangeException(nameof(index),

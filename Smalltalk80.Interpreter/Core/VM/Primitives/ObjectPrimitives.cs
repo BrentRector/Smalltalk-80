@@ -186,16 +186,50 @@ public static class ObjectPrimitives
         // Index must be a positive SmallInteger
         if (!args[0].IsSmallInteger)
         {
-            // DEBUG: Log non-integer index
+            // DEBUG: Log non-integer index with calling context
             var indexClassName = ctx.GetClassNameForObject(args[0]);
             var recvClassName = ctx.GetClassNameForObject(receiver);
             var valueClassName = ctx.GetClassNameForObject(args[1]);
-            
+
             Console.WriteLine($"[AtPut PRIMITIVE FAIL] Non-integer index:");
             Console.WriteLine($"  receiver={receiver} (class={recvClassName})");
             Console.WriteLine($"  index={args[0]} (class={indexClassName})");
             Console.WriteLine($"  value={args[1]} (class={valueClassName})");
-            
+
+            // Show calling context chain to help debug
+            Console.WriteLine($"  Calling context chain:");
+            try
+            {
+                var activeContext = ctx.GetActiveContext();
+                for (int i = 0; i < 5 && activeContext != SpecialObjectsArray.Instance.Nil; i++)
+                {
+                    try
+                    {
+                        // Get method from context (slot 3 for MethodContext)
+                        var methodFieldIndex = ctx.GetFieldIndex("class:MethodContext", "method");
+                        var methodOOP = ctx.GetInstanceVariable(activeContext, methodFieldIndex);
+
+                        // Get context class name
+                        var contextClassName = ctx.GetClassNameForObject(activeContext);
+
+                        Console.WriteLine($"    [{i}] Context={activeContext} ({contextClassName}), Method={methodOOP}");
+
+                        // Get sender (slot 0)
+                        var senderFieldIndex = ctx.GetFieldIndex("class:MethodContext", "sender");
+                        activeContext = ctx.GetInstanceVariable(activeContext, senderFieldIndex);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"    [{i}] Error getting context info: {ex.Message}");
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"    Error walking context chain: {ex.Message}");
+            }
+
             ctx.PrimitiveSuccess = false;
             return SpecialObjectsArray.Instance.Nil;
         }
@@ -1941,14 +1975,12 @@ public static class ObjectPrimitives
             return SpecialObjectsArray.Instance.Nil;
         }
 
-        // For objects: return half the object table index as a SmallInteger
-        // OOP format: object table index shifted left 1 bit (bit 0 = 0 for object pointers)
-        // Hash = (index >> 1) / 2 = index >> 2
-        int objectIndex = receiver.RawValue >> 1;  // Extract object table index
-        int hashValue = objectIndex / 2;           // Half of the index
-        var result = SmalltalkOOP.FromSmallInteger(hashValue);
-
-        return result;
+        // For objects: return half the object pointer as a SmallInteger
+        // Blue Book: "half of the receiver's object pointer"
+        // OOP format: object pointer = (objectTableIndex << 1) | 0
+        // Half of object pointer = objectTableIndex
+        int hashValue = VMUtilities.ComputeIdentityHash(receiver);
+        return SmalltalkOOP.FromSmallInteger(hashValue);
     }
 
     // <summary>

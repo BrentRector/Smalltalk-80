@@ -54,15 +54,21 @@ public class Phase3_ObjectAllocation
     {
 // Console.WriteLine("Phase 3: Object Allocation and Initialization");
 
-        // Section 1: Allocation
+        // Section 1: Allocation (ALL object creation happens here)
         AllocateSentinelObjects();
         AllocateSpecialObjects();
+
+        // Phase 3.5: Pre-create Associations for Undeclared Variables
+        // CRITICAL: This runs BEFORE class pointer fix to ensure all Associations
+        // are created before SetClassReferencesForAllObjects() runs.
+        // This way, the class pointer fix happens in ONE pass for ALL Associations.
+        PreCreateUndeclaredAssociations();
 
         // NOTE: DefaultTextStyle creation moved to Phase 5 (after AssociationRegistry is populated)
 
         LogAllocationCheckpoint();
 
-        // Section 2: Class Reference Setting
+        // Section 2: Class Reference Setting (ONE fix for ALL objects including Phase 3.5 Associations)
         SetClassReferencesForAllObjects();
         LogClassReferenceCheckpoint();
 
@@ -72,16 +78,6 @@ public class Phase3_ObjectAllocation
         // Section 4: Nil Initialization
         InitializeUnsetInstanceVariables();
         LogInitializationCheckpoint();
-
-        // Section 5: Pre-create Associations for Undeclared Variables (Phase 3.5)
-        // CRITICAL: This runs BEFORE Phase 4 (method compilation) to ensure
-        // method literals get the same Association objects that Phase 5 will use
-        PreCreateUndeclaredAssociations();
-
-        // DEBUG: Check SystemDictionary tally at END of Phase 3
-        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-        var tallyEnd = _allocator.GetInstanceVariable(systemDictOOP, 0);
-        Console.WriteLine($"[Phase3 END] SystemDictionary tally: {tallyEnd}, IsSmallInteger={tallyEnd.IsSmallInteger}");
 
 // Console.WriteLine("  Phase 3 complete: All objects allocated and initialized");
     }
@@ -144,22 +140,8 @@ public class Phase3_ObjectAllocation
         GlobalRegistry.Register("true", trueOOP);
         GlobalRegistry.Register("false", falseOOP);
 
-        Console.WriteLine($"  Allocated sentinel objects: nil={nilOOP}, true={trueOOP}, false={falseOOP}");
-
         // Initialize SystemDictionary slots with nil (created in Phase 2 but couldn't be initialized until now)
-        Console.WriteLine($"  About to call InitializeSystemDictionaryWithNil with nilOOP={nilOOP}");
-        
-        // DEBUG: Check tally BEFORE InitializeSystemDictionaryWithNil
-        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-        var tallyBefore = _allocator.GetInstanceVariable(systemDictOOP, 0);
-        Console.WriteLine($"  SystemDictionary tally BEFORE init: {tallyBefore}");
-        
         InitializeSystemDictionaryWithNil(nilOOP);
-        
-        // DEBUG: Check tally AFTER InitializeSystemDictionaryWithNil
-        var tallyAfter = _allocator.GetInstanceVariable(systemDictOOP, 0);
-        Console.WriteLine($"  SystemDictionary tally AFTER init: {tallyAfter}");
-        Console.WriteLine($"  ✓ SystemDictionary initialized with nil");
 
         // Create ProcessorScheduler singleton
         var processorSchedulerOOP = _allocator.AllocateFixedObject("ProcessorScheduler");
@@ -173,10 +155,6 @@ public class Phase3_ObjectAllocation
         // but not yet defined during compilation. SystemDictionary>>at:put: will migrate these
         // Associations when the variables become defined.
         CreateUndeclaredDictionary(nilOOP);
-        
-        // DEBUG: Check tally after CreateUndeclaredDictionary
-        var tallyAfterUndeclared = _allocator.GetInstanceVariable(systemDictOOP, 0);
-        Console.WriteLine($"  SystemDictionary tally after CreateUndeclaredDictionary: {tallyAfterUndeclared}");
     }
 
     /// <summary>
@@ -247,16 +225,11 @@ public class Phase3_ObjectAllocation
             _allocator.SetInstanceVariable(undeclaredOOP, tallyIndex, zeroOOP);
         }
 
-        // Register in GlobalRegistry
+        // Register in GlobalRegistry (Association will be created in Phase 3.5)
         GlobalRegistry.Register("Undeclared", undeclaredOOP);
 
-        // Add to Smalltalk dictionary
-        var undeclaredSymbol = InternSymbol("Undeclared");
-        var undeclaredAssoc = AllocateAssociationWithSemanticAllocator(undeclaredSymbol, undeclaredOOP);
-        InstallAssociationInSystemDictionary(undeclaredAssoc, "Undeclared");
-
         Console.WriteLine($"  Created Undeclared dictionary (OOP={undeclaredOOP}, capacity={initialCapacity}, undeclared count={undeclaredCount})");
-        Console.WriteLine($"  Undeclared Association: key={undeclaredSymbol}, value={undeclaredOOP}, assoc={undeclaredAssoc}");
+        Console.WriteLine($"  Registered in GlobalRegistry - Association will be created in Phase 3.5");
     }
 
     /// <summary>
@@ -449,7 +422,8 @@ public class Phase3_ObjectAllocation
     }
 
     /// <summary>
-    /// Installs an association in SystemDictionary using semantic slot finding.
+    /// Installs an association in SystemDictionary using hash-based slot finding.
+    /// CRITICAL: Must use same algorithm as Dictionary>>findKeyOrNil: so runtime lookups work!
     /// </summary>
     private void InstallAssociationInSystemDictionary(SmalltalkOOP associationOOP, string name)
     {
@@ -457,53 +431,127 @@ public class Phase3_ObjectAllocation
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // Find first available nil slot
-        for (int i = 0; i < systemDictSize; i++)
+        // Get the key symbol from the Association (slot 0)
+        var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
+
+        // Use hash-based lookup to find correct slot (same algorithm as Dictionary>>findKeyOrNil:)
+        // Smalltalk: location _ key hash \\ length + 1 (then convert to 0-based index)
+        int hash = GetSymbolHash(keySymbolOOP);
+        int location = (hash % systemDictSize + systemDictSize) % systemDictSize; // Handle negative hash
+
+        // Probe for nil slot or matching key (linear probing)
+        int pass = 1;
+        int startLocation = location;
+        while (true)
         {
-            var slotOOP = _allocator.GetIndexedOOP(systemDictOOP, i);
-            if (slotOOP == nilOOP)
+            var probe = _allocator.GetIndexedOOP(systemDictOOP, location);
+
+            if (probe == nilOOP)
             {
                 // Found empty slot - install association
-                _allocator.SetIndexedOOP(systemDictOOP, i, associationOOP);
+                _allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
                 return;
             }
-        }
 
-        throw new InvalidOperationException($"SystemDictionary is full - cannot install {name} association");
+            // Check if Association with same key already exists
+            var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+            if (probeKeyOOP == keySymbolOOP)
+            {
+                // Slot already contains Association for this key - update it
+                _allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
+                return;
+            }
+
+            // Linear probe to next slot
+            location = (location + 1) % systemDictSize;
+
+            // Check if we've wrapped around
+            if (location == startLocation)
+            {
+                pass++;
+                if (pass > 2)
+                {
+                    throw new InvalidOperationException($"SystemDictionary is full - cannot install {name} association after 2 passes");
+                }
+            }
+        }
+    }
+
+    private int GetSymbolHash(SmalltalkOOP symbolOOP)
+    {
+        // Symbol>>hash uses Primitive 75: returns half the object pointer
+        // Blue Book: "Answer with a SmallInteger whose value is half of the receiver's object pointer"
+        // This is an IDENTITY hash based on OOP, NOT a string content hash!
+        return VMUtilities.ComputeIdentityHash(symbolOOP);
     }
 
     /// <summary>
-    /// Installs an Association in any Dictionary object (including pool dictionaries).
-    /// Similar to InstallAssociationInSystemDictionary but works with any dictionary OOP.
+    /// Installs an Association in any Dictionary object (including pool dictionaries and Undeclared).
+    /// Uses hash-based lookup to match Dictionary>>findKeyOrNil: algorithm.
     /// </summary>
     private void InstallAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string name)
     {
         int dictSize = _allocator.GetIndexedSize(dictionaryOOP);
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // Find first available nil slot
-        for (int i = 0; i < dictSize; i++)
+        // Get the key symbol from the Association (slot 0)
+        var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
+
+        // Use hash-based lookup (same algorithm as Dictionary>>findKeyOrNil:)
+        int hash = GetSymbolHash(keySymbolOOP);
+        int location = (hash % dictSize + dictSize) % dictSize;
+
+        // Linear probing
+        int pass = 1;
+        int startLocation = location;
+        bool incrementTally = true;
+
+        while (true)
         {
-            var slotOOP = _allocator.GetIndexedOOP(dictionaryOOP, i);
-            if (slotOOP == nilOOP)
+            var probe = _allocator.GetIndexedOOP(dictionaryOOP, location);
+
+            if (probe == nilOOP)
             {
                 // Found empty slot - install association
-                _allocator.SetIndexedOOP(dictionaryOOP, i, associationOOP);
+                _allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
 
-                // Increment tally field (field 0 for Dictionary)
-                int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
-                if (tallyIndex >= 0)
+                // Increment tally field
+                if (incrementTally)
                 {
-                    var currentTallyOOP = _allocator.GetInstanceVariable(dictionaryOOP, tallyIndex);
-                    int currentTally = currentTallyOOP.IsSmallInteger ? currentTallyOOP.AsSmallInteger() : 0;
-                    _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(currentTally + 1));
+                    int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
+                    if (tallyIndex >= 0)
+                    {
+                        var currentTallyOOP = _allocator.GetInstanceVariable(dictionaryOOP, tallyIndex);
+                        int currentTally = currentTallyOOP.IsSmallInteger ? currentTallyOOP.AsSmallInteger() : 0;
+                        _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(currentTally + 1));
+                    }
                 }
 
                 return;
             }
-        }
 
-        throw new InvalidOperationException($"Dictionary is full - cannot install {name} association");
+            // Check if Association with same key already exists
+            var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+            if (probeKeyOOP == keySymbolOOP)
+            {
+                // Update existing Association
+                _allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
+                incrementTally = false;
+                return;
+            }
+
+            // Linear probe
+            location = (location + 1) % dictSize;
+
+            if (location == startLocation)
+            {
+                pass++;
+                if (pass > 2)
+                {
+                    throw new InvalidOperationException($"Dictionary is full - cannot install {name} association after 2 passes");
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -1245,19 +1293,23 @@ public class Phase3_ObjectAllocation
 
         var nilOOP = SpecialObjectsArray.Instance.Nil;
         int createdCount = 0;
-        int skippedClasses = 0;
+        int classNameCount = 0;
+        int withPreCreatedValues = 0;
 
-        // Build set of class names to exclude (these will be installed in SystemDictionary by Phase 5)
+        // Build set of class names for reporting (we CREATE Associations for all, including classes)
         var classNames = new HashSet<string>(_bundle.Classes.Select(c => _symbols[c.NameIndex]));
 
         foreach (var undeclaredVar in _bundle.Undeclared)
         {
-            // CRITICAL: Skip class names - they will be installed directly in SystemDictionary by Phase 5
-            // We only pre-create Associations for non-class undeclared variables (like pool dictionaries)
+            // CRITICAL: Create Associations for ALL undeclared variables (including class names!)
+            // Phase 4 method literals MUST reference the SAME Associations that Phase 5 installs in SystemDictionary.
+            // If we skip classes here, Phase 4 creates Association #1 (value=nil) and Phase 5 creates Association #2 (value=class),
+            // causing method bytecode to reference the wrong Association.
+
+            // Track class names for reporting
             if (classNames.Contains(undeclaredVar.Key))
             {
-                skippedClasses++;
-                continue;
+                classNameCount++;
             }
 
             // Get symbol OOP for the key
@@ -1267,27 +1319,48 @@ public class Phase3_ObjectAllocation
             // This ensures Phase 4 and Phase 5 will get the SAME Association object
             AssociationRegistry.GetOrCreate(undeclaredVar.Key, () =>
             {
-                // Create new Association with key and nil value
-                return AllocateAssociationWithSemanticAllocator(keySymbolOOP, nilOOP);
+                // Check if this global has a pre-created object in GlobalRegistry
+                // (e.g., Undeclared, Smalltalk, ProcessorScheduler created in Phase 3)
+                SmalltalkOOP valueOOP;
+                if (GlobalRegistry.TryGet(undeclaredVar.Key, out var preCreatedValue))
+                {
+                    valueOOP = preCreatedValue;  // Use the pre-created object
+                    withPreCreatedValues++;
+                }
+                else
+                {
+                    valueOOP = nilOOP;  // Default to nil for truly undeclared variables
+                }
+
+                return AllocateAssociationWithSemanticAllocator(keySymbolOOP, valueOOP);
             });
 
             createdCount++;
         }
 
         Console.WriteLine($"  ✓ Pre-created {createdCount} canonical Associations");
-        Console.WriteLine($"  ✓ Skipped {skippedClasses} class names (will be installed directly in SystemDictionary)");
+        Console.WriteLine($"  ✓ Includes {classNameCount} class names (Phase 5 will set their values)");
+        Console.WriteLine($"  ✓ Used pre-created values from GlobalRegistry for {withPreCreatedValues} globals");
         Console.WriteLine($"  ✓ AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations");
 
-        // Show sample
-        if (createdCount > 0)
+        // CRITICAL: Install all Associations in Undeclared dictionary
+        // This matches runtime semantics: undefined variables start in Undeclared,
+        // then migrate to SystemDictionary when defined (e.g., class installation, init expressions)
+        var undeclaredOOP = GlobalRegistry.Get("Undeclared");
+        int installedInUndeclared = 0;
+
+        foreach (var undeclaredVar in _bundle.Undeclared)
         {
-            var nonClassUndeclared = _bundle.Undeclared.Where(u => !classNames.Contains(u.Key)).Take(5);
-            Console.WriteLine($"  Sample non-class undeclared variables:");
-            foreach (var uv in nonClassUndeclared)
-            {
-                Console.WriteLine($"    - {uv.Key} ({uv.References.Length} reference(s))");
-            }
+            // Get the canonical Association from AssociationRegistry (already created in first loop)
+            var associationOOP = AssociationRegistry.GetAll()[undeclaredVar.Key];
+
+            // Install in Undeclared dictionary using hash-based insertion
+            InstallAssociationInDictionary(undeclaredOOP, associationOOP, undeclaredVar.Key);
+            installedInUndeclared++;
         }
+
+        Console.WriteLine($"  ✓ Installed {installedInUndeclared} Associations in Undeclared dictionary");
+        Console.WriteLine($"  ✓ Phase 5 will migrate defined globals to SystemDictionary");
     }
 
     #endregion

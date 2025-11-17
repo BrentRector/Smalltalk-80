@@ -53,16 +53,7 @@ public class Phase5_GlobalsAndPatches
     {
         // DEBUG: Check SystemDictionary tally at START of Phase 5
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-        try
-        {
-            var tallyAtStart = _allocator.GetInstanceVariable(systemDictOOP, 0);
-            Console.WriteLine($"[Phase5 START] SystemDictionary tally: {tallyAtStart}, IsSmallInteger={tallyAtStart.IsSmallInteger}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Phase5 START] ERROR reading SystemDictionary tally: {ex.Message}");
-        }
-        
+
         // Step 1: Apply patches (from Phase10)
         ApplyPatches();
 
@@ -468,81 +459,14 @@ public class Phase5_GlobalsAndPatches
     {
         var systemDictionaryOOP = GlobalRegistry.SystemDictionaryOOP;
 
-        // DEBUG: Check how many "Smalltalk" Associations exist in AssociationRegistry
-        var allAssociations = AssociationRegistry.GetAll();
-        var smalltalkAssocs = allAssociations.Where(kvp => kvp.Key == "Smalltalk").ToList();
-        Console.WriteLine($"[InstallSmalltalkGlobal] Found {smalltalkAssocs.Count} 'Smalltalk' Associations in registry");
-        foreach (var kvp in smalltalkAssocs)
-        {
-            var oop = kvp.Value;
-            var key = _allocator.GetInstanceVariable(oop, 0);
-            var value = _allocator.GetInstanceVariable(oop, 1);
-            Console.WriteLine($"  Registry entry: key={key}, value={value}, oop={oop}");
-        }
-
-        // DEBUG: Scan heap for ALL Associations with key "Smalltalk"
-        var smalltalkSymbolOOP = GetSymbolOOP("Smalltalk");
-        Console.WriteLine($"[InstallSmalltalkGlobal] Smalltalk symbol OOP = {smalltalkSymbolOOP}");
-        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        int foundInHeap = 0;
-        for (int i = 0; i < 100000; i += 2)
-        {
-            try
-            {
-                var objOOP = new SmalltalkOOP(i);
-                var classOOP = _heapManager.GetSlot(objOOP, 0);
-                if (classOOP == associationClassOOP)
-                {
-                    var keyOOP = _allocator.GetInstanceVariable(objOOP, 0);
-                    if (keyOOP == smalltalkSymbolOOP)
-                    {
-                        var valueOOP = _allocator.GetInstanceVariable(objOOP, 1);
-                        Console.WriteLine($"  HEAP SCAN: Found Smalltalk Association OOP={objOOP}, value={valueOOP}");
-                        foundInHeap++;
-                    }
-                }
-            }
-            catch { }
-        }
-        Console.WriteLine($"[InstallSmalltalkGlobal] Total 'Smalltalk' Associations found in heap: {foundInHeap}");
-
         // Get or create canonical Association
         var associationOOP = GetOrCreateCanonicalAssociation("Smalltalk");
-
-        // DEBUG: Check current value before setting
-        var currentValue = _allocator.GetInstanceVariable(associationOOP, 1);
-        Console.WriteLine($"[InstallSmalltalkGlobal] Association OOP={associationOOP}, current value={currentValue}, setting to SystemDict={systemDictionaryOOP}");
 
         // Set Association value to SystemDictionary
         _allocator.SetInstanceVariable(associationOOP, 1, systemDictionaryOOP);
 
-        // DEBUG: Verify value was set
-        var newValue = _allocator.GetInstanceVariable(associationOOP, 1);
-        Console.WriteLine($"[InstallSmalltalkGlobal] After setting, Association value={newValue}");
-
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationOOP, "Smalltalk");
-
-        // DEBUG: Final verification - scan heap again AFTER update
-        Console.WriteLine($"[InstallSmalltalkGlobal] FINAL VERIFICATION - scanning heap after update:");
-        for (int i = 0; i < 100000; i += 2)
-        {
-            try
-            {
-                var objOOP = new SmalltalkOOP(i);
-                var classOOP = _heapManager.GetSlot(objOOP, 0);
-                if (classOOP == associationClassOOP)
-                {
-                    var keyOOP = _allocator.GetInstanceVariable(objOOP, 0);
-                    if (keyOOP == smalltalkSymbolOOP)
-                    {
-                        var valueOOP = _allocator.GetInstanceVariable(objOOP, 1);
-                        Console.WriteLine($"  FINAL: Found Smalltalk Association OOP={objOOP}, value={valueOOP}");
-                    }
-                }
-            }
-            catch { }
-        }
     }
 
     /// <summary>
@@ -763,33 +687,20 @@ public class Phase5_GlobalsAndPatches
 
 // Console.WriteLine($"  [Phase5] Initializing {poolToClasses.Count} pool dictionar{(poolToClasses.Count == 1 ? "y" : "ies")}:");
 
-        // Initialize each discovered pool dictionary
+        // DON'T create pool dictionaries in Phase 5!
+        // Pool dictionaries should be created by init expressions and migrated from Undeclared.
+        //
+        // CORRECT FLOW:
+        // 1. Phase 3.5: Creates Association for TextConstants in Undeclared (undeclared variable)
+        // 2. Phase 4: Compiles methods referencing TextConstants - uses Association from Undeclared
+        // 3. Text initialize: Executes "Smalltalk at: #TextConstants put: (Dictionary new: 32)"
+        // 4. Runtime: SystemDictionary>>at:put: migrates Association from Undeclared to SystemDictionary
+        //
+        // If we pre-create in SystemDictionary, we bypass the migration mechanism.
+
         foreach (var (poolName, declaringClasses) in poolToClasses)
         {
-            // SKIP pools that have init expressions that check for existence and create them
-            // TextConstants: Text>>initialize checks (Smalltalk includes: #TextConstants) ifFalse: [create it]
-            // If we pre-create it as nil, the check returns true and dictionary is never created!
-            if (poolName == "TextConstants")
-            {
-                Console.WriteLine($"  Skipped pool dictionary: {poolName} (created by Text>>initialize)");
-                continue;
-            }
-            
-            // IMPORTANT: Cold start creates the GLOBAL VARIABLE with value = nil
-            // User code (init expressions) will allocate Dictionary and assign it
-            // Example: FilePool _ Dictionary new. (in File class>>initialize)
-            
-            // Create Association: #PoolName → nil
-            var associationOOP = GetOrCreateCanonicalAssociation(poolName);
-            _allocator.SetInstanceVariable(associationOOP, 1, nilOOP);  // value = nil
-            
-            // Install as global in Smalltalk dictionary
-            InstallAssociationInSystemDictionary(associationOOP, poolName);
-            
-            // Register in GlobalRegistry (value = nil for now)
-            GlobalRegistry.Register(poolName, nilOOP);
-
-            Console.WriteLine($"  Created pool dictionary global: {poolName} (value = nil, used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})");
+            Console.WriteLine($"  Pool dictionary {poolName} will be created by init expressions (used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})");
         }
     }
 
@@ -938,54 +849,159 @@ public class Phase5_GlobalsAndPatches
     }
 
     /// <summary>
-    /// Installs an association in the first available slot in SystemDictionary.
+    /// Installs an association in SystemDictionary using hash-based slot finding.
+    /// CRITICAL: Implements Smalltalk-80 migration semantics:
+    /// - If Association exists in Undeclared, REMOVE it from Undeclared before adding to SystemDictionary
+    /// - This matches SystemDictionary>>valueAtNewKey:put:atIndex:declareFrom: behavior
+    /// Must use same algorithm as Dictionary>>findKeyOrNil: so runtime lookups work!
     /// </summary>
     private void InstallAssociationInSystemDictionary(SmalltalkOOP associationOOP, string globalName)
     {
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
-
-        int usedSlots = 0;
         var nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // Find first nil slot in SystemDictionary
-        for (int i = 0; i < systemDictSize; i++)
-        {
-            var slotOOP = _allocator.GetIndexedOOP(systemDictOOP, i);
+        // Get the key symbol from the Association (slot 0)
+        var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
 
-            if (slotOOP == nilOOP || slotOOP == SmalltalkOOP.Null)
+        // MIGRATION STEP: Remove from Undeclared if present
+        // This matches: SystemDictionary>>valueAtNewKey:put:atIndex:declareFrom:
+        //   which does: "aDictionary removeKey: aKey" after migrating
+        RemoveAssociationFromUndeclared(keySymbolOOP, globalName);
+
+        // Use hash-based lookup to find correct slot (same algorithm as Dictionary>>findKeyOrNil:)
+        // Smalltalk: location _ key hash \\ length + 1 (then convert to 0-based index)
+        int hash = GetSymbolHash(keySymbolOOP);
+        int location = (hash % systemDictSize + systemDictSize) % systemDictSize; // Handle negative hash
+
+        // Probe for nil slot or matching key (linear probing)
+        int pass = 1;
+        int startLocation = location;
+        bool incrementTally = true; // Only increment if adding NEW association
+
+        while (true)
+        {
+            var probe = _allocator.GetIndexedOOP(systemDictOOP, location);
+
+            if (probe == nilOOP || probe == SmalltalkOOP.Null)
             {
-                // Found empty slot - handle both nil and any uninitialized cases during architectural transition
-                _allocator.SetIndexedOOP(systemDictOOP, i, associationOOP);
-                
-                // CRITICAL: Increment tally to reflect the new association
-                // SystemDictionary inherits 'tally' instance variable from Set (index 0)
-                var currentTallyOOP = _allocator.GetInstanceVariable(systemDictOOP, 0);
-                
-                // DEBUG: Check what we're reading
-                if (!currentTallyOOP.IsSmallInteger)
+                // Found empty slot - install association
+                _allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
+
+                // Increment tally to reflect the new association
+                if (incrementTally)
                 {
-                    Console.WriteLine($"[TALLY ERROR] Installing '{globalName}': tally is not a SmallInteger!");
-                    Console.WriteLine($"  SystemDict OOP: {systemDictOOP}");
-                    Console.WriteLine($"  Tally OOP: {currentTallyOOP}");
-                    Console.WriteLine($"  Tally is SmallInteger: {currentTallyOOP.IsSmallInteger}");
-                    Console.WriteLine($"  Tally is ObjectPointer: {currentTallyOOP.IsObjectPointer}");
-                    throw new InvalidOperationException($"SystemDictionary tally is not a SmallInteger when installing '{globalName}'. Tally OOP: {currentTallyOOP}");
+                    var currentTallyOOP = _allocator.GetInstanceVariable(systemDictOOP, 0);
+
+                    if (!currentTallyOOP.IsSmallInteger)
+                    {
+                        throw new InvalidOperationException($"SystemDictionary tally is not a SmallInteger when installing '{globalName}'. Tally OOP: {currentTallyOOP}");
+                    }
+
+                    int currentTally = currentTallyOOP.AsSmallInteger();
+                    int newTally = currentTally + 1;
+                    _allocator.SetInstanceVariable(systemDictOOP, 0, SmalltalkOOP.FromSmallInteger(newTally));
                 }
-                
-                int currentTally = currentTallyOOP.AsSmallInteger();
-                int newTally = currentTally + 1;
-                _allocator.SetInstanceVariable(systemDictOOP, 0, SmalltalkOOP.FromSmallInteger(newTally));
-                
+
                 return;
             }
-            else
+
+            // Check if Association with same key already exists
+            var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+            if (probeKeyOOP == keySymbolOOP)
             {
-                usedSlots++;
+                // Slot already contains Association for this key - update it
+                _allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
+                incrementTally = false; // Don't increment tally for replacements
+                return;
+            }
+
+            // Linear probe to next slot
+            location = (location + 1) % systemDictSize;
+
+            // Check if we've wrapped around
+            if (location == startLocation)
+            {
+                pass++;
+                if (pass > 2)
+                {
+                    throw new InvalidOperationException($"SystemDictionary is full - cannot install {globalName} association after 2 passes");
+                }
             }
         }
+    }
 
-        throw new InvalidOperationException($"SystemDictionary is full - cannot install {globalName} global variable (all {systemDictSize} slots occupied)");
+    /// <summary>
+    /// Removes an Association from Undeclared dictionary.
+    /// This implements the migration semantics from SystemDictionary>>valueAtNewKey:put:atIndex:declareFrom:
+    /// which removes the Association from Undeclared after migrating it to SystemDictionary.
+    /// </summary>
+    private void RemoveAssociationFromUndeclared(SmalltalkOOP keySymbolOOP, string keyName)
+    {
+        if (!GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
+        {
+            return; // Undeclared doesn't exist yet
+        }
+
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        int undeclaredSize = _allocator.GetIndexedSize(undeclaredOOP);
+
+        // Use hash-based lookup to find the Association
+        int hash = GetSymbolHash(keySymbolOOP);
+        int location = (hash % undeclaredSize + undeclaredSize) % undeclaredSize;
+
+        int pass = 1;
+        int startLocation = location;
+
+        while (true)
+        {
+            var probe = _allocator.GetIndexedOOP(undeclaredOOP, location);
+
+            if (probe == nilOOP)
+            {
+                // Not found in Undeclared (already migrated or never there)
+                return;
+            }
+
+            // Check if this is the Association we're looking for
+            var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+            if (probeKeyOOP == keySymbolOOP)
+            {
+                // Found it - remove by setting slot to nil
+                _allocator.SetIndexedOOP(undeclaredOOP, location, nilOOP);
+
+                // Decrement Undeclared's tally
+                var tallyOOP = _allocator.GetInstanceVariable(undeclaredOOP, 0);
+                if (tallyOOP.IsSmallInteger)
+                {
+                    int tally = tallyOOP.AsSmallInteger();
+                    _allocator.SetInstanceVariable(undeclaredOOP, 0, SmalltalkOOP.FromSmallInteger(tally - 1));
+                }
+
+                return;
+            }
+
+            // Linear probe to next slot
+            location = (location + 1) % undeclaredSize;
+
+            if (location == startLocation)
+            {
+                pass++;
+                if (pass > 2)
+                {
+                    // Not found after 2 passes
+                    return;
+                }
+            }
+        }
+    }
+
+    private int GetSymbolHash(SmalltalkOOP symbolOOP)
+    {
+        // Symbol>>hash uses Primitive 75: returns half the object pointer
+        // Blue Book: "Answer with a SmallInteger whose value is half of the receiver's object pointer"
+        // This is an IDENTITY hash based on OOP, NOT a string content hash!
+        return VMUtilities.ComputeIdentityHash(symbolOOP);
     }
 
     /// <summary>

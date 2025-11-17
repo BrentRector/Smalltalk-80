@@ -1145,7 +1145,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
             // POOL VARIABLES: Check if this is a 2-element Array (binding metadata)
             var classOOP = _heapManager.GetClassOOP(literalOOP);
-            var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+            var arrayClassOOP = _runtimeHeapAccess.GetClass("Array");
             
             if (classOOP == arrayClassOOP)
             {
@@ -1158,7 +1158,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     
                     // Check if element 0 is a Symbol (pool name) or an OOP (already patched to dictionary)
                     var element0Class = _heapManager.GetClassOOP(element0);
-                    var symbolClass = GlobalRegistry.LookupClassOOP("Symbol");
+                    var symbolClass = _runtimeHeapAccess.GetClass("Symbol");
                     
                     if (element0Class == symbolClass)
                     {
@@ -1172,7 +1172,7 @@ public partial class VirtualMachine : IPrimitiveContext
                     {
                         // Already patched: element0 is pool dictionary OOP (fast path)
                         // Verify element0 is a Dictionary (should always be true after patching)
-                        var dictionaryClassOOP = GlobalRegistry.LookupClassOOP("Dictionary");
+                        var dictionaryClassOOP = _runtimeHeapAccess.GetClass("Dictionary");
                         if (element0Class != dictionaryClassOOP)
                         {
                             throw new InvalidOperationException(
@@ -1610,34 +1610,78 @@ public partial class VirtualMachine : IPrimitiveContext
                     return true;
                 }
 
-            case 0x07: // PUSH_LITERAL_VAR - Push literal variable (association value)
+            case 0x07: // PUSH_LITERAL_VAR - Push literal variable (association value or qualified pool var)
                 {
                     byte index = bytecodes[ip++];
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
+                    var literalOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
-                    // DEBUG: Check if this is even an Association
-                    var assocClass = GetClassName(GetClass(associationOOP));
-                    if (assocClass != "Association")
+                    // Check if this is an Association (unqualified variable) or Array (qualified pool variable)
+                    var literalClass = GetClassName(GetClass(literalOOP));
+
+                    if (literalClass == "Association")
                     {
-                        Console.WriteLine($"[PUSH_LITERAL_VAR] ERROR: literal[{index}] is NOT an Association! It's a {assocClass}, OOP={associationOOP}");
-                        Push(associationOOP); // Push it anyway
+                        // Unqualified variable reference: push Association value directly
+                        var valueOOP = _heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                        Push(valueOOP);
                         return true;
                     }
-
-                    var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                    var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-
-                    // DEBUG: Log EVERY push of a 'Smalltalk' Association
-                    var keySymbol = GetSymbolName(keyOOP);
-                    if (keySymbol == "Smalltalk")
+                    else if (literalClass == "Array")
                     {
-                        Console.WriteLine($"[PUSH_LITERAL_VAR] Pushing Smalltalk: assoc={associationOOP}, key={keyOOP}, value={valueOOP}");
-                        Console.WriteLine($"[PUSH_LITERAL_VAR] Expected Association OOP=34404, actual={associationOOP}, match={associationOOP == new SmalltalkOOP(34404)}");
-                    }
+                        // Qualified pool variable reference: #(poolDictName variableName)
+                        int size = _heapManager.GetIndexedSize(literalOOP);
+                        if (size == 2)
+                        {
+                            var poolDictNameOOP = _heapManager.GetIndexedOOP(literalOOP, 0);
+                            var varNameOOP = _heapManager.GetIndexedOOP(literalOOP, 1);
+                            var poolDictName = GetSymbolName(poolDictNameOOP);
+                            var varName = GetSymbolName(varNameOOP);
 
-                    Push(valueOOP);
-                    return true;
+                            if (poolDictName == null || varName == null)
+                            {
+                                throw new InvalidOperationException($"PUSH_LITERAL_VAR: Qualified pool variable Array must contain Symbols");
+                            }
+
+                            // Look up pool dictionary in Smalltalk SystemDictionary
+                            // NOTE: LookupGlobalByName returns the VALUE, not the Association
+                            var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+                            var poolDictOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, poolDictName);
+
+                            if (poolDictOOP == SpecialObjectsArray.Instance.Nil)
+                            {
+                                throw new InvalidOperationException($"Pool dictionary not found: {poolDictName}");
+                            }
+
+                            // Verify it's a Dictionary
+                            var poolDictClass = GetClassName(GetClass(poolDictOOP));
+                            if (poolDictClass != "Dictionary")
+                            {
+                                throw new InvalidOperationException(
+                                    $"PUSH_LITERAL_VAR: Expected Dictionary for pool '{poolDictName}', got {poolDictClass} (OOP={poolDictOOP})");
+                            }
+
+                            // Look up variable value in pool dictionary by variable name
+                            // NOTE: LookupGlobalByName returns the VALUE, not the Association
+                            var valueOOP = _runtimeHeapAccess.LookupGlobalByName(poolDictOOP, varName);
+
+                            if (valueOOP == SpecialObjectsArray.Instance.Nil)
+                            {
+                                throw new InvalidOperationException($"Variable not found in pool dictionary {poolDictName}: {varName}");
+                            }
+
+                            // Push the variable value
+                            Push(valueOOP);
+                            return true;
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException($"PUSH_LITERAL_VAR: Array literal has size {size}, expected 2 for qualified pool variable");
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException($"PUSH_LITERAL_VAR: Expected Association or Array, got {literalClass}");
+                    }
                 }
 
             case 0x08: // STORE_LITERAL_VAR - Store to literal variable without popping
@@ -4503,10 +4547,11 @@ public partial class VirtualMachine : IPrimitiveContext
             // This handles cases where the pool dictionary is created by an initialize method
             var poolNameString = GetSymbolString(poolNameSymbol);
             Console.WriteLine($"[POOL VAR FALLBACK] Pool dictionary '{poolNameString}' not found, checking Undeclared");
-            
+
             // Look up in Undeclared dictionary
-            var undeclaredOOP = GlobalRegistry.Get("Undeclared");
-            if (undeclaredOOP != SmalltalkOOP.Null)
+            var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+            var undeclaredOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, "Undeclared");
+            if (undeclaredOOP != SpecialObjectsArray.Instance.Nil)
             {
                 var undeclaredValueOOP = LookupInDictionary(undeclaredOOP, keySymbol);
                 if (undeclaredValueOOP != SpecialObjectsArray.Instance.Nil)

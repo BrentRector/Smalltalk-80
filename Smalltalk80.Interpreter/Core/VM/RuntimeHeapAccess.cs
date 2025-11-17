@@ -139,20 +139,21 @@ public class RuntimeHeapAccess
     }
 
     /// <summary>
-    /// Looks up a global variable by name using byte comparison (no symbol interning needed).
+    /// Looks up a global variable by name using linear search with byte comparison.
     /// Used to break the circular dependency when looking up USTable.
-    /// CRITICAL: SystemDictionary is an Array of Associations, NOT a Dictionary with keys/values arrays!
+    /// CRITICAL: Cannot use hash-based lookup because Symbol>>hash depends on OOP, not string content!
     /// </summary>
     public SmalltalkOOP LookupGlobalByName(SmalltalkOOP dictOOP, string globalName)
     {
         byte[] searchBytes = Encoding.Latin1.GetBytes(globalName);
-
-        // SystemDictionary structure: Array of Association objects
-        // Each Association has: slot 0 = key (Symbol), slot 1 = value (Object)
         int size = _heapManager.GetIndexedSize(dictOOP);
+
+        // Linear search through entire dictionary (cannot use hash - Symbol>>hash is OOP-based!)
         for (int i = 0; i < size; i++)
         {
             var associationOOP = _heapManager.GetIndexedOOP(dictOOP, i);
+
+            // Skip nil slots
             if (associationOOP == SpecialObjectsArray.Instance.Nil || associationOOP.IsSmallInteger)
                 continue;
 
