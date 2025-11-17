@@ -1981,14 +1981,17 @@ public static class ObjectPrimitives
         int hashValue = VMUtilities.ComputeIdentityHash(receiver);
 
         // Debug TextConstants Symbol hash
-        var className = ctx.GetClassName(ctx.GetClass(receiver));
-        if (className == "Symbol")
+        try
         {
-            var symbolName = ctx.GetSymbolName(receiver);
+            string symbolName = GetSymbolName(ctx, receiver);
             if (symbolName == "TextConstants")
             {
                 Console.WriteLine($"[PRIM75-HASH] Symbol #TextConstants: oop={receiver}, hash={hashValue}");
             }
+        }
+        catch
+        {
+            // Not a symbol, ignore
         }
 
         return SmalltalkOOP.FromSmallInteger(hashValue);
