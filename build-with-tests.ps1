@@ -65,4 +65,6 @@ Write-Host "To run the interpreter with tests:" -ForegroundColor Cyan
 Write-Host "  cd Smalltalk80.Interpreter" -ForegroundColor White
 Write-Host "  dotnet run -- --coldstart ../Smalltalk80.Compiler/bin/$Configuration/net9.0/coldstart_with_tests.json" -ForegroundColor White
 Write-Host
-Write-Host "Expected test result: 3503 (all 120 BlockContext tests passing)" -ForegroundColor Yellow
+Write-Host "NOTE: This bundle includes BlockContextTest but does NOT run tests automatically" -ForegroundColor Yellow
+Write-Host "      (BlockContextTest has no initialize method)" -ForegroundColor Yellow
+Write-Host "      To run tests automatically, use build-with-runner.ps1 instead" -ForegroundColor Yellow
