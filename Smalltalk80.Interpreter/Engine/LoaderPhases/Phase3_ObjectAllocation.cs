@@ -1299,20 +1299,23 @@ public class Phase3_ObjectAllocation
 
         var nilOOP = SpecialObjectsArray.Instance.Nil;
         int createdCount = 0;
-        int skippedClasses = 0;
+        int classNameCount = 0;
         int withPreCreatedValues = 0;
 
-        // Build set of class names to exclude (these will be installed in SystemDictionary by Phase 5)
+        // Build set of class names for reporting (we CREATE Associations for all, including classes)
         var classNames = new HashSet<string>(_bundle.Classes.Select(c => _symbols[c.NameIndex]));
 
         foreach (var undeclaredVar in _bundle.Undeclared)
         {
-            // CRITICAL: Skip class names - they will be installed directly in SystemDictionary by Phase 5
-            // We only pre-create Associations for non-class undeclared variables (like pool dictionaries)
+            // CRITICAL: Create Associations for ALL undeclared variables (including class names!)
+            // Phase 4 method literals MUST reference the SAME Associations that Phase 5 installs in SystemDictionary.
+            // If we skip classes here, Phase 4 creates Association #1 (value=nil) and Phase 5 creates Association #2 (value=class),
+            // causing method bytecode to reference the wrong Association.
+
+            // Track class names for reporting
             if (classNames.Contains(undeclaredVar.Key))
             {
-                skippedClasses++;
-                continue;
+                classNameCount++;
             }
 
             // Get symbol OOP for the key
@@ -1342,7 +1345,7 @@ public class Phase3_ObjectAllocation
         }
 
         Console.WriteLine($"  ✓ Pre-created {createdCount} canonical Associations");
-        Console.WriteLine($"  ✓ Skipped {skippedClasses} class names (will be installed directly in SystemDictionary)");
+        Console.WriteLine($"  ✓ Includes {classNameCount} class names (Phase 5 will set their values)");
         Console.WriteLine($"  ✓ Used pre-created values from GlobalRegistry for {withPreCreatedValues} globals");
         Console.WriteLine($"  ✓ AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations");
     }
