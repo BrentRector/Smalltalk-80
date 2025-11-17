@@ -139,39 +139,28 @@ public class RuntimeHeapAccess
     }
 
     /// <summary>
-    /// Looks up a global variable by name using hash-based lookup (matching Dictionary>>findKeyOrNil:).
+    /// Looks up a global variable by name using linear search with byte comparison.
     /// Used to break the circular dependency when looking up USTable.
-    /// CRITICAL: SystemDictionary is an Array of Associations, NOT a Dictionary with keys/values arrays!
+    /// CRITICAL: Cannot use hash-based lookup because Symbol>>hash depends on OOP, not string content!
     /// </summary>
     public SmalltalkOOP LookupGlobalByName(SmalltalkOOP dictOOP, string globalName)
     {
         byte[] searchBytes = Encoding.Latin1.GetBytes(globalName);
-
-        // Compute hash for hash-based lookup (matches Smalltalk algorithm)
-        int hash = ComputeSymbolHashFromString(globalName);
         int size = _heapManager.GetIndexedSize(dictOOP);
-        int location = (hash % size + size) % size;
 
-        // Linear probe from hash location
-        int pass = 1;
-        int startLocation = location;
-
-        while (true)
+        // Linear search through entire dictionary (cannot use hash - Symbol>>hash is OOP-based!)
+        for (int i = 0; i < size; i++)
         {
-            var associationOOP = _heapManager.GetIndexedOOP(dictOOP, location);
+            var associationOOP = _heapManager.GetIndexedOOP(dictOOP, i);
 
-            // Found nil slot - not in dictionary
+            // Skip nil slots
             if (associationOOP == SpecialObjectsArray.Instance.Nil || associationOOP.IsSmallInteger)
-            {
-                return SpecialObjectsArray.Instance.Nil;
-            }
+                continue;
 
             // Get the key from the Association (slot 0)
             var keyOOP = _heapManager.GetInstanceVariable(associationOOP, 0);
             if (keyOOP == SpecialObjectsArray.Instance.Nil || keyOOP.IsSmallInteger)
-            {
-                return SpecialObjectsArray.Instance.Nil;
-            }
+                continue;
 
             // Compare Symbol bytes directly
             int symbolLength = _heapManager.GetIndexedSize(keyOOP);
@@ -194,41 +183,9 @@ public class RuntimeHeapAccess
                     return _heapManager.GetInstanceVariable(associationOOP, 1);
                 }
             }
-
-            // Linear probe to next slot
-            location = (location + 1) % size;
-
-            // Check for wrap-around (searched entire dictionary)
-            if (location == startLocation)
-            {
-                if (pass == 2)
-                {
-                    return SpecialObjectsArray.Instance.Nil; // Not found after full scan
-                }
-                pass = 2;
-            }
         }
-    }
 
-    /// <summary>
-    /// Computes hash for a symbol string using Smalltalk-80's Symbol>>hash algorithm.
-    /// CRITICAL: Must match exactly: hash := (hash + char) \\ 16r0FFFFFFF
-    /// </summary>
-    private int ComputeSymbolHashFromString(string symbolName)
-    {
-        byte[] bytes = Encoding.Latin1.GetBytes(symbolName);
-
-        // Smalltalk-80: hash := (hash + char) \\ 16r0FFFFFFF
-        // CRITICAL: Must use Smalltalk \\ (floored division), not C# % (truncated division)
-        // For non-power-of-2 modulus and negative numbers, these give different results!
-        const int HashModulus = 0x0FFFFFFF; // 268435455 = 2^28 - 1
-
-        int hash = 0;
-        foreach (byte b in bytes)
-        {
-            hash = SmalltalkMath.Modulo(hash + b, HashModulus); // Smalltalk \\ semantics
-        }
-        return hash;
+        return SpecialObjectsArray.Instance.Nil;  // Not found
     }
 
     /// <summary>

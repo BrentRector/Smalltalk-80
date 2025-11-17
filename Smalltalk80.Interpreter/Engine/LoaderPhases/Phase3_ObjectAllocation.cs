@@ -479,19 +479,10 @@ public class Phase3_ObjectAllocation
 
     private int GetSymbolHash(SmalltalkOOP symbolOOP)
     {
-        // Get symbol bytes for hashing
-        int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
-
-        // Smalltalk-80 hash algorithm: hash := (hash + char) \\ 16r0FFFFFFF
-        // CRITICAL: Must use Smalltalk \\ (floored division), not C# % (truncated division)
-        const int HashModulus = 0x0FFFFFFF; // 268435455 = 2^28 - 1
-        int hash = 0;
-        for (int i = 0; i < symbolLength; i++)
-        {
-            byte b = _heapManager.GetIndexedByte(symbolOOP, i);
-            hash = SmalltalkMath.Modulo(hash + b, HashModulus); // Smalltalk \\ semantics
-        }
-        return hash;
+        // Symbol>>hash uses Primitive 75: returns half the object pointer
+        // Blue Book: "Answer with a SmallInteger whose value is half of the receiver's object pointer"
+        // This is an IDENTITY hash based on OOP, NOT a string content hash!
+        return (int)(symbolOOP.Value >> 1);
     }
 
     /// <summary>

@@ -712,39 +712,11 @@ public class Phase5_GlobalsAndPatches
             
             // Create Association: #PoolName → nil
             var associationOOP = GetOrCreateCanonicalAssociation(poolName);
-
-            // DEBUG: Check if Association already has a value before overwriting
-            var existingValue = _allocator.GetInstanceVariable(associationOOP, 1);
-            if (existingValue != nilOOP)
-            {
-                Console.WriteLine($"    WARNING: {poolName} Association already has value {existingValue}, overwriting to nil");
-            }
-
             _allocator.SetInstanceVariable(associationOOP, 1, nilOOP);  // value = nil
-
-            // DEBUG: Verify the Association was created correctly
-            var keySymbol = _allocator.GetInstanceVariable(associationOOP, 0);
-            Console.WriteLine($"    DEBUG: {poolName} Association OOP={associationOOP}, key={keySymbol}, value={nilOOP}");
 
             // Install as global in Smalltalk dictionary
             InstallAssociationInSystemDictionary(associationOOP, poolName);
 
-            // DEBUG: Verify it was installed correctly by looking it up
-            var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-            var lookedUpValue = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, poolName);
-            if (lookedUpValue == nilOOP)
-            {
-                Console.WriteLine($"    ✓ Verified {poolName} lookup returns nil (correct)");
-            }
-            else if (lookedUpValue == SpecialObjectsArray.Instance.Nil)
-            {
-                Console.WriteLine($"    ❌ ERROR: {poolName} NOT FOUND in SystemDictionary after installation!");
-            }
-            else
-            {
-                Console.WriteLine($"    ❌ ERROR: {poolName} lookup returned unexpected value: {lookedUpValue}");
-            }
-            
             // Register in GlobalRegistry (value = nil for now)
             GlobalRegistry.Register(poolName, nilOOP);
 
@@ -1046,19 +1018,10 @@ public class Phase5_GlobalsAndPatches
 
     private int GetSymbolHash(SmalltalkOOP symbolOOP)
     {
-        // Get symbol bytes for hashing
-        int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
-
-        // Smalltalk-80 hash algorithm: hash := (hash + char) \\ 16r0FFFFFFF
-        // CRITICAL: Must use Smalltalk \\ (floored division), not C# % (truncated division)
-        const int HashModulus = 0x0FFFFFFF; // 268435455 = 2^28 - 1
-        int hash = 0;
-        for (int i = 0; i < symbolLength; i++)
-        {
-            byte b = _heapManager.GetIndexedByte(symbolOOP, i);
-            hash = SmalltalkMath.Modulo(hash + b, HashModulus); // Smalltalk \\ semantics
-        }
-        return hash;
+        // Symbol>>hash uses Primitive 75: returns half the object pointer
+        // Blue Book: "Answer with a SmallInteger whose value is half of the receiver's object pointer"
+        // This is an IDENTITY hash based on OOP, NOT a string content hash!
+        return (int)(symbolOOP.Value >> 1);
     }
 
     /// <summary>
