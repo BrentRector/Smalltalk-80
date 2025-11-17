@@ -78,6 +78,12 @@ public class Phase3_ObjectAllocation
         // method literals get the same Association objects that Phase 5 will use
         PreCreateUndeclaredAssociations();
 
+        // CRITICAL FIX: Set class references for Associations created in Phase 3.5
+        // PreCreateUndeclaredAssociations() creates 70 new Association objects above,
+        // but they are created AFTER SetClassReferencesForAllObjects() ran (line 66).
+        // We need to fix their class pointers here.
+        SetAssociationClassReferences();
+
         // DEBUG: Check SystemDictionary tally at END of Phase 3
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         var tallyEnd = _allocator.GetInstanceVariable(systemDictOOP, 0);
