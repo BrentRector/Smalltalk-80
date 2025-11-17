@@ -10,9 +10,8 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     
     <!-- Output paths -->
-    <BaseOutputPath>$(MSBuildThisFileDirectory)bin\</BaseOutputPath>
-    <!-- Each project uses its own obj directory to avoid conflicts -->
-    <!-- <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj\</BaseIntermediateOutputPath> -->
+    <!-- Each project uses its own bin/obj directories (default behavior) -->
+    <!-- Removed shared BaseOutputPath to avoid conflicts between projects -->
     
     <!-- Package metadata -->
     <Authors>Smalltalk-80 Contributors</Authors>

@@ -35,14 +35,13 @@
   </ItemGroup>
   
   <!-- Verify coldstart.json exists after build -->
-  <!-- Note: Shared bin directory is configured in Directory.Build.props -->
-  <!-- Compiler outputs to: Smalltalk-80/bin/Debug/net9.0/coldstart.json -->
-  <!-- Interpreter outputs to: Smalltalk-80/bin/Debug/net9.0-windows/ -->
+  <!-- Note: Each project has its own bin/obj directories -->
+  <!-- Compiler outputs to: Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json -->
+  <!-- Interpreter outputs to: Smalltalk80.Interpreter/bin/Debug/net9.0-windows/ -->
   <Target Name="VerifyColdStartJson" AfterTargets="Build">
     <PropertyGroup>
-      <!-- BaseOutputPath is set by Directory.Build.props to solution-level bin/ -->
-      <!-- Compiler outputs to ../bin/Debug/net9.0/, Interpreter to bin/Debug/net9.0-windows/ -->
-      <CompilerOutputDir>$(BaseOutputPath)Debug\net9.0\</CompilerOutputDir>
+      <!-- Look for coldstart.json in Compiler's output directory -->
+      <CompilerOutputDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\</CompilerOutputDir>
       <ColdStartFile>$(CompilerOutputDir)coldstart.json</ColdStartFile>
     </PropertyGroup>
 
@@ -53,7 +52,7 @@
       Condition="Exists('$(ColdStartFile)')" />
 
     <Warning
-      Text="⚠ coldstart.json not found: $(ColdStartFile) - Run 'dotnet build' from solution root to generate it"
+      Text="⚠ coldstart.json not found: $(ColdStartFile) - Run build-standard.ps1 or build-with-tests.ps1 to generate it"
       Condition="!Exists('$(ColdStartFile)')" />
   </Target>
 
