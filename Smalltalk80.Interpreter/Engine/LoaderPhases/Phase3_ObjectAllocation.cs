@@ -1348,6 +1348,25 @@ public class Phase3_ObjectAllocation
         Console.WriteLine($"  ✓ Includes {classNameCount} class names (Phase 5 will set their values)");
         Console.WriteLine($"  ✓ Used pre-created values from GlobalRegistry for {withPreCreatedValues} globals");
         Console.WriteLine($"  ✓ AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations");
+
+        // CRITICAL: Install all Associations in Undeclared dictionary
+        // This matches runtime semantics: undefined variables start in Undeclared,
+        // then migrate to SystemDictionary when defined (e.g., class installation, init expressions)
+        var undeclaredOOP = GlobalRegistry.Get("Undeclared");
+        int installedInUndeclared = 0;
+
+        foreach (var undeclaredVar in _bundle.Undeclared)
+        {
+            // Get the canonical Association from AssociationRegistry
+            var associationOOP = AssociationRegistry.Get(undeclaredVar.Key);
+
+            // Install in Undeclared dictionary using hash-based insertion
+            InstallAssociationInDictionary(undeclaredOOP, associationOOP, undeclaredVar.Key);
+            installedInUndeclared++;
+        }
+
+        Console.WriteLine($"  ✓ Installed {installedInUndeclared} Associations in Undeclared dictionary");
+        Console.WriteLine($"  ✓ Phase 5 will migrate defined globals to SystemDictionary");
     }
 
     #endregion

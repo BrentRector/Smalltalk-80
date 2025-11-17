@@ -870,7 +870,10 @@ public class Phase5_GlobalsAndPatches
 
     /// <summary>
     /// Installs an association in SystemDictionary using hash-based slot finding.
-    /// CRITICAL: Must use same algorithm as Dictionary>>findKeyOrNil: so runtime lookups work!
+    /// CRITICAL: Implements Smalltalk-80 migration semantics:
+    /// - If Association exists in Undeclared, REMOVE it from Undeclared before adding to SystemDictionary
+    /// - This matches SystemDictionary>>valueAtNewKey:put:atIndex:declareFrom: behavior
+    /// Must use same algorithm as Dictionary>>findKeyOrNil: so runtime lookups work!
     /// </summary>
     private void InstallAssociationInSystemDictionary(SmalltalkOOP associationOOP, string globalName)
     {
@@ -880,6 +883,11 @@ public class Phase5_GlobalsAndPatches
 
         // Get the key symbol from the Association (slot 0)
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
+
+        // MIGRATION STEP: Remove from Undeclared if present
+        // This matches: SystemDictionary>>valueAtNewKey:put:atIndex:declareFrom:
+        //   which does: "aDictionary removeKey: aKey" after migrating
+        RemoveAssociationFromUndeclared(keySymbolOOP, globalName);
 
         // Use hash-based lookup to find correct slot (same algorithm as Dictionary>>findKeyOrNil:)
         // Smalltalk: location _ key hash \\ length + 1 (then convert to 0-based index)
@@ -938,6 +946,71 @@ public class Phase5_GlobalsAndPatches
                 if (pass > 2)
                 {
                     throw new InvalidOperationException($"SystemDictionary is full - cannot install {globalName} association after 2 passes");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes an Association from Undeclared dictionary.
+    /// This implements the migration semantics from SystemDictionary>>valueAtNewKey:put:atIndex:declareFrom:
+    /// which removes the Association from Undeclared after migrating it to SystemDictionary.
+    /// </summary>
+    private void RemoveAssociationFromUndeclared(SmalltalkOOP keySymbolOOP, string keyName)
+    {
+        if (!GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
+        {
+            return; // Undeclared doesn't exist yet
+        }
+
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        int undeclaredSize = _allocator.GetIndexedSize(undeclaredOOP);
+
+        // Use hash-based lookup to find the Association
+        int hash = GetSymbolHash(keySymbolOOP);
+        int location = (hash % undeclaredSize + undeclaredSize) % undeclaredSize;
+
+        int pass = 1;
+        int startLocation = location;
+
+        while (true)
+        {
+            var probe = _allocator.GetIndexedOOP(undeclaredOOP, location);
+
+            if (probe == nilOOP)
+            {
+                // Not found in Undeclared (already migrated or never there)
+                return;
+            }
+
+            // Check if this is the Association we're looking for
+            var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+            if (probeKeyOOP == keySymbolOOP)
+            {
+                // Found it - remove by setting slot to nil
+                _allocator.SetIndexedOOP(undeclaredOOP, location, nilOOP);
+
+                // Decrement Undeclared's tally
+                var tallyOOP = _allocator.GetInstanceVariable(undeclaredOOP, 0);
+                if (tallyOOP.IsSmallInteger)
+                {
+                    int tally = tallyOOP.AsSmallInteger();
+                    _allocator.SetInstanceVariable(undeclaredOOP, 0, SmalltalkOOP.FromSmallInteger(tally - 1));
+                }
+
+                return;
+            }
+
+            // Linear probe to next slot
+            location = (location + 1) % undeclaredSize;
+
+            if (location == startLocation)
+            {
+                pass++;
+                if (pass > 2)
+                {
+                    // Not found after 2 passes
+                    return;
                 }
             }
         }
