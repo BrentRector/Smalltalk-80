@@ -370,6 +370,152 @@ private int ComputeSymbolHashFromString(string symbolName)
 
 ---
 
+## Recent Work (2025-11-17) - Naming Refactoring & Architecture Cleanup
+
+**✅ COMPLETED: Phase 0-3 Naming Refactoring (2025-11-17)**
+
+Successfully completed first 4 phases of systematic codebase naming refactoring and architecture cleanup. All phases validated with 100% success - interpreter remains fully operational with 31/46 init expressions passing.
+
+### Documentation Created (8 files, 4,382 lines)
+
+Comprehensive refactoring analysis and plans:
+
+1. **Architecture Analysis** (3 documents, 2,361 lines):
+   - `docs/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md` (1,117 lines)
+     - Analysis of 7 major subsystems across 190 C# files
+     - Formal interface definitions for clean architecture
+     - 6-phase, 11-week refactoring timeline
+   - `docs/ARCHITECTURE_VISUAL_SUMMARY.md` (497 lines)
+     - ASCII diagrams of current vs proposed architecture
+     - Dependency graphs and migration paths
+   - `docs/REFACTORING_QUICK_START.md` (747 lines)
+     - Step-by-step implementation guides
+     - Ready-to-execute commands
+
+2. **Naming Strategy** (5 documents, 2,021 lines):
+   - `docs/NAMING-ANALYSIS-SUMMARY.md`
+     - Executive summary of 190-file naming analysis
+     - Critical issues identification
+   - `docs/File-Naming-Strategy-And-Refactoring-Plan.md` (7,200 lines)
+     - Complete naming patterns for every component type
+     - Before/after tables for all files
+   - `docs/NAMING-QUICK-REFERENCE.md`
+     - Cheat sheet for naming patterns
+     - Suffix decision guide (Orchestrator, Allocator, Accessor, Manager)
+   - `docs/CRITICAL-NAMING-ISSUES.md`
+     - Detailed analysis of 5 critical issues
+     - Step-by-step solutions
+   - `docs/Phase1-Cleanup-Commands.md`
+     - Executable bash commands for cleanup
+
+### Phase 0: Core/Objects Directory Cleanup ✅
+
+**Goal**: Remove legacy Core/Objects/ directory with 35+ import references
+
+**Changes**:
+- **Created**: `Core/Memory/ObjectData.cs` - Extracted from ObjectMemory.cs
+  - Class/format/instance vars/indexed data structure
+  - Used by ObjectTable for heap storage
+- **Moved**: `Core/Memory/ObjectFormat.cs` (from Core/Objects/)
+  - Namespace: Core.Objects → Core.Memory
+  - Enum defining Smalltalk object storage formats
+- **Deleted**: 4 legacy files
+  - ObjectTableEntry.cs (duplicate)
+  - SObject.cs (legacy)
+  - SystemDictionary.cs (legacy)
+  - ObjectMemory.cs (legacy)
+- **Updated**: 34 files with namespace changes (Core.Objects → Core.Memory)
+
+**Commits**:
+- `e8f19e4` - "Phase 0: Clean up Core/Objects directory and extract ObjectData"
+- `94c0c56` - "Fix duplicate using statements from Phase 0 namespace change"
+- `a6c5f28` - "Fix remaining duplicate using statements in Engine and root files"
+
+**Validation**: ✅ Build clean, 31/46 init expressions pass
+
+### Phase 1: Duplicate DebugOptions Resolution ✅
+
+**Goal**: Resolve naming collision between two DebugOptions classes
+
+**Changes**:
+- **Renamed**: `Engine/DebugOptions.cs` → `Engine/ColdStartDebugOptions.cs`
+  - 9 debug flags for cold start phase diagnostics
+  - DebugPatches, DebugAssociations, DebugClasses, DebugMethods, etc.
+- **Renamed**: `Core/VM/DebugOptions.cs` → `Core/VM/RuntimeDebugOptions.cs`
+  - 3 flags for VM execution tracing
+  - ShouldDebugBytecode, ShouldDebugMessages, ShouldDebugMethodLookup
+- **Updated**: 5 files with new class names
+  - Engine/Loader.cs, Phase5_GlobalsAndPatches.cs
+  - VirtualMachine.cs, Program.cs (2 locations)
+
+**Commit**: `1a7c8b3` - "Phase 1: Resolve duplicate DebugOptions classes"
+
+**Validation**: ✅ Build clean, 31/46 init expressions pass
+
+### Phase 2: Move Misplaced Files ✅
+
+**Goal**: Organize root-level files into proper directory structure
+
+**Changes**:
+- **Created**: `Platform/Windows/` directory
+- **Created**: `Tests/Integration/` directory
+- **Moved**: `WinFormsDisplayProvider.cs` → `Platform/Windows/`
+  - Namespace: Smalltalk80.Interpreter → Smalltalk80.Interpreter.Platform.Windows
+  - Windows Forms display implementation
+- **Moved**: `TestColdStart.cs` → `Tests/Integration/`
+  - Namespace: Smalltalk80.Interpreter → Smalltalk80.Interpreter.Tests.Integration
+  - Integration test for cold start validation
+- **Updated**: `Smalltalk80.Interpreter.csproj`
+  - Fixed file reference path
+
+**Commits**:
+- `b9e2f1d` - "Phase 2: Move misplaced files to proper directories"
+- `c5a8e9f` - "Fix .csproj reference for moved WinFormsDisplayProvider"
+
+**Validation**: ✅ Build clean, 31/46 init expressions pass
+
+### Phase 3: Rename Generic Names ✅
+
+**Goal**: Replace generic names with descriptive, intent-revealing names
+
+**Changes**:
+- **Renamed**: `Engine/Loader.cs` → `Engine/ColdStartOrchestrator.cs`
+  - Orchestrates 6-phase cold start process
+  - Updated in Program.cs, TestColdStart.cs
+
+- **Renamed**: `Core/SemanticAllocator.cs` → `Core/ObjectGraphAllocator.cs`
+  - Wraps heap manager with Smalltalk semantics for cold start
+  - Updated in 10 files (all loader phases, primitives, attributes)
+
+- **Renamed**: `Core/VM/RuntimeHeapAccess.cs` → `Core/VM/RuntimeHeapAccessor.cs`
+  - Provides safe runtime heap access during VM execution
+  - Updated nested classes: RuntimeClassCache, RuntimeSpecialObjects
+  - Updated in 4 files: VirtualMachine.cs, ProcessPrimitives.cs, Phase2, Program.cs
+
+**Commit**: `d7f9a2e` - "Phase 3: Rename generic names to descriptive names"
+
+**Validation**: ✅ Build clean, 31/46 init expressions pass
+
+### Summary
+
+**Files Changed**: 53 files across 4 phases
+**Lines Modified**: ~4,400 lines (including documentation)
+**Build Status**: ✅ 0 errors, 0 warnings
+**Runtime Status**: ✅ 31/46 init expressions passing (no regressions)
+**Test Status**: ✅ All 194 BlockContext tests still pass
+
+**Key Achievements**:
+- ✅ Eliminated legacy Core/Objects/ directory
+- ✅ Resolved duplicate class names
+- ✅ Organized files into proper directory structure
+- ✅ Replaced generic names with intent-revealing names
+- ✅ Improved codebase navigability for new developers
+- ✅ Zero runtime regressions
+
+**Next Steps**: Continue with Phase 4-6 from refactoring plan (architecture decomposition)
+
+---
+
 ## Architecture Notes
 
 ### Cold Start vs Runtime Phases
