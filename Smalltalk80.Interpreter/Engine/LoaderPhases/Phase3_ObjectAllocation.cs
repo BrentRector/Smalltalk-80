@@ -73,6 +73,11 @@ public class Phase3_ObjectAllocation
         InitializeUnsetInstanceVariables();
         LogInitializationCheckpoint();
 
+        // Section 5: Pre-create Associations for Undeclared Variables (Phase 3.5)
+        // CRITICAL: This runs BEFORE Phase 4 (method compilation) to ensure
+        // method literals get the same Association objects that Phase 5 will use
+        PreCreateUndeclaredAssociations();
+
         // DEBUG: Check SystemDictionary tally at END of Phase 3
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         var tallyEnd = _allocator.GetInstanceVariable(systemDictOOP, 0);
@@ -208,8 +213,8 @@ public class Phase3_ObjectAllocation
 
     /// <summary>
     /// Creates the Undeclared Dictionary and registers it as a global (v1.0.7).
-    /// The Undeclared dictionary is initially empty - it will be populated during Phase 5
-    /// with Association objects for each variable found in bundle.Undeclared[].
+    /// The Undeclared dictionary is initially empty - it will be populated later in Phase 3 (Section 5)
+    /// with canonical Association objects for each variable found in bundle.Undeclared[].
     /// </summary>
     private void CreateUndeclaredDictionary(SmalltalkOOP nilOOP)
     {
@@ -1209,6 +1214,80 @@ public class Phase3_ObjectAllocation
     {
         _allocator.SetInstanceVariable(oop, slot, value);
         _initializedFields.Add((oop, slot));
+    }
+
+    #endregion
+
+    #region Pre-create Undeclared Associations (Phase 3.5)
+
+    /// <summary>
+    /// Pre-creates canonical Association objects for undeclared variables (Phase 3.5).
+    /// CRITICAL: This runs BEFORE Phase 4 (method compilation).
+    ///
+    /// Architecture:
+    /// 1. Creates canonical Associations via AssociationRegistry for each undeclared variable
+    /// 2. Does NOT add them to Undeclared dictionary yet
+    /// 3. Phase 4 will use AssociationRegistry.GetOrCreate() to get the SAME Associations for method literals
+    /// 4. Phase 5 will use AssociationRegistry.GetOrCreate() to get the SAME Associations for global installation
+    ///
+    /// This ensures ONE Association object per global variable name, enabling the
+    /// Undeclared → SystemDictionary migration pattern specified in the Blue Book.
+    /// </summary>
+    private void PreCreateUndeclaredAssociations()
+    {
+        if (_bundle.Undeclared == null || _bundle.Undeclared.Length == 0)
+        {
+            Console.WriteLine("[Phase3.5] No undeclared variables in bundle - skipping Association pre-creation");
+            return;
+        }
+
+        Console.WriteLine($"[Phase3.5] Pre-creating canonical Associations for undeclared variables...");
+
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        int createdCount = 0;
+        int skippedClasses = 0;
+
+        // Build set of class names to exclude (these will be installed in SystemDictionary by Phase 5)
+        var classNames = new HashSet<string>(_bundle.Classes.Select(c => _symbols[c.NameIndex]));
+
+        foreach (var undeclaredVar in _bundle.Undeclared)
+        {
+            // CRITICAL: Skip class names - they will be installed directly in SystemDictionary by Phase 5
+            // We only pre-create Associations for non-class undeclared variables (like pool dictionaries)
+            if (classNames.Contains(undeclaredVar.Key))
+            {
+                skippedClasses++;
+                continue;
+            }
+
+            // Get symbol OOP for the key
+            SmalltalkOOP keySymbolOOP = InternSymbol(undeclaredVar.Key);
+
+            // Use AssociationRegistry to create canonical Association
+            // This ensures Phase 4 and Phase 5 will get the SAME Association object
+            AssociationRegistry.GetOrCreate(undeclaredVar.Key, () =>
+            {
+                // Create new Association with key and nil value
+                return AllocateAssociationWithSemanticAllocator(keySymbolOOP, nilOOP);
+            });
+
+            createdCount++;
+        }
+
+        Console.WriteLine($"  ✓ Pre-created {createdCount} canonical Associations");
+        Console.WriteLine($"  ✓ Skipped {skippedClasses} class names (will be installed directly in SystemDictionary)");
+        Console.WriteLine($"  ✓ AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations");
+
+        // Show sample
+        if (createdCount > 0)
+        {
+            var nonClassUndeclared = _bundle.Undeclared.Where(u => !classNames.Contains(u.Key)).Take(5);
+            Console.WriteLine($"  Sample non-class undeclared variables:");
+            foreach (var uv in nonClassUndeclared)
+            {
+                Console.WriteLine($"    - {uv.Key} ({uv.References.Length} reference(s))");
+            }
+        }
     }
 
     #endregion
