@@ -53,16 +53,7 @@ public class Phase5_GlobalsAndPatches
     {
         // DEBUG: Check SystemDictionary tally at START of Phase 5
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-        try
-        {
-            var tallyAtStart = _allocator.GetInstanceVariable(systemDictOOP, 0);
-            Console.WriteLine($"[Phase5 START] SystemDictionary tally: {tallyAtStart}, IsSmallInteger={tallyAtStart.IsSmallInteger}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Phase5 START] ERROR reading SystemDictionary tally: {ex.Message}");
-        }
-        
+
         // Step 1: Apply patches (from Phase10)
         ApplyPatches();
 
@@ -468,81 +459,14 @@ public class Phase5_GlobalsAndPatches
     {
         var systemDictionaryOOP = GlobalRegistry.SystemDictionaryOOP;
 
-        // DEBUG: Check how many "Smalltalk" Associations exist in AssociationRegistry
-        var allAssociations = AssociationRegistry.GetAll();
-        var smalltalkAssocs = allAssociations.Where(kvp => kvp.Key == "Smalltalk").ToList();
-        Console.WriteLine($"[InstallSmalltalkGlobal] Found {smalltalkAssocs.Count} 'Smalltalk' Associations in registry");
-        foreach (var kvp in smalltalkAssocs)
-        {
-            var oop = kvp.Value;
-            var key = _allocator.GetInstanceVariable(oop, 0);
-            var value = _allocator.GetInstanceVariable(oop, 1);
-            Console.WriteLine($"  Registry entry: key={key}, value={value}, oop={oop}");
-        }
-
-        // DEBUG: Scan heap for ALL Associations with key "Smalltalk"
-        var smalltalkSymbolOOP = GetSymbolOOP("Smalltalk");
-        Console.WriteLine($"[InstallSmalltalkGlobal] Smalltalk symbol OOP = {smalltalkSymbolOOP}");
-        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        int foundInHeap = 0;
-        for (int i = 0; i < 100000; i += 2)
-        {
-            try
-            {
-                var objOOP = new SmalltalkOOP(i);
-                var classOOP = _heapManager.GetSlot(objOOP, 0);
-                if (classOOP == associationClassOOP)
-                {
-                    var keyOOP = _allocator.GetInstanceVariable(objOOP, 0);
-                    if (keyOOP == smalltalkSymbolOOP)
-                    {
-                        var valueOOP = _allocator.GetInstanceVariable(objOOP, 1);
-                        Console.WriteLine($"  HEAP SCAN: Found Smalltalk Association OOP={objOOP}, value={valueOOP}");
-                        foundInHeap++;
-                    }
-                }
-            }
-            catch { }
-        }
-        Console.WriteLine($"[InstallSmalltalkGlobal] Total 'Smalltalk' Associations found in heap: {foundInHeap}");
-
         // Get or create canonical Association
         var associationOOP = GetOrCreateCanonicalAssociation("Smalltalk");
-
-        // DEBUG: Check current value before setting
-        var currentValue = _allocator.GetInstanceVariable(associationOOP, 1);
-        Console.WriteLine($"[InstallSmalltalkGlobal] Association OOP={associationOOP}, current value={currentValue}, setting to SystemDict={systemDictionaryOOP}");
 
         // Set Association value to SystemDictionary
         _allocator.SetInstanceVariable(associationOOP, 1, systemDictionaryOOP);
 
-        // DEBUG: Verify value was set
-        var newValue = _allocator.GetInstanceVariable(associationOOP, 1);
-        Console.WriteLine($"[InstallSmalltalkGlobal] After setting, Association value={newValue}");
-
         // Install in SystemDictionary
         InstallAssociationInSystemDictionary(associationOOP, "Smalltalk");
-
-        // DEBUG: Final verification - scan heap again AFTER update
-        Console.WriteLine($"[InstallSmalltalkGlobal] FINAL VERIFICATION - scanning heap after update:");
-        for (int i = 0; i < 100000; i += 2)
-        {
-            try
-            {
-                var objOOP = new SmalltalkOOP(i);
-                var classOOP = _heapManager.GetSlot(objOOP, 0);
-                if (classOOP == associationClassOOP)
-                {
-                    var keyOOP = _allocator.GetInstanceVariable(objOOP, 0);
-                    if (keyOOP == smalltalkSymbolOOP)
-                    {
-                        var valueOOP = _allocator.GetInstanceVariable(objOOP, 1);
-                        Console.WriteLine($"  FINAL: Found Smalltalk Association OOP={objOOP}, value={valueOOP}");
-                    }
-                }
-            }
-            catch { }
-        }
     }
 
     /// <summary>

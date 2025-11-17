@@ -79,11 +79,6 @@ public class Phase3_ObjectAllocation
         InitializeUnsetInstanceVariables();
         LogInitializationCheckpoint();
 
-        // DEBUG: Check SystemDictionary tally at END of Phase 3
-        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-        var tallyEnd = _allocator.GetInstanceVariable(systemDictOOP, 0);
-        Console.WriteLine($"[Phase3 END] SystemDictionary tally: {tallyEnd}, IsSmallInteger={tallyEnd.IsSmallInteger}");
-
 // Console.WriteLine("  Phase 3 complete: All objects allocated and initialized");
     }
 
@@ -145,22 +140,8 @@ public class Phase3_ObjectAllocation
         GlobalRegistry.Register("true", trueOOP);
         GlobalRegistry.Register("false", falseOOP);
 
-        Console.WriteLine($"  Allocated sentinel objects: nil={nilOOP}, true={trueOOP}, false={falseOOP}");
-
         // Initialize SystemDictionary slots with nil (created in Phase 2 but couldn't be initialized until now)
-        Console.WriteLine($"  About to call InitializeSystemDictionaryWithNil with nilOOP={nilOOP}");
-        
-        // DEBUG: Check tally BEFORE InitializeSystemDictionaryWithNil
-        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-        var tallyBefore = _allocator.GetInstanceVariable(systemDictOOP, 0);
-        Console.WriteLine($"  SystemDictionary tally BEFORE init: {tallyBefore}");
-        
         InitializeSystemDictionaryWithNil(nilOOP);
-        
-        // DEBUG: Check tally AFTER InitializeSystemDictionaryWithNil
-        var tallyAfter = _allocator.GetInstanceVariable(systemDictOOP, 0);
-        Console.WriteLine($"  SystemDictionary tally AFTER init: {tallyAfter}");
-        Console.WriteLine($"  ✓ SystemDictionary initialized with nil");
 
         // Create ProcessorScheduler singleton
         var processorSchedulerOOP = _allocator.AllocateFixedObject("ProcessorScheduler");
@@ -174,10 +155,6 @@ public class Phase3_ObjectAllocation
         // but not yet defined during compilation. SystemDictionary>>at:put: will migrate these
         // Associations when the variables become defined.
         CreateUndeclaredDictionary(nilOOP);
-        
-        // DEBUG: Check tally after CreateUndeclaredDictionary
-        var tallyAfterUndeclared = _allocator.GetInstanceVariable(systemDictOOP, 0);
-        Console.WriteLine($"  SystemDictionary tally after CreateUndeclaredDictionary: {tallyAfterUndeclared}");
     }
 
     /// <summary>
@@ -1287,19 +1264,6 @@ public class Phase3_ObjectAllocation
         Console.WriteLine($"  ✓ Skipped {skippedClasses} class names (will be installed directly in SystemDictionary)");
         Console.WriteLine($"  ✓ Used pre-created values from GlobalRegistry for {withPreCreatedValues} globals");
         Console.WriteLine($"  ✓ AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations");
-
-        // Show sample
-        if (createdCount > 0)
-        {
-            var actuallyCreated = _bundle.Undeclared
-                .Where(u => !classNames.Contains(u.Key))
-                .Take(5);
-            Console.WriteLine($"  Sample pre-created undeclared Associations:");
-            foreach (var uv in actuallyCreated)
-            {
-                Console.WriteLine($"    - {uv.Key} ({uv.References.Length} reference(s))");
-            }
-        }
     }
 
     #endregion
