@@ -54,15 +54,21 @@ public class Phase3_ObjectAllocation
     {
 // Console.WriteLine("Phase 3: Object Allocation and Initialization");
 
-        // Section 1: Allocation
+        // Section 1: Allocation (ALL object creation happens here)
         AllocateSentinelObjects();
         AllocateSpecialObjects();
+
+        // Phase 3.5: Pre-create Associations for Undeclared Variables
+        // CRITICAL: This runs BEFORE class pointer fix to ensure all Associations
+        // are created before SetClassReferencesForAllObjects() runs.
+        // This way, the class pointer fix happens in ONE pass for ALL Associations.
+        PreCreateUndeclaredAssociations();
 
         // NOTE: DefaultTextStyle creation moved to Phase 5 (after AssociationRegistry is populated)
 
         LogAllocationCheckpoint();
 
-        // Section 2: Class Reference Setting
+        // Section 2: Class Reference Setting (ONE fix for ALL objects including Phase 3.5 Associations)
         SetClassReferencesForAllObjects();
         LogClassReferenceCheckpoint();
 
@@ -72,17 +78,6 @@ public class Phase3_ObjectAllocation
         // Section 4: Nil Initialization
         InitializeUnsetInstanceVariables();
         LogInitializationCheckpoint();
-
-        // Section 5: Pre-create Associations for Undeclared Variables (Phase 3.5)
-        // CRITICAL: This runs BEFORE Phase 4 (method compilation) to ensure
-        // method literals get the same Association objects that Phase 5 will use
-        PreCreateUndeclaredAssociations();
-
-        // CRITICAL FIX: Set class references for Associations created in Phase 3.5
-        // PreCreateUndeclaredAssociations() creates 70 new Association objects above,
-        // but they are created AFTER SetClassReferencesForAllObjects() ran (line 66).
-        // We need to fix their class pointers here.
-        SetAssociationClassReferences();
 
         // DEBUG: Check SystemDictionary tally at END of Phase 3
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
