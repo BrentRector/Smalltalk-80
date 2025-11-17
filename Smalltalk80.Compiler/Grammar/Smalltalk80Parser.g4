@@ -460,8 +460,9 @@ block
     ;
 
 // Block arguments
+// Note: PIPE is mandatory - it terminates the argument list per Smalltalk-80 spec
 blockArgs
-    : (COLON argumentName)+ PIPE?
+    : (COLON argumentName)+ PIPE
     ;
 
 // Block temporaries
