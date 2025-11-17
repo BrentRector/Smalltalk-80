@@ -250,6 +250,40 @@ Created `SmalltalkMath.Modulo()` matching Primitive 11 semantics. All hash imple
 
 **Commit**: `891b4aa` - "Use Smalltalk floored division semantics for hash modulo operations"
 
+**🔴 ACTUAL ROOT CAUSE: Symbol>>hash Uses OOP-Based Hash, Not String Hash!**
+
+The previous fixes (modulo vs AND, floored vs truncated division) were addressing the wrong problem. The **real issue** was discovered by analyzing the actual Smalltalk-80 source code:
+
+**Symbol>>hash implementation:**
+```smalltalk
+hash
+    "Answer with a SmallInteger whose value is half of the receiver's object pointer"
+    <primitive: 75>
+    ^self!
+```
+
+Symbol>>hash uses **Primitive 75** which returns `objectPointer / 2` (OOP-based identity hash), **NOT** a hash computed from string contents!
+
+**Why This Broke Everything:**
+1. Our code computed hash from STRING contents: `hash = sum(char) % modulus`
+2. Smalltalk uses hash from OOP: `hash = oop / 2`
+3. **Complete mismatch** → Associations installed/looked up at different locations
+4. Result: Duplicate Associations, nil values, infinite loops
+
+**The Real Fix:**
+Changed GetSymbolHash() to use OOP-based hash:
+```csharp
+private int GetSymbolHash(SmalltalkOOP symbolOOP)
+{
+    // Symbol>>hash uses Primitive 75: half the object pointer
+    return (int)(symbolOOP.Value >> 1);
+}
+```
+
+Also changed RuntimeHeapAccess.LookupGlobalByName to use **linear search** instead of hash-based lookup (can't compute OOP hash from string name).
+
+**Commit**: `8a0b16f` - "CRITICAL FIX: Use OOP-based hash (Primitive 75) for Symbol>>hash"
+
 ---
 
 **✅ COMPLETED: Runtime GlobalRegistry Violations Fixed**
