@@ -200,17 +200,23 @@ public static class ObjectPrimitives
             Console.WriteLine($"  Calling context chain:");
             try
             {
-                var activeContext = ctx.ActiveContext;
+                var activeContext = ctx.GetActiveContext();
                 for (int i = 0; i < 5 && activeContext != SpecialObjectsArray.Instance.Nil; i++)
                 {
                     try
                     {
-                        var methodOOP = ctx.GetMethod(activeContext);
-                        var methodLocalId = ctx.GetLocalId(methodOOP);
-                        Console.WriteLine($"    [{i}] Context={activeContext}, Method={methodLocalId}");
+                        // Get method from context (slot 3 for MethodContext)
+                        var methodFieldIndex = ctx.GetFieldIndex("class:MethodContext", "method");
+                        var methodOOP = ctx.GetInstanceVariable(activeContext, methodFieldIndex);
 
-                        // Get sender
-                        activeContext = ctx.GetSender(activeContext);
+                        // Get context class name
+                        var contextClassName = ctx.GetClassNameForObject(activeContext);
+
+                        Console.WriteLine($"    [{i}] Context={activeContext} ({contextClassName}), Method={methodOOP}");
+
+                        // Get sender (slot 0)
+                        var senderFieldIndex = ctx.GetFieldIndex("class:MethodContext", "sender");
+                        activeContext = ctx.GetInstanceVariable(activeContext, senderFieldIndex);
                     }
                     catch (Exception ex)
                     {
