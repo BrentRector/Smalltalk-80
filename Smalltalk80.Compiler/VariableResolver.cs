@@ -73,10 +73,10 @@ namespace Smalltalk80.Compiler
             var pseudoResult = TryResolvePseudoVariable(varName);
             if (pseudoResult.HasValue)
             {
-                if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Returned at Step 1 (pseudo-var)");
+                // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Returned at Step 1 (pseudo-var)");
                 return pseudoResult.Value;
             }
-            if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Passed Step 1");
+            // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Passed Step 1");
 
             // Step 2-5: Try to resolve as temp variable using allocator (if provided)
             // This is the unified temp frame approach for method args/temps and block temps
@@ -304,12 +304,12 @@ namespace Smalltalk80.Compiler
                     );
                 }
             }
-            
-            Console.WriteLine($"[POOL VAR DEBUG] Variable '{varName}' falling through to Step 11");
-            
+
+            // Console.WriteLine($"[POOL VAR DEBUG] Variable '{varName}' falling through to Step 11");
+
             if (varName == "DefaultTab")
             {
-                Console.WriteLine($"[DEFAULT_TAB DEBUG] At Step 11, PoolVariables.ContainsKey('__HAS_POOLS__')={context.PoolVariables.ContainsKey("__HAS_POOLS__")}");
+                // Console.WriteLine($"[DEFAULT_TAB DEBUG] At Step 11, PoolVariables.ContainsKey('__HAS_POOLS__')={context.PoolVariables.ContainsKey("__HAS_POOLS__")}");
             }
             
             // Step 10c: Check for well-known system globals that should never be pool variables
@@ -375,7 +375,7 @@ namespace Smalltalk80.Compiler
             
             // Step 12: Fallback - assume global variable (will be resolved at runtime)
             // Global variables are stored as Associations in Smalltalk dictionary
-            Console.WriteLine($"[GLOBAL FALLBACK] Variable '{varName}' assumed to be global (no pool dictionaries)");
+            // Console.WriteLine($"[GLOBAL FALLBACK] Variable '{varName}' assumed to be global (no pool dictionaries)");
             return new ResolutionResult(
                 VariableType.Global,
                 -1,  // Literal index assigned by caller
