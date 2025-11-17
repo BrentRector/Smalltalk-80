@@ -238,6 +238,18 @@ Text initialize should now succeed - dictionary operations will find the correct
 
 **Commit**: `2a1d5b5` - "CRITICAL FIX: Use modulo (%) instead of bitwise AND (&) in hash algorithm"
 
+**FOLLOW-UP: Smalltalk Floored Division Semantics**
+
+Further refined to use Smalltalk `\\` (floored division) instead of C# `%` (truncated division):
+- **C# `%`**: Remainder sign follows dividend - Example: `-7 % 3 = -1`
+- **Smalltalk `\\`**: Remainder sign follows divisor - Example: `-7 \\ 3 = 2`
+
+Created `SmalltalkMath.Modulo()` matching Primitive 11 semantics. All hash implementations now use `SmalltalkMath.Modulo(hash + b, HashModulus)`.
+
+**Note**: For our inputs (positive bytes, positive modulus), results are identical, but this ensures correctness per Blue Book spec.
+
+**Commit**: `891b4aa` - "Use Smalltalk floored division semantics for hash modulo operations"
+
 ---
 
 **✅ COMPLETED: Runtime GlobalRegistry Violations Fixed**
