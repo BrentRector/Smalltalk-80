@@ -1637,7 +1637,16 @@ public partial class VirtualMachine : IPrimitiveContext
                             {
                                 var elem = _heapManager.GetIndexedOOP(associationOOP, i);
                                 var elemClass = elem.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(elem));
-                                Console.WriteLine($"    [{i}] = {elem} ({elemClass})");
+                                var elemValue = "";
+                                if (elemClass == "Symbol")
+                                {
+                                    elemValue = $" = #{GetSymbolName(elem)}";
+                                }
+                                else if (elem.IsSmallInteger)
+                                {
+                                    elemValue = $" = {elem.AsSmallInteger()}";
+                                }
+                                Console.WriteLine($"    [{i}] = {elem} ({elemClass}){elemValue}");
                             }
                         }
 
