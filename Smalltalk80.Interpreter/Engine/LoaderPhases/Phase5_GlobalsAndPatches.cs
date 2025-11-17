@@ -1022,13 +1022,13 @@ public class Phase5_GlobalsAndPatches
         int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
 
         // Smalltalk-80 hash algorithm: hash := (hash + char) \\ 16r0FFFFFFF
-        // CRITICAL: Must use MODULO (%), not bitwise AND (&), to match Smalltalk Symbol>>hash
+        // CRITICAL: Must use Smalltalk \\ (floored division), not C# % (truncated division)
         const int HashModulus = 0x0FFFFFFF; // 268435455 = 2^28 - 1
         int hash = 0;
         for (int i = 0; i < symbolLength; i++)
         {
             byte b = _heapManager.GetIndexedByte(symbolOOP, i);
-            hash = (hash + b) % HashModulus; // Modulo, NOT bitwise AND!
+            hash = SmalltalkMath.Modulo(hash + b, HashModulus); // Smalltalk \\ semantics
         }
         return hash;
     }
