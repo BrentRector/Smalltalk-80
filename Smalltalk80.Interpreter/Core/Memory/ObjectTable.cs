@@ -1,7 +1,6 @@
 namespace Smalltalk80.Interpreter.Core.Memory;
 
 using System.Runtime.CompilerServices;
-using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.HeapManager;
 
 /// <summary>
@@ -42,7 +41,7 @@ public sealed class ObjectTable
     /// </summary>
     internal sealed class ObjectTableEntry
     {
-        public ObjectMemory.ObjectData? Data { get; set; }
+        public ObjectData? Data { get; set; }
         public bool IsFree { get; set; }
 
         public ObjectTableEntry()
@@ -103,7 +102,7 @@ public sealed class ObjectTable
     /// O(1) operation using free list or next available index.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public int Allocate(ObjectMemory.ObjectData data)
+    public int Allocate(ObjectData data)
     {
         lock (_tableLock)
         {
@@ -170,7 +169,7 @@ public sealed class ObjectTable
     /// O(1) lookup.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ObjectMemory.ObjectData? Get(int index)
+    public ObjectData? Get(int index)
     {
         if (index < 0 || index >= _nextIndex)
             return null;
@@ -184,7 +183,7 @@ public sealed class ObjectTable
     /// O(1) operation.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Set(int index, ObjectMemory.ObjectData data)
+    public void Set(int index, ObjectData data)
     {
         lock (_tableLock)
         {
@@ -307,7 +306,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Traces all object references in the given ObjectData.
     /// </summary>
-    private void TraceReferences(ObjectMemory.ObjectData data, Queue<SmalltalkOOP> workList)
+    private void TraceReferences(ObjectData data, Queue<SmalltalkOOP> workList)
     {
         bool enableDetailedLogging = false; // TODO: Re-enable when RuntimeOptions is added
 
@@ -460,7 +459,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Gets all values (ObjectData) in the table.
     /// </summary>
-    public IEnumerable<ObjectMemory.ObjectData> Values
+    public IEnumerable<ObjectData> Values
     {
         get
         {
@@ -481,7 +480,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Enumerates live objects with their index and data.
     /// </summary>
-    public IEnumerable<(int index, ObjectMemory.ObjectData data)> EnumerateLiveObjects()
+    public IEnumerable<(int index, ObjectData data)> EnumerateLiveObjects()
     {
         lock (_tableLock)
         {
@@ -499,7 +498,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Provides enumeration support for foreach.
     /// </summary>
-    public IEnumerator<KeyValuePair<int, ObjectMemory.ObjectData>> GetEnumerator()
+    public IEnumerator<KeyValuePair<int, ObjectData>> GetEnumerator()
     {
         lock (_tableLock)
         {
@@ -508,7 +507,7 @@ public sealed class ObjectTable
                 var entry = GetEntry(i);
                 if (!entry.IsFree && entry.Data != null)
                 {
-                    yield return new KeyValuePair<int, ObjectMemory.ObjectData>(i, entry.Data!);
+                    yield return new KeyValuePair<int, ObjectData>(i, entry.Data!);
                 }
             }
         }
@@ -517,7 +516,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Indexer to access ObjectData by index.
     /// </summary>
-    public ObjectMemory.ObjectData? this[int index]
+    public ObjectData? this[int index]
     {
         get => Get(index);
         set
@@ -530,7 +529,7 @@ public sealed class ObjectTable
     /// <summary>
     /// Tries to remove an object at the specified index.
     /// </summary>
-    public bool TryRemove(int index, out ObjectMemory.ObjectData? data)
+    public bool TryRemove(int index, out ObjectData? data)
     {
         lock (_tableLock)
         {

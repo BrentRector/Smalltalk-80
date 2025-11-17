@@ -1,4 +1,4 @@
-namespace Smalltalk80.Interpreter.Core.Objects;
+namespace Smalltalk80.Interpreter.Core.Memory;
 
 /// <summary>
 /// Object format enumeration matching Smalltalk-80 Blue Book specification.

@@ -1,4 +1,4 @@
-using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM.Graphics;
 using Smalltalk80.Interpreter.Core.HeapManager;
