@@ -1705,20 +1705,6 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                     var valueOOP = Pop();
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
-                    // Debug TextConstants writes
-                    if (_debugOptions.ShouldDebugTextConstants)
-                    {
-                        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                        string? keyName = GetSymbolName(keyOOP);
-                        if (keyName == "TextConstants")
-                        {
-                            string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"{valueOOP}";
-                            var valueClass = GetClassName(GetClass(valueOOP));
-                            string? methodLocalId = GetLocalId(methodOOP);
-                            Console.WriteLine($"[TC-STORE] Storing to TextConstants Association (no pop): assoc={associationOOP}, value={valStr} (class={valueClass}), method={methodLocalId}");
-                        }
-                    }
-
                     _heapManager.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
                     Push(valueOOP); // Leave value on stack
                     return true;
@@ -1753,20 +1739,6 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                             $"POP_STORE_LITERAL_VAR: literal[{index}] is {literalClassName} (oop={associationOOP}), expected Association. " +
                             $"Method: {methodLocalId}, PC: {ip - 2}. " +
                             $"This likely means the compiler generated wrong bytecode (should be POP_STORE_TEMP for temp variable).");
-                    }
-
-                    // DIAGNOSTIC: Log TextConstants Association writes
-                    if (_debugOptions.ShouldDebugTextConstants)
-                    {
-                        var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                        string? keyName = GetSymbolName(keyOOP);
-                        if (keyName == "TextConstants")
-                        {
-                            string valStr = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" : $"{valueOOP}";
-                            var valueClass = GetClassName(GetClass(valueOOP));
-                            string? methodLocalId = GetLocalId(methodOOP);
-                            Console.WriteLine($"[TC-WRITE] Storing to TextConstants Association: assoc={associationOOP}, value={valStr} (class={valueClass}), method={methodLocalId}");
-                        }
                     }
 
                     // Store the value in the Association using write-barrier (runtime mode)
