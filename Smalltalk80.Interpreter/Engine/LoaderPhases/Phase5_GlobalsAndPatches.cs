@@ -869,54 +869,92 @@ public class Phase5_GlobalsAndPatches
     }
 
     /// <summary>
-    /// Installs an association in the first available slot in SystemDictionary.
+    /// Installs an association in SystemDictionary using hash-based slot finding.
+    /// CRITICAL: Must use same algorithm as Dictionary>>findKeyOrNil: so runtime lookups work!
     /// </summary>
     private void InstallAssociationInSystemDictionary(SmalltalkOOP associationOOP, string globalName)
     {
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
-
-        int usedSlots = 0;
         var nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // Find first nil slot in SystemDictionary
-        for (int i = 0; i < systemDictSize; i++)
-        {
-            var slotOOP = _allocator.GetIndexedOOP(systemDictOOP, i);
+        // Get the key symbol from the Association (slot 0)
+        var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
 
-            if (slotOOP == nilOOP || slotOOP == SmalltalkOOP.Null)
+        // Use hash-based lookup to find correct slot (same algorithm as Dictionary>>findKeyOrNil:)
+        // Smalltalk: location _ key hash \\ length + 1 (then convert to 0-based index)
+        int hash = GetSymbolHash(keySymbolOOP);
+        int location = (hash % systemDictSize + systemDictSize) % systemDictSize; // Handle negative hash
+
+        // Probe for nil slot or matching key (linear probing)
+        int pass = 1;
+        int startLocation = location;
+        bool incrementTally = true; // Only increment if adding NEW association
+
+        while (true)
+        {
+            var probe = _allocator.GetIndexedOOP(systemDictOOP, location);
+
+            if (probe == nilOOP || probe == SmalltalkOOP.Null)
             {
-                // Found empty slot - handle both nil and any uninitialized cases during architectural transition
-                _allocator.SetIndexedOOP(systemDictOOP, i, associationOOP);
-                
-                // CRITICAL: Increment tally to reflect the new association
-                // SystemDictionary inherits 'tally' instance variable from Set (index 0)
-                var currentTallyOOP = _allocator.GetInstanceVariable(systemDictOOP, 0);
-                
-                // DEBUG: Check what we're reading
-                if (!currentTallyOOP.IsSmallInteger)
+                // Found empty slot - install association
+                _allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
+
+                // Increment tally to reflect the new association
+                if (incrementTally)
                 {
-                    Console.WriteLine($"[TALLY ERROR] Installing '{globalName}': tally is not a SmallInteger!");
-                    Console.WriteLine($"  SystemDict OOP: {systemDictOOP}");
-                    Console.WriteLine($"  Tally OOP: {currentTallyOOP}");
-                    Console.WriteLine($"  Tally is SmallInteger: {currentTallyOOP.IsSmallInteger}");
-                    Console.WriteLine($"  Tally is ObjectPointer: {currentTallyOOP.IsObjectPointer}");
-                    throw new InvalidOperationException($"SystemDictionary tally is not a SmallInteger when installing '{globalName}'. Tally OOP: {currentTallyOOP}");
+                    var currentTallyOOP = _allocator.GetInstanceVariable(systemDictOOP, 0);
+
+                    if (!currentTallyOOP.IsSmallInteger)
+                    {
+                        throw new InvalidOperationException($"SystemDictionary tally is not a SmallInteger when installing '{globalName}'. Tally OOP: {currentTallyOOP}");
+                    }
+
+                    int currentTally = currentTallyOOP.AsSmallInteger();
+                    int newTally = currentTally + 1;
+                    _allocator.SetInstanceVariable(systemDictOOP, 0, SmalltalkOOP.FromSmallInteger(newTally));
                 }
-                
-                int currentTally = currentTallyOOP.AsSmallInteger();
-                int newTally = currentTally + 1;
-                _allocator.SetInstanceVariable(systemDictOOP, 0, SmalltalkOOP.FromSmallInteger(newTally));
-                
+
                 return;
             }
-            else
+
+            // Check if Association with same key already exists
+            var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+            if (probeKeyOOP == keySymbolOOP)
             {
-                usedSlots++;
+                // Slot already contains Association for this key - update it
+                _allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
+                incrementTally = false; // Don't increment tally for replacements
+                return;
+            }
+
+            // Linear probe to next slot
+            location = (location + 1) % systemDictSize;
+
+            // Check if we've wrapped around
+            if (location == startLocation)
+            {
+                pass++;
+                if (pass > 2)
+                {
+                    throw new InvalidOperationException($"SystemDictionary is full - cannot install {globalName} association after 2 passes");
+                }
             }
         }
+    }
 
-        throw new InvalidOperationException($"SystemDictionary is full - cannot install {globalName} global variable (all {systemDictSize} slots occupied)");
+    private int GetSymbolHash(SmalltalkOOP symbolOOP)
+    {
+        // Get symbol string for hashing
+        var symbolChars = _heapManager.GetIndexedBytes(symbolOOP);
+
+        // Smalltalk-80 hash algorithm for strings (simplified)
+        int hash = 0;
+        foreach (byte b in symbolChars)
+        {
+            hash = (hash + b) & 0x0FFFFFFF; // Keep in SmallInteger range
+        }
+        return hash;
     }
 
     /// <summary>

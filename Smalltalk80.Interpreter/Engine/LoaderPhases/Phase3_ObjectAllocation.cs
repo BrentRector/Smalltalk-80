@@ -422,7 +422,8 @@ public class Phase3_ObjectAllocation
     }
 
     /// <summary>
-    /// Installs an association in SystemDictionary using semantic slot finding.
+    /// Installs an association in SystemDictionary using hash-based slot finding.
+    /// CRITICAL: Must use same algorithm as Dictionary>>findKeyOrNil: so runtime lookups work!
     /// </summary>
     private void InstallAssociationInSystemDictionary(SmalltalkOOP associationOOP, string name)
     {
@@ -430,19 +431,64 @@ public class Phase3_ObjectAllocation
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // Find first available nil slot
-        for (int i = 0; i < systemDictSize; i++)
+        // Get the key symbol from the Association (slot 0)
+        var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
+
+        // Use hash-based lookup to find correct slot (same algorithm as Dictionary>>findKeyOrNil:)
+        // Smalltalk: location _ key hash \\ length + 1 (then convert to 0-based index)
+        int hash = GetSymbolHash(keySymbolOOP);
+        int location = (hash % systemDictSize + systemDictSize) % systemDictSize; // Handle negative hash
+
+        // Probe for nil slot or matching key (linear probing)
+        int pass = 1;
+        int startLocation = location;
+        while (true)
         {
-            var slotOOP = _allocator.GetIndexedOOP(systemDictOOP, i);
-            if (slotOOP == nilOOP)
+            var probe = _allocator.GetIndexedOOP(systemDictOOP, location);
+
+            if (probe == nilOOP)
             {
                 // Found empty slot - install association
-                _allocator.SetIndexedOOP(systemDictOOP, i, associationOOP);
+                _allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
                 return;
             }
-        }
 
-        throw new InvalidOperationException($"SystemDictionary is full - cannot install {name} association");
+            // Check if Association with same key already exists
+            var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+            if (probeKeyOOP == keySymbolOOP)
+            {
+                // Slot already contains Association for this key - update it
+                _allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
+                return;
+            }
+
+            // Linear probe to next slot
+            location = (location + 1) % systemDictSize;
+
+            // Check if we've wrapped around
+            if (location == startLocation)
+            {
+                pass++;
+                if (pass > 2)
+                {
+                    throw new InvalidOperationException($"SystemDictionary is full - cannot install {name} association after 2 passes");
+                }
+            }
+        }
+    }
+
+    private int GetSymbolHash(SmalltalkOOP symbolOOP)
+    {
+        // Get symbol string for hashing
+        var symbolChars = _heapManager.GetIndexedBytes(symbolOOP);
+
+        // Smalltalk-80 hash algorithm for strings (simplified)
+        int hash = 0;
+        foreach (byte b in symbolChars)
+        {
+            hash = (hash + b) & 0x0FFFFFFF; // Keep in SmallInteger range
+        }
+        return hash;
     }
 
     /// <summary>
