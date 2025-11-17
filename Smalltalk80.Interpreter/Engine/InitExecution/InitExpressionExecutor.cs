@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using Smalltalk80.Interpreter.Core.Memory;
-
 using System.Text.Json;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;

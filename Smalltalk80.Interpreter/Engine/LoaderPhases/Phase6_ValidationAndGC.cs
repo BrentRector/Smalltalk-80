@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
