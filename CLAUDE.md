@@ -209,6 +209,66 @@ cp ../bin/Debug/net9.0/coldstart.json ../bin/Debug/net9.0/coldstart_with_runner.
 
 ---
 
+## Recent Work (2025-11-17)
+
+**✅ COMPLETED: Runtime GlobalRegistry Violations Fixed**
+
+Successfully identified and eliminated all runtime GlobalRegistry access violations, ensuring clean separation between cold start infrastructure and runtime execution.
+
+**Issues Fixed**:
+
+1. **RuntimeHeapAccess.LookupGlobalByName** (lines 146-226):
+   - **Problem**: Used O(n) linear search through entire SystemDictionary
+   - **Solution**: Implemented O(1) hash-based lookup matching Dictionary>>findKeyOrNil: algorithm
+   - **Impact**: Massive performance improvement for ~500 entry SystemDictionary lookups
+
+2. **VirtualMachine.cs Runtime Violations** (4 instances):
+   - Line 1148: `GlobalRegistry.LookupClassOOP("Array")` → `_runtimeHeapAccess.GetClass("Array")`
+   - Line 1161: `GlobalRegistry.LookupClassOOP("Symbol")` → `_runtimeHeapAccess.GetClass("Symbol")`
+   - Line 1175: `GlobalRegistry.LookupClassOOP("Dictionary")` → `_runtimeHeapAccess.GetClass("Dictionary")`
+   - Line 4508: `GlobalRegistry.Get("Undeclared")` → `_runtimeHeapAccess.LookupGlobalByName(systemDictOOP, "Undeclared")`
+
+**Hash Algorithm Implementation**:
+```csharp
+private int ComputeSymbolHashFromString(string symbolName)
+{
+    byte[] bytes = Encoding.Latin1.GetBytes(symbolName);
+    int hash = 0;
+    foreach (byte b in bytes)
+    {
+        hash = (hash + b) & 0x0FFFFFFF;
+    }
+    return hash;
+}
+```
+
+**Verified Acceptable GlobalRegistry Usage**:
+- VirtualMachine.cs:192 - USTable lookup during VM initialization (cold start only, documented)
+- VirtualMachine.cs:2919 - objectIdToLocalId lookup (VM metadata, not Smalltalk data, documented)
+
+**Compilation Fixes**:
+- Phase3_ObjectAllocation.cs:483 - Fixed GetSymbolHash() to use GetIndexedByte() instead of non-existent GetIndexedBytes()
+- Phase5_GlobalsAndPatches.cs:1022 - Fixed GetSymbolHash() to use GetIndexedByte() instead of non-existent GetIndexedBytes()
+- Phase3_ObjectAllocation.cs:1361 - Fixed to use AssociationRegistry.GetAll()[key] instead of non-existent Get() method
+
+**Files Modified**:
+- `RuntimeHeapAccess.cs:146-226` - Hash-based lookup + ComputeSymbolHashFromString()
+- `VirtualMachine.cs:1148,1161,1175,4509` - Replaced 4 GlobalRegistry calls
+- `Phase3_ObjectAllocation.cs:483,1361` - Fixed GetSymbolHash() and AssociationRegistry access
+- `Phase5_GlobalsAndPatches.cs:1022` - Fixed GetSymbolHash()
+
+**Commits**:
+- `4f823e8` - "Fix runtime GlobalRegistry violations and optimize dictionary lookups"
+- `cf03359` - "Fix compilation errors from hash-based lookup changes"
+
+**Impact**:
+✅ Clean separation between cold start (GlobalRegistry) and runtime (Smalltalk heap only)
+✅ All dictionary operations now use consistent hash-based lookup algorithm
+✅ O(1) performance for global variable lookups
+✅ Matches Smalltalk-80 Dictionary semantics exactly
+
+---
+
 ## Recent Work (2025-11-14)
 
 **BlockContext Test Suite Validation - COMPREHENSIVE TESTING**:
