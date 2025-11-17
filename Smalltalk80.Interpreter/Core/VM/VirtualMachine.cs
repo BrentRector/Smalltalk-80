@@ -1669,7 +1669,7 @@ public partial class VirtualMachine : IPrimitiveContext
 
                             // Verify it's actually an Association
                             var varAssocClass = GetClassName(GetClass(variableAssocOOP));
-                            var instanceVarCount = _heapManager.GetInstanceSize(variableAssocOOP);
+                            var instanceVarCount = _heapManager.GetInstanceVariableCount(variableAssocOOP);
                             if (varAssocClass != "Association")
                             {
                                 throw new InvalidOperationException(
