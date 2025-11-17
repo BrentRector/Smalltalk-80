@@ -996,6 +996,14 @@ public class Phase5_GlobalsAndPatches
     }
 
     /// <summary>
+    /// Gets the identity hash of a Symbol using Primitive 75 semantics (oop >> 1).
+    /// </summary>
+    private int GetSymbolHash(SmalltalkOOP symbolOOP)
+    {
+        return VMUtilities.ComputeIdentityHash(symbolOOP);
+    }
+
+    /// <summary>
     /// Gets the symbol OOP for a given symbol name.
     /// </summary>
     private SmalltalkOOP GetSymbolOOP(string symbolName)
