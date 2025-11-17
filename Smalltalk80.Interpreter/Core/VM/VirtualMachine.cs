@@ -2,7 +2,6 @@ using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Attributes;
 
 namespace Smalltalk80.Interpreter.Core.VM;
@@ -4030,7 +4029,7 @@ public partial class VirtualMachine : IPrimitiveContext
         int instVarCount = _layoutResolver.GetInstanceVariableCount("class:Dictionary");
 
         var dictOOP = _heapManager.AllocateObject(
-            Smalltalk80.Interpreter.Core.Objects.ObjectFormat.PointerIndexed,
+            ObjectFormat.PointerIndexed,
             instVarCount,
             initialSize
         );
