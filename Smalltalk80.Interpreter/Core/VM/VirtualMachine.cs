@@ -1637,6 +1637,11 @@ public partial class VirtualMachine : IPrimitiveContext
                             var poolDictName = GetSymbolName(poolDictNameOOP);
                             var varName = GetSymbolName(varNameOOP);
 
+                            if (poolDictName == null || varName == null)
+                            {
+                                throw new InvalidOperationException($"PUSH_LITERAL_VAR: Qualified pool variable Array must contain Symbols");
+                            }
+
                             // Look up pool dictionary in Smalltalk SystemDictionary
                             var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
                             var poolDictAssocOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, poolDictName);
