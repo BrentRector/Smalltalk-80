@@ -536,12 +536,6 @@ public class Phase3_ObjectAllocation
                 // Update existing Association
                 _allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
 
-                // Debug: Log replacement at slot 33
-                if (location == 33)
-                {
-                    Console.WriteLine($"[PHASE3-SLOT33] REPLACED '{name}' at slot 33: old={probe}, new={associationOOP}");
-                }
-
                 incrementTally = false;
                 return;
             }
