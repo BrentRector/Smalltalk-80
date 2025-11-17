@@ -248,20 +248,11 @@ public class Phase3_ObjectAllocation
             _allocator.SetInstanceVariable(undeclaredOOP, tallyIndex, zeroOOP);
         }
 
-        // Register in GlobalRegistry
+        // Register in GlobalRegistry (Association will be created in Phase 3.5)
         GlobalRegistry.Register("Undeclared", undeclaredOOP);
 
-        // Add to Smalltalk dictionary
-        var undeclaredSymbol = InternSymbol("Undeclared");
-        var undeclaredAssoc = AllocateAssociationWithSemanticAllocator(undeclaredSymbol, undeclaredOOP);
-        InstallAssociationInSystemDictionary(undeclaredAssoc, "Undeclared");
-
-        // CRITICAL: Register in AssociationRegistry so Phase 4 method literals can reference it
-        // This ensures method literals that reference "Undeclared" get the correct Association (not a new one with nil value)
-        AssociationRegistry.GetOrCreate("Undeclared", () => undeclaredAssoc);
-
         Console.WriteLine($"  Created Undeclared dictionary (OOP={undeclaredOOP}, capacity={initialCapacity}, undeclared count={undeclaredCount})");
-        Console.WriteLine($"  Undeclared Association: key={undeclaredSymbol}, value={undeclaredOOP}, assoc={undeclaredAssoc}");
+        Console.WriteLine($"  Registered in GlobalRegistry - Association will be created in Phase 3.5");
     }
 
     /// <summary>
@@ -1251,14 +1242,10 @@ public class Phase3_ObjectAllocation
         var nilOOP = SpecialObjectsArray.Instance.Nil;
         int createdCount = 0;
         int skippedClasses = 0;
-        int skippedSpecialGlobals = 0;
+        int withPreCreatedValues = 0;
 
         // Build set of class names to exclude (these will be installed in SystemDictionary by Phase 5)
         var classNames = new HashSet<string>(_bundle.Classes.Select(c => _symbols[c.NameIndex]));
-
-        // Special globals that are created explicitly in Phase 3 (with correct values)
-        // Skip these to avoid creating duplicate Associations with nil values
-        var specialGlobals = new HashSet<string> { "Undeclared", "Smalltalk" };
 
         foreach (var undeclaredVar in _bundle.Undeclared)
         {
@@ -1270,14 +1257,6 @@ public class Phase3_ObjectAllocation
                 continue;
             }
 
-            // CRITICAL: Skip special globals that are created explicitly in Phase 3 with correct values
-            // Creating them here would create duplicate Associations with nil values
-            if (specialGlobals.Contains(undeclaredVar.Key))
-            {
-                skippedSpecialGlobals++;
-                continue;
-            }
-
             // Get symbol OOP for the key
             SmalltalkOOP keySymbolOOP = InternSymbol(undeclaredVar.Key);
 
@@ -1285,8 +1264,20 @@ public class Phase3_ObjectAllocation
             // This ensures Phase 4 and Phase 5 will get the SAME Association object
             AssociationRegistry.GetOrCreate(undeclaredVar.Key, () =>
             {
-                // Create new Association with key and nil value
-                return AllocateAssociationWithSemanticAllocator(keySymbolOOP, nilOOP);
+                // Check if this global has a pre-created object in GlobalRegistry
+                // (e.g., Undeclared, Smalltalk, ProcessorScheduler created in Phase 3)
+                SmalltalkOOP valueOOP;
+                if (GlobalRegistry.TryGet(undeclaredVar.Key, out var preCreatedValue))
+                {
+                    valueOOP = preCreatedValue;  // Use the pre-created object
+                    withPreCreatedValues++;
+                }
+                else
+                {
+                    valueOOP = nilOOP;  // Default to nil for truly undeclared variables
+                }
+
+                return AllocateAssociationWithSemanticAllocator(keySymbolOOP, valueOOP);
             });
 
             createdCount++;
@@ -1294,14 +1285,14 @@ public class Phase3_ObjectAllocation
 
         Console.WriteLine($"  ✓ Pre-created {createdCount} canonical Associations");
         Console.WriteLine($"  ✓ Skipped {skippedClasses} class names (will be installed directly in SystemDictionary)");
-        Console.WriteLine($"  ✓ Skipped {skippedSpecialGlobals} special globals (created explicitly in Phase 3)");
+        Console.WriteLine($"  ✓ Used pre-created values from GlobalRegistry for {withPreCreatedValues} globals");
         Console.WriteLine($"  ✓ AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations");
 
         // Show sample
         if (createdCount > 0)
         {
             var actuallyCreated = _bundle.Undeclared
-                .Where(u => !classNames.Contains(u.Key) && !specialGlobals.Contains(u.Key))
+                .Where(u => !classNames.Contains(u.Key))
                 .Take(5);
             Console.WriteLine($"  Sample pre-created undeclared Associations:");
             foreach (var uv in actuallyCreated)
