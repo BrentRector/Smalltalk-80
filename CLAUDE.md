@@ -1,16 +1,16 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-15
+**Last Updated**: 2025-11-17
 
 ## Project Status
 
 **Interpreter Status**: ✅ **FULLY OPERATIONAL**
 
-- **Build**: 0 errors, 1 warning (353 undeclared variables in source)
+- **Build**: 0 errors, 0 warnings
 - **Cold Start**: Phase 1-6 all succeed
-- **Init Expressions**: 30/46 succeed (65% success rate - updated 2025-11-14)
-  - ✅ 30 passing (all essential system classes)
-  - ⏭️ 16 skipped (require GUI/process/file I/O primitives not available at bootstrap)
+- **Init Expressions**: 31/46 succeed (67% success rate - updated 2025-11-17)
+  - ✅ 31 passing (all essential system classes including Text)
+  - ⏭️ 15 skipped (require GUI/process/file I/O primitives not available at bootstrap)
 - **BlockContext Tests**: ✅ **194/194 tests PASS** (validated 2025-11-14)
 - **Instruction Counter**: ✅ Fixed to count bytecode opcodes (was counting interpreter loop iterations)
 - **VM Core**: Fully functional, verified operational
@@ -53,12 +53,12 @@ dotnet run
 
 This executes:
 - Cold start phases 1-6
-- 30 initialize expressions in dependency order
-- Skips 16 init expressions requiring GUI/process/file I/O primitives
+- 31 initialize expressions in dependency order
+- Skips 15 init expressions requiring GUI/process/file I/O primitives
 
-### Init Expression Status (30/46 passing - updated 2025-11-14)
+### Init Expression Status (31/46 passing - updated 2025-11-17)
 
-**✅ Passing (30)**:
+**✅ Passing (31)**:
 All essential system classes initialize successfully:
 - Character, Float, SmallInteger (numeric/character basics)
 - BinaryChoiceView (GUI foundation)
@@ -67,13 +67,13 @@ All essential system classes initialize successfully:
 - File, FileDirectory, WindowsFileDirectory, WindowsFileSystem (file system)
 - InputSensor, InputState (input handling)
 - InstructionStream, Scanner, MessageNode, ParseNode (compiler)
-- Paragraph, StringHolder, Symbol (text/string support)
+- Paragraph, StringHolder, Symbol, **Text** (text/string support)
 - ProcessorScheduler, Project (process management)
 - SystemDictionary, SystemTracer (system globals)
 - Debugger (debugging support)
 - LargePositiveInteger, LargeNegativeInteger (large integer arithmetic)
 
-**⏭️ Skipped (16 - require runtime features not available at bootstrap)**:
+**⏭️ Skipped (15 - require runtime features not available at bootstrap)**:
 
 *GUI/PopUpMenu infrastructure (10)*:
 - BitEditor, ChangeListController, FormEditor, NotifierController
@@ -87,36 +87,33 @@ All essential system classes initialize successfully:
 *Complex initialization issues (4)*:
 - Form (infinite loop 4M+ instructions)
 - Object (GUI: confirm: needs Sensor cursorPoint)
-- Text (❌ Method not found: aNumber in class Symbol at 21K instructions)
 - TextList (infinite loop 500K+ instructions)
 - VariableNode (infinite loop 500K+ instructions)
 
-**✅ FIXED: Association Class Pointer Bug (2025-11-14)**
+**✅ FIXED: TextConstants Pool Dictionary Creation (2025-11-17)**
 
-**Original Bug**:
-- Text class>>initialize failed with "Method not found: value in class 0"
-- OOP 13508 (an Association) had classOOP=0 instead of valid Association class pointer
-- Allocated at runtime in Phase 3 (`CreateUndeclaredDictionary()`) but class pointer never set
+**The Bug**:
+- Text class>>initialize failed with primitive failure when executing `TextConstants at: #CaretForm put: ...`
+- Error: "[AtPut PRIMITIVE FAIL] Non-integer index" - receiver was nil instead of Dictionary
 
 **Root Cause**:
-- Phase 3 creates runtime Associations (Undeclared, pool dictionaries) via `AllocateAssociationWithSemanticAllocator()`
-- `AllocateFixedObject()` allocates objects but does NOT set class pointers (by design during cold start)
-- `SetClassReferencesForAllObjects()` only scanned `_localIdToObjectId` (bundle objects)
-- Runtime-allocated Associations not in `_localIdToObjectId` → class pointers never set
+- Phase 5 was pre-creating TextConstants Association with value=nil during pool dictionary initialization
+- Text>>initialize checks `(Smalltalk includes: #TextConstants)` before creating the Dictionary
+- Since Association existed (value=nil), the check returned true and Dictionary was never created
+- Code tried to execute `nil at: #CaretForm put: ...` → primitive failure
 
 **The Fix**:
-- Added `SetAssociationClassReferences()` in Phase3_ObjectAllocation.cs:663-704
-- Scans ENTIRE heap via `EnumerateObjectTable()` (not just `_localIdToObjectId`)
-- Identifies Associations by signature: Pointer format + 2 instance vars + 0 indexed size
-- Sets classOOP to Association class for all Associations with unset class pointers
+- Modified Phase5_GlobalsAndPatches.cs:771-775 to SKIP TextConstants during cold start
+- Added explicit check to skip pool dictionaries that have init expressions
+- Text>>initialize now creates TextConstants Dictionary at runtime as intended
 
 **Files Modified**:
-- `Phase3_ObjectAllocation.cs:648-704` - Added `SetAssociationClassReferences()` method and call
-- `Program.cs:201` - Uncommented "Text initialize" (now passes classOOP=0 check)
+- `Phase5_GlobalsAndPatches.cs:768-775` - Added skip logic for TextConstants
 
 **Result**:
-- Text initialize now runs successfully past classOOP=0 check (21K+ instructions before hitting different issue)
-- All runtime-allocated Associations now have valid class pointers
+- ✅ Text initialize now runs successfully - 86,221 instructions, no errors
+- ✅ TextConstants Dictionary created and populated with pool variables
+- ✅ Init expression success rate improved from 30/46 (65%) to 31/46 (67%)
 
 ### With Essential Init Expressions Only
 
@@ -210,6 +207,33 @@ cp ../bin/Debug/net9.0/coldstart.json ../bin/Debug/net9.0/coldstart_with_runner.
 ---
 
 ## Recent Work (2025-11-17)
+
+**✅ COMPLETED: TextConstants Pool Dictionary Fix (2025-11-17)**
+
+Successfully fixed Text class>>initialize failure by preventing Phase 5 from pre-creating TextConstants pool dictionary during cold start.
+
+**Problem**:
+- Text>>initialize includes guard code: `(Smalltalk includes: #TextConstants) ifFalse: [Smalltalk at: #TextConstants put: (Dictionary new: 32)]`
+- Phase 5 was pre-creating TextConstants Association with value=nil
+- Guard returned true, Dictionary never created
+- Subsequent `TextConstants at: #CaretForm put: ...` tried to send at:put: to nil → primitive failure
+
+**Solution**:
+- Added skip logic in Phase5_GlobalsAndPatches.cs:768-775
+- TextConstants now created at runtime by Text>>initialize as source code intends
+- Follows same pattern as CharacterBlock pool dictionary creation
+
+**Result**:
+- ✅ Text initialize: 86,221 instructions, SUCCESS
+- ✅ Init expressions: 31/46 passing (67% success rate, up from 30/46)
+- ✅ All pool variables (CaretForm, DefaultTab, etc.) properly initialized
+
+**Files Modified**:
+- `Phase5_GlobalsAndPatches.cs:768-775` - Skip TextConstants during cold start
+
+---
+
+## Recent Work (2025-11-17) - Hash Algorithm Fixes
 
 **🔴 CRITICAL FIX: Hash Algorithm Modulo vs Bitwise AND (2025-11-17)**
 
@@ -343,282 +367,6 @@ private int ComputeSymbolHashFromString(string symbolName)
 ✅ O(1) performance for global variable lookups
 ✅ Matches Smalltalk-80 Dictionary semantics exactly
 
----
-
-## Recent Work (2025-11-14)
-
-**BlockContext Test Suite Validation - COMPREHENSIVE TESTING**:
-
-Completed exhaustive validation of the BlockContext implementation against a 194-test comprehensive suite.
-
-**Test Validation Status**: ✅ **ALL 194 TESTS PASS**
-
-**Test Categories Verified** (20 categories):
-- **s*** (9): Single-level blocks - varying arg/temp combinations
-- **t*** (81): Two-level nested blocks - all combinations
-- **n*** (27): Three-level nested blocks - complex patterns
-- **m*** (6): Method multi-temp access from nested blocks
-- **mut*** (3): Temp mutation from blocks
-- **ma*** (6): Method argument access from nested blocks
-- **rw*** (5): Real-world patterns (whileTrue:, whileFalse:, do:, select:)
-- **e*** (7): Edge cases (empty blocks, multiple blocks, etc.)
-- **nlr*** (3): Non-local returns
-- **stress*** (3): Max nesting, complex mutation, shadowing
-- **bl*** (2): Block lifetime and storage
-- **cf*** (2): Control flow (early exit, recursion)
-- **iv*** (10): Instance variable access from blocks
-- **cv*** (5): Class variable access from blocks
-- **pv*** (3): Pool variable access from blocks
-- **gv*** (5): Global variable access from blocks
-- **ps*** (5): Pseudo-variables (self, true, false, nil, super)
-- **mx*** (5): Mixed variable types
-- **es*** (2): Self-modifying and mixed access patterns
-- **sd*** (1): Deep nesting (10 levels)
-
-**Key Achievements**:
-✅ All nested block patterns (1-3 levels) work correctly  
-✅ Real-world control structures fully operational  
-✅ Variable mutations from nested blocks work correctly  
-✅ Method argument access from nested blocks works correctly  
-✅ All variable types accessible from blocks (IV/CV/PV/Global)  
-✅ Non-local returns work correctly  
-✅ Complex stress tests pass  
-
-**Test Result**: `BlockContextTest>>testAllCombinations` returns **3503** (expected)
-
-**Documentation Updated**:
-- `docs/Block-Context-And-Variable-Access-COMPREHENSIVE.md` - Added Appendix A.1 with complete test results table
-- `CLAUDE.md` - Updated project status to reflect test validation
-
-**Architecture Validation**: The unified temp frame architecture is **proven correct** and fully operational for all block and variable access patterns.
-
----
-
-## Recent Work (2025-11-15)
-
-**✅ COMPLETED: Optimized Windows Forms Window Creation Timing**
-
-Successfully moved the Windows Forms display window creation to occur immediately after cold start Phase 6, before init expressions execute. This improves the user experience by preparing the window early while still showing it after init expressions complete.
-
-**Changes Made**:
-1. **Early Window Creation**: Window now created after Phase 6 (line 106-109 in Program.cs)
-2. **Delayed Display**: Window shown after init expressions complete (line 529-530)
-3. **Event Loop**: Application.Run() moved to end (line 657-660)
-
-**Architecture Flow**:
-```
-Cold Start Phases 1-6
-  ↓
-Create WinFormsDisplayProvider (hidden)
-  ↓
-Run GC after cold start
-  ↓
-Execute 30 init expressions (Display global available)
-  ↓
-Show window (displayProvider.Show())
-  ↓
-Execute user expression (if --execute flag)
-  ↓
-Enter Windows Forms event loop (Application.Run())
-```
-
-**Files Modified**:
-- `Smalltalk80.Interpreter/Program.cs:106-109` - Early window creation
-- `Smalltalk80.Interpreter/Program.cs:529-530` - Show window after init expressions
-- `Smalltalk80.Interpreter/Program.cs:657-660` - Event loop at end
-
-**Testing Results**:
-- ✅ Window creation succeeds
-- ✅ 30/46 init expressions still pass (no regressions)
-- ❌ Text initialize still fails with "Method not found: aNumber in class Symbol" (Display global did NOT fix this)
-- ❌ Other disabled init expressions remain disabled (still require GUI/process primitives)
-
-**Impact**: Display global exists during init expressions, but does NOT enable any new init expressions to pass. Text initialize failure is NOT related to Display missing - it's a separate method lookup bug in Symbol class.
-
----
-
-## Recent Work (2025-11-14)
-
-**✅ COMPLETED: Association Class Pointer Bug Fix**
-
-Successfully identified and fixed critical classOOP=0 bug affecting runtime-allocated Associations.
-
-**Bug Fixed**:
-- Phase 3 runtime Associations (Undeclared, pool dictionaries) had classOOP=0
-- `AllocateFixedObject()` doesn't set class pointers (by design during cold start)
-- `SetClassReferencesForAllObjects()` only scanned `_localIdToObjectId` (bundle objects)
-- Runtime Associations weren't in `_localIdToObjectId` → class pointers never set
-
-**Solution Implemented**:
-- Added `SetAssociationClassReferences()` in Phase3_ObjectAllocation.cs:663-704
-- Scans entire heap via `_heapManager.EnumerateObjectTable()`
-- Identifies Associations by signature: Pointer format + 2 instance vars + 0 indexed
-- Sets classOOP for all Associations with unset class pointers
-
-**Files Modified**:
-- Phase3_ObjectAllocation.cs:648-704
-- SmalltalkHeapManager.cs (removed debug code)
-- Program.cs:201 (updated Text skip comment)
-- CLAUDE.md (documented fix)
-
-**Impact**: Text initialize now runs 21K+ instructions (was 98), all 30 passing init expressions still pass
-
----
-
-**✅ COMPLETED: Display Global Implementation (2025-11-14)**
-
-Successfully implemented Display global as an instance of DisplayScreen (Form subclass) to support init expressions that require Display width/height.
-
-**Implementation Details**:
-- **Class**: DisplayScreen (Form subclass)
-- **Instance Variables**:
-  - `bits`: DisplayBitmap (WordArray subclass) - empty bitmap for bootstrap
-  - `width`: 640 pixels (SmallInteger)
-  - `height`: 480 pixels (SmallInteger)
-  - `offset`: Point (0@0)
-- **Location**: Phase5_GlobalsAndPatches.cs:1216-1327 (CreateDisplay method)
-- **Call Site**: Phase5_GlobalsAndPatches.cs:70 (Run method, after CreateDefaultTextStyle)
-
-**Architecture**:
-- Display is a stub object with empty bitmap (0 words)
-- Sufficient for init expressions that only read width/height methods
-- Follows same pattern as CreateDefaultTextStyle (established Phase 5 pattern)
-- Display installed as global variable in SystemDictionary
-- No primitives required - all dependencies already exist in system
-
-**Files Modified**:
-- `Phase5_GlobalsAndPatches.cs:1216-1327` - Added CreateDisplay() method
-- `Phase5_GlobalsAndPatches.cs:70` - Added CreateDisplay() call
-- `CLAUDE.md` - Documented implementation
-
-**Actual Impact**:
-- **Display global**: ✅ Created successfully with 640x480 DisplayBitmap (38,400 bytes)
-- **Text initialize**: Display width check passed, but exposed new bug at 21K instructions
-- **New Error**: "Method not found: aNumber in class Symbol" (method lookup issue in Symbol class)
-- **Success Rate**: Remains 30/46 passing (Text re-disabled to allow GUI to appear)
-
-**Files Modified**:
-- `Phase5_GlobalsAndPatches.cs:1216-1327` - Added CreateDisplay() method
-- `Phase5_GlobalsAndPatches.cs:70` - Added CreateDisplay() call
-- `Program.cs:207` - Re-added Text initialize to skip list after discovering aNumber bug
-- `CLAUDE.md` - Documented implementation
-
-**Next Steps**:
-- Investigate Symbol class method lookup for "aNumber" (required by Text initialize)
-- GUI window should now appear successfully with 30/46 init expressions passing
-
----
-
-**✅ COMPLETED: Windows Forms GUI Implementation (2025-11-14)**
-
-Successfully implemented Windows Forms display window to visualize the Smalltalk-80 display buffer.
-
-**Implementation Details**:
-- **Framework**: Windows Forms (net9.0-windows)
-- **Display Size**: 640x480 pixels
-- **Bitmap Format**: 1-bit monochrome (38,400 bytes)
-- **Architecture**: Double-buffered rendering with MSB-first encoding
-- **Files Created**:
-  - `WinFormsDisplayProvider.cs` - Display window implementation
-  - Modified `Smalltalk80.Interpreter.csproj` - Windows Forms support
-  - Modified `Program.cs` - [STAThread], Application.Run() integration
-
-**Key Features**:
-- Real-time bitmap rendering from Smalltalk Display.bits
-- Monochrome palette (0=white, 1=black)
-- Double-buffered graphics for smooth updates
-- DisplayBuffer exposed as Memory<byte> for VM integration
-
-**Project Configuration**:
-- Target framework: net9.0-windows
-- Output type: Exe (console + GUI)
-- Windows Forms enabled
-- System.Drawing.Common package reference
-
-**Status**: ✅ Build successful (0 errors, 0 warnings)
-
-**Expected Behavior**:
-After init expressions complete (30/46 passing), the 640x480 Smalltalk-80 Display window will appear and enter the Windows Forms event loop.
-
-**Files Modified**:
-- `Smalltalk80.Interpreter.csproj` - Changed to net9.0-windows, added Windows Forms
-- `Smalltalk80.Interpreter.Tests.csproj` - Updated to net9.0-windows for compatibility
-- `WinFormsDisplayProvider.cs` - Created display window implementation
-- `Program.cs:1-30, 654-666` - Added [STAThread] and Windows Forms initialization
-
----
-
-## Init Expression Validation Results (2025-01-14 - SUPERSEDED by 2025-11-14)
-
-### Summary
-- **Total Attempted**: 29 initialize expressions
-- **Succeeded**: 29 (100%)
-- **Failed**: 0
-- **Skipped**: 5 (known issues)
-
-**NOTE**: This section is superseded by the 2025-11-14 work above which tested 46 total expressions.
-
-### Successful Init Expressions (29)
-1. Character, Float, SmallInteger (essential)
-2. BinaryChoiceView, ClassOrganizer, CompiledMethod
-3. Cursor, Date, Debugger, Decompiler
-4. Explainer, FileDirectory
-5. InputSensor, InputState, InstructionStream
-6. LargeNegativeInteger, LargePositiveInteger
-7. MessageNode, Paragraph, ParseNode
-8. ProcessorScheduler, Project
-9. Scanner, StringHolder, Symbol
-10. SystemDictionary, SystemTracer
-11. WindowsFileDirectory, WindowsFileSystem
-
-### Skipped Init Expressions (5)
-
-**Infinite Loops** (Dictionary initialization issues):
-1. `File initialize` - 1M+ instructions, Dictionary creation loop
-2. `Form initialize` - 4M+ instructions
-3. `TextList initialize` - 100K+ instructions
-
-**Other Issues**:
-4. `Object initialize` - Requires interactive GUI (`confirm:` → `Sensor cursorPoint`)
-5. `Text initialize` - Corrupt OOP (classId 0, method lookup fails)
-
-### Key Fix: InputSensor Dependency (2025-01-14)
-
-**Problem**: Object initialize failed because Sensor global was nil.
-
-**Root Cause**: InputSensor initialize creates keyboard map but does NOT create Sensor global. The `InputSensor initSensor` method must be called separately (commented out in source).
-
-**Solution**: 
-1. Added InputSensor to dependency order BEFORE Object
-2. InputSensor initialize now runs and succeeds
-3. Object initialize skipped (requires interactive confirmation)
-
-**Files Modified**:
-- `Smalltalk80.Interpreter/Program.cs:1972` - Added InputSensor to dependency order
-
----
-
-## Recent Work (2025-01-14)
-
-### Fixed Instruction Counter to Count Bytecode Opcodes
-
-**Problem**: Instruction counter was counting interpreter loop iterations instead of bytecode opcodes executed. Float initialize showed "2 instructions" when it actually executed 39 bytecodes.
-
-**Root Cause**: Counter was incremented in `InterpreterLoop()` (once per context switch) instead of in `ExecuteBytecodeStep()` (once per bytecode opcode).
-
-**The Fix**:
-- **File**: `VirtualMachine.cs`
-- **Removed**: `_instructionCount++` from `InterpreterLoop()` (line 469)
-- **Added**: `_instructionCount++` inside bytecode dispatch loop in `ExecuteBytecodeStep()` (line 582)
-- **Added**: `_instructionCount++` for primitive execution (line 2183)
-
-**Result**: Instruction counter now correctly reflects bytecode opcodes executed:
-- Float initialize: 39 opcodes (was 2)
-- Character initialize: 3,594 opcodes (was 3,594 - happened to be same due to many message sends)
-- Each bytecode opcode = 1 instruction
-- Each primitive execution = 1 instruction
-
-**Configuration**: MAX_INSTRUCTIONS raised from 100K to 500K to allow more complex init expressions to run.
 
 ---
 
