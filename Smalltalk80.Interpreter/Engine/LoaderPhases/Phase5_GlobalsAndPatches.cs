@@ -1167,14 +1167,6 @@ public class Phase5_GlobalsAndPatches
         }
     }
 
-    private int GetSymbolHash(SmalltalkOOP symbolOOP)
-    {
-        // Symbol>>hash uses Primitive 75: returns half the object pointer
-        // Blue Book: "Answer with a SmallInteger whose value is half of the receiver's object pointer"
-        // This is an IDENTITY hash based on OOP, NOT a string content hash!
-        return VMUtilities.ComputeIdentityHash(symbolOOP);
-    }
-
     /// <summary>
     /// Gets the symbol OOP for a given symbol name.
     /// </summary>
