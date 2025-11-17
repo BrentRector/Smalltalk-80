@@ -983,6 +983,11 @@ public class Phase5_GlobalsAndPatches
                     _allocator.SetInstanceVariable(undeclaredOOP, 0, SmalltalkOOP.FromSmallInteger(tally - 1));
                 }
 
+                // CRITICAL: Fix probe chain after removal (implements Dictionary>>fixCollisionsFrom:)
+                // Removing an entry creates a "hole" that breaks linear probing for entries that
+                // hashed to earlier slots. We must rehash all following entries to repair the chain.
+                FixCollisionsFrom(undeclaredOOP, location, undeclaredSize);
+
                 return;
             }
 
@@ -998,6 +1003,118 @@ public class Phase5_GlobalsAndPatches
                     return;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Repairs the linear probing chain after removing an entry from a Dictionary.
+    /// Implements Smalltalk-80 Dictionary>>fixCollisionsFrom: semantics.
+    ///
+    /// Algorithm (from Blue Book):
+    /// 1. Start at the removed slot
+    /// 2. Walk forward, wrapping around
+    /// 3. For each non-nil entry:
+    ///    - Find where it SHOULD be (using its hash)
+    ///    - If it's displaced, move it to the correct slot
+    ///    - Set old slot to nil
+    /// 4. Stop when hitting a nil slot
+    /// </summary>
+    /// <param name="dictionaryOOP">Dictionary to repair</param>
+    /// <param name="startIndex">Index where entry was removed (0-based)</param>
+    /// <param name="dictSize">Size of dictionary's indexed slots</param>
+    private void FixCollisionsFrom(SmalltalkOOP dictionaryOOP, int startIndex, int dictSize)
+    {
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        int oldIndex = startIndex;
+
+        while (true)
+        {
+            // Advance to next slot (Smalltalk: oldIndex _ oldIndex \\ myLength + 1)
+            oldIndex = (oldIndex + 1) % dictSize;
+
+            // Get entry at this slot (Smalltalk: nextObject _ self basicAt: oldIndex)
+            var nextObject = _allocator.GetIndexedOOP(dictionaryOOP, oldIndex);
+
+            // Stop if we hit nil (Smalltalk: nextObject == nil whileFalse:)
+            if (nextObject == nilOOP)
+                break;
+
+            // Find where this Association SHOULD be based on its key's hash
+            // (Smalltalk: nextIndex _ self findElementOrNil: nextObject)
+            var keyOOP = _allocator.GetInstanceVariable(nextObject, 0); // Association key
+            int hash = GetSymbolHash(keyOOP);
+            int nextIndex = (hash % dictSize + dictSize) % dictSize;
+
+            // Linear probe to find empty slot or matching key
+            int probeCount = 0;
+            while (true)
+            {
+                var probe = _allocator.GetIndexedOOP(dictionaryOOP, nextIndex);
+
+                // Found empty slot - this is where it should go
+                if (probe == nilOOP)
+                    break;
+
+                // Found the Association itself - it's already in the right place
+                if (probe == nextObject)
+                    break;
+
+                // Check if another Association with same key exists (shouldn't happen)
+                var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+                if (probeKeyOOP == keyOOP)
+                    break;
+
+                // Linear probe forward
+                nextIndex = (nextIndex + 1) % dictSize;
+                probeCount++;
+
+                if (probeCount >= dictSize)
+                {
+                    // Safety: prevent infinite loop
+                    throw new InvalidOperationException($"FixCollisionsFrom: Cannot find slot for Association during rehash");
+                }
+            }
+
+            // If the Association is displaced, move it
+            // (Smalltalk: nextIndex = oldIndex ifFalse: [...])
+            if (nextIndex != oldIndex)
+            {
+                // Debug logging for slot 33
+                if (oldIndex == 33 || nextIndex == 33)
+                {
+                    var keyName = GetSymbolNameFromOOP(keyOOP);
+                    Console.WriteLine($"[PHASE5-FIX] Moving Association #{keyName} from slot {oldIndex} to slot {nextIndex}");
+                }
+
+                // Move Association to correct slot
+                // (Smalltalk: self basicAt: nextIndex put: nextObject)
+                _allocator.SetIndexedOOP(dictionaryOOP, nextIndex, nextObject);
+
+                // Clear old slot
+                // (Smalltalk: self basicAt: oldIndex put: nil)
+                _allocator.SetIndexedOOP(dictionaryOOP, oldIndex, nilOOP);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Helper to get symbol name from Symbol OOP for debugging.
+    /// </summary>
+    private string GetSymbolNameFromOOP(SmalltalkOOP symbolOOP)
+    {
+        try
+        {
+            int size = _allocator.GetIndexedSize(symbolOOP);
+            var bytes = new byte[size];
+            for (int i = 0; i < size; i++)
+            {
+                bytes[i] = _allocator.GetIndexedByte(symbolOOP, i);
+            }
+            return System.Text.Encoding.ASCII.GetString(bytes);
+        }
+        catch
+        {
+            return $"oop={symbolOOP}";
         }
     }
 
