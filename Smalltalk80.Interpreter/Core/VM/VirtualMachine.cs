@@ -1610,63 +1610,65 @@ public partial class VirtualMachine : IPrimitiveContext
                     return true;
                 }
 
-            case 0x07: // PUSH_LITERAL_VAR - Push literal variable (association value)
+            case 0x07: // PUSH_LITERAL_VAR - Push literal variable (association value or qualified pool var)
                 {
                     byte index = bytecodes[ip++];
                     _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
+                    var literalOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
-                    // DEBUG: Check if this is even an Association
-                    var assocClass = GetClassName(GetClass(associationOOP));
-                    if (assocClass != "Association")
+                    // Check if this is an Association (unqualified variable) or Array (qualified pool variable)
+                    var literalClass = GetClassName(GetClass(literalOOP));
+
+                    if (literalClass == "Association")
                     {
-                        Console.WriteLine($"[PUSH_LITERAL_VAR] ERROR: literal[{index}] is NOT an Association! It's a {assocClass}, OOP={associationOOP}");
-
-                        // Dump method info
-                        var methodClass = GetClassName(GetClass(methodOOP));
-                        var selectorOOP = GetMethodLiteral(methodOOP, 1);
-                        var methodSelector = GetSymbolName(selectorOOP);
-                        Console.WriteLine($"  Method: {methodClass}>>{methodSelector} (OOP={methodOOP})");
-
-                        // Dump the Array contents if it's an Array
-                        if (assocClass == "Array")
-                        {
-                            int size = _heapManager.GetIndexedSize(associationOOP);
-                            Console.WriteLine($"  Array size: {size}");
-                            for (int i = 0; i < Math.Min(size, 5); i++)
-                            {
-                                var elem = _heapManager.GetIndexedOOP(associationOOP, i);
-                                var elemClass = elem.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(elem));
-                                var elemValue = "";
-                                if (elemClass == "Symbol")
-                                {
-                                    elemValue = $" = #{GetSymbolName(elem)}";
-                                }
-                                else if (elem.IsSmallInteger)
-                                {
-                                    elemValue = $" = {elem.AsSmallInteger()}";
-                                }
-                                Console.WriteLine($"    [{i}] = {elem} ({elemClass}){elemValue}");
-                            }
-                        }
-
-                        Push(associationOOP); // Push it anyway
+                        // Unqualified variable reference: push Association value directly
+                        var valueOOP = _heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                        Push(valueOOP);
                         return true;
                     }
-
-                    var keyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                    var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-
-                    // DEBUG: Log EVERY push of a 'Smalltalk' Association
-                    var keySymbol = GetSymbolName(keyOOP);
-                    if (keySymbol == "Smalltalk")
+                    else if (literalClass == "Array")
                     {
-                        Console.WriteLine($"[PUSH_LITERAL_VAR] Pushing Smalltalk: assoc={associationOOP}, key={keyOOP}, value={valueOOP}");
-                        Console.WriteLine($"[PUSH_LITERAL_VAR] Expected Association OOP=34404, actual={associationOOP}, match={associationOOP == new SmalltalkOOP(34404)}");
-                    }
+                        // Qualified pool variable reference: #(poolDictName variableName)
+                        int size = _heapManager.GetIndexedSize(literalOOP);
+                        if (size == 2)
+                        {
+                            var poolDictNameOOP = _heapManager.GetIndexedOOP(literalOOP, 0);
+                            var varNameOOP = _heapManager.GetIndexedOOP(literalOOP, 1);
+                            var poolDictName = GetSymbolName(poolDictNameOOP);
+                            var varName = GetSymbolName(varNameOOP);
 
-                    Push(valueOOP);
-                    return true;
+                            // Look up pool dictionary in Smalltalk globals
+                            var smalltalkOOP = _runtimeHeapAccess.GetClass("Smalltalk");
+                            var poolDictOOP = _runtimeHeapAccess.LookupGlobalByName(smalltalkOOP, poolDictName);
+
+                            if (poolDictOOP == SpecialObjectsArray.Instance.Nil)
+                            {
+                                throw new InvalidOperationException($"Pool dictionary not found: {poolDictName}");
+                            }
+
+                            // Look up variable Association in pool dictionary
+                            var varSymbolOOP = poolDictNameOOP; // We already have the Symbol OOP
+                            var associationOOP = _runtimeHeapAccess.LookupAssociationBySymbol(poolDictOOP, varNameOOP);
+
+                            if (associationOOP == SpecialObjectsArray.Instance.Nil)
+                            {
+                                throw new InvalidOperationException($"Variable not found in pool dictionary {poolDictName}: {varName}");
+                            }
+
+                            // Push the Association value
+                            var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                            Push(valueOOP);
+                            return true;
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException($"PUSH_LITERAL_VAR: Array literal has size {size}, expected 2 for qualified pool variable");
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException($"PUSH_LITERAL_VAR: Expected Association or Array, got {literalClass}");
+                    }
                 }
 
             case 0x08: // STORE_LITERAL_VAR - Store to literal variable without popping
