@@ -521,12 +521,12 @@ public class Phase3_ObjectAllocation
                 string probeDesc = probe == nilOOP ? "nil" : $"{probe}";
                 if (probe != nilOOP && !probe.IsSmallInteger)
                 {
-                    var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
-                    int probeKeySize = _allocator.GetIndexedSize(probeKeyOOP);
+                    var debugProbeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
+                    int probeKeySize = _allocator.GetIndexedSize(debugProbeKeyOOP);
                     var probeKeyBytes = new byte[probeKeySize];
                     for (int i = 0; i < probeKeySize; i++)
                     {
-                        probeKeyBytes[i] = _allocator.GetIndexedByte(probeKeyOOP, i);
+                        probeKeyBytes[i] = _allocator.GetIndexedByte(debugProbeKeyOOP, i);
                     }
                     string probeKeyName = System.Text.Encoding.ASCII.GetString(probeKeyBytes);
                     probeDesc += $" (key=#{probeKeyName})";
