@@ -335,3 +335,47 @@ public static class SmallIntegerArithmetic
         }
     }
 }
+
+/// <summary>
+/// Miscellaneous arithmetic-related primitives.
+/// </summary>
+public static class MiscArithmetic
+{
+    /// <summary>
+    /// Primitive 76: SmallInteger asObject - Convert SmallInteger to object pointer.
+    /// Blue Book: Page 641, Chapter 29.
+    /// </summary>
+    /// <remarks>
+    /// Converts a SmallInteger value to an object pointer by doubling.
+    /// SmallIntegers are tagged with low bit set (odd): 2n+1
+    /// Objects have low bit clear (even): 2n
+    /// So doubling the SmallInteger value gives the object pointer.
+    /// </remarks>
+    public class AsObject : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            // Blue Book: primitive takes no arguments
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+
+            // Must be a SmallInteger to convert to object pointer
+            if (!context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+
+            // Extract integer value from tagged OOP
+            int value = context.Receiver.AsSmallInteger();
+
+            // Object pointer is twice the SmallInteger value
+            int objectPointer = value * 2;
+            var oop = new SmalltalkOOP(objectPointer);
+
+            // Verify the resulting OOP references a valid object in the heap
+            if (oop.IsSmallInteger) return PrimitiveResult.Fail();
+
+            // Check if OOP is in valid range
+            if (objectPointer < 0) return PrimitiveResult.Fail();
+
+            // The heap manager will handle validation when the object is accessed
+            return PrimitiveResult.Ok(oop);
+        }
+    }
+}

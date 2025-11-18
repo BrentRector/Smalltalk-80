@@ -308,6 +308,9 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(16, new NewPrimitives.SmallIntegerArithmetic.BitXor());
         registry.Register(17, new NewPrimitives.SmallIntegerArithmetic.BitShift());
 
+        // Override with new IPrimitive implementations for Point primitives (18)
+        registry.Register(18, new NewPrimitives.PointPrimitives.MakePoint());
+
         // Override with new IPrimitive implementations for Float arithmetic (40-54)
         registry.Register(40, new NewPrimitives.FloatArithmetic.AsFloat());
         registry.Register(41, new NewPrimitives.FloatArithmetic.Add());
@@ -332,6 +335,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(73, new NewPrimitives.SimpleObjectPrimitives.InstVarAt());
         registry.Register(74, new NewPrimitives.SimpleObjectPrimitives.InstVarAtPut());
         registry.Register(75, new NewPrimitives.SimpleObjectPrimitives.Hash());
+        registry.Register(76, new NewPrimitives.MiscArithmetic.AsObject());
         registry.Register(110, new NewPrimitives.SimpleObjectPrimitives.IdentityEquals());
         registry.Register(111, new NewPrimitives.SimpleObjectPrimitives.Class());
 
@@ -399,6 +403,10 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(102, new NewPrimitives.GraphicsOperations.BeCursor());
         registry.Register(103, new NewPrimitives.GraphicsOperations.Beep());
         registry.Register(104, new NewPrimitives.GraphicsOperations.ClipboardText());
+
+        // Override with new IPrimitive implementations for String primitives (105-106)
+        registry.Register(105, new NewPrimitives.StringPrimitives.StringReplace());
+        registry.Register(106, new NewPrimitives.StringPrimitives.AsSymbol());
 
         // Override with new IPrimitive implementations for System primitives (112-139)
         registry.Register(112, new NewPrimitives.SystemOperations.CoreLeft());
