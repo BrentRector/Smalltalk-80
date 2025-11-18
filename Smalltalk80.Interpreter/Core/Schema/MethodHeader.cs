@@ -5,7 +5,7 @@ namespace Smalltalk80.Interpreter.Core.Schema;
 /// Matches coldstart-v1.0.3.schema.json method header structure.
 /// v1.0.3: All fields are REQUIRED (not optional).
 /// </summary>
-public class MethodHeader
+public record MethodHeader
 {
     public required int Word { get; init; }  // 16-bit header word
     public required int LiteralCount { get; init; }  // v1.0.3: REQUIRED
