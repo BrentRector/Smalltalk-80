@@ -621,16 +621,16 @@ public static class CompiledMethodHelpers
 
         // 5. Set indexed slots
         // Slot 0: header
-        heapManager.SetIndexedPointer(methodOOP, 0, SmalltalkOOP.FromSmallInteger(headerWord));
+        heapManager.SetIndexedOOP(methodOOP, 0, SmalltalkOOP.FromSmallInteger(headerWord));
 
         // Slots 1..N: literals
         for (int i = 0; i < literalOOPs.Length; i++)
         {
-            heapManager.SetIndexedPointer(methodOOP, i + 1, literalOOPs[i]);
+            heapManager.SetIndexedOOP(methodOOP, i + 1, literalOOPs[i]);
         }
 
         // Final slot: bytecodeArrayOOP
-        heapManager.SetIndexedPointer(methodOOP, literalOOPs.Length + 1, bytecodeArrayOOP);
+        heapManager.SetIndexedOOP(methodOOP, literalOOPs.Length + 1, bytecodeArrayOOP);
 
         return methodOOP;
     }
