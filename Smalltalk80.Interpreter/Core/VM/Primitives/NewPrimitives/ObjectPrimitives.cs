@@ -197,4 +197,347 @@ public static class SimpleObjectPrimitives
             return PrimitiveResult.Ok(value);
         }
     }
+
+    /// <summary>Primitive 63: String at: - access character from string</summary>
+    public class StringAt : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+
+            int index = context.Arguments[0].AsSmallInteger();
+            if (index < 1) return PrimitiveResult.Fail();
+
+            int size = context.HeapManager.GetIndexedSize(context.Receiver);
+            if (index > size) return PrimitiveResult.Fail();
+
+            byte byteValue = context.HeapManager.GetIndexedByte(context.Receiver, index - 1);
+
+            // Get Character from CharacterTable
+            var characterTableOOP = SpecialObjectsArray.Instance.CharacterTable;
+            if (characterTableOOP == SpecialObjectsArray.Instance.Nil)
+                return PrimitiveResult.Fail();
+
+            var characterOOP = context.HeapManager.GetIndexedOOP(characterTableOOP, byteValue);
+            return PrimitiveResult.Ok(characterOOP);
+        }
+    }
+
+    /// <summary>Primitive 64: String at:put: - store character in string</summary>
+    public class StringAtPut : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+
+            int index = context.Arguments[0].AsSmallInteger();
+            if (index < 1) return PrimitiveResult.Fail();
+
+            SmalltalkOOP characterOOP = context.Arguments[1];
+            int charValue;
+
+            // Accept SmallInteger directly (0-255 range)
+            if (characterOOP.IsSmallInteger)
+            {
+                charValue = characterOOP.AsSmallInteger();
+                if (charValue < 0 || charValue > 255) return PrimitiveResult.Fail();
+            }
+            else
+            {
+                // Character object - extract value from instance variable 0
+                var asciiOOP = context.HeapManager.GetInstanceVariable(characterOOP, 0);
+                if (!asciiOOP.IsSmallInteger) return PrimitiveResult.Fail();
+                charValue = asciiOOP.AsSmallInteger();
+                if (charValue < 0 || charValue > 255) return PrimitiveResult.Fail();
+            }
+
+            int size = context.HeapManager.GetIndexedSize(context.Receiver);
+            if (index > size) return PrimitiveResult.Fail();
+
+            context.HeapManager.SetIndexedByte(context.Receiver, index - 1, (byte)charValue);
+            return PrimitiveResult.Ok(characterOOP);
+        }
+    }
+
+    /// <summary>Primitive 65: Stream next - read next element from stream</summary>
+    public class Next : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+
+            // Stream instance variables: collection (0), position (1), readLimit (2)
+            SmalltalkOOP collectionOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 0);
+            SmalltalkOOP positionOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 1);
+            SmalltalkOOP readLimitOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 2);
+
+            if (!positionOOP.IsSmallInteger || !readLimitOOP.IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            int position = positionOOP.AsSmallInteger();
+            int readLimit = readLimitOOP.AsSmallInteger();
+
+            if (position > readLimit) return PrimitiveResult.Fail();
+            if (collectionOOP.IsSmallInteger) return PrimitiveResult.Fail();
+
+            int collectionSize = context.HeapManager.GetIndexedSize(collectionOOP);
+            if (position < 1 || position > collectionSize) return PrimitiveResult.Fail();
+
+            // Read element from collection
+            SmalltalkOOP element;
+            var format = context.HeapManager.GetObjectFormat(collectionOOP);
+            if (format == ObjectFormat.ByteIndexed)
+            {
+                byte byteValue = context.HeapManager.GetIndexedByte(collectionOOP, position - 1);
+                element = SmalltalkOOP.FromSmallInteger(byteValue);
+            }
+            else
+            {
+                element = context.HeapManager.GetIndexedOOP(collectionOOP, position - 1);
+            }
+
+            // Increment position
+            context.HeapManager.SetInstanceVariable(context.Receiver, 1, SmalltalkOOP.FromSmallInteger(position + 1));
+
+            return PrimitiveResult.Ok(element);
+        }
+    }
+
+    /// <summary>Primitive 66: Stream nextPut: - write element to stream</summary>
+    public class NextPut : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+
+            SmalltalkOOP value = context.Arguments[0];
+
+            // Stream instance variables: collection (0), position (1), readLimit (2), writeLimit (3)
+            SmalltalkOOP collectionOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 0);
+            SmalltalkOOP positionOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 1);
+            SmalltalkOOP writeLimitOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 3);
+
+            if (!positionOOP.IsSmallInteger || !writeLimitOOP.IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            int position = positionOOP.AsSmallInteger();
+            int writeLimit = writeLimitOOP.AsSmallInteger();
+
+            if (position > writeLimit) return PrimitiveResult.Fail();
+            if (collectionOOP.IsSmallInteger) return PrimitiveResult.Fail();
+
+            int collectionSize = context.HeapManager.GetIndexedSize(collectionOOP);
+            if (position < 1 || position > collectionSize) return PrimitiveResult.Fail();
+
+            // Write element to collection
+            var format = context.HeapManager.GetObjectFormat(collectionOOP);
+            if (format == ObjectFormat.ByteIndexed)
+            {
+                if (!value.IsSmallInteger) return PrimitiveResult.Fail();
+                int byteValue = value.AsSmallInteger();
+                if (byteValue < 0 || byteValue > 255) return PrimitiveResult.Fail();
+                context.HeapManager.SetIndexedByte(collectionOOP, position - 1, (byte)byteValue);
+            }
+            else
+            {
+                context.HeapManager.SetIndexedOOP(collectionOOP, position - 1, value);
+            }
+
+            // Increment position
+            context.HeapManager.SetInstanceVariable(context.Receiver, 1, SmalltalkOOP.FromSmallInteger(position + 1));
+
+            return PrimitiveResult.Ok(value);
+        }
+    }
+
+    /// <summary>Primitive 67: Stream atEnd - check if stream is at end</summary>
+    public class AtEnd : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+
+            // Stream instance variables: collection (0), position (1), readLimit (2)
+            SmalltalkOOP positionOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 1);
+            SmalltalkOOP readLimitOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 2);
+
+            if (!positionOOP.IsSmallInteger || !readLimitOOP.IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            int position = positionOOP.AsSmallInteger();
+            int readLimit = readLimitOOP.AsSmallInteger();
+
+            return PrimitiveResult.FromBool(position > readLimit);
+        }
+    }
+
+    /// <summary>Primitive 68: CompiledMethod objectAt: - access method header/literal</summary>
+    public class ObjectAt : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+
+            int index = context.Arguments[0].AsSmallInteger();
+            if (index < 1) return PrimitiveResult.Fail();
+
+            int size = context.HeapManager.GetIndexedSize(context.Receiver);
+            if (index > size) return PrimitiveResult.Fail();
+
+            return PrimitiveResult.Ok(context.HeapManager.GetIndexedOOP(context.Receiver, index - 1));
+        }
+    }
+
+    /// <summary>Primitive 69: CompiledMethod objectAt:put: - modify method header/literal</summary>
+    public class ObjectAtPut : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+
+            int index = context.Arguments[0].AsSmallInteger();
+            if (index < 1) return PrimitiveResult.Fail();
+
+            int size = context.HeapManager.GetIndexedSize(context.Receiver);
+            if (index > size) return PrimitiveResult.Fail();
+
+            SmalltalkOOP value = context.Arguments[1];
+            context.HeapManager.SetIndexedOOP(context.Receiver, index - 1, value);
+            return PrimitiveResult.Ok(value);
+        }
+    }
+
+    /// <summary>Primitive 70: Behavior new - create new instance with no indexed fields</summary>
+    public class New : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+
+            try
+            {
+                var result = context.HeapManager.AllocateInstanceOf(context.Receiver, 0);
+                return PrimitiveResult.Ok(result);
+            }
+            catch
+            {
+                return PrimitiveResult.Fail();
+            }
+        }
+    }
+
+    /// <summary>Primitive 71: Behavior new: - create new instance with indexed fields</summary>
+    public class NewWithSize : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+
+            int size = context.Arguments[0].AsSmallInteger();
+            if (size < 0) return PrimitiveResult.Fail();
+
+            var result = context.HeapManager.AllocateInstanceOf(context.Receiver, size);
+            return PrimitiveResult.Ok(result);
+        }
+    }
+
+    /// <summary>Primitive 72: Object become: - two-way identity swap</summary>
+    public class Become : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger || context.Arguments[0].IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            context.HeapManager.BecomeTwoWay(context.Receiver, context.Arguments[0]);
+            return PrimitiveResult.Ok(context.Receiver);
+        }
+    }
+
+    /// <summary>Primitive 77: Behavior someInstance - return first instance of class</summary>
+    public class SomeInstance : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+
+            var instance = context.HeapManager.FindInstanceOf(context.Receiver);
+            if (instance == SpecialObjectsArray.Instance.Nil)
+                return PrimitiveResult.Fail();
+
+            return PrimitiveResult.Ok(instance);
+        }
+    }
+
+    /// <summary>Primitive 78: Object nextInstance - return next instance of same class</summary>
+    public class NextInstance : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+
+            var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+            var nextInstance = context.HeapManager.FindNextInstanceOf(classOOP, context.Receiver);
+
+            if (nextInstance == SpecialObjectsArray.Instance.Nil)
+                return PrimitiveResult.Fail();
+
+            return PrimitiveResult.Ok(nextInstance);
+        }
+    }
+
+    /// <summary>Primitive 79: CompiledMethod newMethod:header: - create new CompiledMethod</summary>
+    public class NewMethodHeader : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
+            if (!context.Arguments[0].IsSmallInteger || !context.Arguments[1].IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            int numberOfBytes = context.Arguments[0].AsSmallInteger();
+            int headerWord = context.Arguments[1].AsSmallInteger();
+
+            if (numberOfBytes < 0) return PrimitiveResult.Fail();
+
+            // Get class OOPs
+            var compiledMethodClassOOP = context.RuntimeHeapAccess?.GetClass("CompiledMethod");
+            var byteArrayClassOOP = context.RuntimeHeapAccess?.GetClass("ByteArray");
+
+            if (compiledMethodClassOOP == null || byteArrayClassOOP == null)
+                return PrimitiveResult.Fail();
+
+            // Create bytecode array
+            byte[] bytecodes = new byte[numberOfBytes];
+
+            // Use shared helper
+            var methodOOP = CompiledMethodPrimitives.AllocateCompiledMethodInternal(
+                context.HeapManager,
+                compiledMethodClassOOP.Value,
+                byteArrayClassOOP.Value,
+                SpecialObjectsArray.Instance.Nil,
+                headerWord,
+                Array.Empty<SmalltalkOOP>(),
+                bytecodes);
+
+            return PrimitiveResult.Ok(methodOOP);
+        }
+    }
 }

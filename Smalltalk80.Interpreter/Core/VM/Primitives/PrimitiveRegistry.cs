@@ -331,6 +331,72 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(88, new NewPrimitives.ControlPrimitives.Suspend());
         registry.Register(89, new NewPrimitives.ControlPrimitives.FlushCache());
 
+        // Override with new IPrimitive implementations for LargeInteger arithmetic (21-37)
+        registry.Register(21, new NewPrimitives.LargeIntegerArithmetic.Add());
+        registry.Register(22, new NewPrimitives.LargeIntegerArithmetic.Subtract());
+        registry.Register(23, new NewPrimitives.LargeIntegerArithmetic.LessThan());
+        registry.Register(24, new NewPrimitives.LargeIntegerArithmetic.GreaterThan());
+        registry.Register(25, new NewPrimitives.LargeIntegerArithmetic.LessOrEqual());
+        registry.Register(26, new NewPrimitives.LargeIntegerArithmetic.GreaterOrEqual());
+        registry.Register(27, new NewPrimitives.LargeIntegerArithmetic.Equal());
+        registry.Register(28, new NewPrimitives.LargeIntegerArithmetic.NotEqual());
+        registry.Register(29, new NewPrimitives.LargeIntegerArithmetic.Multiply());
+        registry.Register(30, new NewPrimitives.LargeIntegerArithmetic.Divide());
+        registry.Register(31, new NewPrimitives.LargeIntegerArithmetic.Mod());
+        registry.Register(32, new NewPrimitives.LargeIntegerArithmetic.Div());
+        registry.Register(33, new NewPrimitives.LargeIntegerArithmetic.Quo());
+        registry.Register(34, new NewPrimitives.LargeIntegerArithmetic.BitAnd());
+        registry.Register(35, new NewPrimitives.LargeIntegerArithmetic.BitOr());
+        registry.Register(36, new NewPrimitives.LargeIntegerArithmetic.BitXor());
+        registry.Register(37, new NewPrimitives.LargeIntegerArithmetic.BitShift());
+
+        // Override with new IPrimitive implementations for remaining Object primitives (63-72, 77-79)
+        registry.Register(63, new NewPrimitives.SimpleObjectPrimitives.StringAt());
+        registry.Register(64, new NewPrimitives.SimpleObjectPrimitives.StringAtPut());
+        registry.Register(65, new NewPrimitives.SimpleObjectPrimitives.Next());
+        registry.Register(66, new NewPrimitives.SimpleObjectPrimitives.NextPut());
+        registry.Register(67, new NewPrimitives.SimpleObjectPrimitives.AtEnd());
+        registry.Register(68, new NewPrimitives.SimpleObjectPrimitives.ObjectAt());
+        registry.Register(69, new NewPrimitives.SimpleObjectPrimitives.ObjectAtPut());
+        registry.Register(70, new NewPrimitives.SimpleObjectPrimitives.New());
+        registry.Register(71, new NewPrimitives.SimpleObjectPrimitives.NewWithSize());
+        registry.Register(72, new NewPrimitives.SimpleObjectPrimitives.Become());
+        registry.Register(77, new NewPrimitives.SimpleObjectPrimitives.SomeInstance());
+        registry.Register(78, new NewPrimitives.SimpleObjectPrimitives.NextInstance());
+        registry.Register(79, new NewPrimitives.SimpleObjectPrimitives.NewMethodHeader());
+
+        // Override with new IPrimitive implementations for Input primitives (90-95)
+        registry.Register(90, new NewPrimitives.InputOperations.MousePoint());
+        registry.Register(91, new NewPrimitives.InputOperations.CursorLocPut());
+        registry.Register(92, new NewPrimitives.InputOperations.CursorLink());
+        registry.Register(93, new NewPrimitives.InputOperations.InputSemaphore());
+        registry.Register(94, new NewPrimitives.InputOperations.SampleInterval());
+        registry.Register(95, new NewPrimitives.InputOperations.InputWord());
+
+        // Override with new IPrimitive implementations for Graphics primitives (96-104)
+        registry.Register(96, new NewPrimitives.GraphicsOperations.CopyBits());
+        registry.Register(97, new NewPrimitives.GraphicsOperations.Snapshot());
+        registry.Register(98, new NewPrimitives.GraphicsOperations.OopsLeft());
+        registry.Register(99, new NewPrimitives.GraphicsOperations.CoreLeft());
+        registry.Register(100, new NewPrimitives.GraphicsOperations.TimeWords());
+        registry.Register(101, new NewPrimitives.GraphicsOperations.BeDisplay());
+        registry.Register(102, new NewPrimitives.GraphicsOperations.BeCursor());
+        registry.Register(103, new NewPrimitives.GraphicsOperations.Beep());
+        registry.Register(104, new NewPrimitives.GraphicsOperations.ClipboardText());
+
+        // Override with new IPrimitive implementations for System primitives (112-139)
+        registry.Register(112, new NewPrimitives.SystemOperations.CoreLeft());
+        registry.Register(113, new NewPrimitives.SystemOperations.Quit());
+        registry.Register(114, new NewPrimitives.SystemOperations.ExitToDebugger());
+        registry.Register(115, new NewPrimitives.SystemOperations.OopsLeft());
+        registry.Register(116, new NewPrimitives.SystemOperations.SignalAtOopsLeftWordsLeft());
+        registry.Register(128, new NewPrimitives.SystemOperations.SomeInstance());
+        registry.Register(129, new NewPrimitives.SystemOperations.NextInstance());
+        registry.Register(130, new NewPrimitives.SystemOperations.BecomeForward());
+        registry.Register(131, new NewPrimitives.SystemOperations.InstanceCount());
+        registry.Register(133, new NewPrimitives.SystemOperations.ForceGC());
+        registry.Register(139, new NewPrimitives.SystemOperations.NextObject());
+
         return registry;
     }
 }
