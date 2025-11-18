@@ -201,7 +201,7 @@ public partial class VirtualMachine
             Console.WriteLine($"   Receiver class: {className} OOP({classOOP.RawValue})");
             Console.WriteLine($"   Arguments: {args.Length}");
             Console.WriteLine("\nSmalltalk Context Chain:");
-            DumpSenderChain(_contextManager.ActiveContext, 10);
+            _debugger.DumpSenderChain(_contextManager.ActiveContext, 10);
 
             throw new InvalidOperationException(
                 $"Method not found: {selectorName ?? "<unknown>"} in class {className} OOP({classOOP.RawValue})");
@@ -366,7 +366,7 @@ public partial class VirtualMachine
         // Display bytecode disassembly
         Console.WriteLine("BYTECODE DISASSEMBLY:");
         string disassembly = BytecodeDisassembler.Disassemble(bytecodes, literalOOPs,
-            (litOOP) => DescribeLiteral(litOOP),
+            (litOOP) => _debugger.DescribeLiteral(litOOP),
             Array.Empty<string>());
         Console.WriteLine(disassembly);
 
@@ -375,7 +375,7 @@ public partial class VirtualMachine
         for (int i = 0; i < literalCount; i++)
         {
             var litOOP = _heapManager.GetIndexedOOP(methodOOP, i + 1);
-            Console.WriteLine($"  [{i}] = {DescribeLiteral(litOOP)}");
+            Console.WriteLine($"  [{i}] = {_debugger.DescribeLiteral(litOOP)}");
         }
         Console.WriteLine();
 
@@ -383,13 +383,13 @@ public partial class VirtualMachine
         Console.WriteLine($"ARGUMENTS ({args.Length}):");
         for (int i = 0; i < args.Length; i++)
         {
-            Console.WriteLine($"  arg{i} = {DescribeValue(args[i])}");
+            Console.WriteLine($"  arg{i} = {_debugger.DescribeValue(args[i])}");
         }
         Console.WriteLine();
 
         // Display receiver
         Console.WriteLine("RECEIVER:");
-        Console.WriteLine($"  self = {DescribeValue(receiverOOP)}");
+        Console.WriteLine($"  self = {_debugger.DescribeValue(receiverOOP)}");
         Console.WriteLine();
 
         // Display temps (if in active context)
@@ -399,7 +399,7 @@ public partial class VirtualMachine
             for (int i = 0; i < tempCount; i++)
             {
                 var tempOOP = _heapManager.GetIndexedOOP(_contextManager.ActiveContext, i);
-                Console.WriteLine($"  temp{i} = {DescribeValue(tempOOP)}");
+                Console.WriteLine($"  temp{i} = {_debugger.DescribeValue(tempOOP)}");
             }
             Console.WriteLine();
         }
@@ -416,7 +416,7 @@ public partial class VirtualMachine
             for (int i = stackStart; i < stackp; i++)
             {
                 var stackOOP = _heapManager.GetIndexedOOP(_contextManager.ActiveContext, i);
-                Console.WriteLine($"  [{i - stackStart}] = {DescribeValue(stackOOP)}");
+                Console.WriteLine($"  [{i - stackStart}] = {_debugger.DescribeValue(stackOOP)}");
             }
         }
 

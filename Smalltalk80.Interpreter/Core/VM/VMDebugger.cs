@@ -4,11 +4,19 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
-/// Partial class containing debug and diagnostic methods.
+/// Provides debugging and diagnostic output for VM execution.
+/// Handles stack dumps, sender chain visualization, bytecode disassembly, and value formatting.
 /// </summary>
-public partial class VirtualMachine
+/// <param name="heapManager">Heap manager for object access.</param>
+/// <param name="contextManager">Context manager for active context access.</param>
+/// <param name="helpers">Helper methods for symbol/class name resolution.</param>
+internal sealed class VMDebugger(
+    ISmalltalkHeapManager heapManager,
+    IContextManager contextManager,
+    IVMDebugHelpers helpers) : IVMDebugger
 {
-    private void DumpSenderChain(SmalltalkOOP contextOOP, int maxDepth)
+    /// <inheritdoc/>
+    public void DumpSenderChain(SmalltalkOOP contextOOP, int maxDepth)
     {
         Console.WriteLine($"  SENDER CHAIN (showing up to {maxDepth} contexts):");
 
@@ -28,7 +36,7 @@ public partial class VirtualMachine
 
             try
             {
-                var methodOOP = _heapManager.GetInstanceVariable(currentOOP, methodIndex);
+                var methodOOP = heapManager.GetInstanceVariable(currentOOP, methodIndex);
 
                 // Get selector from method's literal[0] (stored at indexed slot 1 in our format)
                 // indexed slot 0 = header, indexed slot 1 = literal[0] (selector)
@@ -36,11 +44,11 @@ public partial class VirtualMachine
                 string selectorName = "<unknown>";
                 try
                 {
-                    var selectorOOP = GetMethodLiteral(methodOOP, 1);
-                    var symbolName = GetSymbolName(selectorOOP);
+                    var selectorOOP = helpers.GetMethodLiteral(methodOOP, 1);
+                    var symbolName = helpers.GetSymbolName(selectorOOP);
 
                     // Check if this is a selector (Symbol) or something else (likely a block)
-                    if (symbolName != null && selectorOOP != SpecialObjectsArray.Instance.Nil)
+                    if (symbolName is not null && selectorOOP != SpecialObjectsArray.Instance.Nil)
                     {
                         selectorName = symbolName;
                     }
@@ -65,12 +73,12 @@ public partial class VirtualMachine
                     selectorName = $"<error: {ex.Message}>";
                 }
 
-                var classOOP = _heapManager.GetClassOOP(currentOOP);
-                var className = GetClassName(classOOP) ?? "?";
+                var classOOP = heapManager.GetClassOOP(currentOOP);
+                var className = helpers.GetClassName(classOOP) ?? "?";
 
                 // Get symbolic names for context and method
-                string contextName = GetLocalId(currentOOP) ?? "";
-                string methodName = GetLocalId(methodOOP) ?? "";
+                string contextName = helpers.GetLocalId(currentOOP) ?? "";
+                string methodName = helpers.GetLocalId(methodOOP) ?? "";
 
                 // Format context info
                 string contextInfo = string.IsNullOrEmpty(contextName)
@@ -84,7 +92,7 @@ public partial class VirtualMachine
 
                 Console.WriteLine($"    [{depth}] {className}>>{selectorName} ({contextInfo}, {methodInfo})");
 
-                var senderOOP = _heapManager.GetInstanceVariable(currentOOP, senderIndex);
+                var senderOOP = heapManager.GetInstanceVariable(currentOOP, senderIndex);
                 currentOOP = senderOOP;
                 depth++;
             }
@@ -101,10 +109,11 @@ public partial class VirtualMachine
         }
     }
 
-    private void DumpStack(string label)
+    /// <inheritdoc/>
+    public void DumpStack(string label)
     {
         Console.WriteLine($"  [{label}] STACK:");
-        var stackpOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_STACKP_INDEX);
+        var stackpOOP = heapManager.GetInstanceVariable(contextManager.ActiveContext, VMConstants.CONTEXT_STACKP_INDEX);
         int stackp = stackpOOP.AsSmallInteger();
 
         Console.WriteLine($"    stackp={stackp}");
@@ -113,33 +122,36 @@ public partial class VirtualMachine
         int startIdx = Math.Max(0, stackp - 5);
         for (int i = startIdx; i < stackp; i++)
         {
-            var value = _heapManager.GetIndexedOOP(_contextManager.ActiveContext, VMConstants.CONTEXT_TEMP_FRAME_START + i);
-            string valueDesc = value.IsSmallInteger ? $"SmallInteger({value.AsSmallInteger()})" :
-                               value == SpecialObjectsArray.Instance.Nil ? "nil" :
-                               $"{_heapManager.GetClassName(value)} OOP({value})";
+            var value = heapManager.GetIndexedOOP(contextManager.ActiveContext, VMConstants.CONTEXT_TEMP_FRAME_START + i);
+            string valueDesc = value.IsSmallInteger
+                ? $"SmallInteger({value.AsSmallInteger()})"
+                : value == SpecialObjectsArray.Instance.Nil
+                    ? "nil"
+                    : $"{heapManager.GetClassName(value)} OOP({value})";
             Console.WriteLine($"      [{i}] = {valueDesc}");
         }
     }
 
-    private string DescribeLiteral(SmalltalkOOP oop)
+    /// <inheritdoc/>
+    public string DescribeLiteral(SmalltalkOOP oop)
     {
         if (oop.IsSmallInteger)
         {
             return $"SmallInteger({oop.AsSmallInteger()})";
         }
 
-        string className = _heapManager.GetClassName(oop);
+        string className = heapManager.GetClassName(oop);
 
         if (className == "Symbol")
         {
-            string? name = GetSymbolName(oop);
+            string? name = helpers.GetSymbolName(oop);
             return $"Symbol(#{name})";
         }
 
         if (className == "Association")
         {
-            var keyOOP = _heapManager.GetInstanceVariable(oop, VMConstants.ASSOCIATION_KEY_INDEX);
-            string? keyName = GetSymbolName(keyOOP);
+            var keyOOP = heapManager.GetInstanceVariable(oop, VMConstants.ASSOCIATION_KEY_INDEX);
+            string? keyName = helpers.GetSymbolName(keyOOP);
             return $"Association(#{keyName})";
         }
 
@@ -151,7 +163,8 @@ public partial class VirtualMachine
         return $"{className}({oop})";
     }
 
-    private string DescribeValue(SmalltalkOOP oop)
+    /// <inheritdoc/>
+    public string DescribeValue(SmalltalkOOP oop)
     {
         if (oop.IsSmallInteger)
         {
@@ -173,20 +186,21 @@ public partial class VirtualMachine
             return "false";
         }
 
-        string className = _heapManager.GetClassName(oop);
+        string className = heapManager.GetClassName(oop);
 
         if (className == "Symbol")
         {
-            string? name = GetSymbolName(oop);
+            string? name = helpers.GetSymbolName(oop);
             return $"#{name}";
         }
 
         return $"{className}({oop})";
     }
 
-    private void DumpBytecodes(SmalltalkOOP methodOOP, string prefix)
+    /// <inheritdoc/>
+    public void DumpBytecodes(SmalltalkOOP methodOOP, string prefix)
     {
-        var bytecodes = GetMethodBytecodes(methodOOP);
+        var bytecodes = helpers.GetMethodBytecodes(methodOOP);
         Console.WriteLine($"{prefix}Bytecode dump ({bytecodes.Length} bytes):");
 
         int i = 0;
@@ -222,10 +236,8 @@ public partial class VirtualMachine
         }
     }
 
-    /// <summary>
-    /// Helper method to format an OOP value for debugging
-    /// </summary>
-    private string FormatOOPValue(SmalltalkOOP oop)
+    /// <inheritdoc/>
+    public string FormatOOPValue(SmalltalkOOP oop)
     {
         if (oop.IsSmallInteger)
             return $"SmallInteger({oop.AsSmallInteger()})";
@@ -238,7 +250,7 @@ public partial class VirtualMachine
 
         try
         {
-            string className = _heapManager.GetClassName(oop);
+            string className = heapManager.GetClassName(oop);
             return $"{className} OOP({oop})";
         }
         catch

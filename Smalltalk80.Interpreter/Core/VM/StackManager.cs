@@ -7,43 +7,32 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// Manages the execution stack for the Smalltalk-80 VM.
 /// Handles Push, Pop, and Peek operations on the current context's operand stack.
 /// </summary>
-internal class StackManager : IStackManager
+/// <param name="heapManager">The heap manager for memory operations.</param>
+/// <param name="metadata">VM metadata containing class OOPs.</param>
+/// <param name="helpers">VM helper methods.</param>
+/// <param name="getActiveContext">Function to get the currently active context.</param>
+/// <param name="getSelectorTraceEnabled">Function to check if selector tracing is enabled.</param>
+/// <param name="getPushTraceCounter">Function to get the current push trace counter.</param>
+/// <param name="incrementPushTraceCounter">Action to increment the push trace counter.</param>
+internal class StackManager(
+    ISmalltalkHeapManager heapManager,
+    VMMetadata metadata,
+    IVMHelpers helpers,
+    Func<SmalltalkOOP> getActiveContext,
+    Func<bool> getSelectorTraceEnabled,
+    Func<int> getPushTraceCounter,
+    Action incrementPushTraceCounter) : IStackManager
 {
-    private readonly ISmalltalkHeapManager _heapManager;
-    private readonly VMMetadata _metadata;
-    private readonly IVMHelpers _helpers;
-    private readonly Func<SmalltalkOOP> _getActiveContext;
-    private readonly Func<bool> _getSelectorTraceEnabled;
-    private readonly Func<int> _getPushTraceCounter;
-    private readonly Action _incrementPushTraceCounter;
-
-    public StackManager(
-        ISmalltalkHeapManager heapManager,
-        VMMetadata metadata,
-        IVMHelpers helpers,
-        Func<SmalltalkOOP> getActiveContext,
-        Func<bool> getSelectorTraceEnabled,
-        Func<int> getPushTraceCounter,
-        Action incrementPushTraceCounter)
-    {
-        _heapManager = heapManager;
-        _metadata = metadata;
-        _helpers = helpers;
-        _getActiveContext = getActiveContext;
-        _getSelectorTraceEnabled = getSelectorTraceEnabled;
-        _getPushTraceCounter = getPushTraceCounter;
-        _incrementPushTraceCounter = incrementPushTraceCounter;
-    }
-
+    /// <inheritdoc />
     public void Push(SmalltalkOOP valueOOP)
     {
-        var activeContextOOP = _getActiveContext();
+        var activeContextOOP = getActiveContext();
 
         // DEBUG: Trace ALL stack pushes when tracing is enabled
-        if (_getSelectorTraceEnabled())
+        if (getSelectorTraceEnabled())
         {
-            _incrementPushTraceCounter();
-            if (_getPushTraceCounter() <= 10)
+            incrementPushTraceCounter();
+            if (getPushTraceCounter() <= 10)
             {
                 // Format: "oop=#### (ClassName)" for objects, "SmallInteger(#)" for small integers
                 string valueStr;
@@ -55,7 +44,7 @@ internal class StackManager : IStackManager
                 {
                     try
                     {
-                        string className = _helpers.GetClassName(_helpers.GetClass(valueOOP));
+                        string className = helpers.GetClassName(helpers.GetClass(valueOOP));
                         valueStr = $"{valueOOP} ({className})";
 
                         // If Symbol, show value
@@ -63,16 +52,20 @@ internal class StackManager : IStackManager
                         {
                             try
                             {
-                                int byteSize = _heapManager.GetIndexedSize(valueOOP);
+                                int byteSize = heapManager.GetIndexedSize(valueOOP);
                                 var bytes = new byte[byteSize];
                                 for (int i = 0; i < byteSize; i++)
                                 {
-                                    bytes[i] = _heapManager.GetIndexedByte(valueOOP, i);
+                                    bytes[i] = heapManager.GetIndexedByte(valueOOP, i);
                                 }
+
                                 string symbolValue = System.Text.Encoding.Latin1.GetString(bytes);
                                 valueStr = $"{valueOOP} (Symbol) = #{symbolValue}";
                             }
-                            catch { }
+                            catch
+                            {
+                                // Ignore errors when reading symbol value
+                            }
                         }
                     }
                     catch
@@ -81,21 +74,22 @@ internal class StackManager : IStackManager
                         valueStr = valueOOP.ToString();
                     }
                 }
-                Console.WriteLine($"[PUSH #{_getPushTraceCounter()}] Pushing {valueStr} onto stack");
+
+                Console.WriteLine($"[PUSH #{getPushTraceCounter()}] Pushing {valueStr} onto stack");
             }
         }
 
         // DIAGNOSTIC: Validate activeContextOOP is a valid context (MethodContext or BlockContext)
-        var activeContextFormat = _heapManager.GetObjectFormat(activeContextOOP);
-        var activeContextClass = _helpers.GetClassName(_helpers.GetClass(activeContextOOP));
+        var activeContextFormat = heapManager.GetObjectFormat(activeContextOOP);
+        var activeContextClass = helpers.GetClassName(helpers.GetClass(activeContextOOP));
 
         // Both MethodContext (PointerIndexed) and BlockContext (should be PointerIndexed but may be Pointer due to allocation bug) are valid
-        bool isValidContext = (activeContextFormat == ObjectFormat.PointerIndexed) ||
+        bool isValidContext = activeContextFormat == ObjectFormat.PointerIndexed ||
                              (activeContextFormat == ObjectFormat.Pointer && (activeContextClass == "MethodContext" || activeContextClass == "BlockContext"));
 
         if (!isValidContext)
         {
-            var valueClass = valueOOP.IsSmallInteger ? "SmallInteger" : _helpers.GetClassName(_helpers.GetClass(valueOOP));
+            var valueClass = valueOOP.IsSmallInteger ? "SmallInteger" : helpers.GetClassName(helpers.GetClass(valueOOP));
             Console.WriteLine($"[ERROR Push] activeContextOOP is not a valid context!");
             Console.WriteLine($"  activeContextOOP: {activeContextOOP}");
             Console.WriteLine($"  Expected: MethodContext or BlockContext");
@@ -107,27 +101,28 @@ internal class StackManager : IStackManager
         }
 
         int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        var spOOP = _heapManager.GetInstanceVariable(activeContextOOP, spIndex);
+        var spOOP = heapManager.GetInstanceVariable(activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
 
         // Check for stack overflow
-        int stackSize = _heapManager.GetIndexedSize(activeContextOOP);
+        int stackSize = heapManager.GetIndexedSize(activeContextOOP);
         if (sp >= stackSize)
         {
             throw new InvalidOperationException(
                 $"Stack overflow: sp={sp}, allocated size={stackSize}, context={activeContextOOP}");
         }
 
-        _heapManager.SetIndexedOOP(activeContextOOP, sp, valueOOP);
-        _heapManager.SetInstanceVariable(activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp + 1));
+        heapManager.SetIndexedOOP(activeContextOOP, sp, valueOOP);
+        heapManager.SetInstanceVariable(activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp + 1));
     }
 
+    /// <inheritdoc />
     public SmalltalkOOP Pop()
     {
-        var activeContextOOP = _getActiveContext();
+        var activeContextOOP = getActiveContext();
 
         int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        var spOOP = _heapManager.GetInstanceVariable(activeContextOOP, spIndex);
+        var spOOP = heapManager.GetInstanceVariable(activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
 
         // Get method to determine where execution stack starts
@@ -137,8 +132,8 @@ internal class StackManager : IStackManager
         int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
 
         // Check if this is a BlockContext - they retrieve method from home MethodContext
-        var contextClassOOP = _heapManager.GetClassOOP(activeContextOOP);
-        bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
+        var contextClassOOP = heapManager.GetClassOOP(activeContextOOP);
+        bool isBlockContext = contextClassOOP == metadata.BlockContextClassOOP;
 
         int initialSP;
         SmalltalkOOP methodOOP;
@@ -147,29 +142,29 @@ internal class StackManager : IStackManager
         {
             // BlockContext: execution stack starts after block arguments
             // Block's indexed area: [0..nargs-1] = args, [nargs..] = execution stack
-            var nargsOOP = _heapManager.GetInstanceVariable(activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
+            var nargsOOP = heapManager.GetInstanceVariable(activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
             initialSP = nargsOOP.AsSmallInteger();
 
             // Get method from home context (needed for diagnostic messages)
             // For nested blocks, home might be another BlockContext
             // Must traverse the home chain to find the ultimate MethodContext
-            var methodContextOOP = _helpers.FindMethodContext(activeContextOOP);
-            methodOOP = _heapManager.GetInstanceVariable(methodContextOOP, methodIndex);
+            var methodContextOOP = helpers.FindMethodContext(activeContextOOP);
+            methodOOP = heapManager.GetInstanceVariable(methodContextOOP, methodIndex);
         }
         else
         {
             // MethodContext: execution stack starts after args + temps
             // Method's indexed area: [0..numArgs-1] = args, [numArgs..numArgs+numTemps-1] = temps, [numArgs+numTemps..] = execution stack
-            methodOOP = _heapManager.GetInstanceVariable(activeContextOOP, methodIndex);
-            var header = _helpers.ParseMethodHeader(methodOOP);
+            methodOOP = heapManager.GetInstanceVariable(activeContextOOP, methodIndex);
+            var header = helpers.ParseMethodHeader(methodOOP);
             initialSP = header.NumArgs + header.NumTemps;
         }
 
         if (sp <= initialSP)
         {
             // Diagnostic: show what context we're in
-            var contextClass = _helpers.GetClassName(_helpers.GetClass(activeContextOOP));
-            var methodClass = methodOOP.IsSmallInteger ? "SmallInteger" : _helpers.GetClassName(_helpers.GetClass(methodOOP));
+            var contextClass = helpers.GetClassName(helpers.GetClass(activeContextOOP));
+            var methodClass = methodOOP.IsSmallInteger ? "SmallInteger" : helpers.GetClassName(helpers.GetClass(methodOOP));
             Console.WriteLine($"[Pop ERROR] Stack underflow diagnostics:");
             Console.WriteLine($"  activeContext: {activeContextOOP}, class: {contextClass}");
             Console.WriteLine($"  methodOOP: {methodOOP}, class: {methodClass}");
@@ -177,12 +172,12 @@ internal class StackManager : IStackManager
 
             if (isBlockContext)
             {
-                var nargsOOP = _heapManager.GetInstanceVariable(activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
+                var nargsOOP = heapManager.GetInstanceVariable(activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
                 Console.WriteLine($"  BlockContext: nargs={nargsOOP.AsSmallInteger()}");
             }
             else
             {
-                var header = _helpers.ParseMethodHeader(methodOOP);
+                var header = helpers.ParseMethodHeader(methodOOP);
                 Console.WriteLine($"  MethodContext: numArgs={header.NumArgs}, numTemps={header.NumTemps}, numLiterals={header.NumLiterals}");
             }
 
@@ -191,18 +186,19 @@ internal class StackManager : IStackManager
         }
 
         sp--;
-        _heapManager.SetInstanceVariable(activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp));
-        var value = _heapManager.GetIndexedOOP(activeContextOOP, sp);
+        heapManager.SetInstanceVariable(activeContextOOP, spIndex, SmalltalkOOP.FromSmallInteger(sp));
+        var value = heapManager.GetIndexedOOP(activeContextOOP, sp);
 
         return value;
     }
 
+    /// <inheritdoc />
     public SmalltalkOOP Peek()
     {
-        var activeContextOOP = _getActiveContext();
+        var activeContextOOP = getActiveContext();
 
         int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        var spOOP = _heapManager.GetInstanceVariable(activeContextOOP, spIndex);
+        var spOOP = heapManager.GetInstanceVariable(activeContextOOP, spIndex);
         int sp = spOOP.AsSmallInteger();
 
         if (sp <= 0)
@@ -210,7 +206,7 @@ internal class StackManager : IStackManager
             throw new InvalidOperationException("Stack underflow in Peek()");
         }
 
-        var value = _heapManager.GetIndexedOOP(activeContextOOP, sp - 1);
+        var value = heapManager.GetIndexedOOP(activeContextOOP, sp - 1);
         return value;
     }
 }

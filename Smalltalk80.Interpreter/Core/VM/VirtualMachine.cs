@@ -15,7 +15,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// NO access to cold start proxy data (_symbols[], ColdStartBundle, unfrozen registries).
 /// </summary>
 [RuntimeOnly(Reason = "Executes Smalltalk bytecode at runtime, must use heap-only access")]
-public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
+public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDebugHelpers
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly RuntimeHeapAccessor _runtimeHeapAccess;
@@ -26,6 +26,8 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     private readonly IStackManager _stackManager;
     private readonly IContextManager _contextManager;
     private readonly IMessageDispatcher _messageDispatcher;
+    private readonly IBytecodeInterpreter _bytecodeInterpreter;
+    private readonly IVMDebugger _debugger;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -156,6 +158,20 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             _layoutResolver,
             this // IVMHelpers
         );
+
+        _bytecodeInterpreter = new BytecodeInterpreter(
+            heapManager,
+            this, // IBytecodeContext
+            this, // IPrimitiveContext
+            _runtimeHeapAccess,
+            metadata
+        );
+
+        _debugger = new VMDebugger(
+            heapManager,
+            _contextManager,
+            this // IVMDebugHelpers
+        );
     }
 
     /// <summary>
@@ -190,6 +206,9 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         {
             _specialSelectorOOPs[i] = LookupSymbolInHeap(specialSelectors[i]);
         }
+
+        // Pass selector caches to bytecode interpreter
+        _bytecodeInterpreter.InitializeSelectorCaches(_arithmeticSelectorOOPs, _specialSelectorOOPs);
     }
 
     /// <summary>
@@ -265,6 +284,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     {
         _verboseDebugMode = enabled;
         _heapManager.VerboseDebugMode = enabled;
+        _bytecodeInterpreter.VerboseDebug = enabled;
     }
 
     /// <summary>
@@ -483,8 +503,8 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 throw new InvalidOperationException($"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
             }
 
-            // Execute the bytecode
-            bool continueExecution = ExecuteBytecode(bytecode, methodOOP);
+            // Execute the bytecode using the bytecode interpreter
+            bool continueExecution = _bytecodeInterpreter.ExecuteBytecode(bytecode, methodOOP);
 
             if (!continueExecution)
             {
@@ -824,8 +844,8 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             // Update IP
             _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
-            // Execute the bytecode
-            bool continueExecution = ExecuteBytecode(bytecode, methodOOP);
+            // Execute the bytecode using the bytecode interpreter
+            bool continueExecution = _bytecodeInterpreter.ExecuteBytecode(bytecode, methodOOP);
 
             if (!continueExecution)
             {
@@ -856,7 +876,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     // Methods extracted to partial classes:
     // - VirtualMachine.MessageSending.cs: SendSuperMessage, SendMessage, ConsumeCallOutcome, DumpMethodStateOnError, ReuseContextForTailCall, IsAtTailCallPosition
     // - VirtualMachine.VariableAccess.cs: GetMethodBytecodes, GetLiteralCount, GetMethodLiteral, GetTemporaryVariable, SetTemporaryVariable, FindHomeMethodContext
-    // - VirtualMachine.Diagnostics.cs: DumpSenderChain, DumpStack, DescribeLiteral, DescribeValue, DumpBytecodes, FormatOOPValue
+    // Diagnostic methods (DumpSenderChain, DumpStack, etc.) extracted to VMDebugger component
 
     /// <summary>
     /// Invokes a block CompiledMethod with proper BlockContext wrapping for v1.0.3 semantics.
@@ -1039,6 +1059,74 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     string IVMHelpers.GetClassName(SmalltalkOOP classOOP) => GetClassName(classOOP);
     SmalltalkOOP IVMHelpers.FindMethodContext(SmalltalkOOP contextOOP) => _contextManager.FindMethodContext(contextOOP);
     MethodHeaderInfo IVMHelpers.ParseMethodHeader(SmalltalkOOP methodOOP) => ParseMethodHeader(methodOOP);
+
+    // IBytecodeContext implementation
+    string? IBytecodeContext.GetSymbolName(SmalltalkOOP symbolOOP) => GetSymbolName(symbolOOP);
+    string? IBytecodeContext.GetLocalId(SmalltalkOOP objectOOP) => GetLocalId(objectOOP);
+    SmalltalkOOP IBytecodeContext.GetMethodLiteral(SmalltalkOOP methodOOP, int index) => GetMethodLiteral(methodOOP, index);
+    byte[] IBytecodeContext.GetMethodBytecodes(SmalltalkOOP methodOOP) => GetMethodBytecodes(methodOOP);
+    SmalltalkOOP IBytecodeContext.GetTemporaryVariable(SmalltalkOOP contextOOP, int index) => GetTemporaryVariable(contextOOP, index);
+    void IBytecodeContext.SetTemporaryVariable(SmalltalkOOP contextOOP, int index, SmalltalkOOP valueOOP) => SetTemporaryVariable(contextOOP, index, valueOOP);
+    void IBytecodeContext.Push(SmalltalkOOP valueOOP) => Push(valueOOP);
+    SmalltalkOOP IBytecodeContext.Pop() => Pop();
+    SmalltalkOOP IBytecodeContext.Peek() => Peek();
+    SmalltalkOOP IBytecodeContext.ResolveAndPatchPoolVariable(SmalltalkOOP poolLiteralOOP, SmalltalkOOP methodOOP, int literalIndex, SmalltalkOOP poolNameSymbol, SmalltalkOOP keySymbol)
+        => ResolveAndPatchPoolVariable(poolLiteralOOP, methodOOP, literalIndex, poolNameSymbol, keySymbol);
+    SmalltalkOOP IBytecodeContext.LookupInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbol)
+        => LookupInDictionary(dictionaryOOP, keySymbol);
+    SmalltalkOOP IBytecodeContext.ActiveContext => _contextManager.ActiveContext;
+
+    bool IBytecodeContext.NonLocalReturnPending
+    {
+        get => _nonLocalReturnPending;
+        set => _nonLocalReturnPending = value;
+    }
+
+    SmalltalkOOP IBytecodeContext.NLRTargetContext
+    {
+        get => _nlrTargetContext;
+        set => _nlrTargetContext = value;
+    }
+
+    SmalltalkOOP IBytecodeContext.NLRValue
+    {
+        get => _nlrValue;
+        set => _nlrValue = value;
+    }
+
+    bool IBytecodeContext.ContextSwitchPending
+    {
+        get => _contextSwitchPending;
+        set => _contextSwitchPending = value;
+    }
+
+    void IBytecodeContext.DumpStack(string label) => _debugger.DumpStack(label);
+
+    bool IBytecodeContext.IsInSenderChain(SmalltalkOOP targetOOP, SmalltalkOOP startOOP)
+        => _contextManager.IsInSenderChain(targetOOP, startOOP);
+
+    bool IBytecodeContext.SendMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
+    {
+        var outcome = SendMessage(receiverOOP, selectorOOP, args);
+        return ConsumeCallOutcome(outcome);
+    }
+
+    bool IBytecodeContext.SendSuperMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
+    {
+        var outcome = SendSuperMessage(receiverOOP, selectorOOP, args);
+        return ConsumeCallOutcome(outcome);
+    }
+
+    void IBytecodeContext.AddAssociationToClassPoolIfNeeded(SmalltalkOOP classOOP, SmalltalkOOP associationOOP)
+        => AddAssociationToClassPoolIfNeeded(classOOP, associationOOP);
+
+    // IVMDebugHelpers explicit interface implementations
+    SmalltalkOOP IVMDebugHelpers.GetClass(SmalltalkOOP objectOOP) => GetClass(objectOOP);
+    string IVMDebugHelpers.GetClassName(SmalltalkOOP classOOP) => GetClassName(classOOP);
+    string? IVMDebugHelpers.GetSymbolName(SmalltalkOOP symbolOOP) => GetSymbolName(symbolOOP);
+    string? IVMDebugHelpers.GetLocalId(SmalltalkOOP objectOOP) => GetLocalId(objectOOP);
+    SmalltalkOOP IVMDebugHelpers.GetMethodLiteral(SmalltalkOOP methodOOP, int index) => GetMethodLiteral(methodOOP, index);
+    byte[] IVMDebugHelpers.GetMethodBytecodes(SmalltalkOOP methodOOP) => GetMethodBytecodes(methodOOP);
 
     /// <summary>
     /// Pushes a value onto the operand stack.
