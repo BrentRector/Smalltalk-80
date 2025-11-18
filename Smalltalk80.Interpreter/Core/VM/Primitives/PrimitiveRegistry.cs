@@ -66,15 +66,32 @@ public class PrimitiveRegistry : IPrimitiveRegistry
     /// <inheritdoc/>
     public SmalltalkOOP ExecuteLegacy(int primitiveNumber, IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
+        // Call extended version with no extra dependencies
+        return ExecuteLegacyExtended(primitiveNumber, ctx, receiver, args, null, null);
+    }
+
+    /// <summary>
+    /// Executes a primitive with extended dependencies for new IPrimitive implementations.
+    /// </summary>
+    public SmalltalkOOP ExecuteLegacyExtended(
+        int primitiveNumber,
+        IPrimitiveContext ctx,
+        SmalltalkOOP receiver,
+        SmalltalkOOP[] args,
+        RuntimeHeapAccessor? runtimeHeapAccess,
+        LayoutResolver? layoutResolver)
+    {
         // Try new interface first - adapt to legacy calling convention
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
-            // Create execution context from legacy context
+            // Create execution context from legacy context with full dependencies
             var execContext = new PrimitiveExecutionContext(
                 receiver,
                 args,
                 ctx.HeapManager,
-                platform: ctx.PlatformBridge
+                platform: ctx.PlatformBridge,
+                runtimeHeapAccess: runtimeHeapAccess,
+                layoutResolver: layoutResolver
             );
 
             var result = primitive.Execute(execContext);
@@ -266,6 +283,23 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(15, new NewPrimitives.SmallIntegerArithmetic.BitOr());
         registry.Register(16, new NewPrimitives.SmallIntegerArithmetic.BitXor());
         registry.Register(17, new NewPrimitives.SmallIntegerArithmetic.BitShift());
+
+        // Override with new IPrimitive implementations for Float arithmetic (40-54)
+        registry.Register(40, new NewPrimitives.FloatArithmetic.AsFloat());
+        registry.Register(41, new NewPrimitives.FloatArithmetic.Add());
+        registry.Register(42, new NewPrimitives.FloatArithmetic.Subtract());
+        registry.Register(43, new NewPrimitives.FloatArithmetic.LessThan());
+        registry.Register(44, new NewPrimitives.FloatArithmetic.GreaterThan());
+        registry.Register(45, new NewPrimitives.FloatArithmetic.LessOrEqual());
+        registry.Register(46, new NewPrimitives.FloatArithmetic.GreaterOrEqual());
+        registry.Register(47, new NewPrimitives.FloatArithmetic.Equal());
+        registry.Register(48, new NewPrimitives.FloatArithmetic.NotEqual());
+        registry.Register(49, new NewPrimitives.FloatArithmetic.Multiply());
+        registry.Register(50, new NewPrimitives.FloatArithmetic.Divide());
+        registry.Register(51, new NewPrimitives.FloatArithmetic.Truncated());
+        registry.Register(52, new NewPrimitives.FloatArithmetic.FractionPart());
+        registry.Register(53, new NewPrimitives.FloatArithmetic.Exponent());
+        registry.Register(54, new NewPrimitives.FloatArithmetic.TimesTwoPower());
 
         return registry;
     }

@@ -95,7 +95,7 @@ public partial class VirtualMachine
                 Console.WriteLine($"[PRIMITIVE #{_instructionCount}] Trying primitive {primitiveNumber} in {GetLocalId(methodInfo.MethodOOP)}");
             }
 
-            var primitiveResult = _primitiveRegistry.ExecuteLegacy(primitiveNumber, this, receiverOOP, args);
+            var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver);
 
             if (_primitiveSuccess)
             {
@@ -228,7 +228,7 @@ public partial class VirtualMachine
             }
 
             // Try to execute the primitive
-            var primitiveResult = _primitiveRegistry.ExecuteLegacy(primitiveNumber, this, receiverOOP, args);
+            var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver);
 
             if (_primitiveSuccess)
             {
