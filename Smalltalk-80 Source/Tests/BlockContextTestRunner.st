@@ -47,13 +47,13 @@ initialize
 	 diagOa  → 11  (PASSED: returned 11)
 	 diagOt1 → 22  (PASSED: returned 22)
 	 diagOt2 → 44  (PASSED: returned 44)
-	 diagMa  → 88
+	 diagMa  → 88  (PASSED: returned 88)
 	 diagMt1 → 166
 	 diagMt2 → 322
 	 diagIa  → 644
 	 diagIt1 → 188
 	 diagIt2 → 266"
 
-	^4000 + (tester diagMa)! !
+	^5000 + (tester diagMt1)! !
 
 BlockContextTestRunner initialize!
