@@ -219,6 +219,77 @@ See test breakdown above for expected return value calculation.
 
 ---
 
+## Recent Work (2025-11-18) - Diagnostic System Complete
+
+**✅ COMPLETED: Event-Based Diagnostic System**
+
+Successfully implemented a comprehensive event-based diagnostic system with multiple listeners and command-line control.
+
+### Diagnostic System Architecture
+
+**Core Components** (`Core/Diagnostics/`):
+- `DiagnosticEventTypes.cs` - 64 event type flags for filtering
+- `DiagnosticEvents.cs` - 15+ typed event records
+- `IDiagnosticHub.cs` - Hub and listener interfaces
+- `DiagnosticHub.cs` - Thread-safe event dispatch
+
+**Listeners** (`Core/Diagnostics/Listeners/`):
+- `ColdStartProgressListener.cs` - Phase progress output (default)
+- `ColdStartDetailListener.cs` - Verbose cold start events
+- `MethodTraceListener.cs` - Runtime method entry/exit
+- `RuntimeMemoryListener.cs` - GC and allocation events
+- `BytecodeTraceListener.cs` - Low-level bytecode execution
+
+### Command-Line Usage
+
+```bash
+# Default output (phase progress only)
+dotnet run
+
+# Enable verbose cold start diagnostics
+dotnet run -- --diagnostics detail
+
+# Enable method tracing
+dotnet run -- --diagnostics method
+
+# Enable GC events
+dotnet run -- --diagnostics gc
+
+# Enable multiple categories
+dotnet run -- --diagnostics detail,gc
+
+# Enable all diagnostics
+dotnet run -- --diagnostics all
+```
+
+### Event Categories
+
+| Category | Events | Use Case |
+|----------|--------|----------|
+| `detail` | SymbolInterned, ClassCreated, MethodCompiled, PatchApplied, GlobalInstalled | Debug cold start issues |
+| `method` | MethodEntry, MethodExit, PrimitiveCall, PrimitiveFailure | Runtime execution tracing |
+| `gc` | GCEvent, AllocationEvent | Memory debugging |
+| `bytecode` | InstructionEvent | Low-level VM debugging |
+
+### Key Features
+
+1. **Zero-cost when disabled** - Fast-path `IsEnabled()` checking before event creation
+2. **Multiple listeners** - Same event can be consumed by different listeners
+3. **Thread-safe** - Concurrent event emission supported
+4. **Typed events** - Strongly-typed record types for all events
+5. **Extensible** - Add new listeners by implementing `IDiagnosticListener`
+
+### Files Modified
+
+- `Program.cs` - Added `--diagnostics` flag and listener registration
+- All 6 loader phases - Emit diagnostic events instead of Console.WriteLine
+- `ColdStartOrchestrator.cs` - Pass diagnostic hub to all phases
+
+**Build Status**: ✅ 0 errors, 0 warnings
+**Test Status**: ✅ All 120 BlockContext tests pass (returns 1191)
+
+---
+
 ## Recent Work (2025-11-18) - Architecture Refactoring Complete
 
 **✅ COMPLETED: Full Architecture Refactoring (Phases 0-5)**

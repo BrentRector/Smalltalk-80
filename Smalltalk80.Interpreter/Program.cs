@@ -32,7 +32,7 @@ public static class Program
         try
         {
             // Parse command line arguments
-            var (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, skipInitExpressions, executeExpression) = ParseCommandLine(args);
+            var (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, skipInitExpressions, executeExpression, diagnosticCategories) = ParseCommandLine(args);
 
             if (!File.Exists(coldStartFile))
             {
@@ -50,6 +50,12 @@ public static class Program
                 Console.Error.WriteLine("                         (e.g., 'BlockContextTest testAllCombinations')");
                 Console.Error.WriteLine("  --verbose, -v          Enable verbose debugging (logs all method calls)");
                 Console.Error.WriteLine("  --coldstart-report=<path>  Write coldstart metrics to JSON file");
+                Console.Error.WriteLine("  --diagnostics <cats>   Enable diagnostic categories (comma-separated)");
+                Console.Error.WriteLine("                         Categories: detail,method,gc,bytecode,all");
+                Console.Error.WriteLine("                         detail: verbose cold start (symbols, classes, methods)");
+                Console.Error.WriteLine("                         method: runtime method entry/exit tracing");
+                Console.Error.WriteLine("                         gc: garbage collection events");
+                Console.Error.WriteLine("                         bytecode: low-level bytecode execution");
                 Environment.Exit(1);
                 return;
             }
@@ -60,6 +66,58 @@ public static class Program
             // Register cold start progress listener for console output
             var progressListener = new ColdStartProgressListener();
             diagnostics.Register(progressListener, DiagnosticEventTypes.AllColdStart);
+
+            // Register additional diagnostic listeners based on --diagnostics flag
+            if (diagnosticCategories != null)
+            {
+                var categories = diagnosticCategories.ToLower().Split(',', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var category in categories)
+                {
+                    switch (category.Trim())
+                    {
+                        case "detail":
+                        case "verbose":
+                            var detailListener = new ColdStartDetailListener();
+                            diagnostics.Register(detailListener, DiagnosticEventTypes.AllColdStartDetail);
+                            Console.WriteLine("Diagnostics: Cold start detail listener enabled");
+                            break;
+
+                        case "method":
+                        case "trace":
+                            var methodListener = new MethodTraceListener();
+                            diagnostics.Register(methodListener, DiagnosticEventTypes.AllMethod);
+                            Console.WriteLine("Diagnostics: Method trace listener enabled");
+                            break;
+
+                        case "gc":
+                        case "memory":
+                            var memoryListener = new RuntimeMemoryListener();
+                            diagnostics.Register(memoryListener, DiagnosticEventTypes.AllMemory);
+                            Console.WriteLine("Diagnostics: Runtime memory listener enabled");
+                            break;
+
+                        case "bytecode":
+                        case "instruction":
+                            var bytecodeListener = new BytecodeTraceListener();
+                            diagnostics.Register(bytecodeListener, DiagnosticEventTypes.AllBytecode);
+                            Console.WriteLine("Diagnostics: Bytecode trace listener enabled");
+                            break;
+
+                        case "all":
+                            diagnostics.Register(new ColdStartDetailListener(), DiagnosticEventTypes.AllColdStartDetail);
+                            diagnostics.Register(new MethodTraceListener(), DiagnosticEventTypes.AllMethod);
+                            diagnostics.Register(new RuntimeMemoryListener(), DiagnosticEventTypes.AllMemory);
+                            diagnostics.Register(new BytecodeTraceListener(), DiagnosticEventTypes.AllBytecode);
+                            Console.WriteLine("Diagnostics: All listeners enabled (detail, method, gc, bytecode)");
+                            break;
+
+                        default:
+                            Console.Error.WriteLine($"Warning: Unknown diagnostic category '{category}'");
+                            break;
+                    }
+                }
+                Console.WriteLine();
+            }
 
             Console.WriteLine($"Loading cold start bundle: {coldStartFile}");
 
@@ -1080,7 +1138,7 @@ public static class Program
     /// Supports: --coldstart path, --dump-class ClassName, --verbose, --skip-init-expressions, etc.
     /// Default: coldstart.json in the compiler output directory (../net9.0/coldstart.json)
     /// </summary>
-    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, bool skipInitExpressions, string? executeExpression, string? diagnosticCategories) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
@@ -1089,6 +1147,7 @@ public static class Program
         string? reportOutput = null;
         bool skipInitExpressions = false;
         string? executeExpression = null;
+        string? diagnosticCategories = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -1124,6 +1183,15 @@ public static class Program
             {
                 reportOutput = args[i].Substring("--coldstart-report=".Length);
             }
+            else if (args[i] == "--diagnostics" && i + 1 < args.Length)
+            {
+                diagnosticCategories = args[i + 1];
+                i++; // Skip the next argument
+            }
+            else if (args[i].StartsWith("--diagnostics="))
+            {
+                diagnosticCategories = args[i].Substring("--diagnostics=".Length);
+            }
         }
 
         // Default: coldstart.json in the compiler's output directory
@@ -1153,7 +1221,7 @@ public static class Program
             }
         }
 
-        return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, skipInitExpressions, executeExpression);
+        return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, skipInitExpressions, executeExpression, diagnosticCategories);
     }
 
     private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver)
