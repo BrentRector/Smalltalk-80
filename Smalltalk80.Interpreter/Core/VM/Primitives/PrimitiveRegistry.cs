@@ -88,6 +88,9 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         // Try new interface first - adapt to legacy calling convention
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
+            // Save current active context to detect context switches
+            SmalltalkOOP? activeContextBefore = contextManager?.ActiveContext;
+
             // Create execution context from legacy context with full dependencies
             var execContext = new PrimitiveExecutionContext(
                 receiver,
@@ -104,6 +107,19 @@ public class PrimitiveRegistry : IPrimitiveRegistry
 
             var result = primitive.Execute(execContext);
             ctx.PrimitiveSuccess = result.Success;
+
+            // Detect if primitive changed the active context and propagate to VM
+            // This ensures _contextSwitchedByPrimitive flag gets set properly
+            if (contextManager != null && activeContextBefore.HasValue)
+            {
+                SmalltalkOOP activeContextAfter = contextManager.ActiveContext;
+                if (activeContextAfter != activeContextBefore.Value)
+                {
+                    // Context was switched by primitive - signal to VM via IPrimitiveContext
+                    ctx.SetActiveContext(activeContextAfter);
+                }
+            }
+
             return result.Value;
         }
 
@@ -320,17 +336,15 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(111, new NewPrimitives.SimpleObjectPrimitives.Class());
 
         // Override with new IPrimitive implementations for Control primitives (80-89)
-        // NOTE: Block primitives (80-82) and process primitives (85-88) use legacy implementations
-        // due to subtle context handling differences that need further investigation
-        // registry.Register(80, new NewPrimitives.ControlPrimitives.BlockCopy());
-        // registry.Register(81, new NewPrimitives.ControlPrimitives.Value());
-        // registry.Register(82, new NewPrimitives.ControlPrimitives.ValueWithArguments());
+        registry.Register(80, new NewPrimitives.ControlPrimitives.BlockCopy());
+        registry.Register(81, new NewPrimitives.ControlPrimitives.Value());
+        registry.Register(82, new NewPrimitives.ControlPrimitives.ValueWithArguments());
         registry.Register(83, new NewPrimitives.ControlPrimitives.Perform());
         registry.Register(84, new NewPrimitives.ControlPrimitives.PerformWith());
-        // registry.Register(85, new NewPrimitives.ControlPrimitives.Signal());
-        // registry.Register(86, new NewPrimitives.ControlPrimitives.Wait());
-        // registry.Register(87, new NewPrimitives.ControlPrimitives.Resume());
-        // registry.Register(88, new NewPrimitives.ControlPrimitives.Suspend());
+        registry.Register(85, new NewPrimitives.ControlPrimitives.Signal());
+        registry.Register(86, new NewPrimitives.ControlPrimitives.Wait());
+        registry.Register(87, new NewPrimitives.ControlPrimitives.Resume());
+        registry.Register(88, new NewPrimitives.ControlPrimitives.Suspend());
         registry.Register(89, new NewPrimitives.ControlPrimitives.FlushCache());
 
         // Override with new IPrimitive implementations for LargeInteger arithmetic (21-37)
