@@ -316,9 +316,49 @@ Successfully implemented type-safe Blue Book view types and bytecode instruction
 
 **Build Status**: ✅ 0 errors, 0 warnings
 
+See `docs/Refactoring/Refactoring Plan - Second Stage.md` for full refactoring plan.
+
+---
+
+## Recent Work (2025-11-18) - Phase 8 Heap Decomposition Complete
+
+**✅ COMPLETED: Phase 8 Heap Decomposition (1,716→774 lines)**
+
+Successfully decomposed SmalltalkHeapManager.cs from 1,716 lines to 774 lines by extracting three focused components.
+
+### Key Accomplishments
+
+- **Extracted Components** (`Core/HeapManager/`):
+  - `GarbageCollector.cs` (~240 lines) - Mark/sweep GC with IGarbageCollector interface
+  - `ObjectTableManager.cs` (~130 lines) - Table block management with IObjectTableManager interface
+  - `BecomeHandler.cs` (~80 lines) - Identity swap operations with IBecomeHandler interface
+
+- **New Interfaces**:
+  - `IGarbageCollector` - SetGCRoots, GarbageCollect, GetGCStatistics, MarkObject
+  - `IObjectTableManager` - AllocateObjectTableIndex, GetObjectTableEntry, EnumerateObjectTable
+  - `IBecomeHandler` - BecomeTwoWay for Blue Book become: primitive
+
+### Benefits
+
+1. **Separation of Concerns** - GC, table management, and become are now independent
+2. **Testability** - Each component can be unit tested in isolation
+3. **Maintainability** - 774 lines vs 1,716 lines (55% reduction)
+4. **Clear Interfaces** - Well-defined contracts for each subsystem
+
+### Commits
+
+- `7128e46` - Phase 8: Heap Decomposition - Extract GC, ObjectTable, and Become components
+- `9dde61d` - Update documentation for Phase 8 completion
+- `87d9e14` - Fix accessibility: make BecomeHandler and GarbageCollector internal
+- `ccd1d82` - Remove debug output after confirming no duplicate execution
+
+**Build Status**: ✅ 0 errors, 0 warnings
+**Test Status**: ✅ All 120 BlockContext tests pass (returns 1191)
+**Init Expressions**: ✅ 43/43 succeed
+
 ### Next Steps
 
-Proceeding with Phase 8 (Heap Decomposition) - decomposing SmalltalkHeapManager.cs into focused components.
+Proceeding with Phase 11 (Remaining Decomposition) - decomposing Program.cs and Phase5_GlobalsAndPatches.cs.
 
 See `docs/Refactoring/Refactoring Plan - Second Stage.md` for full refactoring plan.
 
