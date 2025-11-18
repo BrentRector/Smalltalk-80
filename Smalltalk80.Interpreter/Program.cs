@@ -689,59 +689,6 @@ public static class Program
     }
 
     /// <summary>
-    /// Counts the number of bytecode instructions (not bytes, since some are multi-byte).
-    /// </summary>
-    private static int CountInstructions(byte[] bytecodes)
-    {
-        int count = 0;
-        int i = 0;
-
-        while (i < bytecodes.Length)
-        {
-            byte opcode = bytecodes[i];
-            count++;
-            i++;
-
-            // Extended prefix - consumes additional bytes
-            if (opcode == 0x80)
-            {
-                if (i < bytecodes.Length)
-                {
-                    byte subop = bytecodes[i];
-                    i++; // subop byte
-
-                    // Check if this subop needs more bytes
-                    if (subop == 0x0D || subop == 0x11) // SEND_N, SEND_SUPER_N
-                    {
-                        i += 2; // selector index + arg count
-                    }
-                    else if (subop >= 0x14 && subop <= 0x19) // Jump operations
-                    {
-                        i += 2; // offset (2 bytes)
-                    }
-                    else
-                    {
-                        i++; // most extended ops have 1 operand byte
-                    }
-                }
-            }
-            // Long jumps (0xA1-0xA7) - consume N bytes
-            else if (opcode >= 0xA1 && opcode <= 0xA7)
-            {
-                int n = opcode - 159; // Number of bytes for distance
-                i += n;
-            }
-            // Medium jump (0xA0) - consumes 1 byte
-            else if (opcode == 0xA0)
-            {
-                i++;
-            }
-        }
-
-        return count;
-    }
-
-    /// <summary>
     /// Helper method to find a method literal for debugging.
     /// </summary>
     private static SmalltalkOOP FindMethodLiteral(ColdStartOrchestrator loader, ColdStartBundle bundle, string methodLocalId, int literalIndex)
@@ -964,8 +911,15 @@ public static class Program
         }
 
         // 4. Bytecode disassembly (symbolic form)
-        Console.WriteLine($"\nBytecode ({bytecodes.Length} bytes, {CountInstructions(bytecodes)} instructions):");
-        DisassembleBytecodes(bytecodes, bundle);
+        var disassembly = BytecodeDisassembler.Disassemble(
+            bytecodes,
+            literalOOPs,
+            oop => FormatReturnValue(heapManager, bundle, oop),
+            []  // No additional optimized selectors needed
+        );
+        int instructionCount = disassembly.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+        Console.WriteLine($"\nBytecode ({bytecodes.Length} bytes, {instructionCount} instructions):");
+        Console.Write(disassembly);
 
         // 5. Stack trace (if available)
         if (result.Diagnostic?.StackTrace != null)
@@ -975,160 +929,6 @@ public static class Program
         }
 
         Console.WriteLine("\n=== END DEBUG OUTPUT ===");
-    }
-
-    /// <summary>
-    /// Disassembles bytecodes to symbolic form for debugging.
-    /// </summary>
-    private static void DisassembleBytecodes(byte[] bytecodes, ColdStartBundle bundle)
-    {
-        int pc = 0;
-        int instrNum = 0;
-
-        while (pc < bytecodes.Length)
-        {
-            byte opcode = bytecodes[pc];
-            Console.Write($"  [{instrNum:D3}] @{pc:D4}: ");
-
-            pc++;
-
-            // Decode based on bytecode ranges from Interpreter-Architecture.md
-            if (opcode <= 0x0F) // Push receiver variable 0-15
-            {
-                Console.WriteLine($"PUSH_IVAR_{opcode}");
-            }
-            else if (opcode <= 0x1F) // Push temporary 0-15
-            {
-                Console.WriteLine($"PUSH_TEMP_{opcode - 0x10}");
-            }
-            else if (opcode <= 0x3F) // Push literal constant 0-31
-            {
-                Console.WriteLine($"PUSH_LITERAL_CONST_{opcode - 0x20}");
-            }
-            else if (opcode <= 0x5F) // Push literal variable 0-31
-            {
-                Console.WriteLine($"PUSH_LITERAL_VAR_{opcode - 0x40}");
-            }
-            else if (opcode <= 0x67) // Pop/store receiver variable 0-7
-            {
-                Console.WriteLine($"POP_STORE_IVAR_{opcode - 0x60}");
-            }
-            else if (opcode <= 0x6F) // Pop/store temporary 0-7
-            {
-                Console.WriteLine($"POP_STORE_TEMP_{opcode - 0x68}");
-            }
-            else if (opcode == 0x70) Console.WriteLine("PUSH_SELF");
-            else if (opcode == 0x71) Console.WriteLine("PUSH_TRUE");
-            else if (opcode == 0x72) Console.WriteLine("PUSH_FALSE");
-            else if (opcode == 0x73) Console.WriteLine("PUSH_NIL");
-            else if (opcode == 0x74) Console.WriteLine("PUSH_MINUS_ONE");
-            else if (opcode == 0x75) Console.WriteLine("PUSH_ZERO");
-            else if (opcode == 0x76) Console.WriteLine("PUSH_ONE");
-            else if (opcode == 0x77) Console.WriteLine("PUSH_TWO");
-            else if (opcode == 0x78) Console.WriteLine("RETURN_SELF");
-            else if (opcode == 0x79) Console.WriteLine("RETURN_TRUE");
-            else if (opcode == 0x7A) Console.WriteLine("RETURN_FALSE");
-            else if (opcode == 0x7B) Console.WriteLine("RETURN_NIL");
-            else if (opcode == 0x7C) Console.WriteLine("RETURN_TOP");
-            else if (opcode == 0x7D) Console.WriteLine("BLOCK_RETURN_SELF");
-            else if (opcode == 0x7E) Console.WriteLine("BLOCK_RETURN_TOP");
-            else if (opcode == 0x7F) Console.WriteLine("NOP");
-            else if (opcode == 0x80) // Extended prefix
-            {
-                if (pc < bytecodes.Length)
-                {
-                    byte subop = bytecodes[pc++];
-                    Console.Write($"EXTENDED_{subop:X2} ");
-
-                    string[] extendedNames = new[] {
-                        "PUSH_IVAR", "STORE_IVAR", "POP_STORE_IVAR", "PUSH_TEMP", "STORE_TEMP", "POP_STORE_TEMP",
-                        "PUSH_LITERAL", "PUSH_LITERAL_VAR", "STORE_LITERAL_VAR", "POP_STORE_LITERAL_VAR",
-                        "SEND_0", "SEND_1", "SEND_2", "SEND_N", "SEND_SUPER_0", "SEND_SUPER_1",
-                        "SEND_SUPER_2", "SEND_SUPER_N", "POP", "DUP", "JUMP_TRUE", "JUMP_FALSE",
-                        "JUMP", "JUMP_LONG_TRUE", "JUMP_LONG_FALSE", "JUMP_LONG"
-                    };
-
-                    if (subop < extendedNames.Length)
-                    {
-                        Console.Write($"({extendedNames[subop]})");
-                        if (subop <= 0x09 && pc < bytecodes.Length) // Has index operand
-                        {
-                            Console.Write($" {bytecodes[pc++]}");
-                        }
-                        else if ((subop == 0x0D || subop == 0x11) && pc + 1 < bytecodes.Length) // SEND_N
-                        {
-                            Console.Write($" selector={bytecodes[pc++]}, argc={bytecodes[pc++]}");
-                        }
-                        else if (subop >= 0x14 && subop <= 0x19 && pc + 1 < bytecodes.Length) // Jumps
-                        {
-                            int offset = (bytecodes[pc] << 8) | bytecodes[pc + 1];
-                            pc += 2;
-                            Console.Write($" offset={offset}");
-                        }
-                    }
-                    Console.WriteLine();
-                }
-                else
-                {
-                    Console.WriteLine("(incomplete)");
-                }
-            }
-            else if (opcode == 0x89) Console.WriteLine("PUSH_ACTIVE_CONTEXT");
-            else if (opcode >= 0x90 && opcode <= 0x97) // Short jumps
-            {
-                Console.WriteLine($"SHORT_JUMP_FWD_{opcode - 0x8F}");
-            }
-            else if (opcode == 0xA0 && pc < bytecodes.Length) // Medium jump
-            {
-                Console.WriteLine($"MEDIUM_JUMP_FWD {bytecodes[pc++] + 1}");
-            }
-            else if (opcode >= 0xA1 && opcode <= 0xA7) // Long jumps
-            {
-                int n = opcode - 159;
-                Console.Write($"LONG_JUMP_FWD_{n} ");
-                if (pc + n <= bytecodes.Length)
-                {
-                    int distance = 0;
-                    for (int i = 0; i < n; i++)
-                    {
-                        distance = (distance << 8) | bytecodes[pc++];
-                    }
-                    Console.WriteLine($"{distance + 1}");
-                }
-                else
-                {
-                    Console.WriteLine("(incomplete)");
-                }
-            }
-            else if (opcode >= 0xB0 && opcode <= 0xBF) // Arithmetic sends
-            {
-                string[] arithOps = new[] { "+", "-", "<", ">", "<=", ">=", "=", "~=", "*", "/", "\\\\", "@", "bitShift:", "//", "bitAnd:", "bitOr:" };
-                Console.WriteLine($"SEND_ARITH ({arithOps[opcode - 0xB0]})");
-            }
-            else if (opcode >= 0xC0 && opcode <= 0xCF) // Special sends
-            {
-                string[] specialOps = new[] { "at:", "at:put:", "size", "next", "nextPut:", "atEnd", "==", "class", "blockCopy:", "value", "value:", "do:", "new", "new:", "x", "y" };
-                Console.WriteLine($"SEND_SPECIAL ({specialOps[opcode - 0xC0]})");
-            }
-            else if (opcode >= 0xD0 && opcode <= 0xDF) // Send literal 0 args
-            {
-                Console.WriteLine($"SEND_LIT_0_ARGS_{opcode - 0xD0}");
-            }
-            else if (opcode >= 0xE0 && opcode <= 0xEF) // Send literal 1 arg
-            {
-                Console.WriteLine($"SEND_LIT_1_ARG_{opcode - 0xE0}");
-            }
-            else if (opcode >= 0xF0 && opcode <= 0xFF) // Send literal 2 args
-            {
-                Console.WriteLine($"SEND_LIT_2_ARGS_{opcode - 0xF0}");
-            }
-            else
-            {
-                Console.WriteLine($"UNKNOWN_{opcode:X2}");
-            }
-
-            instrNum++;
-        }
     }
 
     private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver)
