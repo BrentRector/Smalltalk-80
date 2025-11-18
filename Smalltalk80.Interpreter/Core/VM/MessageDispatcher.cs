@@ -8,11 +8,9 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// Walks the class hierarchy to find methods and extracts primitive numbers.
 /// </summary>
 /// <param name="heapManager">The heap manager for memory operations.</param>
-/// <param name="layoutResolver">Resolver for class layout information.</param>
 /// <param name="helpers">VM helper methods.</param>
 internal class MessageDispatcher(
     ISmalltalkHeapManager heapManager,
-    LayoutResolver layoutResolver,
     IVMHelpers helpers) : IMessageDispatcher
 {
     /// <inheritdoc />

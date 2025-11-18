@@ -155,7 +155,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
         _messageDispatcher = new MessageDispatcher(
             heapManager,
-            _layoutResolver,
             this // IVMHelpers
         );
 
