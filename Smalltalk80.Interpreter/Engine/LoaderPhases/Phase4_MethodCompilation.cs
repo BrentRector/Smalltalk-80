@@ -276,6 +276,27 @@ public class Phase4_MethodCompilation : IPhase
             _localIdToObjectId[method.LocalId] = methodOOP;
             objectIdToLocalId[methodOOP] = method.LocalId;
             methodsCreated++;
+
+            // Emit typed event for detail listeners
+            // Skip block literals - they don't have selectors
+            if (!method.LocalId.StartsWith("block:"))
+            {
+                string className = method.HomeClassLocalId?.Replace("class:", "").Replace("meta:", "") + (method.HomeClassLocalId?.StartsWith("meta:") == true ? " class" : "") ?? "Unknown";
+                string selector = method.SelectorIndex >= 0 && method.SelectorIndex < _bundle.Symbols.Length
+                    ? _bundle.Symbols[method.SelectorIndex]
+                    : "unknown";
+
+                _diagnostics?.Emit(new MethodCompiledEvent
+                {
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0,
+                    ClassName = className,
+                    Selector = selector,
+                    MethodOOP = methodOOP,
+                    BytecodeLength = bytecodes.Length,
+                    LiteralCount = method.Literals.Length
+                });
+            }
         }
 
         // PASS 2: Resolve and patch all literals now that all blocks exist

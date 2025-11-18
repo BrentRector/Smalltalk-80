@@ -102,6 +102,16 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
                 string symbolName = _bundle.Symbols[i];
                 var symbolOOP = InternSymbol(symbolName);
                 SymbolRegistry.Register(i, symbolOOP);
+
+                // Emit typed event for detail listeners
+                _diagnostics?.Emit(new SymbolInternedEvent
+                {
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0,
+                    SymbolIndex = i,
+                    SymbolText = symbolName,
+                    SymbolOOP = symbolOOP
+                });
             }
 
             // Update symbol count in report (already set in Loader constructor, but verify)
