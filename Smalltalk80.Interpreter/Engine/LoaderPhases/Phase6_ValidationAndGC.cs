@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
@@ -31,6 +33,7 @@ public class Phase6_ValidationAndGC : IPhase
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly string[] _symbols;
     private readonly ColdstartReport _report;
+    private readonly IDiagnosticHub? _diagnostics;
 
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
@@ -48,7 +51,8 @@ public class Phase6_ValidationAndGC : IPhase
         ISmalltalkHeapManager heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
-        ColdstartReport report)
+        ColdstartReport report,
+        IDiagnosticHub? diagnostics = null)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -56,6 +60,7 @@ public class Phase6_ValidationAndGC : IPhase
         _layoutResolver = layoutResolver;
         _localIdToObjectId = localIdToObjectId;
         _report = report ?? throw new ArgumentNullException(nameof(report));
+        _diagnostics = diagnostics;
 
         // Use symbols from bundle for validation
         _symbols = bundle.Symbols;
@@ -739,15 +744,26 @@ public class Phase6_ValidationAndGC : IPhase
     private void RunGCVerification()
     {
         // Log object counts before GC
-        Console.WriteLine($"[Phase6] Objects before GC:");
-        Console.WriteLine($"  Total objects: {_heapManager.GetActiveObjectCount()}");
+        _diagnostics?.Emit(new DiagnosticMessageEvent
+        {
+            Severity = MessageSeverity.Info,
+            Category = "Phase6",
+            Message = $"Objects before GC: Total objects: {_heapManager.GetActiveObjectCount()}",
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
 
         var gcStats = _heapManager.GarbageCollect();
 
         // Print GC statistics
-        Console.WriteLine($"[Phase6] GC Results:");
-        Console.WriteLine($"  Live objects: {gcStats.LiveObjects}");
-        Console.WriteLine($"  Collected: {gcStats.CollectedObjects}");
+        _diagnostics?.Emit(new DiagnosticMessageEvent
+        {
+            Severity = MessageSeverity.Info,
+            Category = "Phase6",
+            Message = $"GC Results: Live objects: {gcStats.LiveObjects}, Collected: {gcStats.CollectedObjects}",
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
 
         // Update report metrics
         _report.Metrics.TotalObjectsAllocated = gcStats.TotalObjects;
@@ -757,9 +773,22 @@ public class Phase6_ValidationAndGC : IPhase
         // Cold start fails if ANY objects were collected
         if (gcStats.CollectedObjects > 0)
         {
-            Console.WriteLine($"\n✗ COLD START FAILED: GC collected {gcStats.CollectedObjects} objects!");
-            Console.WriteLine($"  All objects must be reachable from GC roots for cold start to pass.");
-            Console.WriteLine($"\n  Collected Objects (first 50):");
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Error,
+                Category = "Phase6",
+                Message = $"COLD START FAILED: GC collected {gcStats.CollectedObjects} objects! All objects must be reachable from GC roots for cold start to pass.",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Error,
+                Category = "Phase6",
+                Message = "Collected Objects (first 50):",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
             
             // Group by class name
             var byClass = gcStats.CollectedObjectDetails
@@ -769,7 +798,14 @@ public class Phase6_ValidationAndGC : IPhase
             
             foreach (var group in byClass)
             {
-                Console.WriteLine($"    {group.Key}: {group.Count()} objects");
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Error,
+                    Category = "Phase6",
+                    Message = $"  {group.Key}: {group.Count()} objects",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
                 
                 // Show ALL collected objects if <= 50
                 int showCount = Math.Min(group.Count(), 50);
@@ -848,11 +884,25 @@ public class Phase6_ValidationAndGC : IPhase
                         elementsInfo = $" <error: {ex.Message}>";
                     }
                     
-                    Console.WriteLine($"      OOP={obj.oop}, Format={obj.format}, Size={obj.size} words, Class={obj.className}{slot0Info}{elementsInfo}");
+                    _diagnostics?.Emit(new DiagnosticMessageEvent
+                    {
+                        Severity = MessageSeverity.Error,
+                        Category = "Phase6",
+                        Message = $"    OOP={obj.oop}, Format={obj.format}, Size={obj.size} words, Class={obj.className}{slot0Info}{elementsInfo}",
+                        Timestamp = Stopwatch.GetTimestamp(),
+                        InstructionCount = 0
+                    });
                 }
                 if (group.Count() > showCount)
                 {
-                    Console.WriteLine($"      ... and {group.Count() - showCount} more");
+                    _diagnostics?.Emit(new DiagnosticMessageEvent
+                    {
+                        Severity = MessageSeverity.Error,
+                        Category = "Phase6",
+                        Message = $"    ... and {group.Count() - showCount} more",
+                        Timestamp = Stopwatch.GetTimestamp(),
+                        InstructionCount = 0
+                    });
                 }
             }
 

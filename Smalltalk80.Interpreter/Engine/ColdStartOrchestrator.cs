@@ -131,7 +131,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 1: Preflight + Symbol Interning
         // Validates bundle and creates all Symbol objects
-        var phase1 = new Phase1_PreflightAndSymbols(_bundle, _allocator, _report);
+        var phase1 = new Phase1_PreflightAndSymbols(_bundle, _allocator, _report, _diagnostics);
         _phases.Add(phase1);
         RunPhase(phase1.Name, () =>
         {
@@ -143,7 +143,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 2: Class Infrastructure
         // Creates class/metaclass shells, wires inheritance, resolves layouts
-        var phase2 = new Phase2_ClassInfrastructure(_bundle, _allocator, _heapManager, _localIdToObjectId, _initializedFields, _report);
+        var phase2 = new Phase2_ClassInfrastructure(_bundle, _allocator, _heapManager, _localIdToObjectId, _initializedFields, _report, _diagnostics);
         _phases.Add(phase2);
         RunPhase(phase2.Name, () =>
         {
@@ -156,7 +156,7 @@ public class ColdStartOrchestrator : IColdStartLoader
         if (LayoutResolver == null)
             throw new InvalidOperationException("LayoutResolver not initialized after Phase 2");
 
-        var phase3 = new Phase3_ObjectAllocation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
+        var phase3 = new Phase3_ObjectAllocation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics);
         _phases.Add(phase3);
         RunPhase(phase3.Name, () =>
         {
@@ -165,7 +165,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 4: Method Compilation
         // Compiles all methods, installs in dictionaries, prepares init expressions
-        var phase4 = new Phase4_MethodCompilation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
+        var phase4 = new Phase4_MethodCompilation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics);
         _phases.Add(phase4);
         RunPhase(phase4.Name, () =>
         {
@@ -175,7 +175,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches
-        var phase5 = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
+        var phase5 = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics);
         _phases.Add(phase5);
         RunPhase(phase5.Name, () =>
         {
@@ -184,7 +184,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 6: Validation + GC Verification
         // Comprehensive validation and GC verification to ensure cold start correctness
-        var phase6 = new Phase6_ValidationAndGC(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _report);
+        var phase6 = new Phase6_ValidationAndGC(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _report, _diagnostics);
         _phases.Add(phase6);
         RunPhase(phase6.Name, () =>
         {

@@ -1,9 +1,11 @@
+using System;
+using System.Diagnostics;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
-using System;
+using Smalltalk80.Interpreter.Core.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
@@ -25,6 +27,7 @@ public class Phase5_GlobalsAndPatches : IPhase
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
     private readonly IReadOnlyList<string> _symbols;
     private readonly ColdstartReport _report;
+    private readonly IDiagnosticHub? _diagnostics;
 
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
@@ -43,7 +46,8 @@ public class Phase5_GlobalsAndPatches : IPhase
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
-        ColdstartReport report)
+        ColdstartReport report,
+        IDiagnosticHub? diagnostics = null)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -53,6 +57,7 @@ public class Phase5_GlobalsAndPatches : IPhase
         _initializedFields = initializedFields;
         _symbols = bundle.Symbols;
         _report = report ?? throw new ArgumentNullException(nameof(report));
+        _diagnostics = diagnostics;
     }
 
     /// <summary>
@@ -112,7 +117,14 @@ public class Phase5_GlobalsAndPatches : IPhase
     {
         if (_bundle.Patches == null || _bundle.Patches.Length == 0)
         {
-            Console.WriteLine($"[Phase5] No patches to apply");
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Info,
+                Category = "Phase5",
+                Message = "No patches to apply",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
             return;
         }
 
@@ -650,7 +662,14 @@ public class Phase5_GlobalsAndPatches : IPhase
 
         foreach (var (poolName, declaringClasses) in poolToClasses)
         {
-            Console.WriteLine($"  Pool dictionary {poolName} will be created by init expressions (used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})");
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Info,
+                Category = "Phase5",
+                Message = $"Pool dictionary {poolName} will be created by init expressions (used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
         }
     }
 
@@ -1159,7 +1178,14 @@ public class Phase5_GlobalsAndPatches : IPhase
             return;
         }
 
-Console.WriteLine($"[Phase5] Populating Undeclared dictionary with {_bundle.Undeclared.Length} variables...");
+        _diagnostics?.Emit(new DiagnosticMessageEvent
+        {
+            Severity = MessageSeverity.Info,
+            Category = "Phase5",
+            Message = $"Populating Undeclared dictionary with {_bundle.Undeclared.Length} variables...",
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
 
         var undeclaredOOP = GlobalRegistry.Get("Undeclared");
         var nilOOP = SpecialObjectsArray.Instance.Nil;
@@ -1192,19 +1218,40 @@ Console.WriteLine($"[Phase5] Populating Undeclared dictionary with {_bundle.Unde
         {
             // Set Association value field (slot 1) to the Undeclared dictionary OOP
             _allocator.SetInstanceVariable(undeclaredAssoc, 1, undeclaredOOP);
-Console.WriteLine($"  ✓ Set Undeclared Association value to dictionary OOP={undeclaredOOP}");
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Info,
+                Category = "Phase5",
+                Message = $"Set Undeclared Association value to dictionary OOP={undeclaredOOP}",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
         }
 
         // Show sample of undeclared variables
         if (addedCount > 0)
         {
             var sampleCount = Math.Min(5, _bundle.Undeclared.Length);
-Console.WriteLine($"  Sample undeclared variables:");
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Info,
+                Category = "Phase5",
+                Message = "Sample undeclared variables:",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
             for (int i = 0; i < sampleCount; i++)
             {
                 var varName = _bundle.Undeclared[i].Key;
                 var refCount = _bundle.Undeclared[i].References.Length;
-Console.WriteLine($"    - {varName} ({refCount} reference(s))");
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Info,
+                    Category = "Phase5",
+                    Message = $"  - {varName} ({refCount} reference(s))",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
             }
         }
     }
@@ -1386,7 +1433,14 @@ Console.WriteLine($"    - {varName} ({refCount} reference(s))");
             // Update the Association's value (instance variable 1) to point to our TextStyle
             _allocator.SetInstanceVariable(defaultTextStyleAssoc, 1, textStyleOOP);
             _initializedFields.Add((defaultTextStyleAssoc, 1));
-            Console.WriteLine($"  ✓ Created DefaultTextStyle (oop={textStyleOOP.RawValue}) with stub StrikeFont");
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Info,
+                Category = "Phase5",
+                Message = $"Created DefaultTextStyle (oop={textStyleOOP.RawValue}) with stub StrikeFont",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
         }
         else
         {
@@ -1551,7 +1605,14 @@ Console.WriteLine($"    - {varName} ({refCount} reference(s))");
         // Register in GlobalRegistry for direct access
         GlobalRegistry.Register("Display", displayScreenOOP);
 
-        Console.WriteLine($"  ✓ Created Display (640x480, {totalBytes} byte bitmap) as DisplayScreen OOP({displayScreenOOP.RawValue})");
+        _diagnostics?.Emit(new DiagnosticMessageEvent
+        {
+            Severity = MessageSeverity.Info,
+            Category = "Phase5",
+            Message = $"Created Display (640x480, {totalBytes} byte bitmap) as DisplayScreen OOP({displayScreenOOP.RawValue})",
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
     }
 
     #endregion

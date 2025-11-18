@@ -4,9 +4,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
@@ -26,6 +28,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
         private readonly ObjectGraphAllocator _allocator;
         private readonly Dictionary<string, SmalltalkOOP> _symbolTable = new();
         private readonly ColdstartReport _report;
+        private readonly IDiagnosticHub? _diagnostics;
 
         /// <summary>
         /// Gets the phase name for diagnostics and logging.
@@ -37,11 +40,12 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
         /// </summary>
         public int PhaseNumber => 1;
 
-        public Phase1_PreflightAndSymbols(ColdStartBundle bundle, ObjectGraphAllocator allocator, ColdstartReport report)
+        public Phase1_PreflightAndSymbols(ColdStartBundle bundle, ObjectGraphAllocator allocator, ColdstartReport report, IDiagnosticHub? diagnostics = null)
         {
             _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
             _allocator = allocator ?? throw new ArgumentNullException(nameof(allocator));
             _report = report ?? throw new ArgumentNullException(nameof(report));
+            _diagnostics = diagnostics;
         }
 
         /// <summary>
