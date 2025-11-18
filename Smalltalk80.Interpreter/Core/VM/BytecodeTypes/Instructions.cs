@@ -1,4 +1,4 @@
-namespace Smalltalk80.Interpreter.Core.VM.Bytecode;
+namespace Smalltalk80.Interpreter.Core.VM.BytecodeTypes;
 
 /// <summary>
 /// Base type for decoded bytecode instructions per Blue Book Chapter 28.

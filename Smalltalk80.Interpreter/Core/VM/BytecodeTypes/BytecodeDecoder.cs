@@ -1,4 +1,4 @@
-namespace Smalltalk80.Interpreter.Core.VM.Bytecode;
+namespace Smalltalk80.Interpreter.Core.VM.BytecodeTypes;
 
 /// <summary>
 /// Interface for decoding raw bytecodes into typed instructions.
