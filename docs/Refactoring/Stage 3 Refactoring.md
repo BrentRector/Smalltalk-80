@@ -13,27 +13,32 @@ Analysis of 153 C# files (34,651 total lines) in the Smalltalk80.Interpreter cod
 
 ## Priority 1: HIGH - Should Address Soon
 
-### 1.1 VirtualMachine.cs Exceeds Size Guidelines
+### 1.1 VirtualMachine.cs Requires Controlled Rewrite
 
-**Issue**: VirtualMachine.cs is 2,109 lines, significantly exceeding the 1,500 line guideline for large components.
+**Issue**: VirtualMachine.cs is 2,096 lines implementing 5 interfaces (God Object). Entangled state (NLR, trampoline, debug) makes incremental refactoring risky.
 
-**Location**: `Core/VM/VirtualMachine.cs`
+**Location**: `Core/VM/VirtualMachine.cs` (plus 2 partial files totaling 2,732 lines)
 
-**Recommendation**: Extract additional responsibilities into focused components:
-- Extract `InterpreterLoop` and trampoline state machine into `InterpreterOrchestrator.cs` (~300 lines)
-- Extract `CallOutcome` handling and NLR state management into `NonLocalReturnHandler.cs` (~150 lines)
-- The partial files (MessageSending, VariableAccess) are good but VirtualMachine core still has too many concerns
+**Recommendation**: Controlled rewrite following Phase 5 decomposition pattern. See **[VirtualMachine-Rewrite-Plan.md](VirtualMachine-Rewrite-Plan.md)** for detailed plan.
+
+Target architecture:
+- `VirtualMachine.cs` (~300 lines) - Orchestrator only, 2 interfaces
+- `Interpreter/InterpreterEngine.cs` (~400 lines) - Execution loop
+- `Interpreter/NonLocalReturnHandler.cs` (~150 lines) - NLR state machine
+- `Caching/SelectorCache.cs` (~100 lines) - Selector caches
+- `Diagnostics/ExecutionTracer.cs` (~200 lines) - All debug/trace logic
 
 **Priority**: High
-**Effort**: Medium (requires careful extraction maintaining performance)
+**Effort**: High (3-5 days, but achieves proper architecture)
 
 **Tasks**:
-- [ ] Analyze VirtualMachine.cs to identify extraction boundaries
-- [ ] Create `InterpreterOrchestrator.cs` with interpreter loop logic
-- [ ] Create `NonLocalReturnHandler.cs` with NLR state management
-- [ ] Update VirtualMachine to delegate to new components
-- [ ] Verify all tests pass after extraction
-- [ ] Update documentation to reflect new structure
+- [ ] Phase 1: Extract state records (NonLocalReturnState, ExecutionState)
+- [ ] Phase 2: Extract ExecutionTracer (all debug/trace logic)
+- [ ] Phase 3: Extract SelectorCache (arithmetic/special selectors)
+- [ ] Phase 4: Extract NonLocalReturnHandler (NLR state machine)
+- [ ] Phase 5: Extract InterpreterEngine (execution loop)
+- [ ] Phase 6: Interface cleanup (reduce from 5 to 2 interfaces)
+- [ ] Phase 7: Final cleanup and documentation
 
 ---
 
@@ -358,7 +363,7 @@ The static registries (`GlobalRegistry`, `SymbolRegistry`, `AssociationRegistry`
 
 | # | Issue | Priority | Effort | Lines Affected |
 |---|-------|----------|--------|----------------|
-| 1.1 | VirtualMachine.cs too large | High | Medium | ~500 extracted |
+| 1.1 | VirtualMachine.cs rewrite | High | High | ~2,700 restructured |
 | 1.2 | Duplicate bytecode disassembly | High | Low | ~150 removed |
 | 1.3 | IBytecodeContext too large | High | Medium | ~165 refactored |
 | 1.4 | Duplicate HeapManagerTests | High | Low | File moved |
@@ -385,11 +390,14 @@ The static registries (`GlobalRegistry`, `SymbolRegistry`, `AssociationRegistry`
    - [ ] 1.3 Split IBytecodeContext
    - [ ] 2.2 Rename generic helpers
 
-3. **Major extractions** (1-2 days):
-   - [ ] 1.1 VirtualMachine decomposition
+3. **VirtualMachine rewrite** (3-5 days):
+   - [ ] 1.1 VirtualMachine controlled rewrite (see VirtualMachine-Rewrite-Plan.md)
+   - [ ] 1.3 IBytecodeContext split (done as part of 1.1 Phase 6)
+
+4. **Phase decomposition** (1-2 days):
    - [ ] 2.4 Phase3/Phase4 decomposition
 
-4. **Housekeeping** (ongoing):
+5. **Housekeeping** (ongoing):
    - [ ] 2.5 TODO triage
    - [ ] 3.2 Documentation
    - [ ] 3.3 Modern C# patterns
