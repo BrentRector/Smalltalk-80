@@ -198,7 +198,7 @@ public readonly struct PrimitiveExecutionContext
             return RuntimeHeapAccess.GetClass(name);
 
         // For globals, look up in SystemDictionary
-        var systemDictOOP = RuntimeHeapAccess.SystemDictionary;
+        var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
         return RuntimeHeapAccess.LookupGlobalByName(systemDictOOP, name);
     }
 }
@@ -282,6 +282,21 @@ public interface IPrimitiveRegistry
     /// <param name="args">Arguments array.</param>
     /// <returns>Return value (check ctx.PrimitiveSuccess for success).</returns>
     SmalltalkOOP ExecuteLegacy(int primitiveNumber, IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args);
+
+    /// <summary>
+    /// Executes a primitive with extended dependencies for new IPrimitive implementations.
+    /// </summary>
+    SmalltalkOOP ExecuteLegacyExtended(
+        int primitiveNumber,
+        IPrimitiveContext ctx,
+        SmalltalkOOP receiver,
+        SmalltalkOOP[] args,
+        RuntimeHeapAccessor? runtimeHeapAccess,
+        LayoutResolver? layoutResolver,
+        IContextManager? contextManager = null,
+        int instructionPointer = 0,
+        ICacheManager? cacheManager = null,
+        IPrimitiveMessageSender? messageSender = null);
 
     /// <summary>
     /// Checks if a primitive is registered.

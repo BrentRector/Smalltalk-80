@@ -39,7 +39,7 @@ public static class SimpleObjectPrimitives
             }
 
             // For objects, hash is half the OOP (Primitive 75 semantics)
-            int hash = (int)(context.Receiver.Value >> 1);
+            int hash = (int)(context.Receiver.RawValue >> 1);
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(hash));
         }
     }

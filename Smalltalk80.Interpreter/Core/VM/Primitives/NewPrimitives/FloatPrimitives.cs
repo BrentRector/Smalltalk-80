@@ -27,7 +27,7 @@ public static class FloatArithmetic
     private static SmalltalkOOP FromDouble(PrimitiveExecutionContext ctx, double value)
     {
         // Allocate Float with 4 indexed words
-        var floatOop = ctx.RuntimeHeapAccess!.AllocateObject("class:Float", 4);
+        var floatOop = ctx.AllocateObject("Float", 4);
         byte[] bytes = BitConverter.GetBytes(value);
         for (int i = 0; i < 4; i++)
         {

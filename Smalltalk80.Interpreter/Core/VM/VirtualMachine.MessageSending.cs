@@ -96,7 +96,7 @@ public partial class VirtualMachine
             }
 
             // Get current instruction pointer for primitives that need it
-            int currentPC = GetInstructionPointer();
+            int currentPC = ((IPrimitiveContext)this).GetInstructionPointer();
 
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
@@ -233,7 +233,7 @@ public partial class VirtualMachine
             }
 
             // Get current instruction pointer for primitives that need it
-            int currentPC = GetInstructionPointer();
+            int currentPC = ((IPrimitiveContext)this).GetInstructionPointer();
 
             // Try to execute the primitive
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
