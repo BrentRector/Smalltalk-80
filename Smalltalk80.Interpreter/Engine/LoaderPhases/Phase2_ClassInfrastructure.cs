@@ -157,11 +157,27 @@ public class Phase2_ClassInfrastructure : IPhase
             // Register class in GlobalRegistry
             // For instance classes (class:Name), register as "Name"
             // For metaclasses (meta:Name), DON'T register (only instance classes need global lookup)
+            string className = _bundle.Symbols[cls.NameIndex];
             if (!cls.IsMetaclass)
             {
-                string className = GetClassNameFromLocalId(cls.LocalId);
                 GlobalRegistry.RegisterClass(className, classOOP);
             }
+
+            // Emit typed event for detail listeners
+            // Get the metaclass OOP for this class (will be nil for metaclasses themselves)
+            var metaclassOOP = cls.IsMetaclass
+                ? SpecialObjectsArray.Instance.Nil
+                : (_localIdToObjectId.TryGetValue($"meta:{className}", out var metaOOP) ? metaOOP : SpecialObjectsArray.Instance.Nil);
+
+            _diagnostics?.Emit(new ClassCreatedEvent
+            {
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0,
+                ClassName = cls.IsMetaclass ? $"{className} class" : className,
+                ClassOOP = classOOP,
+                MetaclassOOP = metaclassOOP,
+                InstanceVariableCount = cls.TotalInstanceVarCount
+            });
         }
     }
 

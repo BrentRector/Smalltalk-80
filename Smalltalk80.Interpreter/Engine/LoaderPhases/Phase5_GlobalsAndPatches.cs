@@ -872,6 +872,17 @@ public class Phase5_GlobalsAndPatches : IPhase
                     _allocator.SetInstanceVariable(systemDictOOP, 0, SmalltalkOOP.FromSmallInteger(newTally));
                 }
 
+                // Emit typed event for detail listeners
+                var valueOOP = _allocator.GetInstanceVariable(associationOOP, 1);
+                _diagnostics?.Emit(new GlobalInstalledEvent
+                {
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0,
+                    GlobalName = globalName,
+                    AssociationOOP = associationOOP,
+                    ValueOOP = valueOOP
+                });
+
                 return;
             }
 
