@@ -24,7 +24,6 @@ public class InitExpressionExecutor
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly VirtualMachine _vm;
-    private readonly ProcessPrimitives _processPrimitives;
     private readonly InitPolicy _policy;
     private readonly int _defaultTimeoutMs;
 
@@ -38,7 +37,16 @@ public class InitExpressionExecutor
         _vm = vm;
         _policy = policy;
         _defaultTimeoutMs = defaultTimeoutMs;
-        _processPrimitives = new ProcessPrimitives(heapManager, vm);
+    }
+
+    /// <summary>
+    /// Resumes a Process by executing its suspended context.
+    /// </summary>
+    private SmalltalkOOP ResumeProcess(SmalltalkOOP processOOP)
+    {
+        // Get the suspended context from the Process (instance variable 0)
+        var contextOOP = _heapManager.GetSlot(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX + 1);
+        return _vm.ExecuteExistingContext(contextOOP);
     }
 
 
@@ -134,7 +142,7 @@ public class InitExpressionExecutor
                 }
                 else
                 {
-                    resultOOP = _processPrimitives.Resume(processOOP);
+                    resultOOP = ResumeProcess(processOOP);
                 }
             }
             catch (OperationCanceledException)
@@ -345,7 +353,7 @@ public class InitExpressionExecutor
     private SmalltalkOOP ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return _processPrimitives.Resume(processOOP);
+        return ResumeProcess(processOOP);
     }
 
     /// <summary>
