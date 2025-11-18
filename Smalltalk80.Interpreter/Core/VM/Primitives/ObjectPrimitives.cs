@@ -569,7 +569,7 @@ public static class SimpleObjectPrimitives
             byte[] bytecodes = new byte[numberOfBytes];
 
             // Use shared helper
-            var methodOOP = CompiledMethodPrimitives.AllocateCompiledMethodInternal(
+            var methodOOP = CompiledMethodHelpers.AllocateCompiledMethodInternal(
                 context.HeapManager,
                 compiledMethodClassOOP.Value,
                 byteArrayClassOOP.Value,
@@ -580,5 +580,58 @@ public static class SimpleObjectPrimitives
 
             return PrimitiveResult.Ok(methodOOP);
         }
+    }
+}
+
+/// <summary>
+/// Helper methods for CompiledMethod allocation shared between primitives and cold start.
+/// </summary>
+public static class CompiledMethodHelpers
+{
+    /// <summary>
+    /// Allocates a CompiledMethod object following our C# design:
+    /// Fixed slot 0: homeClass (needed for super sends)
+    /// Indexed slots: [header, literal1, literal2, ..., literalN, bytecodeArrayOOP]
+    /// + Separate ByteArray for actual bytecodes
+    /// </summary>
+    public static SmalltalkOOP AllocateCompiledMethodInternal(
+        ISmalltalkHeapManager heapManager,
+        SmalltalkOOP compiledMethodClassOOP,
+        SmalltalkOOP byteArrayClassOOP,
+        SmalltalkOOP homeClassOOP,
+        int headerWord,
+        SmalltalkOOP[] literalOOPs,
+        byte[] bytecodes)
+    {
+        // 1. Allocate ByteArray for bytecodes
+        var bytecodeArrayOOP = heapManager.AllocateInstanceOf(byteArrayClassOOP, bytecodes.Length);
+
+        // 2. Copy bytecodes to ByteArray
+        for (int i = 0; i < bytecodes.Length; i++)
+        {
+            heapManager.SetIndexedByte(bytecodeArrayOOP, i, bytecodes[i]);
+        }
+
+        // 3. Allocate CompiledMethod with indexed slots: header + literals + bytecodeArrayOOP
+        int indexedSize = literalOOPs.Length + 2; // header + literals + bytecodeArrayOOP
+        var methodOOP = heapManager.AllocateInstanceOf(compiledMethodClassOOP, indexedSize);
+
+        // 4. Set homeClass as instance variable 0 (fixed slot)
+        heapManager.SetInstanceVariable(methodOOP, 0, homeClassOOP);
+
+        // 5. Set indexed slots
+        // Slot 0: header
+        heapManager.SetIndexedPointer(methodOOP, 0, SmalltalkOOP.FromSmallInteger(headerWord));
+
+        // Slots 1..N: literals
+        for (int i = 0; i < literalOOPs.Length; i++)
+        {
+            heapManager.SetIndexedPointer(methodOOP, i + 1, literalOOPs[i]);
+        }
+
+        // Final slot: bytecodeArrayOOP
+        heapManager.SetIndexedPointer(methodOOP, literalOOPs.Length + 1, bytecodeArrayOOP);
+
+        return methodOOP;
     }
 }

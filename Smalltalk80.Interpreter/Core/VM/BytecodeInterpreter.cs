@@ -11,13 +11,11 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// </summary>
 /// <param name="heapManager">The heap manager for memory operations.</param>
 /// <param name="context">The bytecode context for accessing execution state.</param>
-/// <param name="primitiveContext">The primitive context for primitive execution.</param>
 /// <param name="runtimeHeapAccess">Runtime heap access for class lookups.</param>
 /// <param name="metadata">VM metadata containing class OOPs.</param>
 internal class BytecodeInterpreter(
     ISmalltalkHeapManager heapManager,
     IBytecodeContext context,
-    IPrimitiveContext primitiveContext,
     RuntimeHeapAccessor runtimeHeapAccess,
     VMMetadata metadata) : IBytecodeInterpreter
 {
@@ -1047,13 +1045,14 @@ internal class BytecodeInterpreter(
 
             // Call primitive 80 (blockCopy:) using new IPrimitive static helper
             // Need: heapManager, activeContext, blockContextClassOOP, nargs, argStartIndex, currentPC
+            int currentPC = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.CONTEXT_PC_INDEX).AsSmallInteger();
             var result = ControlPrimitives.BlockCopy.CreateBlockContext(
                 heapManager,
                 context.ActiveContext,
                 metadata.BlockContextClassOOP,
                 nargsOOP,
                 argStartIndexOOP,
-                context.GetPC(context.ActiveContext));
+                currentPC);
 
             if (!result.Success)
             {

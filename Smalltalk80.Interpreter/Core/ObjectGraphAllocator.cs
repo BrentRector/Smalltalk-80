@@ -539,7 +539,7 @@ public class ObjectGraphAllocator
         byte[] bytecodes)
     {
         // Delegate to shared helper (eliminates code duplication with primitive 79)
-        return CompiledMethodPrimitives.AllocateCompiledMethodInternal(
+        return CompiledMethodHelpers.AllocateCompiledMethodInternal(
             _heapManager,
             compiledMethodClassOOP,
             byteArrayClassOOP,

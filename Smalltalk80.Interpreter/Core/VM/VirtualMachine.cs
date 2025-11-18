@@ -175,7 +175,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         _bytecodeInterpreter = new BytecodeInterpreter(
             heapManager,
             this, // IBytecodeContext
-            this, // IPrimitiveContext
             _runtimeHeapAccess,
             metadata
         );
