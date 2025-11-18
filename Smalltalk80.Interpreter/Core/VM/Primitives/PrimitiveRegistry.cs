@@ -4,59 +4,33 @@ using Smalltalk80.Interpreter.Core.Memory;
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
 /// <summary>
-/// Registry and dispatch for primitive operations.
-/// Supports both new IPrimitive interface and legacy PrimitiveFunction for gradual migration.
+/// Registry and dispatch for primitive operations using the IPrimitive interface.
 /// </summary>
 public class PrimitiveRegistry : IPrimitiveRegistry
 {
     private readonly Dictionary<int, IPrimitive> _primitives = new();
-    private readonly Dictionary<int, PrimitiveFunction> _legacyPrimitives = new();
 
     /// <inheritdoc/>
-    public int Count => _primitives.Count + _legacyPrimitives.Count;
+    public int Count => _primitives.Count;
 
     /// <inheritdoc/>
     public void Register(int primitiveNumber, IPrimitive primitive)
     {
-        // Remove legacy version if exists (migration)
-        _legacyPrimitives.Remove(primitiveNumber);
         _primitives[primitiveNumber] = primitive;
-    }
-
-    /// <inheritdoc/>
-    public void RegisterLegacy(int primitiveNumber, PrimitiveFunction function)
-    {
-        // Only register legacy if no new implementation exists
-        if (!_primitives.ContainsKey(primitiveNumber))
-        {
-            _legacyPrimitives[primitiveNumber] = function;
-        }
     }
 
     /// <inheritdoc/>
     public bool IsRegistered(int primitiveNumber)
     {
-        return _primitives.ContainsKey(primitiveNumber) || _legacyPrimitives.ContainsKey(primitiveNumber);
+        return _primitives.ContainsKey(primitiveNumber);
     }
 
     /// <inheritdoc/>
     public PrimitiveResult Execute(int primitiveNumber, PrimitiveExecutionContext context)
     {
-        // Try new interface first
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
             return primitive.Execute(context);
-        }
-
-        // Fall back to legacy - need to create a legacy context wrapper
-        // This path is for primitives not yet migrated
-        if (_legacyPrimitives.TryGetValue(primitiveNumber, out var legacyFunc))
-        {
-            // We need an IPrimitiveContext to call legacy primitives
-            // This will be provided by the caller during transition
-            throw new InvalidOperationException(
-                $"Primitive {primitiveNumber} is registered as legacy but called via new interface. " +
-                "Use ExecuteLegacy() during migration period.");
         }
 
         // Primitive not found
@@ -71,7 +45,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
     }
 
     /// <summary>
-    /// Executes a primitive with extended dependencies for new IPrimitive implementations.
+    /// Executes a primitive with extended dependencies for IPrimitive implementations.
+    /// This method adapts the legacy calling convention to the new IPrimitive interface.
     /// </summary>
     public SmalltalkOOP ExecuteLegacyExtended(
         int primitiveNumber,
@@ -85,7 +60,6 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null)
     {
-        // Try new interface first - adapt to legacy calling convention
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
             // Save current active context to detect context switches
@@ -109,7 +83,6 @@ public class PrimitiveRegistry : IPrimitiveRegistry
             ctx.PrimitiveSuccess = result.Success;
 
             // Detect if primitive changed the active context and propagate to VM
-            // This ensures _contextSwitchedByPrimitive flag gets set properly
             if (contextManager != null && activeContextBefore.HasValue)
             {
                 SmalltalkOOP activeContextAfter = contextManager.ActiveContext;
@@ -121,13 +94,6 @@ public class PrimitiveRegistry : IPrimitiveRegistry
             }
 
             return result.Value;
-        }
-
-        // Fall back to legacy
-        if (_legacyPrimitives.TryGetValue(primitiveNumber, out var legacyFunc))
-        {
-            ctx.PrimitiveSuccess = true; // Set success flag before calling
-            return legacyFunc(ctx, receiver, args);
         }
 
         // Primitive not found
@@ -144,7 +110,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
     {
         var registry = new PrimitiveRegistry();
 
-        // Override with new IPrimitive implementations for SmallInteger arithmetic (1-17)
+        // SmallInteger arithmetic primitives (1-17)
         registry.Register(1, new SmallIntegerArithmetic.Add());
         registry.Register(2, new SmallIntegerArithmetic.Subtract());
         registry.Register(3, new SmallIntegerArithmetic.LessThan());
@@ -163,50 +129,10 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(16, new SmallIntegerArithmetic.BitXor());
         registry.Register(17, new SmallIntegerArithmetic.BitShift());
 
-        // Override with new IPrimitive implementations for Point primitives (18)
+        // Point primitives (18)
         registry.Register(18, new PointPrimitives.MakePoint());
 
-        // Override with new IPrimitive implementations for Float arithmetic (40-54)
-        registry.Register(40, new FloatArithmetic.AsFloat());
-        registry.Register(41, new FloatArithmetic.Add());
-        registry.Register(42, new FloatArithmetic.Subtract());
-        registry.Register(43, new FloatArithmetic.LessThan());
-        registry.Register(44, new FloatArithmetic.GreaterThan());
-        registry.Register(45, new FloatArithmetic.LessOrEqual());
-        registry.Register(46, new FloatArithmetic.GreaterOrEqual());
-        registry.Register(47, new FloatArithmetic.Equal());
-        registry.Register(48, new FloatArithmetic.NotEqual());
-        registry.Register(49, new FloatArithmetic.Multiply());
-        registry.Register(50, new FloatArithmetic.Divide());
-        registry.Register(51, new FloatArithmetic.Truncated());
-        registry.Register(52, new FloatArithmetic.FractionPart());
-        registry.Register(53, new FloatArithmetic.Exponent());
-        registry.Register(54, new FloatArithmetic.TimesTwoPower());
-
-        // Override with new IPrimitive implementations for Object primitives (60-75, 110-111)
-        registry.Register(60, new SimpleObjectPrimitives.At());
-        registry.Register(61, new SimpleObjectPrimitives.AtPut());
-        registry.Register(62, new SimpleObjectPrimitives.Size());
-        registry.Register(73, new SimpleObjectPrimitives.InstVarAt());
-        registry.Register(74, new SimpleObjectPrimitives.InstVarAtPut());
-        registry.Register(75, new SimpleObjectPrimitives.Hash());
-        registry.Register(76, new MiscArithmetic.AsObject());
-        registry.Register(110, new SimpleObjectPrimitives.IdentityEquals());
-        registry.Register(111, new SimpleObjectPrimitives.Class());
-
-        // Override with new IPrimitive implementations for Control primitives (80-89)
-        registry.Register(80, new ControlPrimitives.BlockCopy());
-        registry.Register(81, new ControlPrimitives.Value());
-        registry.Register(82, new ControlPrimitives.ValueWithArguments());
-        registry.Register(83, new ControlPrimitives.Perform());
-        registry.Register(84, new ControlPrimitives.PerformWith());
-        registry.Register(85, new ControlPrimitives.Signal());
-        registry.Register(86, new ControlPrimitives.Wait());
-        registry.Register(87, new ControlPrimitives.Resume());
-        registry.Register(88, new ControlPrimitives.Suspend());
-        registry.Register(89, new ControlPrimitives.FlushCache());
-
-        // Override with new IPrimitive implementations for LargeInteger arithmetic (21-37)
+        // LargeInteger arithmetic primitives (21-37)
         registry.Register(21, new LargeIntegerArithmetic.Add());
         registry.Register(22, new LargeIntegerArithmetic.Subtract());
         registry.Register(23, new LargeIntegerArithmetic.LessThan());
@@ -225,7 +151,27 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(36, new LargeIntegerArithmetic.BitXor());
         registry.Register(37, new LargeIntegerArithmetic.BitShift());
 
-        // Override with new IPrimitive implementations for remaining Object primitives (63-72, 77-79)
+        // Float arithmetic primitives (40-54)
+        registry.Register(40, new FloatArithmetic.AsFloat());
+        registry.Register(41, new FloatArithmetic.Add());
+        registry.Register(42, new FloatArithmetic.Subtract());
+        registry.Register(43, new FloatArithmetic.LessThan());
+        registry.Register(44, new FloatArithmetic.GreaterThan());
+        registry.Register(45, new FloatArithmetic.LessOrEqual());
+        registry.Register(46, new FloatArithmetic.GreaterOrEqual());
+        registry.Register(47, new FloatArithmetic.Equal());
+        registry.Register(48, new FloatArithmetic.NotEqual());
+        registry.Register(49, new FloatArithmetic.Multiply());
+        registry.Register(50, new FloatArithmetic.Divide());
+        registry.Register(51, new FloatArithmetic.Truncated());
+        registry.Register(52, new FloatArithmetic.FractionPart());
+        registry.Register(53, new FloatArithmetic.Exponent());
+        registry.Register(54, new FloatArithmetic.TimesTwoPower());
+
+        // Object primitives (60-79, 110-111)
+        registry.Register(60, new SimpleObjectPrimitives.At());
+        registry.Register(61, new SimpleObjectPrimitives.AtPut());
+        registry.Register(62, new SimpleObjectPrimitives.Size());
         registry.Register(63, new SimpleObjectPrimitives.StringAt());
         registry.Register(64, new SimpleObjectPrimitives.StringAtPut());
         registry.Register(65, new SimpleObjectPrimitives.Next());
@@ -236,11 +182,29 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(70, new SimpleObjectPrimitives.New());
         registry.Register(71, new SimpleObjectPrimitives.NewWithSize());
         registry.Register(72, new SimpleObjectPrimitives.Become());
+        registry.Register(73, new SimpleObjectPrimitives.InstVarAt());
+        registry.Register(74, new SimpleObjectPrimitives.InstVarAtPut());
+        registry.Register(75, new SimpleObjectPrimitives.Hash());
+        registry.Register(76, new MiscArithmetic.AsObject());
         registry.Register(77, new SimpleObjectPrimitives.SomeInstance());
         registry.Register(78, new SimpleObjectPrimitives.NextInstance());
         registry.Register(79, new SimpleObjectPrimitives.NewMethodHeader());
+        registry.Register(110, new SimpleObjectPrimitives.IdentityEquals());
+        registry.Register(111, new SimpleObjectPrimitives.Class());
 
-        // Override with new IPrimitive implementations for Input primitives (90-95)
+        // Control primitives (80-89)
+        registry.Register(80, new ControlPrimitives.BlockCopy());
+        registry.Register(81, new ControlPrimitives.Value());
+        registry.Register(82, new ControlPrimitives.ValueWithArguments());
+        registry.Register(83, new ControlPrimitives.Perform());
+        registry.Register(84, new ControlPrimitives.PerformWith());
+        registry.Register(85, new ControlPrimitives.Signal());
+        registry.Register(86, new ControlPrimitives.Wait());
+        registry.Register(87, new ControlPrimitives.Resume());
+        registry.Register(88, new ControlPrimitives.Suspend());
+        registry.Register(89, new ControlPrimitives.FlushCache());
+
+        // Input primitives (90-95)
         registry.Register(90, new InputOperations.MousePoint());
         registry.Register(91, new InputOperations.CursorLocPut());
         registry.Register(92, new InputOperations.CursorLink());
@@ -248,7 +212,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(94, new InputOperations.SampleInterval());
         registry.Register(95, new InputOperations.InputWord());
 
-        // Override with new IPrimitive implementations for Graphics primitives (96-104)
+        // Graphics primitives (96-104)
         registry.Register(96, new GraphicsOperations.CopyBits());
         registry.Register(97, new GraphicsOperations.Snapshot());
         registry.Register(98, new GraphicsOperations.OopsLeft());
@@ -259,11 +223,11 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(103, new GraphicsOperations.Beep());
         registry.Register(104, new GraphicsOperations.ClipboardText());
 
-        // Override with new IPrimitive implementations for String primitives (105-106)
+        // String primitives (105-106)
         registry.Register(105, new StringPrimitives.StringReplace());
         registry.Register(106, new StringPrimitives.AsSymbol());
 
-        // Override with new IPrimitive implementations for System primitives (112-139)
+        // System primitives (112-139)
         registry.Register(112, new SystemOperations.CoreLeft());
         registry.Register(113, new SystemOperations.Quit());
         registry.Register(114, new SystemOperations.ExitToDebugger());
