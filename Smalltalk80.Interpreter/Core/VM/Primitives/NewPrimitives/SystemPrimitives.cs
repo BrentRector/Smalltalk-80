@@ -37,9 +37,9 @@ public static class SystemOperations
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
 
-            if (context.PlatformBridge != null)
+            if (context.Platform != null)
             {
-                context.PlatformBridge.Quit(0);
+                context.Platform.Quit(0);
             }
             else
             {
@@ -163,7 +163,7 @@ public static class SystemOperations
 
             try
             {
-                context.HeapManager.BecomeOneWay(context.Receiver, context.Arguments[0]);
+                context.HeapManager.BecomeTwoWay(context.Receiver, context.Arguments[0]);
                 return PrimitiveResult.Ok(context.Arguments[0]);
             }
             catch
@@ -188,7 +188,7 @@ public static class SystemOperations
             for (int i = 0; i < tableSize; i++)
             {
                 var oop = SmalltalkOOP.FromObjectTableIndex(i);
-                if (!context.HeapManager.IsValidObject(oop)) continue;
+                if (!context.HeapManager.IsValidObjectOOP(oop)) continue;
 
                 SmalltalkOOP objClassOOP = context.HeapManager.GetClassOOP(oop);
                 if (objClassOOP == context.Receiver)
@@ -230,7 +230,7 @@ public static class SystemOperations
             for (int i = receiverIndex + 1; i < tableSize; i++)
             {
                 var oop = SmalltalkOOP.FromObjectTableIndex(i);
-                if (context.HeapManager.IsValidObject(oop))
+                if (context.HeapManager.IsValidObjectOOP(oop))
                 {
                     return PrimitiveResult.Ok(oop);
                 }

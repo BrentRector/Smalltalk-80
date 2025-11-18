@@ -215,13 +215,54 @@ public static class SimpleObjectPrimitives
 
             byte byteValue = context.HeapManager.GetIndexedByte(context.Receiver, index - 1);
 
-            // Get Character from CharacterTable
-            var characterTableOOP = SpecialObjectsArray.Instance.CharacterTable;
-            if (characterTableOOP == SpecialObjectsArray.Instance.Nil)
+            // Get Character from CharacterTable (Character class pool variable)
+            var characterOOP = GetCharacterForAscii(context, byteValue);
+            if (characterOOP == SpecialObjectsArray.Instance.Nil)
                 return PrimitiveResult.Fail();
 
-            var characterOOP = context.HeapManager.GetIndexedOOP(characterTableOOP, byteValue);
             return PrimitiveResult.Ok(characterOOP);
+        }
+
+        // Helper to get Character object for ASCII code
+        private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
+        {
+            if (context.RuntimeHeapAccess == null)
+                return SpecialObjectsArray.Instance.Nil;
+
+            // Get Character class from SystemDictionary
+            var characterClassOOP = context.RuntimeHeapAccess.GetClass("Character");
+            if (characterClassOOP == SpecialObjectsArray.Instance.Nil)
+                return SpecialObjectsArray.Instance.Nil;
+
+            // Get classPool from Character class (instance variable index 7)
+            var classPoolOOP = context.HeapManager.GetInstanceVariable(characterClassOOP, 7);
+            if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+                return SpecialObjectsArray.Instance.Nil;
+
+            // Search for CharacterTable in class pool
+            int dictSize = context.HeapManager.GetIndexedSize(classPoolOOP);
+            for (int i = 0; i < dictSize; i++)
+            {
+                var entryOOP = context.HeapManager.GetIndexedOOP(classPoolOOP, i);
+                if (entryOOP == SpecialObjectsArray.Instance.Nil)
+                    continue;
+
+                var keyOOP = context.HeapManager.GetInstanceVariable(entryOOP, 0);
+                int symbolSize = context.HeapManager.GetIndexedSize(keyOOP);
+                if (symbolSize != 14) continue; // "CharacterTable" has 14 chars
+
+                byte[] bytes = new byte[symbolSize];
+                for (int j = 0; j < symbolSize; j++)
+                    bytes[j] = context.HeapManager.GetIndexedByte(keyOOP, j);
+
+                if (System.Text.Encoding.ASCII.GetString(bytes) == "CharacterTable")
+                {
+                    var characterTableOOP = context.HeapManager.GetInstanceVariable(entryOOP, 1);
+                    return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+                }
+            }
+
+            return SpecialObjectsArray.Instance.Nil;
         }
     }
 

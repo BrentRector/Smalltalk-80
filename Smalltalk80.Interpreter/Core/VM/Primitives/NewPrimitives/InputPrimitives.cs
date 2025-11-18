@@ -19,9 +19,9 @@ public static class InputOperations
             int x = 0, y = 0;
 
             // Query platform bridge for native cursor position
-            if (context.PlatformBridge != null)
+            if (context.Platform != null)
             {
-                (x, y) = context.PlatformBridge.GetMousePosition();
+                (x, y) = context.Platform.GetMousePosition();
             }
 
             // Get Point class OOP
@@ -61,9 +61,9 @@ public static class InputOperations
             int y = yOOP.AsSmallInteger();
 
             // Move native cursor via platform bridge
-            if (context.PlatformBridge != null)
+            if (context.Platform != null)
             {
-                context.PlatformBridge.SetCursorPosition(x, y);
+                context.Platform.SetCursorPosition(x, y);
             }
 
             return PrimitiveResult.Ok(context.Receiver);
@@ -99,9 +99,9 @@ public static class InputOperations
                 return PrimitiveResult.Fail();
 
             // Register semaphore with platform event system
-            if (context.PlatformBridge != null)
+            if (context.Platform != null)
             {
-                context.PlatformBridge.SetInputSemaphore(semaphoreOOP);
+                context.Platform.SetInputSemaphore(semaphoreOOP);
             }
 
             return PrimitiveResult.Ok(context.Receiver);
@@ -121,9 +121,9 @@ public static class InputOperations
             int intervalMs = intervalOOP.AsSmallInteger();
 
             // Configure polling interval
-            if (context.PlatformBridge != null)
+            if (context.Platform != null)
             {
-                context.PlatformBridge.SetSampleInterval(intervalMs);
+                context.Platform.SetSampleInterval(intervalMs);
             }
 
             return PrimitiveResult.Ok(context.Receiver);
@@ -141,9 +141,9 @@ public static class InputOperations
             int inputWord = 0;
 
             // Get next input event from queue
-            if (context.PlatformBridge != null)
+            if (context.Platform != null)
             {
-                inputWord = context.PlatformBridge.GetInputWord();
+                inputWord = context.Platform.GetInputWord();
             }
 
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(inputWord));

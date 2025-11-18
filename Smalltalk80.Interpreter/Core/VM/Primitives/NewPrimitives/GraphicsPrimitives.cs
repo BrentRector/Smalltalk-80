@@ -18,9 +18,9 @@ public static class GraphicsOperations
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
 
             // Prefer hardware-accelerated BitBlt if available
-            if (context.PlatformBridge != null)
+            if (context.Platform != null)
             {
-                bool success = context.PlatformBridge.PerformBitBlt(context.Receiver);
+                bool success = context.Platform.PerformBitBlt(context.Receiver);
                 if (!success) return PrimitiveResult.Fail();
                 return PrimitiveResult.Ok(context.Receiver);
             }
@@ -122,9 +122,9 @@ public static class GraphicsOperations
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
 
-            if (context.PlatformBridge == null) return PrimitiveResult.Fail();
+            if (context.Platform == null) return PrimitiveResult.Fail();
 
-            bool success = context.PlatformBridge.PerformSnapshot(context.Receiver);
+            bool success = context.Platform.PerformSnapshot(context.Receiver);
             if (!success) return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(context.Receiver);
@@ -167,9 +167,9 @@ public static class GraphicsOperations
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
 
             int seconds;
-            if (context.PlatformBridge != null)
+            if (context.Platform != null)
             {
-                seconds = context.PlatformBridge.GetTimeWords();
+                seconds = context.Platform.GetTimeWords();
             }
             else
             {
@@ -189,13 +189,13 @@ public static class GraphicsOperations
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
 
             // Invalidate display if platform bridge available
-            if (context.PlatformBridge != null)
+            if (context.Platform != null)
             {
                 try
                 {
                     int width = context.HeapManager.GetInstanceVariable(context.Receiver, 1).AsSmallInteger();
                     int height = context.HeapManager.GetInstanceVariable(context.Receiver, 2).AsSmallInteger();
-                    context.PlatformBridge.InvalidateDisplayRegion(0, 0, width, height);
+                    context.Platform.InvalidateDisplayRegion(0, 0, width, height);
                 }
                 catch
                 {
@@ -227,9 +227,9 @@ public static class GraphicsOperations
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
 
-            if (context.PlatformBridge != null)
+            if (context.Platform != null)
             {
-                context.PlatformBridge.Beep();
+                context.Platform.Beep();
             }
             else
             {
@@ -245,12 +245,12 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.PlatformBridge == null) return PrimitiveResult.Fail();
+            if (context.Platform == null) return PrimitiveResult.Fail();
 
             if (context.Arguments.Length == 0)
             {
                 // Read clipboard
-                SmalltalkOOP stringOOP = context.PlatformBridge.ReadClipboardToStringOOP();
+                SmalltalkOOP stringOOP = context.Platform.ReadClipboardToStringOOP();
                 return PrimitiveResult.Ok(stringOOP);
             }
             else if (context.Arguments.Length == 1)
@@ -260,7 +260,7 @@ public static class GraphicsOperations
                 if (stringOOP.IsSmallInteger || stringOOP == SpecialObjectsArray.Instance.Nil)
                     return PrimitiveResult.Fail();
 
-                bool success = context.PlatformBridge.WriteClipboardFromStringOOP(stringOOP);
+                bool success = context.Platform.WriteClipboardFromStringOOP(stringOOP);
                 if (!success) return PrimitiveResult.Fail();
 
                 return PrimitiveResult.Ok(context.Receiver);
