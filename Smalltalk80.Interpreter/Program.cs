@@ -513,7 +513,7 @@ public static class Program
                         Console.WriteLine($"   Status: {result.Status}");
                         if (result.Diagnostic?.Message != null)
                         {
-                            Console.WriteLine($"   Error: {result.Diagnostic.Message}");
+                            Console.WriteLine($"   Error: {result.Diagnostic?.Message}");
                         }
                         // Stack trace suppressed for cleaner output
                         // if (result.Diagnostic?.StackTrace != null)
@@ -658,11 +658,11 @@ public static class Program
                         Console.WriteLine($"   Status: {result.Status}");
                         if (result.Diagnostic?.Message != null)
                         {
-                            Console.WriteLine($"   Error: {result.Diagnostic.Message}");
+                            Console.WriteLine($"   Error: {result.Diagnostic?.Message}");
                         }
                         if (verboseDebug && result.Diagnostic?.StackTrace != null)
                         {
-                            Console.WriteLine($"   Stack trace:\n{result.Diagnostic.StackTrace}");
+                            Console.WriteLine($"   Stack trace:\n{result.Diagnostic?.StackTrace}");
                         }
                         Environment.Exit(1);
                     }

@@ -18,6 +18,8 @@
   <!-- CLI and GUI files -->
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="CommandLineParser.cs" />
+    <Compile Include="DiagnosticInspector.cs" />
     <Compile Include="Platform\Windows\WinFormsDisplayProvider.cs" />
   </ItemGroup>
 
