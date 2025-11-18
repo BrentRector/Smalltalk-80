@@ -96,9 +96,6 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _specialSelectorOOPs;
 
-    // DEBUG: Context creation counter for diagnostic output
-    private static int _createContextCallCount = 0;
-
     // Blue Book architectural constants are defined in VMConstants.cs
     // All context field indices are now static constants shared across the VM
 
