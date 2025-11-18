@@ -496,7 +496,20 @@ n210012 "O[2,1] M[0,0] I[1,2]: varied nesting"
 	^[:oa1 :oa2 | | ot | ot _ 2. [[[:ia | | it1 it2 | it1 _ 3. it2 _ 5. oa1 + oa2 + ot + it1 + it2] value: 999] value] value] value: 0 value: 0!
 
 n121212 "O[1,2] M[1,2] I[1,2]: uniform complex nesting"
-	^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 0] value: 0] value: 0! !
+	^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 0] value: 0] value: 0!
+
+n121212diag "DIAGNOSTIC: Use powers of 2 to identify which variables are accessed"
+	"Expected result: 511 (binary 111111111 = all 9 variables accessed)
+	 Bit 0 (1):   oa  = 1
+	 Bit 1 (2):   ot1 = 2
+	 Bit 2 (4):   ot2 = 4
+	 Bit 3 (8):   ma  = 8
+	 Bit 4 (16):  mt1 = 16
+	 Bit 5 (32):  mt2 = 32
+	 Bit 6 (64):  ia  = 64
+	 Bit 7 (128): it1 = 128
+	 Bit 8 (256): it2 = 256"
+	^[:oa | | ot1 ot2 | ot1 _ 2. ot2 _ 4. [:ma | | mt1 mt2 | mt1 _ 16. mt2 _ 32. [:ia | | it1 it2 | it1 _ 128. it2 _ 256. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 64] value: 8] value: 1! !
 
 "Mutation tests"
 !BlockContextTest methodsFor: 'mutation'!

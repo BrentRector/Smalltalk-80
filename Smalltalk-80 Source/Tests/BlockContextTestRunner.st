@@ -41,10 +41,10 @@ initialize
 	sum := sum + (tester n210210).
 	sum := sum + (tester n012210).
 	sum := sum + (tester n210012).
-	sum := sum + (tester n121212).
 
-	"Check three-level (sum should be 1170 = 900 + 270)"
-	sum = 1170 ifFalse: [^sum].  "Return actual sum if three-level has issues"
+	"DIAGNOSTIC: Run n121212diag instead of n121212"
+	"Expected: 511 (all 9 variables), Previous actual: 1 (only oa)"
+	^(tester n121212diag)  "Return diagnostic result to decode which variables work"
 
 	"Mutation tests: 3 tests (each should return 10)"
 	sum := sum + (tester mut1).
