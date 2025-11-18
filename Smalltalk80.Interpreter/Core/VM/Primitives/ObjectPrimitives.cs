@@ -603,33 +603,38 @@ public static class CompiledMethodHelpers
         SmalltalkOOP[] literalOOPs,
         byte[] bytecodes)
     {
-        // 1. Allocate ByteArray for bytecodes
-        var bytecodeArrayOOP = heapManager.AllocateInstanceOf(byteArrayClassOOP, bytecodes.Length);
+        // Blue Book: CompiledMethod has heterogeneous format (pointers + bytes)
+        // Our implementation: PointerIndexed CompiledMethod + separate ByteArray
+        // CompiledMethod has 1 fixed slot (homeClass) plus indexed slots
+        int fixedSlots = 1;  // slot 0 = homeClass
+        int indexedSlots = 1 + literalOOPs.Length + 1; // header + literals + bytecodeArrayOOP
 
-        // 2. Copy bytecodes to ByteArray
+        // Step 1: Create separate ByteArray for bytecodes
+        var bytecodeArrayOOP = heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, bytecodes.Length);
+        heapManager.SetSlot(bytecodeArrayOOP, 0, byteArrayClassOOP);
         for (int i = 0; i < bytecodes.Length; i++)
         {
             heapManager.SetIndexedByte(bytecodeArrayOOP, i, bytecodes[i]);
         }
 
-        // 3. Allocate CompiledMethod with indexed slots: header + literals + bytecodeArrayOOP
-        int indexedSize = literalOOPs.Length + 2; // header + literals + bytecodeArrayOOP
-        var methodOOP = heapManager.AllocateInstanceOf(compiledMethodClassOOP, indexedSize);
+        // Step 2: Allocate PointerIndexed CompiledMethod
+        var methodOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, indexedSlots);
+        heapManager.SetSlot(methodOOP, 0, compiledMethodClassOOP);
 
-        // 4. Set homeClass as instance variable 0 (fixed slot)
+        // Step 3: Set fixed slot 0 (homeClass) - needed for super sends
         heapManager.SetInstanceVariable(methodOOP, 0, homeClassOOP);
 
-        // 5. Set indexed slots
-        // Slot 0: header
+        // Step 4: Populate indexed slots
+        // Indexed slot 0: Method header
         heapManager.SetIndexedOOP(methodOOP, 0, SmalltalkOOP.FromSmallInteger(headerWord));
 
-        // Slots 1..N: literals
+        // Slots 1..N: Literals
         for (int i = 0; i < literalOOPs.Length; i++)
         {
             heapManager.SetIndexedOOP(methodOOP, i + 1, literalOOPs[i]);
         }
 
-        // Final slot: bytecodeArrayOOP
+        // Slot N+1: Hidden ByteArray reference
         heapManager.SetIndexedOOP(methodOOP, literalOOPs.Length + 1, bytecodeArrayOOP);
 
         return methodOOP;
