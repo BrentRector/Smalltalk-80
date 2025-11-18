@@ -282,6 +282,139 @@ See `docs/Refactoring/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md` for detaile
 
 ---
 
+## Recent Work (2025-11-18) - Phase 7 Semantic Layer Complete
+
+**✅ COMPLETED: Phase 7 Semantic Layer (1,469 lines added)**
+
+Successfully implemented type-safe Blue Book view types and bytecode instruction records.
+
+### Key Accomplishments
+
+- **View Types** (`Core/VM/Views/`):
+  - `MethodContextView.cs` - Blue Book Chapter 27 method execution context
+  - `BlockContextView.cs` - Blue Book Chapter 27 block execution context
+  - `CompiledMethodView.cs` - Blue Book Chapter 26 compiled method with header parsing
+  - `ClassView.cs` - Blue Book Chapter 26 class structure
+  - `IContextAccessor.cs` - Unified context access interface with default implementation
+
+- **Bytecode Types** (`Core/VM/BytecodeTypes/`):
+  - `Instructions.cs` - 40+ typed instruction records for pattern matching
+  - `BytecodeDecoder.cs` - Decodes raw bytecodes to typed instructions
+
+### Benefits
+
+1. **Type Safety** - Can't confuse MethodContext with BlockContext
+2. **Self-Documenting** - Properties have Blue Book names (Sender, PC, StackPointer)
+3. **Pattern Matching** - Enables `switch (instruction) { case SendLiteral s: ... }`
+4. **Encapsulation** - Hides raw OOP/index manipulation
+5. **Incremental Adoption** - Existing code can adopt view types gradually
+
+### Commits
+
+- `53ab44c` - Phase 7: Semantic Layer - Blue Book view types and bytecode records
+- `0873ed2` - Fix namespace collision and missing using statements
+
+**Build Status**: ✅ 0 errors, 0 warnings
+
+See `docs/Refactoring/Refactoring Plan - Second Stage.md` for full refactoring plan.
+
+---
+
+## Recent Work (2025-11-18) - Phase 8 Heap Decomposition Complete
+
+**✅ COMPLETED: Phase 8 Heap Decomposition (1,716→774 lines)**
+
+Successfully decomposed SmalltalkHeapManager.cs from 1,716 lines to 774 lines by extracting three focused components.
+
+### Key Accomplishments
+
+- **Extracted Components** (`Core/HeapManager/`):
+  - `GarbageCollector.cs` (~240 lines) - Mark/sweep GC with IGarbageCollector interface
+  - `ObjectTableManager.cs` (~130 lines) - Table block management with IObjectTableManager interface
+  - `BecomeHandler.cs` (~80 lines) - Identity swap operations with IBecomeHandler interface
+
+- **New Interfaces**:
+  - `IGarbageCollector` - SetGCRoots, GarbageCollect, GetGCStatistics, MarkObject
+  - `IObjectTableManager` - AllocateObjectTableIndex, GetObjectTableEntry, EnumerateObjectTable
+  - `IBecomeHandler` - BecomeTwoWay for Blue Book become: primitive
+
+### Benefits
+
+1. **Separation of Concerns** - GC, table management, and become are now independent
+2. **Testability** - Each component can be unit tested in isolation
+3. **Maintainability** - 774 lines vs 1,716 lines (55% reduction)
+4. **Clear Interfaces** - Well-defined contracts for each subsystem
+
+### Commits
+
+- `7128e46` - Phase 8: Heap Decomposition - Extract GC, ObjectTable, and Become components
+- `9dde61d` - Update documentation for Phase 8 completion
+- `87d9e14` - Fix accessibility: make BecomeHandler and GarbageCollector internal
+- `ccd1d82` - Remove debug output after confirming no duplicate execution
+
+**Build Status**: ✅ 0 errors, 0 warnings
+**Test Status**: ✅ All 120 BlockContext tests pass (returns 1191)
+**Init Expressions**: ✅ 43/43 succeed
+
+### Next Steps
+
+Proceeding with Phase 11 (Remaining Decomposition) - decomposing Program.cs and Phase5_GlobalsAndPatches.cs.
+
+See `docs/Refactoring/Refactoring Plan - Second Stage.md` for full refactoring plan.
+
+---
+
+## Recent Work (2025-11-18) - Phase 10 Legacy Cleanup Complete
+
+**✅ COMPLETED: Phase 10 Legacy Cleanup (~8,000 lines removed)**
+
+Successfully removed all legacy primitive code and modernized the primitive system as part of the Second Stage refactoring.
+
+### Key Accomplishments
+
+- **Deleted 13 legacy primitive files** (~8,185 lines):
+  - ArithmeticPrimitives.cs (1,429 lines)
+  - ObjectPrimitives.cs (2,105 lines)
+  - ControlPrimitives.cs (1,040 lines)
+  - FloatPrimitives.cs (778 lines)
+  - LargeIntegerPrimitives.cs (795 lines)
+  - GraphicsPrimitives.cs (524 lines)
+  - InputPrimitives.cs (289 lines)
+  - StringPrimitives.cs (315 lines)
+  - SystemPrimitives.cs (479 lines)
+  - ProcessPrimitives.cs (134 lines)
+  - PointPrimitives.cs (106 lines)
+  - CompiledMethodPrimitives.cs (191 lines)
+  - PrimitiveTable.cs
+
+- **Modernized primitive system**:
+  - Moved NewPrimitives files to Primitives directory
+  - Updated all namespaces from NewPrimitives to Primitives
+  - Removed `ProcessPrimitives` dependency from InitExpressionExecutor
+  - Removed unused `primitiveContext` parameter from BytecodeInterpreter
+  - Cleaned up `IPrimitiveRegistry` interface (removed RegisterLegacy)
+  - Created `CompiledMethodHelpers` static helper class
+
+### Commits
+
+- `309a61a` - Phase 10: Complete legacy primitive cleanup
+- `88b8197` - Remove legacy PrimitiveFunction support from registry
+- `c69f4fa` - Fix build errors from legacy primitive cleanup
+- `062d0cf` - Fix SetIndexedPointer -> SetIndexedOOP method name
+- `8e70f4a` - Remove legacy ProcessPrimitives dependency
+- `e027c04` - Fix CompiledMethod allocation to use explicit fixed slots
+
+**Build Status**: ✅ 0 errors, 0 warnings
+**Test Status**: ✅ All 120 BlockContext tests pass (returns 1191)
+
+### Next Steps
+
+Phase 7 (Semantic Layer) completed. See section above for details.
+
+See `docs/Refactoring/Refactoring Plan - Second Stage.md` for full refactoring plan.
+
+---
+
 ## Recent Work (2025-11-18) - Phase 0 Naming Refactoring
 
 Successfully completed first 4 phases of systematic codebase naming refactoring and architecture cleanup. All phases validated with 100% success - interpreter remains fully operational.

@@ -5,6 +5,7 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Attributes;
+using Smalltalk80.Interpreter.Core.Diagnostics;
 using System.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Engine;
@@ -26,7 +27,7 @@ public class ColdStartOrchestrator : IColdStartLoader
     private readonly ObjectGraphAllocator _allocator;
     private readonly ColdstartReport _report;
     private readonly string _bundlePath;
-    private readonly ColdStartDebugOptions _debugOptions;
+    private readonly IDiagnosticHub? _diagnostics;
 
     /// <summary>
     /// Maps localId strings to allocated OOP values.
@@ -79,14 +80,14 @@ public class ColdStartOrchestrator : IColdStartLoader
     /// <param name="bundle">The cold start bundle containing the Smalltalk image data.</param>
     /// <param name="heapManager">The heap manager for allocating objects.</param>
     /// <param name="bundlePath">Optional path to the bundle file for diagnostics.</param>
-    /// <param name="debugOptions">Optional debug options for diagnostic output.</param>
-    public ColdStartOrchestrator(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, string? bundlePath = null, ColdStartDebugOptions? debugOptions = null)
+    /// <param name="diagnostics">Optional diagnostic hub for event emission.</param>
+    public ColdStartOrchestrator(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, string? bundlePath = null, IDiagnosticHub? diagnostics = null)
     {
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
         _heapManager = heapManager ?? throw new ArgumentNullException(nameof(heapManager));
         _allocator = new ObjectGraphAllocator(heapManager, bundle);
         _bundlePath = bundlePath ?? "coldstart.json";
-        _debugOptions = debugOptions ?? ColdStartDebugOptions.None;
+        _diagnostics = diagnostics;
 
         // Initialize SpecialObjectsArray (will be populated during Phase 3)
         SpecialObjectsArray.Initialize();
@@ -111,7 +112,14 @@ public class ColdStartOrchestrator : IColdStartLoader
     /// </summary>
     public void Run()
     {
-        Console.WriteLine("\n=== Cold Start Loader (New 6-Phase Architecture) ===\n");
+        _diagnostics?.Emit(new DiagnosticMessageEvent
+        {
+            Severity = MessageSeverity.Info,
+            Category = "ColdStart",
+            Message = "=== Cold Start Loader (New 6-Phase Architecture) ===",
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
 
         try
         {
@@ -167,7 +175,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches
-        var phase5 = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _debugOptions);
+        var phase5 = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
         _phases.Add(phase5);
         RunPhase(phase5.Name, () =>
         {
@@ -186,7 +194,14 @@ public class ColdStartOrchestrator : IColdStartLoader
             // Freeze global registry - no more registrations after this point
             GlobalRegistry.Freeze();
 
-            Console.WriteLine("\n=== Cold Start Complete ===\n");
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Info,
+                Category = "ColdStart",
+                Message = "=== Cold Start Complete ===",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
         }
         catch (Exception ex)
         {
@@ -273,7 +288,25 @@ public class ColdStartOrchestrator : IColdStartLoader
     /// <param name="phaseAction">The action to execute for the phase.</param>
     private void RunPhase(string phaseName, Action phaseAction)
     {
-        Console.Write($"{phaseName}... ");
+        // Extract phase number from name (e.g., "Phase 1: ..." -> 1)
+        int phaseNumber = 0;
+        if (phaseName.StartsWith("Phase ") && phaseName.Length > 6)
+        {
+            int colonIndex = phaseName.IndexOf(':');
+            if (colonIndex > 6)
+            {
+                int.TryParse(phaseName.Substring(6, colonIndex - 6), out phaseNumber);
+            }
+        }
+
+        _diagnostics?.Emit(new PhaseStartEvent
+        {
+            PhaseNumber = phaseNumber,
+            PhaseName = phaseName,
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
+
         var stopwatch = Stopwatch.StartNew();
 
         try
@@ -281,7 +314,16 @@ public class ColdStartOrchestrator : IColdStartLoader
             phaseAction();
             stopwatch.Stop();
             int durationMs = (int)stopwatch.ElapsedMilliseconds;
-            Console.WriteLine($"✓ ({durationMs}ms)");
+
+            _diagnostics?.Emit(new PhaseEndEvent
+            {
+                PhaseNumber = phaseNumber,
+                PhaseName = phaseName,
+                Duration = stopwatch.Elapsed,
+                Success = true,
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
 
             // Record phase duration in report
             _report.RecordPhaseDuration(phaseName, durationMs);
@@ -290,20 +332,23 @@ public class ColdStartOrchestrator : IColdStartLoader
         {
             stopwatch.Stop();
             int durationMs = (int)stopwatch.ElapsedMilliseconds;
-            Console.WriteLine($"✗ FAILED ({durationMs}ms)");
-            Console.WriteLine($"  Error: {ex.Message}");
+
+            _diagnostics?.Emit(new PhaseEndEvent
+            {
+                PhaseNumber = phaseNumber,
+                PhaseName = phaseName,
+                Duration = stopwatch.Elapsed,
+                Success = false,
+                ErrorMessage = ex.Message,
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
 
             // Record phase duration even on failure
             _report.RecordPhaseDuration(phaseName, durationMs);
 
             // Set failure information in report
             _report.SetFailure(phaseName, ex.Message);
-
-            // Include inner exception details if present
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"  Inner: {ex.InnerException.Message}");
-            }
 
             throw new InvalidOperationException($"Cold start failed at {phaseName}", ex);
         }

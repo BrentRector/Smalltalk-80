@@ -35,7 +35,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     private readonly LayoutResolver _layoutResolver;
     private readonly VMMetadata _metadata;
     private readonly IPlatformBridge? _platformBridge;
-    private readonly RuntimeDebugOptions _debugOptions;
     private readonly IStackManager _stackManager;
     private readonly IContextManager _contextManager;
     private readonly IMessageDispatcher _messageDispatcher;
@@ -55,9 +54,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
     /// <summary>Gets the total number of instructions executed by this VM instance.</summary>
     public long InstructionCount => _instructionCount;
-
-    /// <summary>Gets the runtime debug options for this VM instance.</summary>
-    public RuntimeDebugOptions DebugOptions => _debugOptions;
 
     /// <summary>Resets the instruction counter to zero. Used before executing init expressions.</summary>
     public void ResetInstructionCount() => _instructionCount = 0;
@@ -140,7 +136,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     private int _selectorTraceDepth = 0;
     private readonly Stack<(string className, string selector, int depth)> _selectorTraceStack = new();
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, RuntimeDebugOptions? debugOptions = null)
+    public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
     {
         _heapManager = heapManager;
         _layoutResolver = layoutResolver;
@@ -148,7 +144,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
         _metadata = metadata;
         _platformBridge = platformBridge;
-        _debugOptions = debugOptions ?? RuntimeDebugOptions.Default;
 
         _contextManager = new ContextManager(
             heapManager,
@@ -175,7 +170,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         _bytecodeInterpreter = new BytecodeInterpreter(
             heapManager,
             this, // IBytecodeContext
-            this, // IPrimitiveContext
             _runtimeHeapAccess,
             metadata
         );
@@ -853,11 +847,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
                 opcodeBytes = $"0x{bytecode:X2}";
             }
 
-            // if (_debugOptions.ShouldDebugBytecode)
-            // {
-            //     Console.WriteLine($"[BYTECODE EXEC] context={_contextManager.ActiveContext}, ip={ip-1}, bytecode={opcodeName} ({opcodeBytes})");
-            // }
-
             // Update IP
             _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
@@ -866,10 +855,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
             if (!continueExecution)
             {
-                // if (_debugOptions.ShouldDebugBytecode)
-                // {
-                //     Console.WriteLine($"[BYTECODE RETURN] context={_contextManager.ActiveContext}, returning from bytecode loop");
-                // }
                 // Check if this is a non-local return (block return bytecodes 0x7D/0x7E)
                 // If so, the return value is already in _nlrValue and we must not pop again
                 if (_nonLocalReturnPending)

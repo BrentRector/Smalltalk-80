@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using Smalltalk80.Interpreter.Core.Memory;
 
 namespace Smalltalk80.Interpreter.Core.HeapManager;
@@ -7,17 +6,13 @@ namespace Smalltalk80.Interpreter.Core.HeapManager;
 /// <summary>
 /// Implementation of ISmalltalkHeapManager providing low-level Smalltalk object management.
 /// Uses tagged OOPs for SmallIntegers and ObjectTable indirection for heap objects.
-/// Implements non-moving garbage collection that leverages .NET memory management.
+/// Delegates to specialized components for GC, table management, and become operations.
 /// </summary>
 public class SmalltalkHeapManager : ISmalltalkHeapManager
 {
-    private readonly List<ObjectTableBlock> _objectTableBlocks = new();
-    private readonly Stack<int> _freeObjectTableIndices = new();
-    private int _nextObjectTableIndex = 1; // Start at 1, reserve 0 for null/special cases
-    private const int ObjectTableBlockSize = 1024;
-
-    // GC root management
-    private SmalltalkOOP[] _gcRoots = Array.Empty<SmalltalkOOP>();
+    private readonly IObjectTableManager _tableManager;
+    private readonly IGarbageCollector _garbageCollector;
+    private readonly IBecomeHandler _becomeHandler;
 
     // Class name field index (determined from coldstart.json during initialization)
     private int _classNameFieldIndex = -1;
@@ -28,17 +23,11 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     // Verbose debug mode control
     public bool VerboseDebugMode { get; set; } = false;
 
-    /// <summary>Represents a block of ObjectTable entries for scalable growth.</summary>
-    private sealed class ObjectTableBlock
-    {
-        public readonly ObjectTableEntry?[] Entries = new ObjectTableEntry[ObjectTableBlockSize];
-        public int ActiveCount = 0;
-    }
-
     public SmalltalkHeapManager()
     {
-        // Allocate initial ObjectTable block
-        _objectTableBlocks.Add(new ObjectTableBlock());
+        _tableManager = new ObjectTableManager();
+        _garbageCollector = new GarbageCollector(_tableManager, this);
+        _becomeHandler = new BecomeHandler(_tableManager);
     }
 
     /// <summary>
@@ -49,6 +38,8 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     {
         _classNameFieldIndex = index;
     }
+
+    #region Object Allocation
 
     /// <summary>
     /// Allocates object with specified memory layout using managed storage.
@@ -78,19 +69,17 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         };
 
         // CRITICAL: Initialize all OOP slots to nil (Blue Book requirement)
-        // In Smalltalk-80, uninitialized instance variables must be nil, not OOP(0)
-        // C# arrays default to zero, but Smalltalk requires explicit nil initialization
         if (managedStorage is SmalltalkOOP[] oopArray)
         {
             var nilOOP = SpecialObjectsArray.Instance.Nil;
-            for (int i = 1; i < oopArray.Length; i++) // Skip slot 0 (class pointer, set below)
+            for (int i = 1; i < oopArray.Length; i++) // Skip slot 0 (class pointer)
             {
                 oopArray[i] = nilOOP;
             }
         }
 
         // Get ObjectTable index
-        int tableIndex = AllocateObjectTableIndex();
+        int tableIndex = _tableManager.AllocateObjectTableIndex();
 
         // Create ObjectTableEntry with managed storage and explicit metadata
         int? originalIndexedSize = (format == ObjectFormat.ByteIndexed) ? indexedSize : null;
@@ -103,7 +92,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         );
 
         // Store entry in ObjectTable
-        SetObjectTableEntry(tableIndex, entry);
+        _tableManager.SetObjectTableEntry(tableIndex, entry);
 
         // Return tagged OOP
         return SmalltalkOOP.FromObjectTableIndex(tableIndex);
@@ -116,18 +105,12 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             throw new ArgumentException("Cannot allocate instance of SmallInteger", nameof(classOOP));
 
         // Read the class's format field (instance variable 2 in Behavior hierarchy)
-        // Behavior: superclass(0), methodDict(1), format(2), subclasses(3)
         SmalltalkOOP formatOOP = GetInstanceVariable(classOOP, 2);
 
         if (!formatOOP.IsSmallInteger)
             throw new InvalidOperationException($"Class format field must be a SmallInteger, got {formatOOP}");
 
         // Decode the format SmallInteger
-        // Format encoding (from ColdStartJsonGenerator.cs CalculateFormatWord):
-        // - Bits 12-13: instanceSpec (instance specification: 01=pointer, 10=word-indexable, 11=byte-indexable)
-        // - Bits 6-11: fixedFieldCount (number of instance variables, 0-63)
-        // - Bit 4: isIndexable flag
-        // - Bit 3: hasPointers flag
         int formatValue = formatOOP.AsSmallInteger();
 
         int instanceSpec = (formatValue >> 12) & 0x03;
@@ -138,13 +121,13 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // Decode object format using the same logic as Phase2
         ObjectFormat format = instanceSpec switch
         {
-            0x00 => ObjectFormat.Pointer, // Fixed pointer objects
-            0x01 => ObjectFormat.Pointer, // Fixed pointer objects
-            0x02 when hasPointers && isIndexable => ObjectFormat.PointerIndexed, // Variable pointer objects (variableSubclass:)
-            0x02 when hasPointers && !isIndexable => ObjectFormat.Pointer, // Fixed pointer objects
-            0x02 when !hasPointers && isIndexable => ObjectFormat.WordIndexed, // WordIndexed objects (variableWordSubclass:)
-            0x02 when !hasPointers && !isIndexable => ObjectFormat.Pointer, // Fixed non-pointer objects (rare)
-            0x03 => ObjectFormat.ByteIndexed, // Byte objects (variableByteSubclass:)
+            0x00 => ObjectFormat.Pointer,
+            0x01 => ObjectFormat.Pointer,
+            0x02 when hasPointers && isIndexable => ObjectFormat.PointerIndexed,
+            0x02 when hasPointers && !isIndexable => ObjectFormat.Pointer,
+            0x02 when !hasPointers && isIndexable => ObjectFormat.WordIndexed,
+            0x02 when !hasPointers && !isIndexable => ObjectFormat.Pointer,
+            0x03 => ObjectFormat.ByteIndexed,
             _ => throw new InvalidOperationException($"Unknown format instanceSpec: {instanceSpec:X2}")
         };
 
@@ -154,8 +137,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // Set the new instance's class reference (slot 0) to the class
         SetSlot(newInstanceOOP, 0, classOOP);
 
-        // Initialize all instance variables (slots 1+) to nil
-        // C# arrays default to SmalltalkOOP(0), but we need nil
+        // Initialize all instance variables to nil
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
 
         // Track runtime allocations for debugging
@@ -165,10 +147,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (nilOOP.RawValue == 0)
         {
             throw new InvalidOperationException(
-                $"FATAL: SpecialObjectsArray.Instance.Nil is OOP(0)! " +
-                $"This means SpecialObjectsArray was not properly initialized. " +
-                $"Loader must call SpecialObjectsArray.Initialize() in constructor, " +
-                $"and GlobalRegistry.Register('nil', ...) must be called before runtime allocation.");
+                $"FATAL: SpecialObjectsArray.Instance.Nil is OOP(0)!");
         }
 
         for (int i = 1; i <= instanceVariableCount; i++)
@@ -188,6 +167,22 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         return newInstanceOOP;
     }
 
+    /// <summary>Calculates words needed for indexed data based on format.</summary>
+    private static int CalculateIndexedWords(ObjectFormat format, int indexedSize)
+    {
+        return format switch
+        {
+            ObjectFormat.Pointer => 0,
+            ObjectFormat.PointerIndexed => indexedSize,
+            ObjectFormat.ByteIndexed => (indexedSize + 3) / 4,
+            ObjectFormat.WordIndexed => (indexedSize + 1) / 2,
+            _ => throw new ArgumentException($"Unknown object format: {format}")
+        };
+    }
+
+    #endregion
+
+    #region Slot Access
 
     /// <summary>
     /// Raw slot access - gets OOP from any slot (semantic-agnostic).
@@ -197,7 +192,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot get slot from SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
         return ReadSlot(entry, slotIndex);
     }
 
@@ -209,141 +204,43 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot set slot in SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
         WriteSlot(entry, slotIndex, value);
     }
 
-    /// <summary>Calculates words needed for indexed data based on format.</summary>
-    private static int CalculateIndexedWords(ObjectFormat format, int indexedSize)
-    {
-        return format switch
-        {
-            ObjectFormat.Pointer => 0, // No indexed data
-            ObjectFormat.PointerIndexed => indexedSize, // 1 word per OOP
-            ObjectFormat.ByteIndexed => (indexedSize + 3) / 4, // Round up to words
-            ObjectFormat.WordIndexed => (indexedSize + 1) / 2, // Round up to words  
-            _ => throw new ArgumentException($"Unknown object format: {format}")
-        };
-    }
-
-    /// <summary>Allocates a new ObjectTable index, growing blocks as needed.</summary>
-    private int AllocateObjectTableIndex()
-    {
-        // Reuse free index if available
-        if (_freeObjectTableIndices.Count > 0)
-            return _freeObjectTableIndices.Pop();
-
-        // Canonical mapping: index >= 1, so (index - 1) gives 0-based block/entry
-        int blockIndex = (_nextObjectTableIndex - 1) / ObjectTableBlockSize;
-        if (blockIndex >= _objectTableBlocks.Count)
-        {
-            _objectTableBlocks.Add(new ObjectTableBlock());
-        }
-
-        return _nextObjectTableIndex++;
-    }
-
-    /// <summary>Gets ObjectTableEntry for a given OOP.</summary>
-    private ObjectTableEntry GetObjectTableEntry(SmalltalkOOP objectOOP)
-    {
-        int tableIndex = objectOOP.ToObjectTableIndex();
-
-        // Canonical mapping: (index - 1) for 1-based indices
-        int blockIndex = (tableIndex - 1) / ObjectTableBlockSize;
-        int entryIndex = (tableIndex - 1) % ObjectTableBlockSize;
-
-        if (blockIndex >= _objectTableBlocks.Count)
-            throw new ArgumentException($"Invalid ObjectTable index: {tableIndex}");
-
-        var entry = _objectTableBlocks[blockIndex].Entries[entryIndex];
-        if (entry == null)
-            throw new ArgumentException($"ObjectTable entry {tableIndex} is null");
-
-        return entry;
-    }
-
-    /// <summary>Sets ObjectTableEntry for a given index.</summary>
-    private void SetObjectTableEntry(int tableIndex, ObjectTableEntry entry)
-    {
-        // Canonical mapping: (index - 1) for 1-based indices
-        int blockIndex = (tableIndex - 1) / ObjectTableBlockSize;
-        int entryIndex = (tableIndex - 1) % ObjectTableBlockSize;
-
-        if (blockIndex >= _objectTableBlocks.Count)
-            throw new ArgumentException($"Invalid ObjectTable index: {tableIndex}");
-
-        var block = _objectTableBlocks[blockIndex];
-        bool wasNull = block.Entries[entryIndex] == null;
-
-        block.Entries[entryIndex] = entry;
-
-        if (wasNull && entry != null)
-            block.ActiveCount++;
-        else if (!wasNull && entry == null)
-            block.ActiveCount--;
-    }
-
-    /// <summary>
-    /// Gets an instance variable by index with bounds checking.
-    /// </summary>
     public SmalltalkOOP GetInstanceVariable(SmalltalkOOP objectOOP, int index)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot get instance variable of SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
         int instanceVarCount = entry.InstanceVariableCountExplicit;
 
         if (index < 0 || index >= instanceVarCount)
             throw new ArgumentOutOfRangeException(nameof(index),
                 $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
 
-        // Slot layout: [0]=header, [1..N]=instance variables
         return ReadSlot(entry, 1 + index);
     }
 
-    /// <summary>
-    /// Sets an instance variable by index with bounds checking.
-    /// </summary>
     public void SetInstanceVariable(SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
     {
-        // Default behavior: use barrier for safety
         SetInstanceVariableWithBarrier(objectOOP, index, value);
     }
-
-    // DEBUG: Counter for SetInstanceVariable calls
-    private static int _setInstanceVarCallCount = 0;
 
     public void SetInstanceVariableWithBarrier(SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot set instance variable of SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
         int instanceVarCount = entry.InstanceVariableCountExplicit;
 
         if (index < 0 || index >= instanceVarCount)
             throw new ArgumentOutOfRangeException(nameof(index),
                 $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
 
-        // DEBUG: Log WriteStream instance variable assignments (classOOP=oop=8544)
-        var classOOP = GetSlot(objectOOP, 0);
-        if (classOOP.RawValue == 8544)  // WriteStream class
-        {
-            System.Threading.Interlocked.Increment(ref _setInstanceVarCallCount);
-            if (_setInstanceVarCallCount <= 50)  // Reduced to 50 to avoid clutter
-            {
-                Console.WriteLine($"[SetInstVar #{_setInstanceVarCallCount}] {objectOOP}.field[{index}] ← {value}");
-            }
-            else if (_setInstanceVarCallCount == 51)
-            {
-                Console.WriteLine($"[SetInstVar] (suppressing after 50, reduces clutter)");
-            }
-        }
-
-        // Slot layout: [0]=header, [1..N]=instance variables
         WriteSlot(entry, 1 + index, value);
-
         // Write barrier: Future implementation for incremental/concurrent GC
     }
 
@@ -352,172 +249,62 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot set instance variable of SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
         int instanceVarCount = entry.InstanceVariableCountExplicit;
 
         if (index < 0 || index >= instanceVarCount)
             throw new ArgumentOutOfRangeException(nameof(index),
                 $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
 
-        // Direct write without barrier - ONLY safe during loader
         WriteSlot(entry, 1 + index, value);
     }
 
-    /// <summary>Helper to calculate indexed size from entry metadata.</summary>
-    private int GetIndexedSizeFromEntry(ObjectTableEntry entry)
-    {
-        int totalWords = entry.SizeInWords;
-        int headerWords = 1;
-        int instanceVarCount = entry.InstanceVariableCount;
-        
-        // Calculate indexed portion: total - header - instance variables
-        int indexedWords = totalWords - headerWords - instanceVarCount;
-        if (indexedWords < 0) indexedWords = 0; // Safety check
-        
-        return entry.Format switch
-        {
-            ObjectFormat.PointerIndexed => indexedWords,
-            ObjectFormat.ByteIndexed => entry.OriginalIndexedSize ?? (indexedWords * 4), // Use original size if available, fallback to word-aligned calculation
-            ObjectFormat.WordIndexed => indexedWords * 2,
-            _ => 0
-        };
-    }
+    #endregion
 
-    /// <summary>
-    /// Gets indexed OOP from PointerIndexed objects with format and bounds validation.
-    /// </summary>
+    #region Indexed Access
+
     public SmalltalkOOP GetIndexedOOP(SmalltalkOOP objectOOP, int index)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot get indexed OOP from SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
 
         if (entry.FormatExplicit != ObjectFormat.PointerIndexed)
         {
-            // Enhanced error message with diagnostic info
-            var classOOP = GetSlot(objectOOP, 0); // Get class from slot 0
-            string className = "UnknownClass";
-            try
-            {
-                if (!classOOP.IsSmallInteger && classOOP != default)
-                {
-                    // Try to get class name for better diagnostics
-                    var classEntry = GetObjectTableEntry(classOOP);
-                    if (classEntry.FormatExplicit == ObjectFormat.Pointer || classEntry.FormatExplicit == ObjectFormat.PointerIndexed)
-                    {
-                        // Classes have a 'name' field - but we need the field index
-                        // For now, just show the classOOP
-                        className = $"class={classOOP}";
-                    }
-                }
-            }
-            catch
-            {
-                // Ignore errors in diagnostic code
-            }
-
+            var classOOP = GetSlot(objectOOP, 0);
             throw new InvalidOperationException(
                 $"GetIndexedOOP called on non-PointerIndexed object!\n" +
-                $"  objectOOP: {objectOOP}\n" +
-                $"  format: {entry.FormatExplicit} (expected PointerIndexed)\n" +
-                $"  {className}\n" +
-                $"  index: {index}\n" +
-                $"  This likely means a ByteIndexed Symbol/String or bytecode array is being used where a PointerIndexed object (like Array or MethodDictionary) was expected.");
+                $"  objectOOP: {objectOOP}, format: {entry.FormatExplicit}, class={classOOP}, index: {index}");
         }
 
         return ReadIndexedOop(entry, index);
     }
 
-    /// <summary>
-    /// Sets indexed OOP in PointerIndexed objects with format and bounds validation.
-    /// </summary>
     public void SetIndexedOOP(SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot set indexed OOP in SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
 
         if (entry.FormatExplicit != ObjectFormat.PointerIndexed)
         {
-            // Enhanced error message with diagnostic info
             var classOOP = GetSlot(objectOOP, 0);
-            string className = "UnknownClass";
-            string valueClassName = "UnknownClass";
-            try
-            {
-                if (!classOOP.IsSmallInteger && classOOP != default)
-                {
-                    var classEntry = GetObjectTableEntry(classOOP);
-                    if (classEntry.FormatExplicit == ObjectFormat.Pointer || classEntry.FormatExplicit == ObjectFormat.PointerIndexed)
-                    {
-                        className = $"class={classOOP}";
-                    }
-                }
-
-                // Get info about the value we're trying to write
-                if (!value.IsSmallInteger && value != default)
-                {
-                    var valueClassOOP = GetSlot(value, 0);
-                    valueClassName = $"class={valueClassOOP}";
-                }
-                else if (value.IsSmallInteger)
-                {
-                    valueClassName = "SmallInteger";
-                }
-            }
-            catch
-            {
-                // Ignore errors in diagnostic code
-            }
-
             throw new InvalidOperationException(
                 $"SetIndexedOOP called on non-PointerIndexed object!\n" +
-                $"  objectOOP: {objectOOP}\n" +
-                $"  format: {entry.FormatExplicit} (expected PointerIndexed)\n" +
-                $"  {className}\n" +
-                $"  index: {index}\n" +
-                $"  value: {value}\n" +
-                $"  value class: {valueClassName}\n" +
-                $"  This likely means we're trying to write to a ByteIndexed object (Symbol/String/ByteArray/WordArray) indexed slots, which is not allowed.\n" +
-                $"  Possible causes:\n" +
-                $"    - Context object has wrong format (should be PointerIndexed)\n" +
-                $"    - Wrong object being used as a context or array\n" +
-                $"    - Field layout error causing wrong object to be accessed");
-        }
-
-        // DEBUG: Track writes to BlockContext 64034 (the one being corrupted)
-        // OOP display format "oop=64034" means object table index 32017, raw value 64034
-        if (objectOOP.RawValue == 64034)  // Match the raw OOP value directly
-        {
-            var classOOP = GetSlot(objectOOP, 0);
-            string className = GetClassName(classOOP);
-            string valueStr = value.IsSmallInteger ? $"SmallInteger({value.AsSmallInteger()})" : $"{value}";
-            if (!value.IsSmallInteger)
-            {
-                try
-                {
-                    var valueClassOOP = GetSlot(value, 0);
-                    string valueClassName = GetClassName(valueClassOOP);
-                    valueStr = $"{valueClassName} OOP({value})";
-                }
-                catch { }
-            }
+                $"  objectOOP: {objectOOP}, format: {entry.FormatExplicit}, class={classOOP}, index: {index}");
         }
 
         WriteIndexedOop(entry, index, value);
     }
 
-    /// <summary>
-    /// Gets indexed byte from ByteIndexed objects with format and bounds validation.
-    /// </summary>
     public byte GetIndexedByte(SmalltalkOOP objectOOP, int index)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot get indexed byte from SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
 
         if (entry.FormatExplicit != ObjectFormat.ByteIndexed)
             throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support byte indexing");
@@ -525,15 +312,12 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         return ReadIndexedByte(entry, index);
     }
 
-    /// <summary>
-    /// Sets indexed byte in ByteIndexed objects with format and bounds validation.
-    /// </summary>
     public void SetIndexedByte(SmalltalkOOP objectOOP, int index, byte value)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot set indexed byte in SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
 
         if (entry.FormatExplicit != ObjectFormat.ByteIndexed)
             throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support byte indexing");
@@ -541,15 +325,12 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         WriteIndexedByte(entry, index, value);
     }
 
-    /// <summary>
-    /// Gets indexed word from WordIndexed objects with format and bounds validation.
-    /// </summary>
     public ushort GetIndexedWord(SmalltalkOOP objectOOP, int index)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot get indexed word from SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
 
         if (entry.FormatExplicit != ObjectFormat.WordIndexed)
             throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support word indexing");
@@ -557,15 +338,12 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         return ReadIndexedWord(entry, index);
     }
 
-    /// <summary>
-    /// Sets indexed word in WordIndexed objects with format and bounds validation.
-    /// </summary>
     public void SetIndexedWord(SmalltalkOOP objectOOP, int index, ushort value)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot set indexed word in SmallInteger");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
 
         if (entry.FormatExplicit != ObjectFormat.WordIndexed)
             throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support word indexing");
@@ -573,27 +351,16 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         WriteIndexedWord(entry, index, value);
     }
 
-
-    /// <summary>Helper to get instance variable count from entry.</summary>
-    private int GetInstanceVariableCountFromEntry(ObjectTableEntry entry)
-    {
-        return entry.InstanceVariableCount;
-    }
+    #endregion
 
     #region Managed Storage Access Helpers
 
-    /// <summary>
-    /// Reads a slot from PointerIndexed/Pointer object storage.
-    /// Slot 0 = header, slots 1+ = instance variables or indexed elements.
-    /// </summary>
     private SmalltalkOOP ReadSlot(ObjectTableEntry entry, int slotIndex)
     {
-        // Slot 0 is always the class reference - handle specially for ByteIndexed/WordIndexed
         if (slotIndex == 0)
         {
             if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
                 return entry.ClassOOP;
-            // Fall through to OOP array access for Pointer/PointerIndexed
         }
 
         var oopArray = entry.AsOopArray();
@@ -607,12 +374,8 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         return oopArray[slotIndex];
     }
 
-    /// <summary>
-    /// Writes a slot in PointerIndexed/Pointer object storage.
-    /// </summary>
     private void WriteSlot(ObjectTableEntry entry, int slotIndex, SmalltalkOOP value)
     {
-        // Slot 0 is always the class reference - handle specially for ByteIndexed/WordIndexed
         if (slotIndex == 0)
         {
             if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
@@ -620,7 +383,6 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                 entry.ClassOOP = value;
                 return;
             }
-            // Fall through to OOP array access for Pointer/PointerIndexed
         }
 
         var oopArray = entry.AsOopArray();
@@ -634,19 +396,14 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         oopArray[slotIndex] = value;
     }
 
-    /// <summary>
-    /// Reads indexed OOP from PointerIndexed object (skips header + instance variables).
-    /// </summary>
     private SmalltalkOOP ReadIndexedOop(ObjectTableEntry entry, int index)
     {
-        Debug.Assert(entry.FormatExplicit == ObjectFormat.PointerIndexed,
-            $"Expected PointerIndexed format, got {entry.FormatExplicit}");
+        Debug.Assert(entry.FormatExplicit == ObjectFormat.PointerIndexed);
 
         var oopArray = entry.AsOopArray();
         if (oopArray == null)
             throw new InvalidOperationException($"PointerIndexed object has no OOP array storage");
 
-        // Calculate offset: header (1) + instance variables
         int offset = 1 + entry.InstanceVariableCountExplicit;
         int indexedSize = oopArray.Length - offset;
 
@@ -657,19 +414,14 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         return oopArray[offset + index];
     }
 
-    /// <summary>
-    /// Writes indexed OOP to PointerIndexed object.
-    /// </summary>
     private void WriteIndexedOop(ObjectTableEntry entry, int index, SmalltalkOOP value)
     {
-        Debug.Assert(entry.FormatExplicit == ObjectFormat.PointerIndexed,
-            $"Expected PointerIndexed format, got {entry.FormatExplicit}");
+        Debug.Assert(entry.FormatExplicit == ObjectFormat.PointerIndexed);
 
         var oopArray = entry.AsOopArray();
         if (oopArray == null)
             throw new InvalidOperationException($"PointerIndexed object has no OOP array storage");
 
-        // Calculate offset: header (1) + instance variables
         int offset = 1 + entry.InstanceVariableCountExplicit;
         int indexedSize = oopArray.Length - offset;
 
@@ -680,13 +432,9 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         oopArray[offset + index] = value;
     }
 
-    /// <summary>
-    /// Reads indexed byte from ByteIndexed object.
-    /// </summary>
     private byte ReadIndexedByte(ObjectTableEntry entry, int index)
     {
-        Debug.Assert(entry.FormatExplicit == ObjectFormat.ByteIndexed,
-            $"Expected ByteIndexed format, got {entry.FormatExplicit}");
+        Debug.Assert(entry.FormatExplicit == ObjectFormat.ByteIndexed);
 
         var byteArray = entry.AsByteArray();
         if (byteArray == null)
@@ -699,13 +447,9 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         return byteArray[index];
     }
 
-    /// <summary>
-    /// Writes indexed byte to ByteIndexed object.
-    /// </summary>
     private void WriteIndexedByte(ObjectTableEntry entry, int index, byte value)
     {
-        Debug.Assert(entry.FormatExplicit == ObjectFormat.ByteIndexed,
-            $"Expected ByteIndexed format, got {entry.FormatExplicit}");
+        Debug.Assert(entry.FormatExplicit == ObjectFormat.ByteIndexed);
 
         var byteArray = entry.AsByteArray();
         if (byteArray == null)
@@ -718,13 +462,9 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         byteArray[index] = value;
     }
 
-    /// <summary>
-    /// Reads indexed word from WordIndexed object.
-    /// </summary>
     private ushort ReadIndexedWord(ObjectTableEntry entry, int index)
     {
-        Debug.Assert(entry.FormatExplicit == ObjectFormat.WordIndexed,
-            $"Expected WordIndexed format, got {entry.FormatExplicit}");
+        Debug.Assert(entry.FormatExplicit == ObjectFormat.WordIndexed);
 
         var wordArray = entry.AsWordArray();
         if (wordArray == null)
@@ -737,13 +477,9 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         return wordArray[index];
     }
 
-    /// <summary>
-    /// Writes indexed word to WordIndexed object.
-    /// </summary>
     private void WriteIndexedWord(ObjectTableEntry entry, int index, ushort value)
     {
-        Debug.Assert(entry.FormatExplicit == ObjectFormat.WordIndexed,
-            $"Expected WordIndexed format, got {entry.FormatExplicit}");
+        Debug.Assert(entry.FormatExplicit == ObjectFormat.WordIndexed);
 
         var wordArray = entry.AsWordArray();
         if (wordArray == null)
@@ -758,469 +494,149 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
 
     #endregion
 
-    /// <summary>
-    /// Gets the OOP stored in slot 0 (header).
-    /// DEPRECATED: Use GetSlot(objectOOP, 0) instead for semantic-agnostic access.
-    /// </summary>
+    #region Object Metadata
+
     public SmalltalkOOP GetClassOOP(SmalltalkOOP objectOOP)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("SmallIntegers don't have header slot");
 
-        var entry = GetObjectTableEntry(objectOOP);
-        var classOOP = ReadSlot(entry, 0); // Slot 0 is always the class reference
-        return classOOP;
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+        return ReadSlot(entry, 0);
     }
 
-    /// <summary>
-    /// Sets the class reference of an object (slot 0).
-    /// Used by primitives that create instances of dynamically determined classes.
-    /// </summary>
     public void SetClassOOP(SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
     {
         SetSlot(objectOOP, 0, classOOP);
     }
 
-    /// <summary>
-    /// Gets the object format from ObjectTableEntry.
-    /// </summary>
     public ObjectFormat GetObjectFormat(SmalltalkOOP objectOOP)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("SmallIntegers don't have object format");
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
         return entry.Format;
     }
 
-    /// <summary>
-    /// Gets the total size of an object in words.
-    /// </summary>
     public int GetObjectSizeInWords(SmalltalkOOP objectOOP)
     {
         if (objectOOP.IsSmallInteger)
-            return 0; // SmallIntegers have no heap footprint
+            return 0;
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
         return entry.SizeInWords;
     }
 
-    /// <summary>
-    /// Gets the number of instance variables for an object.
-    /// </summary>
     public int GetInstanceVariableCount(SmalltalkOOP objectOOP)
     {
         if (objectOOP.IsSmallInteger)
-            return 0; // SmallIntegers have no instance variables
+            return 0;
 
-        var entry = GetObjectTableEntry(objectOOP);
-        return GetInstanceVariableCountFromEntry(entry);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+        return entry.InstanceVariableCount;
     }
 
-    /// <summary>
-    /// Gets the size of the indexed portion of an object.
-    /// </summary>
     public int GetIndexedSize(SmalltalkOOP objectOOP)
     {
         if (objectOOP.IsSmallInteger)
-            return 0; // SmallIntegers have no indexed data
+            return 0;
 
-        var entry = GetObjectTableEntry(objectOOP);
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
         return GetIndexedSizeFromEntry(entry);
     }
 
-    /// <summary>
-    /// Marks an object as reachable during GC mark phase.
-    /// </summary>
-    public void MarkObject(SmalltalkOOP objectOOP)
+    private int GetIndexedSizeFromEntry(ObjectTableEntry entry)
     {
-        if (objectOOP.IsSmallInteger)
-            return; // SmallIntegers don't need marking
+        int totalWords = entry.SizeInWords;
+        int headerWords = 1;
+        int instanceVarCount = entry.InstanceVariableCount;
+        int indexedWords = totalWords - headerWords - instanceVarCount;
+        if (indexedWords < 0) indexedWords = 0;
 
-        if (!IsValidObjectOOP(objectOOP))
-            return; // Invalid OOPs are ignored
-
-        var entry = GetObjectTableEntry(objectOOP);
-        entry.IsMarked = true;
-    }
-
-    /// <summary>
-    /// Sets the GC root objects array. The GC will start its reachability walk from these objects.
-    /// This replaces any previously set root objects.
-    /// </summary>
-    public void SetGCRoots(SmalltalkOOP[] rootObjects)
-    {
-        _gcRoots = rootObjects?.ToArray() ?? Array.Empty<SmalltalkOOP>();
-    }
-
-    /// <summary>
-    /// Adds additional OOPs to the current GC roots array.
-    /// Useful for temporarily adding objects during specific operations.
-    /// </summary>
-    public void AddGCRoots(SmalltalkOOP[] additionalRoots)
-    {
-        if (additionalRoots == null || additionalRoots.Length == 0)
-            return;
-            
-        var newRoots = new SmalltalkOOP[_gcRoots.Length + additionalRoots.Length];
-        _gcRoots.CopyTo(newRoots, 0);
-        additionalRoots.CopyTo(newRoots, _gcRoots.Length);
-        _gcRoots = newRoots;
-    }
-
-    /// <summary>
-    /// Gets the current GC roots array (defensive copy).
-    /// </summary>
-    public SmalltalkOOP[] GetGCRoots()
-    {
-        return _gcRoots.ToArray();
-    }
-
-    /// <summary>
-    /// DEBUG: Performs GC marking phase only and returns unreachable objects without collecting them.
-    /// Returns array of OOPs that would be collected during a full GC.
-    /// </summary>
-    public SmalltalkOOP[] GetUnreachableObjects()
-    {
-        var unreachableObjects = new List<SmalltalkOOP>();
-        
-        // Phase 1: Clear all mark bits
-        foreach (var block in _objectTableBlocks)
+        return entry.Format switch
         {
-            for (int i = 0; i < block.Entries.Length; i++)
-            {
-                if (block.Entries[i] != null)
-                    block.Entries[i]!.IsMarked = false;
-            }
-        }
-        
-        // Phase 2: Mark from configured roots
-        foreach (var rootOOP in _gcRoots)
-        {
-            MarkObjectRecursively(rootOOP);
-        }
-        
-        // Phase 3: Find unmarked objects (would be collected)
-        for (int blockIndex = 0; blockIndex < _objectTableBlocks.Count; blockIndex++)
-        {
-            var block = _objectTableBlocks[blockIndex];
-            for (int i = 0; i < block.Entries.Length; i++)
-            {
-                var entry = block.Entries[i];
-                if (entry != null && !entry.IsMarked)
-                {
-                    // Use canonical mapping to create OOP
-                    int objectId = blockIndex * ObjectTableBlockSize + i + 1;
-                    unreachableObjects.Add(SmalltalkOOP.FromObjectTableIndex(objectId));
-                }
-            }
-        }
-        
-        return unreachableObjects.ToArray();
-    }
-
-    /// <summary>
-    /// Performs mark-and-sweep garbage collection using the configured root objects.
-    /// Returns detailed statistics about the collection.
-    /// </summary>
-    public GCStatistics GarbageCollect()
-    {
-        var stopwatch = Stopwatch.StartNew();
-
-        // Phase 1: Count objects before collection
-        int objectsBeforeCollection = GetActiveObjectCount();
-
-        // Phase 2: Clear all mark bits
-        foreach (var block in _objectTableBlocks)
-        {
-            for (int i = 0; i < block.Entries.Length; i++)
-            {
-                if (block.Entries[i] != null)
-                    block.Entries[i]!.IsMarked = false;
-            }
-        }
-
-        double markStartTime = stopwatch.Elapsed.TotalMilliseconds;
-
-        // Phase 3: Mark from configured roots
-        foreach (var rootOOP in _gcRoots)
-        {
-            MarkObjectRecursively(rootOOP);
-        }
-
-        double markEndTime = stopwatch.Elapsed.TotalMilliseconds;
-        double markTime = markEndTime - markStartTime;
-        
-        // Phase 4: Sweep unmarked objects
-        var collectedByFormat = new Dictionary<ObjectFormat, int>();
-        long estimatedBytesFreed = 0;
-        int objectsCollected = 0;
-        
-        var firstCollectedIds = new List<int>();
-        var collectedObjectDetails = new List<(int oop, ObjectFormat format, int size, string? className)>();
-        
-        for (int blockIndex = 0; blockIndex < _objectTableBlocks.Count; blockIndex++)
-        {
-            var block = _objectTableBlocks[blockIndex];
-            for (int i = 0; i < block.Entries.Length; i++)
-            {
-                var entry = block.Entries[i];
-                if (entry != null && !entry.IsMarked)
-                {
-                    // Track collection statistics
-                    collectedByFormat[entry.FormatExplicit] = collectedByFormat.GetValueOrDefault(entry.FormatExplicit) + 1;
-                    estimatedBytesFreed += entry.SizeInWordsExplicit * 4;
-                    objectsCollected++;
-
-                    // Track collected object IDs for debugging (use canonical mapping)
-                    int objectId = blockIndex * ObjectTableBlockSize + i + 1;
-                    if (firstCollectedIds.Count < 20)
-                    {
-                        firstCollectedIds.Add(objectId);
-                    }
-                    
-                    // Track detailed info about collected objects
-                    if (collectedObjectDetails.Count < 50)
-                    {
-                        var oop = SmalltalkOOP.FromObjectTableIndex(objectId);
-                        string? className = null;
-                        try
-                        {
-                            className = GetClassName(oop);
-                        }
-                        catch
-                        {
-                            className = "<unknown>";
-                        }
-                        collectedObjectDetails.Add((objectId, entry.FormatExplicit, entry.SizeInWordsExplicit, className));
-                    }
-
-                    // Clear managed storage (allows .NET GC to reclaim memory)
-                    entry.ManagedStorage = null;
-
-                    // Push freed index back to free list for reuse
-                    _freeObjectTableIndices.Push(objectId);
-
-                    // Free the ObjectTable entry
-                    block.Entries[i] = null;
-                    block.ActiveCount--;
-                }
-            }
-        }
-        
-        
-        double sweepEndTime = stopwatch.Elapsed.TotalMilliseconds;
-        double sweepTime = sweepEndTime - markEndTime;
-        
-        int objectsAfterCollection = GetActiveObjectCount();
-        int freeEntries = GetObjectTableSize() - objectsAfterCollection;
-        
-        
-        return new GCStatistics
-        {
-            TotalObjects = objectsBeforeCollection,
-            LiveObjects = objectsAfterCollection,
-            CollectedObjects = objectsCollected,
-            MarkTimeMs = markTime,
-            SweepTimeMs = sweepTime,
-            TotalTimeMs = stopwatch.Elapsed.TotalMilliseconds,
-            EstimatedBytesFreed = estimatedBytesFreed,
-            CollectedByFormat = collectedByFormat,
-            FreeObjectTableEntries = freeEntries,
-            CollectedObjectDetails = collectedObjectDetails
+            ObjectFormat.PointerIndexed => indexedWords,
+            ObjectFormat.ByteIndexed => entry.OriginalIndexedSize ?? (indexedWords * 4),
+            ObjectFormat.WordIndexed => indexedWords * 2,
+            _ => 0
         };
     }
 
-    /// <summary>Recursively marks an object and all objects it references.</summary>
-    private void MarkObjectRecursively(SmalltalkOOP objectOOP)
+    #endregion
+
+    #region GC Delegation
+
+    public void MarkObject(SmalltalkOOP objectOOP) => _garbageCollector.MarkObject(objectOOP);
+    public void SetGCRoots(SmalltalkOOP[] rootObjects) => _garbageCollector.SetGCRoots(rootObjects);
+    public void AddGCRoots(SmalltalkOOP[] additionalRoots) => _garbageCollector.AddGCRoots(additionalRoots);
+    public SmalltalkOOP[] GetGCRoots() => _garbageCollector.GetGCRoots();
+    public SmalltalkOOP[] GetUnreachableObjects() => _garbageCollector.GetUnreachableObjects();
+    public GCStatistics GarbageCollect() => _garbageCollector.GarbageCollect();
+    public GCStatistics GetGCStatistics() => _garbageCollector.GetGCStatistics();
+
+    #endregion
+
+    #region Table Management Delegation
+
+    public int GetObjectTableSize() => _tableManager.GetObjectTableSize();
+    public int GetActiveObjectCount() => _tableManager.GetActiveObjectCount();
+    public bool IsValidObjectOOP(SmalltalkOOP objectOOP) => _tableManager.IsValidObjectOOP(objectOOP);
+    public bool IsValidOOP(SmalltalkOOP oop) => _tableManager.IsValidOOP(oop);
+    public IEnumerable<SmalltalkOOP> EnumerateObjectTable() => _tableManager.EnumerateObjectTable();
+
+    #endregion
+
+    #region Become Delegation
+
+    public void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2) => _becomeHandler.BecomeTwoWay(oop1, oop2);
+
+    #endregion
+
+    #region Instance Finding
+
+    public SmalltalkOOP FindInstanceOf(SmalltalkOOP classOOP)
     {
-        if (objectOOP.IsSmallInteger)
-            return;
-
-        if (!IsValidObjectOOP(objectOOP))
-            return;
-
-        var entry = GetObjectTableEntry(objectOOP);
-        if (entry.IsMarked)
-            return;
-
-        entry.IsMarked = true;
-
-        // Traverse pointer fields based on format
-        if (entry.FormatExplicit == ObjectFormat.Pointer || entry.FormatExplicit == ObjectFormat.PointerIndexed)
+        foreach (var oop in EnumerateObjectTable())
         {
-            var oopArray = entry.AsOopArray();
-            if (oopArray != null)
+            if (oop.IsSmallInteger)
+                continue;
+
+            var objectClass = GetClassOOP(oop);
+            if (objectClass == classOOP)
+                return oop;
+        }
+
+        return SpecialObjectsArray.Instance.Nil;
+    }
+
+    public SmalltalkOOP FindNextInstanceOf(SmalltalkOOP classOOP, SmalltalkOOP afterOOP)
+    {
+        bool foundCurrent = false;
+
+        foreach (var oop in EnumerateObjectTable())
+        {
+            if (oop.IsSmallInteger)
+                continue;
+
+            if (!foundCurrent)
             {
-                // Mark all OOPs in the array (header, instance vars, indexed elements)
-                // INCLUDES slot 0 (class pointer) for Pointer/PointerIndexed objects
-                foreach (var childOOP in oopArray)
-                {
-                    MarkObjectRecursively(childOOP);
-                }
+                if (oop == afterOOP)
+                    foundCurrent = true;
+                continue;
             }
-        }
-        // ALSO mark the class pointer for ByteIndexed/WordIndexed objects
-        // (they store class in separate ClassOOP field, not in OOP array)
-        else if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
-        {
-            var classOOP = entry.ClassOOP;
-            if (classOOP != SmalltalkOOP.Null)
-            {
-                MarkObjectRecursively(classOOP);
-            }
-        }
-    }
 
-
-    /// <summary>
-    /// Gets current GC statistics without performing collection.
-    /// </summary>
-    public GCStatistics GetGCStatistics()
-    {
-        var objectsByFormat = new Dictionary<ObjectFormat, int>();
-        long estimatedMemoryUsage = 0;
-        int activeObjects = 0;
-
-        foreach (var block in _objectTableBlocks)
-        {
-            for (int i = 0; i < block.Entries.Length; i++)
-            {
-                var entry = block.Entries[i];
-                if (entry != null)
-                {
-                    activeObjects++;
-                    objectsByFormat[entry.Format] = objectsByFormat.GetValueOrDefault(entry.Format) + 1;
-                    estimatedMemoryUsage += entry.SizeInBytes;
-                }
-            }
+            var objectClass = GetClassOOP(oop);
+            if (objectClass == classOOP)
+                return oop;
         }
 
-        return new GCStatistics
-        {
-            TotalObjects = activeObjects,
-            LiveObjects = activeObjects,
-            CollectedObjects = 0, // No collection performed
-            MarkTimeMs = 0,
-            SweepTimeMs = 0,
-            TotalTimeMs = 0,
-            EstimatedBytesFreed = 0,
-            CollectedByFormat = new Dictionary<ObjectFormat, int>(),
-            FreeObjectTableEntries = GetObjectTableSize() - activeObjects
-        };
+        return SpecialObjectsArray.Instance.Nil;
     }
 
-    public int GetObjectTableSize()
-    {
-        return _nextObjectTableIndex - 1;
-    }
+    #endregion
 
-    public int GetActiveObjectCount()
-    {
-        return _objectTableBlocks.Sum(block => block.ActiveCount);
-    }
-
-    public bool IsValidObjectOOP(SmalltalkOOP objectOOP)
-    {
-        if (objectOOP.IsSmallInteger)
-            return true; // SmallIntegers are always valid
-
-        int tableIndex = objectOOP.ToObjectTableIndex();
-        if (tableIndex <= 0 || tableIndex >= _nextObjectTableIndex)
-            return false;
-
-        // Use canonical mapping: (index - 1) for 1-based indices
-        int blockIndex = (tableIndex - 1) / ObjectTableBlockSize;
-        int entryIndex = (tableIndex - 1) % ObjectTableBlockSize;
-
-        return blockIndex < _objectTableBlocks.Count &&
-               _objectTableBlocks[blockIndex].Entries[entryIndex] != null;
-    }
-
-    /// <summary>
-    /// Helper method to get the class name of an object.
-    /// Traverses: object -> class -> class name (symbol) -> extract string
-    /// </summary>
-    private string GetObjectClassName(SmalltalkOOP objectOOP)
-    {
-        try
-        {
-            if (objectOOP.IsSmallInteger || !IsValidObjectOOP(objectOOP))
-                return "SmallInteger";
-
-            // Get class OOP from object header (slot 0)
-            var classOOP = GetSlot(objectOOP, 0);
-            if (classOOP.IsSmallInteger || !IsValidObjectOOP(classOOP))
-                return "InvalidClass";
-
-            // Get class name symbol from class object
-            var classNameSymbolOOP = GetInstanceVariable(classOOP, 0);
-            if (classNameSymbolOOP.IsSmallInteger || !IsValidObjectOOP(classNameSymbolOOP))
-                return "InvalidSymbol";
-
-            // Extract the string from the Symbol's byte data
-            var symbolEntry = GetObjectTableEntry(classNameSymbolOOP);
-            if (symbolEntry.Format != ObjectFormat.ByteIndexed)
-                return "NotSymbol";
-
-            int symbolSize = GetIndexedSizeFromEntry(symbolEntry);
-            var symbolBytes = new byte[symbolSize];
-            for (int i = 0; i < symbolSize; i++)
-            {
-                symbolBytes[i] = GetIndexedByte(classNameSymbolOOP, i);
-            }
-            
-            return System.Text.Encoding.UTF8.GetString(symbolBytes);
-        }
-        catch
-        {
-            return "Error";
-        }
-    }
-
-    /// <summary>
-    /// Helper method to check if an object is of a specific class by name.
-    /// Traverses: object -> class -> class name (symbol) -> compare string
-    /// </summary>
-    private bool IsObjectOfClass(SmalltalkOOP objectOOP, string className)
-    {
-        try
-        {
-            if (objectOOP.IsSmallInteger || !IsValidObjectOOP(objectOOP))
-                return false;
-
-            // Get class OOP from object header (slot 0)
-            var classOOP = GetSlot(objectOOP, 0);
-            if (classOOP.IsSmallInteger || !IsValidObjectOOP(classOOP))
-                return false;
-
-            // Get class name symbol from class object
-            // Assuming class has name in instance variable 0 (typical Smalltalk layout)
-            var classNameSymbolOOP = GetInstanceVariable(classOOP, 0);
-            if (classNameSymbolOOP.IsSmallInteger || !IsValidObjectOOP(classNameSymbolOOP))
-                return false;
-
-            // Check if this is a Symbol object with ByteIndexed format containing the class name
-            var symbolEntry = GetObjectTableEntry(classNameSymbolOOP);
-            if (symbolEntry.Format != ObjectFormat.ByteIndexed)
-                return false;
-
-            // Extract the string from the Symbol's byte data
-            int symbolSize = GetIndexedSizeFromEntry(symbolEntry);
-            var symbolBytes = new byte[symbolSize];
-            for (int i = 0; i < symbolSize; i++)
-            {
-                symbolBytes[i] = GetIndexedByte(classNameSymbolOOP, i);
-            }
-            
-            string actualClassName = System.Text.Encoding.UTF8.GetString(symbolBytes);
-            return actualClassName == className;
-        }
-        catch
-        {
-            return false; // Any error means it's not the expected class
-        }
-    }
+    #region Class Name Utilities
 
     public string GetClassName(SmalltalkOOP objectOOP)
     {
@@ -1229,32 +645,28 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             if (objectOOP.IsSmallInteger)
                 return "SmallInteger";
 
-            bool isValid = IsValidObjectOOP(objectOOP);
-            if (!isValid)
+            if (!IsValidObjectOOP(objectOOP))
                 return "Invalid";
 
-            // Get class OOP from object header (slot 0)
             var classOOP = GetSlot(objectOOP, 0);
             if (classOOP.IsSmallInteger)
                 return "InvalidClass(SmallInt)";
-            
+
             if (!IsValidObjectOOP(classOOP))
                 return $"InvalidClass(OOP={classOOP.RawValue})";
 
-            var classEntry = GetObjectTableEntry(classOOP);
-            int instVarCount = GetInstanceVariableCountFromEntry(classEntry);
-            
+            var classEntry = _tableManager.GetObjectTableEntry(classOOP);
+            int instVarCount = classEntry.InstanceVariableCount;
+
             // If class name field index is configured, try to extract the class name
-            // The name field is an instance variable of the class object that points to a Symbol
             if (_classNameFieldIndex >= 0 && instVarCount > _classNameFieldIndex)
             {
-                // Get name Symbol from the configured instance variable index
                 var classNameSymbolOOP = GetInstanceVariable(classOOP, _classNameFieldIndex);
-                
+
                 if (!classNameSymbolOOP.IsSmallInteger && IsValidObjectOOP(classNameSymbolOOP))
                 {
-                    var symbolEntry = GetObjectTableEntry(classNameSymbolOOP);
-                    
+                    var symbolEntry = _tableManager.GetObjectTableEntry(classNameSymbolOOP);
+
                     if (symbolEntry.Format == ObjectFormat.ByteIndexed)
                     {
                         int symbolSize = GetIndexedSizeFromEntry(symbolEntry);
@@ -1270,27 +682,22 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                     }
                 }
             }
-            
-            // For metaclass instances (e.g., "Float class"), follow thisClass pointer to get name
-            // Metaclass has 6 instance variables: superclass, methodDict, format, subclasses (from Behavior)
-            //                                     + instanceVariables, organization (from ClassDescription)
-            //                                     + thisClass (from Metaclass) at index 6
-            // The name is stored in the instance class, not the metaclass
+
+            // For metaclass instances, follow thisClass pointer
             const int METACLASS_THISCLASS_INDEX = 6;
             if (instVarCount > METACLASS_THISCLASS_INDEX)
             {
                 var thisClassOOP = GetInstanceVariable(classOOP, METACLASS_THISCLASS_INDEX);
                 if (!thisClassOOP.IsSmallInteger && IsValidObjectOOP(thisClassOOP))
                 {
-                    // Check if thisClass has a name field
-                    var thisClassEntry = GetObjectTableEntry(thisClassOOP);
-                    int thisClassInstVarCount = GetInstanceVariableCountFromEntry(thisClassEntry);
+                    var thisClassEntry = _tableManager.GetObjectTableEntry(thisClassOOP);
+                    int thisClassInstVarCount = thisClassEntry.InstanceVariableCount;
                     if (_classNameFieldIndex >= 0 && thisClassInstVarCount > _classNameFieldIndex)
                     {
                         var nameSymbolOOP = GetInstanceVariable(thisClassOOP, _classNameFieldIndex);
                         if (!nameSymbolOOP.IsSmallInteger && IsValidObjectOOP(nameSymbolOOP))
                         {
-                            var symbolEntry = GetObjectTableEntry(nameSymbolOOP);
+                            var symbolEntry = _tableManager.GetObjectTableEntry(nameSymbolOOP);
                             if (symbolEntry.Format == ObjectFormat.ByteIndexed)
                             {
                                 int symbolSize = GetIndexedSizeFromEntry(symbolEntry);
@@ -1323,29 +730,18 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         int invalidCount = 0;
         var invalidObjects = new List<(int objectId, string className)>();
 
-        // Iterate through all object table blocks
-        for (int blockIdx = 0; blockIdx < _objectTableBlocks.Count; blockIdx++)
+        foreach (var objectOOP in EnumerateObjectTable())
         {
-            var block = _objectTableBlocks[blockIdx];
-            for (int i = 0; i < ObjectTableBlockSize; i++)
-            {
-                var entry = block.Entries[i];
-                if (entry == null)
-                    continue;
+            int objectId = objectOOP.ToObjectTableIndex();
+            string className = GetClassName(objectOOP);
 
-                // Use canonical mapping: objectId = blockIdx * BlockSize + i + 1
-                int objectId = blockIdx * ObjectTableBlockSize + i + 1;
-                var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-                string className = GetClassName(objectOOP);
-                
-                if (className.StartsWith("Invalid") || className.StartsWith("NoClassName") || 
-                    className.StartsWith("BadClassNameFormat") || className.StartsWith("Error"))
+            if (className.StartsWith("Invalid") || className.StartsWith("NoClassName") ||
+                className.StartsWith("BadClassNameFormat") || className.StartsWith("Error"))
+            {
+                invalidCount++;
+                if (invalidObjects.Count < 10)
                 {
-                    invalidCount++;
-                    if (invalidObjects.Count < 10)
-                    {
-                        invalidObjects.Add((objectId, className));
-                    }
+                    invalidObjects.Add((objectId, className));
                 }
             }
         }
@@ -1356,28 +752,16 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             foreach (var (objectId, className) in invalidObjects)
             {
                 var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
-                var entry = GetObjectTableEntry(objectOOP);
+                var entry = _tableManager.GetObjectTableEntry(objectOOP);
                 var classOOP = GetSlot(objectOOP, 0);
 
-                // Try to find localId for this object
                 string localId = localIdToObjectId.FirstOrDefault(kvp => kvp.Value == objectId).Key ?? "unknown";
 
-                // Get some info about the object's contents
-                int instVarCount = GetInstanceVariableCountFromEntry(entry);
+                int instVarCount = entry.InstanceVariableCount;
                 int indexedSize = GetIndexedSizeFromEntry(entry);
-                string instVarInfo = "";
-                if (instVarCount > 0 && instVarCount <= 3)
-                {
-                    var instVars = new List<string>();
-                    for (int i = 0; i < instVarCount; i++)
-                    {
-                        var varOOP = GetInstanceVariable(objectOOP, i);
-                        instVars.Add(varOOP.IsSmallInteger ? $"SmallInt({varOOP.AsSmallInteger()})" : $"OOP({varOOP})");
-                    }
-                    instVarInfo = $", instVarValues=[{string.Join(", ", instVars)}]";
-                }
-                
-                Console.WriteLine($"  Object {objectId} (localId={localId}): class='{className}', classOOP={classOOP}, format={entry.Format}, instVars={instVarCount}, indexed={indexedSize}{instVarInfo}");
+
+                Console.WriteLine($"  Object {objectId} (localId={localId}): class='{className}', " +
+                    $"classOOP={classOOP}, format={entry.Format}, instVars={instVarCount}, indexed={indexedSize}");
             }
             if (invalidCount > 10)
             {
@@ -1386,332 +770,5 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         }
     }
 
-    /// <summary>
-    /// Enumerates all valid objects in the object table in canonical order.
-    /// Yields only non-null entries, skipping freed slots.
-    /// </summary>
-    public IEnumerable<SmalltalkOOP> EnumerateObjectTable()
-    {
-        for (int blockIndex = 0; blockIndex < _objectTableBlocks.Count; blockIndex++)
-        {
-            var block = _objectTableBlocks[blockIndex];
-            for (int i = 0; i < ObjectTableBlockSize; i++)
-            {
-                if (block.Entries[i] != null)
-                {
-                    // Use canonical mapping: objectId = blockIndex * BlockSize + i + 1
-                    int objectId = blockIndex * ObjectTableBlockSize + i + 1;
-                    yield return SmalltalkOOP.FromObjectTableIndex(objectId);
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Validates that an OOP refers to a valid object in the heap.
-    /// Used by primitive 76 (SmallInteger asObject).
-    /// </summary>
-    public bool IsValidOOP(SmalltalkOOP oop)
-    {
-        // SmallIntegers are always valid
-        if (oop.IsSmallInteger)
-            return true;
-
-        // Check if object ID is in valid range
-        int objectId = oop.ToObjectTableIndex();
-        if (objectId <= 0)
-            return false;
-
-        // Calculate block and index
-        int blockIndex = (objectId - 1) / ObjectTableBlockSize;
-        int index = (objectId - 1) % ObjectTableBlockSize;
-
-        // Check bounds
-        if (blockIndex >= _objectTableBlocks.Count)
-            return false;
-
-        // Check if entry exists
-        var block = _objectTableBlocks[blockIndex];
-        return block.Entries[index] != null;
-    }
-
-    /// <summary>
-    /// Finds the first instance of a given class.
-    /// Used by primitive 77 (Behavior someInstance).
-    /// Returns nil if no instances exist.
-    /// </summary>
-    public SmalltalkOOP FindInstanceOf(SmalltalkOOP classOOP)
-    {
-        // Enumerate all objects and find first instance of the class
-        foreach (var oop in EnumerateObjectTable())
-        {
-            // Skip SmallIntegers (they have no class object)
-            if (oop.IsSmallInteger)
-                continue;
-
-            // Check if this object's class matches
-            var objectClass = GetClassOOP(oop);
-            if (objectClass == classOOP)
-                return oop;
-        }
-
-        // No instances found
-        return SpecialObjectsArray.Instance.Nil;
-    }
-
-    /// <summary>
-    /// Finds the next instance of the same class as the given object.
-    /// Used by primitive 78 (Object nextInstance).
-    /// Returns nil if the object is the last instance of its class.
-    /// </summary>
-    public SmalltalkOOP FindNextInstanceOf(SmalltalkOOP classOOP, SmalltalkOOP afterOOP)
-    {
-        bool foundCurrent = false;
-
-        // Enumerate all objects and find next instance after the given object
-        foreach (var oop in EnumerateObjectTable())
-        {
-            // Skip SmallIntegers
-            if (oop.IsSmallInteger)
-                continue;
-
-            // Skip until we find the 'after' object
-            if (!foundCurrent)
-            {
-                if (oop == afterOOP)
-                    foundCurrent = true;
-                continue;
-            }
-
-            // After finding the 'after' object, find next instance of same class
-            var objectClass = GetClassOOP(oop);
-            if (objectClass == classOOP)
-                return oop;
-        }
-
-        // No more instances found
-        return SpecialObjectsArray.Instance.Nil;
-    }
-
-    /// <summary>
-    /// Implements the become: primitive (primitive 72) which swaps the identities of two objects.
-    /// This is a bidirectional swap - all references to oop1 now point to oop2 and vice versa.
-    /// The swap is implemented by exchanging the ObjectTableEntry contents and updating all references throughout the heap.
-    /// 
-    /// Per the Blue Book specification:
-    /// "The primitive swaps the receiver and the argument so that all pointers to the receiver now point to the argument and vice versa."
-    /// 
-    /// Implementation details:
-    /// 1. Swap the ObjectTableEntry contents for both OOPs
-    /// 2. Scan the entire heap and update all OOP references
-    /// 3. Update special objects array if either object is a special object
-    /// </summary>
-    /// <param name="oop1">First object to swap</param>
-    /// <param name="oop2">Second object to swap</param>
-    public void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2)
-    {
-        // Validate parameters
-        if (oop1 == oop2)
-            return; // No-op if swapping object with itself
-
-        if (oop1.IsSmallInteger || oop2.IsSmallInteger)
-            throw new ArgumentException("Cannot become: with SmallIntegers - they are immediate values");
-
-        if (!IsValidObjectOOP(oop1))
-            throw new ArgumentException($"Invalid OOP: {oop1}");
-        
-        if (!IsValidObjectOOP(oop2))
-            throw new ArgumentException($"Invalid OOP: {oop2}");
-
-        // Blue Book become: semantics: Swap the object table entry contents
-        // This makes oop1 point to what oop2 pointed to, and vice versa
-        // All existing OOP references remain unchanged - they just now point to swapped data
-        SwapObjectTableEntries(oop1, oop2);
-    }
-
-    /// <summary>
-    /// Swaps the ObjectTableEntry contents for two OOPs.
-    /// After this operation, oop1 will have the entry that oop2 had and vice versa.
-    /// </summary>
-    private void SwapObjectTableEntries(SmalltalkOOP oop1, SmalltalkOOP oop2)
-    {
-        var entry1 = GetObjectTableEntry(oop1);
-        var entry2 = GetObjectTableEntry(oop2);
-
-        // Create temporary copies of the entries to avoid aliasing issues
-        var temp1 = new ObjectTableEntry(
-            managedStorage: entry1.ManagedStorage,
-            format: entry1.FormatExplicit,
-            sizeInWords: entry1.SizeInWordsExplicit,
-            instanceVariableCount: entry1.InstanceVariableCountExplicit,
-            originalIndexedSize: entry1.OriginalIndexedSize)
-        {
-            PackedMetadata = entry1.PackedMetadata,
-            ExtendedSize = entry1.ExtendedSize,
-            IsMarked = entry1.IsMarked,
-            NamedSlots = entry1.NamedSlots != null ? new Dictionary<string, int>(entry1.NamedSlots) : null,
-            ClassOOP = entry1.ClassOOP
-        };
-
-        // Copy entry2 to entry1's position
-        SetObjectTableEntryContents(oop1, entry2);
-
-        // Copy temp1 (original entry1) to entry2's position
-        SetObjectTableEntryContents(oop2, temp1);
-    }
-
-    /// <summary>
-    /// Sets the contents of an ObjectTableEntry at the given OOP's position.
-    /// </summary>
-    private void SetObjectTableEntryContents(SmalltalkOOP oop, ObjectTableEntry sourceEntry)
-    {
-        int tableIndex = oop.ToObjectTableIndex();
-        int blockIndex = (tableIndex - 1) / ObjectTableBlockSize;
-        int entryIndex = (tableIndex - 1) % ObjectTableBlockSize;
-
-        if (blockIndex >= _objectTableBlocks.Count)
-            throw new ArgumentException($"Invalid ObjectTable index: {tableIndex}");
-
-        var block = _objectTableBlocks[blockIndex];
-        var targetEntry = block.Entries[entryIndex];
-        if (targetEntry == null)
-            throw new ArgumentException($"ObjectTable entry {tableIndex} is null");
-
-        // Copy all fields from source to target
-        targetEntry.ManagedStorage = sourceEntry.ManagedStorage;
-        targetEntry.PackedMetadata = sourceEntry.PackedMetadata;
-        targetEntry.ExtendedSize = sourceEntry.ExtendedSize;
-        targetEntry.OriginalIndexedSize = sourceEntry.OriginalIndexedSize;
-        targetEntry.IsMarked = sourceEntry.IsMarked;
-        targetEntry.NamedSlots = sourceEntry.NamedSlots != null ? new Dictionary<string, int>(sourceEntry.NamedSlots) : null;
-        targetEntry.FormatExplicit = sourceEntry.FormatExplicit;
-        targetEntry.SizeInWordsExplicit = sourceEntry.SizeInWordsExplicit;
-        targetEntry.InstanceVariableCountExplicit = sourceEntry.InstanceVariableCountExplicit;
-        targetEntry.ClassOOP = sourceEntry.ClassOOP;
-    }
-
-    /// <summary>
-    /// Updates all references throughout the heap after a become operation.
-    /// This scans every object and updates any OOP references that point to the swapped objects.
-    /// </summary>
-    private void UpdateAllReferencesAfterBecome(SmalltalkOOP oop1, SmalltalkOOP oop2)
-    {
-        // Update references in all heap objects
-        foreach (var objectOOP in EnumerateObjectTable())
-        {
-            if (objectOOP.IsSmallInteger)
-                continue; // SmallIntegers can't contain OOP references
-
-            UpdateReferencesInObject(objectOOP, oop1, oop2);
-        }
-
-        // Update references in Special Objects Array
-        UpdateSpecialObjectsArrayReferences(oop1, oop2);
-    }
-
-    /// <summary>
-    /// Updates OOP references within a single object.
-    /// Checks both instance variables and indexed slots (for PointerIndexed objects).
-    /// </summary>
-    private void UpdateReferencesInObject(SmalltalkOOP objectOOP, SmalltalkOOP oop1, SmalltalkOOP oop2)
-    {
-        var entry = GetObjectTableEntry(objectOOP);
-
-        // Update instance variables (including class reference in slot 0 for Pointer/PointerIndexed)
-        if (entry.FormatExplicit == ObjectFormat.Pointer || entry.FormatExplicit == ObjectFormat.PointerIndexed)
-        {
-            var oopArray = entry.AsOopArray();
-            if (oopArray != null)
-            {
-                for (int i = 0; i < oopArray.Length; i++)
-                {
-                    if (oopArray[i] == oop1)
-                    {
-                        oopArray[i] = oop2;
-                    }
-                    else if (oopArray[i] == oop2)
-                    {
-                        oopArray[i] = oop1;
-                    }
-                }
-            }
-        }
-
-        // Update class reference for ByteIndexed/WordIndexed objects
-        if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
-        {
-            if (entry.ClassOOP == oop1)
-            {
-                entry.ClassOOP = oop2;
-            }
-            else if (entry.ClassOOP == oop2)
-            {
-                entry.ClassOOP = oop1;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Updates references in the Special Objects Array if either swapped object is a special object.
-    /// This is critical for maintaining heap integrity since the SOA contains GC roots.
-    /// </summary>
-    private void UpdateSpecialObjectsArrayReferences(SmalltalkOOP oop1, SmalltalkOOP oop2)
-    {
-        var soa = SpecialObjectsArray.Instance;
-
-        // Check and update each special object
-        if (soa.Nil == oop1)
-        {
-            SpecialObjectsArray.SetNil(oop2);
-        }
-        else if (soa.Nil == oop2)
-        {
-            SpecialObjectsArray.SetNil(oop1);
-        }
-
-        if (soa.False == oop1)
-        {
-            SpecialObjectsArray.SetFalse(oop2);
-        }
-        else if (soa.False == oop2)
-        {
-            SpecialObjectsArray.SetFalse(oop1);
-        }
-
-        if (soa.True == oop1)
-        {
-            SpecialObjectsArray.SetTrue(oop2);
-        }
-        else if (soa.True == oop2)
-        {
-            SpecialObjectsArray.SetTrue(oop1);
-        }
-
-        if (soa.Smalltalk == oop1)
-        {
-            SpecialObjectsArray.SetSmalltalk(oop2);
-        }
-        else if (soa.Smalltalk == oop2)
-        {
-            SpecialObjectsArray.SetSmalltalk(oop1);
-        }
-
-        if (soa.ProcessorScheduler == oop1)
-        {
-            SpecialObjectsArray.SetProcessorScheduler(oop2);
-        }
-        else if (soa.ProcessorScheduler == oop2)
-        {
-            SpecialObjectsArray.SetProcessorScheduler(oop1);
-        }
-
-        if (soa.InitExpressionMethods == oop1)
-        {
-            SpecialObjectsArray.SetInitExpressionMethods(oop2);
-        }
-        else if (soa.InitExpressionMethods == oop2)
-        {
-            SpecialObjectsArray.SetInitExpressionMethods(oop1);
-        }
-    }
+    #endregion
 }

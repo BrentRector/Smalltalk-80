@@ -25,7 +25,6 @@ public class Phase5_GlobalsAndPatches : IPhase
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
     private readonly IReadOnlyList<string> _symbols;
     private readonly ColdstartReport _report;
-    private readonly ColdStartDebugOptions _debugOptions;
 
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
@@ -44,8 +43,7 @@ public class Phase5_GlobalsAndPatches : IPhase
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
-        ColdstartReport report,
-        ColdStartDebugOptions? debugOptions = null)
+        ColdstartReport report)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -55,7 +53,6 @@ public class Phase5_GlobalsAndPatches : IPhase
         _initializedFields = initializedFields;
         _symbols = bundle.Symbols;
         _report = report ?? throw new ArgumentNullException(nameof(report));
-        _debugOptions = debugOptions ?? ColdStartDebugOptions.None;
     }
 
     /// <summary>
@@ -102,38 +99,6 @@ public class Phase5_GlobalsAndPatches : IPhase
 
         // Freeze AssociationRegistry after all globals installed
         AssociationRegistry.Freeze();
-// Console.WriteLine($"[AssociationRegistry] Frozen with {AssociationRegistry.Count} associations");
-
-        // DEBUG: Check ALL Associations in the heap, not just those in AssociationRegistry
-        if (_debugOptions.ShouldDebugAssociations)
-        {
-// Console.WriteLine($"[Phase5] Scanning entire heap for ALL Associations...");
-            var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-            int totalAssociations = 0;
-            int registeredCount = AssociationRegistry.GetAll().Count;
-
-            // Scan entire heap for Association objects
-            for (int oop = 0; oop < 100000; oop += 2) // Scan first 100000 OOPs (even numbers only for object pointers)
-            {
-                try
-                {
-                    var objOOP = new SmalltalkOOP(oop);
-                    var classOOP = _heapManager.GetSlot(objOOP, 0);
-                    if (classOOP == associationClassOOP)
-                    {
-                        totalAssociations++;
-                    }
-                }
-                catch
-                {
-                    // Skip invalid OOPs
-                }
-            }
-
-// Console.WriteLine($"  Total Associations in heap: {totalAssociations}");
-// Console.WriteLine($"  Associations in AssociationRegistry: {registeredCount}");
-// Console.WriteLine($"  Unregistered Associations: {totalAssociations - registeredCount}");
-        }
     }
 
     // ================================================================================
@@ -185,37 +150,17 @@ public class Phase5_GlobalsAndPatches : IPhase
         var targetOOP = _localIdToObjectId[patch.TargetLocalId!];
         int fieldIndex = _layoutResolver.GetFieldIndex(patch.TargetLocalId!, patch.FieldName!);
 
-        // Get before value for logging (if debug enabled)
-        SmalltalkOOP? beforeOOP = null;
-        if (_debugOptions.ShouldDebugPatches)
-        {
-            beforeOOP = _heapManager.GetInstanceVariable(targetOOP, fieldIndex);
-        }
-
         // Resolve new value
         var valueOOP = ResolveFieldValue(patch.Value);
 
         // Apply patch
         _heapManager.SetInstanceVariable(targetOOP, fieldIndex, valueOOP);
-
-        // Debug output only if enabled
-        if (_debugOptions.ShouldDebugPatches)
-        {
-// Console.WriteLine($"    [PATCH] SetInstanceVariable: {patch.TargetLocalId}.{patch.FieldName} = {valueOOP} (before: {beforeOOP})");
-        }
     }
 
     private void ApplyInstallMethodDictionaryPatch(PatchDescriptor patch)
     {
-        var classOOP = _localIdToObjectId[patch.ClassLocalId!];
-
         // Method dictionary should already exist from Phase 4
         // This patch type is for forward compatibility
-
-        if (_debugOptions.ShouldDebugPatches)
-        {
-// Console.WriteLine($"    [PATCH] InstallMethodDictionary: {patch.ClassLocalId} (already installed in Phase 4)");
-        }
     }
 
     private int _replacedArrayCount = 0;
@@ -235,18 +180,7 @@ public class Phase5_GlobalsAndPatches : IPhase
         if (literalClassOOP == associationClassOOP)
         {
             // It's an Association - set its VALUE field (index 1), don't replace the Association itself
-            SmalltalkOOP? beforeValue = null;
-            if (_debugOptions.ShouldDebugPatches)
-            {
-                beforeValue = _heapManager.GetInstanceVariable(literalOOP, 1);
-            }
-
             _heapManager.SetInstanceVariable(literalOOP, 1, newValueOOP);
-
-            if (_debugOptions.ShouldDebugPatches)
-            {
-// Console.WriteLine($"    [PATCH] ReplaceLiteral: {patch.MethodLocalId}[{patch.LiteralIndex}] Association.value = {newValueOOP} (before: {beforeValue})");
-            }
         }
         else
         {
@@ -279,11 +213,6 @@ public class Phase5_GlobalsAndPatches : IPhase
             }
 
             _heapManager.SetIndexedOOP(methodOOP, patch.LiteralIndex.Value + 1, newValueOOP);
-
-            if (_debugOptions.ShouldDebugPatches)
-            {
-// Console.WriteLine($"    [PATCH] ReplaceLiteral: {patch.MethodLocalId}[{patch.LiteralIndex}] = {newValueOOP} (before: {literalOOP})");
-            }
         }
     }
 
@@ -294,13 +223,7 @@ public class Phase5_GlobalsAndPatches : IPhase
 
         if (value.Type == "objectRef")
         {
-            var resolvedOOP = _localIdToObjectId[value.LocalId!];
-            // DEBUG: Check if String class is being resolved correctly
-            if (_debugOptions.ShouldDebugPatches && value.LocalId == "class:String")
-            {
-// Console.WriteLine($"      [DEBUG] Resolving class:String -> {resolvedOOP}");
-            }
-            return resolvedOOP;
+            return _localIdToObjectId[value.LocalId!];
         }
 
         return value.Type switch

@@ -11,13 +11,11 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// </summary>
 /// <param name="heapManager">The heap manager for memory operations.</param>
 /// <param name="context">The bytecode context for accessing execution state.</param>
-/// <param name="primitiveContext">The primitive context for primitive execution.</param>
 /// <param name="runtimeHeapAccess">Runtime heap access for class lookups.</param>
 /// <param name="metadata">VM metadata containing class OOPs.</param>
 internal class BytecodeInterpreter(
     ISmalltalkHeapManager heapManager,
     IBytecodeContext context,
-    IPrimitiveContext primitiveContext,
     RuntimeHeapAccessor runtimeHeapAccess,
     VMMetadata metadata) : IBytecodeInterpreter
 {
@@ -1045,14 +1043,24 @@ internal class BytecodeInterpreter(
                 throw new InvalidOperationException($"blockCopy: args must be SmallIntegers, got nargs={nargsOOP}, argStartIndex={argStartIndexOOP}");
             }
 
-            // Call primitive 80 (blockCopy:) - receiver is the active context
-            var blockContextOOP = ControlPrimitives.BlockCopy(
-                primitiveContext,
+            // Call primitive 80 (blockCopy:) using new IPrimitive static helper
+            // Need: heapManager, activeContext, blockContextClassOOP, nargs, argStartIndex, currentPC
+            int currentPC = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.CONTEXT_PC_INDEX).AsSmallInteger();
+            var result = ControlPrimitives.BlockCopy.CreateBlockContext(
+                heapManager,
                 context.ActiveContext,
-                [nargsOOP, argStartIndexOOP]);
+                metadata.BlockContextClassOOP,
+                nargsOOP,
+                argStartIndexOOP,
+                currentPC);
+
+            if (!result.Success)
+            {
+                throw new InvalidOperationException("blockCopy: primitive failed unexpectedly");
+            }
 
             // Push the new BlockContext onto the stack
-            context.Push(blockContextOOP);
+            context.Push(result.Value);
             return true;
         }
 

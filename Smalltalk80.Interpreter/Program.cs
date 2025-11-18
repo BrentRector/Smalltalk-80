@@ -5,6 +5,8 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 using Smalltalk80.Interpreter.Platform.Windows;
 using ClassHierarchyUtils = Smalltalk80.Interpreter.Core.ClassHierarchyUtils;
 using System.Windows.Forms;
@@ -30,7 +32,7 @@ public static class Program
         try
         {
             // Parse command line arguments
-            var (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions, skipInitExpressions, executeExpression) = ParseCommandLine(args);
+            var (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, skipInitExpressions, executeExpression) = ParseCommandLine(args);
 
             if (!File.Exists(coldStartFile))
             {
@@ -48,22 +50,16 @@ public static class Program
                 Console.Error.WriteLine("                         (e.g., 'BlockContextTest testAllCombinations')");
                 Console.Error.WriteLine("  --verbose, -v          Enable verbose debugging (logs all method calls)");
                 Console.Error.WriteLine("  --coldstart-report=<path>  Write coldstart metrics to JSON file");
-                Console.Error.WriteLine("\nDebug Options:");
-                Console.Error.WriteLine("  Cold start diagnostics:");
-                Console.Error.WriteLine("    --debug-patches        Show patch application details");
-                Console.Error.WriteLine("    --debug-associations   Show association scanning and validation");
-                Console.Error.WriteLine("    --debug-classes        Show class resolution details");
-                Console.Error.WriteLine("    --debug-methods        Show method installation details");
-                Console.Error.WriteLine("    --debug-globals        Show global variable installation details");
-                Console.Error.WriteLine("  Runtime VM diagnostics:");
-                Console.Error.WriteLine("    --debug-bytecode       Show bytecode execution trace");
-                Console.Error.WriteLine("    --debug-messages       Show message send and method lookup trace");
-                Console.Error.WriteLine("  Post cold-start diagnostics:");
-                Console.Error.WriteLine("    --debug-diagnostics    Show diagnostic reports (ClassDescription, BuildFieldMap)");
-                Console.Error.WriteLine("  --debug-all              Enable all debug output");
                 Environment.Exit(1);
                 return;
             }
+
+            // Create diagnostic hub for event-based logging
+            var diagnostics = new DiagnosticHub();
+
+            // Register cold start progress listener for console output
+            var progressListener = new ColdStartProgressListener();
+            diagnostics.Register(progressListener, DiagnosticEventTypes.AllColdStart);
 
             Console.WriteLine($"Loading cold start bundle: {coldStartFile}");
 
@@ -84,7 +80,7 @@ public static class Program
             // Create and run the loader
             Console.WriteLine("Starting cold start loader (6-phase)...");
 
-            var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, debugOptions);
+            var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, diagnostics);
             loader.Run();
             var layoutResolver = loader.LayoutResolver;
 
@@ -113,21 +109,6 @@ public static class Program
             var gcStatsBefore = heapManager.GarbageCollect();
             Console.WriteLine($"  {gcStatsBefore.GetSummary()}");
 
-            // DIAGNOSTIC: Inspect ClassDescription.instanceVariables field (slot 4)
-            if (debugOptions.ShouldDebugDiagnostics)
-            {
-                Console.WriteLine("\n=== DIAGNOSTIC: Checking ClassDescription.instanceVariables ===");
-                InspectClassDescriptionInstanceVariables(heapManager, bundle);
-
-                // DIAGNOSTIC: Test RuntimeHeapAccessor.BuildFieldMap()
-                Console.WriteLine("\n=== DIAGNOSTIC: Testing RuntimeHeapAccessor.BuildFieldMap() ===");
-                TestBuildFieldMap(heapManager);
-
-                // DIAGNOSTIC: Inspect File class>>initialize method's literal frame
-                Console.WriteLine("\n=== DIAGNOSTIC: Checking File class>>initialize Literals AFTER Phase 4 ===");
-                InspectFileInitializeLiterals(heapManager, bundle);
-            }
-
             // Execute init expressions - Run normal init expressions to check for regressions
             bool executeInitExpressions = !skipInitExpressions;
             bool onlyRunTests = false; // DISABLED - Run normal init expressions for debugging
@@ -146,15 +127,7 @@ public static class Program
 
                 var vmMetadata = BuildVMMetadata(layoutResolver);
 
-                // Convert Engine.ColdStartDebugOptions to Core.VM.RuntimeDebugOptions for the VirtualMachine
-                var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.RuntimeDebugOptions
-                {
-                    ShouldDebugBytecode = debugOptions.ShouldDebugBytecode,
-                    ShouldDebugMessages = debugOptions.ShouldDebugMessages,
-                    ShouldDebugMethodLookup = debugOptions.ShouldDebugMessages // Method lookup is part of message debugging
-                };
-
-                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions: vmDebugOptions);
+                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;
@@ -285,8 +258,8 @@ public static class Program
                     // 68 total classes: Level 0 (62), Level 1 (5), Level 2 (1)
                     // No circular dependencies detected
 
-                    var dependencyOrder = GetInitExpressionDependencyOrder();
-                    phase1Indices = ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
+                    var dependencyOrder = InitExpressionOrdering.GetDependencyOrder();
+                    phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
                     Console.WriteLine($"\n=== Dependency-Ordered Init Expression Execution ===");
                     Console.WriteLine($"  Total: {phase1Indices.Count} initialize expressions");
@@ -564,15 +537,7 @@ public static class Program
 
                     var vmMetadata = BuildVMMetadata(layoutResolver);
 
-                    // Convert Engine.ColdStartDebugOptions to Core.VM.RuntimeDebugOptions for the VirtualMachine
-                    var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.RuntimeDebugOptions
-                    {
-                        ShouldDebugBytecode = debugOptions.ShouldDebugBytecode,
-                        ShouldDebugMessages = debugOptions.ShouldDebugMessages,
-                        ShouldDebugMethodLookup = debugOptions.ShouldDebugMessages
-                    };
-
-                    var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions: vmDebugOptions);
+                    var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
                     vm.VerboseDebug = verboseDebug;
                     vm.InitializeSelectorCaches();
 
@@ -1115,7 +1080,7 @@ public static class Program
     /// Supports: --coldstart path, --dump-class ClassName, --verbose, --skip-init-expressions, etc.
     /// Default: coldstart.json in the compiler output directory (../net9.0/coldstart.json)
     /// </summary>
-    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.ColdStartDebugOptions debugOptions, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
@@ -1124,7 +1089,6 @@ public static class Program
         string? reportOutput = null;
         bool skipInitExpressions = false;
         string? executeExpression = null;
-        var debugOptions = new Smalltalk80.Interpreter.Engine.ColdStartDebugOptions();
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -1160,42 +1124,6 @@ public static class Program
             {
                 reportOutput = args[i].Substring("--coldstart-report=".Length);
             }
-            else if (args[i] == "--debug-all")
-            {
-                debugOptions.DebugAll = true;
-            }
-            else if (args[i] == "--debug-patches")
-            {
-                debugOptions.DebugPatches = true;
-            }
-            else if (args[i] == "--debug-associations")
-            {
-                debugOptions.DebugAssociations = true;
-            }
-            else if (args[i] == "--debug-classes")
-            {
-                debugOptions.DebugClasses = true;
-            }
-            else if (args[i] == "--debug-methods")
-            {
-                debugOptions.DebugMethods = true;
-            }
-            else if (args[i] == "--debug-globals")
-            {
-                debugOptions.DebugGlobals = true;
-            }
-            else if (args[i] == "--debug-bytecode")
-            {
-                debugOptions.DebugBytecode = true;
-            }
-            else if (args[i] == "--debug-messages")
-            {
-                debugOptions.DebugMessages = true;
-            }
-            else if (args[i] == "--debug-diagnostics")
-            {
-                debugOptions.DebugDiagnostics = true;
-            }
         }
 
         // Default: coldstart.json in the compiler's output directory
@@ -1225,7 +1153,7 @@ public static class Program
             }
         }
 
-        return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions, skipInitExpressions, executeExpression);
+        return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, skipInitExpressions, executeExpression);
     }
 
     private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver)
@@ -1928,198 +1856,5 @@ public static class Program
             Console.WriteLine($"\n❌ Error inspecting File initialize literals: {ex.Message}");
             Console.WriteLine($"   Stack trace: {ex.StackTrace}");
         }
-    }
-
-    /// <summary>
-    /// Returns the complete dependency-ordered list of class names for init expression execution.
-    /// Based on InitExpression-DependencyAnalysis.md topological sort (3 levels, no circular deps).
-    /// </summary>
-    private static List<string> GetInitExpressionDependencyOrder()
-    {
-        return new List<string>
-        {
-            // LEVEL 0: 81 classes with no dependencies (alphabetically sorted within level)
-            // ESSENTIAL CLASSES FIRST (required for basic VM functionality)
-            "Character class",        // ESSENTIAL: Required for CharacterTable (String>>at: primitive)
-            "Float class",            // ESSENTIAL: Required for Float constants (Pi, E, etc.)
-            "SmallInteger class",     // ESSENTIAL: Required for SmallInteger constants/utilities (moved to front)
-
-            // Other Level 0 classes
-            "Benchmark class",
-            "BinaryChoiceView class",
-            "BlockContextTest class",
-            "BrowserView class",
-            "Change class",
-            "ChangesView class",
-            "Class class",
-            "ClassHierarchyBrowserView class",
-            "ClassOrganizer class",
-            "CompiledMethod class",
-            "ControlManager class",
-            "Cursor class",
-            "Date class",
-            "DebuggerView class",
-            "Decompiler class",
-            "DigitBuffer class",
-            "DiskBrowserView class",
-            "DisplayScreen class",
-            "DisplayTextView class",
-            "Encoder class",
-            "Explainer class",
-            "File class",
-            "FileDirectory class",
-            "FileList class",
-            "Form class",
-            "FormButtonView class",
-            "FormEditor class",
-            "FormView class",
-            "InputSensor class",       // REQUIRED BEFORE Object: Object>>confirm: uses Sensor cursorPoint
-            "InputState class",
-            "Inspector class",
-            "InspectorView class",
-            "InstructionStream class",
-            "Lexicon class",
-            "ListController class",
-            "ListView class",
-            "LockedTextView class",
-            "LowSpaceView class",
-            "Magnitude class",
-            "MenuView class",
-            "MessageNode class",
-            "MethodNode class",
-            "MixedInspectorView class",
-            "NameSetInspectorView class",
-            "NoControllerView class",
-            "Notifier class",
-            "NotifierView class",
-            "Object class",
-            "OccupationView class",
-            "OrderedCollection class",
-            "Paragraph class",
-            "ParseNode class",
-            "Path class",
-            "Point class",
-            "ProcessorScheduler class",
-            "Project class",
-            "Rectangle class",
-            "Scanner class",
-            "SourceFileManager class",
-            "SplinesView class",
-            "StandardSystemView class",
-            "StringHolder class",
-            "StringHolderView class",
-            "Symbol class",
-            "SymbolAsStringTest class",
-            "SystemDictionary class",
-            "SystemTracer class",
-            "SystemView class",
-            "SystemWorkspace class",
-            "Text class",
-            "TextCollectorView class",
-            "TextEditor class",
-            "TextList class",
-            "TileableView class",
-            "UndefinedObject class",
-            "WindowsFileDirectory class",
-            "WindowsFileSystem class",
-            "WorkspaceView class",
-
-            // LEVEL 1: 5 classes that depend on Level 0
-            "BitEditor class",      // depends on: OrderedCollection, Point
-            "Debugger class",       // depends on: NotifierView, Project
-            "FormMenuView class",   // depends on: DisplayScreen
-            "LargePositiveInteger class",  // depends on: DigitBuffer
-            "Spline class",         // depends on: Point
-
-            // LEVEL 2: 1 class that depends on Level 1
-            "LargeNegativeInteger class"   // depends on: LargePositiveInteger
-        };
-    }
-
-    /// <summary>
-    /// Reorders init expression indices according to dependency order.
-    /// Maps class names from bundle to desired execution order, preserving any not in dependency list.
-    /// Within each dependency level, sorts by bytecode length (shortest first).
-    /// </summary>
-    private static List<int> ReorderByDependencies(
-        List<int> originalIndices,
-        ColdStartBundle bundle,
-        List<string> dependencyOrder)
-    {
-        var result = new List<int>();
-        var remainingIndices = new HashSet<int>(originalIndices);
-
-        // Group classes by dependency level
-        var levels = new List<List<string>>();
-        var currentLevel = new List<string>();
-
-        foreach (var className in dependencyOrder)
-        {
-            // Check if this is a level marker comment (these are NOT in the actual list)
-            // The dependency order list contains only class names, not comments
-            // So we detect level boundaries by the structure of the list itself
-            currentLevel.Add(className);
-        }
-
-        // Since the dependency order list doesn't contain comment markers,
-        // we need to manually split based on known level sizes from the comments:
-        // LEVEL 0: 81 classes (indices 0-80)
-        // LEVEL 1: 5 classes (indices 81-85)
-        // LEVEL 2: 1 class (index 86)
-        levels.Add(dependencyOrder.Take(81).ToList());      // Level 0
-        levels.Add(dependencyOrder.Skip(81).Take(5).ToList()); // Level 1
-        levels.Add(dependencyOrder.Skip(86).ToList());      // Level 2
-
-        // Process each level
-        foreach (var levelClasses in levels)
-        {
-            // Find indices for all classes in this level
-            var levelIndices = new List<(int index, int bytecodeLength)>();
-
-            foreach (var className in levelClasses)
-            {
-                var bareClassName = className.Replace(" class", "");
-                var expectedSource = $"{bareClassName} initialize";
-
-                for (int i = 0; i < bundle.InitExpressions.Length; i++)
-                {
-                    if (!remainingIndices.Contains(i))
-                        continue;
-
-                    var initExpr = bundle.InitExpressions[i];
-                    if (initExpr.Source == expectedSource)
-                    {
-                        // Get bytecode length - handle both int[] and base64 string formats
-                        int bytecodeLength = 0;
-                        if (initExpr.Bytecodes is int[] intArray)
-                        {
-                            bytecodeLength = intArray.Length;
-                        }
-                        else if (initExpr.Bytecodes is string base64String)
-                        {
-                            bytecodeLength = Convert.FromBase64String(base64String).Length;
-                        }
-
-                        levelIndices.Add((i, bytecodeLength));
-                        remainingIndices.Remove(i);
-                        break;
-                    }
-                }
-            }
-
-            // Sort this level by bytecode length (shortest first)
-            var sortedLevel = levelIndices.OrderBy(x => x.bytecodeLength).ToList();
-            result.AddRange(sortedLevel.Select(x => x.index));
-        }
-
-        // Add any remaining indices that weren't in dependency order (at the end)
-        // These are init expressions that don't match our dependency analysis
-        if (remainingIndices.Count > 0)
-        {
-            Console.WriteLine($"  ⚠️  {remainingIndices.Count} init expressions not in dependency order (appending at end)");
-            result.AddRange(remainingIndices.OrderBy(i => i));
-        }
-
-        return result;
     }
 }

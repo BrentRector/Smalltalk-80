@@ -258,12 +258,6 @@ public interface IPrimitiveRegistry
     /// <param name="primitive">Primitive implementation.</param>
     void Register(int primitiveNumber, IPrimitive primitive);
 
-    /// <summary>
-    /// Registers a legacy primitive function (for backward compatibility).
-    /// </summary>
-    /// <param name="primitiveNumber">Blue Book primitive number.</param>
-    /// <param name="function">Legacy primitive function delegate.</param>
-    void RegisterLegacy(int primitiveNumber, PrimitiveFunction function);
 
     /// <summary>
     /// Executes a primitive by number using new interface.
