@@ -42365,7 +42365,26 @@ diagMt1 "Return mt1 (expect 166)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma |
 diagMt2 "Return mt2 (expect 322)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. mt2] value: 644] value: 88] value: 11!
 diagIa  "Return ia (expect 644)"  ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. ia] value: 644] value: 88] value: 11!
 diagIt1 "Return it1 (expect 188)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it1] value: 644] value: 88] value: 11!
-diagIt2 "Return it2 (expect 266)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it2] value: 644] value: 88] value: 11! !
+diagIt2 "Return it2 (expect 266)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it2] value: 644] value: 88] value: 11!
+
+diagPow10 "Powers of 10: each var unique magnitude (expect 111111111)"
+	"oa=1, ot1=10, ot2=100, ma=1000, mt1=10000, mt2=100000, ia=1000000, it1=10000000, it2=100000000
+	 Digits reveal WHICH variables accessed AND which were skipped:
+	   111111111 = all correct (all 9 variables)
+	   111111011 = ot2 (100) NOT accessed, others OK
+	   111011111 = mt2 (100000) NOT accessed, others OK
+	   111111200 = ot2 accessed TWICE (100+100=200), it1+it2 skipped
+	   100000000 = ONLY it2 accessed, all others zero
+	   111111110 = it2 aliased to ot1 (read as 10 instead of 100000000)"
+	^[:oa | | ot1 ot2 | ot1 _ 10. ot2 _ 100. [:ma | | mt1 mt2 | mt1 _ 10000. mt2 _ 100000. [:ia | | it1 it2 | it1 _ 10000000. it2 _ 100000000. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 1000000] value: 1000] value: 1!
+
+diagZero "Same as diagPow10 but with ZEROS for args (expect 111111111)"
+	"Test if zeros cause the bug. Args set to 0, temps use powers of 10.
+	 oa=0, ot1=10, ot2=100, ma=0, mt1=10000, mt2=100000, ia=0, it1=10000000, it2=100000000
+	 Expected: 110110110 (only temps, no args)
+	 If we get 111111111, zeros are being read as their power-of-10 value somehow
+	 If we get 110110100, last digit wrong (it2 issue with zeros)"
+	^[:oa | | ot1 ot2 | ot1 _ 10. ot2 _ 100. [:ma | | mt1 mt2 | mt1 _ 10000. mt2 _ 100000. [:ia | | it1 it2 | it1 _ 10000000. it2 _ 100000000. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 0] value: 0] value: 0! !
 
 "Mutation tests"
 !BlockContextTest methodsFor: 'mutation'!
@@ -42381,6 +42400,107 @@ mut3 "Args immutable: inner sees original"
 
 "Global test"
 BlockContextTest new testAllCombinations!
+"BlockContext Diagnostic Runners - Each tests one variable"
+
+Object subclass: #DiagOa
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagOa class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagOa! !
+
+Object subclass: #DiagOt1
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagOt1 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagOt1! !
+
+Object subclass: #DiagOt2
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagOt2 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagOt2! !
+
+Object subclass: #DiagMa
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagMa class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagMa! !
+
+Object subclass: #DiagMt1
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagMt1 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagMt1! !
+
+Object subclass: #DiagMt2
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagMt2 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagMt2! !
+
+Object subclass: #DiagIa
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagIa class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagIa! !
+
+Object subclass: #DiagIt1
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagIt1 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagIt1! !
+
+Object subclass: #DiagIt2
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagIt2 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagIt2! !
+
+Object subclass: #DiagPow10
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagPow10 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagPow10! !
+
+Object subclass: #DiagZero
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagZero class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagZero! !
+
+DiagOa initialize!
+DiagOt1 initialize!
+DiagOt2 initialize!
+DiagMa initialize!
+DiagMt1 initialize!
+DiagMt2 initialize!
+DiagIa initialize!
+DiagIt1 initialize!
+DiagIt2 initialize!
+DiagPow10 initialize!
+DiagZero initialize!
 "BlockContextTestRunner - Automatically runs BlockContextTest suite during initialization"
 
 Object subclass: #BlockContextTestRunner
@@ -42392,51 +42512,22 @@ Object subclass: #BlockContextTestRunner
 !BlockContextTestRunner class methodsFor: 'class initialization'!
 
 initialize
-	"Run three-level and mutation tests individually to find failure"
-	| tester sum |
-	tester := BlockContextTest new.
-	sum := 900.  "Start after confirmed working single+two-level tests"
+	"Run complete BlockContextTest suite - all 120 tests
+	 Expected total: 1200 (120 tests × 10 points each)
 
-	"Three level: 27 tests (each should return 10)"
-	sum := sum + (tester n000000).
-	sum := sum + (tester n000111).
-	sum := sum + (tester n000222).
-	sum := sum + (tester n011011).
-	sum := sum + (tester n011122).
-	sum := sum + (tester n022022).
-	sum := sum + (tester n100100).
-	sum := sum + (tester n100211).
-	sum := sum + (tester n111000).
-	sum := sum + (tester n111111).
-	sum := sum + (tester n111222).
-	sum := sum + (tester n122122).
-	sum := sum + (tester n200200).
-	sum := sum + (tester n211011).
-	sum := sum + (tester n211211).
-	sum := sum + (tester n222000).
-	sum := sum + (tester n222111).
-	sum := sum + (tester n222222).
-	sum := sum + (tester n012012).
-	sum := sum + (tester n021021).
-	sum := sum + (tester n102102).
-	sum := sum + (tester n120120).
-	sum := sum + (tester n201201).
-	sum := sum + (tester n210210).
-	sum := sum + (tester n012210).
-	sum := sum + (tester n210012).
+	 DIAGNOSTIC RESULTS (all variables tested individually):
+	 ✓ diagOa  → 11  (outer arg)
+	 ✓ diagOt1 → 22  (outer temp 1)
+	 ✓ diagOt2 → 44  (outer temp 2)
+	 ✓ diagMa  → 88  (middle arg)
+	 ✓ diagMt1 → 166 (middle temp 1)
+	 ✓ diagMt2 → 322 (middle temp 2)
+	 ✓ diagIa  → 644 (inner arg)
+	 ✓ diagIt1 → 188 (inner temp 1)
+	 ✓ diagIt2 → 266 (inner temp 2)
 
-	"DIAGNOSTIC: Test each variable individually to detect aliasing
-	 Expected values:
-	 diagOa  → 11  (PASSED: returned 11)
-	 diagOt1 → 22  (PASSED: returned 22)
-	 diagOt2 → 44  (PASSED: returned 44)
-	 diagMa  → 88  (PASSED: returned 88)
-	 diagMt1 → 166 (PASSED: returned 166)
-	 diagMt2 → 322
-	 diagIa  → 644
-	 diagIt1 → 188
-	 diagIt2 → 266"
+	 All variables work individually. Testing full suite..."
 
-	^6000 + (tester diagMt2)! !
+	^BlockContextTest new testAllCombinations! !
 
 BlockContextTestRunner initialize!

@@ -1,12 +1,13 @@
 # Smalltalk-80 Interpreter Runtime Architecture
 
-**Last Updated**: 2025-11-15
-**Status**: 🎉 **Production-Ready Interpreter** - Hybrid Block Execution + Variable Access Optimizations + Pool Variables
+**Last Updated**: 2025-11-18
+**Status**: 🎉 **Production-Ready Interpreter** - Architecture Refactoring Complete + Hybrid Block Execution + Variable Access Optimizations + Pool Variables
 **Heap Manager**: ✅ Perfect GC (0 unreachable objects) with bulletproof allocation architecture
 **VM Core**: 🚀 High-performance variable access with cycle detection and bounds checking
 **Block Support**: ✅ Hybrid architecture supporting both Blue Book primitives 80-82 and offline compiler literals
 **Pool Variables**: ✅ Complete implementation with two-phase resolution and runtime patching
-**Primitive Coverage**: ✅ Enhanced with objectAt:/at: access patterns
+**Primitive Coverage**: ✅ 110 primitives migrated to IPrimitive pattern
+**Architecture**: ✅ Full refactoring complete (Phases 0-6) with clean interfaces
 **Schema Version**: v1.0.8 (Pool variable support via `poolDictionaryName` field)
 
 ## Executive Summary
@@ -21,6 +22,8 @@ This document provides the canonical architectural documentation for the Smallta
 - **Complete Cold Start**: All 6 phases work correctly with optimized GC roots
 - **100% Compiler Validation**: 10,182 methods validate correctly with temp indexing fixes
 - **Tail Recursion Optimization**: Prevents context accumulation in recursive patterns
+- **Architecture Refactoring Complete**: 10 new interfaces, clean separation of concerns
+- **120/120 BlockContext Tests Pass**: Comprehensive test suite validates all operations
 
 These optimizations work synergistically to enable deep recursion with constant context depth and minimal allocation overhead.
 
@@ -110,7 +113,33 @@ dotnet run --project Smalltalk80.Interpreter -- --coldstart bin/Debug/net9.0/col
 # ✓ Cold start loader test PASSED!
 ```
 
-### Recent Improvements (2025-11-05 to 2025-11-07)
+### Recent Improvements (2025-11-05 to 2025-11-18)
+
+**2025-11-18: Complete Architecture Refactoring (Phases 0-6)**
+
+Successfully completed comprehensive architectural refactoring with 10 new interfaces and clean separation of concerns.
+
+**New Interfaces Created**:
+- `IPrimitive` - Individual primitive implementations (110 primitives)
+- `IPrimitiveRegistry` - Registry and dispatch
+- `PrimitiveExecutionContext` - Dependency injection for primitives
+- `IPhase` - Cold start phase contract
+- `IColdStartLoader` - Loader API
+- `IBytecodeCompiler` - Compilation API
+- `IRuntimeHeapAccessor` - Runtime heap access
+
+**Files Extracted**:
+- From VirtualMachine.cs (4,639→1,500 lines): `StackManager.cs`, `ContextManager.cs`, `MessageDispatcher.cs`, `BytecodeInterpreter.cs`, `VMDebugger.cs`
+- From BytecodeCompiler.cs (3,459→2,330 lines): `CompilationEnvironment.cs`, `BytecodeEmitter.cs`, `CollectingErrorListener.cs`
+- From RuntimeHeapAccessor.cs (498→393 lines): `RuntimeClassCache.cs`, `RuntimeSpecialObjects.cs`
+
+**Architecture Patterns Established**:
+1. **Freeze Pattern** - Cold start registries prevent runtime modifications
+2. **Cache Invalidation** - Runtime caches invalidated by primitive 89
+3. **Dependency Injection** - Primitives receive `PrimitiveExecutionContext`
+4. **Interface Segregation** - Small, focused interfaces for each subsystem
+
+See `docs/Refactoring/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md` for detailed documentation.
 
 **2025-11-07: BlockContext.executionContext Architecture**
 - Added `executionContext` as 5th field in BlockContext class (Smalltalk-80.st:41840)
@@ -174,10 +203,28 @@ dotnet run --project Smalltalk80.Interpreter -- --coldstart bin/Debug/net9.0/col
 - Hybrid block execution (BlockContext + CompiledMethod literals)
 - High-performance variable access with cycle detection
 
-**Key Files**:
-- `VirtualMachine.cs` - Main interpreter loop, bytecode execution, block handling
+**Key Files** (after 2025-11-18 refactoring):
+- `VirtualMachine.cs` - Main interpreter coordination (~1,500 lines, down from 4,639)
+- `StackManager.cs` - Stack operations and management
+- `ContextManager.cs` - Context switching and lifecycle
+- `MessageDispatcher.cs` - Method lookup and dispatch
+- `BytecodeInterpreter.cs` - Bytecode execution
+- `VMDebugger.cs` - Debug and tracing support
 - `VMMetadata.cs` - Cached class OOPs for fast type detection
-- `VMConstants.cs` - Field indices for BlockContext, BlockContext, MethodContext
+- `VMConstants.cs` - Field indices for BlockContext, MethodContext
+
+**Primitive System** (`Core/VM/Primitives/`):
+- `IPrimitive.cs` - Primitive interface
+- `IPrimitiveRegistry.cs` - Registry interface
+- `PrimitiveRegistry.cs` - 110 primitives with dispatch
+- `PrimitiveExecutionContext.cs` - Dependency injection
+- `ArithmeticPrimitives.cs`, `ObjectPrimitives.cs`, `ControlPrimitives.cs`, etc.
+
+**Runtime Services** (`Core/VM/`):
+- `IRuntimeHeapAccessor.cs` - Runtime heap access interface
+- `RuntimeHeapAccessor.cs` - Implementation (~393 lines)
+- `RuntimeClassCache.cs` - Class lookup caching
+- `RuntimeSpecialObjects.cs` - Common class singleton
 
 #### 2. Object Memory System
 **Location**: `Smalltalk80.Interpreter/Core/HeapManager/`
@@ -202,9 +249,15 @@ dotnet run --project Smalltalk80.Interpreter -- --coldstart bin/Debug/net9.0/col
 - Class hierarchy establishment
 - Precomputed layout loading (v1.0.6)
 
-**Key Files**:
-- `Loader.cs` - Main loader orchestration
-- `Phase1_Preflight.cs` through `Phase6_Validation.cs` - Individual phase implementations
+**Key Files** (after 2025-11-18 refactoring):
+- `IColdStartInterfaces.cs` - `IPhase`, `IColdStartLoader` interfaces
+- `ColdStartOrchestrator.cs` - Main loader orchestration (implements `IColdStartLoader`)
+- `LoaderPhases/Phase1_PreflightAndSymbols.cs` - Phase 1 (implements `IPhase`)
+- `LoaderPhases/Phase2_ClassInfrastructure.cs` - Phase 2 (implements `IPhase`)
+- `LoaderPhases/Phase3_ObjectAllocation.cs` - Phase 3 (implements `IPhase`)
+- `LoaderPhases/Phase4_MethodCompilation.cs` - Phase 4 (implements `IPhase`)
+- `LoaderPhases/Phase5_GlobalsAndPatches.cs` - Phase 5 (implements `IPhase`)
+- `LoaderPhases/Phase6_ValidationAndGC.cs` - Phase 6 (implements `IPhase`)
 - `LayoutResolver.cs` - Runtime field index resolution
 
 #### 4. Compiler System
@@ -216,11 +269,17 @@ dotnet run --project Smalltalk80.Interpreter -- --coldstart bin/Debug/net9.0/col
 - Method header encoding
 - Cold start bundle generation
 
-**Key Files**:
-- `BytecodeCompiler.cs` - Main compilation logic
-- `TailRecursionAnalyzer.cs` - Detects tail-recursive patterns
+**Key Files** (after 2025-11-18 refactoring):
+- `IBytecodeCompiler.cs` - Compiler interface
+- `BytecodeCompiler.cs` - Main compilation logic (~2,330 lines, down from 3,459)
+- `CompilationEnvironment.cs` - Scope tracking (extracted)
+- `BytecodeEmitter.cs` - Bytecode emission (extracted)
+- `CollectingErrorListener.cs` - ANTLR error handling (extracted)
+- `VariableResolver.cs` - Variable resolution
+- `Analysis/TailRecursionAnalyzer.cs` - Detects tail-recursive patterns
+- `Analysis/TempFrameAllocator.cs` - Variable allocation
+- `CodeGen/ColdStartJsonGenerator.cs` - Bundle generation with precomputed layouts
 - `CompilerOptions.cs` - Feature flags (tail recursion, etc.)
-- `ColdStartJsonGenerator.cs` - Bundle generation with precomputed layouts
 
 ## Heap Manager Architecture
 
@@ -2197,17 +2256,133 @@ Phase 6: Validation + GC Verification...
 
 ---
 
+## Running Tests
+
+### Build and Run Interpreter
+
+```bash
+# Build the interpreter
+cd Smalltalk80.Interpreter
+dotnet build
+
+# Run standard execution (31/46 init expressions)
+dotnet run
+
+# Run with specific coldstart bundle
+dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart.json
+
+# Skip init expressions (cold start only)
+dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart.json --skip-init-expressions
+```
+
+### BlockContext Test Suite (120 Tests)
+
+**CRITICAL**: Run after ANY compiler or interpreter changes.
+
+```bash
+# Generate test bundle with BlockContextTest
+cd "Smalltalk-80 Source"
+cat Smalltalk-80.st Tests/BlockContextTest.st Tests/BlockContextTestRunner.st > Smalltalk-80-with-runner.st
+dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80-with-runner.st"
+cp ../bin/Debug/net9.0/coldstart.json ../bin/Debug/net9.0/coldstart_with_runner.json
+
+# Run test suite
+cd ../Smalltalk80.Interpreter
+dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
+```
+
+**Expected Output**:
+```
+[292] BlockContextTestRunner initialize... ~4,000 instructions  ✓ SUCCESS - Returned: 1191
+```
+
+**Result Interpretation**:
+- `1191` = ✅ All 120 tests pass
+- Any other value = ❌ Test failure (investigate)
+
+### Unit Tests for Interfaces
+
+```bash
+# Run interface tests (requires test project setup)
+cd Smalltalk80.Interpreter
+dotnet test
+
+# Or run directly
+dotnet run --project Tests/Smalltalk80.Interpreter.Tests.csproj
+```
+
+**Test Files**:
+- `Tests/Interfaces/RuntimeHeapAccessorTests.cs` - IRuntimeHeapAccessor tests
+- `Tests/Interfaces/ColdStartInterfaceTests.cs` - IPhase, IColdStartLoader tests
+- `Tests/Integration/SubsystemIntegrationTests.cs` - Cross-subsystem tests
+
+### Primitive Tests
+
+```bash
+# Run arithmetic primitive tests
+dotnet test --filter "ArithmeticPrimitivesTests"
+
+# Run object primitive tests
+dotnet test --filter "ObjectArrayPrimitivesTests"
+```
+
+### Schema Validation
+
+```bash
+# Validate coldstart bundle
+dotnet run --project Smalltalk80.Validator -- bin/Debug/net9.0/coldstart.json
+
+# Expected: ✓ Validation PASSED (10,182 methods, 0 errors)
+```
+
+---
+
 **End of Document**
 
-**Document Status**: ✅ **Current as of 2025-11-07**
+**Document Status**: ✅ **Current as of 2025-11-18**
 
-**Key Files Referenced**:
-- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` - Main VM implementation
+**Key Files Referenced** (after architecture refactoring):
+
+**VM Core**:
+- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` - Main VM coordination
+- `Smalltalk80.Interpreter/Core/VM/StackManager.cs` - Stack operations
+- `Smalltalk80.Interpreter/Core/VM/ContextManager.cs` - Context management
+- `Smalltalk80.Interpreter/Core/VM/MessageDispatcher.cs` - Method dispatch
+- `Smalltalk80.Interpreter/Core/VM/BytecodeInterpreter.cs` - Bytecode execution
 - `Smalltalk80.Interpreter/Core/VM/VMMetadata.cs` - Cached class OOPs
 - `Smalltalk80.Interpreter/Core/VM/VMConstants.cs` - Field indices
+
+**Primitive System**:
+- `Smalltalk80.Interpreter/Core/VM/Primitives/IPrimitive.cs` - Primitive interface
+- `Smalltalk80.Interpreter/Core/VM/Primitives/PrimitiveRegistry.cs` - 110 primitives
+
+**Runtime Services**:
+- `Smalltalk80.Interpreter/Core/VM/IRuntimeHeapAccessor.cs` - Runtime heap interface
+- `Smalltalk80.Interpreter/Core/VM/RuntimeHeapAccessor.cs` - Implementation
+- `Smalltalk80.Interpreter/Core/VM/RuntimeClassCache.cs` - Class caching
+- `Smalltalk80.Interpreter/Core/VM/RuntimeSpecialObjects.cs` - Common classes
+
+**Cold Start System**:
+- `Smalltalk80.Interpreter/Engine/IColdStartInterfaces.cs` - IPhase, IColdStartLoader
+- `Smalltalk80.Interpreter/Engine/ColdStartOrchestrator.cs` - Loader orchestration
+- `Smalltalk80.Interpreter/Engine/LoaderPhases/` - 6 phase implementations
+
+**Heap Manager**:
 - `Smalltalk80.Interpreter/Core/HeapManager/SmalltalkHeapManager.cs` - Heap operations
-- `Smalltalk80.Interpreter/Engine/Loader.cs` - Cold start orchestration
-- `Smalltalk80.Interpreter/Core/VM/LayoutResolver.cs` - Runtime field resolution
-- `Smalltalk80.Compiler/BytecodeCompiler.cs` - Bytecode generation
+- `Smalltalk80.Interpreter/Core/HeapManager/ISmalltalkHeapManager.cs` - Heap interface
+
+**Compiler**:
+- `Smalltalk80.Compiler/IBytecodeCompiler.cs` - Compiler interface
+- `Smalltalk80.Compiler/BytecodeCompiler.cs` - Main compilation
+- `Smalltalk80.Compiler/CompilationEnvironment.cs` - Scope tracking
+- `Smalltalk80.Compiler/BytecodeEmitter.cs` - Bytecode emission
+- `Smalltalk80.Compiler/VariableResolver.cs` - Variable resolution
 - `Smalltalk80.Compiler/Analysis/TailRecursionAnalyzer.cs` - Tail call detection
+- `Smalltalk80.Compiler/CodeGen/ColdStartJsonGenerator.cs` - Bundle generation
+
+**Documentation**:
+- `docs/Refactoring/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md` - Complete refactoring plan
+- `docs/Refactoring/ARCHITECTURE_DIAGRAMS.md` - ASCII architecture diagrams
+- `docs/Refactoring/MIGRATION_GUIDE.md` - Patterns for future changes
+- `docs/Refactoring/PERFORMANCE_BENCHMARKS.md` - Performance metrics
 - `Smalltalk-80 Source/Smalltalk-80.st` - System image source

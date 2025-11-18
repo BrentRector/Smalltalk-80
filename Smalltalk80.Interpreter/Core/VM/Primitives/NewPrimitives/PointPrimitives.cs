@@ -1,0 +1,40 @@
+using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.HeapManager;
+
+namespace Smalltalk80.Interpreter.Core.VM.Primitives.NewPrimitives;
+
+/// <summary>
+/// Point primitives using new IPrimitive interface.
+/// </summary>
+public static class PointPrimitives
+{
+    /// <summary>Primitive 18: Number @ - Fast Point creation</summary>
+    public class MakePoint : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+
+            var xOop = context.Receiver;
+            var yOop = context.Arguments[0];
+
+            // Both coordinates must be SmallIntegers
+            if (!xOop.IsSmallInteger || !yOop.IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            // Allocate Point with 2 instance variables
+            var pointOOP = context.AllocateObject("Point", 0);
+
+            // Get field indices from layout resolver
+            if (context.LayoutResolver == null) return PrimitiveResult.Fail();
+            int xIndex = context.LayoutResolver.GetFieldIndex("class:Point", "x");
+            int yIndex = context.LayoutResolver.GetFieldIndex("class:Point", "y");
+
+            // Store coordinates
+            context.HeapManager.SetInstanceVariable(pointOOP, xIndex, xOop);
+            context.HeapManager.SetInstanceVariable(pointOOP, yIndex, yOop);
+
+            return PrimitiveResult.Ok(pointOOP);
+        }
+    }
+}

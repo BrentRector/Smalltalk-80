@@ -20,18 +20,46 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
     /// - Interns all symbols into heap as ByteIndexed objects
     /// - Populates and freezes SymbolRegistry
     /// </summary>
-    public class Phase1_PreflightAndSymbols
+    public class Phase1_PreflightAndSymbols : IPhase
     {
         private readonly ColdStartBundle _bundle;
         private readonly ObjectGraphAllocator _allocator;
         private readonly Dictionary<string, SmalltalkOOP> _symbolTable = new();
         private readonly ColdstartReport _report;
 
+        /// <summary>
+        /// Gets the phase name for diagnostics and logging.
+        /// </summary>
+        public string Name => "Phase 1: Preflight Validation and Symbol Interning";
+
+        /// <summary>
+        /// Gets the phase number (1-6).
+        /// </summary>
+        public int PhaseNumber => 1;
+
         public Phase1_PreflightAndSymbols(ColdStartBundle bundle, ObjectGraphAllocator allocator, ColdstartReport report)
         {
             _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
             _allocator = allocator ?? throw new ArgumentNullException(nameof(allocator));
             _report = report ?? throw new ArgumentNullException(nameof(report));
+        }
+
+        /// <summary>
+        /// Validates phase preconditions before execution.
+        /// </summary>
+        /// <returns>List of precondition failure messages.</returns>
+        public IReadOnlyList<string> ValidatePreconditions()
+        {
+            return new List<string>();
+        }
+
+        /// <summary>
+        /// Validates phase postconditions after execution.
+        /// </summary>
+        /// <returns>List of postcondition failure messages.</returns>
+        public IReadOnlyList<string> ValidatePostconditions()
+        {
+            return new List<string>();
         }
 
         public void Run()

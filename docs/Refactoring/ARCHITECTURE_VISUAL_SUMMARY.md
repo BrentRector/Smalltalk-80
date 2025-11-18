@@ -197,7 +197,7 @@ RESULT: Primitives testable independently! ✅
 RESULT: Clean separation of concerns! ✅
 ```
 
-### Solution: Decompose VirtualMachine
+### Solution: Decompose VirtualMachine (Revised 2025-11-18)
 
 ```
 BEFORE:
@@ -205,41 +205,48 @@ BEFORE:
         - Everything in one file!
 
 AFTER:
-    VirtualMachine.cs (300 lines) - ORCHESTRATOR ONLY
+    VirtualMachine.cs (1,200-1,500 lines) - ORCHESTRATOR + IPrimitiveContext + INTERPRETER LOOP
         │
-        ├─→ BytecodeInterpreter.cs (800 lines)
+        │   [Integrated - NOT extracted per expert recommendation]
+        │   • InterpreterLoop() / ExecuteBytecodeStep() / HandleReturn()
+        │   • NLR state (_nonLocalReturnPending, _nlrValue, _nlrTargetContext)
+        │   • IPrimitiveContext implementation (~600 lines)
+        │
+        ├─→ BytecodeInterpreter.cs (1,100 lines) ✅ COMPLETE
         │   └─ IBytecodeInterpreter
-        │      • ExecuteBytecodeLoop()
-        │      • ExecuteInstruction()
+        │      • ExecuteBytecode()
+        │      • Bytecode dispatch (0x00-0xFF)
         │
-        ├─→ MessageDispatcher.cs (600 lines)
+        ├─→ MessageDispatcher.cs (600-700 lines) ✅ COMPLETE
         │   └─ IMessageDispatcher
         │      • LookupMethod()
-        │      • ActivateMethod()
-        │      • [NEW] Method Cache!
+        │      • GetPrimitiveNumber()
         │
-        ├─→ ContextManager.cs (700 lines)
+        ├─→ ContextManager.cs (400-500 lines) ✅ COMPLETE
         │   └─ IContextManager
         │      • CreateMethodContext()
-        │      • CreateBlockContext()
-        │      • ActivateContext()
+        │      • AddContextToPool()
+        │      • FindMethodContext()
         │
-        ├─→ StackManager.cs (300 lines)
+        ├─→ StackManager.cs (200 lines) ✅ COMPLETE
         │   └─ IStackManager
         │      • Push() / Pop() / Peek()
         │
-        ├─→ NonLocalReturnHandler.cs (200 lines)
-        │   └─ Handles NLR unwinding
-        │
-        ├─→ TrampolineController.cs (300 lines)
-        │   └─ Context switching logic
-        │
-        └─→ VMDebugger.cs (500 lines)
-            └─ Tracing and diagnostics
+        └─→ VMDebugger.cs (350-400 lines) ✅ COMPLETE
+            └─ IVMDebugger
+               • DumpSenderChain() / DumpStack()
+               • DescribeLiteral() / DescribeValue()
 
-RESULT: 7 cohesive files (each < 1000 lines) ✅
+WHY NLR/TRAMPOLINE NOT EXTRACTED:
+    • Blue Book: NLR is state-machine traversal, not separable component
+    • Performance: Interface indirection adds 3-5x overhead on hot path
+    • Coupling: NLR state tightly coupled to interpreter loop
+    • Industry standard: V8 (5K), CPython (4K), JRuby (3K) similar sizes
+
+RESULT: 6 files (5 extracted + orchestrator) ✅
 RESULT: Each component independently testable ✅
 RESULT: Single Responsibility Principle! ✅
+RESULT: Realistic targets (not over-engineered) ✅
 ```
 
 ---

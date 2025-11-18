@@ -1,0 +1,212 @@
+using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Memory;
+
+namespace Smalltalk80.Interpreter.Core.VM;
+
+/// <summary>
+/// Manages execution contexts for the Smalltalk-80 VM.
+/// Handles context creation, pooling, switching, and chain traversal.
+/// </summary>
+/// <param name="heapManager">The heap manager for memory operations.</param>
+/// <param name="metadata">VM metadata containing class OOPs.</param>
+/// <param name="layoutResolver">Resolver for class layout information.</param>
+/// <param name="helpers">VM helper methods.</param>
+internal class ContextManager(
+    ISmalltalkHeapManager heapManager,
+    VMMetadata metadata,
+    LayoutResolver layoutResolver,
+    IVMHelpers helpers) : IContextManager
+{
+    // Active context (current MethodContext being executed)
+    private SmalltalkOOP _activeContextOOP;
+
+    // Context depth tracking to detect infinite recursion
+    private int _activeContextCount;
+    private const int MaxContextDepth = 5000;
+
+    // Context pooling - reuse recently returned contexts to reduce GC pressure
+    private readonly Dictionary<int, Stack<SmalltalkOOP>> _contextPools = [];
+    private const int MaxPooledContextsPerSize = 20;
+
+    /// <inheritdoc />
+    public SmalltalkOOP ActiveContext => _activeContextOOP;
+
+    /// <inheritdoc />
+    public int ContextDepth => _activeContextCount;
+
+    /// <inheritdoc />
+    public void SetActiveContext(SmalltalkOOP contextOOP) => _activeContextOOP = contextOOP;
+
+    /// <inheritdoc />
+    public void ResetContextDepth() => _activeContextCount = 0;
+
+    /// <inheritdoc />
+    public void DecrementContextDepth() => _activeContextCount--;
+
+    /// <inheritdoc />
+    public SmalltalkOOP CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP = default)
+    {
+        // Step 1: Validate CompiledMethod exists and parse header
+        var header = helpers.ParseMethodHeader(methodOOP);
+
+        // Validate argument count matches
+        if (arguments.Length != header.NumArgs)
+        {
+            throw new InvalidOperationException(
+                $"Argument count mismatch: method expects {header.NumArgs} args, got {arguments.Length}");
+        }
+
+        // Step 2: Calculate stack size (args + temps + execution stack)
+        int executionStackSize = header.NeedsLargeFrame ? 48 : 16;
+        int stackSize = header.NumArgs + header.NumTemps + executionStackSize;
+
+        // Step 3: Get MethodContext class from RuntimeSpecialObjects
+        var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
+
+        // Step 4: Try to reuse a pooled context with matching size, otherwise allocate new
+        SmalltalkOOP contextOOP;
+        int instanceVarCount = layoutResolver.GetInstanceVariableCount("class:MethodContext");
+
+        // Check size-specific pool for matching context
+        if (_contextPools.TryGetValue(stackSize, out var pool) && pool.Count > 0)
+        {
+            contextOOP = pool.Pop();
+
+            // Check if we accidentally picked the active context
+            if (contextOOP == _activeContextOOP || IsInSenderChain(contextOOP, _activeContextOOP))
+            {
+                pool.Push(contextOOP);
+                contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
+                heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
+            }
+        }
+        else
+        {
+            contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
+            heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
+        }
+
+        // Increment context depth and check limit
+        _activeContextCount++;
+
+        if (_activeContextCount > MaxContextDepth)
+        {
+            throw new InvalidOperationException(
+                $"Context depth limit exceeded: {_activeContextCount} contexts (limit: {MaxContextDepth}). " +
+                $"This typically indicates infinite recursion or primitive failure causing excessive message sends.");
+        }
+
+        // Step 5: Get field indices
+        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        int pcIndex = VMConstants.CONTEXT_PC_INDEX;
+        int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
+        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
+        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
+
+        // Step 6: Initialize MethodContext fixed fields
+        var callerOOP = callerContextOOP == default ? SpecialObjectsArray.Instance.Nil : callerContextOOP;
+        heapManager.SetInstanceVariable(contextOOP, senderIndex, callerOOP);
+        heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
+        heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
+        heapManager.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
+        heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
+
+        // Step 7: Initialize indexed fields (args + temps + stack)
+        for (int i = 0; i < header.NumArgs; i++)
+        {
+            heapManager.SetIndexedOOP(contextOOP, i, arguments[i]);
+        }
+
+        // Initialize temps to nil
+        for (int i = header.NumArgs; i < header.NumArgs + header.NumTemps; i++)
+        {
+            heapManager.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
+        }
+
+        // Initialize execution stack slots to nil
+        for (int i = header.NumArgs + header.NumTemps; i < stackSize; i++)
+        {
+            heapManager.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
+        }
+
+        return contextOOP;
+    }
+
+    /// <inheritdoc />
+    public SmalltalkOOP FindMethodContext(SmalltalkOOP contextOOP)
+    {
+        var currentOOP = contextOOP;
+        int depth = 0;
+        const int maxDepth = 100;
+
+        while (depth < maxDepth)
+        {
+            var contextClassOOP = heapManager.GetClassOOP(currentOOP);
+            bool isBlockContext = contextClassOOP == metadata.BlockContextClassOOP;
+
+            if (!isBlockContext)
+            {
+                return currentOOP;
+            }
+
+            currentOOP = heapManager.GetInstanceVariable(currentOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+            depth++;
+        }
+
+        throw new InvalidOperationException($"FindMethodContext: Max traversal depth exceeded (depth={maxDepth})");
+    }
+
+    /// <inheritdoc />
+    public bool IsInSenderChain(SmalltalkOOP contextToFind, SmalltalkOOP startContext)
+    {
+        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
+        var current = startContext;
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        for (int i = 0; i < 100; i++)
+        {
+            if (current == nilOOP || current == default)
+            {
+                return false;
+            }
+
+            var senderOOP = heapManager.GetInstanceVariable(current, senderIndex);
+            if (senderOOP == contextToFind)
+            {
+                return true;
+            }
+
+            current = senderOOP;
+        }
+
+        return false;
+    }
+
+    /// <inheritdoc />
+    public void AddContextToPool(SmalltalkOOP contextOOP)
+    {
+        // NEVER pool the active context
+        if (contextOOP == _activeContextOOP)
+        {
+            return;
+        }
+
+        // NEVER pool a context that's in the active context's sender chain
+        if (IsInSenderChain(contextOOP, _activeContextOOP))
+        {
+            return;
+        }
+
+        int size = heapManager.GetIndexedSize(contextOOP);
+        if (!_contextPools.TryGetValue(size, out var poolForSize))
+        {
+            poolForSize = new Stack<SmalltalkOOP>();
+            _contextPools[size] = poolForSize;
+        }
+
+        if (poolForSize.Count < MaxPooledContextsPerSize)
+        {
+            poolForSize.Push(contextOOP);
+        }
+    }
+}

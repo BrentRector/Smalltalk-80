@@ -11,21 +11,21 @@ public interface IStackManager
     /// <summary>
     /// Pushes a value onto the operand stack of the current context.
     /// </summary>
-    /// <param name="valueOOP">Value to push onto the stack</param>
-    /// <exception cref="InvalidOperationException">Thrown when stack overflow occurs</exception>
+    /// <param name="valueOOP">Value to push onto the stack.</param>
+    /// <exception cref="InvalidOperationException">Thrown when stack overflow occurs.</exception>
     void Push(SmalltalkOOP valueOOP);
 
     /// <summary>
     /// Pops a value from the operand stack of the current context.
     /// </summary>
-    /// <returns>The popped value</returns>
-    /// <exception cref="InvalidOperationException">Thrown when stack underflow occurs (stack empty)</exception>
+    /// <returns>The popped value.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when stack underflow occurs (stack empty).</exception>
     SmalltalkOOP Pop();
 
     /// <summary>
     /// Peeks at the top value on the operand stack without removing it.
     /// </summary>
-    /// <returns>The top stack value</returns>
-    /// <exception cref="InvalidOperationException">Thrown when stack is empty</exception>
+    /// <returns>The top stack value.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when stack is empty.</exception>
     SmalltalkOOP Peek();
 }
