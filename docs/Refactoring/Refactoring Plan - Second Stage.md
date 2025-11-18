@@ -1,7 +1,7 @@
 # Smalltalk-80 Interpreter - Second Stage Refactoring Plan
 
 **Date**: 2025-11-18
-**Status**: In Progress - Phases 7 & 10 Complete
+**Status**: In Progress - Phases 7, 8 & 10 Complete
 **Scope**: Post-Phase 6 architectural improvements focusing on semantic clarity, modern C# patterns, and remaining decomposition
 
 ---
@@ -164,7 +164,7 @@ Five additional phases to complete the architectural refactoring:
 | Phase | Name | Priority | Duration | Risk | Status |
 |-------|------|----------|----------|------|--------|
 | 7 | Semantic Layer | Medium | 2 weeks | Medium | **Complete** |
-| 8 | Heap Decomposition | High | 1 week | Medium | Pending |
+| 8 | Heap Decomposition | High | 1 week | Medium | **Complete** |
 | 9 | Modern C# Patterns | Low | 1 week | Low | Pending |
 | 10 | Legacy Cleanup | High | 3 days | Low | **Complete** |
 | 11 | Remaining Decomposition | Medium | 1 week | Medium | Pending |
@@ -410,6 +410,28 @@ public interface IContextAccessor
 **Duration**: 1 week
 **Priority**: High
 **Risk**: Medium
+**Status**: ✅ **COMPLETE** (2025-11-18)
+
+### Completion Summary
+
+Successfully decomposed SmalltalkHeapManager.cs from 1,716 lines to 774 lines by extracting three focused components.
+
+**Key Accomplishments**:
+- Extracted GarbageCollector.cs (~240 lines) with IGarbageCollector interface
+- Extracted ObjectTableManager.cs (~130 lines) with IObjectTableManager interface
+- Extracted BecomeHandler.cs (~80 lines) with IBecomeHandler interface
+- SmalltalkHeapManager now delegates to extracted components
+- Target achieved: 774 lines < 800 line goal
+
+**Files Created** (~450 lines):
+- `Core/HeapManager/IGarbageCollector.cs` - GC interface
+- `Core/HeapManager/GarbageCollector.cs` - Mark/sweep implementation
+- `Core/HeapManager/IObjectTableManager.cs` - Table management interface (includes ObjectTableBlock class)
+- `Core/HeapManager/ObjectTableManager.cs` - Table block management
+- `Core/HeapManager/IBecomeHandler.cs` - Become interface
+- `Core/HeapManager/BecomeHandler.cs` - Identity swap operations
+
+**Commit**: `7128e46` - Phase 8: Heap Decomposition - Extract GC, ObjectTable, and Become components
 
 ### 6.1 Current Structure
 
@@ -491,13 +513,13 @@ public interface IBecomeHandler
 
 ### 6.4 Deliverables
 
-- [ ] `Core/HeapManager/IGarbageCollector.cs`
-- [ ] `Core/HeapManager/GarbageCollector.cs`
-- [ ] `Core/HeapManager/IObjectTableManager.cs`
-- [ ] `Core/HeapManager/ObjectTableManager.cs`
-- [ ] `Core/HeapManager/IBecomeHandler.cs`
-- [ ] `Core/HeapManager/BecomeHandler.cs`
-- [ ] Refactored `SmalltalkHeapManager.cs` (< 800 lines)
+- [x] `Core/HeapManager/IGarbageCollector.cs`
+- [x] `Core/HeapManager/GarbageCollector.cs`
+- [x] `Core/HeapManager/IObjectTableManager.cs`
+- [x] `Core/HeapManager/ObjectTableManager.cs`
+- [x] `Core/HeapManager/IBecomeHandler.cs`
+- [x] `Core/HeapManager/BecomeHandler.cs`
+- [x] Refactored `SmalltalkHeapManager.cs` (774 lines < 800 target)
 
 ---
 
@@ -829,8 +851,8 @@ Phase5_GlobalsAndPatches.cs (600 lines) - Orchestration
 
 1. **Week 1**: Phase 10 (Legacy Cleanup) - ✅ **COMPLETE**
 2. **Week 2**: Phase 7 (Semantic Layer) - ✅ **COMPLETE**
-3. **Week 3**: Phase 8 (Heap Decomposition) - Address largest remaining file ← **NEXT**
-4. **Week 4**: Phase 11 (Remaining Decomposition) - Organize Program.cs, Phase5
+3. **Week 3**: Phase 8 (Heap Decomposition) - ✅ **COMPLETE**
+4. **Week 4**: Phase 11 (Remaining Decomposition) - Organize Program.cs, Phase5 ← **NEXT**
 5. **Week 5**: Phase 9 (Modern C# Patterns) - Polish
 
 **Total Duration**: 6 weeks
@@ -841,7 +863,7 @@ Phase5_GlobalsAndPatches.cs (600 lines) - Orchestration
 |------|-----------|------------|--------|
 | 1 | Legacy code removed | ~8,000 lines deleted, tests pass | ✅ Complete |
 | 2 | Semantic layer complete | View types and bytecode records | ✅ Complete |
-| 3 | Heap decomposed | SmalltalkHeapManager < 800 lines | Pending |
+| 3 | Heap decomposed | SmalltalkHeapManager 774 lines | ✅ Complete |
 | 4 | Program.cs organized | All files < 1,000 lines | Pending |
 | 5 | Modern patterns applied | Records, primary constructors | Pending |
 
@@ -985,10 +1007,10 @@ The combined approach takes the best practices from the existing work (interface
 
 ---
 
-**Document Version**: 1.2
+**Document Version**: 1.3
 **Author**: Claude (Anthropic)
 **Date**: 2025-11-18
-**Status**: In Progress - Phases 7 & 10 Complete
+**Status**: In Progress - Phases 7, 8 & 10 Complete
 
 ### Revision History
 
@@ -997,3 +1019,4 @@ The combined approach takes the best practices from the existing work (interface
 | 1.0 | 2025-11-18 | Initial proposal |
 | 1.1 | 2025-11-18 | Phase 10 marked complete (~8,000 lines removed) |
 | 1.2 | 2025-11-18 | Phase 7 marked complete (1,469 lines of semantic layer) |
+| 1.3 | 2025-11-18 | Phase 8 marked complete (SmalltalkHeapManager: 1,716→774 lines) |
