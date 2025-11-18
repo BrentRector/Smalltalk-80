@@ -6,7 +6,8 @@
   Builds the Compiler and generates coldstart_with_runner.json from:
     - Smalltalk-80.st (base system)
     - BlockContextTest_full.st (test methods + 9 diagnostic methods)
-    - BlockContextDiagnostics.st (9 classes with initialize methods)
+    - BlockContextDiagnostics.st (9 diagnostic classes with initialize methods)
+    - BlockContextTestRunner.st (runs testAllCombinations automatically)
 
   Output: Smalltalk80.Compiler/bin/Debug/net9.0/coldstart_with_runner.json
 
@@ -44,6 +45,7 @@ $SourceDir = "Smalltalk-80 Source"
 $BaseFile = "$SourceDir/Smalltalk-80.st"
 $TestFile = "$SourceDir/Tests/BlockContextTest_full.st"
 $DiagnosticsFile = "$SourceDir/Tests/BlockContextDiagnostics.st"
+$RunnerFile = "$SourceDir/Tests/BlockContextTestRunner.st"
 $CombinedFile = "$SourceDir/Smalltalk-80-with-runner.st"
 
 if (-not (Test-Path $BaseFile)) {
@@ -61,8 +63,13 @@ if (-not (Test-Path $DiagnosticsFile)) {
     exit 1
 }
 
+if (-not (Test-Path $RunnerFile)) {
+    Write-Error "Runner file not found: $RunnerFile"
+    exit 1
+}
+
 # Combine files
-Get-Content $BaseFile, $TestFile, $DiagnosticsFile | Set-Content $CombinedFile
+Get-Content $BaseFile, $TestFile, $DiagnosticsFile, $RunnerFile | Set-Content $CombinedFile
 Write-Host "  Created: $CombinedFile" -ForegroundColor Green
 
 # Compile to coldstart.json
@@ -95,14 +102,19 @@ Write-Host "  cd Smalltalk80.Interpreter" -ForegroundColor White
 Write-Host "  dotnet run -- --coldstart ../Smalltalk80.Compiler/bin/$Configuration/net9.0/coldstart_with_runner.json" -ForegroundColor White
 Write-Host
 
-Write-Host "Expected output (9 diagnostic tests):" -ForegroundColor Yellow
-Write-Host "  DiagOa initialize... Returned: 11" -ForegroundColor White
-Write-Host "  DiagOt1 initialize... Returned: 22" -ForegroundColor White
-Write-Host "  DiagOt2 initialize... Returned: 44" -ForegroundColor White
-Write-Host "  DiagMa initialize... Returned: 88" -ForegroundColor White
-Write-Host "  DiagMt1 initialize... Returned: 166" -ForegroundColor White
-Write-Host "  DiagMt2 initialize... Returned: 322" -ForegroundColor White
-Write-Host "  DiagIa initialize... Returned: 644" -ForegroundColor White
-Write-Host "  DiagIt1 initialize... Returned: 188" -ForegroundColor White
-Write-Host "  DiagIt2 initialize... Returned: 266" -ForegroundColor White
+Write-Host "Expected output:" -ForegroundColor Yellow
+Write-Host "  1. Diagnostic tests (9 individual variable tests):" -ForegroundColor Cyan
+Write-Host "     DiagOa initialize... Returned: 11" -ForegroundColor White
+Write-Host "     DiagOt1 initialize... Returned: 22" -ForegroundColor White
+Write-Host "     DiagOt2 initialize... Returned: 44" -ForegroundColor White
+Write-Host "     DiagMa initialize... Returned: 88" -ForegroundColor White
+Write-Host "     DiagMt1 initialize... Returned: 166" -ForegroundColor White
+Write-Host "     DiagMt2 initialize... Returned: 322" -ForegroundColor White
+Write-Host "     DiagIa initialize... Returned: 644" -ForegroundColor White
+Write-Host "     DiagIt1 initialize... Returned: 188" -ForegroundColor White
+Write-Host "     DiagIt2 initialize... Returned: 266" -ForegroundColor White
+Write-Host
+Write-Host "  2. Full test suite:" -ForegroundColor Cyan
+Write-Host "     BlockContextTestRunner initialize... Returned: 1200" -ForegroundColor White
+Write-Host "     (120 tests × 10 points each)" -ForegroundColor DarkGray
 Write-Host
