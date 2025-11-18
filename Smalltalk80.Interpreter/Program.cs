@@ -378,9 +378,9 @@ public static class Program
                     {
                         succeeded++;
                         successfulExpressions.Add((index, expr.Source ?? ""));
-                        
-                        // For Block test classes, show the actual return value
-                        if (expr.Source != null && (expr.Source.Contains("Block") && expr.Source.Contains("Test")))
+
+                        // For Block test classes and diagnostic tests, show the actual return value
+                        if (expr.Source != null && ((expr.Source.Contains("Block") && expr.Source.Contains("Test")) || expr.Source.Contains("Diag")))
                         {
                             var returnOOP = result.ReturnValueOop;
                             if (returnOOP.HasValue && returnOOP.Value.IsSmallInteger)
