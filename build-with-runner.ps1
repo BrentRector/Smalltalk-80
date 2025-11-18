@@ -6,7 +6,7 @@
   Builds the Compiler and generates coldstart_with_runner.json from:
     - Smalltalk-80.st (base system)
     - BlockContextTest_full.st (test methods + 9 diagnostic methods)
-    - BlockContextDiagnostics.st (single class with 9 test methods)
+    - BlockContextDiagnostics.st (9 classes with initialize methods)
 
   Output: Smalltalk80.Compiler/bin/Debug/net9.0/coldstart_with_runner.json
 
@@ -96,13 +96,13 @@ Write-Host "  dotnet run -- --coldstart ../Smalltalk80.Compiler/bin/$Configurati
 Write-Host
 
 Write-Host "Expected output (9 diagnostic tests):" -ForegroundColor Yellow
-Write-Host "  BlockContextDiagnostics testOa... Returned: 11" -ForegroundColor White
-Write-Host "  BlockContextDiagnostics testOt1... Returned: 22" -ForegroundColor White
-Write-Host "  BlockContextDiagnostics testOt2... Returned: 44" -ForegroundColor White
-Write-Host "  BlockContextDiagnostics testMa... Returned: 88" -ForegroundColor White
-Write-Host "  BlockContextDiagnostics testMt1... Returned: 166" -ForegroundColor White
-Write-Host "  BlockContextDiagnostics testMt2... Returned: 322" -ForegroundColor White
-Write-Host "  BlockContextDiagnostics testIa... Returned: 644" -ForegroundColor White
-Write-Host "  BlockContextDiagnostics testIt1... Returned: 188" -ForegroundColor White
-Write-Host "  BlockContextDiagnostics testIt2... Returned: 266" -ForegroundColor White
+Write-Host "  DiagOa initialize... Returned: 11" -ForegroundColor White
+Write-Host "  DiagOt1 initialize... Returned: 22" -ForegroundColor White
+Write-Host "  DiagOt2 initialize... Returned: 44" -ForegroundColor White
+Write-Host "  DiagMa initialize... Returned: 88" -ForegroundColor White
+Write-Host "  DiagMt1 initialize... Returned: 166" -ForegroundColor White
+Write-Host "  DiagMt2 initialize... Returned: 322" -ForegroundColor White
+Write-Host "  DiagIa initialize... Returned: 644" -ForegroundColor White
+Write-Host "  DiagIt1 initialize... Returned: 188" -ForegroundColor White
+Write-Host "  DiagIt2 initialize... Returned: 266" -ForegroundColor White
 Write-Host

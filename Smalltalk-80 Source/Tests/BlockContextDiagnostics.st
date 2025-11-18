@@ -1,56 +1,83 @@
-"BlockContext Diagnostic Test Runner - Tests each variable individually"
+"BlockContext Diagnostic Runners - Each tests one variable"
 
-Object subclass: #BlockContextDiagnostics
+Object subclass: #DiagOa
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Tests-BlockContext'! !
+!DiagOa class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagOa! !
 
-!BlockContextDiagnostics class methodsFor: 'diagnostics'!
+Object subclass: #DiagOt1
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagOt1 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagOt1! !
 
-testOa
-	"Test outer block argument (expect 11)"
-	^BlockContextTest new diagOa!
+Object subclass: #DiagOt2
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagOt2 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagOt2! !
 
-testOt1
-	"Test outer block temp 1 (expect 22)"
-	^BlockContextTest new diagOt1!
+Object subclass: #DiagMa
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagMa class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagMa! !
 
-testOt2
-	"Test outer block temp 2 (expect 44)"
-	^BlockContextTest new diagOt2!
+Object subclass: #DiagMt1
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagMt1 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagMt1! !
 
-testMa
-	"Test middle block argument (expect 88)"
-	^BlockContextTest new diagMa!
+Object subclass: #DiagMt2
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagMt2 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagMt2! !
 
-testMt1
-	"Test middle block temp 1 (expect 166)"
-	^BlockContextTest new diagMt1!
+Object subclass: #DiagIa
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagIa class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagIa! !
 
-testMt2
-	"Test middle block temp 2 (expect 322)"
-	^BlockContextTest new diagMt2!
+Object subclass: #DiagIt1
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagIt1 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagIt1! !
 
-testIa
-	"Test inner block argument (expect 644)"
-	^BlockContextTest new diagIa!
+Object subclass: #DiagIt2
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagIt2 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagIt2! !
 
-testIt1
-	"Test inner block temp 1 (expect 188)"
-	^BlockContextTest new diagIt1!
-
-testIt2
-	"Test inner block temp 2 (expect 266)"
-	^BlockContextTest new diagIt2! !
-
-"Run all 9 diagnostic tests"
-BlockContextDiagnostics testOa!
-BlockContextDiagnostics testOt1!
-BlockContextDiagnostics testOt2!
-BlockContextDiagnostics testMa!
-BlockContextDiagnostics testMt1!
-BlockContextDiagnostics testMt2!
-BlockContextDiagnostics testIa!
-BlockContextDiagnostics testIt1!
-BlockContextDiagnostics testIt2!
+DiagOa initialize!
+DiagOt1 initialize!
+DiagOt2 initialize!
+DiagMa initialize!
+DiagMt1 initialize!
+DiagMt2 initialize!
+DiagIa initialize!
+DiagIt1 initialize!
+DiagIt2 initialize!
