@@ -37,7 +37,7 @@ public interface IAssociationManager
 /// </summary>
 public interface IPatchApplier
 {
-    PatchApplicationResult Apply(PatchDescriptor[] patches);
+    PatchApplicationResult Apply(PatchDescriptor[]? patches);
 }
 
 /// <summary>
