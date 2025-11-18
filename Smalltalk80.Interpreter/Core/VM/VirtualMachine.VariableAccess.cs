@@ -5,6 +5,16 @@ namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
 /// Partial class containing variable access and method literal helper methods.
+///
+/// This partial class contains:
+/// - GetMethodBytecodes() / GetLiteralCount() / GetMethodLiteral() - Method structure access
+/// - GetTemporaryVariable() / SetTemporaryVariable() - Unified temp frame variable access
+/// - FindHomeMethodContext() - Home context chain traversal
+///
+/// These methods remain in VirtualMachine because they:
+/// - Implement the unified temp frame architecture (core VM data structure)
+/// - Are called from both bytecode interpretation and context management
+/// - Require access to VM metadata (_metadata.BlockContextClassOOP)
 /// </summary>
 public partial class VirtualMachine
 {

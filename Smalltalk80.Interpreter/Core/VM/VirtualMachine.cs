@@ -7,7 +7,20 @@ using Smalltalk80.Interpreter.Core.Attributes;
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
-/// The Smalltalk-80 Virtual Machine - handles bytecode execution, message sending, and method dispatch.
+/// The Smalltalk-80 Virtual Machine - orchestrates bytecode execution and implements IPrimitiveContext.
+///
+/// Architecture (after Phase 2 decomposition):
+/// - VirtualMachine.cs: Interpreter loop, NLR state machine, IPrimitiveContext, component coordination
+/// - VirtualMachine.MessageSending.cs: SendMessage, ConsumeCallOutcome, error diagnostics
+/// - VirtualMachine.VariableAccess.cs: Unified temp frame variable access, method literal helpers
+///
+/// Extracted components:
+/// - IStackManager → StackManager.cs: Stack operations (Push, Pop, Peek)
+/// - IContextManager → ContextManager.cs: Context lifecycle and activation
+/// - IMessageDispatcher → MessageDispatcher.cs: Method lookup in class hierarchy
+/// - IBytecodeInterpreter → BytecodeInterpreter.cs: Bytecode dispatch and execution
+/// - IVMDebugger → VMDebugger.cs: Debugging and diagnostic output
+///
 /// Uses ISmalltalkHeapManager for object storage and LayoutResolver for dynamic field access.
 /// Consistently uses SmalltalkOOP for ALL object references to avoid OOP↔int conversions.
 ///
