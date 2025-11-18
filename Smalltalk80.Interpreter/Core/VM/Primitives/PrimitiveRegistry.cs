@@ -301,6 +301,16 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(53, new NewPrimitives.FloatArithmetic.Exponent());
         registry.Register(54, new NewPrimitives.FloatArithmetic.TimesTwoPower());
 
+        // Override with new IPrimitive implementations for Object primitives (60-75, 110-111)
+        registry.Register(60, new NewPrimitives.SimpleObjectPrimitives.At());
+        registry.Register(61, new NewPrimitives.SimpleObjectPrimitives.AtPut());
+        registry.Register(62, new NewPrimitives.SimpleObjectPrimitives.Size());
+        registry.Register(73, new NewPrimitives.SimpleObjectPrimitives.InstVarAt());
+        registry.Register(74, new NewPrimitives.SimpleObjectPrimitives.InstVarAtPut());
+        registry.Register(75, new NewPrimitives.SimpleObjectPrimitives.Hash());
+        registry.Register(110, new NewPrimitives.SimpleObjectPrimitives.IdentityEquals());
+        registry.Register(111, new NewPrimitives.SimpleObjectPrimitives.Class());
+
         return registry;
     }
 }
