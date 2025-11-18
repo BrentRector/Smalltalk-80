@@ -42427,8 +42427,8 @@ initialize
 
 	"DIAGNOSTIC: Test each variable individually to detect aliasing
 	 Expected values:
-	 diagOa  → 11
-	 diagOt1 → 22
+	 diagOa  → 11  (PASSED: returned 1011)
+	 diagOt1 → 22  (TESTING NOW)
 	 diagOt2 → 44
 	 diagMa  → 88
 	 diagMt1 → 166
@@ -42437,6 +42437,6 @@ initialize
 	 diagIt1 → 188
 	 diagIt2 → 266"
 
-	^1000 + (tester diagOa)! !
+	^2000 + (tester diagOt1)! !
 
 BlockContextTestRunner initialize!
