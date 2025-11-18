@@ -25,6 +25,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     private readonly RuntimeDebugOptions _debugOptions;
     private readonly IStackManager _stackManager;
     private readonly IContextManager _contextManager;
+    private readonly IMessageDispatcher _messageDispatcher;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -148,6 +149,12 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             () => _selectorTraceEnabled,
             () => _pushTraceCounter,
             () => _pushTraceCounter++
+        );
+
+        _messageDispatcher = new MessageDispatcher(
+            heapManager,
+            _layoutResolver,
+            this // IVMHelpers
         );
     }
 
@@ -2022,7 +2029,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         string? selectorName = GetSymbolName(selectorOOP);
 
         // Now look up the method starting from the superclass
-        var methodInfo = GetMethod(superclassOOP, selectorName!);
+        var methodInfo = _messageDispatcher.LookupMethod(superclassOOP, selectorName!);
 
         if (methodInfo == null)
         {
@@ -2032,7 +2039,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         }
 
         // Check if the method has a primitive
-        int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
+        int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
         if (primitiveNumber > 0)
         {
             if (_selectorTraceEnabled && _instructionCount >= 2000 && _instructionCount < 2100)
@@ -2134,12 +2141,12 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 $"Method not found: {selectorName ?? "unknown"} in class 0 (receiver OOP={receiverOOP}, receiverId has classId 0!)");
         }
 
-        var methodInfo = GetMethod(classOOP, selectorName!);
+        var methodInfo = _messageDispatcher.LookupMethod(classOOP, selectorName!);
 
         // DIAGNOSTIC: Show what method was found for hash/stringhash (disabled for quiet mode)
         // if ((selectorName == "hash" || selectorName == "stringhash") && methodInfo != null)
         // {
-        //     int primNum = GetPrimitiveNumber(methodInfo.MethodOOP);
+        //     int primNum = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
         //     string methodLocalId = GetLocalId(methodInfo.MethodOOP) ?? "unknown";
         //     Console.WriteLine($"  Found method: {methodLocalId}, primitiveNumber={primNum}");
         // }
@@ -2165,7 +2172,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         }
 
         // Check if the method has a primitive
-        int primitiveNumber = GetPrimitiveNumber(methodInfo.MethodOOP);
+        int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
 
         if (primitiveNumber > 0)
         {
@@ -2829,16 +2836,6 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     MethodHeaderInfo IVMHelpers.ParseMethodHeader(SmalltalkOOP methodOOP) => ParseMethodHeader(methodOOP);
 
     /// <summary>
-    /// Extracts the primitive number from a method's header.
-    /// Returns 0 if the method has no primitive.
-    /// </summary>
-    private int GetPrimitiveNumber(SmalltalkOOP methodOOP)
-    {
-        var headerInfo = ParseMethodHeader(methodOOP);
-        return headerInfo.Primitive;
-    }
-
-    /// <summary>
     /// Pushes a value onto the operand stack.
     /// Delegates to StackManager for implementation.
     /// </summary>
@@ -2994,204 +2991,6 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         }
         
         return System.Text.Encoding.ASCII.GetString(bytes);
-    }
-
-    private MethodInfo? GetMethod(SmalltalkOOP classOOP, string selectorName)
-    {
-        var currentClassOOP = classOOP;
-        int depth = 0;
-        const int maxDepth = 20; // Prevent infinite loops
-
-
-        // Walk up the inheritance chain until we find the method or reach nil
-        while (currentClassOOP != SpecialObjectsArray.Instance.Nil && depth < maxDepth)
-        {
-            string currentClassName = GetClassName(currentClassOOP);
-            // if (_debugOptions.ShouldDebugMethodLookup)
-            // {
-            //     Console.WriteLine($"  [GetMethod] depth={depth}, class={currentClassName}, looking for '{selectorName}'");
-            // }
-
-            // Get the method dictionary from the class
-            // Use Blue Book architectural constants: methodDict is ALWAYS at index 1 in Behavior
-            var methodDictOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_METHODDICT_INDEX);
-
-            if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
-            {
-                // No method dictionary, try superclass
-                // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
-                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
-
-                if (superclassOOP == SpecialObjectsArray.Instance.Nil)
-                {
-                    // if (_debugOptions.ShouldDebugMethodLookup)
-                    // {
-                    //     Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root of hierarchy)");
-                    // }
-                    break; // Reached root of class hierarchy
-                }
-
-                // if (_debugOptions.ShouldDebugMethodLookup)
-                // {
-                //     string superclassName = GetClassName(superclassOOP);
-                //     Console.WriteLine($"  '{selectorName}' not found, trying superclass={superclassName}");
-                // }
-                currentClassOOP = superclassOOP;
-                depth++;
-                continue;
-            }
-
-            // MethodDictionary structure (IdentityDictionary):
-            // - Instance variable [0] = valuesArray (Array of methods)
-            // - Instance variable [1] = tally (SmallInteger)
-            // - Indexed fields = keys (selectors)
-            // To find a method: search indexed fields for selector, then get method from valuesArray at same index
-
-            var valuesArrayOOP = _heapManager.GetInstanceVariable(methodDictOOP, 0);
-            if (valuesArrayOOP == SpecialObjectsArray.Instance.Nil)
-            {
-                // No values array, try superclass
-                // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
-                var superclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
-                string superclassName = GetClassName(superclassOOP);
-                Console.WriteLine($"  '{selectorName}' not found, trying superclass={superclassName}");
-                currentClassOOP = superclassOOP;
-                depth++;
-                continue;
-            }
-
-            // DIAGNOSTIC: Get format once for both validation blocks
-            var methodDictFormat = _heapManager.GetObjectFormat(methodDictOOP);
-
-            // DIAGNOSTIC: Validate methodDictOOP format FIRST (before we try to access its indexed slots)
-            if (methodDictFormat != ObjectFormat.PointerIndexed)
-            {
-                var methodDictClass = GetClassName(GetClass(methodDictOOP));
-                Console.WriteLine($"[ERROR] methodDictOOP has wrong format!");
-                Console.WriteLine($"  methodDictOOP: {methodDictOOP}");
-                Console.WriteLine($"  Expected: PointerIndexed (MethodDictionary)");
-                Console.WriteLine($"  Actual: {methodDictFormat}");
-                Console.WriteLine($"  Class: {methodDictClass}");
-                Console.WriteLine($"  currentClassOOP={currentClassOOP}, className={GetClassName(currentClassOOP)}");
-                Console.WriteLine($"  Looking for selector: {selectorName}");
-
-                // Check ALL instance variables in the class
-                Console.WriteLine($"  Checking class instance variables:");
-                try
-                {
-                    string? className = GetClassName(currentClassOOP);
-                    int instanceVarCount = className != null ? _layoutResolver.GetInstanceVariableCount(className) : 0;
-                    Console.WriteLine($"    Instance variable count: {instanceVarCount}");
-                    for (int slot = 0; slot < instanceVarCount; slot++)
-                    {
-                        try
-                        {
-                            var slotValue = _heapManager.GetInstanceVariable(currentClassOOP, slot);
-                            var slotFormat = slotValue.IsSmallInteger ? "SmallInteger" : _heapManager.GetObjectFormat(slotValue).ToString();
-                            var slotClass = slotValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(slotValue));
-                            Console.WriteLine($"    slot[{slot}]: {slotValue}, format={slotFormat}, class={slotClass}");
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"    slot[{slot}]: ERROR - {ex.Message}");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"    ERROR getting instance variables: {ex.Message}");
-                }
-
-                throw new InvalidOperationException($"Class methodDict field contains {methodDictFormat} object (class={methodDictClass}) instead of PointerIndexed MethodDictionary");
-            }
-
-            // DIAGNOSTIC: Validate valuesArrayOOP format BEFORE using it
-            var valuesArrayFormat = _heapManager.GetObjectFormat(valuesArrayOOP);
-            if (valuesArrayFormat != ObjectFormat.PointerIndexed)
-            {
-                var valuesArrayClass = GetClassName(GetClass(valuesArrayOOP));
-                Console.WriteLine($"[ERROR] valuesArrayOOP has wrong format!");
-                Console.WriteLine($"  valuesArrayOOP: {valuesArrayOOP}");
-                Console.WriteLine($"  Expected: PointerIndexed (Array)");
-                Console.WriteLine($"  Actual: {valuesArrayFormat}");
-                Console.WriteLine($"  Class: {valuesArrayClass}");
-                Console.WriteLine($"  methodDictOOP: {methodDictOOP}, format={methodDictFormat}");
-                Console.WriteLine($"  currentClassOOP={currentClassOOP}, className={GetClassName(currentClassOOP)}");
-                Console.WriteLine($"  Looking for selector: {selectorName}");
-
-                // Check ALL instance variables in the MethodDictionary
-                Console.WriteLine($"  Checking MethodDictionary instance variables:");
-                for (int slot = 0; slot < 3; slot++)
-                {
-                    try
-                    {
-                        var slotValue = _heapManager.GetInstanceVariable(methodDictOOP, slot);
-                        var slotFormat = slotValue.IsSmallInteger ? "SmallInteger" : _heapManager.GetObjectFormat(slotValue).ToString();
-                        var slotClass = slotValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(slotValue));
-                        Console.WriteLine($"    slot[{slot}]: {slotValue}, format={slotFormat}, class={slotClass}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"    slot[{slot}]: ERROR - {ex.Message}");
-                    }
-                }
-
-                throw new InvalidOperationException($"MethodDictionary slot[0] (valuesArray) contains {valuesArrayFormat} object (class={valuesArrayClass}) instead of PointerIndexed Array");
-            }
-
-            int dictSize = _heapManager.GetIndexedSize(methodDictOOP);
-
-
-            for (int i = 0; i < dictSize; i++)
-            {
-                var selectorOOP = _heapManager.GetIndexedOOP(methodDictOOP, i);
-
-                // Skip nil entries (empty slots in the hash table)
-                if (selectorOOP == SpecialObjectsArray.Instance.Nil)
-                    continue;
-
-                // Check if this is the selector we're looking for
-                string? currentSelectorName = GetSymbolName(selectorOOP);
-
-                if (currentSelectorName == selectorName)
-                {
-                    // Found it! Get the method from the valuesArray at the same index
-                    var methodOOP = _heapManager.GetIndexedOOP(valuesArrayOOP, i);
-                    return new MethodInfo { MethodOOP = methodOOP };
-                }
-            }
-
-            // Not found in this class, try superclass
-            // Use Blue Book architectural constant: superclass is ALWAYS at index 0 in Behavior
-            var nextSuperclassOOP = _heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
-
-            // if (_debugOptions.ShouldDebugMethodLookup)
-            // {
-            //     if (nextSuperclassOOP == SpecialObjectsArray.Instance.Nil)
-            //     {
-            //         Console.WriteLine($"  '{selectorName}' not found, superclass is nil (reached root)");
-            //     }
-            //     else
-            //     {
-            //         string nextSuperclassName = GetClassName(nextSuperclassOOP);
-            //         Console.WriteLine($"  '{selectorName}' not found, trying superclass={nextSuperclassName}");
-            //     }
-            // }
-
-            currentClassOOP = nextSuperclassOOP;
-            depth++;
-        }
-
-        // if (_debugOptions.ShouldDebugMethodLookup)
-        // {
-        //     Console.WriteLine($"  [GetMethod] FAILED: '{selectorName}' not found after {depth} levels");
-        // }
-        return null;
-    }
-
-    private class MethodInfo
-    {
-        public SmalltalkOOP MethodOOP { get; set; }
     }
 
     // IPrimitiveContext implementation - using new heap manager API with SmalltalkOOP types
