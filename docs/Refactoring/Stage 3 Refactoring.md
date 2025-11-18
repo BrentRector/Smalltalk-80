@@ -52,10 +52,10 @@ Analysis of 153 C# files (34,651 total lines) in the Smalltalk80.Interpreter cod
 **Effort**: Low (straightforward refactor)
 
 **Tasks**:
-- [ ] Compare `DisassembleBytecodes()` with `BytecodeDecompiler` functionality
-- [ ] Add any missing features to `BytecodeDecompiler` if needed
-- [ ] Update `DumpInitExpressionDebugInfo()` to use `BytecodeDecompiler`
-- [ ] Remove `DisassembleBytecodes()` and `CountInstructions()` from Program.cs
+- [x] Compare `DisassembleBytecodes()` with `BytecodeDecompiler` functionality
+- [x] Add any missing features to `BytecodeDecompiler` if needed
+- [x] Update `DumpInitExpressionDebugInfo()` to use `BytecodeDisassembler`
+- [x] Remove `DisassembleBytecodes()` and `CountInstructions()` from Program.cs
 - [ ] Test verbose debug output still works correctly
 
 ---
@@ -378,7 +378,7 @@ The static registries (`GlobalRegistry`, `SymbolRegistry`, `AssociationRegistry`
 1. **Quick wins first** (1-2 hours each):
    - [ ] 1.4 Duplicate HeapManagerTests
    - [ ] 2.3 DiagnosticInspector location
-   - [ ] 1.2 Remove duplicated DisassembleBytecodes
+   - [x] 1.2 Remove duplicated DisassembleBytecodes
 
 2. **Interface cleanup** (half day):
    - [ ] 2.1 Remove IVMDebugHelpers
