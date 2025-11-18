@@ -521,10 +521,14 @@ diagIa  "Return ia (expect 644)"  ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma |
 diagIt1 "Return it1 (expect 188)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it1] value: 644] value: 88] value: 11!
 diagIt2 "Return it2 (expect 266)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it2] value: 644] value: 88] value: 11!
 
-diagSum  "Return sum of all 9 vars - exact n121212 structure (expect 10)" ^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 0] value: 0] value: 0!
-diagSum2 "Return sum of first 2 vars (expect 0)" ^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1] value: 0] value: 0] value: 0!
-diagSum3 "Return sum of first 3 vars (expect 1)" ^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1 + ot2] value: 0] value: 0] value: 0!
-diagSum6 "Return sum of first 6 vars (expect 6)" ^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1 + ot2 + ma + mt1 + mt2] value: 0] value: 0] value: 0! !
+diagPow10 "Powers of 10: each var unique magnitude (expect 111111111)"
+	"oa=1, ot1=10, ot2=100, ma=1000, mt1=10000, mt2=100000, ia=1000000, it1=10000000, it2=100000000
+	 Digits reveal WHICH variables accessed. Example results:
+	   111111111 = all correct
+	   111111110 = it2 accessed as 10 instead of 100000000
+	   111111200 = ot2 accessed twice (100+100 instead of it1+it2)
+	   200000000 = only it2 accessed, all others ignored"
+	^[:oa | | ot1 ot2 | ot1 _ 10. ot2 _ 100. [:ma | | mt1 mt2 | mt1 _ 10000. mt2 _ 100000. [:ia | | it1 it2 | it1 _ 10000000. it2 _ 100000000. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 1000000] value: 1000] value: 1! !
 
 "Mutation tests"
 !BlockContextTest methodsFor: 'mutation'!
