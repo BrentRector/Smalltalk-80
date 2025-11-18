@@ -42429,7 +42429,7 @@ initialize
 	 Expected values:
 	 diagOa  → 11  (PASSED: returned 11)
 	 diagOt1 → 22  (PASSED: returned 22)
-	 diagOt2 → 44
+	 diagOt2 → 44  (PASSED: returned 44)
 	 diagMa  → 88
 	 diagMt1 → 166
 	 diagMt2 → 322
@@ -42437,6 +42437,6 @@ initialize
 	 diagIt1 → 188
 	 diagIt2 → 266"
 
-	^3000 + (tester diagOt2)! !
+	^4000 + (tester diagMa)! !
 
 BlockContextTestRunner initialize!
