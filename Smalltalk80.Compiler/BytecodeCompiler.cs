@@ -1312,7 +1312,7 @@ namespace Smalltalk80.Compiler
             environment.KnownPoolDictionaryNames = knownPoolDictionaryNames;
             if (knownPoolDictionaryNames != null && knownPoolDictionaryNames.Count > 0)
             {
-                Console.WriteLine($"[BYTECODE COMPILER] Set KnownPoolDictionaryNames: [{string.Join(", ", knownPoolDictionaryNames)}]");
+                // Console.WriteLine($"[BYTECODE COMPILER] Set KnownPoolDictionaryNames: [{string.Join(", ", knownPoolDictionaryNames)}]");
             }
             
             // Set up class variables
@@ -3353,7 +3353,7 @@ namespace Smalltalk80.Compiler
                     // Create GlobalVariable literal
                     // Pool variables are handled by VariableResolver during resolution phase
                     object literalValue = new GlobalVariable(new Symbol(name), null);
-                    Console.WriteLine($"[{literalValue.GetType().Name} created] key={name}");
+                    // Console.WriteLine($"[{literalValue.GetType().Name} created] key={name}");
                     emitter.AddLiteral(literalValue);
                 }
                 

@@ -427,13 +427,13 @@ n000222 "O[0,0] M[0,2] I[2,2]: max inner, access method temp"
 	| m | m _ 0. ^[[| mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia1 :ia2 | | it1 it2 | it1 _ 2. it2 _ 3. m + mt1 + mt2 + it1 + it2] value: 999 value: 888] value] value!
 
 n011011 "O[0,1] M[1,0] I[1,1]: middle arg, inner accesses outer temp"
-	^[| ot | ot _ 4. [:ma | [:ia | | it | it _ 3. ot + it] value: 999] value: 888] value] value!
+	^[| ot | ot _ 4. [:ma | [:ia | | it | it _ 3. ot + it] value: 999] value: 888] value!
 
 n011122 "O[0,1] M[1,1] I[2,2]: outer temp accessed by innermost"
-	^[| ot | ot _ 0. [:ma | | mt | mt _ 2. [:ia1 :ia2 | | it1 it2 | it1 _ 3. it2 _ 5. ot + mt + it1 + it2] value: 999 value: 888] value: 777] value] value!
+	^[| ot | ot _ 0. [:ma | | mt | mt _ 2. [:ia1 :ia2 | | it1 it2 | it1 _ 3. it2 _ 5. ot + mt + it1 + it2] value: 999 value: 888] value: 777] value!
 
 n022022 "O[0,2] M[2,0] I[2,2]: outer temps accessed by innermost"
-	^[| ot1 ot2 | ot1 _ 2. ot2 _ 3. [:ma1 :ma2 | [:ia1 :ia2 | | it1 it2 | it1 _ 2. it2 _ 3. ot1 + ot2 + it1 + it2] value: 999 value: 888] value: 777 value: 666] value] value!
+	^[| ot1 ot2 | ot1 _ 2. ot2 _ 3. [:ma1 :ma2 | [:ia1 :ia2 | | it1 it2 | it1 _ 2. it2 _ 3. ot1 + ot2 + it1 + it2] value: 999 value: 888] value: 777 value: 666] value!
 
 n100100 "O[1,0] M[0,1] I[0,0]: outer arg accessed through middle temp"
 	^[:oa | [| mt | mt _ 5. [oa + mt] value] value] value: 5!
@@ -472,10 +472,10 @@ n222222 "All [2,2]: maximum complexity"
 	^[:oa1 :oa2 | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma1 :ma2 | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia1 :ia2 | | it1 it2 | it1 _ 2. it2 _ 2. oa1 + oa2 + ot1 + ot2 + mt1 + mt2 + it1 + it2] value: 999 value: 888] value: 777 value: 666] value: 0 value: 0!
 
 n012012 "O[0,1] M[2,0] I[1,2]: varied nesting"
-	^[| ot | ot _ 3. [:ma1 :ma2 | [:ia | | it1 it2 | it1 _ 3. it2 _ 4. ot + it1 + it2] value: 999] value: 888 value: 777] value] value!
+	^[| ot | ot _ 3. [:ma1 :ma2 | [:ia | | it1 it2 | it1 _ 3. it2 _ 4. ot + it1 + it2] value: 999] value: 888 value: 777] value!
 
 n021021 "O[0,2] M[1,0] I[2,1]: varied nesting"
-	^[| ot1 ot2 | ot1 _ 3. ot2 _ 4. [:ma | [:ia1 :ia2 | | it | it _ 3. ot1 + ot2 + it] value: 999 value: 888] value: 777] value] value!
+	^[| ot1 ot2 | ot1 _ 3. ot2 _ 4. [:ma | [:ia1 :ia2 | | it | it _ 3. ot1 + ot2 + it] value: 999 value: 888] value: 777] value!
 
 n102102 "O[1,0] M[2,1] I[0,2]: varied nesting"
 	^[:oa | [:ma1 :ma2 | | mt | mt _ 2. [| it1 it2 | it1 _ 3. it2 _ 5. oa + mt + it1 + it2] value] value: 888 value: 777] value: 0!
@@ -490,13 +490,55 @@ n210210 "O[2,1] M[0,2] I[1,0]: varied nesting"
 	^[:oa1 :oa2 | | ot | ot _ 3. [| mt1 mt2 | mt1 _ 3. mt2 _ 4. [:ia | oa1 + oa2 + ot + mt1 + mt2] value: 999] value] value: 0 value: 0!
 
 n012210 "O[0,1] M[2,2] I[1,0]: varied nesting"
-	^[| ot | ot _ 2. [:ma1 :ma2 | | mt1 mt2 | mt1 _ 3. mt2 _ 5. [:ia | ot + mt1 + mt2] value: 999] value: 888 value: 777] value] value!
+	^[| ot | ot _ 2. [:ma1 :ma2 | | mt1 mt2 | mt1 _ 3. mt2 _ 5. [:ia | ot + mt1 + mt2] value: 999] value: 888 value: 777] value!
 
 n210012 "O[2,1] M[0,0] I[1,2]: varied nesting"
 	^[:oa1 :oa2 | | ot | ot _ 2. [[[:ia | | it1 it2 | it1 _ 3. it2 _ 5. oa1 + oa2 + ot + it1 + it2] value: 999] value] value] value: 0 value: 0!
 
 n121212 "O[1,2] M[1,2] I[1,2]: uniform complex nesting"
-	^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 0] value: 0] value: 0! !
+	^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 0] value: 0] value: 0!
+
+n121212diag "DIAGNOSTIC: Use powers of 2 to identify which variables are accessed"
+	"Expected result: 511 (binary 111111111 = all 9 variables accessed)
+	 Bit 0 (1):   oa  = 1
+	 Bit 1 (2):   ot1 = 2
+	 Bit 2 (4):   ot2 = 4
+	 Bit 3 (8):   ma  = 8
+	 Bit 4 (16):  mt1 = 16
+	 Bit 5 (32):  mt2 = 32
+	 Bit 6 (64):  ia  = 64
+	 Bit 7 (128): it1 = 128
+	 Bit 8 (256): it2 = 256"
+	^[:oa | | ot1 ot2 | ot1 _ 2. ot2 _ 4. [:ma | | mt1 mt2 | mt1 _ 16. mt2 _ 32. [:ia | | it1 it2 | it1 _ 128. it2 _ 256. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 64] value: 8] value: 1!
+
+diagOa  "Return oa (expect 11)"  ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. oa] value: 644] value: 88] value: 11!
+diagOt1 "Return ot1 (expect 22)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. ot1] value: 644] value: 88] value: 11!
+diagOt2 "Return ot2 (expect 44)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. ot2] value: 644] value: 88] value: 11!
+diagMa  "Return ma (expect 88)"  ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. ma] value: 644] value: 88] value: 11!
+diagMt1 "Return mt1 (expect 166)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. mt1] value: 644] value: 88] value: 11!
+diagMt2 "Return mt2 (expect 322)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. mt2] value: 644] value: 88] value: 11!
+diagIa  "Return ia (expect 644)"  ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. ia] value: 644] value: 88] value: 11!
+diagIt1 "Return it1 (expect 188)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it1] value: 644] value: 88] value: 11!
+diagIt2 "Return it2 (expect 266)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it2] value: 644] value: 88] value: 11!
+
+diagPow10 "Powers of 10: each var unique magnitude (expect 111111111)"
+	"oa=1, ot1=10, ot2=100, ma=1000, mt1=10000, mt2=100000, ia=1000000, it1=10000000, it2=100000000
+	 Digits reveal WHICH variables accessed AND which were skipped:
+	   111111111 = all correct (all 9 variables)
+	   111111011 = ot2 (100) NOT accessed, others OK
+	   111011111 = mt2 (100000) NOT accessed, others OK
+	   111111200 = ot2 accessed TWICE (100+100=200), it1+it2 skipped
+	   100000000 = ONLY it2 accessed, all others zero
+	   111111110 = it2 aliased to ot1 (read as 10 instead of 100000000)"
+	^[:oa | | ot1 ot2 | ot1 _ 10. ot2 _ 100. [:ma | | mt1 mt2 | mt1 _ 10000. mt2 _ 100000. [:ia | | it1 it2 | it1 _ 10000000. it2 _ 100000000. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 1000000] value: 1000] value: 1!
+
+diagZero "Same as diagPow10 but with ZEROS for args (expect 111111111)"
+	"Test if zeros cause the bug. Args set to 0, temps use powers of 10.
+	 oa=0, ot1=10, ot2=100, ma=0, mt1=10000, mt2=100000, ia=0, it1=10000000, it2=100000000
+	 Expected: 110110110 (only temps, no args)
+	 If we get 111111111, zeros are being read as their power-of-10 value somehow
+	 If we get 110110100, last digit wrong (it2 issue with zeros)"
+	^[:oa | | ot1 ot2 | ot1 _ 10. ot2 _ 100. [:ma | | mt1 mt2 | mt1 _ 10000. mt2 _ 100000. [:ia | | it1 it2 | it1 _ 10000000. it2 _ 100000000. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 0] value: 0] value: 0! !
 
 "Mutation tests"
 !BlockContextTest methodsFor: 'mutation'!

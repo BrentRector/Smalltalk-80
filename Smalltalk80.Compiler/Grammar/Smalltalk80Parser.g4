@@ -455,11 +455,13 @@ nonKeywordExpr
 // Block closure
 // Example: [x + y]
 // Example: [:a :b | a max: b]
+// Example: [:ignored] - block with arg but no body (PIPE omitted)
 block
     : LEFT_BRACKET blockArgs? blockTemps? statements? RIGHT_BRACKET
     ;
 
 // Block arguments
+// PIPE is optional to support blocks with args but no body: [:ignored]
 blockArgs
     : (COLON argumentName)+ PIPE?
     ;

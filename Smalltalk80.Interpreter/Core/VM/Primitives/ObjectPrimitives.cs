@@ -1,4 +1,3 @@
-using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.VM;
@@ -1980,6 +1979,7 @@ public static class ObjectPrimitives
         // OOP format: object pointer = (objectTableIndex << 1) | 0
         // Half of object pointer = objectTableIndex
         int hashValue = VMUtilities.ComputeIdentityHash(receiver);
+
         return SmalltalkOOP.FromSmallInteger(hashValue);
     }
 

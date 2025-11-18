@@ -1,8 +1,7 @@
 using Smalltalk80.Interpreter.Core.Schema;
-using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using System.Text;
 using System.Linq;
@@ -23,7 +22,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 public class Phase3_ObjectAllocation
 {
     private readonly ColdStartBundle _bundle;
-    private readonly SemanticAllocator _allocator;
+    private readonly ObjectGraphAllocator _allocator;
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly LayoutResolver _layoutResolver;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
@@ -33,7 +32,7 @@ public class Phase3_ObjectAllocation
 
     public Phase3_ObjectAllocation(
         ColdStartBundle bundle,
-        SemanticAllocator allocator,
+        ObjectGraphAllocator allocator,
         ISmalltalkHeapManager heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
@@ -389,11 +388,11 @@ public class Phase3_ObjectAllocation
     }
 
     /// <summary>
-    /// Allocates an object using SemanticAllocator based on format hint.
+    /// Allocates an object using ObjectGraphAllocator based on format hint.
     /// </summary>
     private SmalltalkOOP AllocateObjectWithSemanticAllocator(string className, string formatHint, int fixedSize, int indexedSize)
     {
-        // Map format hint to appropriate SemanticAllocator method
+        // Map format hint to appropriate ObjectGraphAllocator method
         var objectOOP = formatHint.ToLower() switch
         {
             "pointers" or "pointer" or "fixed" => _allocator.AllocateFixedObject(className),
@@ -408,7 +407,7 @@ public class Phase3_ObjectAllocation
     }
 
     /// <summary>
-    /// Allocates an Association object (key-value pair) using SemanticAllocator.
+    /// Allocates an Association object (key-value pair) using ObjectGraphAllocator.
     /// </summary>
     private SmalltalkOOP AllocateAssociationWithSemanticAllocator(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
@@ -536,6 +535,7 @@ public class Phase3_ObjectAllocation
             {
                 // Update existing Association
                 _allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
+
                 incrementTally = false;
                 return;
             }
@@ -1103,14 +1103,14 @@ public class Phase3_ObjectAllocation
     }
 
     /// <summary>
-    /// Allocates a Float object using SemanticAllocator.
+    /// Allocates a Float object using ObjectGraphAllocator.
     /// Float must be WordIndexed with 4 words (16-bit each) per Blue Book specification.
     /// </summary>
     private SmalltalkOOP AllocateFloat(double value)
     {
         Console.WriteLine($"[Phase3.AllocateFloat] Creating Float value={value}");
 
-        // Use SemanticAllocator's AllocateFloat which correctly creates WordIndexed Float with 4 words
+        // Use ObjectGraphAllocator's AllocateFloat which correctly creates WordIndexed Float with 4 words
         var floatOOP = _allocator.AllocateFloat(value);
 
         Console.WriteLine($"[Phase3.AllocateFloat] Created floatOOP={floatOOP}, format={_heapManager.GetObjectFormat(floatOOP)}, size={_heapManager.GetIndexedSize(floatOOP)}");

@@ -10,7 +10,6 @@ using System.Text.Json.Serialization;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Schema;
-using Smalltalk80.Interpreter.Core.Objects;
 
 namespace Smalltalk80.Interpreter.Core
 {

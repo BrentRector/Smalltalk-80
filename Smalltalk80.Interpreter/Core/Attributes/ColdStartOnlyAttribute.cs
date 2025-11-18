@@ -9,7 +9,7 @@ namespace Smalltalk80.Interpreter.Core.Attributes;
 /// - Modify registries (GlobalRegistry, SymbolRegistry)
 /// - Operate on proxy data that becomes stale after cold start
 ///
-/// Examples: Loader, SemanticAllocator, Phase classes
+/// Examples: Loader, ObjectGraphAllocator, Phase classes
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Field | AttributeTargets.Property)]
 public class ColdStartOnlyAttribute : Attribute

@@ -23,11 +23,11 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
     public class Phase1_PreflightAndSymbols
     {
         private readonly ColdStartBundle _bundle;
-        private readonly SemanticAllocator _allocator;
+        private readonly ObjectGraphAllocator _allocator;
         private readonly Dictionary<string, SmalltalkOOP> _symbolTable = new();
         private readonly ColdstartReport _report;
 
-        public Phase1_PreflightAndSymbols(ColdStartBundle bundle, SemanticAllocator allocator, ColdstartReport report)
+        public Phase1_PreflightAndSymbols(ColdStartBundle bundle, ObjectGraphAllocator allocator, ColdstartReport report)
         {
             _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
             _allocator = allocator ?? throw new ArgumentNullException(nameof(allocator));

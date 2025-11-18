@@ -1,6 +1,6 @@
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 
@@ -14,7 +14,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 public class Phase2_ClassInfrastructure
 {
     private readonly ColdStartBundle _bundle;
-    private readonly SemanticAllocator _allocator;
+    private readonly ObjectGraphAllocator _allocator;
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
@@ -27,7 +27,7 @@ public class Phase2_ClassInfrastructure
 
     public Phase2_ClassInfrastructure(
         ColdStartBundle bundle,
-        SemanticAllocator allocator,
+        ObjectGraphAllocator allocator,
         ISmalltalkHeapManager heapManager,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
@@ -597,7 +597,7 @@ public class Phase2_ClassInfrastructure
     /// <summary>
     /// Populates ClassDescription.instanceVariables field (slot 4) with Array-of-Strings
     /// containing the class's own instance variable names (not inherited ones).
-    /// This enables runtime reflection via RuntimeHeapAccess.BuildFieldMap().
+    /// This enables runtime reflection via RuntimeHeapAccessor.BuildFieldMap().
     ///
     /// ClassDescription field layout:
     ///   Inherited from Behavior: superclass(0), methodDict(1), format(2), subclasses(3)

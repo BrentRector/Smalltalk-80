@@ -1,6 +1,5 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
-using Smalltalk80.Interpreter.Core.Objects;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -11,7 +10,7 @@ public static class CompiledMethodPrimitives
 {
     // <summary>
     // Internal shared helper for allocating CompiledMethod objects.
-    // Used by both primitive 79 (runtime) and SemanticAllocator (cold start).
+    // Used by both primitive 79 (runtime) and ObjectGraphAllocator (cold start).
     // This eliminates code duplication while maintaining the proper separation of concerns.
     // </summary>
     // <param name="heapManager">Heap manager for object allocation</param>

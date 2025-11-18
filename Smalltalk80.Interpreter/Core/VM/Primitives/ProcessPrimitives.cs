@@ -59,7 +59,7 @@ public class ProcessPrimitives
     //
     // <para><b>Heap-Only Access:</b></para>
     // <para>All operations use heap-only access pattern, retrieving ProcessorScheduler
-    // from SpecialObjectsArray and accessing Process fields via RuntimeHeapAccess.</para>
+    // from SpecialObjectsArray and accessing Process fields via RuntimeHeapAccessor.</para>
     // </remarks>
     // <param name="processOOP">The Process object to resume</param>
     // <returns>The result of executing the process's suspended context</returns>

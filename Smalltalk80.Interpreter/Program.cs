@@ -4,8 +4,8 @@ using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.Core.Objects;
 using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Platform.Windows;
 using ClassHierarchyUtils = Smalltalk80.Interpreter.Core.ClassHierarchyUtils;
 using System.Windows.Forms;
 
@@ -84,7 +84,7 @@ public static class Program
             // Create and run the loader
             Console.WriteLine("Starting cold start loader (6-phase)...");
 
-            var loader = new Loader(bundle, heapManager, coldStartFile, debugOptions);
+            var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, debugOptions);
             loader.Run();
             var layoutResolver = loader.LayoutResolver;
 
@@ -119,8 +119,8 @@ public static class Program
                 Console.WriteLine("\n=== DIAGNOSTIC: Checking ClassDescription.instanceVariables ===");
                 InspectClassDescriptionInstanceVariables(heapManager, bundle);
 
-                // DIAGNOSTIC: Test RuntimeHeapAccess.BuildFieldMap()
-                Console.WriteLine("\n=== DIAGNOSTIC: Testing RuntimeHeapAccess.BuildFieldMap() ===");
+                // DIAGNOSTIC: Test RuntimeHeapAccessor.BuildFieldMap()
+                Console.WriteLine("\n=== DIAGNOSTIC: Testing RuntimeHeapAccessor.BuildFieldMap() ===");
                 TestBuildFieldMap(heapManager);
 
                 // DIAGNOSTIC: Inspect File class>>initialize method's literal frame
@@ -146,8 +146,8 @@ public static class Program
 
                 var vmMetadata = BuildVMMetadata(layoutResolver);
 
-                // Convert Engine.DebugOptions to Core.VM.DebugOptions for the VirtualMachine
-                var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.DebugOptions
+                // Convert Engine.ColdStartDebugOptions to Core.VM.RuntimeDebugOptions for the VirtualMachine
+                var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.RuntimeDebugOptions
                 {
                     ShouldDebugBytecode = debugOptions.ShouldDebugBytecode,
                     ShouldDebugMessages = debugOptions.ShouldDebugMessages,
@@ -268,9 +268,9 @@ public static class Program
                         {
                             phase2Indices.Add(i);
                         }
-                        else if (expr.Source.Contains("Test "))
+                        else if (expr.Source.Contains("Test ") || expr.Source.StartsWith("BlockContextTest"))
                         {
-                            // Test expressions (e.g., "BlockContextTest validate")
+                            // Test expressions (e.g., "BlockContextTest validate", "BlockContextTest new testAllCombinations!")
                             testIndices.Add(i);
                         }
                         // Skip other expressions (run! messages) in normal mode
@@ -378,9 +378,9 @@ public static class Program
                     {
                         succeeded++;
                         successfulExpressions.Add((index, expr.Source ?? ""));
-                        
-                        // For Block test classes, show the actual return value
-                        if (expr.Source != null && (expr.Source.Contains("Block") && expr.Source.Contains("Test")))
+
+                        // For Block test classes and diagnostic tests, show the actual return value
+                        if (expr.Source != null && ((expr.Source.Contains("Block") && expr.Source.Contains("Test")) || expr.Source.Contains("Diag")))
                         {
                             var returnOOP = result.ReturnValueOop;
                             if (returnOOP.HasValue && returnOOP.Value.IsSmallInteger)
@@ -564,8 +564,8 @@ public static class Program
 
                     var vmMetadata = BuildVMMetadata(layoutResolver);
 
-                    // Convert Engine.DebugOptions to Core.VM.DebugOptions for the VirtualMachine
-                    var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.DebugOptions
+                    // Convert Engine.ColdStartDebugOptions to Core.VM.RuntimeDebugOptions for the VirtualMachine
+                    var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.RuntimeDebugOptions
                     {
                         ShouldDebugBytecode = debugOptions.ShouldDebugBytecode,
                         ShouldDebugMessages = debugOptions.ShouldDebugMessages,
@@ -723,7 +723,7 @@ public static class Program
     /// <summary>
     /// Helper method to find a method literal for debugging.
     /// </summary>
-    private static SmalltalkOOP FindMethodLiteral(Loader loader, ColdStartBundle bundle, string methodLocalId, int literalIndex)
+    private static SmalltalkOOP FindMethodLiteral(ColdStartOrchestrator loader, ColdStartBundle bundle, string methodLocalId, int literalIndex)
     {
         if (loader.LocalIdToObjectId.TryGetValue(methodLocalId, out var methodOOP))
         {
@@ -738,7 +738,7 @@ public static class Program
     private static SmalltalkOOP ResolveLiteralValueAsOOP(
         LiteralValue literal,
         ColdStartBundle bundle,
-        SemanticAllocator allocator,
+        ObjectGraphAllocator allocator,
         IReadOnlyDictionary<string, SmalltalkOOP> localIdToObjectId)
     {
         return literal.Type switch
@@ -764,7 +764,7 @@ public static class Program
         };
     }
 
-    private static SmalltalkOOP AllocateCharacter(int codePoint, SemanticAllocator allocator)
+    private static SmalltalkOOP AllocateCharacter(int codePoint, ObjectGraphAllocator allocator)
     {
         var characterOOP = allocator.AllocateFixedObject("Character");
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
@@ -772,7 +772,7 @@ public static class Program
         return characterOOP;
     }
 
-    private static SmalltalkOOP AllocateByteArray(string encoding, string data, SemanticAllocator allocator)
+    private static SmalltalkOOP AllocateByteArray(string encoding, string data, ObjectGraphAllocator allocator)
     {
         byte[] bytes = encoding.ToLower() switch
         {
@@ -783,7 +783,7 @@ public static class Program
         return allocator.AllocateByteArray("ByteArray", bytes);
     }
 
-    private static SmalltalkOOP AllocateArray(SmalltalkOOP[] elementOOPs, SemanticAllocator allocator)
+    private static SmalltalkOOP AllocateArray(SmalltalkOOP[] elementOOPs, ObjectGraphAllocator allocator)
     {
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         var arrayOOP = allocator.AllocateArray(arrayClassOOP, elementOOPs.Length);
@@ -797,7 +797,7 @@ public static class Program
     private static SmalltalkOOP ResolveAssociation(
         AssociationLiteral assoc,
         ColdStartBundle bundle,
-        SemanticAllocator allocator,
+        ObjectGraphAllocator allocator,
         IReadOnlyDictionary<string, SmalltalkOOP> localIdToObjectId)
     {
         var keyOOP = SymbolRegistry.GetSymbolOOP(assoc.KeyIndex);
@@ -1115,7 +1115,7 @@ public static class Program
     /// Supports: --coldstart path, --dump-class ClassName, --verbose, --skip-init-expressions, etc.
     /// Default: coldstart.json in the compiler output directory (../net9.0/coldstart.json)
     /// </summary>
-    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.DebugOptions debugOptions, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.ColdStartDebugOptions debugOptions, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
@@ -1124,7 +1124,7 @@ public static class Program
         string? reportOutput = null;
         bool skipInitExpressions = false;
         string? executeExpression = null;
-        var debugOptions = new Smalltalk80.Interpreter.Engine.DebugOptions();
+        var debugOptions = new Smalltalk80.Interpreter.Engine.ColdStartDebugOptions();
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -1253,7 +1253,7 @@ public static class Program
         };
     }
 
-    private static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, Loader loader, ColdStartBundle bundle)
+    private static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, ColdStartOrchestrator loader, ColdStartBundle bundle)
     {
         try
         {
@@ -1442,7 +1442,7 @@ public static class Program
         }
     }
 
-    private static void DiagnoseCursorClassVariables(ISmalltalkHeapManager heapManager, Loader loader, ColdStartBundle bundle)
+    private static void DiagnoseCursorClassVariables(ISmalltalkHeapManager heapManager, ColdStartOrchestrator loader, ColdStartBundle bundle)
     {
         try
         {
@@ -1696,14 +1696,14 @@ public static class Program
     }
 
     /// <summary>
-    /// DIAGNOSTIC: Tests RuntimeHeapAccess.BuildFieldMap() to verify it can read
+    /// DIAGNOSTIC: Tests RuntimeHeapAccessor.BuildFieldMap() to verify it can read
     /// instance variable names from the heap and build complete field layouts.
     /// </summary>
     private static void TestBuildFieldMap(ISmalltalkHeapManager heapManager)
     {
         try
         {
-            var runtimeHeapAccess = new RuntimeHeapAccess(heapManager);
+            var runtimeHeapAccess = new RuntimeHeapAccessor(heapManager);
             Console.WriteLine("Building field map from heap...");
 
             var startTime = System.Diagnostics.Stopwatch.StartNew();

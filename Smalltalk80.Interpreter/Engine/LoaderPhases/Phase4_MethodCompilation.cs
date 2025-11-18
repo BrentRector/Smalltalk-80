@@ -1,9 +1,8 @@
 using System.Text.Json;
-using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
@@ -25,7 +24,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 public class Phase4_MethodCompilation
 {
     private readonly ColdStartBundle _bundle;
-    private readonly SemanticAllocator _allocator;
+    private readonly ObjectGraphAllocator _allocator;
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly LayoutResolver _layoutResolver;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
@@ -41,7 +40,7 @@ public class Phase4_MethodCompilation
 
     public Phase4_MethodCompilation(
         ColdStartBundle bundle,
-        SemanticAllocator allocator,
+        ObjectGraphAllocator allocator,
         ISmalltalkHeapManager heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
@@ -1062,12 +1061,12 @@ public class Phase4_MethodCompilation
     }
 
     /// <summary>
-    /// Allocates a Float object using SemanticAllocator.
+    /// Allocates a Float object using ObjectGraphAllocator.
     /// Float must be WordIndexed with 4 words (16-bit each) per Blue Book specification.
     /// </summary>
     private SmalltalkOOP AllocateFloat(double value)
     {
-        // Use SemanticAllocator's AllocateFloat which correctly creates WordIndexed Float with 4 words
+        // Use ObjectGraphAllocator's AllocateFloat which correctly creates WordIndexed Float with 4 words
         var floatOOP = _allocator.AllocateFloat(value);
 
         // Set Float class reference

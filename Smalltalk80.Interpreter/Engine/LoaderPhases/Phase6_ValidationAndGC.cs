@@ -1,9 +1,8 @@
 using System.Text.Json;
-using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Objects;
+using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
@@ -26,7 +25,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 public class Phase6_ValidationAndGC
 {
     private readonly ColdStartBundle _bundle;
-    private readonly SemanticAllocator _allocator;
+    private readonly ObjectGraphAllocator _allocator;
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly LayoutResolver _layoutResolver;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
@@ -35,7 +34,7 @@ public class Phase6_ValidationAndGC
 
     public Phase6_ValidationAndGC(
         ColdStartBundle bundle,
-        SemanticAllocator allocator,
+        ObjectGraphAllocator allocator,
         ISmalltalkHeapManager heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
