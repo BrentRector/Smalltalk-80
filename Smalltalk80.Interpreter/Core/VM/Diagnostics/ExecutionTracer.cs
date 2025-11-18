@@ -48,6 +48,21 @@ public class ExecutionTracer
     /// <summary>Increments and returns the push trace counter.</summary>
     public int IncrementPushTraceCounter() => _pushTraceCounter++;
 
+    /// <summary>Gets current bytecode instruction counter.</summary>
+    public int BytecodeInstructionCounter => _bytecodeInstructionCounter;
+
+    /// <summary>Increments bytecode instruction counter.</summary>
+    public void IncrementBytecodeCounter() => _bytecodeInstructionCounter++;
+
+    /// <summary>Gets current selector trace depth (call nesting level).</summary>
+    public int SelectorTraceDepth => _selectorTraceDepth;
+
+    /// <summary>Increments trace depth when entering a method.</summary>
+    public void IncrementTraceDepth() => _selectorTraceDepth++;
+
+    /// <summary>Decrements trace depth when exiting a method.</summary>
+    public void DecrementTraceDepth() => _selectorTraceDepth--;
+
     /// <summary>Resets the instruction counter to zero.</summary>
     public void ResetInstructionCount() => _instructionCount = 0;
 
