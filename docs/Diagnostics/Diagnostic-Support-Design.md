@@ -1,14 +1,21 @@
 # Smalltalk-80 Interpreter Diagnostic Support Design
 
 **Date**: 2025-11-18
-**Status**: Draft - Proposal
+**Status**: Draft - Proposal (v1.1)
 **Author**: Claude (Anthropic)
 
 ---
 
 ## Executive Summary
 
-This document proposes a comprehensive diagnostic subsystem for the Smalltalk-80 interpreter. The current ad-hoc diagnostic code is scattered throughout the codebase, making it difficult to maintain and extend. This design introduces a clean event-based listener model that decouples diagnostic concerns from core interpreter logic.
+This document proposes a comprehensive diagnostic subsystem for the Smalltalk-80 interpreter covering **both cold start and runtime phases**. The current ad-hoc diagnostic code is scattered throughout the codebase, making it difficult to maintain and extend. This design introduces a clean event-based listener model that decouples diagnostic concerns from core interpreter logic.
+
+**Key Features:**
+- Unified diagnostic hub for cold start and runtime
+- Event-based listener model with filtering
+- Zero-cost when disabled
+- Extensible event types and output formats
+- Support for ad-hoc messages alongside typed events
 
 ---
 
@@ -39,25 +46,32 @@ Current diagnostics are implemented as:
 ### 2.1 Core Concepts
 
 ```
-┌─────────────────────┐
-│   VirtualMachine    │
-│                     │
-│  ┌───────────────┐  │
-│  │ DiagnosticHub │  │
-│  └───────┬───────┘  │
-│          │          │
-└──────────┼──────────┘
-           │ Events
-           ▼
-    ┌──────────────┐
-    │  Listeners   │
-    ├──────────────┤
-    │ ConsoleTrace │
-    │ JsonLogger   │
-    │ Profiler     │
-    │ Debugger     │
-    └──────────────┘
+                    ┌─────────────────┐
+                    │  DiagnosticHub  │ (Created first, shared by all)
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+              ▼              ▼              ▼
+    ┌─────────────────┐  ┌──────────┐  ┌────────────┐
+    │ ColdStartLoader │  │   VM     │  │ HeapManager │
+    │   (Phases 1-6)  │  │ Runtime  │  │    (GC)     │
+    └────────┬────────┘  └────┬─────┘  └─────┬──────┘
+             │                │              │
+             └────────────────┼──────────────┘
+                              │ Events
+                              ▼
+                       ┌──────────────┐
+                       │  Listeners   │
+                       ├──────────────┤
+                       │ ConsoleTrace │
+                       │ JsonLogger   │
+                       │ Profiler     │
+                       │ ColdStart    │
+                       └──────────────┘
 ```
+
+**Key Principle:** The DiagnosticHub is created **before** any other component and passed to both cold start and runtime systems. This ensures diagnostics are available from the very first operation.
 
 ### 2.2 Event-Based Listener Model
 
@@ -236,7 +250,7 @@ public enum DiagnosticEventTypes : ulong
 {
     None = 0,
 
-    // Method events
+    // Method events (runtime)
     MethodEntry = 1 << 0,
     MethodExit = 1 << 1,
     PrimitiveCall = 1 << 2,
@@ -244,28 +258,49 @@ public enum DiagnosticEventTypes : ulong
     MessageNotUnderstood = 1 << 4,
     NonLocalReturn = 1 << 5,
 
-    // Bytecode events
+    // Bytecode events (runtime)
     InstructionExecute = 1 << 10,
     StackPush = 1 << 11,
     StackPop = 1 << 12,
     Jump = 1 << 13,
 
-    // Context events
+    // Context events (runtime)
     ContextActivate = 1 << 20,
     ContextDeactivate = 1 << 21,
     BlockCreate = 1 << 22,
 
-    // Memory events
+    // Memory events (both phases)
     ObjectAllocate = 1 << 30,
     GarbageCollect = 1 << 31,
     Become = 1 << 32,
 
-    // Compound groups
+    // Cold start phase events
+    PhaseStart = 1 << 40,
+    PhaseEnd = 1 << 41,
+    SymbolInterned = 1 << 42,
+    ClassCreated = 1 << 43,
+    MethodCompiled = 1 << 44,
+    PatchApplied = 1 << 45,
+    GlobalInstalled = 1 << 46,
+    AssociationCreated = 1 << 47,
+
+    // Generic message event (both phases)
+    Message = 1 << 50,
+
+    // Compound groups - Runtime
     AllMethod = MethodEntry | MethodExit | PrimitiveCall | PrimitiveFailure | MessageNotUnderstood | NonLocalReturn,
     AllBytecode = InstructionExecute | StackPush | StackPop | Jump,
     AllContext = ContextActivate | ContextDeactivate | BlockCreate,
     AllMemory = ObjectAllocate | GarbageCollect | Become,
-    All = ~None
+    AllRuntime = AllMethod | AllBytecode | AllContext | AllMemory,
+
+    // Compound groups - Cold Start
+    AllColdStartPhase = PhaseStart | PhaseEnd,
+    AllColdStartDetail = SymbolInterned | ClassCreated | MethodCompiled | PatchApplied | GlobalInstalled | AssociationCreated,
+    AllColdStart = AllColdStartPhase | AllColdStartDetail | Message,
+
+    // Everything
+    All = AllRuntime | AllColdStart | Message
 }
 ```
 
@@ -339,7 +374,101 @@ public record GCEvent : DiagnosticEvent
     public required double MarkTimeMs { get; init; }
     public required double SweepTimeMs { get; init; }
 }
+
+// ============================================================
+// Cold Start Events
+// ============================================================
+
+/// <summary>Cold start phase beginning.</summary>
+public record PhaseStartEvent : DiagnosticEvent
+{
+    public required int PhaseNumber { get; init; }
+    public required string PhaseName { get; init; }
+}
+
+/// <summary>Cold start phase completion.</summary>
+public record PhaseEndEvent : DiagnosticEvent
+{
+    public required int PhaseNumber { get; init; }
+    public required string PhaseName { get; init; }
+    public required TimeSpan Duration { get; init; }
+    public required bool Success { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+/// <summary>Symbol interned during Phase 1.</summary>
+public record SymbolInternedEvent : DiagnosticEvent
+{
+    public required int SymbolIndex { get; init; }
+    public required string SymbolText { get; init; }
+    public required SmalltalkOOP SymbolOOP { get; init; }
+}
+
+/// <summary>Class created during Phase 2.</summary>
+public record ClassCreatedEvent : DiagnosticEvent
+{
+    public required string ClassName { get; init; }
+    public required SmalltalkOOP ClassOOP { get; init; }
+    public required SmalltalkOOP MetaclassOOP { get; init; }
+    public required int InstanceVariableCount { get; init; }
+}
+
+/// <summary>Method compiled during Phase 4.</summary>
+public record MethodCompiledEvent : DiagnosticEvent
+{
+    public required string ClassName { get; init; }
+    public required string Selector { get; init; }
+    public required SmalltalkOOP MethodOOP { get; init; }
+    public required int BytecodeLength { get; init; }
+    public required int LiteralCount { get; init; }
+}
+
+/// <summary>Patch applied during Phase 5.</summary>
+public record PatchAppliedEvent : DiagnosticEvent
+{
+    public required string PatchType { get; init; }
+    public required string TargetLocalId { get; init; }
+    public string? FieldName { get; init; }
+    public int? LiteralIndex { get; init; }
+}
+
+/// <summary>Global installed in SystemDictionary.</summary>
+public record GlobalInstalledEvent : DiagnosticEvent
+{
+    public required string GlobalName { get; init; }
+    public required SmalltalkOOP AssociationOOP { get; init; }
+    public required SmalltalkOOP ValueOOP { get; init; }
+}
+
+/// <summary>Association created.</summary>
+public record AssociationCreatedEvent : DiagnosticEvent
+{
+    public required string Key { get; init; }
+    public required SmalltalkOOP AssociationOOP { get; init; }
+}
+
+// ============================================================
+// Generic Message Event (for ad-hoc output)
+// ============================================================
+
+/// <summary>Message severity levels.</summary>
+public enum MessageSeverity { Debug, Info, Warning, Error }
+
+/// <summary>Generic diagnostic message for informational output.</summary>
+public record DiagnosticMessageEvent : DiagnosticEvent
+{
+    public required MessageSeverity Severity { get; init; }
+    public required string Category { get; init; }
+    public required string Message { get; init; }
+    public object? Data { get; init; }
+}
 ```
+
+**Usage Notes:**
+
+- **Typed events** (ClassCreatedEvent, MethodCompiledEvent, etc.) are for structured operations that benefit from machine-readable data
+- **DiagnosticMessageEvent** is for informational/progress output that doesn't fit specific typed events
+- Both can be used together - listeners choose what to consume
 
 ---
 
@@ -418,6 +547,81 @@ Supports interactive debugging.
 - Break on specific instruction
 - Conditional breakpoints
 
+### 5.5 ColdStartProgressListener
+
+Outputs cold start phase progress (reproduces current console output).
+
+**Features:**
+- Phase start/end markers
+- Timing information
+- Success/failure indicators
+- Message output with severity
+
+**Example Output:**
+```
+Phase 1: Preflight Validation and Symbol Interning... ✓ (102ms)
+Phase 2: Class Infrastructure... ✓ (20ms)
+Phase 3: Object Allocation and Initialization...
+  Created Undeclared dictionary (OOP=13922, capacity=634, undeclared count=317)
+  ✓ Pre-created 317 canonical Associations
+✓ (20ms)
+...
+```
+
+**Implementation:**
+```csharp
+public class ColdStartProgressListener : IDiagnosticListener
+{
+    public string Name => "ColdStartProgress";
+
+    public void OnEvent(DiagnosticEvent evt)
+    {
+        switch (evt)
+        {
+            case PhaseStartEvent e:
+                Console.Write($"{e.PhaseName}...");
+                break;
+
+            case PhaseEndEvent e:
+                Console.WriteLine($" ✓ ({e.Duration.TotalMilliseconds:F0}ms)");
+                break;
+
+            case DiagnosticMessageEvent e:
+                var prefix = e.Severity switch
+                {
+                    MessageSeverity.Warning => "  ⚠️  ",
+                    MessageSeverity.Error => "  ❌  ",
+                    _ => "  "
+                };
+                Console.WriteLine($"{prefix}{e.Message}");
+                break;
+        }
+    }
+}
+```
+
+### 5.6 ColdStartDetailListener
+
+Outputs detailed cold start operations for debugging.
+
+**Features:**
+- Symbol interning details
+- Class creation details
+- Patch application details
+- Global installation details
+
+**Configuration:**
+```csharp
+var listener = new ColdStartDetailListener
+{
+    ShowSymbols = false,      // Too verbose usually
+    ShowClasses = true,
+    ShowMethods = false,      // Very verbose
+    ShowPatches = true,
+    ShowGlobals = true
+};
+```
+
 ---
 
 ## 6. Integration Points
@@ -463,7 +667,90 @@ public class BytecodeInterpreter
 }
 ```
 
-### 6.3 Command Line Integration
+### 6.3 Cold Start Integration
+
+The diagnostic hub must be created **before** cold start begins and passed through all phases.
+
+**Program.cs Setup:**
+```csharp
+// 1. Create hub FIRST (before anything else)
+var diagnosticHub = new DiagnosticHub();
+
+// 2. Configure listeners before cold start
+diagnosticHub.Register(
+    new ColdStartProgressListener(),
+    DiagnosticEventTypes.AllColdStartPhase | DiagnosticEventTypes.Message
+);
+
+// 3. Pass hub to orchestrator
+var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, diagnosticHub);
+loader.Run();
+
+// 4. Same hub continues into runtime
+var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, diagnosticHub);
+```
+
+**Phase Integration Example (Phase 3):**
+```csharp
+public class Phase3_ObjectAllocation : IPhase
+{
+    private readonly IDiagnosticHub? _diagnostics;
+
+    public void Run()
+    {
+        _diagnostics?.Emit(new PhaseStartEvent
+        {
+            PhaseNumber = 3,
+            PhaseName = Name,
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
+
+        // Create Undeclared dictionary
+        var undeclaredOOP = CreateUndeclaredDictionary();
+
+        _diagnostics?.Emit(new DiagnosticMessageEvent
+        {
+            Severity = MessageSeverity.Info,
+            Category = "Phase3",
+            Message = $"Created Undeclared dictionary (OOP={undeclaredOOP}, capacity={capacity})",
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
+
+        // ... more operations ...
+
+        _diagnostics?.Emit(new PhaseEndEvent
+        {
+            PhaseNumber = 3,
+            PhaseName = Name,
+            Duration = stopwatch.Elapsed,
+            Success = true,
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
+    }
+}
+```
+
+**Typed Event Usage (optional detail tracing):**
+```csharp
+// In Phase 2 - emit class creation event
+if (_diagnostics?.IsEnabled(DiagnosticEventTypes.ClassCreated) ?? false)
+{
+    _diagnostics.Emit(new ClassCreatedEvent
+    {
+        ClassName = className,
+        ClassOOP = classOOP,
+        MetaclassOOP = metaclassOOP,
+        InstanceVariableCount = instVarCount,
+        Timestamp = Stopwatch.GetTimestamp(),
+        InstructionCount = 0
+    });
+}
+```
+
+### 6.4 Command Line Integration
 
 ```bash
 # Enable method tracing for all Dictionary methods
@@ -477,6 +764,10 @@ dotnet run -- --trace-output trace.jsonl --trace-format json
 
 # Multiple filters
 dotnet run -- --trace-methods "Collection*" --trace-primitives 60-69
+
+# Cold start diagnostics
+dotnet run -- --trace-coldstart           # Phase progress only
+dotnet run -- --trace-coldstart-detail    # All cold start events
 ```
 
 ---
@@ -517,18 +808,26 @@ dotnet run -- --trace-methods "Collection*" --trace-primitives 60-69
 ### Phase 1: Core Infrastructure (3-4 days)
 
 1. **Create diagnostic namespace and interfaces**
-   - `Core/VM/Diagnostics/IDiagnosticHub.cs`
-   - `Core/VM/Diagnostics/IDiagnosticListener.cs`
-   - `Core/VM/Diagnostics/DiagnosticEventTypes.cs`
+   - `Core/Diagnostics/IDiagnosticHub.cs`
+   - `Core/Diagnostics/IDiagnosticListener.cs`
+   - `Core/Diagnostics/DiagnosticEventTypes.cs`
+   - `Core/Diagnostics/DiagnosticEvents.cs` (all event records)
 
 2. **Implement DiagnosticHub**
    - Event dispatch with filtering
    - Listener registration
    - Fast-path `IsEnabled()` check
+   - Thread-safe operations
 
-3. **Define event records**
-   - All event types from Section 4.3
-   - Include all necessary context
+3. **Define all event records**
+   - Runtime events (MethodEntry, Instruction, etc.)
+   - Cold start events (PhaseStart, ClassCreated, etc.)
+   - DiagnosticMessageEvent for ad-hoc output
+
+4. **Add hub to Program.cs**
+   - Create hub before anything else
+   - Pass to ColdStartOrchestrator
+   - Pass to VirtualMachine
 
 ### Phase 2: Method Tracing (2-3 days)
 
@@ -572,7 +871,27 @@ dotnet run -- --trace-methods "Collection*" --trace-primitives 60-69
    - Pattern matching
    - Range specification
 
-### Phase 5: Additional Listeners (2-3 days)
+### Phase 5: Cold Start Integration (3-4 days)
+
+1. **Add hub parameter to ColdStartOrchestrator**
+   - Constructor accepts optional IDiagnosticHub
+   - Passes hub to all phase classes
+
+2. **Implement ColdStartProgressListener**
+   - Phase start/end output
+   - Message handling
+   - Reproduces current console output
+
+3. **Add events to all 6 phases**
+   - PhaseStart/PhaseEnd events
+   - DiagnosticMessageEvent for informational output
+   - Typed events for detail tracing (optional)
+
+4. **Add command line options**
+   - `--trace-coldstart`
+   - `--trace-coldstart-detail`
+
+### Phase 6: Additional Listeners (2-3 days)
 
 1. **JsonLogListener**
    - JSON Lines output
@@ -582,16 +901,23 @@ dotnet run -- --trace-methods "Collection*" --trace-primitives 60-69
    - Statistics aggregation
    - Report generation
 
-### Phase 6: Cleanup (1-2 days)
+3. **ColdStartDetailListener**
+   - Detailed cold start events
+   - Configurable verbosity
+
+### Phase 7: Cleanup (1-2 days)
 
 1. **Remove old diagnostic code**
-   - Delete ad-hoc Console.WriteLine calls
-   - Remove old DebugOptions flags
+   - Delete ad-hoc Console.WriteLine calls from all phases
+   - Verify output matches expected format
    - Update documentation
 
 2. **Final testing and documentation**
+   - Test cold start output
+   - Test runtime tracing
+   - Update CLAUDE.md
 
-**Total Estimate**: 12-17 days
+**Total Estimate**: 15-21 days
 
 ---
 
@@ -640,31 +966,61 @@ dotnet run -- --trace-methods "Collection*" --trace-primitives 60-69
 
 ---
 
-## 11. Appendix: Current Diagnostic Code Locations
+## 11. Appendix: Console Output to Replace
 
-Files containing ad-hoc diagnostic code to be migrated:
+Files containing Console.WriteLine calls to be replaced with diagnostic events:
 
-| File | Lines | Diagnostic Type |
-|------|-------|-----------------|
-| VirtualMachine.cs | ~50 | Bytecode tracing, method lookup |
-| BytecodeInterpreter.cs | ~30 | Instruction tracing |
-| Program.cs | ~200 | Init expression debugging |
-| Phase5_GlobalsAndPatches.cs | ~100 | Cold start diagnostics |
-| Various primitives | ~50 | Primitive debugging |
+| File | Lines | Output Type |
+|------|-------|-------------|
+| Program.cs | ~240 | Init expression progress, GC stats, startup info |
+| ColdStartOrchestrator.cs | ~10 | Phase progress markers |
+| Phase2_ClassInfrastructure.cs | ~20 | Class infrastructure setup |
+| Phase3_ObjectAllocation.cs | ~30 | Object allocation progress, Undeclared dict |
+| Phase4_MethodCompilation.cs | ~20 | Method compilation stats |
+| Phase5_GlobalsAndPatches.cs | ~40 | Globals, patches, Display creation |
+| Phase6_ValidationAndGC.cs | ~45 | GC verification stats |
+| StackManager.cs | ~15 | Stack overflow warnings |
 
-**Total**: ~430 lines of ad-hoc diagnostic code
+**Total**: ~420 lines of Console.WriteLine calls to migrate
+
+**Note**: Legacy debug options (RuntimeDebugOptions, ColdStartDebugOptions) have been removed.
+The new system will replace all remaining Console.WriteLine calls with diagnostic events.
 
 ---
 
 ## 12. Success Criteria
 
 1. **Functionality**: All existing diagnostic capabilities preserved
+   - Cold start phase progress output matches current format
+   - Init expression execution output matches current format
+   - GC statistics output matches current format
+
 2. **Performance**: < 1% overhead when disabled
+   - Fast-path `IsEnabled()` check before event creation
+   - No allocations when diagnostics disabled
+
 3. **Usability**: Clear, filterable output
+   - Class/method pattern filtering
+   - Call depth limiting
+   - Output format options (console, JSON, etc.)
+
 4. **Maintainability**: Single integration point per subsystem
+   - One hub passed through all components
+   - Consistent event emission pattern
+   - Clear separation of concerns
+
 5. **Extensibility**: Easy to add new event types and listeners
+   - Add new DiagnosticEventTypes flags
+   - Add new event record types
+   - Implement new IDiagnosticListener
+
+6. **Cold Start Support**: Complete coverage of all phases
+   - Phase lifecycle events (PhaseStart, PhaseEnd)
+   - DiagnosticMessageEvent for informational output
+   - Optional typed events for detail tracing
 
 ---
 
-**Document Version**: 1.0
-**Status**: Draft - Awaiting Review
+**Document Version**: 1.1
+**Status**: Draft - Cold Start Support Added
+**Last Updated**: 2025-11-18
