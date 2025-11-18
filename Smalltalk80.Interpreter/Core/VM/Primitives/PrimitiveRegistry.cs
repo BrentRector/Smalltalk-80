@@ -237,4 +237,36 @@ public class PrimitiveRegistry : IPrimitiveRegistry
 
         return registry;
     }
+
+    /// <summary>
+    /// Creates a registry with new IPrimitive implementations where available.
+    /// Falls back to legacy for primitives not yet migrated.
+    /// </summary>
+    /// <returns>Registry with new primitives enabled.</returns>
+    public static PrimitiveRegistry CreateWithNewPrimitives()
+    {
+        // Start with all legacy primitives
+        var registry = CreateWithLegacyPrimitives();
+
+        // Override with new IPrimitive implementations for SmallInteger arithmetic (1-17)
+        registry.Register(1, new NewPrimitives.SmallIntegerArithmetic.Add());
+        registry.Register(2, new NewPrimitives.SmallIntegerArithmetic.Subtract());
+        registry.Register(3, new NewPrimitives.SmallIntegerArithmetic.LessThan());
+        registry.Register(4, new NewPrimitives.SmallIntegerArithmetic.GreaterThan());
+        registry.Register(5, new NewPrimitives.SmallIntegerArithmetic.LessOrEqual());
+        registry.Register(6, new NewPrimitives.SmallIntegerArithmetic.GreaterOrEqual());
+        registry.Register(7, new NewPrimitives.SmallIntegerArithmetic.Equal());
+        registry.Register(8, new NewPrimitives.SmallIntegerArithmetic.NotEqual());
+        registry.Register(9, new NewPrimitives.SmallIntegerArithmetic.Multiply());
+        registry.Register(10, new NewPrimitives.SmallIntegerArithmetic.Divide());
+        registry.Register(11, new NewPrimitives.SmallIntegerArithmetic.Mod());
+        registry.Register(12, new NewPrimitives.SmallIntegerArithmetic.Div());
+        registry.Register(13, new NewPrimitives.SmallIntegerArithmetic.Quo());
+        registry.Register(14, new NewPrimitives.SmallIntegerArithmetic.BitAnd());
+        registry.Register(15, new NewPrimitives.SmallIntegerArithmetic.BitOr());
+        registry.Register(16, new NewPrimitives.SmallIntegerArithmetic.BitXor());
+        registry.Register(17, new NewPrimitives.SmallIntegerArithmetic.BitShift());
+
+        return registry;
+    }
 }
