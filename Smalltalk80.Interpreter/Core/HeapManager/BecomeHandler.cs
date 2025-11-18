@@ -5,7 +5,7 @@ namespace Smalltalk80.Interpreter.Core.HeapManager;
 /// <summary>
 /// Handles become operations (identity swapping) per Blue Book specification.
 /// </summary>
-public class BecomeHandler : IBecomeHandler
+internal class BecomeHandler : IBecomeHandler
 {
     private readonly IObjectTableManager _tableManager;
 

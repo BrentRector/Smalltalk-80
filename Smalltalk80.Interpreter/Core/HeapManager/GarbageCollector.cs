@@ -7,7 +7,7 @@ namespace Smalltalk80.Interpreter.Core.HeapManager;
 /// Mark-and-sweep garbage collector for the Smalltalk heap.
 /// Uses GC roots as starting points for the mark phase.
 /// </summary>
-public class GarbageCollector : IGarbageCollector
+internal class GarbageCollector : IGarbageCollector
 {
     private readonly IObjectTableManager _tableManager;
     private readonly ISmalltalkHeapManager _heap;
