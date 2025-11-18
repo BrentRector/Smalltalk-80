@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Memory;
 
 namespace Smalltalk80.Interpreter.Core.Diagnostics;
 
