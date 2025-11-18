@@ -361,8 +361,13 @@ public static class Program
                 var successfulExpressions = new List<(int index, string source)>();
 
                 // Execute with per-expression status output
+                int loopIteration = 0;
+                Console.Error.WriteLine($"DEBUG: reorderedIndices.Count = {reorderedIndices.Count}");
                 foreach (int index in reorderedIndices)
                 {
+                    loopIteration++;
+                    Console.Error.WriteLine($"DEBUG: Loop iteration {loopIteration}, index={index}");
+
                     var expr = bundle.InitExpressions[index];
                     var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
 
