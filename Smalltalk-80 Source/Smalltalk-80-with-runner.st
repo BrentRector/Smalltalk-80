@@ -42431,12 +42431,12 @@ initialize
 	 diagOt1 → 22  (PASSED: returned 22)
 	 diagOt2 → 44  (PASSED: returned 44)
 	 diagMa  → 88  (PASSED: returned 88)
-	 diagMt1 → 166
+	 diagMt1 → 166 (PASSED: returned 166)
 	 diagMt2 → 322
 	 diagIa  → 644
 	 diagIt1 → 188
 	 diagIt2 → 266"
 
-	^5000 + (tester diagMt1)! !
+	^6000 + (tester diagMt2)! !
 
 BlockContextTestRunner initialize!
