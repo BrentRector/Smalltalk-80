@@ -79,7 +79,11 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         SmalltalkOOP receiver,
         SmalltalkOOP[] args,
         RuntimeHeapAccessor? runtimeHeapAccess,
-        LayoutResolver? layoutResolver)
+        LayoutResolver? layoutResolver,
+        IContextManager? contextManager = null,
+        int instructionPointer = 0,
+        ICacheManager? cacheManager = null,
+        IMessageDispatcher? messageDispatcher = null)
     {
         // Try new interface first - adapt to legacy calling convention
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
@@ -91,7 +95,11 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 ctx.HeapManager,
                 platform: ctx.PlatformBridge,
                 runtimeHeapAccess: runtimeHeapAccess,
-                layoutResolver: layoutResolver
+                layoutResolver: layoutResolver,
+                contextManager: contextManager,
+                instructionPointer: instructionPointer,
+                cacheManager: cacheManager,
+                messageDispatcher: messageDispatcher
             );
 
             var result = primitive.Execute(execContext);
@@ -310,6 +318,18 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(75, new NewPrimitives.SimpleObjectPrimitives.Hash());
         registry.Register(110, new NewPrimitives.SimpleObjectPrimitives.IdentityEquals());
         registry.Register(111, new NewPrimitives.SimpleObjectPrimitives.Class());
+
+        // Override with new IPrimitive implementations for Control primitives (80-89)
+        registry.Register(80, new NewPrimitives.ControlPrimitives.BlockCopy());
+        registry.Register(81, new NewPrimitives.ControlPrimitives.Value());
+        registry.Register(82, new NewPrimitives.ControlPrimitives.ValueWithArguments());
+        registry.Register(83, new NewPrimitives.ControlPrimitives.Perform());
+        registry.Register(84, new NewPrimitives.ControlPrimitives.PerformWith());
+        registry.Register(85, new NewPrimitives.ControlPrimitives.Signal());
+        registry.Register(86, new NewPrimitives.ControlPrimitives.Wait());
+        registry.Register(87, new NewPrimitives.ControlPrimitives.Resume());
+        registry.Register(88, new NewPrimitives.ControlPrimitives.Suspend());
+        registry.Register(89, new NewPrimitives.ControlPrimitives.FlushCache());
 
         return registry;
     }

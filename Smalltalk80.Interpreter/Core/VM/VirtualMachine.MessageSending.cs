@@ -95,7 +95,12 @@ public partial class VirtualMachine
                 Console.WriteLine($"[PRIMITIVE #{_instructionCount}] Trying primitive {primitiveNumber} in {GetLocalId(methodInfo.MethodOOP)}");
             }
 
-            var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver);
+            // Get current instruction pointer for primitives that need it
+            int currentPC = GetInstructionPointer();
+
+            var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
+                primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
+                _contextManager, currentPC, this, this);
 
             if (_primitiveSuccess)
             {
@@ -227,8 +232,13 @@ public partial class VirtualMachine
                 throw new InvalidOperationException($"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
             }
 
+            // Get current instruction pointer for primitives that need it
+            int currentPC = GetInstructionPointer();
+
             // Try to execute the primitive
-            var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver);
+            var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
+                primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
+                _contextManager, currentPC, this, this);
 
             if (_primitiveSuccess)
             {

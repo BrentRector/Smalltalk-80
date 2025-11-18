@@ -28,7 +28,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// NO access to cold start proxy data (_symbols[], ColdStartBundle, unfrozen registries).
 /// </summary>
 [RuntimeOnly(Reason = "Executes Smalltalk bytecode at runtime, must use heap-only access")]
-public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDebugHelpers
+public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDebugHelpers, ICacheManager, IMessageDispatcher
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly RuntimeHeapAccessor _runtimeHeapAccess;
@@ -1251,6 +1251,44 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     void IPrimitiveContext.InvalidateAllRuntimeCaches()
     {
         _runtimeHeapAccess.InvalidateAllCaches();
+    }
+
+    // ICacheManager explicit interface implementation
+    void ICacheManager.ClearMethodCache()
+    {
+        ClearMethodCache();
+    }
+
+    void ICacheManager.InvalidateAllRuntimeCaches()
+    {
+        _runtimeHeapAccess.InvalidateAllCaches();
+    }
+
+    // IMessageDispatcher explicit interface implementation
+    SmalltalkOOP IMessageDispatcher.SendMessage(SmalltalkOOP receiver, SmalltalkOOP selector, SmalltalkOOP[] arguments)
+    {
+        // This is called by perform primitives via the new IPrimitive pattern
+        // We need to dispatch the message and handle the result
+        var outcome = SendMessage(receiver, selector, arguments);
+
+        // Handle the outcome
+        if (outcome.Kind == CallOutcomeKind.Normal)
+        {
+            return outcome.Value;
+        }
+        else if (outcome.Kind == CallOutcomeKind.ContextSwitch)
+        {
+            // Context switch - signal and return nil
+            // The InterpreterLoop will handle the context switch
+            _contextSwitchPending = true;
+            return SpecialObjectsArray.Instance.Nil;
+        }
+        else
+        {
+            // Other outcomes (VMException, NonLocalReturn) - return nil
+            // In legacy perform primitives, these were also handled
+            return SpecialObjectsArray.Instance.Nil;
+        }
     }
 
     SmalltalkOOP IPrimitiveContext.GetBlockContextClassOOP()

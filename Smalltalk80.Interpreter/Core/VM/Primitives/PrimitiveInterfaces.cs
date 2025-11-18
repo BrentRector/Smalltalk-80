@@ -64,6 +64,15 @@ public readonly struct PrimitiveExecutionContext
     /// <summary>Gets the runtime heap accessor for class/global lookups.</summary>
     public RuntimeHeapAccessor? RuntimeHeapAccess { get; }
 
+    /// <summary>Gets the current instruction pointer when primitive was called (for block primitives).</summary>
+    public int InstructionPointer { get; }
+
+    /// <summary>Gets the cache manager for method/runtime cache operations.</summary>
+    public ICacheManager? CacheManager { get; }
+
+    /// <summary>Gets the message dispatcher for perform primitives.</summary>
+    public IMessageDispatcher? MessageDispatcher { get; }
+
     /// <summary>
     /// Creates a new primitive execution context.
     /// </summary>
@@ -75,7 +84,10 @@ public readonly struct PrimitiveExecutionContext
         IContextManager? contextManager = null,
         LayoutResolver? layoutResolver = null,
         IPlatformBridge? platform = null,
-        RuntimeHeapAccessor? runtimeHeapAccess = null)
+        RuntimeHeapAccessor? runtimeHeapAccess = null,
+        int instructionPointer = 0,
+        ICacheManager? cacheManager = null,
+        IMessageDispatcher? messageDispatcher = null)
     {
         Receiver = receiver;
         Arguments = arguments;
@@ -85,6 +97,9 @@ public readonly struct PrimitiveExecutionContext
         LayoutResolver = layoutResolver;
         Platform = platform;
         RuntimeHeapAccess = runtimeHeapAccess;
+        InstructionPointer = instructionPointer;
+        CacheManager = cacheManager;
+        MessageDispatcher = messageDispatcher;
     }
 
     /// <summary>
@@ -110,6 +125,82 @@ public readonly struct PrimitiveExecutionContext
         int fieldIndex = LayoutResolver.GetFieldIndex(className, fieldName);
         HeapManager.SetInstanceVariable(oop, fieldIndex, value);
     }
+
+    /// <summary>
+    /// Gets the currently active context.
+    /// </summary>
+    public SmalltalkOOP GetActiveContext()
+    {
+        if (ContextManager == null)
+            throw new InvalidOperationException("ContextManager not available");
+        return ContextManager.ActiveContext;
+    }
+
+    /// <summary>
+    /// Sets the active context (for context-switching primitives).
+    /// </summary>
+    public void SetActiveContext(SmalltalkOOP contextOOP)
+    {
+        if (ContextManager == null)
+            throw new InvalidOperationException("ContextManager not available");
+        ContextManager.SetActiveContext(contextOOP);
+    }
+
+    /// <summary>
+    /// Gets the BlockContext class OOP.
+    /// </summary>
+    public SmalltalkOOP GetBlockContextClassOOP()
+    {
+        if (RuntimeHeapAccess == null)
+            throw new InvalidOperationException("RuntimeHeapAccess not available");
+        return RuntimeHeapAccess.GetClass("BlockContext");
+    }
+
+    /// <summary>
+    /// Allocates a new object instance with optional indexed fields.
+    /// </summary>
+    public SmalltalkOOP AllocateObject(string className, int indexedSize)
+    {
+        if (RuntimeHeapAccess == null)
+            throw new InvalidOperationException("RuntimeHeapAccess not available");
+
+        var classOOP = RuntimeHeapAccess.GetClass(className);
+        return HeapManager.AllocateInstanceOf(classOOP, indexedSize);
+    }
+
+    /// <summary>
+    /// Gets the class name for an object.
+    /// </summary>
+    public string? GetClassNameForObject(SmalltalkOOP objectOOP)
+    {
+        if (objectOOP.IsSmallInteger)
+            return "class:SmallInteger";
+        return "class:" + HeapManager.GetClassName(objectOOP);
+    }
+
+    /// <summary>
+    /// Gets a global object by name from SystemDictionary.
+    /// </summary>
+    public SmalltalkOOP GetGlobalObjectByName(string globalName)
+    {
+        if (RuntimeHeapAccess == null)
+            throw new InvalidOperationException("RuntimeHeapAccess not available");
+
+        // Remove "class:" or "global:" prefix if present
+        string name = globalName;
+        if (globalName.StartsWith("class:"))
+            name = globalName.Substring(6);
+        else if (globalName.StartsWith("global:"))
+            name = globalName.Substring(7);
+
+        // For classes, use GetClass
+        if (globalName.StartsWith("class:"))
+            return RuntimeHeapAccess.GetClass(name);
+
+        // For globals, look up in SystemDictionary
+        var systemDictOOP = RuntimeHeapAccess.SystemDictionary;
+        return RuntimeHeapAccess.LookupGlobalByName(systemDictOOP, name);
+    }
 }
 
 /// <summary>
@@ -124,6 +215,33 @@ public interface IPrimitive
     /// <param name="context">Execution context with receiver, args, and dependencies.</param>
     /// <returns>Result with success flag and return value.</returns>
     PrimitiveResult Execute(PrimitiveExecutionContext context);
+}
+
+/// <summary>
+/// Interface for cache management operations used by primitives.
+/// </summary>
+public interface ICacheManager
+{
+    /// <summary>Clears the method lookup cache.</summary>
+    void ClearMethodCache();
+
+    /// <summary>Invalidates all runtime caches (method, class, field layout).</summary>
+    void InvalidateAllRuntimeCaches();
+}
+
+/// <summary>
+/// Interface for message dispatch operations used by perform primitives.
+/// </summary>
+public interface IMessageDispatcher
+{
+    /// <summary>
+    /// Sends a message to a receiver object.
+    /// </summary>
+    /// <param name="receiver">Receiver object.</param>
+    /// <param name="selector">Selector Symbol.</param>
+    /// <param name="arguments">Arguments array.</param>
+    /// <returns>Result of message send.</returns>
+    SmalltalkOOP SendMessage(SmalltalkOOP receiver, SmalltalkOOP selector, SmalltalkOOP[] arguments);
 }
 
 /// <summary>
