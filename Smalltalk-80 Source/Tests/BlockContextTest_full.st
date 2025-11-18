@@ -519,7 +519,12 @@ diagMt1 "Return mt1 (expect 166)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma |
 diagMt2 "Return mt2 (expect 322)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. mt2] value: 644] value: 88] value: 11!
 diagIa  "Return ia (expect 644)"  ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. ia] value: 644] value: 88] value: 11!
 diagIt1 "Return it1 (expect 188)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it1] value: 644] value: 88] value: 11!
-diagIt2 "Return it2 (expect 266)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it2] value: 644] value: 88] value: 11! !
+diagIt2 "Return it2 (expect 266)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it2] value: 644] value: 88] value: 11!
+
+diagSum  "Return sum of all 9 vars - exact n121212 structure (expect 10)" ^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 0] value: 0] value: 0!
+diagSum2 "Return sum of first 2 vars (expect 0)" ^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1] value: 0] value: 0] value: 0!
+diagSum3 "Return sum of first 3 vars (expect 1)" ^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1 + ot2] value: 0] value: 0] value: 0!
+diagSum6 "Return sum of first 6 vars (expect 6)" ^[:oa | | ot1 ot2 | ot1 _ 0. ot2 _ 1. [:ma | | mt1 mt2 | mt1 _ 2. mt2 _ 3. [:ia | | it1 it2 | it1 _ 2. it2 _ 2. oa + ot1 + ot2 + ma + mt1 + mt2] value: 0] value: 0] value: 0! !
 
 "Mutation tests"
 !BlockContextTest methodsFor: 'mutation'!

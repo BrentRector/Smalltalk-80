@@ -72,6 +72,38 @@ Object subclass: #DiagIt2
 !DiagIt2 class methodsFor: 'class initialization'!
 initialize ^BlockContextTest new diagIt2! !
 
+Object subclass: #DiagSum
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagSum class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagSum! !
+
+Object subclass: #DiagSum2
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagSum2 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagSum2! !
+
+Object subclass: #DiagSum3
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagSum3 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagSum3! !
+
+Object subclass: #DiagSum6
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagSum6 class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagSum6! !
+
 DiagOa initialize!
 DiagOt1 initialize!
 DiagOt2 initialize!
@@ -81,3 +113,7 @@ DiagMt2 initialize!
 DiagIa initialize!
 DiagIt1 initialize!
 DiagIt2 initialize!
+DiagSum initialize!
+DiagSum2 initialize!
+DiagSum3 initialize!
+DiagSum6 initialize!
