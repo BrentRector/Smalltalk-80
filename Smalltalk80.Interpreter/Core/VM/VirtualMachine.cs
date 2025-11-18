@@ -186,9 +186,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             this // IVMDebugHelpers
         );
 
-        // Initialize primitive registry with legacy primitives
-        // Can switch to CreateWithNewPrimitives() to test new IPrimitive implementations
-        _primitiveRegistry = Primitives.PrimitiveRegistry.CreateWithLegacyPrimitives();
+        // Initialize primitive registry with new IPrimitive implementations
+        // Uses migrated primitives: SmallInteger (1-17), Float (40-54), Object (60-75, 110-111), Control (80-89)
+        _primitiveRegistry = Primitives.PrimitiveRegistry.CreateWithNewPrimitives();
     }
 
     /// <summary>
