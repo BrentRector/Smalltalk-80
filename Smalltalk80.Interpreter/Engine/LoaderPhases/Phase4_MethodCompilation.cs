@@ -21,7 +21,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 /// - BlockOwnerMap tracking for lexical scoping
 /// - Linear probing for method dictionary insertion
 /// </summary>
-public class Phase4_MethodCompilation
+public class Phase4_MethodCompilation : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
@@ -32,11 +32,21 @@ public class Phase4_MethodCompilation
     private readonly IReadOnlyList<string> _symbols;
     private readonly IReadOnlyList<string> _strings;
     private readonly ColdstartReport _report;
-    
+
     // Pool variable binding Array deduplication registry
     // Key: "PoolDictionaryName:KeySymbol", Value: 2-element Array OOP (#PoolName, #Key)
     // These are NOT Associations - they are binding metadata for VM runtime resolution
     private readonly Dictionary<string, SmalltalkOOP> _poolVariableBindings = new();
+
+    /// <summary>
+    /// Gets the phase name for diagnostics and logging.
+    /// </summary>
+    public string Name => "Phase 4: Method Compilation";
+
+    /// <summary>
+    /// Gets the phase number (1-6).
+    /// </summary>
+    public int PhaseNumber => 4;
 
     public Phase4_MethodCompilation(
         ColdStartBundle bundle,
@@ -56,6 +66,24 @@ public class Phase4_MethodCompilation
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _symbols = bundle.Symbols;
         _strings = bundle.Strings;
+    }
+
+    /// <summary>
+    /// Validates phase preconditions before execution.
+    /// </summary>
+    /// <returns>List of precondition failure messages.</returns>
+    public IReadOnlyList<string> ValidatePreconditions()
+    {
+        return new List<string>();
+    }
+
+    /// <summary>
+    /// Validates phase postconditions after execution.
+    /// </summary>
+    /// <returns>List of postcondition failure messages.</returns>
+    public IReadOnlyList<string> ValidatePostconditions()
+    {
+        return new List<string>();
     }
 
     public void Run()

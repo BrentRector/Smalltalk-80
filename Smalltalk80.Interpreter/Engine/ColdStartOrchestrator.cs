@@ -19,7 +19,7 @@ namespace Smalltalk80.Interpreter.Engine;
 /// Runtime code must NOT use this class.
 /// </summary>
 [ColdStartOnly(Reason = "Builds heap from ColdStartBundle, modifies frozen registries")]
-public class ColdStartOrchestrator
+public class ColdStartOrchestrator : IColdStartLoader
 {
     private readonly ColdStartBundle _bundle;
     private readonly ISmalltalkHeapManager _heapManager;
@@ -41,6 +41,12 @@ public class ColdStartOrchestrator
     private readonly HashSet<(SmalltalkOOP objectOOP, int fieldIndex)> _initializedFields = new();
 
     /// <summary>
+    /// List of phases for inspection/testing.
+    /// Populated during Run().
+    /// </summary>
+    private readonly List<IPhase> _phases = new();
+
+    /// <summary>
     /// Gets the layout resolver (available after Phase 2 completes).
     /// </summary>
     public LayoutResolver? LayoutResolver { get; private set; }
@@ -59,6 +65,11 @@ public class ColdStartOrchestrator
     /// Gets the coldstart execution report.
     /// </summary>
     public ColdstartReport Report => _report;
+
+    /// <summary>
+    /// Gets all phases for inspection/testing.
+    /// </summary>
+    public IReadOnlyList<IPhase> Phases => _phases;
 
     // InitExpressionsArrayOOP removed - accessible via SpecialObjectsArray.Instance.InitExpressionMethods
 
@@ -107,12 +118,16 @@ public class ColdStartOrchestrator
             // Configure heap manager with class name field index for GetClassName() to work
             ConfigureHeapManager();
 
+        // Clear any previous phases (for re-runs)
+        _phases.Clear();
+
         // Phase 1: Preflight + Symbol Interning
         // Validates bundle and creates all Symbol objects
-        RunPhase("Phase 1: Preflight + Symbol Interning", () =>
+        var phase1 = new Phase1_PreflightAndSymbols(_bundle, _allocator, _report);
+        _phases.Add(phase1);
+        RunPhase(phase1.Name, () =>
         {
-            var phase = new Phase1_PreflightAndSymbols(_bundle, _allocator, _report);
-            phase.Run();
+            phase1.Run();
 
             // Freeze symbol registry - no more symbol registration after this point
             SymbolRegistry.Freeze();
@@ -120,57 +135,52 @@ public class ColdStartOrchestrator
 
         // Phase 2: Class Infrastructure
         // Creates class/metaclass shells, wires inheritance, resolves layouts
-        Phase2_ClassInfrastructure? phase2 = null;
-        RunPhase("Phase 2: Class Infrastructure", () =>
+        var phase2 = new Phase2_ClassInfrastructure(_bundle, _allocator, _heapManager, _localIdToObjectId, _initializedFields, _report);
+        _phases.Add(phase2);
+        RunPhase(phase2.Name, () =>
         {
-            phase2 = new Phase2_ClassInfrastructure(_bundle, _allocator, _heapManager, _localIdToObjectId, _initializedFields, _report);
             phase2.Run();
             LayoutResolver = phase2.LayoutResolver;
         });
 
         // Phase 3: Object Allocation
         // Allocates all remaining objects (globals, singletons, strings, etc.)
-        RunPhase("Phase 3: Object Allocation", () =>
-        {
-            if (LayoutResolver == null)
-                throw new InvalidOperationException("LayoutResolver not initialized after Phase 2");
+        if (LayoutResolver == null)
+            throw new InvalidOperationException("LayoutResolver not initialized after Phase 2");
 
-            var phase = new Phase3_ObjectAllocation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
-            phase.Run();
+        var phase3 = new Phase3_ObjectAllocation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
+        _phases.Add(phase3);
+        RunPhase(phase3.Name, () =>
+        {
+            phase3.Run();
         });
 
         // Phase 4: Method Compilation
         // Compiles all methods, installs in dictionaries, prepares init expressions
-        RunPhase("Phase 4: Method Compilation", () =>
+        var phase4 = new Phase4_MethodCompilation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
+        _phases.Add(phase4);
+        RunPhase(phase4.Name, () =>
         {
-            if (LayoutResolver == null)
-                throw new InvalidOperationException("LayoutResolver not initialized after Phase 2");
-
-            var phase = new Phase4_MethodCompilation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
-            phase.Run();
+            phase4.Run();
             // Init expressions array is set in SpecialObjectsArray by Phase4
         });
 
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches
-        RunPhase("Phase 5: Globals + Patches", () =>
+        var phase5 = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _debugOptions);
+        _phases.Add(phase5);
+        RunPhase(phase5.Name, () =>
         {
-            if (LayoutResolver == null)
-                throw new InvalidOperationException("LayoutResolver not initialized after Phase 2");
-
-            var phase = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _debugOptions);
-            phase.Run();
+            phase5.Run();
         });
 
         // Phase 6: Validation + GC Verification
         // Comprehensive validation and GC verification to ensure cold start correctness
-        RunPhase("Phase 6: Validation + GC Verification", () =>
+        var phase6 = new Phase6_ValidationAndGC(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _report);
+        _phases.Add(phase6);
+        RunPhase(phase6.Name, () =>
         {
-            if (LayoutResolver == null)
-                throw new InvalidOperationException("LayoutResolver not initialized after Phase 2");
-
-            var phase = new Phase6_ValidationAndGC(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _report);
-            phase.Run();
+            phase6.Run();
         });
 
             // Freeze global registry - no more registrations after this point

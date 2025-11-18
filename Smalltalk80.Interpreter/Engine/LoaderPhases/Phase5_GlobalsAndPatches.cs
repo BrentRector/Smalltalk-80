@@ -15,7 +15,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 /// 2. Creating and populating the Universal Symbol Table (USTable)
 /// 3. Creating SystemDictionary and installing all global variables
 /// </summary>
-public class Phase5_GlobalsAndPatches
+public class Phase5_GlobalsAndPatches : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
@@ -26,6 +26,16 @@ public class Phase5_GlobalsAndPatches
     private readonly IReadOnlyList<string> _symbols;
     private readonly ColdstartReport _report;
     private readonly ColdStartDebugOptions _debugOptions;
+
+    /// <summary>
+    /// Gets the phase name for diagnostics and logging.
+    /// </summary>
+    public string Name => "Phase 5: Globals and Patches";
+
+    /// <summary>
+    /// Gets the phase number (1-6).
+    /// </summary>
+    public int PhaseNumber => 5;
 
     public Phase5_GlobalsAndPatches(
         ColdStartBundle bundle,
@@ -46,6 +56,24 @@ public class Phase5_GlobalsAndPatches
         _symbols = bundle.Symbols;
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _debugOptions = debugOptions ?? ColdStartDebugOptions.None;
+    }
+
+    /// <summary>
+    /// Validates phase preconditions before execution.
+    /// </summary>
+    /// <returns>List of precondition failure messages.</returns>
+    public IReadOnlyList<string> ValidatePreconditions()
+    {
+        return new List<string>();
+    }
+
+    /// <summary>
+    /// Validates phase postconditions after execution.
+    /// </summary>
+    /// <returns>List of postcondition failure messages.</returns>
+    public IReadOnlyList<string> ValidatePostconditions()
+    {
+        return new List<string>();
     }
 
     public void Run()

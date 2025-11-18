@@ -11,7 +11,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 /// Consolidates class shell allocation, metaclass wiring, class metadata, and layout loading.
 /// This phase creates all class and metaclass objects with their complete infrastructure.
 /// </summary>
-public class Phase2_ClassInfrastructure
+public class Phase2_ClassInfrastructure : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
@@ -19,6 +19,16 @@ public class Phase2_ClassInfrastructure
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
     private readonly ColdstartReport _report;
+
+    /// <summary>
+    /// Gets the phase name for diagnostics and logging.
+    /// </summary>
+    public string Name => "Phase 2: Class Infrastructure";
+
+    /// <summary>
+    /// Gets the phase number (1-6).
+    /// </summary>
+    public int PhaseNumber => 2;
 
     /// <summary>
     /// Gets the layout resolver populated with class layouts.
@@ -39,6 +49,24 @@ public class Phase2_ClassInfrastructure
         _localIdToObjectId = localIdToObjectId;
         _initializedFields = initializedFields;
         _report = report ?? throw new ArgumentNullException(nameof(report));
+    }
+
+    /// <summary>
+    /// Validates phase preconditions before execution.
+    /// </summary>
+    /// <returns>List of precondition failure messages.</returns>
+    public IReadOnlyList<string> ValidatePreconditions()
+    {
+        return new List<string>();
+    }
+
+    /// <summary>
+    /// Validates phase postconditions after execution.
+    /// </summary>
+    /// <returns>List of postcondition failure messages.</returns>
+    public IReadOnlyList<string> ValidatePostconditions()
+    {
+        return new List<string>();
     }
 
     public void Run()

@@ -19,7 +19,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 /// This phase creates the fundamental objects needed by the Smalltalk system and ensures
 /// all objects are properly initialized with class references and nil-initialized fields.
 /// </summary>
-public class Phase3_ObjectAllocation
+public class Phase3_ObjectAllocation : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
@@ -29,6 +29,16 @@ public class Phase3_ObjectAllocation
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
     private readonly IReadOnlyList<string> _symbols;
     private readonly ColdstartReport _report;
+
+    /// <summary>
+    /// Gets the phase name for diagnostics and logging.
+    /// </summary>
+    public string Name => "Phase 3: Object Allocation and Initialization";
+
+    /// <summary>
+    /// Gets the phase number (1-6).
+    /// </summary>
+    public int PhaseNumber => 3;
 
     public Phase3_ObjectAllocation(
         ColdStartBundle bundle,
@@ -47,6 +57,24 @@ public class Phase3_ObjectAllocation
         _initializedFields = initializedFields;
         _symbols = bundle.Symbols;
         _report = report ?? throw new ArgumentNullException(nameof(report));
+    }
+
+    /// <summary>
+    /// Validates phase preconditions before execution.
+    /// </summary>
+    /// <returns>List of precondition failure messages.</returns>
+    public IReadOnlyList<string> ValidatePreconditions()
+    {
+        return new List<string>();
+    }
+
+    /// <summary>
+    /// Validates phase postconditions after execution.
+    /// </summary>
+    /// <returns>List of postcondition failure messages.</returns>
+    public IReadOnlyList<string> ValidatePostconditions()
+    {
+        return new List<string>();
     }
 
     public void Run()

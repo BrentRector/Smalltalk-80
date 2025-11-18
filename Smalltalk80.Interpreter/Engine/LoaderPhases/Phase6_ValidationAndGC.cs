@@ -22,7 +22,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 /// - GC roots are properly configured
 /// - ALL objects are reachable (no garbage collected)
 /// </summary>
-public class Phase6_ValidationAndGC
+public class Phase6_ValidationAndGC : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
@@ -31,6 +31,16 @@ public class Phase6_ValidationAndGC
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly string[] _symbols;
     private readonly ColdstartReport _report;
+
+    /// <summary>
+    /// Gets the phase name for diagnostics and logging.
+    /// </summary>
+    public string Name => "Phase 6: Validation and GC Verification";
+
+    /// <summary>
+    /// Gets the phase number (1-6).
+    /// </summary>
+    public int PhaseNumber => 6;
 
     public Phase6_ValidationAndGC(
         ColdStartBundle bundle,
@@ -49,6 +59,24 @@ public class Phase6_ValidationAndGC
 
         // Use symbols from bundle for validation
         _symbols = bundle.Symbols;
+    }
+
+    /// <summary>
+    /// Validates phase preconditions before execution.
+    /// </summary>
+    /// <returns>List of precondition failure messages.</returns>
+    public IReadOnlyList<string> ValidatePreconditions()
+    {
+        return new List<string>();
+    }
+
+    /// <summary>
+    /// Validates phase postconditions after execution.
+    /// </summary>
+    /// <returns>List of postcondition failure messages.</returns>
+    public IReadOnlyList<string> ValidatePostconditions()
+    {
+        return new List<string>();
     }
 
     /// <summary>
