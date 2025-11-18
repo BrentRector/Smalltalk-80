@@ -24,20 +24,13 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     private readonly IPlatformBridge? _platformBridge;
     private readonly RuntimeDebugOptions _debugOptions;
     private readonly IStackManager _stackManager;
+    private readonly IContextManager _contextManager;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
 
-    // Active context (current MethodContext being executed) - now using SmalltalkOOP
-    private SmalltalkOOP _activeContextOOP;
-
     // Primitive success flag (Blue Book specification)
     private bool _primitiveSuccess;
-
-    // Context depth tracking to detect infinite recursion
-    // (Trampoline architecture prevents CLR stack overflow, so this limit is only for detecting logic errors)
-    private int _activeContextCount = 0;
-    private const int MAX_CONTEXT_DEPTH = 5000;  // Increased for init expressions with deep dependencies
 
     // Instruction execution counter for debugging infinite loops
     private long _instructionCount = 0;
@@ -92,11 +85,6 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     private bool _contextSwitchPending;  // Signal that a context switch occurred (for trampoline)
     private bool _contextSwitchedByPrimitive;  // Primitive created new context (e.g., block invocation)
 
-    // Context pooling - reuse recently returned contexts to reduce GC pressure
-    // Dictionary keyed by indexed size (stack size) for efficient matching
-    private Dictionary<int, Stack<SmalltalkOOP>> _contextPools = new Dictionary<int, Stack<SmalltalkOOP>>();
-    private const int MAX_POOLED_CONTEXTS_PER_SIZE = 20;
-
     // Non-local return state (replaces exception-based unwinding)
     private bool _nonLocalReturnPending;  // NLR in progress
     private SmalltalkOOP _nlrValue;  // Value to return
@@ -148,11 +136,18 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         _platformBridge = platformBridge;
         _debugOptions = debugOptions ?? RuntimeDebugOptions.Default;
 
+        _contextManager = new ContextManager(
+            heapManager,
+            metadata,
+            _layoutResolver,
+            this // IVMHelpers
+        );
+
         _stackManager = new StackManager(
             heapManager,
             metadata,
             this, // IVMHelpers
-            () => _activeContextOOP,
+            () => _contextManager.ActiveContext,
             () => _selectorTraceEnabled,
             () => _pushTraceCounter,
             () => _pushTraceCounter++
@@ -323,7 +318,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         }
 
         // Create a MethodContext for this execution
-        _activeContextOOP = CreateMethodContext(methodOOP, receiverOOP, arguments);
+        _contextManager.SetActiveContext(_contextManager.CreateMethodContext(methodOOP, receiverOOP, arguments));
 
         // Execute bytecodes using trampoline pattern to prevent stack overflow
         return InterpreterLoop();
@@ -333,146 +328,12 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     {
         // Reset context depth counter for fresh execution
         // Each init expression should start with depth=0
-        _activeContextCount = 0;
+        _contextManager.ResetContextDepth();
 
-        _activeContextOOP = contextOOP;
+        _contextManager.SetActiveContext(contextOOP);
         var result = InterpreterLoop();
         // Console.WriteLine($"[ExecuteExistingContext] Finished with result {result}");
         return result;
-    }
-
-    /// <summary>
-    /// Creates a MethodContext object for executing a method.
-    /// Implements proper Blue Book MethodContext initialization with all required fields.
-    /// </summary>
-    /// <param name="methodOOP">CompiledMethod OOP to execute</param>
-    /// <param name="receiverOOP">Receiver OOP for this activation</param>
-    /// <param name="arguments">Method arguments as OOPs</param>
-    /// <param name="callerContextOOP">Optional caller context (sender), default for top-level DoIts</param>
-    /// <returns>Allocated and initialized MethodContext OOP</returns>
-    private SmalltalkOOP CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP = default)
-    {
-        // DEBUG: Log first 20 context creations
-        System.Threading.Interlocked.Increment(ref _createContextCallCount);
-        string? methodLocalId = GetLocalId(methodOOP);
-
-        // Step 1: Validate CompiledMethod exists and parse header
-        var header = ParseMethodHeader(methodOOP);
-
-        // Validate argument count matches
-        if (arguments.Length != header.NumArgs)
-        {
-            throw new InvalidOperationException(
-                $"Argument count mismatch: method expects {header.NumArgs} args, got {arguments.Length}");
-        }
-
-        // Step 2: Calculate stack size (args + temps + execution stack)
-        // Use large frame (48) or small frame (16) based on needsLargeFrame flag
-        int executionStackSize = header.NeedsLargeFrame ? 48 : 16;
-        int stackSize = header.NumArgs + header.NumTemps + executionStackSize;
-
-        // Step 3: Get MethodContext class from RuntimeSpecialObjects
-        var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
-
-        // Step 4: Try to reuse a pooled context with matching size, otherwise allocate new
-        SmalltalkOOP contextOOP;
-        int instanceVarCount = _layoutResolver.GetInstanceVariableCount("class:MethodContext");
-
-        // Check size-specific pool for matching context
-        if (_contextPools.TryGetValue(stackSize, out var pool) && pool.Count > 0)
-        {
-            // Reuse pooled context with exact size match
-            // CRITICAL: Never reuse the active context or any context in the sender chain!
-            contextOOP = pool.Pop();
-
-            // Check if we accidentally picked the active context
-            if (contextOOP == _activeContextOOP || IsInSenderChain(contextOOP, _activeContextOOP))
-            {
-                // Put it back and allocate a fresh one
-                pool.Push(contextOOP);
-                contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
-                _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
-            }
-            else
-            {
-                // if (_verboseDebugMode)
-                //     Console.WriteLine($"[POOL] Reusing pooled context {contextOOP} with size {stackSize} (pool size now: {pool.Count})");
-            }
-        }
-        else
-        {
-            // Allocate new context
-            contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
-            _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP); // Set class reference
-            // if (_verboseDebugMode)
-            //     Console.WriteLine($"[POOL] Allocated new context {contextOOP} with size {stackSize} (pool empty or doesn't exist)");
-        }
-
-        // Increment context depth and check limit
-        _activeContextCount++;
-
-        if (_activeContextCount > MAX_CONTEXT_DEPTH)
-        {
-            // Console.WriteLine($"\n[CONTEXT DEPTH EXCEEDED] Depth: {_activeContextCount}, Limit: {MAX_CONTEXT_DEPTH}");
-            // Console.WriteLine($"Current receiver: {receiverOOP}, method: {methodOOP}");
-            DumpSenderChain(callerContextOOP, 30);
-
-            throw new InvalidOperationException(
-                $"Context depth limit exceeded: {_activeContextCount} contexts (limit: {MAX_CONTEXT_DEPTH}). " +
-                $"This typically indicates infinite recursion or primitive failure causing excessive message sends.");
-        }
-
-        // Step 5: Get field indices using LayoutResolver
-        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
-        int pcIndex = VMConstants.CONTEXT_PC_INDEX;
-        int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
-        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
-
-        // Step 6: Initialize MethodContext fixed fields
-
-        // sender: caller context or nil for top-level DoIts
-        var callerOOP = callerContextOOP == default ? SpecialObjectsArray.Instance.Nil : callerContextOOP;
-        _heapManager.SetInstanceVariable(contextOOP, senderIndex, callerOOP);
-
-        // pc: start at bytecode offset 0
-        _heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
-
-        // stackp: points after args+temps (start of execution stack)
-        _heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
-
-        // method: the CompiledMethod being executed
-        _heapManager.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
-
-        // receiver: the object receiving this message
-        _heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
-
-        // Step 7: Initialize indexed fields (args + temps + stack)
-
-        // Copy arguments into arg slots
-        for (int i = 0; i < header.NumArgs; i++)
-        {
-            _heapManager.SetIndexedOOP(contextOOP, i, arguments[i]);
-        }
-
-        // CRITICAL: Initialize temps to nil for ALL contexts (both new and pooled)
-        // Previously, pooled contexts retained stale temp values from previous use!
-        for (int i = header.NumArgs; i < header.NumArgs + header.NumTemps; i++)
-        {
-            _heapManager.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
-        }
-
-        // Initialize execution stack slots to nil (also for all contexts)
-        for (int i = header.NumArgs + header.NumTemps; i < stackSize; i++)
-        {
-            _heapManager.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
-        }
-
-        // Note: GC root registration is implicit - the VM's _activeContextOOP field keeps the context alive
-        // Note: home field is not applicable for MethodContext (only for BlockContext)
-        // Note: literalFrame is accessed via method.literals, not stored in context
-
-        return contextOOP;
     }
 
     /// <summary>
@@ -483,7 +344,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     private SmalltalkOOP InterpreterLoop()
     {
         // Save initial context - we return when we get back to this context
-        _initialContextOOP = _activeContextOOP;
+        _initialContextOOP = _contextManager.ActiveContext;
 
         while (true)
         {
@@ -517,7 +378,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     private InterpreterStatus ExecuteBytecodeStep()
     {
         // if (_verboseDebugMode)
-        //     Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_activeContextOOP}");
+        //     Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_contextManager.ActiveContext}");
 
         // If NLR is pending, continue unwinding instead of executing bytecodes
         if (_nonLocalReturnPending)
@@ -532,7 +393,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         // Check if this is a BlockContext - they retrieve method from home MethodContext
-        var contextClassOOP = _heapManager.GetClassOOP(_activeContextOOP);
+        var contextClassOOP = _heapManager.GetClassOOP(_contextManager.ActiveContext);
         bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
 
         SmalltalkOOP methodOOP;
@@ -543,20 +404,20 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             // BlockContext: bytecode stored inline in parent method, receiver from home MethodContext
             // Blue Book design: BlockContext.startpc points to bytecode offset in parent method
             // With nested block support: traverse home chain to find the ultimate MethodContext
-            var methodContextOOP = FindMethodContext(_activeContextOOP);
+            var methodContextOOP = _contextManager.FindMethodContext(_contextManager.ActiveContext);
             methodOOP = _heapManager.GetInstanceVariable(methodContextOOP, methodIndex);
             receiverOOP = _heapManager.GetInstanceVariable(methodContextOOP, VMConstants.CONTEXT_RECEIVER_INDEX);
         }
         else
         {
             // MethodContext: method and receiver in instance variables
-            methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
-            receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+            methodOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, methodIndex);
+            receiverOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, receiverIndex);
         }
 
         // Diagnostic: show stack pointer
         int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+        var spOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, spIndex);
         int sp = spOOP.AsSmallInteger();
 
         // if (_verboseDebugMode)
@@ -571,10 +432,10 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         {
             var className = GetClassName(GetClass(methodOOP));
             var localId = GetLocalId(methodOOP);
-            var contextClass = GetClassName(GetClass(_activeContextOOP));
+            var contextClass = GetClassName(GetClass(_contextManager.ActiveContext));
             throw new InvalidOperationException(
                 $"ExecuteBytecodeStep: method field in context contains non-PointerIndexed object!\n" +
-                $"  Context: {_activeContextOOP}, contextClass={contextClass}\n" +
+                $"  Context: {_contextManager.ActiveContext}, contextClass={contextClass}\n" +
                 $"  Method field (index {methodIndex}): {methodOOP}\n" +
                 $"  Method format: {methodFormat} (expected PointerIndexed)\n" +
                 $"  Method class: {className}\n" +
@@ -584,7 +445,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
 
         byte[] bytecodes = GetMethodBytecodes(methodOOP);
 
-        var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+        var ipOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
         int ip = ipOOP.AsSmallInteger();
 
         while (ip < bytecodes.Length)
@@ -592,7 +453,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             byte bytecode = bytecodes[ip++];
 
             // Update IP
-            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+            _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
             // Increment and check instruction counter (one count per bytecode executed)
             _instructionCount++;
@@ -601,7 +462,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             if (_selectorTraceEnabled && _instructionCount % 10000 == 0)
             {
                 var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
-                var ctxReceiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.CONTEXT_RECEIVER_INDEX);
+                var ctxReceiverOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_RECEIVER_INDEX);
                 var className = GetClassName(GetClass(ctxReceiverOOP));
                 Console.WriteLine($"[{_instructionCount / 1000}K instructions] In: {className}>>{methodLocalId}, IP={ip-1}");
             }
@@ -652,73 +513,12 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             }
 
             // Re-read IP in case bytecode modified it (jumps)
-            ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            ipOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
             ip = ipOOP.AsSmallInteger();
         }
 
         // If we fall off the end, return self
         return HandleReturn(receiverOOP);
-    }
-
-    /// <summary>
-    /// Adds a context to the size-specific pool for reuse.
-    /// CRITICAL: Only pool contexts that are truly dead (no longer referenced anywhere).
-    /// </summary>
-    private void AddContextToPool(SmalltalkOOP contextOOP)
-    {
-        // NEVER pool the active context
-        if (contextOOP == _activeContextOOP)
-        {
-            // if (_verboseDebugMode)
-            //     Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's the active context!");
-            return;
-        }
-
-        // NEVER pool a context that's in the active context's sender chain
-        if (IsInSenderChain(contextOOP, _activeContextOOP))
-        {
-            // if (_verboseDebugMode)
-            //     Console.WriteLine($"[POOL] SKIPPED pooling {contextOOP} - it's in the sender chain of {_activeContextOOP}");
-            return;
-        }
-
-        int size = _heapManager.GetIndexedSize(contextOOP);
-        if (!_contextPools.TryGetValue(size, out var poolForSize))
-        {
-            poolForSize = new Stack<SmalltalkOOP>();
-            _contextPools[size] = poolForSize;
-        }
-        if (poolForSize.Count < MAX_POOLED_CONTEXTS_PER_SIZE)
-        {
-            poolForSize.Push(contextOOP);
-            // if (_verboseDebugMode)
-            //     Console.WriteLine($"[POOL] Added {contextOOP} to pool (size {size}), pool now has {poolForSize.Count} contexts");
-        }
-    }
-
-    /// <summary>
-    /// Checks if a context is in the sender chain of another context.
-    /// </summary>
-    private bool IsInSenderChain(SmalltalkOOP contextToFind, SmalltalkOOP startContext)
-    {
-        int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
-        SmalltalkOOP current = startContext;
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
-
-        // Walk up the sender chain looking for contextToFind
-        for (int i = 0; i < 100; i++) // Limit iterations to prevent infinite loops
-        {
-            if (current == nilOOP || current == default)
-                return false;
-
-            var senderOOP = _heapManager.GetInstanceVariable(current, senderIndex);
-            if (senderOOP == contextToFind)
-                return true;
-
-            current = senderOOP;
-        }
-
-        return false;
     }
 
     /// <summary>
@@ -736,13 +536,13 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         if (_nonLocalReturnPending)
         {
             // if (_verboseDebugMode)
-            //     Console.WriteLine($"[HandleReturn NLR] Unwinding from {_activeContextOOP} to target {_nlrTargetContext}, value={_nlrValue}");
+            //     Console.WriteLine($"[HandleReturn NLR] Unwinding from {_contextManager.ActiveContext} to target {_nlrTargetContext}, value={_nlrValue}");
 
             // Check if current context is the NLR target
-            if (_activeContextOOP == _nlrTargetContext)
+            if (_contextManager.ActiveContext == _nlrTargetContext)
             {
                 // if (_verboseDebugMode)
-                //     Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_activeContextOOP}");
+                //     Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_contextManager.ActiveContext}");
 
                 // Target reached - clear NLR state and push value
                 _nonLocalReturnPending = false;
@@ -751,26 +551,26 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 _nlrTargetContext = default;
 
                 // Get sender to continue execution
-                senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
+                senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
 
                 // Add context to size-specific pool for reuse
-                AddContextToPool(_activeContextOOP);
+                _contextManager.AddContextToPool(_contextManager.ActiveContext);
 
                 // Decrement context depth
-                _activeContextCount--;
+                _contextManager.DecrementContextDepth();
 
                 // Check if target was the initial context
                 if (senderOOP == _initialContextOOP || senderOOP == SpecialObjectsArray.Instance.Nil)
                 {
                     _returnValue = nlrValue;
-                    _activeContextOOP = _initialContextOOP;
+                    _contextManager.SetActiveContext(_initialContextOOP);
                     // if (_verboseDebugMode)
                     //     Console.WriteLine($"[HandleReturn NLR] Returning to initial context");
                     return InterpreterStatus.Return;
                 }
 
                 // Switch to sender and push NLR value
-                _activeContextOOP = senderOOP;
+                _contextManager.SetActiveContext(senderOOP);
                 Push(nlrValue);
                 // if (_verboseDebugMode)
                 //     Console.WriteLine($"[HandleReturn NLR] Pushed NLR value onto sender {senderOOP}");
@@ -778,15 +578,15 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             }
 
             // Not the target - continue unwinding (don't push value)
-            senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
+            senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
             // if (_verboseDebugMode)
-            //     Console.WriteLine($"[HandleReturn NLR] Unwinding through {_activeContextOOP}, next sender={senderOOP}");
+            //     Console.WriteLine($"[HandleReturn NLR] Unwinding through {_contextManager.ActiveContext}, next sender={senderOOP}");
 
             // Add context to size-specific pool for reuse
-            AddContextToPool(_activeContextOOP);
+            _contextManager.AddContextToPool(_contextManager.ActiveContext);
 
             // Decrement context depth
-            _activeContextCount--;
+            _contextManager.DecrementContextDepth();
 
             // Check if we ran out of contexts (error case)
             if (senderOOP == SpecialObjectsArray.Instance.Nil)
@@ -797,24 +597,24 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             }
 
             // Continue unwinding
-            _activeContextOOP = senderOOP;
+            _contextManager.SetActiveContext(senderOOP);
             // if (_verboseDebugMode)
-            //     Console.WriteLine($"[HandleReturn NLR] Switched to sender {_activeContextOOP}, continuing unwinding");
+            //     Console.WriteLine($"[HandleReturn NLR] Switched to sender {_contextManager.ActiveContext}, continuing unwinding");
             return InterpreterStatus.Continue;
         }
 
         // Normal return (not NLR)
-        senderOOP = _heapManager.GetInstanceVariable(_activeContextOOP, senderIndex);
+        senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
 
         // if (_verboseDebugMode)
         // {
-        //     Console.WriteLine($"[HandleReturn] Normal return from {_activeContextOOP} to {senderOOP}");
+        //     Console.WriteLine($"[HandleReturn] Normal return from {_contextManager.ActiveContext} to {senderOOP}");
         //     Console.WriteLine($"  Return value: {returnValue} (SmallInt={returnValue.IsSmallInteger})");
         // }
 
         // DIAGNOSTIC: Track return values from hash/stringhash methods (disabled for quiet mode)
         // int methodIndex2 = VMConstants.CONTEXT_METHOD_INDEX;
-        // var returningMethodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex2);
+        // var returningMethodOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, methodIndex2);
         // string? methodLocalId = GetLocalId(returningMethodOOP);
         // if (methodLocalId != null && (methodLocalId.Contains(">>hash") || methodLocalId.Contains(">>stringhash")))
         // {
@@ -835,24 +635,24 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         }
 
         // Add context to size-specific pool for reuse
-        AddContextToPool(_activeContextOOP);
+        _contextManager.AddContextToPool(_contextManager.ActiveContext);
 
         // Decrement context depth
-        _activeContextCount--;
+        _contextManager.DecrementContextDepth();
 
         // Check if we're returning to the initial context
         if (senderOOP == _initialContextOOP || senderOOP == SpecialObjectsArray.Instance.Nil)
         {
             // Execution complete - return to caller
             _returnValue = returnValue;
-            _activeContextOOP = _initialContextOOP;
+            _contextManager.SetActiveContext(_initialContextOOP);
             // if (_verboseDebugMode)
             //     Console.WriteLine($"[HandleReturn] Execution complete, returning to initial context");
             return InterpreterStatus.Return;
         }
 
         // Switch to sender context and push return value
-        _activeContextOOP = senderOOP;
+        _contextManager.SetActiveContext(senderOOP);
         Push(returnValue);
         // if (_verboseDebugMode)
         //     Console.WriteLine($"  Pushed return value onto sender's stack");
@@ -872,7 +672,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         // Check if this is a BlockContext - they retrieve method from home MethodContext
-        var contextClassOOP = _heapManager.GetClassOOP(_activeContextOOP);
+        var contextClassOOP = _heapManager.GetClassOOP(_contextManager.ActiveContext);
         bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
 
         SmalltalkOOP methodOOP;
@@ -883,15 +683,15 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             // BlockContext: bytecode stored inline in parent method, receiver from home MethodContext
             // Blue Book design: BlockContext.startpc points to bytecode offset in parent method
             // With nested block support: traverse home chain to find the ultimate MethodContext
-            var methodContextOOP = FindMethodContext(_activeContextOOP);
+            var methodContextOOP = _contextManager.FindMethodContext(_contextManager.ActiveContext);
             methodOOP = _heapManager.GetInstanceVariable(methodContextOOP, methodIndex);
             receiverOOP = _heapManager.GetInstanceVariable(methodContextOOP, VMConstants.CONTEXT_RECEIVER_INDEX);
         }
         else
         {
             // MethodContext: method and receiver in instance variables
-            methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
-            receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+            methodOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, methodIndex);
+            receiverOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, receiverIndex);
         }
 
         // Diagnostic: Show method name when recursion depth > 10
@@ -924,12 +724,12 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         // Debug: Check what methodOOP we got
         if (methodOOP.IsSmallInteger)
         {
-            var activeClassName = _heapManager.GetClassName(_heapManager.GetClassOOP(_activeContextOOP));
-            var methodContextOOP = isBlockContext ? FindMethodContext(_activeContextOOP) : _activeContextOOP;
+            var activeClassName = _heapManager.GetClassName(_heapManager.GetClassOOP(_contextManager.ActiveContext));
+            var methodContextOOP = isBlockContext ? _contextManager.FindMethodContext(_contextManager.ActiveContext) : _contextManager.ActiveContext;
             var methodContextClassName = _heapManager.GetClassName(_heapManager.GetClassOOP(methodContextOOP));
             throw new InvalidOperationException(
                 $"ExecuteBytecodeLoop: methodOOP is SmallInteger!\n" +
-                $"  ActiveContext: {_activeContextOOP}, class={activeClassName}\n" +
+                $"  ActiveContext: {_contextManager.ActiveContext}, class={activeClassName}\n" +
                 $"  isBlockContext: {isBlockContext}\n" +
                 $"  methodContext: {methodContextOOP}, class={methodContextClassName}\n" +
                 $"  methodIndex: {methodIndex}\n" +
@@ -942,10 +742,10 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         {
             var className = GetClassName(GetClass(methodOOP));
             var localId = GetLocalId(methodOOP);
-            var contextClass = GetClassName(GetClass(_activeContextOOP));
+            var contextClass = GetClassName(GetClass(_contextManager.ActiveContext));
             throw new InvalidOperationException(
                 $"ExecuteBytecodeLoop: method field in context contains non-PointerIndexed object!\n" +
-                $"  Context: {_activeContextOOP}, contextClass={contextClass}\n" +
+                $"  Context: {_contextManager.ActiveContext}, contextClass={contextClass}\n" +
                 $"  Method field (index {methodIndex}): {methodOOP}\n" +
                 $"  Method format: {methodFormat} (expected PointerIndexed)\n" +
                 $"  Method class: {className}\n" +
@@ -955,7 +755,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         // TODO: Implement GetMethodBytecodes in heap manager or add helper method
         byte[] bytecodes = GetMethodBytecodes(methodOOP);
 
-        var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+        var ipOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
         int ip = ipOOP.AsSmallInteger();
 
         while (ip < bytecodes.Length)
@@ -1014,11 +814,11 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
 
             // if (_debugOptions.ShouldDebugBytecode)
             // {
-            //     Console.WriteLine($"[BYTECODE EXEC] context={_activeContextOOP}, ip={ip-1}, bytecode={opcodeName} ({opcodeBytes})");
+            //     Console.WriteLine($"[BYTECODE EXEC] context={_contextManager.ActiveContext}, ip={ip-1}, bytecode={opcodeName} ({opcodeBytes})");
             // }
 
             // Update IP
-            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+            _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
             // Execute the bytecode
             bool continueExecution = ExecuteBytecode(bytecode, methodOOP);
@@ -1027,7 +827,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             {
                 // if (_debugOptions.ShouldDebugBytecode)
                 // {
-                //     Console.WriteLine($"[BYTECODE RETURN] context={_activeContextOOP}, returning from bytecode loop");
+                //     Console.WriteLine($"[BYTECODE RETURN] context={_contextManager.ActiveContext}, returning from bytecode loop");
                 // }
                 // Check if this is a non-local return (block return bytecodes 0x7D/0x7E)
                 // If so, the return value is already in _nlrValue and we must not pop again
@@ -1041,7 +841,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             }
 
             // Re-read IP in case bytecode modified it (jumps)
-            ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            ipOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
             ip = ipOOP.AsSmallInteger();
         }
 
@@ -1062,7 +862,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         // }
 
         // Check if this is a BlockContext - they retrieve receiver from home MethodContext
-        var contextClassOOP = _heapManager.GetClassOOP(_activeContextOOP);
+        var contextClassOOP = _heapManager.GetClassOOP(_contextManager.ActiveContext);
         bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
 
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
@@ -1071,13 +871,13 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         if (isBlockContext)
         {
             // BlockContext: receiver from home MethodContext (slot 5 in BlockContext is HOME, not receiver!)
-            var methodContextOOP = FindMethodContext(_activeContextOOP);
+            var methodContextOOP = _contextManager.FindMethodContext(_contextManager.ActiveContext);
             receiverOOP = _heapManager.GetInstanceVariable(methodContextOOP, receiverIndex);
         }
         else
         {
             // MethodContext: receiver in instance variable
-            receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+            receiverOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, receiverIndex);
         }
 
         // Push receiver variable 0-15 (0x00-0x0F)
@@ -1097,12 +897,12 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
 
             if (VerboseDebug)
             {
-                var contextClass = _heapManager.GetClassOOP(_activeContextOOP);
+                var contextClass = _heapManager.GetClassOOP(_contextManager.ActiveContext);
                 string contextType = (contextClass == _metadata.BlockContextClassOOP) ? "BlockContext" : "MethodContext";
-                Console.WriteLine($"[PUSH_TEMP] index={index}, activeContext={_activeContextOOP} ({contextType})");
+                Console.WriteLine($"[PUSH_TEMP] index={index}, activeContext={_contextManager.ActiveContext} ({contextType})");
             }
 
-            var valueOOP = GetTemporaryVariable(_activeContextOOP, index);
+            var valueOOP = GetTemporaryVariable(_contextManager.ActiveContext, index);
 
             if (VerboseDebug)
             {
@@ -1243,7 +1043,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         {
             int index = BytecodeUtil.PopStoreTempIndex(bytecode);
             var valueOOP = Pop();
-            SetTemporaryVariable(_activeContextOOP, index, valueOOP);
+            SetTemporaryVariable(_contextManager.ActiveContext, index, valueOOP);
             return true;
         }
 
@@ -1309,7 +1109,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 {
                     // Check if we're in a BlockContext by reading slot 5 (home field)
                     var homeOOP = _heapManager.GetInstanceVariable(
-                        _activeContextOOP,
+                        _contextManager.ActiveContext,
                         VMConstants.BLOCKCONTEXT_HOME_INDEX  // Slot 5
                     );
 
@@ -1320,7 +1120,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                         var targetContextOOP = homeOOP;
 
                         // Validate home is still in sender chain (not already returned)
-                        if (!IsInSenderChain(targetContextOOP, _activeContextOOP))
+                        if (!_contextManager.IsInSenderChain(targetContextOOP, _contextManager.ActiveContext))
                         {
                             throw new InvalidOperationException(
                                 "Block return failed: home context has already returned");
@@ -1348,7 +1148,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
 
                     // Check if we're in a BlockContext by reading slot 5 (home field)
                     var homeOOP = _heapManager.GetInstanceVariable(
-                        _activeContextOOP,
+                        _contextManager.ActiveContext,
                         VMConstants.BLOCKCONTEXT_HOME_INDEX  // Slot 5, NOT lexicalParent (slot 4)!
                     );
 
@@ -1358,7 +1158,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                         var targetContextOOP = homeOOP;
 
                         // Validate target is in sender chain (safety check)
-                        if (!IsInSenderChain(targetContextOOP, _activeContextOOP))
+                        if (!_contextManager.IsInSenderChain(targetContextOOP, _contextManager.ActiveContext))
                         {
                             throw new InvalidOperationException(
                                 "Non-local return target not in sender chain - block's defining method has already returned");
@@ -1393,7 +1193,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         // Push active context (0x89) - used for blockCopy: primitive
         if (bytecode == (byte)Bytecode.PUSH_ACTIVE_CONTEXT)
         {
-            Push(_activeContextOOP);
+            Push(_contextManager.ActiveContext);
             return true;
         }
 
@@ -1402,9 +1202,9 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         {
             int distance = (bytecode - 0x90) + 1; // Jump 1-8 bytes
             int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-            var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            var ipOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
             int currentIp = ipOOP.AsSmallInteger();
-            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
+            _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
             return true;
         }
 
@@ -1413,13 +1213,13 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         {
             byte[] bytecodes = GetMethodBytecodes(methodOOP);
             int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-            var ipOOP2 = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            var ipOOP2 = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
             int currentIp = ipOOP2.AsSmallInteger();
 
             byte distanceByte = bytecodes[currentIp++];
             int distance = distanceByte + 1; // Distance is encoded as (distance - 1)
 
-            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
+            _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
             return true;
         }
 
@@ -1428,7 +1228,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         {
             byte[] bytecodes = GetMethodBytecodes(methodOOP);
             int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-            var ipOOP3 = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            var ipOOP3 = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
             int currentIp = ipOOP3.AsSmallInteger();
 
             int numBytes = bytecode - 0x9F; // 0xA1 => 2 bytes, 0xA2 => 3 bytes, etc.
@@ -1439,7 +1239,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             }
             distance += 1; // Distance is encoded as (distance - 1)
 
-            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
+            _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
             return true;
         }
 
@@ -1448,7 +1248,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         {
             int offset = bytecode - 0xA8;  // 0xA8 => jump back 0 (nop), 0xA9 => back 1, ..., 0xAF => back 7
             int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-            var ipOOP4 = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+            var ipOOP4 = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
             int currentIp = ipOOP4.AsSmallInteger();
 
             // Jump backward by offset bytes
@@ -1463,7 +1263,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                     $"(currentIp={currentIp}, newIp={newIp})");
             }
 
-            _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(newIp));
+            _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(newIp));
             return true;
         }
 
@@ -1506,9 +1306,9 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             var argOOP = Pop();
             var receiverOOP2 = Pop();
 
-            // Console.WriteLine($"[SEND1 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
+            // Console.WriteLine($"[SEND1 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_contextManager.ActiveContext}");
             var outcome1 = SendMessage(receiverOOP2, selectorOOP, new[] { argOOP });
-            // Console.WriteLine($"[SEND1 AFTER] Message outcome.Kind={outcome1.Kind}, context={_activeContextOOP}");
+            // Console.WriteLine($"[SEND1 AFTER] Message outcome.Kind={outcome1.Kind}, context={_contextManager.ActiveContext}");
             if (!ConsumeCallOutcome(outcome1)) return false;
             // Console.WriteLine($"[SEND1 PUSHED] Pushed result onto stack");
             return true;
@@ -1527,9 +1327,9 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             var arg1OOP = Pop();
             var receiverOOP2 = Pop();
 
-            // Console.WriteLine($"[SEND2 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_activeContextOOP}");
+            // Console.WriteLine($"[SEND2 BEFORE] About to send message, receiver={receiverOOP2}, selector={GetSymbolName(selectorOOP)}, context={_contextManager.ActiveContext}");
             var outcome2 = SendMessage(receiverOOP2, selectorOOP, new[] { arg1OOP, arg2OOP });
-            // Console.WriteLine($"[SEND2 AFTER] Message outcome.Kind={outcome2.Kind}, context={_activeContextOOP}");
+            // Console.WriteLine($"[SEND2 AFTER] Message outcome.Kind={outcome2.Kind}, context={_contextManager.ActiveContext}");
             if (!ConsumeCallOutcome(outcome2)) return false;
             // Console.WriteLine($"[SEND2 PUSHED] Pushed result onto stack");
             return true;
@@ -1547,19 +1347,19 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         int ipIndex = VMConstants.CONTEXT_PC_INDEX;
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
-        var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+        var ipOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
         int ip = ipOOP.AsSmallInteger();
         byte subOp = bytecodes[ip++];
-        _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
-        var receiverOOP = _heapManager.GetInstanceVariable(_activeContextOOP, receiverIndex);
+        var receiverOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, receiverIndex);
 
         switch (subOp)
         {
             case 0x00: // PUSH_IVAR - Push instance variable at any index
                 {
                     byte index = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = _heapManager.GetInstanceVariable(receiverOOP, index);
                     Push(valueOOP);
                     return true;
@@ -1568,7 +1368,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x01: // STORE_IVAR - Store to instance variable without popping
                 {
                     byte index = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
                     _heapManager.SetInstanceVariable(receiverOOP, index, valueOOP);
                     Push(valueOOP); // Leave value on stack
@@ -1578,7 +1378,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x02: // POP_STORE_IVAR - Pop and store to instance variable
                 {
                     byte index = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
                     _heapManager.SetInstanceVariable(receiverOOP, index, valueOOP);
                     return true;
@@ -1588,8 +1388,8 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 // Uses BlockContext home chain traversal for proper variable access
                 {
                     byte index = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var valueOOP = GetTemporaryVariable(_activeContextOOP, index);
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    var valueOOP = GetTemporaryVariable(_contextManager.ActiveContext, index);
                     Push(valueOOP);
                     return true;
                 }
@@ -1598,9 +1398,9 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 // Uses BlockContext home chain traversal for proper variable access
                 {
                     byte index = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Peek(); // Don't pop - STORE keeps value on stack
-                    SetTemporaryVariable(_activeContextOOP, index, valueOOP);
+                    SetTemporaryVariable(_contextManager.ActiveContext, index, valueOOP);
                     return true;
                 }
 
@@ -1608,16 +1408,16 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 // Uses BlockContext home chain traversal for proper variable access
                 {
                     byte index = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
-                    SetTemporaryVariable(_activeContextOOP, index, valueOOP);
+                    SetTemporaryVariable(_contextManager.ActiveContext, index, valueOOP);
                     return true;
                 }
 
             case 0x06: // PUSH_LITERAL - Push literal constant at any index
                 {
                     byte index = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var literal = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
                     Push(literal);
                     return true;
@@ -1626,7 +1426,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x07: // PUSH_LITERAL_VAR - Push literal variable (association value or qualified pool var)
                 {
                     byte index = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var literalOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
                     // Check if this is an Association (unqualified variable) or Array (qualified pool variable)
@@ -1701,7 +1501,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x08: // STORE_LITERAL_VAR - Store to literal variable without popping
                 {
                     byte index = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
@@ -1713,7 +1513,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x09: // POP_STORE_LITERAL_VAR - Pop and store to literal variable (class/global variable)
                 {
                     byte index = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = Pop();
                     var associationOOP = GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
@@ -1754,7 +1554,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x0A: // SEND_0 - Send with 0 args
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var receiver = Pop();
                     var outcome = SendMessage(receiver, selectorOOP, Array.Empty<SmalltalkOOP>());
@@ -1764,7 +1564,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x0B: // SEND_1 - Send with 1 arg
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var arg = Pop();
                     var receiver = Pop();
@@ -1775,7 +1575,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x0C: // SEND_2 - Send with 2 args
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var arg2 = Pop();
                     var arg1 = Pop();
@@ -1788,7 +1588,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 {
                     byte selectorIndex = bytecodes[ip++];
                     byte argCount = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
                     var args = new SmalltalkOOP[argCount];
@@ -1804,7 +1604,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x0E: // SEND_SUPER_0 - Send to super with 0 args
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var receiver = Pop();
                     var outcome = SendSuperMessage(receiver, selectorOOP, Array.Empty<SmalltalkOOP>());
@@ -1814,7 +1614,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x0F: // SEND_SUPER_1 - Send to super with 1 arg
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var arg = Pop();
                     var receiver = Pop();
@@ -1825,7 +1625,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x10: // SEND_SUPER_2 - Send to super with 2 args
                 {
                     byte selectorIndex = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
                     var arg2 = Pop();
                     var arg1 = Pop();
@@ -1838,7 +1638,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 {
                     byte selectorIndex = bytecodes[ip++];
                     byte argCount = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var selectorOOP = GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
                     var args = new SmalltalkOOP[argCount];
@@ -1860,13 +1660,13 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             case 0x13: // DUP - Duplicate top of stack
                 {
                     int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-                    var spOOP = _heapManager.GetInstanceVariable(_activeContextOOP, spIndex);
+                    var spOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, spIndex);
                     int sp = spOOP.AsSmallInteger();
                     if (sp <= 0)
                     {
                         throw new InvalidOperationException("Stack underflow on DUP");
                     }
-                    var valueOOP = _heapManager.GetIndexedOOP(_activeContextOOP, sp - 1);
+                    var valueOOP = _heapManager.GetIndexedOOP(_contextManager.ActiveContext, sp - 1);
                     Push(valueOOP);
                     return true;
                 }
@@ -1875,14 +1675,14 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 {
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = Pop();
 
                     if (valueOOP == SpecialObjectsArray.Instance.True)
                     {
-                        _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
+                        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
                     return true;
                 }
@@ -1891,14 +1691,14 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 {
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = Pop();
 
                     if (valueOOP == SpecialObjectsArray.Instance.False)
                     {
-                        _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
+                        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
                     return true;
                 }
@@ -1910,7 +1710,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                     int offset = (offsetHigh << 8) | offsetLow;
                     int newIP = ip + offset;
                     // Console.WriteLine($"[JUMP] from IP={ip-2} offset={offset} to newIP={newIP}, method={GetLocalId(methodOOP)}");
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(newIP));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(newIP));
                     return true;
                 }
 
@@ -1918,14 +1718,14 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 {
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = Pop();
 
                     if (valueOOP == SpecialObjectsArray.Instance.True)
                     {
-                        _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
+                        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
                     return true;
                 }
@@ -1934,14 +1734,14 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                 {
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = Pop();
 
                     if (valueOOP == SpecialObjectsArray.Instance.False)
                     {
-                        _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
+                        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
                     return true;
                 }
@@ -1951,7 +1751,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
                     byte offsetHigh = bytecodes[ip++];
                     byte offsetLow = bytecodes[ip++];
                     int offset = (offsetHigh << 8) | offsetLow;
-                    _heapManager.SetInstanceVariable(_activeContextOOP, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
+                    _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     return true;
                 }
 
@@ -2077,7 +1877,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             }
 
             // Call primitive 80 (blockCopy:) - receiver is the active context
-            var blockContextOOP = ControlPrimitives.BlockCopy(this, _activeContextOOP, new[] { nargsOOP, argStartIndexOOP });
+            var blockContextOOP = ControlPrimitives.BlockCopy(this, _contextManager.ActiveContext, new[] { nargsOOP, argStartIndexOOP });
 
             // Push the new BlockContext onto the stack
             Push(blockContextOOP);
@@ -2177,11 +1977,11 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         // that contains the currently executing method, NOT from the receiver's class.
 
         // CRITICAL FIX: Read the method from the correct context
-        // When executing inside a block, _activeContextOOP is a BlockContext, and we need to walk to home MethodContext.
-        // When executing in a method, _activeContextOOP is already a MethodContext.
+        // When executing inside a block, _contextManager.ActiveContext is a BlockContext, and we need to walk to home MethodContext.
+        // When executing in a method, _contextManager.ActiveContext is already a MethodContext.
 
         // Check if we're in a BlockContext or MethodContext
-        var contextClass = GetClassName(_heapManager.GetSlot(_activeContextOOP, 0));
+        var contextClass = GetClassName(_heapManager.GetSlot(_contextManager.ActiveContext, 0));
         SmalltalkOOP methodContextOOP;
 
         if (contextClass == "BlockContext")
@@ -2189,7 +1989,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             // We're in a block - walk to the home MethodContext
             // For nested blocks, home might be another BlockContext
             // Must traverse the home chain to find the ultimate MethodContext
-            methodContextOOP = FindMethodContext(_activeContextOOP);
+            methodContextOOP = _contextManager.FindMethodContext(_contextManager.ActiveContext);
 
             // if (_debugOptions.ShouldDebugMessages)
             // {
@@ -2199,12 +1999,12 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         else if (contextClass == "MethodContext")
         {
             // We're already in a MethodContext
-            methodContextOOP = _activeContextOOP;
+            methodContextOOP = _contextManager.ActiveContext;
         }
         else
         {
             throw new InvalidOperationException(
-                $"Super send requires MethodContext or BlockContext, but _activeContextOOP is {contextClass}.");
+                $"Super send requires MethodContext or BlockContext, but _contextManager.ActiveContext is {contextClass}.");
         }
 
         // Now read the method from the MethodContext (slot 3)
@@ -2264,7 +2064,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         if (_selectorTraceEnabled && _instructionCount < 5000)
         {
             var recvClass = GetClassName(GetClass(receiverOOP));
-            var currentMethod = GetLocalId(_heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.CONTEXT_METHOD_INDEX)) ?? "unknown";
+            var currentMethod = GetLocalId(_heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_METHOD_INDEX)) ?? "unknown";
             Console.WriteLine($"[SEND #{_instructionCount}] {recvClass}>>{selectorName} (from {currentMethod})");
             
             // Special alert for error: sends
@@ -2278,8 +2078,8 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         // The InterpreterLoop will continue execution in the new context
 
         // Create new context with current context as sender
-        _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _activeContextOOP);
-        // Console.WriteLine($"[SendMessage AFTER CreateMethodContext] _activeContextOOP = {_activeContextOOP}");
+        _contextManager.SetActiveContext(_contextManager.CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _contextManager.ActiveContext));
+        // Console.WriteLine($"[SendMessage AFTER CreateMethodContext] _contextManager.ActiveContext = {_contextManager.ActiveContext}");
 
         // Signal context switch - InterpreterLoop will continue in new context
         return CallOutcome.ContextSwitch();
@@ -2361,7 +2161,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
             Console.WriteLine($"   Receiver class: {className} OOP({classOOP.RawValue})");
             Console.WriteLine($"   Arguments: {args.Length}");
             Console.WriteLine("\nSmalltalk Context Chain:");
-            DumpSenderChain(_activeContextOOP, 10);
+            DumpSenderChain(_contextManager.ActiveContext, 10);
 
             throw new InvalidOperationException(
                 $"Method not found: {selectorName ?? "<unknown>"} in class {className} OOP({classOOP.RawValue})");
@@ -2412,7 +2212,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         // }
 
         // Create new context with current context as sender
-        _activeContextOOP = CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _activeContextOOP);
+        _contextManager.SetActiveContext(_contextManager.CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _contextManager.ActiveContext));
 
         // Selector trace: log method entry
         if (_selectorTraceEnabled)
@@ -2462,10 +2262,10 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         // Non-local return
         if (outcome.Kind == CallOutcomeKind.NonLocalReturn)
         {
-            // Console.WriteLine($"[CONSUME NLR] target={outcome.TargetContextOop}, activeContext={_activeContextOOP}, match={outcome.TargetContextOop == _activeContextOOP}");
+            // Console.WriteLine($"[CONSUME NLR] target={outcome.TargetContextOop}, activeContext={_contextManager.ActiveContext}, match={outcome.TargetContextOop == _contextManager.ActiveContext}");
 
             // If NLR targets this context, this context must return immediately with the provided value.
-            if (outcome.TargetContextOop == _activeContextOOP)
+            if (outcome.TargetContextOop == _contextManager.ActiveContext)
             {
                 // Console.WriteLine($"[NLR TARGET MATCH] Stopping execution, returning value={outcome.Value}");
                 // push the return value and signal method-return
@@ -2553,29 +2353,29 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         Console.WriteLine();
 
         // Display temps (if in active context)
-        if (_activeContextOOP != SmalltalkOOP.Null)
+        if (_contextManager.ActiveContext != SmalltalkOOP.Null)
         {
             Console.WriteLine($"TEMPORARIES ({tempCount}):");
             for (int i = 0; i < tempCount; i++)
             {
-                var tempOOP = _heapManager.GetIndexedOOP(_activeContextOOP, i);
+                var tempOOP = _heapManager.GetIndexedOOP(_contextManager.ActiveContext, i);
                 Console.WriteLine($"  temp{i} = {DescribeValue(tempOOP)}");
             }
             Console.WriteLine();
         }
 
         // Display stack
-        if (_activeContextOOP != SmalltalkOOP.Null)
+        if (_contextManager.ActiveContext != SmalltalkOOP.Null)
         {
             int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
-            var stackpOOP = _heapManager.GetInstanceVariable(_activeContextOOP, stackpIndex);
+            var stackpOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, stackpIndex);
             int stackp = stackpOOP.AsSmallInteger();
 
             Console.WriteLine($"STACK (sp={stackp}):");
             int stackStart = tempCount;
             for (int i = stackStart; i < stackp; i++)
             {
-                var stackOOP = _heapManager.GetIndexedOOP(_activeContextOOP, i);
+                var stackOOP = _heapManager.GetIndexedOOP(_contextManager.ActiveContext, i);
                 Console.WriteLine($"  [{i - stackStart}] = {DescribeValue(stackOOP)}");
             }
         }
@@ -2605,25 +2405,25 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         // Replace method and receiver
-        _heapManager.SetInstanceVariable(_activeContextOOP, methodIndex, methodOOP);
-        _heapManager.SetInstanceVariable(_activeContextOOP, receiverIndex, receiverOOP);
+        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, methodIndex, methodOOP);
+        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, receiverIndex, receiverOOP);
 
         // Reset PC to start of method
-        _heapManager.SetInstanceVariable(_activeContextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
+        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, pcIndex, SmalltalkOOP.FromSmallInteger(0));
 
         // Reset stack pointer to after args+temps
-        _heapManager.SetInstanceVariable(_activeContextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
+        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
 
         // Replace arguments
         for (int i = 0; i < header.NumArgs; i++)
         {
-            _heapManager.SetIndexedOOP(_activeContextOOP, i, arguments[i]);
+            _heapManager.SetIndexedOOP(_contextManager.ActiveContext, i, arguments[i]);
         }
 
         // Clear temps to nil
         for (int i = header.NumArgs; i < header.NumArgs + header.NumTemps; i++)
         {
-            _heapManager.SetIndexedOOP(_activeContextOOP, i, SpecialObjectsArray.Instance.Nil);
+            _heapManager.SetIndexedOOP(_contextManager.ActiveContext, i, SpecialObjectsArray.Instance.Nil);
         }
 
         // Note: sender stays the same - we return to the same place
@@ -2640,13 +2440,13 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         {
             // Get current PC
             int pcIndex = VMConstants.CONTEXT_PC_INDEX;
-            var pcOOP = _heapManager.GetInstanceVariable(_activeContextOOP, pcIndex);
+            var pcOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, pcIndex);
             if (!pcOOP.IsSmallInteger) return false;
             int currentPC = pcOOP.AsSmallInteger();
 
             // Get method
             int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
-            var methodOOP = _heapManager.GetInstanceVariable(_activeContextOOP, methodIndex);
+            var methodOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, methodIndex);
 
             // Get bytecodes from method (last indexed item is the bytecode array OOP)
             int literalCount = _heapManager.GetIndexedSize(methodOOP);
@@ -2769,7 +2569,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     private void DumpStack(string label)
     {
         Console.WriteLine($"  [{label}] STACK:");
-        var stackpOOP = _heapManager.GetInstanceVariable(_activeContextOOP, VMConstants.CONTEXT_STACKP_INDEX);
+        var stackpOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_STACKP_INDEX);
         int stackp = stackpOOP.AsSmallInteger();
 
         Console.WriteLine($"    stackp={stackp}");
@@ -2778,7 +2578,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         int startIdx = Math.Max(0, stackp - 5);
         for (int i = startIdx; i < stackp; i++)
         {
-            var value = _heapManager.GetIndexedOOP(_activeContextOOP, VMConstants.CONTEXT_TEMP_FRAME_START + i);
+            var value = _heapManager.GetIndexedOOP(_contextManager.ActiveContext, VMConstants.CONTEXT_TEMP_FRAME_START + i);
             string valueDesc = value.IsSmallInteger ? $"SmallInteger({value.AsSmallInteger()})" :
                                value == SpecialObjectsArray.Instance.Nil ? "nil" :
                                $"{_heapManager.GetClassName(value)} OOP({value})";
@@ -2877,21 +2677,21 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
 
         // Get receiver from current context (blocks inherit self)
         var currentReceiverOOP = _heapManager.GetInstanceVariable(
-            _activeContextOOP,
+            _contextManager.ActiveContext,
             VMConstants.CONTEXT_RECEIVER_INDEX
         );
 
         // Create MethodContext for block execution
-        var blockContextOOP = CreateMethodContext(
+        var blockContextOOP = _contextManager.CreateMethodContext(
             blockMethodOOP,
             currentReceiverOOP,
             args,
-            _activeContextOOP      // sender = current context (return point)
+            _contextManager.ActiveContext      // sender = current context (return point)
         );
 
         // Switch to block context
-        var previousContext = _activeContextOOP;
-        _activeContextOOP = blockContextOOP;
+        var previousContext = _contextManager.ActiveContext;
+        _contextManager.SetActiveContext(blockContextOOP);
 
         if (_verboseDebugMode)
         {
@@ -2920,42 +2720,6 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
 
 
 
-
-
-
-
-
-
-    // TODO: Implement using lexicalParent field (Single-Context Architecture)
-    /// <summary>
-    /// Finds the ultimate MethodContext by traversing the home chain.
-    /// With nested block support, home can point to BlockContext → BlockContext → MethodContext.
-    /// This traverses until it finds a MethodContext.
-    /// </summary>
-    private SmalltalkOOP FindMethodContext(SmalltalkOOP contextOOP)
-    {
-        var currentOOP = contextOOP;
-        int depth = 0;
-        const int MAX_DEPTH = 100;
-
-        while (depth < MAX_DEPTH)
-        {
-            var contextClassOOP = _heapManager.GetClassOOP(currentOOP);
-            bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
-
-            if (!isBlockContext)
-            {
-                // Found a MethodContext (or something that's not a BlockContext)
-                return currentOOP;
-            }
-
-            // It's a BlockContext - traverse to its home
-            currentOOP = _heapManager.GetInstanceVariable(currentOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-            depth++;
-        }
-
-        throw new InvalidOperationException($"FindMethodContext: Max traversal depth exceeded (depth={MAX_DEPTH})");
-    }
 
     /// <summary>
     /// Gets the local ID for an object (used for blockOwnerMap lookup).
@@ -3064,7 +2828,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     // These delegate to the existing private methods while maintaining encapsulation
     SmalltalkOOP IVMHelpers.GetClass(SmalltalkOOP objectOOP) => GetClass(objectOOP);
     string IVMHelpers.GetClassName(SmalltalkOOP classOOP) => GetClassName(classOOP);
-    SmalltalkOOP IVMHelpers.FindMethodContext(SmalltalkOOP contextOOP) => FindMethodContext(contextOOP);
+    SmalltalkOOP IVMHelpers.FindMethodContext(SmalltalkOOP contextOOP) => _contextManager.FindMethodContext(contextOOP);
     MethodHeaderInfo IVMHelpers.ParseMethodHeader(SmalltalkOOP methodOOP) => ParseMethodHeader(methodOOP);
 
     /// <summary>
@@ -3103,7 +2867,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     /// <returns>True if target is in sender chain</returns>
     private bool IsInSenderChain(SmalltalkOOP targetOOP)
     {
-        var currentOOP = _activeContextOOP;
+        var currentOOP = _contextManager.ActiveContext;
         int depth = 0;
         const int MAX_DEPTH = 5000;
 
@@ -3450,7 +3214,7 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
     void IPrimitiveContext.SetActiveContext(SmalltalkOOP newContextOOP)
     {
         // Switch to new context and signal that a primitive switched contexts
-        _activeContextOOP = newContextOOP;
+        _contextManager.SetActiveContext(newContextOOP);
         _contextSwitchedByPrimitive = true;
     }
 
@@ -3571,14 +3335,14 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
 
     SmalltalkOOP IPrimitiveContext.GetActiveContext()
     {
-        return _activeContextOOP;
+        return _contextManager.ActiveContext;
     }
 
     int IPrimitiveContext.GetInstructionPointer()
     {
         // Get the instruction pointer from the active context
         int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-        var ipOOP = _heapManager.GetInstanceVariable(_activeContextOOP, ipIndex);
+        var ipOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
         return ipOOP.AsSmallInteger();
     }
 
@@ -3692,19 +3456,19 @@ public partial class VirtualMachine : IPrimitiveContext, IVMHelpers
         }
 
         // Set up the block context for execution
-        _heapManager.SetInstanceVariable(blockContextOOP, senderIndex, _activeContextOOP); // Current context becomes sender
+        _heapManager.SetInstanceVariable(blockContextOOP, senderIndex, _contextManager.ActiveContext); // Current context becomes sender
         _heapManager.SetInstanceVariable(blockContextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(startPC)); // Set PC to start of block
         _heapManager.SetInstanceVariable(blockContextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(expectedArgCount)); // Stack pointer after args
 
         // Save current context and switch to block context
-        var previousContext = _activeContextOOP;
-        _activeContextOOP = blockContextOOP;
+        var previousContext = _contextManager.ActiveContext;
+        _contextManager.SetActiveContext(blockContextOOP);
 
         // Execute the block
         var result = ExecuteBytecodeLoop();
 
         // Restore previous context
-        _activeContextOOP = previousContext;
+        _contextManager.SetActiveContext(previousContext);
 
         return result;
     }
