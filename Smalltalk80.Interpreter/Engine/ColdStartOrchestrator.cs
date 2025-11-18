@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Engine.LoaderPhases;
+using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
@@ -175,7 +176,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches
-        var phase5 = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics);
+        var phase5 = new Phase5Orchestrator(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics);
         _phases.Add(phase5);
         RunPhase(phase5.Name, () =>
         {
