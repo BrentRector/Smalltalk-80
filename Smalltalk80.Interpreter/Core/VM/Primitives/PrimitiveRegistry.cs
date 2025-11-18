@@ -1,0 +1,240 @@
+using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Core.Memory;
+
+namespace Smalltalk80.Interpreter.Core.VM.Primitives;
+
+/// <summary>
+/// Registry and dispatch for primitive operations.
+/// Supports both new IPrimitive interface and legacy PrimitiveFunction for gradual migration.
+/// </summary>
+public class PrimitiveRegistry : IPrimitiveRegistry
+{
+    private readonly Dictionary<int, IPrimitive> _primitives = new();
+    private readonly Dictionary<int, PrimitiveFunction> _legacyPrimitives = new();
+
+    /// <inheritdoc/>
+    public int Count => _primitives.Count + _legacyPrimitives.Count;
+
+    /// <inheritdoc/>
+    public void Register(int primitiveNumber, IPrimitive primitive)
+    {
+        // Remove legacy version if exists (migration)
+        _legacyPrimitives.Remove(primitiveNumber);
+        _primitives[primitiveNumber] = primitive;
+    }
+
+    /// <inheritdoc/>
+    public void RegisterLegacy(int primitiveNumber, PrimitiveFunction function)
+    {
+        // Only register legacy if no new implementation exists
+        if (!_primitives.ContainsKey(primitiveNumber))
+        {
+            _legacyPrimitives[primitiveNumber] = function;
+        }
+    }
+
+    /// <inheritdoc/>
+    public bool IsRegistered(int primitiveNumber)
+    {
+        return _primitives.ContainsKey(primitiveNumber) || _legacyPrimitives.ContainsKey(primitiveNumber);
+    }
+
+    /// <inheritdoc/>
+    public PrimitiveResult Execute(int primitiveNumber, PrimitiveExecutionContext context)
+    {
+        // Try new interface first
+        if (_primitives.TryGetValue(primitiveNumber, out var primitive))
+        {
+            return primitive.Execute(context);
+        }
+
+        // Fall back to legacy - need to create a legacy context wrapper
+        // This path is for primitives not yet migrated
+        if (_legacyPrimitives.TryGetValue(primitiveNumber, out var legacyFunc))
+        {
+            // We need an IPrimitiveContext to call legacy primitives
+            // This will be provided by the caller during transition
+            throw new InvalidOperationException(
+                $"Primitive {primitiveNumber} is registered as legacy but called via new interface. " +
+                "Use ExecuteLegacy() during migration period.");
+        }
+
+        // Primitive not found
+        return PrimitiveResult.Fail();
+    }
+
+    /// <inheritdoc/>
+    public SmalltalkOOP ExecuteLegacy(int primitiveNumber, IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
+    {
+        // Try new interface first - adapt to legacy calling convention
+        if (_primitives.TryGetValue(primitiveNumber, out var primitive))
+        {
+            // Create execution context from legacy context
+            var execContext = new PrimitiveExecutionContext(
+                receiver,
+                args,
+                ctx.HeapManager,
+                platform: ctx.PlatformBridge
+            );
+
+            var result = primitive.Execute(execContext);
+            ctx.PrimitiveSuccess = result.Success;
+            return result.Value;
+        }
+
+        // Fall back to legacy
+        if (_legacyPrimitives.TryGetValue(primitiveNumber, out var legacyFunc))
+        {
+            ctx.PrimitiveSuccess = true; // Set success flag before calling
+            return legacyFunc(ctx, receiver, args);
+        }
+
+        // Primitive not found
+        ctx.PrimitiveSuccess = false;
+        return SpecialObjectsArray.Instance.Nil;
+    }
+
+    /// <summary>
+    /// Creates a registry with all legacy primitives registered.
+    /// Used during migration period to maintain backward compatibility.
+    /// </summary>
+    /// <returns>Registry with all legacy primitives from PrimitiveTable.</returns>
+    public static PrimitiveRegistry CreateWithLegacyPrimitives()
+    {
+        var registry = new PrimitiveRegistry();
+
+        // SmallInteger Arithmetic primitives (1-17)
+        registry.RegisterLegacy(1, ArithmeticPrimitives.Add);
+        registry.RegisterLegacy(2, ArithmeticPrimitives.Subtract);
+        registry.RegisterLegacy(3, ArithmeticPrimitives.LessThan);
+        registry.RegisterLegacy(4, ArithmeticPrimitives.GreaterThan);
+        registry.RegisterLegacy(5, ArithmeticPrimitives.LessOrEqual);
+        registry.RegisterLegacy(6, ArithmeticPrimitives.GreaterOrEqual);
+        registry.RegisterLegacy(7, ArithmeticPrimitives.Equal);
+        registry.RegisterLegacy(8, ArithmeticPrimitives.NotEqual);
+        registry.RegisterLegacy(9, ArithmeticPrimitives.Multiply);
+        registry.RegisterLegacy(10, ArithmeticPrimitives.Divide);
+        registry.RegisterLegacy(11, ArithmeticPrimitives.Mod);
+        registry.RegisterLegacy(12, ArithmeticPrimitives.Div);
+        registry.RegisterLegacy(13, ArithmeticPrimitives.Quo);
+        registry.RegisterLegacy(14, ArithmeticPrimitives.BitAnd);
+        registry.RegisterLegacy(15, ArithmeticPrimitives.BitOr);
+        registry.RegisterLegacy(16, ArithmeticPrimitives.BitXor);
+        registry.RegisterLegacy(17, ArithmeticPrimitives.BitShift);
+
+        // Point primitives (18)
+        registry.RegisterLegacy(18, PointPrimitives.MakePoint);
+
+        // LargeInteger primitives (21-37)
+        registry.RegisterLegacy(21, LargeIntegerPrimitives.Add);
+        registry.RegisterLegacy(22, LargeIntegerPrimitives.Subtract);
+        registry.RegisterLegacy(23, LargeIntegerPrimitives.LessThan);
+        registry.RegisterLegacy(24, LargeIntegerPrimitives.GreaterThan);
+        registry.RegisterLegacy(25, LargeIntegerPrimitives.LessOrEqual);
+        registry.RegisterLegacy(26, LargeIntegerPrimitives.GreaterOrEqual);
+        registry.RegisterLegacy(27, LargeIntegerPrimitives.Equal);
+        registry.RegisterLegacy(28, LargeIntegerPrimitives.NotEqual);
+        registry.RegisterLegacy(29, LargeIntegerPrimitives.Multiply);
+        registry.RegisterLegacy(30, LargeIntegerPrimitives.Divide);
+        registry.RegisterLegacy(31, LargeIntegerPrimitives.Mod);
+        registry.RegisterLegacy(32, LargeIntegerPrimitives.Div);
+        registry.RegisterLegacy(33, LargeIntegerPrimitives.Quo);
+        registry.RegisterLegacy(34, LargeIntegerPrimitives.BitAnd);
+        registry.RegisterLegacy(35, LargeIntegerPrimitives.BitOr);
+        registry.RegisterLegacy(36, LargeIntegerPrimitives.BitXor);
+        registry.RegisterLegacy(37, LargeIntegerPrimitives.BitShift);
+
+        // Float primitives (40-54)
+        registry.RegisterLegacy(40, FloatPrimitives.AsFloat);
+        registry.RegisterLegacy(41, FloatPrimitives.Add);
+        registry.RegisterLegacy(42, FloatPrimitives.Subtract);
+        registry.RegisterLegacy(43, FloatPrimitives.LessThan);
+        registry.RegisterLegacy(44, FloatPrimitives.GreaterThan);
+        registry.RegisterLegacy(45, FloatPrimitives.LessOrEqual);
+        registry.RegisterLegacy(46, FloatPrimitives.GreaterOrEqual);
+        registry.RegisterLegacy(47, FloatPrimitives.Equal);
+        registry.RegisterLegacy(48, FloatPrimitives.NotEqual);
+        registry.RegisterLegacy(49, FloatPrimitives.Multiply);
+        registry.RegisterLegacy(50, FloatPrimitives.Divide);
+        registry.RegisterLegacy(51, FloatPrimitives.Truncated);
+        registry.RegisterLegacy(52, FloatPrimitives.FractionPart);
+        registry.RegisterLegacy(53, FloatPrimitives.Exponent);
+        registry.RegisterLegacy(54, FloatPrimitives.TimesTwoPower);
+
+        // Array/Object primitives (60-78, 110-111)
+        registry.RegisterLegacy(60, ObjectPrimitives.At);
+        registry.RegisterLegacy(61, ObjectPrimitives.AtPut);
+        registry.RegisterLegacy(62, ObjectPrimitives.Size);
+        registry.RegisterLegacy(63, ObjectPrimitives.StringAt);
+        registry.RegisterLegacy(64, ObjectPrimitives.StringAtPut);
+        registry.RegisterLegacy(65, ObjectPrimitives.Next);
+        registry.RegisterLegacy(66, ObjectPrimitives.NextPut);
+        registry.RegisterLegacy(67, ObjectPrimitives.AtEnd);
+        registry.RegisterLegacy(68, ObjectPrimitives.ObjectAt);
+        registry.RegisterLegacy(69, ObjectPrimitives.ObjectAtPut);
+        registry.RegisterLegacy(70, ObjectPrimitives.New);
+        registry.RegisterLegacy(71, ObjectPrimitives.NewWithSize);
+        registry.RegisterLegacy(72, ObjectPrimitives.Become);
+        registry.RegisterLegacy(73, ObjectPrimitives.InstVarAt);
+        registry.RegisterLegacy(74, ObjectPrimitives.InstVarAtPut);
+        registry.RegisterLegacy(75, ObjectPrimitives.Hash);
+        registry.RegisterLegacy(76, ArithmeticPrimitives.AsObject);
+        registry.RegisterLegacy(77, ObjectPrimitives.SomeInstance);
+        registry.RegisterLegacy(78, ObjectPrimitives.NextInstance);
+        registry.RegisterLegacy(110, ObjectPrimitives.IdentityEquals);
+        registry.RegisterLegacy(111, ObjectPrimitives.Class);
+
+        // CompiledMethod primitives (79)
+        registry.RegisterLegacy(79, CompiledMethodPrimitives.NewMethodHeader);
+
+        // Control/Block primitives (80-89)
+        registry.RegisterLegacy(80, ControlPrimitives.BlockCopy);
+        registry.RegisterLegacy(81, ControlPrimitives.Value);
+        registry.RegisterLegacy(82, ControlPrimitives.ValueWithArguments);
+        registry.RegisterLegacy(83, ControlPrimitives.Perform);
+        registry.RegisterLegacy(84, ControlPrimitives.PerformWith);
+        registry.RegisterLegacy(85, ControlPrimitives.Signal);
+        registry.RegisterLegacy(86, ControlPrimitives.Wait);
+        registry.RegisterLegacy(87, ControlPrimitives.Resume);
+        registry.RegisterLegacy(88, ControlPrimitives.Suspend);
+        registry.RegisterLegacy(89, ControlPrimitives.FlushCache);
+
+        // Input primitives (90-95)
+        registry.RegisterLegacy(90, InputPrimitives.MousePoint);
+        registry.RegisterLegacy(91, InputPrimitives.CursorLocPut);
+        registry.RegisterLegacy(92, InputPrimitives.CursorLink);
+        registry.RegisterLegacy(93, InputPrimitives.InputSemaphore);
+        registry.RegisterLegacy(94, InputPrimitives.SampleInterval);
+        registry.RegisterLegacy(95, InputPrimitives.InputWord);
+
+        // Graphics primitives (96-104)
+        registry.RegisterLegacy(96, GraphicsPrimitives.CopyBits);
+        registry.RegisterLegacy(97, GraphicsPrimitives.Snapshot);
+        registry.RegisterLegacy(98, GraphicsPrimitives.OopsLeft);
+        registry.RegisterLegacy(99, GraphicsPrimitives.CoreLeft);
+        registry.RegisterLegacy(100, GraphicsPrimitives.TimeWords);
+        registry.RegisterLegacy(101, GraphicsPrimitives.BeDisplay);
+        registry.RegisterLegacy(102, GraphicsPrimitives.BeCursor);
+        registry.RegisterLegacy(103, GraphicsPrimitives.Beep);
+        registry.RegisterLegacy(104, GraphicsPrimitives.ClipboardText);
+
+        // String primitives (105-106)
+        registry.RegisterLegacy(105, StringPrimitives.StringReplace);
+        registry.RegisterLegacy(106, StringPrimitives.AsSymbol);
+
+        // System primitives (112-139)
+        registry.RegisterLegacy(112, SystemPrimitives.CoreLeft);
+        registry.RegisterLegacy(113, SystemPrimitives.Quit);
+        registry.RegisterLegacy(114, SystemPrimitives.ExitToDebugger);
+        registry.RegisterLegacy(115, SystemPrimitives.OopsLeft);
+        registry.RegisterLegacy(116, SystemPrimitives.SignalAtOopsLeftWordsLeft);
+        registry.RegisterLegacy(128, SystemPrimitives.SomeInstance);
+        registry.RegisterLegacy(129, SystemPrimitives.NextInstance);
+        registry.RegisterLegacy(130, SystemPrimitives.BecomeForward);
+        registry.RegisterLegacy(131, SystemPrimitives.InstanceCount);
+        registry.RegisterLegacy(133, SystemPrimitives.ForceGC);
+        registry.RegisterLegacy(139, SystemPrimitives.NextObject);
+
+        return registry;
+    }
+}
