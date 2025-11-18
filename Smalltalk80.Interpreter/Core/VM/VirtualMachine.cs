@@ -41,6 +41,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     private readonly IMessageDispatcher _messageDispatcher;
     private readonly IBytecodeInterpreter _bytecodeInterpreter;
     private readonly IVMDebugger _debugger;
+    private readonly IPrimitiveRegistry _primitiveRegistry;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -184,6 +185,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             _contextManager,
             this // IVMDebugHelpers
         );
+
+        // Initialize primitive registry with legacy primitives
+        // Can switch to CreateWithNewPrimitives() to test new IPrimitive implementations
+        _primitiveRegistry = Primitives.PrimitiveRegistry.CreateWithLegacyPrimitives();
     }
 
     /// <summary>
