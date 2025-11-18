@@ -17,7 +17,9 @@
 - Organized files into proper directory structure
 - Replaced generic names with descriptive, intent-revealing names
 
-**Ready for**: Phase 1 (VirtualMachine Decomposition)
+**Ready for**: Architecture Refactoring Phase 1 (VirtualMachine Decomposition)
+
+**👉 NEW SESSION? START HERE**: Read `SESSION-HANDOFF.md` for complete handoff context and step-by-step instructions.
 
 ---
 
@@ -163,47 +165,40 @@ Systematic refactoring to improve codebase navigability and prepare for architec
 
 ---
 
-## Next Steps: Architecture Refactoring Phases 4-6
+## Next Steps: Architecture Refactoring
 
-The naming cleanup (Phases 0-3) is complete. The next major work is **architecture decomposition** to break up monolithic files and establish formal API boundaries.
+The naming cleanup is complete. The next major work is **architecture decomposition** to break up monolithic files and establish formal API boundaries.
 
-### Phase 4: VirtualMachine.cs Decomposition (NEXT)
+**📖 Complete Plan**: See `SESSION-HANDOFF.md` for detailed step-by-step instructions.
+
+### Phase 1: VirtualMachine.cs Decomposition (NEXT - 2-3 days)
 
 **Goal**: Break up 4,639-line VirtualMachine.cs into focused components
 
-**Target**:
-- VirtualMachine.cs currently has 8+ responsibilities
-- Extract: BytecodeDispatcher, StackManipulation, ContextManagement, MessageSending
-- Estimated: 2-3 weeks
+**Approach**: Extract in 5 steps (lowest risk first):
+1. **StackManager** (2-3 hours) - Stack operations
+2. **ContextManager** (3-4 hours) - Context creation & switching
+3. **MessageDispatcher** (4-5 hours) - Method lookup & sending
+4. **BytecodeInterpreter** (5-6 hours) - Bytecode dispatch
+5. **Integration** (2-3 hours) - VirtualMachine orchestration
 
-**Reference**: See `docs/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md` Section 3.1
+**Validation**: After EVERY step, run regression test suite
+```bash
+dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
+# Must return: DiagPow10=111111111, DiagZero=110110110, TestRunner=1191
+```
 
-### Phase 5: Primitives Subsystem Refactoring
+### Phase 2: Primitive System Refactoring (Future)
 
-**Goal**: Organize 16 primitive files into logical groups
+**Goal**: Break circular dependency between VM and Primitives
 
-**Current Issues**:
-- Circular dependency: VM ↔ Primitives
-- No formal API boundary
-- Mixed responsibilities
+**Reference**: See `docs/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md` Section 6.2 Phase 1
 
-**Solution**:
-- Create IPrimitiveContext interface
-- Group primitives by domain (arithmetic, array, control, process, etc.)
-- Break circular dependency via dependency injection
+### Phase 3: Additional Subsystem Cleanup (Future)
 
-**Reference**: See `docs/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md` Section 3.2
+**Goal**: Heap manager, compiler integration, snapshot I/O
 
-### Phase 6: Heap Manager Subsystem Cleanup
-
-**Goal**: Separate heap management concerns
-
-**Target**:
-- ObjectTable, GC, snapshot I/O currently mixed
-- Extract GC into separate component
-- Formalize IHeapManager interface
-
-**Reference**: See `docs/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md` Section 3.3
+**Reference**: See `docs/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md` for complete timeline
 
 ---
 
@@ -331,27 +326,27 @@ dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
 
 ## Resuming Work
 
-When resuming this session:
+**🎯 For New Sessions**:
 
-1. **Context**: We're in the middle of a systematic refactoring effort
-2. **Completed**: Phases 0-3 (naming cleanup)
-3. **Next**: Phase 4 (VirtualMachine.cs decomposition)
-4. **Reference**: All plans documented in `docs/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md`
-5. **Validation**: After EVERY change, run `dotnet build && dotnet run` to ensure 31/46 init expressions still pass
+1. **READ THIS FIRST**: `SESSION-HANDOFF.md` - Complete handoff context with step-by-step Phase 1 instructions
+2. **Then Review**: This document (RESUME-PROMPT.md) for historical context
+3. **Detailed Plan**: `docs/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md` for overall architecture
 
-**Quick orientation**:
+**Quick Validation** (verify interpreter works before starting):
 ```bash
-# See current status
-git log --oneline -10
-git status
-
-# Review refactoring plan
-cat docs/ARCHITECTURE_ANALYSIS_AND_REFACTORING_PLAN.md | head -200
-
-# Validate interpreter still works
 cd Smalltalk80.Interpreter
-dotnet build && dotnet run
+dotnet build
+dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
+
+# Expected output:
+#   [290] DiagPow10 initialize... Returned: 111111111 ✅
+#   [291] DiagZero initialize... Returned: 110110110 ✅
+#   [292] BlockContextTestRunner initialize... Returned: 1191 ✅
 ```
+
+**If all 3 tests pass, you're ready to begin Phase 1, Step 1 (StackManager extraction)**
+
+See `SESSION-HANDOFF.md` for detailed instructions on what to do next.
 
 ---
 
