@@ -27,6 +27,14 @@ Analysis of 153 C# files (34,651 total lines) in the Smalltalk80.Interpreter cod
 **Priority**: High
 **Effort**: Medium (requires careful extraction maintaining performance)
 
+**Tasks**:
+- [ ] Analyze VirtualMachine.cs to identify extraction boundaries
+- [ ] Create `InterpreterOrchestrator.cs` with interpreter loop logic
+- [ ] Create `NonLocalReturnHandler.cs` with NLR state management
+- [ ] Update VirtualMachine to delegate to new components
+- [ ] Verify all tests pass after extraction
+- [ ] Update documentation to reflect new structure
+
 ---
 
 ### 1.2 Program.cs Contains Duplicated Bytecode Disassembly
@@ -42,6 +50,13 @@ Analysis of 153 C# files (34,651 total lines) in the Smalltalk80.Interpreter cod
 
 **Priority**: High
 **Effort**: Low (straightforward refactor)
+
+**Tasks**:
+- [ ] Compare `DisassembleBytecodes()` with `BytecodeDecompiler` functionality
+- [ ] Add any missing features to `BytecodeDecompiler` if needed
+- [ ] Update `DumpInitExpressionDebugInfo()` to use `BytecodeDecompiler`
+- [ ] Remove `DisassembleBytecodes()` and `CountInstructions()` from Program.cs
+- [ ] Test verbose debug output still works correctly
 
 ---
 
@@ -63,6 +78,16 @@ Then `IBytecodeContext` can aggregate these as needed.
 **Priority**: High
 **Effort**: Medium (refactoring existing implementations)
 
+**Tasks**:
+- [ ] Create `IStackOperations` interface
+- [ ] Create `INonLocalReturnState` interface
+- [ ] Create `IMethodAccess` interface
+- [ ] Create `IMessageSender` interface
+- [ ] Refactor `IBytecodeContext` to inherit from new interfaces
+- [ ] Update `VirtualMachine` implementation
+- [ ] Update `BytecodeInterpreter` to use specific interfaces where possible
+- [ ] Verify compilation and tests pass
+
 ---
 
 ### 1.4 Duplicate HeapManagerTests Files
@@ -80,6 +105,12 @@ Then `IBytecodeContext` can aggregate these as needed.
 
 **Priority**: High
 **Effort**: Low (file reorganization)
+
+**Tasks**:
+- [ ] Move `Core/HeapManager/HeapManagerTests.cs` to `Tests/HeapManagerSmokeTests.cs`
+- [ ] Update namespace to `Smalltalk80.Interpreter.Tests`
+- [ ] Update any references to the old location
+- [ ] Verify build succeeds
 
 ---
 
@@ -100,6 +131,12 @@ Then `IBytecodeContext` can aggregate these as needed.
 
 **Priority**: Medium
 **Effort**: Low
+
+**Tasks**:
+- [ ] Update `VMDebugger` to use `IVMHelpers` instead of `IVMDebugHelpers`
+- [ ] Remove `IVMDebugHelpers.cs` file
+- [ ] Update any other references to `IVMDebugHelpers`
+- [ ] Verify compilation succeeds
 
 ---
 
@@ -125,6 +162,13 @@ Then `IBytecodeContext` can aggregate these as needed.
 **Priority**: Medium
 **Effort**: Low (rename refactor)
 
+**Tasks**:
+- [ ] Rename `IVMHelpers` to `IObjectMetadataAccessor` (or merge into IBytecodeContext)
+- [ ] Rename `VMUtilities` to `SmallIntegerOperations` or split by function
+- [ ] Rename `ClassHierarchyUtils` to `ClassHierarchyTraversal`
+- [ ] Update all references throughout codebase
+- [ ] Verify compilation succeeds
+
 ---
 
 ### 2.3 DiagnosticInspector.cs Misplaced
@@ -137,6 +181,12 @@ Then `IBytecodeContext` can aggregate these as needed.
 
 **Priority**: Medium
 **Effort**: Low
+
+**Tasks**:
+- [ ] Move `DiagnosticInspector.cs` to `Core/Diagnostics/`
+- [ ] Update namespace to `Smalltalk80.Interpreter.Core.Diagnostics`
+- [ ] Update using statements in files that reference it
+- [ ] Verify compilation succeeds
 
 ---
 
@@ -158,9 +208,20 @@ These are approaching the 1,500 line limit.
 **Priority**: Medium
 **Effort**: Medium
 
+**Tasks**:
+- [ ] Analyze Phase3_ObjectAllocation.cs for extraction candidates
+- [ ] Create `Phase3/ObjectDescriptorResolver.cs`
+- [ ] Create `Phase3/ArrayAllocator.cs`
+- [ ] Refactor Phase3 to use new components
+- [ ] Analyze Phase4_MethodCompilation.cs for extraction candidates
+- [ ] Create `Phase4/MethodCompiler.cs`
+- [ ] Create `Phase4/LiteralFrameBuilder.cs`
+- [ ] Refactor Phase4 to use new components
+- [ ] Verify cold start succeeds after refactoring
+
 ---
 
-### 2.5 24 TODO Comments Need Triage
+### 2.5 TODO Comments Need Triage
 
 **Issue**: 24 TODO/FIXME comments scattered across the codebase. Some are substantial:
 - "Implement NonLocalReturnException" (BytecodeInterpreter.cs)
@@ -176,6 +237,14 @@ These are approaching the 1,500 line limit.
 
 **Priority**: Medium
 **Effort**: Low (documentation/tracking)
+
+**Tasks**:
+- [ ] Run grep to find all TODO/FIXME comments
+- [ ] Categorize TODOs as: substantial, obsolete, or minor
+- [ ] Remove obsolete TODOs
+- [ ] Create GitHub issues for substantial TODOs
+- [ ] Update remaining TODOs with issue numbers
+- [ ] Document any deferred implementation decisions
 
 ---
 
@@ -194,6 +263,13 @@ These are approaching the 1,500 line limit.
 **Priority**: Low
 **Effort**: Low
 
+**Tasks**:
+- [ ] Decide whether to split primitive files (optional)
+- [ ] If splitting, create `ObjectAccessPrimitives.cs` (at:, at:put:, size, etc.)
+- [ ] If splitting, create `ObjectIdentityPrimitives.cs` (==, class, etc.)
+- [ ] Update `PrimitiveRegistry` registrations
+- [ ] Verify all primitives still work
+
 ---
 
 ### 3.2 Missing XML Documentation
@@ -208,6 +284,14 @@ These are approaching the 1,500 line limit.
 
 **Priority**: Low
 **Effort**: Medium
+
+**Tasks**:
+- [ ] Audit interfaces for missing XML documentation
+- [ ] Add documentation to `IStackManager` methods
+- [ ] Add documentation to `IContextManager` methods
+- [ ] Add documentation to `IMessageDispatcher` methods
+- [ ] Add documentation to complex private methods
+- [ ] Run documentation generation to verify completeness
 
 ---
 
@@ -228,6 +312,12 @@ string[] items = ["a", "b", "c"];
 
 **Priority**: Low
 **Effort**: Low
+
+**Tasks**:
+- [ ] Search for `new[]` and `new List<` patterns
+- [ ] Update to collection expressions where appropriate
+- [ ] Verify compilation succeeds
+- [ ] Consider adding analyzer rule for consistency
 
 ---
 
@@ -286,23 +376,23 @@ The static registries (`GlobalRegistry`, `SymbolRegistry`, `AssociationRegistry`
 ## Recommended Implementation Order
 
 1. **Quick wins first** (1-2 hours each):
-   - 1.4 Duplicate HeapManagerTests
-   - 2.3 DiagnosticInspector location
-   - 1.2 Remove duplicated DisassembleBytecodes
+   - [ ] 1.4 Duplicate HeapManagerTests
+   - [ ] 2.3 DiagnosticInspector location
+   - [ ] 1.2 Remove duplicated DisassembleBytecodes
 
 2. **Interface cleanup** (half day):
-   - 2.1 Remove IVMDebugHelpers
-   - 1.3 Split IBytecodeContext
-   - 2.2 Rename generic helpers
+   - [ ] 2.1 Remove IVMDebugHelpers
+   - [ ] 1.3 Split IBytecodeContext
+   - [ ] 2.2 Rename generic helpers
 
 3. **Major extractions** (1-2 days):
-   - 1.1 VirtualMachine decomposition
-   - 2.4 Phase3/Phase4 decomposition
+   - [ ] 1.1 VirtualMachine decomposition
+   - [ ] 2.4 Phase3/Phase4 decomposition
 
 4. **Housekeeping** (ongoing):
-   - 2.5 TODO triage
-   - 3.2 Documentation
-   - 3.3 Modern C# patterns
+   - [ ] 2.5 TODO triage
+   - [ ] 3.2 Documentation
+   - [ ] 3.3 Modern C# patterns
 
 ---
 
