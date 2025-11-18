@@ -1,6 +1,7 @@
 using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.Core.VM.Interpreter;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Attributes;
 
@@ -58,41 +59,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     /// <summary>Resets the instruction counter to zero. Used before executing init expressions.</summary>
     public void ResetInstructionCount() => _instructionCount = 0;
 
-    // Cursor creation loop diagnostics
-
-    // Call outcome used for NLR propagation and context switching in trampoline interpreter
-    private enum CallOutcomeKind { Normal, NonLocalReturn, VMException, ContextSwitch }
-
-    private readonly struct CallOutcome
-    {
-        public readonly CallOutcomeKind Kind;
-        public readonly SmalltalkOOP Value;
-        public readonly SmalltalkOOP TargetContextOop;
-        public readonly Exception? VMEx;
-
-        private CallOutcome(CallOutcomeKind kind, SmalltalkOOP value, SmalltalkOOP target, Exception? vmEx)
-        {
-            Kind = kind;
-            Value = value;
-            TargetContextOop = target;
-            VMEx = vmEx;
-        }
-
-        public static CallOutcome Normal(SmalltalkOOP value) => new(CallOutcomeKind.Normal, value, SmalltalkOOP.Null, null);
-        public static CallOutcome NonLocalReturn(SmalltalkOOP target, SmalltalkOOP value) => new(CallOutcomeKind.NonLocalReturn, value, target, null);
-        public static CallOutcome VMException(Exception ex) => new(CallOutcomeKind.VMException, SmalltalkOOP.Null, SmalltalkOOP.Null, ex);
-        public static CallOutcome ContextSwitch() => new(CallOutcomeKind.ContextSwitch, SmalltalkOOP.Null, SmalltalkOOP.Null, null);
-    }
-
-    // Trampoline interpreter execution status
-    private enum InterpreterStatus
-    {
-        Continue,  // Context switched - keep executing
-        Return,    // Execution complete - return value
-        Yield      // Temporary pause (for future use)
-    }
-
     // Trampoline state - used to avoid recursive ExecuteBytecodeLoop calls
+    // (CallOutcome, CallOutcomeKind, InterpreterStatus moved to Interpreter/ExecutionState.cs)
     private SmalltalkOOP _returnValue;  // Return value from execution
     private SmalltalkOOP _initialContextOOP;  // Starting context for this execution
     private bool _contextSwitchPending;  // Signal that a context switch occurred (for trampoline)
@@ -1386,7 +1354,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
                 // throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
                 return outcome.Value;
             case CallOutcomeKind.VMException:
-                throw outcome.VMEx!;
+                throw outcome.VMException!;
             default:
                 throw new InvalidOperationException("Unknown CallOutcome kind");
         }

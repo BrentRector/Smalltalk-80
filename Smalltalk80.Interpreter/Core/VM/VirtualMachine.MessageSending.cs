@@ -2,6 +2,7 @@ using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.Core.VM.Interpreter;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -302,7 +303,7 @@ public partial class VirtualMachine
 
         if (outcome.Kind == CallOutcomeKind.VMException)
         {
-            throw outcome.VMEx!;
+            throw outcome.VMException!;
         }
 
         if (outcome.Kind == CallOutcomeKind.ContextSwitch)
@@ -315,10 +316,10 @@ public partial class VirtualMachine
         // Non-local return
         if (outcome.Kind == CallOutcomeKind.NonLocalReturn)
         {
-            // Console.WriteLine($"[CONSUME NLR] target={outcome.TargetContextOop}, activeContext={_contextManager.ActiveContext}, match={outcome.TargetContextOop == _contextManager.ActiveContext}");
+            // Console.WriteLine($"[CONSUME NLR] target={outcome.TargetContext}, activeContext={_contextManager.ActiveContext}, match={outcome.TargetContext == _contextManager.ActiveContext}");
 
             // If NLR targets this context, this context must return immediately with the provided value.
-            if (outcome.TargetContextOop == _contextManager.ActiveContext)
+            if (outcome.TargetContext == _contextManager.ActiveContext)
             {
                 // Console.WriteLine($"[NLR TARGET MATCH] Stopping execution, returning value={outcome.Value}");
                 // push the return value and signal method-return
@@ -327,8 +328,8 @@ public partial class VirtualMachine
             }
 
             // Otherwise propagate as exception for callers to handle / continue unwinding
-            // Console.WriteLine($"[NLR PROPAGATE] Rethrowing exception to continue unwinding to {outcome.TargetContextOop}");
-            throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
+            // Console.WriteLine($"[NLR PROPAGATE] Rethrowing exception to continue unwinding to {outcome.TargetContext}");
+            throw new NonLocalReturnException(outcome.Value, outcome.TargetContext);
         }
 
         throw new InvalidOperationException("Unhandled CallOutcome kind");
