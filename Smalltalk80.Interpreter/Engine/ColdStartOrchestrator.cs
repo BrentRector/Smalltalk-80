@@ -26,7 +26,6 @@ public class ColdStartOrchestrator : IColdStartLoader
     private readonly ObjectGraphAllocator _allocator;
     private readonly ColdstartReport _report;
     private readonly string _bundlePath;
-    private readonly ColdStartDebugOptions _debugOptions;
 
     /// <summary>
     /// Maps localId strings to allocated OOP values.
@@ -79,14 +78,12 @@ public class ColdStartOrchestrator : IColdStartLoader
     /// <param name="bundle">The cold start bundle containing the Smalltalk image data.</param>
     /// <param name="heapManager">The heap manager for allocating objects.</param>
     /// <param name="bundlePath">Optional path to the bundle file for diagnostics.</param>
-    /// <param name="debugOptions">Optional debug options for diagnostic output.</param>
-    public ColdStartOrchestrator(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, string? bundlePath = null, ColdStartDebugOptions? debugOptions = null)
+    public ColdStartOrchestrator(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, string? bundlePath = null)
     {
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
         _heapManager = heapManager ?? throw new ArgumentNullException(nameof(heapManager));
         _allocator = new ObjectGraphAllocator(heapManager, bundle);
         _bundlePath = bundlePath ?? "coldstart.json";
-        _debugOptions = debugOptions ?? ColdStartDebugOptions.None;
 
         // Initialize SpecialObjectsArray (will be populated during Phase 3)
         SpecialObjectsArray.Initialize();
@@ -167,7 +164,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches
-        var phase5 = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _debugOptions);
+        var phase5 = new Phase5_GlobalsAndPatches(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report);
         _phases.Add(phase5);
         RunPhase(phase5.Name, () =>
         {

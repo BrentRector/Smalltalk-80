@@ -42,11 +42,6 @@ public partial class VirtualMachine
             // For nested blocks, home might be another BlockContext
             // Must traverse the home chain to find the ultimate MethodContext
             methodContextOOP = _contextManager.FindMethodContext(_contextManager.ActiveContext);
-
-            // if (_debugOptions.ShouldDebugMessages)
-            // {
-            //     Console.WriteLine($"[Super Send in Block] Walking from BlockContext to home MethodContext (oop={methodContextOOP})");
-            // }
         }
         else if (contextClass == "MethodContext")
         {

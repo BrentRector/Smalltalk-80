@@ -30,7 +30,7 @@ public static class Program
         try
         {
             // Parse command line arguments
-            var (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions, skipInitExpressions, executeExpression) = ParseCommandLine(args);
+            var (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, skipInitExpressions, executeExpression) = ParseCommandLine(args);
 
             if (!File.Exists(coldStartFile))
             {
@@ -48,19 +48,6 @@ public static class Program
                 Console.Error.WriteLine("                         (e.g., 'BlockContextTest testAllCombinations')");
                 Console.Error.WriteLine("  --verbose, -v          Enable verbose debugging (logs all method calls)");
                 Console.Error.WriteLine("  --coldstart-report=<path>  Write coldstart metrics to JSON file");
-                Console.Error.WriteLine("\nDebug Options:");
-                Console.Error.WriteLine("  Cold start diagnostics:");
-                Console.Error.WriteLine("    --debug-patches        Show patch application details");
-                Console.Error.WriteLine("    --debug-associations   Show association scanning and validation");
-                Console.Error.WriteLine("    --debug-classes        Show class resolution details");
-                Console.Error.WriteLine("    --debug-methods        Show method installation details");
-                Console.Error.WriteLine("    --debug-globals        Show global variable installation details");
-                Console.Error.WriteLine("  Runtime VM diagnostics:");
-                Console.Error.WriteLine("    --debug-bytecode       Show bytecode execution trace");
-                Console.Error.WriteLine("    --debug-messages       Show message send and method lookup trace");
-                Console.Error.WriteLine("  Post cold-start diagnostics:");
-                Console.Error.WriteLine("    --debug-diagnostics    Show diagnostic reports (ClassDescription, BuildFieldMap)");
-                Console.Error.WriteLine("  --debug-all              Enable all debug output");
                 Environment.Exit(1);
                 return;
             }
@@ -84,7 +71,7 @@ public static class Program
             // Create and run the loader
             Console.WriteLine("Starting cold start loader (6-phase)...");
 
-            var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, debugOptions);
+            var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile);
             loader.Run();
             var layoutResolver = loader.LayoutResolver;
 
@@ -113,21 +100,6 @@ public static class Program
             var gcStatsBefore = heapManager.GarbageCollect();
             Console.WriteLine($"  {gcStatsBefore.GetSummary()}");
 
-            // DIAGNOSTIC: Inspect ClassDescription.instanceVariables field (slot 4)
-            if (debugOptions.ShouldDebugDiagnostics)
-            {
-                Console.WriteLine("\n=== DIAGNOSTIC: Checking ClassDescription.instanceVariables ===");
-                InspectClassDescriptionInstanceVariables(heapManager, bundle);
-
-                // DIAGNOSTIC: Test RuntimeHeapAccessor.BuildFieldMap()
-                Console.WriteLine("\n=== DIAGNOSTIC: Testing RuntimeHeapAccessor.BuildFieldMap() ===");
-                TestBuildFieldMap(heapManager);
-
-                // DIAGNOSTIC: Inspect File class>>initialize method's literal frame
-                Console.WriteLine("\n=== DIAGNOSTIC: Checking File class>>initialize Literals AFTER Phase 4 ===");
-                InspectFileInitializeLiterals(heapManager, bundle);
-            }
-
             // Execute init expressions - Run normal init expressions to check for regressions
             bool executeInitExpressions = !skipInitExpressions;
             bool onlyRunTests = false; // DISABLED - Run normal init expressions for debugging
@@ -146,15 +118,7 @@ public static class Program
 
                 var vmMetadata = BuildVMMetadata(layoutResolver);
 
-                // Convert Engine.ColdStartDebugOptions to Core.VM.RuntimeDebugOptions for the VirtualMachine
-                var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.RuntimeDebugOptions
-                {
-                    ShouldDebugBytecode = debugOptions.ShouldDebugBytecode,
-                    ShouldDebugMessages = debugOptions.ShouldDebugMessages,
-                    ShouldDebugMethodLookup = debugOptions.ShouldDebugMessages // Method lookup is part of message debugging
-                };
-
-                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions: vmDebugOptions);
+                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;
@@ -564,15 +528,7 @@ public static class Program
 
                     var vmMetadata = BuildVMMetadata(layoutResolver);
 
-                    // Convert Engine.ColdStartDebugOptions to Core.VM.RuntimeDebugOptions for the VirtualMachine
-                    var vmDebugOptions = new Smalltalk80.Interpreter.Core.VM.RuntimeDebugOptions
-                    {
-                        ShouldDebugBytecode = debugOptions.ShouldDebugBytecode,
-                        ShouldDebugMessages = debugOptions.ShouldDebugMessages,
-                        ShouldDebugMethodLookup = debugOptions.ShouldDebugMessages
-                    };
-
-                    var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, debugOptions: vmDebugOptions);
+                    var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
                     vm.VerboseDebug = verboseDebug;
                     vm.InitializeSelectorCaches();
 
@@ -1115,7 +1071,7 @@ public static class Program
     /// Supports: --coldstart path, --dump-class ClassName, --verbose, --skip-init-expressions, etc.
     /// Default: coldstart.json in the compiler output directory (../net9.0/coldstart.json)
     /// </summary>
-    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, Smalltalk80.Interpreter.Engine.ColdStartDebugOptions debugOptions, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
+    private static (string coldStartFile, string? dumpClassName, bool verboseDebug, string? testFilter, string? reportOutput, bool skipInitExpressions, string? executeExpression) ParseCommandLine(string[] args)
     {
         string? coldStartFile = null;
         string? dumpClassName = null;
@@ -1124,7 +1080,6 @@ public static class Program
         string? reportOutput = null;
         bool skipInitExpressions = false;
         string? executeExpression = null;
-        var debugOptions = new Smalltalk80.Interpreter.Engine.ColdStartDebugOptions();
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -1160,42 +1115,6 @@ public static class Program
             {
                 reportOutput = args[i].Substring("--coldstart-report=".Length);
             }
-            else if (args[i] == "--debug-all")
-            {
-                debugOptions.DebugAll = true;
-            }
-            else if (args[i] == "--debug-patches")
-            {
-                debugOptions.DebugPatches = true;
-            }
-            else if (args[i] == "--debug-associations")
-            {
-                debugOptions.DebugAssociations = true;
-            }
-            else if (args[i] == "--debug-classes")
-            {
-                debugOptions.DebugClasses = true;
-            }
-            else if (args[i] == "--debug-methods")
-            {
-                debugOptions.DebugMethods = true;
-            }
-            else if (args[i] == "--debug-globals")
-            {
-                debugOptions.DebugGlobals = true;
-            }
-            else if (args[i] == "--debug-bytecode")
-            {
-                debugOptions.DebugBytecode = true;
-            }
-            else if (args[i] == "--debug-messages")
-            {
-                debugOptions.DebugMessages = true;
-            }
-            else if (args[i] == "--debug-diagnostics")
-            {
-                debugOptions.DebugDiagnostics = true;
-            }
         }
 
         // Default: coldstart.json in the compiler's output directory
@@ -1225,7 +1144,7 @@ public static class Program
             }
         }
 
-        return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, debugOptions, skipInitExpressions, executeExpression);
+        return (coldStartFile, dumpClassName, verboseDebug, testFilter, reportOutput, skipInitExpressions, executeExpression);
     }
 
     private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver)
