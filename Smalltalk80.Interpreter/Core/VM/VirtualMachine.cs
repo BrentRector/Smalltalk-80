@@ -2,6 +2,7 @@ using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core.VM.Interpreter;
+using Smalltalk80.Interpreter.Core.VM.Caching;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Attributes;
 
@@ -42,6 +43,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     private readonly IBytecodeInterpreter _bytecodeInterpreter;
     private readonly IVMDebugger _debugger;
     private readonly IPrimitiveRegistry _primitiveRegistry;
+    private readonly SelectorCache _selectorCache;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -71,11 +73,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     private SmalltalkOOP _nlrValue;  // Value to return
     private SmalltalkOOP _nlrTargetContext;  // Context to unwind to
 
-    // Cached selector OOPs for arithmetic bytecodes (0xB0-0xBF) - indexed by bytecode & 0x0F
-    private SmalltalkOOP[]? _arithmeticSelectorOOPs;
-
-    // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
-    private SmalltalkOOP[]? _specialSelectorOOPs;
 
     // Blue Book architectural constants are defined in VMConstants.cs
     // All context field indices are now static constants shared across the VM
@@ -151,6 +148,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         // Initialize primitive registry with new IPrimitive implementations
         // All 110 primitives migrated to IPrimitive pattern (2025-11-18)
         _primitiveRegistry = Primitives.PrimitiveRegistry.CreateWithNewPrimitives();
+
+        // Initialize selector cache (populated later via InitializeSelectorCaches)
+        _selectorCache = new SelectorCache(heapManager);
     }
 
     /// <summary>
@@ -159,100 +159,13 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     /// </summary>
     public void InitializeSelectorCaches()
     {
-        // Initialize arithmetic selector OOPs (bytecodes 0xB0-0xBF)
-        string[] arithmeticSelectors = new[]
-        {
-            "+", "-", "<", ">", "<=", ">=", "=", "~=",
-            "*", "/", "\\\\", "@", "bitShift:", "//", "bitAnd:", "bitOr:"
-        };
-
-        _arithmeticSelectorOOPs = new SmalltalkOOP[16];
-        for (int i = 0; i < arithmeticSelectors.Length; i++)
-        {
-            _arithmeticSelectorOOPs[i] = LookupSymbolInHeap(arithmeticSelectors[i]);
-        }
-
-        // Initialize special selector OOPs (bytecodes 0xC0-0xCF)
-        string[] specialSelectors = new[]
-        {
-            "at:", "at:put:", "size", "next", "nextPut:", "atEnd",
-            "==", "class", "blockCopy:", "value", "value:", "do:",
-            "new", "new:", "x", "y"
-        };
-
-        _specialSelectorOOPs = new SmalltalkOOP[16];
-        for (int i = 0; i < specialSelectors.Length; i++)
-        {
-            _specialSelectorOOPs[i] = LookupSymbolInHeap(specialSelectors[i]);
-        }
+        // Delegate to SelectorCache component
+        _selectorCache.Initialize();
 
         // Pass selector caches to bytecode interpreter
-        _bytecodeInterpreter.InitializeSelectorCaches(_arithmeticSelectorOOPs, _specialSelectorOOPs);
-    }
-
-    /// <summary>
-    /// Looks up a symbol in the Smalltalk heap by searching USTable.
-    /// CRITICAL: Uses heap-only access, no C# proxy data.
-    /// </summary>
-    private SmalltalkOOP LookupSymbolInHeap(string symbolName)
-    {
-        // Get USTable OOP
-        // NOTE: During VM initialization (cold start), GlobalRegistry is valid and contains USTable
-        // This is acceptable because VM initialization happens during cold start, not runtime
-        if (!GlobalRegistry.TryGet("USTable", out var ustableOOP))
-        {
-            throw new InvalidOperationException("USTable not found - cannot initialize selector caches. " +
-                "This method should only be called during cold start initialization.");
-        }
-
-        // USTable is an Array in the Smalltalk heap containing Symbol OOPs
-        int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
-
-        // Convert search string to bytes (Latin-1 encoding)
-        byte[] searchBytes = System.Text.Encoding.Latin1.GetBytes(symbolName);
-
-        // Search through USTable (Array-of-Arrays structure for collision chaining)
-        for (int i = 0; i < ustableSize; i++)
-        {
-            var bucketOOP = _heapManager.GetIndexedOOP(ustableOOP, i);
-
-            // Skip nil buckets (empty slots)
-            if (bucketOOP == nilOOP)
-                continue;
-
-            // Bucket is an Array of Symbols - iterate through it
-            int bucketSize = _heapManager.GetIndexedSize(bucketOOP);
-            for (int k = 0; k < bucketSize; k++)
-            {
-                var symbolOOP = _heapManager.GetIndexedOOP(bucketOOP, k);
-
-                // Skip nil slots (shouldn't happen, but defensive)
-                if (symbolOOP == nilOOP || symbolOOP.IsSmallInteger)
-                    continue;
-
-                // Compare Symbol bytes in heap
-                int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
-                if (symbolLength == searchBytes.Length)
-                {
-                    bool match = true;
-                    for (int j = 0; j < searchBytes.Length; j++)
-                    {
-                        byte symbolByte = _heapManager.GetIndexedByte(symbolOOP, j);
-                        if (symbolByte != searchBytes[j])
-                        {
-                            match = false;
-                            break;
-                        }
-                    }
-
-                    if (match)
-                        return symbolOOP;
-                }
-            }
-        }
-
-        throw new InvalidOperationException($"Symbol '{symbolName}' not found in USTable during selector cache initialization");
+        _bytecodeInterpreter.InitializeSelectorCaches(
+            _selectorCache.ArithmeticSelectors!,
+            _selectorCache.SpecialSelectors!);
     }
 
     /// <summary>
