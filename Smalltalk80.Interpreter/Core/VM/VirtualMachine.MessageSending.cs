@@ -7,6 +7,14 @@ namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
 /// Partial class containing message sending and call outcome handling methods.
+///
+/// This partial class contains:
+/// - SendMessage() / SendSuperMessage() - Method dispatch and invocation
+/// - ConsumeCallOutcome() - Handling return values and NLR propagation
+/// - DumpMethodStateOnError() - Detailed error diagnostics
+///
+/// These methods remain in VirtualMachine because they coordinate multiple components
+/// and access VM-internal state (instruction count, tracing, primitive execution).
 /// </summary>
 public partial class VirtualMachine
 {
@@ -421,95 +429,5 @@ public partial class VirtualMachine
         }
 
         Console.WriteLine(new string('=', 80) + "\n");
-    }
-
-    /// <summary>
-    /// Reuses the current context for a tail call by replacing method, receiver, and arguments.
-    /// This prevents context accumulation in recursive patterns like whileTrue:.
-    /// </summary>
-    private void ReuseContextForTailCall(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments)
-    {
-        var header = ParseMethodHeader(methodOOP);
-
-        // Validate argument count
-        if (arguments.Length != header.NumArgs)
-        {
-            throw new InvalidOperationException(
-                $"Tail call argument count mismatch: method expects {header.NumArgs} args, got {arguments.Length}");
-        }
-
-        // Get field indices
-        int pcIndex = VMConstants.CONTEXT_PC_INDEX;
-        int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
-        int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
-        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
-
-        // Replace method and receiver
-        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, methodIndex, methodOOP);
-        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, receiverIndex, receiverOOP);
-
-        // Reset PC to start of method
-        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, pcIndex, SmalltalkOOP.FromSmallInteger(0));
-
-        // Reset stack pointer to after args+temps
-        _heapManager.SetInstanceVariable(_contextManager.ActiveContext, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
-
-        // Replace arguments
-        for (int i = 0; i < header.NumArgs; i++)
-        {
-            _heapManager.SetIndexedOOP(_contextManager.ActiveContext, i, arguments[i]);
-        }
-
-        // Clear temps to nil
-        for (int i = header.NumArgs; i < header.NumArgs + header.NumTemps; i++)
-        {
-            _heapManager.SetIndexedOOP(_contextManager.ActiveContext, i, SpecialObjectsArray.Instance.Nil);
-        }
-
-        // Note: sender stays the same - we return to the same place
-        // Note: we don't increment _activeContextCount since we're reusing a context
-    }
-
-    /// <summary>
-    /// Checks if the current instruction pointer is at a tail call position.
-    /// A tail call occurs when the next bytecode after a message send is a return.
-    /// </summary>
-    private bool IsAtTailCallPosition()
-    {
-        try
-        {
-            // Get current PC
-            int pcIndex = VMConstants.CONTEXT_PC_INDEX;
-            var pcOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, pcIndex);
-            if (!pcOOP.IsSmallInteger) return false;
-            int currentPC = pcOOP.AsSmallInteger();
-
-            // Get method
-            int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
-            var methodOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, methodIndex);
-
-            // Get bytecodes from method (last indexed item is the bytecode array OOP)
-            int literalCount = _heapManager.GetIndexedSize(methodOOP);
-            if (literalCount == 0) return false;
-            var bytecodeArrayOOP = _heapManager.GetIndexedOOP(methodOOP, literalCount - 1);
-
-            // Get bytecode array bytes
-            int bytecodeLength = _heapManager.GetIndexedSize(bytecodeArrayOOP);
-            if (bytecodeLength == 0) return false;
-
-            // Check if next bytecode (after current send completes) is a return
-            // The send bytecode we just executed consumed some bytes, so we check currentPC+1
-            int nextPC = currentPC + 1;
-            if (nextPC >= bytecodeLength) return false;
-
-            byte nextBytecode = _heapManager.GetIndexedByte(bytecodeArrayOOP, nextPC);
-
-            // Check if it's a return bytecode
-            return BytecodeUtil.IsReturn(nextBytecode);
-        }
-        catch
-        {
-            return false;
-        }
     }
 }
