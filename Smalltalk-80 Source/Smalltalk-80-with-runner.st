@@ -42355,7 +42355,17 @@ n121212diag "DIAGNOSTIC: Use powers of 2 to identify which variables are accesse
 	 Bit 6 (64):  ia  = 64
 	 Bit 7 (128): it1 = 128
 	 Bit 8 (256): it2 = 256"
-	^[:oa | | ot1 ot2 | ot1 _ 2. ot2 _ 4. [:ma | | mt1 mt2 | mt1 _ 16. mt2 _ 32. [:ia | | it1 it2 | it1 _ 128. it2 _ 256. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 64] value: 8] value: 1! !
+	^[:oa | | ot1 ot2 | ot1 _ 2. ot2 _ 4. [:ma | | mt1 mt2 | mt1 _ 16. mt2 _ 32. [:ia | | it1 it2 | it1 _ 128. it2 _ 256. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 64] value: 8] value: 1!
+
+diagOa  "Return oa (expect 11)"  ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. oa] value: 644] value: 88] value: 11!
+diagOt1 "Return ot1 (expect 22)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. ot1] value: 644] value: 88] value: 11!
+diagOt2 "Return ot2 (expect 44)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. ot2] value: 644] value: 88] value: 11!
+diagMa  "Return ma (expect 88)"  ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. ma] value: 644] value: 88] value: 11!
+diagMt1 "Return mt1 (expect 166)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. mt1] value: 644] value: 88] value: 11!
+diagMt2 "Return mt2 (expect 322)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. mt2] value: 644] value: 88] value: 11!
+diagIa  "Return ia (expect 644)"  ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. ia] value: 644] value: 88] value: 11!
+diagIt1 "Return it1 (expect 188)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it1] value: 644] value: 88] value: 11!
+diagIt2 "Return it2 (expect 266)" ^[:oa | | ot1 ot2 | ot1 _ 22. ot2 _ 44. [:ma | | mt1 mt2 | mt1 _ 166. mt2 _ 322. [:ia | | it1 it2 | it1 _ 188. it2 _ 266. it2] value: 644] value: 88] value: 11! !
 
 "Mutation tests"
 !BlockContextTest methodsFor: 'mutation'!
@@ -42415,9 +42425,19 @@ initialize
 	sum := sum + (tester n012210).
 	sum := sum + (tester n210012).
 
-	"DIAGNOSTIC: Run n121212diag instead of n121212"
-	"Expected: 511 (all 9 variables), Previous actual: 1 (only oa)"
-	^(tester n121212diag)  "Return diagnostic result to decode which variables work"
+	"DIAGNOSTIC: Test each variable individually to detect aliasing
+	 Return format: (test_number * 1000) + actual_value
+	 Test 1: diagOa  (expect 11)
+	 Test 2: diagOt1 (expect 22)
+	 Test 3: diagOt2 (expect 44)
+	 Test 4: diagMa  (expect 88)
+	 Test 5: diagMt1 (expect 166)
+	 Test 6: diagMt2 (expect 322)
+	 Test 7: diagIa  (expect 644)
+	 Test 8: diagIt1 (expect 188)
+	 Test 9: diagIt2 (expect 266)"
+
+	^1000 + (tester diagOa)   "Returns 1000+actual (expect 1011)"
 
 	"Mutation tests: 3 tests (each should return 10)"
 	sum := sum + (tester mut1).

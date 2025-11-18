@@ -42,9 +42,19 @@ initialize
 	sum := sum + (tester n012210).
 	sum := sum + (tester n210012).
 
-	"DIAGNOSTIC: Run n121212diag instead of n121212"
-	"Expected: 511 (all 9 variables), Previous actual: 1 (only oa)"
-	^(tester n121212diag)  "Return diagnostic result to decode which variables work"
+	"DIAGNOSTIC: Test each variable individually to detect aliasing
+	 Return format: (test_number * 1000) + actual_value
+	 Test 1: diagOa  (expect 11)
+	 Test 2: diagOt1 (expect 22)
+	 Test 3: diagOt2 (expect 44)
+	 Test 4: diagMa  (expect 88)
+	 Test 5: diagMt1 (expect 166)
+	 Test 6: diagMt2 (expect 322)
+	 Test 7: diagIa  (expect 644)
+	 Test 8: diagIt1 (expect 188)
+	 Test 9: diagIt2 (expect 266)"
+
+	^1000 + (tester diagOa)   "Returns 1000+actual (expect 1011)"
 
 	"Mutation tests: 3 tests (each should return 10)"
 	sum := sum + (tester mut1).
