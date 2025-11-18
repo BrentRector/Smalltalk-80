@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
@@ -32,6 +34,7 @@ public class Phase4_MethodCompilation : IPhase
     private readonly IReadOnlyList<string> _symbols;
     private readonly IReadOnlyList<string> _strings;
     private readonly ColdstartReport _report;
+    private readonly IDiagnosticHub? _diagnostics;
 
     // Pool variable binding Array deduplication registry
     // Key: "PoolDictionaryName:KeySymbol", Value: 2-element Array OOP (#PoolName, #Key)
@@ -55,7 +58,8 @@ public class Phase4_MethodCompilation : IPhase
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
-        ColdstartReport report)
+        ColdstartReport report,
+        IDiagnosticHub? diagnostics = null)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -66,6 +70,7 @@ public class Phase4_MethodCompilation : IPhase
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _symbols = bundle.Symbols;
         _strings = bundle.Strings;
+        _diagnostics = diagnostics;
     }
 
     /// <summary>
@@ -909,7 +914,14 @@ public class Phase4_MethodCompilation : IPhase
             // Get the CompiledMethod object created earlier
             if (!_localIdToObjectId.TryGetValue(method.LocalId, out SmalltalkOOP methodOOP))
             {
-                Console.WriteLine($"[Phase4] WARNING: Method not found in localIdToObjectId: {method.LocalId}");
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Warning,
+                    Category = "Phase4",
+                    Message = $"Method not found in localIdToObjectId: {method.LocalId}",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
                 skippedMethods++;
                 continue;
             }
@@ -917,7 +929,14 @@ public class Phase4_MethodCompilation : IPhase
             // Resolve the home class object
             if (!_localIdToObjectId.TryGetValue(method.HomeClassLocalId, out SmalltalkOOP classOOP))
             {
-                Console.WriteLine($"[Phase4] WARNING: Home class not found: {method.HomeClassLocalId}");
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Warning,
+                    Category = "Phase4",
+                    Message = $"Home class not found: {method.HomeClassLocalId}",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
                 skippedMethods++;
                 continue;
             }
@@ -929,7 +948,14 @@ public class Phase4_MethodCompilation : IPhase
 
             if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
             {
-                Console.WriteLine($"[Phase4] WARNING: Class {method.HomeClassLocalId} has nil methodDict");
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Warning,
+                    Category = "Phase4",
+                    Message = $"Class {method.HomeClassLocalId} has nil methodDict",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
                 skippedMethods++;
                 continue;
             }

@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Schema;
@@ -19,6 +21,7 @@ public class Phase2_ClassInfrastructure : IPhase
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
     private readonly ColdstartReport _report;
+    private readonly IDiagnosticHub? _diagnostics;
 
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
@@ -41,7 +44,8 @@ public class Phase2_ClassInfrastructure : IPhase
         ISmalltalkHeapManager heapManager,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
-        ColdstartReport report)
+        ColdstartReport report,
+        IDiagnosticHub? diagnostics = null)
     {
         _bundle = bundle;
         _allocator = allocator;
@@ -49,6 +53,7 @@ public class Phase2_ClassInfrastructure : IPhase
         _localIdToObjectId = localIdToObjectId;
         _initializedFields = initializedFields;
         _report = report ?? throw new ArgumentNullException(nameof(report));
+        _diagnostics = diagnostics;
     }
 
     /// <summary>
@@ -124,8 +129,15 @@ public class Phase2_ClassInfrastructure : IPhase
         
         // CRITICAL: Mark tally as initialized so Phase 3 won't overwrite it with nil
         _initializedFields.Add((systemDictOOP, 0));
-        
-        Console.WriteLine($"[Phase2] ✓ Initialized SystemDictionary tally to SmallInteger(0) and marked as initialized");
+
+        _diagnostics?.Emit(new DiagnosticMessageEvent
+        {
+            Severity = MessageSeverity.Info,
+            Category = "Phase2",
+            Message = "Initialized SystemDictionary tally to SmallInteger(0) and marked as initialized",
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
 
         GlobalRegistry.Register("Smalltalk", systemDictOOP);
 
