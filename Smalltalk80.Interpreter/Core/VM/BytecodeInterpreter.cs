@@ -1045,14 +1045,23 @@ internal class BytecodeInterpreter(
                 throw new InvalidOperationException($"blockCopy: args must be SmallIntegers, got nargs={nargsOOP}, argStartIndex={argStartIndexOOP}");
             }
 
-            // Call primitive 80 (blockCopy:) - receiver is the active context
-            var blockContextOOP = ControlPrimitives.BlockCopy(
-                primitiveContext,
+            // Call primitive 80 (blockCopy:) using new IPrimitive static helper
+            // Need: heapManager, activeContext, blockContextClassOOP, nargs, argStartIndex, currentPC
+            var result = ControlPrimitives.BlockCopy.CreateBlockContext(
+                heapManager,
                 context.ActiveContext,
-                [nargsOOP, argStartIndexOOP]);
+                metadata.BlockContextClassOOP,
+                nargsOOP,
+                argStartIndexOOP,
+                context.GetPC(context.ActiveContext));
+
+            if (!result.Success)
+            {
+                throw new InvalidOperationException("blockCopy: primitive failed unexpectedly");
+            }
 
             // Push the new BlockContext onto the stack
-            context.Push(blockContextOOP);
+            context.Push(result.Value);
             return true;
         }
 
