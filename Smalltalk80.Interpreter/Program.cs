@@ -5,6 +5,8 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 using Smalltalk80.Interpreter.Platform.Windows;
 using ClassHierarchyUtils = Smalltalk80.Interpreter.Core.ClassHierarchyUtils;
 using System.Windows.Forms;
@@ -52,6 +54,13 @@ public static class Program
                 return;
             }
 
+            // Create diagnostic hub for event-based logging
+            var diagnostics = new DiagnosticHub();
+
+            // Register cold start progress listener for console output
+            var progressListener = new ColdStartProgressListener();
+            diagnostics.Register(progressListener, DiagnosticEventTypes.AllColdStart);
+
             Console.WriteLine($"Loading cold start bundle: {coldStartFile}");
 
             // Load the cold start bundle from JSON
@@ -71,7 +80,7 @@ public static class Program
             // Create and run the loader
             Console.WriteLine("Starting cold start loader (6-phase)...");
 
-            var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile);
+            var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, diagnostics);
             loader.Run();
             var layoutResolver = loader.LayoutResolver;
 
