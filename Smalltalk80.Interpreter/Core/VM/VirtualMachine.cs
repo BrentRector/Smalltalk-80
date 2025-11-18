@@ -186,9 +186,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             this // IVMDebugHelpers
         );
 
-        // Initialize primitive registry with legacy primitives
-        // Can switch to CreateWithNewPrimitives() once all primitives are migrated
-        _primitiveRegistry = Primitives.PrimitiveRegistry.CreateWithLegacyPrimitives();
+        // Initialize primitive registry with new IPrimitive implementations
+        // All 110 primitives migrated to IPrimitive pattern (2025-11-18)
+        _primitiveRegistry = Primitives.PrimitiveRegistry.CreateWithNewPrimitives();
     }
 
     /// <summary>
