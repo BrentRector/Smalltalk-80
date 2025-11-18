@@ -83,7 +83,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         IContextManager? contextManager = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
-        IMessageDispatcher? messageDispatcher = null)
+        IPrimitiveMessageSender? messageSender = null)
     {
         // Try new interface first - adapt to legacy calling convention
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
@@ -99,7 +99,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 contextManager: contextManager,
                 instructionPointer: instructionPointer,
                 cacheManager: cacheManager,
-                messageDispatcher: messageDispatcher
+                messageSender: messageSender
             );
 
             var result = primitive.Execute(execContext);

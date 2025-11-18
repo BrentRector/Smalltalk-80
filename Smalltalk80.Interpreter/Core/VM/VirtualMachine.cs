@@ -28,7 +28,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// NO access to cold start proxy data (_symbols[], ColdStartBundle, unfrozen registries).
 /// </summary>
 [RuntimeOnly(Reason = "Executes Smalltalk bytecode at runtime, must use heap-only access")]
-public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDebugHelpers, ICacheManager, IMessageDispatcher
+public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDebugHelpers, ICacheManager, IPrimitiveMessageSender
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly RuntimeHeapAccessor _runtimeHeapAccess;
@@ -186,9 +186,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             this // IVMDebugHelpers
         );
 
-        // Initialize primitive registry with new IPrimitive implementations
-        // Uses migrated primitives: SmallInteger (1-17), Float (40-54), Object (60-75, 110-111), Control (80-89)
-        _primitiveRegistry = Primitives.PrimitiveRegistry.CreateWithNewPrimitives();
+        // Initialize primitive registry with legacy primitives
+        // Can switch to CreateWithNewPrimitives() once all primitives are migrated
+        _primitiveRegistry = Primitives.PrimitiveRegistry.CreateWithLegacyPrimitives();
     }
 
     /// <summary>
@@ -1264,8 +1264,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         _runtimeHeapAccess.InvalidateAllCaches();
     }
 
-    // IMessageDispatcher explicit interface implementation
-    SmalltalkOOP IMessageDispatcher.SendMessage(SmalltalkOOP receiver, SmalltalkOOP selector, SmalltalkOOP[] arguments)
+    // IPrimitiveMessageSender explicit interface implementation
+    SmalltalkOOP IPrimitiveMessageSender.SendMessage(SmalltalkOOP receiver, SmalltalkOOP selector, SmalltalkOOP[] arguments)
     {
         // This is called by perform primitives via the new IPrimitive pattern
         // We need to dispatch the message and handle the result

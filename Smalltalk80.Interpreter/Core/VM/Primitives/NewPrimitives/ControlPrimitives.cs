@@ -211,12 +211,12 @@ public static class ControlPrimitives
             // args[0] should be a Symbol
             if (context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
 
-            if (context.MessageDispatcher == null) return PrimitiveResult.Fail();
+            if (context.MessageSender == null) return PrimitiveResult.Fail();
 
             SmalltalkOOP selectorOop = context.Arguments[0];
 
             // Send the message with empty arguments
-            SmalltalkOOP resultOop = context.MessageDispatcher.SendMessage(
+            SmalltalkOOP resultOop = context.MessageSender.SendMessage(
                 context.Receiver, selectorOop, Array.Empty<SmalltalkOOP>());
 
             return PrimitiveResult.Ok(resultOop);
@@ -233,12 +233,12 @@ public static class ControlPrimitives
             // args[0] = selector (Symbol), args[1] = argument
             if (context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
 
-            if (context.MessageDispatcher == null) return PrimitiveResult.Fail();
+            if (context.MessageSender == null) return PrimitiveResult.Fail();
 
             SmalltalkOOP selectorOop = context.Arguments[0];
 
             // Send the message with one argument
-            SmalltalkOOP resultOop = context.MessageDispatcher.SendMessage(
+            SmalltalkOOP resultOop = context.MessageSender.SendMessage(
                 context.Receiver, selectorOop, new[] { context.Arguments[1] });
 
             return PrimitiveResult.Ok(resultOop);

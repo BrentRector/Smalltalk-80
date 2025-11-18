@@ -70,8 +70,8 @@ public readonly struct PrimitiveExecutionContext
     /// <summary>Gets the cache manager for method/runtime cache operations.</summary>
     public ICacheManager? CacheManager { get; }
 
-    /// <summary>Gets the message dispatcher for perform primitives.</summary>
-    public IMessageDispatcher? MessageDispatcher { get; }
+    /// <summary>Gets the message sender for perform primitives.</summary>
+    public IPrimitiveMessageSender? MessageSender { get; }
 
     /// <summary>
     /// Creates a new primitive execution context.
@@ -87,7 +87,7 @@ public readonly struct PrimitiveExecutionContext
         RuntimeHeapAccessor? runtimeHeapAccess = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
-        IMessageDispatcher? messageDispatcher = null)
+        IPrimitiveMessageSender? messageSender = null)
     {
         Receiver = receiver;
         Arguments = arguments;
@@ -99,7 +99,7 @@ public readonly struct PrimitiveExecutionContext
         RuntimeHeapAccess = runtimeHeapAccess;
         InstructionPointer = instructionPointer;
         CacheManager = cacheManager;
-        MessageDispatcher = messageDispatcher;
+        MessageSender = messageSender;
     }
 
     /// <summary>
@@ -230,9 +230,10 @@ public interface ICacheManager
 }
 
 /// <summary>
-/// Interface for message dispatch operations used by perform primitives.
+/// Interface for message sending operations used by perform primitives.
+/// Named IPrimitiveMessageSender to avoid conflict with existing IMessageDispatcher.
 /// </summary>
-public interface IMessageDispatcher
+public interface IPrimitiveMessageSender
 {
     /// <summary>
     /// Sends a message to a receiver object.
