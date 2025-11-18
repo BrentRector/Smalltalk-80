@@ -1,7 +1,7 @@
 # Smalltalk-80 Interpreter - Complete Architectural Analysis & Refactoring Plan
 
 **Date**: 2025-11-17 (Created), 2025-11-18 (Updated)
-**Status**: ✅ Phases 0-4 Complete - Ready for Phase 5 (Runtime Services Formalization)
+**Status**: ✅ Phases 0-5 Complete - Ready for Phase 6 (Testing & Documentation)
 **Scope**: Complete system-wide architectural refactoring
 
 ---
@@ -1143,23 +1143,81 @@ Smalltalk80.Compiler/
 
 ---
 
-#### **Phase 5: Runtime Services Formalization (Week 10)**
+#### **Phase 5: Runtime Services Formalization (Week 10)** - ✅ COMPLETE 2025-11-18
 **Goal**: Formalize runtime services with clean APIs
+
+**Current State** (before):
+```
+RuntimeHeapAccessor.cs (498 lines)
+    - RuntimeHeapAccessor class
+    - RuntimeClassCache class (embedded)
+    - RuntimeSpecialObjects class (embedded)
+```
+
+**Target State** (achieved):
+```
+Core/VM/
+    ├─ IRuntimeHeapAccessor.cs (55 lines) - Interface
+    ├─ RuntimeHeapAccessor.cs (393 lines) - Implementation
+    ├─ RuntimeClassCache.cs (46 lines) - Cache layer
+    ├─ RuntimeSpecialObjects.cs (83 lines) - Singleton
+    │
+    ├─ GlobalRegistry.cs (186 lines) - Cold start only, with Freeze()
+    ├─ SymbolRegistry.cs (70 lines) - Cold start only, with Freeze()
+    └─ AssociationRegistry.cs (77 lines) - Cold start only
+```
 
 **Tasks**:
 
-5.1. Define `IRuntimeHeapAccess` interface
-5.2. Define `ISymbolTable` interface
-5.3. Define `IClassRegistry` interface
-5.4. Separate cold start registries from runtime services
-5.5. Document lifecycle (when to freeze, etc.)
+5.1. Define `IRuntimeHeapAccessor` interface ✅ COMPLETE
+   - `InvalidateAllCaches()` - Cache invalidation
+   - `GetClass()` - Class lookup
+   - `InternSymbol()` - Symbol interning
+   - `LookupGlobalByName()` - Global lookup
+   - `BuildFieldMap()` - Field layout building
+
+5.2. Update RuntimeHeapAccessor to implement interface ✅ COMPLETE
+
+5.3. Extract helper classes to separate files ✅ COMPLETE
+   - `RuntimeClassCache.cs` - Cache for class lookups
+   - `RuntimeSpecialObjects.cs` - Singleton for common classes
+
+5.4. Verify cold start/runtime separation ✅ ALREADY IMPLEMENTED
+   - Registries (GlobalRegistry, SymbolRegistry) have Freeze() pattern
+   - Write operations throw after Freeze()
+   - Runtime uses RuntimeHeapAccessor exclusively
+
+**Lifecycle Documentation**:
+
+**Cold Start Phase**:
+1. `SymbolRegistry` - Populated in Phase 1, frozen immediately after
+2. `GlobalRegistry` - Populated in Phases 2-5, frozen at end of cold start
+3. `AssociationRegistry` - Populated during cold start, frozen at end
+
+**Runtime Phase**:
+1. `RuntimeHeapAccessor` - Created from heap manager
+2. `RuntimeClassCache` - Lazy-populated, invalidated by primitive 89
+3. `RuntimeSpecialObjects` - Lazy-populated, invalidated by primitive 89
+
+**Files Created**:
+- `Core/VM/IRuntimeHeapAccessor.cs`
+- `Core/VM/RuntimeClassCache.cs`
+- `Core/VM/RuntimeSpecialObjects.cs`
+
+**Files Modified**:
+- `Core/VM/RuntimeHeapAccessor.cs` - Reduced from 498 to 393 lines, implements interface
 
 **Deliverables**:
-- [ ] Clear API contracts for runtime services
-- [ ] Documentation of lifecycle
-- [ ] No cold start/runtime mixing
+- [x] `IRuntimeHeapAccessor` interface for runtime heap access
+- [x] Helper classes in separate files
+- [x] Lifecycle documented (cold start freeze, runtime caching)
+- [x] No cold start/runtime mixing (enforced by Freeze() pattern)
 
-**Validation**: All runtime code accesses heap only via interfaces
+**Note**: Original plan called for `ISymbolTable` and `IClassRegistry` interfaces, but analysis revealed these are cold-start-only structures that should NOT be accessed at runtime. The Freeze() pattern already enforces this separation. Runtime code uses `IRuntimeHeapAccessor` exclusively.
+
+**Validation**: Build succeeds, runtime services properly isolated
+
+**Next Phase**: Phase 6 (Testing & Documentation) - ready to begin
 
 ---
 

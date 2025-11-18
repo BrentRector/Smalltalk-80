@@ -10,7 +10,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// Replaces GlobalRegistry and LayoutResolver for runtime use.
 /// All methods access ONLY the Smalltalk heap, never cold-start proxy data.
 /// </summary>
-public class RuntimeHeapAccessor
+public class RuntimeHeapAccessor : IRuntimeHeapAccessor
 {
     private readonly ISmalltalkHeapManager _heapManager;
 
@@ -390,110 +390,5 @@ public class RuntimeHeapAccessor
             bytes[i] = _heapManager.GetIndexedByte(stringOOP, i);
         }
         return Encoding.Latin1.GetString(bytes);
-    }
-}
-
-/// <summary>
-/// Cache for runtime class lookups with invalidation support.
-/// </summary>
-public class RuntimeClassCache
-{
-    private readonly RuntimeHeapAccessor _heapAccess;
-    private readonly ISmalltalkHeapManager _heapManager;
-    private Dictionary<string, SmalltalkOOP> _classCache = new();
-    private bool _cacheValid = true;
-
-    public RuntimeClassCache(RuntimeHeapAccessor heapAccess, ISmalltalkHeapManager heapManager)
-    {
-        _heapAccess = heapAccess;
-        _heapManager = heapManager;
-    }
-
-    public SmalltalkOOP GetClass(string className)
-    {
-        if (!_cacheValid || !_classCache.TryGetValue(className, out var classOOP))
-        {
-            classOOP = _heapAccess.LookupClassInHeap(className);
-            if (_cacheValid)
-                _classCache[className] = classOOP;
-        }
-        return classOOP;
-    }
-
-    public void InvalidateCache()
-    {
-        _cacheValid = false;
-        _classCache.Clear();
-    }
-}
-
-
-/// <summary>
-/// Singleton for frequently-accessed runtime classes with cache invalidation.
-/// </summary>
-public class RuntimeSpecialObjects
-{
-    private static RuntimeSpecialObjects? _instance;
-    public static RuntimeSpecialObjects Instance => _instance ??= new();
-
-    // Cached class OOPs (populated on first use)
-    private SmalltalkOOP? _compiledMethodClass;
-    private SmalltalkOOP? _byteArrayClass;
-    private SmalltalkOOP? _methodContextClass;
-    private SmalltalkOOP? _dictionaryClass;
-    private SmalltalkOOP? _arrayClass;
-    private SmalltalkOOP? _stringClass;
-    private SmalltalkOOP? _symbolClass;
-    private SmalltalkOOP? _associationClass;
-
-    // Reference to heap access for lookups
-    private RuntimeHeapAccessor? _heapAccess;
-
-    public void Initialize(RuntimeHeapAccessor heapAccess)
-    {
-        _heapAccess = heapAccess;
-    }
-
-    private SmalltalkOOP LookupClass(string className)
-    {
-        if (_heapAccess == null)
-            throw new InvalidOperationException("RuntimeSpecialObjects not initialized");
-        return _heapAccess.GetClass(className);
-    }
-
-    public SmalltalkOOP CompiledMethodClass =>
-        _compiledMethodClass ??= LookupClass("CompiledMethod");
-
-    public SmalltalkOOP ByteArrayClass =>
-        _byteArrayClass ??= LookupClass("ByteArray");
-
-    public SmalltalkOOP MethodContextClass =>
-        _methodContextClass ??= LookupClass("MethodContext");
-
-    public SmalltalkOOP DictionaryClass =>
-        _dictionaryClass ??= LookupClass("Dictionary");
-
-    public SmalltalkOOP ArrayClass =>
-        _arrayClass ??= LookupClass("Array");
-
-    public SmalltalkOOP StringClass =>
-        _stringClass ??= LookupClass("String");
-
-    public SmalltalkOOP SymbolClass =>
-        _symbolClass ??= LookupClass("Symbol");
-
-    public SmalltalkOOP AssociationClass =>
-        _associationClass ??= LookupClass("Association");
-
-    public void InvalidateCache()
-    {
-        _compiledMethodClass = null;
-        _byteArrayClass = null;
-        _methodContextClass = null;
-        _dictionaryClass = null;
-        _arrayClass = null;
-        _stringClass = null;
-        _symbolClass = null;
-        _associationClass = null;
     }
 }
