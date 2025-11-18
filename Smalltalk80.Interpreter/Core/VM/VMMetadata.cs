@@ -3,30 +3,34 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
-/// VM metadata provided by the cold start loader.
+/// Immutable VM metadata provided by the cold start loader.
 /// Contains field indices and well-known class OOPs that the VM needs to execute code.
 /// This allows the VM to operate purely on the Smalltalk heap without depending on
 /// cold start data structures or hard-coded indices.
 /// </summary>
-public class VMMetadata
+public record VMMetadata
 {
-    public int ClassNameFieldIndex { get; init; }
-    public int ClassSuperclassFieldIndex { get; init; }
-    public int ClassMethodDictFieldIndex { get; init; }
-    public int ClassFormatFieldIndex { get; init; }
-    
-    public int MetaclassThisClassFieldIndex { get; init; }
-    
-    public int MethodDictTallyFieldIndex { get; init; }
-    public int MethodDictKeysFieldIndex { get; init; }
-    public int MethodDictValuesFieldIndex { get; init; }
-    
-    public SmalltalkOOP ClassClassOOP { get; init; }
-    public SmalltalkOOP MetaclassClassOOP { get; init; }
-    public SmalltalkOOP SymbolClassOOP { get; init; }
-    public SmalltalkOOP StringClassOOP { get; init; }
-    public SmalltalkOOP ArrayClassOOP { get; init; }
-    public SmalltalkOOP CompiledMethodClassOOP { get; init; }
-    public SmalltalkOOP SmallIntegerClassOOP { get; init; }
-    public SmalltalkOOP BlockContextClassOOP { get; init; }
+    // Class field indices
+    public required int ClassNameFieldIndex { get; init; }
+    public required int ClassSuperclassFieldIndex { get; init; }
+    public required int ClassMethodDictFieldIndex { get; init; }
+    public required int ClassFormatFieldIndex { get; init; }
+
+    // Metaclass field index
+    public required int MetaclassThisClassFieldIndex { get; init; }
+
+    // MethodDictionary field indices
+    public required int MethodDictTallyFieldIndex { get; init; }
+    public required int MethodDictKeysFieldIndex { get; init; }
+    public required int MethodDictValuesFieldIndex { get; init; }
+
+    // Well-known class OOPs
+    public required SmalltalkOOP ClassClassOOP { get; init; }
+    public required SmalltalkOOP MetaclassClassOOP { get; init; }
+    public required SmalltalkOOP SymbolClassOOP { get; init; }
+    public required SmalltalkOOP StringClassOOP { get; init; }
+    public required SmalltalkOOP ArrayClassOOP { get; init; }
+    public required SmalltalkOOP CompiledMethodClassOOP { get; init; }
+    public required SmalltalkOOP SmallIntegerClassOOP { get; init; }
+    public required SmalltalkOOP BlockContextClassOOP { get; init; }
 }
