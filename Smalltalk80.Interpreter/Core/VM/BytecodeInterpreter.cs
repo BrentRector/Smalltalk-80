@@ -67,7 +67,6 @@ internal class BytecodeInterpreter(
         }
 
         // Push temporary variable 0-15 (0x10-0x1F)
-        // Single-Context Architecture: Uses lexicalParent chain traversal for variable access
         if (BytecodeUtil.IsPushTemp(bytecode))
         {
             int index = BytecodeUtil.PushTempIndex(bytecode);
@@ -126,7 +125,6 @@ internal class BytecodeInterpreter(
             int index = BytecodeUtil.PushLiteralVarIndex(bytecode);
             var literalOOP = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
-            // TODO: Handle blocks with nil literals using lexicalParent (Single-Context Architecture)
             if (literalOOP == SpecialObjectsArray.Instance.Nil)
             {
                 context.Push(SpecialObjectsArray.Instance.Nil);
@@ -205,7 +203,6 @@ internal class BytecodeInterpreter(
         }
 
         // Pop and store receiver variable 0-7 (0x60-0x67)
-        // TODO: Implement using lexicalParent traversal (Single-Context Architecture)
         if (BytecodeUtil.IsPopStoreIvar(bytecode))
         {
             int index = BytecodeUtil.PopStoreIvarIndex(bytecode);
@@ -215,7 +212,6 @@ internal class BytecodeInterpreter(
         }
 
         // Pop and store temporary variable 0-7 (0x68-0x6F)
-        // Single-Context Architecture: Uses lexicalParent chain traversal for variable access
         if (BytecodeUtil.IsPopStoreTemp(bytecode))
         {
             int index = BytecodeUtil.PopStoreTempIndex(bytecode);
@@ -228,7 +224,6 @@ internal class BytecodeInterpreter(
         switch ((Bytecode)bytecode)
         {
             case Bytecode.PUSH_SELF:
-                // TODO: Implement using lexicalParent traversal (Single-Context Architecture)
                 context.Push(receiverOOP);
                 return true;
 
@@ -261,7 +256,6 @@ internal class BytecodeInterpreter(
                 return true;
 
             case Bytecode.RETURN_SELF:
-                // TODO: Implement using lexicalParent traversal (Single-Context Architecture)
                 context.Push(receiverOOP);
                 return false; // Return from method
 
@@ -326,7 +320,7 @@ internal class BytecodeInterpreter(
                     // Check if we're in a BlockContext by reading slot 5 (home field)
                     var homeOOP = heapManager.GetInstanceVariable(
                         context.ActiveContext,
-                        VMConstants.BLOCKCONTEXT_HOME_INDEX  // Slot 5, NOT lexicalParent (slot 4)!
+                        VMConstants.BLOCKCONTEXT_HOME_INDEX  // Slot 5: home MethodContext
                     );
 
                     if (homeOOP != SpecialObjectsArray.Instance.Nil)
@@ -464,8 +458,6 @@ internal class BytecodeInterpreter(
             int selectorIndex = BytecodeUtil.Send0Index(bytecode);
             var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
 
-            // TODO: Handle blocks with nil literals using lexicalParent (Single-Context Architecture)
-
             var receiverOOP2 = context.Pop();
             return context.SendMessageAndContinue(receiverOOP2, selectorOOP, []);
         }
@@ -476,8 +468,6 @@ internal class BytecodeInterpreter(
         {
             int selectorIndex = BytecodeUtil.Send1Index(bytecode);
             var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
-
-            // TODO: Handle blocks with nil literals using lexicalParent (Single-Context Architecture)
 
             var argOOP = context.Pop();
             var receiverOOP2 = context.Pop();
@@ -491,8 +481,6 @@ internal class BytecodeInterpreter(
         {
             int selectorIndex = BytecodeUtil.Send2Index(bytecode);
             var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
-
-            // TODO: Handle blocks with nil literals using lexicalParent (Single-Context Architecture)
 
             var arg2OOP = context.Pop();
             var arg1OOP = context.Pop();

@@ -928,7 +928,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         {
             Console.WriteLine($"[InvokeBlockInternal] Context switch: {previousContext} -> {blockContextOOP}");
             Console.WriteLine($"  Block has {argCount} args, {tempCount} temps");
-            Console.WriteLine($"  lexicalParent = {previousContext}");
+            Console.WriteLine($"  sender = {previousContext}");
         }
 
         // Signal context switch to primitive caller
@@ -937,19 +937,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         // Return nil as sentinel (actual result will be pushed by HandleReturn)
         return SpecialObjectsArray.Instance.Nil;
     }
-
-    /// <summary>
-    /// Creates a MethodContext for executing a block, backed by a BlockContext.
-    /// This implements Approach B from the documentation.
-    /// </summary>
-    // REMOVED: CreateBlockExecutionContext - obsolete in single-context architecture
-    private SmalltalkOOP CreateBlockExecutionContext(SmalltalkOOP blockMethodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP blockContextOOP, SmalltalkOOP senderContextOOP)
-    {
-        throw new NotImplementedException("CreateBlockExecutionContext is obsolete in single-context architecture. Blocks should use CreateMethodContext with lexicalParent field.");
-    }
-
-
-
 
 
     /// <summary>
