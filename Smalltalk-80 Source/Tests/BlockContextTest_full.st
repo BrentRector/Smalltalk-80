@@ -530,7 +530,15 @@ diagPow10 "Powers of 10: each var unique magnitude (expect 111111111)"
 	   111111200 = ot2 accessed TWICE (100+100=200), it1+it2 skipped
 	   100000000 = ONLY it2 accessed, all others zero
 	   111111110 = it2 aliased to ot1 (read as 10 instead of 100000000)"
-	^[:oa | | ot1 ot2 | ot1 _ 10. ot2 _ 100. [:ma | | mt1 mt2 | mt1 _ 10000. mt2 _ 100000. [:ia | | it1 it2 | it1 _ 10000000. it2 _ 100000000. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 1000000] value: 1000] value: 1! !
+	^[:oa | | ot1 ot2 | ot1 _ 10. ot2 _ 100. [:ma | | mt1 mt2 | mt1 _ 10000. mt2 _ 100000. [:ia | | it1 it2 | it1 _ 10000000. it2 _ 100000000. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 1000000] value: 1000] value: 1!
+
+diagZero "Same as diagPow10 but with ZEROS for args (expect 111111111)"
+	"Test if zeros cause the bug. Args set to 0, temps use powers of 10.
+	 oa=0, ot1=10, ot2=100, ma=0, mt1=10000, mt2=100000, ia=0, it1=10000000, it2=100000000
+	 Expected: 110110110 (only temps, no args)
+	 If we get 111111111, zeros are being read as their power-of-10 value somehow
+	 If we get 110110100, last digit wrong (it2 issue with zeros)"
+	^[:oa | | ot1 ot2 | ot1 _ 10. ot2 _ 100. [:ma | | mt1 mt2 | mt1 _ 10000. mt2 _ 100000. [:ia | | it1 it2 | it1 _ 10000000. it2 _ 100000000. oa + ot1 + ot2 + ma + mt1 + mt2 + ia + it1 + it2] value: 0] value: 0] value: 0! !
 
 "Mutation tests"
 !BlockContextTest methodsFor: 'mutation'!

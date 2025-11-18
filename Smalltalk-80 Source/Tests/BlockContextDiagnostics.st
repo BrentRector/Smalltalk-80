@@ -80,6 +80,14 @@ Object subclass: #DiagPow10
 !DiagPow10 class methodsFor: 'class initialization'!
 initialize ^BlockContextTest new diagPow10! !
 
+Object subclass: #DiagZero
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-BlockContext'! !
+!DiagZero class methodsFor: 'class initialization'!
+initialize ^BlockContextTest new diagZero! !
+
 DiagOa initialize!
 DiagOt1 initialize!
 DiagOt2 initialize!
@@ -90,3 +98,4 @@ DiagIa initialize!
 DiagIt1 initialize!
 DiagIt2 initialize!
 DiagPow10 initialize!
+DiagZero initialize!
