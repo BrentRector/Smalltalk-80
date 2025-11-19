@@ -31,7 +31,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// NO access to cold start proxy data (_symbols[], ColdStartBundle, unfrozen registries).
 /// </summary>
 [RuntimeOnly(Reason = "Executes Smalltalk bytecode at runtime, must use heap-only access")]
-public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDebugHelpers, ICacheManager, IPrimitiveMessageSender
+public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICacheManager, IPrimitiveMessageSender
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly RuntimeHeapAccessor _runtimeHeapAccess;
@@ -100,13 +100,13 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             heapManager,
             metadata,
             _layoutResolver,
-            this // IVMHelpers
+            this // IObjectMetadataAccessor
         );
 
         _stackManager = new StackManager(
             heapManager,
             metadata,
-            this, // IVMHelpers
+            this, // IObjectMetadataAccessor
             () => _contextManager.ActiveContext,
             () => _tracer.SelectorTraceEnabled,
             () => _tracer.PushTraceCounter,
@@ -115,7 +115,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
         _messageDispatcher = new MessageDispatcher(
             heapManager,
-            this // IVMHelpers
+            this // IObjectMetadataAccessor
         );
 
         _bytecodeInterpreter = new BytecodeInterpreter(
@@ -128,7 +128,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         _debugger = new VMDebugger(
             heapManager,
             _contextManager,
-            this // IVMDebugHelpers
+            this // IBytecodeContext
         );
 
         // Initialize primitive registry with new IPrimitive implementations
@@ -811,7 +811,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
     /// <summary>
     /// Parses a CompiledMethod header word according to the Smalltalk-80 specification.
-    /// MethodHeaderInfo record is defined in IVMHelpers.cs.
+    /// MethodHeaderInfo record is defined in IObjectMetadataAccessor.cs.
     /// </summary>
     private MethodHeaderInfo ParseMethodHeader(SmalltalkOOP methodOOP)
     {
@@ -897,12 +897,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         );
     }
 
-    // Explicit interface implementations for IVMHelpers
+    // Explicit interface implementations for IObjectMetadataAccessor
     // These delegate to the existing private methods while maintaining encapsulation
-    SmalltalkOOP IVMHelpers.GetClass(SmalltalkOOP objectOOP) => GetClass(objectOOP);
-    string IVMHelpers.GetClassName(SmalltalkOOP classOOP) => GetClassName(classOOP);
-    SmalltalkOOP IVMHelpers.FindMethodContext(SmalltalkOOP contextOOP) => _contextManager.FindMethodContext(contextOOP);
-    MethodHeaderInfo IVMHelpers.ParseMethodHeader(SmalltalkOOP methodOOP) => ParseMethodHeader(methodOOP);
+    SmalltalkOOP IObjectMetadataAccessor.GetClass(SmalltalkOOP objectOOP) => GetClass(objectOOP);
+    string IObjectMetadataAccessor.GetClassName(SmalltalkOOP classOOP) => GetClassName(classOOP);
+    SmalltalkOOP IObjectMetadataAccessor.FindMethodContext(SmalltalkOOP contextOOP) => _contextManager.FindMethodContext(contextOOP);
+    MethodHeaderInfo IObjectMetadataAccessor.ParseMethodHeader(SmalltalkOOP methodOOP) => ParseMethodHeader(methodOOP);
 
     // IStackOperations implementation
     void IStackOperations.Push(SmalltalkOOP valueOOP) => Push(valueOOP);
@@ -969,14 +969,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
     void IBytecodeContext.AddAssociationToClassPoolIfNeeded(SmalltalkOOP classOOP, SmalltalkOOP associationOOP)
         => AddAssociationToClassPoolIfNeeded(classOOP, associationOOP);
-
-    // IVMDebugHelpers explicit interface implementations
-    SmalltalkOOP IVMDebugHelpers.GetClass(SmalltalkOOP objectOOP) => GetClass(objectOOP);
-    string IVMDebugHelpers.GetClassName(SmalltalkOOP classOOP) => GetClassName(classOOP);
-    string? IVMDebugHelpers.GetSymbolName(SmalltalkOOP symbolOOP) => GetSymbolName(symbolOOP);
-    string? IVMDebugHelpers.GetLocalId(SmalltalkOOP objectOOP) => GetLocalId(objectOOP);
-    SmalltalkOOP IVMDebugHelpers.GetMethodLiteral(SmalltalkOOP methodOOP, int index) => GetMethodLiteral(methodOOP, index);
-    byte[] IVMDebugHelpers.GetMethodBytecodes(SmalltalkOOP methodOOP) => GetMethodBytecodes(methodOOP);
 
     /// <summary>
     /// Pushes a value onto the operand stack.

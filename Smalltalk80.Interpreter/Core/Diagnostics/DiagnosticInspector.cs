@@ -5,7 +5,7 @@ using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Engine;
 
-namespace Smalltalk80.Interpreter;
+namespace Smalltalk80.Interpreter.Core.Diagnostics;
 
 /// <summary>
 /// Diagnostic inspection methods for examining heap state and class structures.
@@ -102,7 +102,7 @@ public static class DiagnosticInspector
             int size = heapManager.GetIndexedSize(classPoolOOP);
 
             // Check if classPool is empty (no entries yet - they're lazily created)
-            int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", bundle);
+            int tallyIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Dictionary", "tally", bundle);
             if (tallyIndex >= 0)
             {
                 var tallyOOP = heapManager.GetInstanceVariable(classPoolOOP, tallyIndex);
@@ -253,7 +253,7 @@ public static class DiagnosticInspector
             }
 
             // Check tally to see if dictionary is empty
-            int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", bundle);
+            int tallyIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Dictionary", "tally", bundle);
             if (tallyIndex >= 0)
             {
                 var tallyOOP = heapManager.GetInstanceVariable(classPoolOOP, tallyIndex);

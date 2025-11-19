@@ -263,7 +263,7 @@ public class Phase4_MethodCompilation : IPhase
         int methodsCreated = 0;
         foreach (var method in _bundle.Methods)
         {
-            var bytecodes = ClassHierarchyUtils.DecodeBytecodes(method.Bytecodes);
+            var bytecodes = ClassHierarchyTraversal.DecodeBytecodes(method.Bytecodes);
             var nilOOP = SpecialObjectsArray.Instance.Nil;
             var placeholderLiterals = new SmalltalkOOP[method.Literals.Length];
             for (int i = 0; i < placeholderLiterals.Length; i++)
@@ -880,7 +880,7 @@ public class Phase4_MethodCompilation : IPhase
             string homeClassLocalId = ExtractHomeClassFromInitExpression(expr, literalOOPs);
 
             // Create a CompiledMethod object for the init expression
-            var bytecodes = ClassHierarchyUtils.DecodeBytecodes(expr.Bytecodes);
+            var bytecodes = ClassHierarchyTraversal.DecodeBytecodes(expr.Bytecodes);
             SmalltalkOOP initMethodOOP = CreateCompiledMethod(
                 new MethodDescriptor
                 {
@@ -1157,7 +1157,7 @@ public class Phase4_MethodCompilation : IPhase
     private SmalltalkOOP AllocateCharacter(int codePoint)
     {
         // Look up Character class layout
-        var characterClassDefinition = ClassHierarchyUtils.FindClassDefinition("Character", _bundle);
+        var characterClassDefinition = ClassHierarchyTraversal.FindClassDefinition("Character", _bundle);
         if (characterClassDefinition == null)
         {
             throw new InvalidOperationException("Character class not found in bundle");
@@ -1181,7 +1181,7 @@ public class Phase4_MethodCompilation : IPhase
     private SmalltalkOOP AllocateByteArray(string encoding, string data)
     {
         // Look up ByteArray class layout
-        var byteArrayClassDefinition = ClassHierarchyUtils.FindClassDefinition("ByteArray", _bundle);
+        var byteArrayClassDefinition = ClassHierarchyTraversal.FindClassDefinition("ByteArray", _bundle);
         if (byteArrayClassDefinition == null)
         {
             throw new InvalidOperationException("ByteArray class not found in bundle");
@@ -1211,7 +1211,7 @@ public class Phase4_MethodCompilation : IPhase
     private SmalltalkOOP AllocateArray(SmalltalkOOP[] elementOOPs)
     {
         // Look up Array class layout
-        var arrayClassDefinition = ClassHierarchyUtils.FindClassDefinition("Array", _bundle);
+        var arrayClassDefinition = ClassHierarchyTraversal.FindClassDefinition("Array", _bundle);
         if (arrayClassDefinition == null)
         {
             throw new InvalidOperationException("Array class not found in bundle");
@@ -1236,7 +1236,7 @@ public class Phase4_MethodCompilation : IPhase
     private SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
         // Look up Association class layout from bundle data
-        var associationClassDefinition = ClassHierarchyUtils.FindClassDefinition("Association", _bundle);
+        var associationClassDefinition = ClassHierarchyTraversal.FindClassDefinition("Association", _bundle);
         if (associationClassDefinition == null)
         {
             throw new InvalidOperationException("Association class not found in bundle");

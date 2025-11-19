@@ -15,7 +15,7 @@ internal class ContextManager(
     ISmalltalkHeapManager heapManager,
     VMMetadata metadata,
     LayoutResolver layoutResolver,
-    IVMHelpers helpers) : IContextManager
+    IObjectMetadataAccessor helpers) : IContextManager
 {
     // Active context (current MethodContext being executed)
     private SmalltalkOOP _activeContextOOP;

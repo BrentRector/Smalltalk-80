@@ -274,7 +274,7 @@ public class ColdStartOrchestrator : IColdStartLoader
         if (_heapManager is SmalltalkHeapManager concreteHeapManager)
         {
             // Find the index of the 'name' field in Class
-            int nameFieldIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "name", _bundle);
+            int nameFieldIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Class", "name", _bundle);
             if (nameFieldIndex >= 0)
             {
                 concreteHeapManager.SetClassNameFieldIndex(nameFieldIndex);

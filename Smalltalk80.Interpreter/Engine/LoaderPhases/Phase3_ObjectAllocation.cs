@@ -210,7 +210,7 @@ public class Phase3_ObjectAllocation : IPhase
     private void InitializeProcessorSchedulerFields(SmalltalkOOP processorSchedulerOOP, SmalltalkOOP nilOOP)
     {
         // Get instance variable count for ProcessorScheduler
-        int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("ProcessorScheduler", _bundle);
+        int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("ProcessorScheduler", _bundle);
 
         // Initialize all instance variables to nil
         // This prevents Phase Y from overwriting with nil (it only sets uninitialized fields)
@@ -242,7 +242,7 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // Initialize Dictionary instance variables (tally = 0)
-        int dictInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("Dictionary", _bundle);
+        int dictInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("Dictionary", _bundle);
         for (int i = 0; i < dictInstVarCount; i++)
         {
             _allocator.SetInstanceVariable(undeclaredOOP, i, nilOOP);
@@ -250,7 +250,7 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // Set tally to 0 (will be incremented as Associations are added in Phase 5)
-        int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
+        int tallyIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
         if (tallyIndex >= 0)
         {
             var zeroOOP = SmalltalkOOP.FromSmallInteger(0);
@@ -290,7 +290,7 @@ public class Phase3_ObjectAllocation : IPhase
         var strikeFontOOP = _allocator.AllocateFixedObject("StrikeFont");
 
         // Initialize all StrikeFont fields to nil
-        int strikeFontInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("StrikeFont", _bundle);
+        int strikeFontInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("StrikeFont", _bundle);
         for (int i = 0; i < strikeFontInstVarCount; i++)
         {
             _allocator.SetInstanceVariable(strikeFontOOP, i, nilOOP);
@@ -299,7 +299,7 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Set minimal StrikeFont properties to prevent errors
         // name: "DefaultFont"
-        int nameIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "name", _bundle);
+        int nameIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("StrikeFont", "name", _bundle);
         if (nameIndex >= 0)
         {
             var fontNameOOP = InternString("DefaultFont");
@@ -307,21 +307,21 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // ascent: 12
-        int ascentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "ascent", _bundle);
+        int ascentIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("StrikeFont", "ascent", _bundle);
         if (ascentIndex >= 0)
         {
             _allocator.SetInstanceVariable(strikeFontOOP, ascentIndex, SmalltalkOOP.FromSmallInteger(12));
         }
 
         // descent: 4
-        int descentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "descent", _bundle);
+        int descentIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("StrikeFont", "descent", _bundle);
         if (descentIndex >= 0)
         {
             _allocator.SetInstanceVariable(strikeFontOOP, descentIndex, SmalltalkOOP.FromSmallInteger(4));
         }
 
         // maxWidth: 8
-        int maxWidthIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "maxWidth", _bundle);
+        int maxWidthIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("StrikeFont", "maxWidth", _bundle);
         if (maxWidthIndex >= 0)
         {
             _allocator.SetInstanceVariable(strikeFontOOP, maxWidthIndex, SmalltalkOOP.FromSmallInteger(8));
@@ -336,10 +336,10 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Get TextStyle instance variable indices
         // TextStyle has: fontArray, lineGrid, baseline, alignment, firstIndent, restIndent, rightIndent, tabsArray, marginTabsArray, outputMedium
-        int fontArrayIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "fontArray", _bundle);
-        int lineGridIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "lineGrid", _bundle);
-        int baselineIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "baseline", _bundle);
-        int alignmentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "alignment", _bundle);
+        int fontArrayIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("TextStyle", "fontArray", _bundle);
+        int lineGridIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("TextStyle", "lineGrid", _bundle);
+        int baselineIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("TextStyle", "baseline", _bundle);
+        int alignmentIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("TextStyle", "alignment", _bundle);
 
         // Initialize critical TextStyle fields
         if (fontArrayIndex >= 0)
@@ -367,7 +367,7 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // Initialize remaining TextStyle fields to nil
-        int textStyleInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("TextStyle", _bundle);
+        int textStyleInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("TextStyle", _bundle);
         for (int i = 0; i < textStyleInstVarCount; i++)
         {
             if (!_initializedFields.Contains((textStyleOOP, i)))
@@ -528,7 +528,7 @@ public class Phase3_ObjectAllocation : IPhase
         // Symbol>>hash uses Primitive 75: returns half the object pointer
         // Blue Book: "Answer with a SmallInteger whose value is half of the receiver's object pointer"
         // This is an IDENTITY hash based on OOP, NOT a string content hash!
-        return VMUtilities.ComputeIdentityHash(symbolOOP);
+        return IdentityHashUtility.ComputeIdentityHash(symbolOOP);
     }
 
     /// <summary>
@@ -564,7 +564,7 @@ public class Phase3_ObjectAllocation : IPhase
                 // Increment tally field
                 if (incrementTally)
                 {
-                    int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
+                    int tallyIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
                     if (tallyIndex >= 0)
                     {
                         var currentTallyOOP = _allocator.GetInstanceVariable(dictionaryOOP, tallyIndex);
@@ -863,7 +863,7 @@ public class Phase3_ObjectAllocation : IPhase
 
             // Get the number of instance variables for this type of class object
             string classOfClassName = cls.IsMetaclass ? "Metaclass" : "Class";
-            int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(classOfClassName, _bundle);
+            int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount(classOfClassName, _bundle);
 
             // Initialize ONLY uninitialized instance variables to nil
             for (int i = 0; i < instVarCount; i++)
@@ -876,7 +876,7 @@ public class Phase3_ObjectAllocation : IPhase
                     // Verify Object.superclass is being set to nil
                     if (!cls.IsMetaclass && _bundle.Symbols[cls.NameIndex] == "Object")
                     {
-                        int superclassIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "superclass", _bundle);
+                        int superclassIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Class", "superclass", _bundle);
                         if (i == superclassIndex)
                         {
 // Console.WriteLine($"    Initialized class:Object.superclass = nil (field index {i})");
@@ -899,7 +899,7 @@ public class Phase3_ObjectAllocation : IPhase
                 continue;
 
             string className = _bundle.Symbols[obj.ClassNameIndex];
-            int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(className, _bundle);
+            int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount(className, _bundle);
 
             // First: Initialize ALL instance variables to nil
             for (int i = 0; i < instVarCount; i++)
@@ -936,7 +936,7 @@ public class Phase3_ObjectAllocation : IPhase
     {
         if (GlobalRegistry.TryGet(globalName, out SmalltalkOOP objectId))
         {
-            int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(className, _bundle);
+            int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount(className, _bundle);
             var objectOOP = objectId;
 
             // Only initialize uninitialized instance variables
@@ -955,7 +955,7 @@ public class Phase3_ObjectAllocation : IPhase
         // Initialize SystemDictionary instance variables
         if (GlobalRegistry.TryGet("Smalltalk", out SmalltalkOOP systemDictId))
         {
-            int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("SystemDictionary", _bundle);
+            int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("SystemDictionary", _bundle);
             var systemDictOOP = systemDictId;
 
             // Only initialize uninitialized instance variables
@@ -992,7 +992,7 @@ public class Phase3_ObjectAllocation : IPhase
 
             // Find classPool instance variable
             string templateClassName = "Class";
-            int classPoolIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "classPool", _bundle);
+            int classPoolIndex = ClassHierarchyTraversal.FindInstanceVariableIndex(templateClassName, "classPool", _bundle);
             if (classPoolIndex < 0)
                 continue;
 

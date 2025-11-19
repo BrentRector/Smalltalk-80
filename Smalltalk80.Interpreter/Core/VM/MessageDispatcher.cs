@@ -11,7 +11,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// <param name="helpers">VM helper methods.</param>
 internal class MessageDispatcher(
     ISmalltalkHeapManager heapManager,
-    IVMHelpers helpers) : IMessageDispatcher
+    IObjectMetadataAccessor helpers) : IMessageDispatcher
 {
     /// <inheritdoc />
     public MethodLookupResult? LookupMethod(SmalltalkOOP classOOP, string selectorName)

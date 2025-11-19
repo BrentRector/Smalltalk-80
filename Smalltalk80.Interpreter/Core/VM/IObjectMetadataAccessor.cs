@@ -6,7 +6,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// Helper methods needed by extracted VM components.
 /// Provides access to common VM operations without circular dependencies.
 /// </summary>
-internal interface IVMHelpers
+internal interface IObjectMetadataAccessor
 {
     /// <summary>
     /// Gets the class OOP of an object.
@@ -113,7 +113,7 @@ internal interface IMessageSender
 /// Extended helper interface for bytecode execution.
 /// Aggregates focused interfaces for complete bytecode interpretation support.
 /// </summary>
-internal interface IBytecodeContext : IVMHelpers, IStackOperations, INonLocalReturnState, IMethodAccess, IMessageSender
+internal interface IBytecodeContext : IObjectMetadataAccessor, IStackOperations, INonLocalReturnState, IMethodAccess, IMessageSender
 {
     /// <summary>Gets the name of a symbol as a string.</summary>
     string? GetSymbolName(SmalltalkOOP symbolOOP);

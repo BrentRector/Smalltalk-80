@@ -114,7 +114,7 @@ public class Phase2_ClassInfrastructure : IPhase
         int totalEntries = instanceClassCount + poolCount + systemGlobalCount;
         totalEntries = Math.Max(totalEntries * 2, 500); // Large buffer
 
-        var systemDictClassDefinition = ClassHierarchyUtils.FindClassDefinition("SystemDictionary", _bundle);
+        var systemDictClassDefinition = ClassHierarchyTraversal.FindClassDefinition("SystemDictionary", _bundle);
         if (systemDictClassDefinition == null)
         {
             throw new InvalidOperationException("SystemDictionary class not found in bundle");
@@ -203,7 +203,7 @@ public class Phase2_ClassInfrastructure : IPhase
                 // CRITICAL: Set thisClass on metaclass instances (required for class variable lookup)
                 // Metaclass instances have 'thisClass' instance variable pointing to their instance class
                 // thisClass is defined in the Metaclass class, not in the individual metaclass descriptors
-                int thisClassIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Metaclass", "thisClass", _bundle);
+                int thisClassIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Metaclass", "thisClass", _bundle);
                 if (thisClassIndex >= 0)
                 {
                     // Use 0-based indexing to match heap manager reads
@@ -275,7 +275,7 @@ public class Phase2_ClassInfrastructure : IPhase
         // Wire the metaclass circle using heap manager directly (0-based indexing)
         // Use "Class" instead of "Metaclass" because class:Class, class:ClassDescription, class:Behavior
         // are instances of their respective metaclasses, but all inherit the superclass field from Behavior
-        int superclassIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "superclass", _bundle);
+        int superclassIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Class", "superclass", _bundle);
         if (superclassIndex >= 0)
         {
 // Console.WriteLine($"  Wiring fundamental metaclass hierarchy (superclass index: {superclassIndex}):");
@@ -314,7 +314,7 @@ public class Phase2_ClassInfrastructure : IPhase
         var symbols = _bundle.Symbols;
 
         // Look up the superclass field index properly (inherited from Behavior)
-        int superclassIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "superclass", _bundle);
+        int superclassIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Class", "superclass", _bundle);
         if (superclassIndex < 0)
         {
 // Console.WriteLine("  WARNING: Could not find superclass field index, skipping metaclass superclass wiring");
@@ -518,13 +518,13 @@ public class Phase2_ClassInfrastructure : IPhase
 
         // Dictionary layout: instance var 'tally' + indexed array
         // Find Dictionary's instance variable count
-        var dictClassDef = ClassHierarchyUtils.FindClassDefinition("Dictionary", _bundle);
+        var dictClassDef = ClassHierarchyTraversal.FindClassDefinition("Dictionary", _bundle);
         if (dictClassDef == null)
         {
             throw new InvalidOperationException("Dictionary class definition not found in bundle");
         }
 
-        int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(dictClassDef, _bundle);
+        int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount(dictClassDef, _bundle);
 
         // Allocate Dictionary as PointerIndexed object
         var dictOOP = _heapManager.AllocateObject(
@@ -538,7 +538,7 @@ public class Phase2_ClassInfrastructure : IPhase
 
         // Initialize tally to SmallInteger 0
         // Find 'tally' instance variable index in Dictionary hierarchy
-        int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
+        int tallyIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
         if (tallyIndex >= 0)
         {
             _heapManager.SetInstanceVariable(dictOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(0));
@@ -597,7 +597,7 @@ public class Phase2_ClassInfrastructure : IPhase
         {
             // All metaclass objects are instances of "Metaclass" class
             // Find the Metaclass class in the JSON bundle
-            var metaclassDefinition = ClassHierarchyUtils.FindClassDefinition("Metaclass", _bundle);
+            var metaclassDefinition = ClassHierarchyTraversal.FindClassDefinition("Metaclass", _bundle);
             if (metaclassDefinition != null)
             {
                 return _bundle.Symbols[metaclassDefinition.NameIndex];
@@ -608,7 +608,7 @@ public class Phase2_ClassInfrastructure : IPhase
         {
             // All regular class objects are instances of "Class" class
             // Find the Class class in the JSON bundle
-            var classClassDefinition = ClassHierarchyUtils.FindClassDefinition("Class", _bundle);
+            var classClassDefinition = ClassHierarchyTraversal.FindClassDefinition("Class", _bundle);
             if (classClassDefinition != null)
             {
                 return _bundle.Symbols[classClassDefinition.NameIndex];

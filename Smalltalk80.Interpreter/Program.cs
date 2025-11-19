@@ -8,7 +8,7 @@ using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 using Smalltalk80.Interpreter.Platform.Windows;
-using ClassHierarchyUtils = Smalltalk80.Interpreter.Core.ClassHierarchyUtils;
+using ClassHierarchyTraversal = Smalltalk80.Interpreter.Core.ClassHierarchyTraversal;
 using System.Windows.Forms;
 
 namespace Smalltalk80.Interpreter;
