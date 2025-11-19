@@ -4,6 +4,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 
@@ -17,11 +18,15 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 internal class LiteralResolver(
     ColdStartBundle bundle,
     ObjectGraphAllocator allocator,
-    Dictionary<string, SmalltalkOOP> localIdToObjectId)
+    Dictionary<string, SmalltalkOOP> localIdToObjectId,
+    SymbolService symbolService,
+    FieldValueService fieldValueService)
 {
     private readonly ColdStartBundle _bundle = bundle;
     private readonly ObjectGraphAllocator _allocator = allocator;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = localIdToObjectId;
+    private readonly SymbolService _symbolService = symbolService;
+    private readonly FieldValueService _fieldValueService = fieldValueService;
     private readonly IReadOnlyList<string> _symbols = bundle.Symbols;
     private readonly IReadOnlyList<string> _strings = bundle.Strings;
 
@@ -131,12 +136,7 @@ internal class LiteralResolver(
     /// <exception cref="InvalidOperationException">Thrown when value cannot be converted to int.</exception>
     public int GetIntValue(object value)
     {
-        return value switch
-        {
-            JsonElement e => e.GetInt32(),
-            int i => i,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to int")
-        };
+        return _fieldValueService.GetIntValue(value);
     }
 
     /// <summary>
@@ -147,13 +147,7 @@ internal class LiteralResolver(
     /// <exception cref="InvalidOperationException">Thrown when value cannot be converted to double.</exception>
     public double GetFloatValue(object value)
     {
-        return value switch
-        {
-            JsonElement e => e.GetDouble(),
-            double d => d,
-            float f => f,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to double")
-        };
+        return _fieldValueService.GetFloatValue(value);
     }
 
     /// <summary>
@@ -164,16 +158,7 @@ internal class LiteralResolver(
     /// <exception cref="InvalidOperationException">Thrown when symbol not found in symbol table.</exception>
     public SmalltalkOOP InternSymbol(string name)
     {
-        // Find the symbol in the SymbolRegistry (created in Phase 1)
-        for (int i = 0; i < _bundle.Symbols.Length; i++)
-        {
-            if (_bundle.Symbols[i] == name)
-            {
-                return SymbolRegistry.GetSymbolOOP(i);
-            }
-        }
-
-        throw new InvalidOperationException($"Symbol '{name}' not found in symbol table.");
+        return _symbolService.GetSymbolOOP(name);
     }
 
     /// <summary>
@@ -335,17 +320,6 @@ internal class LiteralResolver(
     /// <exception cref="ArgumentException">Thrown when hex string has odd number of characters.</exception>
     public byte[] ConvertHexStringToBytes(string hex)
     {
-        // Remove any whitespace or separators
-        hex = hex.Replace(" ", "").Replace("-", "").Replace(":", "");
-
-        if (hex.Length % 2 != 0)
-            throw new ArgumentException("Hex string must have even number of characters");
-
-        byte[] bytes = new byte[hex.Length / 2];
-        for (int i = 0; i < bytes.Length; i++)
-        {
-            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-        }
-        return bytes;
+        return _fieldValueService.ConvertHexStringToBytes(hex);
     }
 }

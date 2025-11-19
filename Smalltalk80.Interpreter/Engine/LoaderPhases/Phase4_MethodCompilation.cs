@@ -78,9 +78,10 @@ public class Phase4_MethodCompilation : IPhase
         _symbols = bundle.Symbols;
         _diagnostics = diagnostics;
 
-        // Initialize helper classes
+        // Initialize services and helper classes
         _symbolService = new SymbolService(bundle);
-        _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId);
+        var fieldValueService = new FieldValueService(bundle, _symbolService);
+        _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId, _symbolService, fieldValueService);
         _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, _symbolService, diagnostics);
     }
 
