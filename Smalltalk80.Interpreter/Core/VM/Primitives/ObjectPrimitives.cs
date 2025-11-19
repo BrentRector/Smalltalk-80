@@ -183,13 +183,6 @@ public static class SimpleObjectPrimitives
             var formatWord = new FormatWord(formatOOP.AsSmallInteger());
             int count = formatWord.FixedFields;
 
-            // DEBUG: Trace Form instVarAt: calls
-            if (formatOOP.AsSmallInteger() == 0x4004)
-            {
-                int cachedCount = context.HeapManager.GetInstanceVariableCount(context.Receiver);
-                Console.WriteLine($"[PRIMITIVE 73] Form instVarAt: {index}, count={count}, cached={cachedCount}");
-            }
-
             // Smalltalk indices are 1-based
             if (index < 1 || index > count) return PrimitiveResult.Fail();
 

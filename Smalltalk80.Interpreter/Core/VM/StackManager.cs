@@ -28,55 +28,10 @@ internal class StackManager(
     {
         var activeContextOOP = getActiveContext();
 
-        // DEBUG: Trace ALL stack pushes when tracing is enabled
+        // Track push operations when tracing is enabled
         if (getSelectorTraceEnabled())
         {
             incrementPushTraceCounter();
-            if (false) // Disabled - too verbose
-            {
-                // Format: "oop=#### (ClassName)" for objects, "SmallInteger(#)" for small integers
-                string valueStr;
-                if (valueOOP.IsSmallInteger)
-                {
-                    valueStr = $"SmallInteger({valueOOP.AsSmallInteger()})";
-                }
-                else
-                {
-                    try
-                    {
-                        string className = helpers.GetClassName(helpers.GetClass(valueOOP));
-                        valueStr = $"{valueOOP} ({className})";
-
-                        // If Symbol, show value
-                        if (className == "Symbol")
-                        {
-                            try
-                            {
-                                int byteSize = heapManager.GetIndexedSize(valueOOP);
-                                var bytes = new byte[byteSize];
-                                for (int i = 0; i < byteSize; i++)
-                                {
-                                    bytes[i] = heapManager.GetIndexedByte(valueOOP, i);
-                                }
-
-                                string symbolValue = System.Text.Encoding.Latin1.GetString(bytes);
-                                valueStr = $"{valueOOP} (Symbol) = #{symbolValue}";
-                            }
-                            catch
-                            {
-                                // Ignore errors when reading symbol value
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        // If GetClassName fails, just show the OOP
-                        valueStr = valueOOP.ToString();
-                    }
-                }
-
-                Console.WriteLine($"[PUSH #{getPushTraceCounter()}] Pushing {valueStr} onto stack");
-            }
         }
 
         // DIAGNOSTIC: Validate activeContextOOP is a valid context (MethodContext or BlockContext)

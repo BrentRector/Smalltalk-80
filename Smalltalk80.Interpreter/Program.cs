@@ -416,22 +416,8 @@ public static class Program
                     // Reset instruction count before each expression
                     vm.ResetInstructionCount();
 
-                    // Enable selector tracing for Form initialize to debug the infinite loop
-                    bool enableSelectorTrace = expr.Source == "Form initialize";
-                    if (enableSelectorTrace)
-                    {
-                        Console.WriteLine("\n[SELECTOR TRACE ENABLED for Form initialize]");
-                        vm.EnableSelectorTrace();
-                    }
-
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
                     long instructionCount = vm.InstructionCount;
-
-                    // Disable selector tracing after Form initialize
-                    if (enableSelectorTrace)
-                    {
-                        vm.DisableSelectorTrace();
-                    }
 
                     if (result.Status == InitStatus.Success)
                     {
