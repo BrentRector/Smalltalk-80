@@ -6,6 +6,20 @@
 
 This document describes the font support implementation for the Smalltalk-80 interpreter, which enables proper text rendering during cold start by bootstrapping the `DefaultTextStyle` pool variable with real `StrikeFont` objects.
 
+## Prerequisites
+
+### Pool Dictionary Bootstrap
+
+**IMPORTANT**: For DefaultTextStyle to be accessible to Smalltalk code, the cold start must:
+
+1. Create the TextConstants pool dictionary
+2. Migrate DefaultTextStyle Association from Undeclared to TextConstants
+3. Set the Association's value to the TextStyle object
+
+See **[Pool-Dictionary-Bootstrap-Requirements.md](Pool-Dictionary-Bootstrap-Requirements.md)** for details.
+
+Without this migration, Smalltalk code declaring `poolDictionaries: 'TextConstants'` will not be able to resolve DefaultTextStyle, even though the TextStyle object exists on the heap.
+
 ## Host vs Smalltalk Responsibilities
 
 ### Host System (Windows/WinForms)
