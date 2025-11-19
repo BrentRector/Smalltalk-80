@@ -124,6 +124,11 @@ public class ExecutionTracer
     public void TraceSendEntry(string receiverClass, string selectorName, string fromMethod)
     {
         if (!ShouldTraceSend()) return;
+
+        // Only show sends from within Form class methods
+        if (!fromMethod.Contains("Form>>") && !fromMethod.Contains("Form_class>>"))
+            return;
+
         Console.WriteLine($"[SEND #{_instructionCount}] {receiverClass}>>{selectorName} (from {fromMethod})");
     }
 
