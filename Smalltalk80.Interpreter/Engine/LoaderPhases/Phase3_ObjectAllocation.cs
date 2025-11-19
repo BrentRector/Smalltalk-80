@@ -5,6 +5,7 @@ using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
+using Smalltalk80.Interpreter.Engine.Services;
 using System.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
@@ -68,9 +69,10 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Initialize helper classes
         _fieldValueResolver = new FieldValueResolver(allocator, bundle, localIdToObjectId, diagnostics);
+        var dictionaryService = new DictionaryService(allocator, bundle);
         _dictionaryInstaller = new DictionaryInstaller(
             allocator, bundle, localIdToObjectId, initializedFields,
-            _fieldValueResolver.InternSymbol);
+            _fieldValueResolver.InternSymbol, dictionaryService);
     }
 
     /// <summary>

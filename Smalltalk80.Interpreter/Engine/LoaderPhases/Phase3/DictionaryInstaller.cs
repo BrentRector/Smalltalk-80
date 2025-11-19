@@ -3,6 +3,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
 
@@ -16,7 +17,8 @@ internal class DictionaryInstaller(
     ColdStartBundle bundle,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
     HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
-    Func<string, SmalltalkOOP> symbolInternerFunc)
+    Func<string, SmalltalkOOP> symbolInternerFunc,
+    DictionaryService dictionaryService)
 {
     /// <summary>
     /// Allocates an Association object (key-value pair) using ObjectGraphAllocator.
@@ -43,54 +45,7 @@ internal class DictionaryInstaller(
     /// <param name="name">The key name for diagnostics.</param>
     public void InstallInSystemDictionary(SmalltalkOOP associationOOP, string name)
     {
-        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-        int systemDictSize = allocator.GetIndexedSize(systemDictOOP);
-        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
-
-        // Get the key symbol from the Association (slot 0)
-        var keySymbolOOP = allocator.GetInstanceVariable(associationOOP, 0);
-
-        // Use hash-based lookup to find correct slot (same algorithm as Dictionary>>findKeyOrNil:)
-        // Smalltalk: location _ key hash \\ length + 1 (then convert to 0-based index)
-        int hash = GetSymbolHash(keySymbolOOP);
-        int location = (hash % systemDictSize + systemDictSize) % systemDictSize; // Handle negative hash
-
-        // Probe for nil slot or matching key (linear probing)
-        int pass = 1;
-        int startLocation = location;
-        while (true)
-        {
-            var probe = allocator.GetIndexedOOP(systemDictOOP, location);
-
-            if (probe == nilOOP)
-            {
-                // Found empty slot - install association
-                allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
-                return;
-            }
-
-            // Check if Association with same key already exists
-            var probeKeyOOP = allocator.GetInstanceVariable(probe, 0);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                // Slot already contains Association for this key - update it
-                allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
-                return;
-            }
-
-            // Linear probe to next slot
-            location = (location + 1) % systemDictSize;
-
-            // Check if we've wrapped around
-            if (location == startLocation)
-            {
-                pass++;
-                if (pass > 2)
-                {
-                    throw new InvalidOperationException($"SystemDictionary is full - cannot install {name} association after 2 passes");
-                }
-            }
-        }
+        dictionaryService.InstallInSystemDictionary(associationOOP, name);
     }
 
     /// <summary>
@@ -101,10 +56,7 @@ internal class DictionaryInstaller(
     /// <returns>The identity hash value.</returns>
     public int GetSymbolHash(SmalltalkOOP symbolOOP)
     {
-        // Symbol>>hash uses Primitive 75: returns half the object pointer
-        // Blue Book: "Answer with a SmallInteger whose value is half of the receiver's object pointer"
-        // This is an IDENTITY hash based on OOP, NOT a string content hash!
-        return IdentityHashUtility.ComputeIdentityHash(symbolOOP);
+        return dictionaryService.GetSymbolHash(symbolOOP);
     }
 
     /// <summary>
@@ -116,68 +68,7 @@ internal class DictionaryInstaller(
     /// <param name="name">The key name for diagnostics.</param>
     public void InstallInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string name)
     {
-        int dictSize = allocator.GetIndexedSize(dictionaryOOP);
-        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
-
-        // Get the key symbol from the Association (slot 0)
-        var keySymbolOOP = allocator.GetInstanceVariable(associationOOP, 0);
-
-        // Use hash-based lookup (same algorithm as Dictionary>>findKeyOrNil:)
-        int hash = GetSymbolHash(keySymbolOOP);
-        int location = (hash % dictSize + dictSize) % dictSize;
-
-        // Linear probing
-        int pass = 1;
-        int startLocation = location;
-        bool incrementTally = true;
-
-        while (true)
-        {
-            var probe = allocator.GetIndexedOOP(dictionaryOOP, location);
-
-            if (probe == nilOOP)
-            {
-                // Found empty slot - install association
-                allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
-
-                // Increment tally field
-                if (incrementTally)
-                {
-                    int tallyIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Dictionary", "tally", bundle);
-                    if (tallyIndex >= 0)
-                    {
-                        var currentTallyOOP = allocator.GetInstanceVariable(dictionaryOOP, tallyIndex);
-                        int currentTally = currentTallyOOP.IsSmallInteger ? currentTallyOOP.AsSmallInteger() : 0;
-                        allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(currentTally + 1));
-                    }
-                }
-
-                return;
-            }
-
-            // Check if Association with same key already exists
-            var probeKeyOOP = allocator.GetInstanceVariable(probe, 0);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                // Update existing Association
-                allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
-
-                incrementTally = false;
-                return;
-            }
-
-            // Linear probe
-            location = (location + 1) % dictSize;
-
-            if (location == startLocation)
-            {
-                pass++;
-                if (pass > 2)
-                {
-                    throw new InvalidOperationException($"Dictionary is full - cannot install {name} association after 2 passes");
-                }
-            }
-        }
+        dictionaryService.InstallInDictionary(dictionaryOOP, associationOOP, name);
     }
 
     /// <summary>
