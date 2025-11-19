@@ -167,6 +167,7 @@ internal class GarbageCollector : IGarbageCollector
 
                     // Clear managed storage (allows .NET GC to reclaim memory)
                     entry.ManagedStorage = null;
+                    entry.InstanceVariableStorage = null;
 
                     // Push freed index back to free list for reuse
                     _tableManager.FreeObjectTableIndex(objectId);
@@ -263,14 +264,24 @@ internal class GarbageCollector : IGarbageCollector
                 }
             }
         }
-        // ALSO mark the class pointer for ByteIndexed/WordIndexed objects
-        // (they store class in separate ClassOOP field, not in OOP array)
+        // ALSO mark the class pointer and instance variables for ByteIndexed/WordIndexed objects
+        // (they store class in separate ClassOOP field and instance variables in InstanceVariableStorage)
         else if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
         {
+            // Mark class pointer
             var classOOP = entry.ClassOOP;
             if (classOOP != SmalltalkOOP.Null)
             {
                 MarkObjectRecursively(classOOP);
+            }
+
+            // Mark instance variables (e.g., Form has bits, width, height, offset)
+            if (entry.InstanceVariableStorage != null)
+            {
+                foreach (var instVarOOP in entry.InstanceVariableStorage)
+                {
+                    MarkObjectRecursively(instVarOOP);
+                }
             }
         }
     }

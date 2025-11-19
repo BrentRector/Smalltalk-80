@@ -69,9 +69,9 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         };
 
         // CRITICAL: Initialize all OOP slots to nil (Blue Book requirement)
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
         if (managedStorage is SmalltalkOOP[] oopArray)
         {
-            var nilOOP = SpecialObjectsArray.Instance.Nil;
             for (int i = 1; i < oopArray.Length; i++) // Skip slot 0 (class pointer)
             {
                 oopArray[i] = nilOOP;
@@ -90,6 +90,18 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             instanceVariableCount: fixedSlots,
             originalIndexedSize: originalIndexedSize
         );
+
+        // For ByteIndexed/WordIndexed objects with instance variables, allocate separate storage
+        // These formats store indexed data in ManagedStorage (byte[]/ushort[]) but also need
+        // OOP storage for instance variables (e.g., Form has bits, width, height, offset)
+        if ((format == ObjectFormat.ByteIndexed || format == ObjectFormat.WordIndexed) && fixedSlots > 0)
+        {
+            entry.InstanceVariableStorage = new SmalltalkOOP[fixedSlots];
+            for (int i = 0; i < fixedSlots; i++)
+            {
+                entry.InstanceVariableStorage[i] = nilOOP;
+            }
+        }
 
         // Store entry in ObjectTable
         _tableManager.SetObjectTableEntry(tableIndex, entry);
@@ -364,12 +376,31 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
 
     private SmalltalkOOP ReadSlot(ObjectTableEntry entry, int slotIndex)
     {
-        if (slotIndex == 0)
+        // For ByteIndexed/WordIndexed objects, handle specially
+        if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
         {
-            if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
+            if (slotIndex == 0)
+            {
                 return entry.ClassOOP;
+            }
+
+            // Instance variables stored in InstanceVariableStorage
+            if (entry.InstanceVariableStorage != null)
+            {
+                int instVarIndex = slotIndex - 1;
+                if (instVarIndex < 0 || instVarIndex >= entry.InstanceVariableStorage.Length)
+                    throw new ArgumentOutOfRangeException(nameof(slotIndex),
+                        $"Instance variable index {instVarIndex} out of range [0, {entry.InstanceVariableStorage.Length - 1}]");
+                return entry.InstanceVariableStorage[instVarIndex];
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"ByteIndexed/WordIndexed object has no instance variable storage for slot {slotIndex}");
+            }
         }
 
+        // For Pointer/PointerIndexed, use OOP array
         var oopArray = entry.AsOopArray();
         if (oopArray == null)
             throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support OOP slot access");
@@ -383,15 +414,33 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
 
     private void WriteSlot(ObjectTableEntry entry, int slotIndex, SmalltalkOOP value)
     {
-        if (slotIndex == 0)
+        // For ByteIndexed/WordIndexed objects, handle specially
+        if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
         {
-            if (entry.FormatExplicit == ObjectFormat.ByteIndexed || entry.FormatExplicit == ObjectFormat.WordIndexed)
+            if (slotIndex == 0)
             {
                 entry.ClassOOP = value;
                 return;
             }
+
+            // Instance variables stored in InstanceVariableStorage
+            if (entry.InstanceVariableStorage != null)
+            {
+                int instVarIndex = slotIndex - 1;
+                if (instVarIndex < 0 || instVarIndex >= entry.InstanceVariableStorage.Length)
+                    throw new ArgumentOutOfRangeException(nameof(slotIndex),
+                        $"Instance variable index {instVarIndex} out of range [0, {entry.InstanceVariableStorage.Length - 1}]");
+                entry.InstanceVariableStorage[instVarIndex] = value;
+                return;
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"ByteIndexed/WordIndexed object has no instance variable storage for slot {slotIndex}");
+            }
         }
 
+        // For Pointer/PointerIndexed, use OOP array
         var oopArray = entry.AsOopArray();
         if (oopArray == null)
             throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support OOP slot access");
