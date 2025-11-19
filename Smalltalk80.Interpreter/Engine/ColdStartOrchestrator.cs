@@ -215,8 +215,11 @@ public class ColdStartOrchestrator : IColdStartLoader
             // Create snapshot writer to capture failure details
             try
             {
-                var snapshotWriter = new SnapshotWriter(_heapManager, _bundle, _localIdToObjectId);
-                snapshotWriter.WriteSnapshot(_bundlePath, _report.Failure, ex);
+                if (_localIdToObjectId != null)
+                {
+                    var snapshotWriter = new SnapshotWriter(_heapManager, _bundle, _localIdToObjectId);
+                    snapshotWriter.WriteSnapshot(_bundlePath, _report.Failure, ex);
+                }
             }
             catch
             {
