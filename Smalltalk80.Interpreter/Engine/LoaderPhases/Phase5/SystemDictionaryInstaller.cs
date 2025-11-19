@@ -113,6 +113,7 @@ public class SystemDictionaryInstaller(
     {
         // Discover all unique pool dictionaries from bundle
         var poolToClasses = new Dictionary<string, List<string>>();
+        var poolVariables = new Dictionary<string, HashSet<string>>();
 
         foreach (var cls in context.Bundle.Classes)
         {
@@ -129,24 +130,117 @@ public class SystemDictionaryInstaller(
                     if (!poolToClasses.ContainsKey(poolName))
                     {
                         poolToClasses[poolName] = new List<string>();
+                        poolVariables[poolName] = new HashSet<string>();
                     }
                     poolToClasses[poolName].Add(className);
                 }
             }
         }
 
-        // Just log - pool dictionaries are created by init expressions
+        // Discover pool variable names from method literals
+        foreach (var method in context.Bundle.Methods)
+        {
+            if (method.Literals == null) continue;
+
+            foreach (var literal in method.Literals)
+            {
+                if (literal.Type == "association" && literal.Association?.PoolDictionaryName != null)
+                {
+                    string poolName = literal.Association.PoolDictionaryName;
+                    string varName = literal.Association.Key!;
+
+                    if (!poolVariables.ContainsKey(poolName))
+                    {
+                        poolVariables[poolName] = new HashSet<string>();
+                    }
+                    poolVariables[poolName].Add(varName);
+                }
+            }
+        }
+
+        // Create and populate each pool dictionary
         foreach (var (poolName, declaringClasses) in poolToClasses)
         {
-            context.Diagnostics?.Emit(new DiagnosticMessageEvent
-            {
-                Severity = MessageSeverity.Info,
-                Category = "Phase5",
-                Message = $"Pool dictionary {poolName} will be created by init expressions (used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})",
-                Timestamp = Stopwatch.GetTimestamp(),
-                InstructionCount = 0
-            });
+            var variables = poolVariables.GetValueOrDefault(poolName) ?? new HashSet<string>();
+            CreateAndPopulatePoolDictionary(poolName, variables, declaringClasses);
         }
+    }
+
+    private void CreateAndPopulatePoolDictionary(string poolName, HashSet<string> variableNames, List<string> declaringClasses)
+    {
+        // Allocate Dictionary with enough capacity for variables
+        int capacity = Math.Max(8, variableNames.Count * 2);
+        var poolDictOOP = AllocateEmptyDictionary(capacity);
+
+        // Register the pool dictionary
+        GlobalRegistry.Register(poolName, poolDictOOP);
+
+        // Install pool dictionary in SystemDictionary as a global
+        var poolAssocOOP = associationManager.GetOrCreateCanonical(poolName);
+        context.Allocator.SetInstanceVariable(poolAssocOOP, 1, poolDictOOP);
+        InstallInSystemDictionary(poolAssocOOP, poolName);
+
+        // Get Undeclared dictionary for migration
+        GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP);
+
+        // Migrate associations from Undeclared to the pool dictionary
+        int migratedCount = 0;
+        foreach (var varName in variableNames)
+        {
+            // Get or create canonical association for this variable
+            var varAssocOOP = associationManager.GetOrCreateCanonical(varName);
+
+            // Install in pool dictionary
+            dictionaryOps.InstallAssociation(poolDictOOP, varAssocOOP, varName);
+
+            // Remove from Undeclared if present
+            if (undeclaredOOP != default)
+            {
+                var keySymbolOOP = context.Allocator.GetInstanceVariable(varAssocOOP, 0);
+                dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, varName);
+            }
+
+            migratedCount++;
+        }
+
+        context.Diagnostics?.Emit(new DiagnosticMessageEvent
+        {
+            Severity = MessageSeverity.Info,
+            Category = "Phase5",
+            Message = $"Created pool dictionary {poolName} with {migratedCount} variables (used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})",
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
+    }
+
+    private SmalltalkOOP AllocateEmptyDictionary(int capacity)
+    {
+        // Dictionary has 2 named instance variables (tally, array) plus indexed slots
+        var dictionaryClassOOP = GlobalRegistry.LookupClassOOP("Dictionary");
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+
+        // Allocate the Dictionary object
+        var dictOOP = context.Allocator.AllocateFixedObject("Dictionary");
+        context.Allocator.SetObjectClass(dictOOP, dictionaryClassOOP);
+
+        // Set tally to 0
+        context.Allocator.SetInstanceVariable(dictOOP, 0, SmalltalkOOP.FromSmallInteger(0));
+
+        // Create the backing array
+        var arrayOOP = context.Allocator.AllocateArray("Array", capacity);
+        context.Allocator.SetObjectClass(arrayOOP, arrayClassOOP);
+
+        // Initialize array to nil
+        for (int i = 0; i < capacity; i++)
+        {
+            context.Allocator.SetIndexedOOP(arrayOOP, i, nilOOP);
+        }
+
+        // Set the array reference
+        context.Allocator.SetInstanceVariable(dictOOP, 1, arrayOOP);
+
+        return dictOOP;
     }
 
     private void InstallProcessorGlobal(SmalltalkOOP processorSchedulerOOP)
