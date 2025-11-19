@@ -5,6 +5,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Core.VM.Graphics;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 
@@ -18,13 +19,126 @@ public class RuntimeObjectCreator(
     IDictionaryOperations dictionaryOps) : IRuntimeObjectCreator
 {
     /// <summary>
-    /// Creates a minimal DefaultTextStyle object to support PopUpMenu and other UI features.
+    /// Creates the DefaultTextStyle object with properly initialized StrikeFonts.
+    /// Uses WinFormsFontBridge to generate real font metrics and glyph bitmaps.
     /// </summary>
     public void CreateDefaultTextStyle()
     {
+        // Use the FontObjectBuilder and WinFormsFontBridge to create proper fonts
+        var fontBuilder = new FontObjectBuilder(context);
+
+        // Try to use real fonts via GDI+, fall back to stub if unavailable
+        SmalltalkOOP textStyleOOP;
+        int lineGrid;
+        int baseline;
+
+        try
+        {
+            using var fontBridge = new WinFormsFontBridge();
+
+            // Create canonical font sizes (10, 12, 14)
+            var fontDescriptors = new[]
+            {
+                new FontDescriptor("Courier New", 10),
+                new FontDescriptor("Courier New", 12),
+                new FontDescriptor("Courier New", 14)
+            };
+
+            var strikeFontOOPs = new List<SmalltalkOOP>();
+
+            foreach (var descriptor in fontDescriptors)
+            {
+                // Check if font is available
+                if (!fontBridge.ResolveFace(descriptor))
+                {
+                    // Fall back to a common font
+                    var fallbackDescriptor = new FontDescriptor("Arial", descriptor.SizePixels);
+                    if (!fontBridge.ResolveFace(fallbackDescriptor))
+                    {
+                        // Use stub font as last resort
+                        continue;
+                    }
+                }
+
+                var fontData = fontBridge.BuildStrikeFont(descriptor);
+                var strikeFontOOP = fontBuilder.CreateStrikeFont(fontData);
+                strikeFontOOPs.Add(strikeFontOOP);
+
+                context.Diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Info,
+                    Category = "Phase5",
+                    Message = $"Created StrikeFont '{fontData.Name}' (ascent={fontData.Metrics.Ascent}, descent={fontData.Metrics.Descent}, strikeLength={fontData.StrikeLength})",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
+            }
+
+            // If we have at least one font, use it
+            if (strikeFontOOPs.Count > 0)
+            {
+                // Use the 12px font metrics for TextStyle (or first available)
+                var primaryFontData = fontBridge.BuildStrikeFont(fontDescriptors[Math.Min(1, fontDescriptors.Length - 1)]);
+                lineGrid = primaryFontData.Metrics.Ascent + primaryFontData.Metrics.Descent + primaryFontData.Metrics.Leading;
+                baseline = primaryFontData.Metrics.Ascent;
+
+                textStyleOOP = fontBuilder.CreateTextStyle(strikeFontOOPs.ToArray(), lineGrid, baseline);
+            }
+            else
+            {
+                // Fall back to stub
+                textStyleOOP = CreateStubTextStyle(fontBuilder);
+                lineGrid = 14;
+                baseline = 10;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Fall back to stub on any error (e.g., running without GUI)
+            context.Diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Warning,
+                Category = "Phase5",
+                Message = $"Font bridge failed, using stub: {ex.Message}",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+
+            textStyleOOP = CreateStubTextStyle(fontBuilder);
+            lineGrid = 14;
+            baseline = 10;
+        }
+
+        // Install the DefaultTextStyle in TextConstants
+        var allAssociations = AssociationRegistry.GetAll();
+        if (allAssociations.TryGetValue("DefaultTextStyle", out SmalltalkOOP defaultTextStyleAssoc))
+        {
+            context.Allocator.SetInstanceVariable(defaultTextStyleAssoc, 1, textStyleOOP);
+            context.InitializedFields.Add((defaultTextStyleAssoc, 1));
+
+            context.Diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Info,
+                Category = "Phase5",
+                Message = $"Created DefaultTextStyle (oop={textStyleOOP.RawValue}) with lineGrid={lineGrid}, baseline={baseline}",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+        }
+        else
+        {
+            GlobalRegistry.Register("DefaultTextStyle", textStyleOOP);
+        }
+    }
+
+    /// <summary>
+    /// Creates a minimal stub TextStyle when real fonts are unavailable.
+    /// </summary>
+    private SmalltalkOOP CreateStubTextStyle(FontObjectBuilder fontBuilder)
+    {
         var nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // Step 1: Create minimal stub StrikeFont
+        // Create minimal stub StrikeFont
         var strikeFontOOP = context.Allocator.AllocateFixedObject("StrikeFont");
         var strikeFontClassOOP = GlobalRegistry.LookupClassOOP("StrikeFont");
         context.Allocator.SetObjectClass(strikeFontOOP, strikeFontClassOOP);
@@ -42,55 +156,18 @@ public class RuntimeObjectCreator(
         SetInstanceVarByName(strikeFontOOP, "StrikeFont", "ascent", SmalltalkOOP.FromSmallInteger(10));
         SetInstanceVarByName(strikeFontOOP, "StrikeFont", "descent", SmalltalkOOP.FromSmallInteger(3));
         SetInstanceVarByName(strikeFontOOP, "StrikeFont", "maxWidth", SmalltalkOOP.FromSmallInteger(8));
+        SetInstanceVarByName(strikeFontOOP, "StrikeFont", "minAscii", SmalltalkOOP.FromSmallInteger(0));
+        SetInstanceVarByName(strikeFontOOP, "StrikeFont", "maxAscii", SmalltalkOOP.FromSmallInteger(255));
+        SetInstanceVarByName(strikeFontOOP, "StrikeFont", "strikeLength", SmalltalkOOP.FromSmallInteger(2048));
+        SetInstanceVarByName(strikeFontOOP, "StrikeFont", "xOffset", SmalltalkOOP.FromSmallInteger(0));
+        SetInstanceVarByName(strikeFontOOP, "StrikeFont", "raster", SmalltalkOOP.FromSmallInteger(128));
+        SetInstanceVarByName(strikeFontOOP, "StrikeFont", "type", SmalltalkOOP.FromSmallInteger(0));
+        SetInstanceVarByName(strikeFontOOP, "StrikeFont", "emphasis", SmalltalkOOP.FromSmallInteger(0));
+        SetInstanceVarByName(strikeFontOOP, "StrikeFont", "subscript", SmalltalkOOP.FromSmallInteger(3));
+        SetInstanceVarByName(strikeFontOOP, "StrikeFont", "superscript", SmalltalkOOP.FromSmallInteger(5));
 
-        // Step 2: Create fontArray with one stub font
-        var fontArrayOOP = context.Allocator.AllocateArray("Array", 1);
-        context.Allocator.SetIndexedOOP(fontArrayOOP, 0, strikeFontOOP);
-        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        context.Allocator.SetObjectClass(fontArrayOOP, arrayClassOOP);
-
-        // Step 3: Create TextStyle object
-        var textStyleOOP = context.Allocator.AllocateFixedObject("TextStyle");
-        var textStyleClassOOP = GlobalRegistry.LookupClassOOP("TextStyle");
-        context.Allocator.SetObjectClass(textStyleOOP, textStyleClassOOP);
-
-        // Initialize critical TextStyle fields
-        SetInstanceVarByName(textStyleOOP, "TextStyle", "fontArray", fontArrayOOP);
-        SetInstanceVarByName(textStyleOOP, "TextStyle", "lineGrid", SmalltalkOOP.FromSmallInteger(14));
-        SetInstanceVarByName(textStyleOOP, "TextStyle", "baseline", SmalltalkOOP.FromSmallInteger(10));
-        SetInstanceVarByName(textStyleOOP, "TextStyle", "alignment", SmalltalkOOP.FromSmallInteger(0));
-
-        // Initialize remaining fields to nil
-        int textStyleInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("TextStyle", context.Bundle);
-        for (int i = 0; i < textStyleInstVarCount; i++)
-        {
-            if (!context.InitializedFields.Contains((textStyleOOP, i)))
-            {
-                context.Allocator.SetInstanceVariable(textStyleOOP, i, nilOOP);
-                context.InitializedFields.Add((textStyleOOP, i));
-            }
-        }
-
-        // Step 4: Update the DefaultTextStyle Association
-        var allAssociations = AssociationRegistry.GetAll();
-        if (allAssociations.TryGetValue("DefaultTextStyle", out SmalltalkOOP defaultTextStyleAssoc))
-        {
-            context.Allocator.SetInstanceVariable(defaultTextStyleAssoc, 1, textStyleOOP);
-            context.InitializedFields.Add((defaultTextStyleAssoc, 1));
-
-            context.Diagnostics?.Emit(new DiagnosticMessageEvent
-            {
-                Severity = MessageSeverity.Info,
-                Category = "Phase5",
-                Message = $"Created DefaultTextStyle (oop={textStyleOOP.RawValue}) with stub StrikeFont",
-                Timestamp = Stopwatch.GetTimestamp(),
-                InstructionCount = 0
-            });
-        }
-        else
-        {
-            GlobalRegistry.Register("DefaultTextStyle", textStyleOOP);
-        }
+        // Create TextStyle with stub font
+        return fontBuilder.CreateTextStyle(new[] { strikeFontOOP }, 14, 10);
     }
 
     /// <summary>

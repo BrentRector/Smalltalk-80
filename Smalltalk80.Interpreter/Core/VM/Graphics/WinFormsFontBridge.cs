@@ -1,0 +1,391 @@
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Text;
+
+namespace Smalltalk80.Interpreter.Core.VM.Graphics;
+
+/// <summary>
+/// GDI+/WinForms implementation of IFontBridge.
+/// Uses System.Drawing for font operations with deterministic settings.
+/// </summary>
+public class WinFormsFontBridge : IFontBridge, IDisposable
+{
+    private const int FixedDpi = 96;
+    private readonly Dictionary<FontCacheKey, StrikeFontData> _fontCache = new();
+    private readonly Dictionary<FontDescriptor, Font> _fontObjectCache = new();
+    private bool _disposed;
+
+    /// <inheritdoc/>
+    public int RenderingDpi => FixedDpi;
+
+    /// <inheritdoc/>
+    public bool IsDeterministicMode => true;
+
+    /// <summary>
+    /// Gets or creates a GDI+ Font object for the given descriptor.
+    /// </summary>
+    private Font GetOrCreateFont(FontDescriptor descriptor)
+    {
+        if (_fontObjectCache.TryGetValue(descriptor, out var cached))
+            return cached;
+
+        var style = FontStyle.Regular;
+        if (descriptor.Bold) style |= FontStyle.Bold;
+        if (descriptor.Italic) style |= FontStyle.Italic;
+
+        // Convert pixel size to points (at 96 DPI, 1 point = 1.333... pixels)
+        float pointSize = descriptor.SizePixels * 72f / FixedDpi;
+
+        var font = new Font(descriptor.FamilyName, pointSize, style, GraphicsUnit.Point);
+        _fontObjectCache[descriptor] = font;
+        return font;
+    }
+
+    /// <inheritdoc/>
+    public bool ResolveFace(FontDescriptor descriptor)
+    {
+        try
+        {
+            using var fontFamily = new FontFamily(descriptor.FamilyName);
+            return fontFamily.IsStyleAvailable(GetFontStyle(descriptor));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static FontStyle GetFontStyle(FontDescriptor descriptor)
+    {
+        var style = FontStyle.Regular;
+        if (descriptor.Bold) style |= FontStyle.Bold;
+        if (descriptor.Italic) style |= FontStyle.Italic;
+        return style;
+    }
+
+    /// <inheritdoc/>
+    public FontMetrics GetMetrics(FontDescriptor descriptor)
+    {
+        var font = GetOrCreateFont(descriptor);
+        var fontFamily = font.FontFamily;
+        var style = GetFontStyle(descriptor);
+
+        // Get design units and convert to pixels
+        int emHeight = fontFamily.GetEmHeight(style);
+        int cellAscent = fontFamily.GetCellAscent(style);
+        int cellDescent = fontFamily.GetCellDescent(style);
+        int lineSpacing = fontFamily.GetLineSpacing(style);
+
+        // Convert design units to pixels
+        float pixelScale = font.Size / emHeight * FixedDpi / 72f;
+        int ascent = (int)Math.Ceiling(cellAscent * pixelScale);
+        int descent = (int)Math.Ceiling(cellDescent * pixelScale);
+        int lineHeight = (int)Math.Ceiling(lineSpacing * pixelScale);
+        int leading = lineHeight - ascent - descent;
+
+        // Measure space width and average width
+        int spaceWidth = GetCharWidth(descriptor, ' ');
+        int avgWidth = GetCharWidth(descriptor, 'x');
+
+        // Calculate max width by measuring some wide characters
+        int maxWidth = 0;
+        foreach (char c in "MW@#$%&")
+        {
+            int w = GetCharWidth(descriptor, c);
+            if (w > maxWidth) maxWidth = w;
+        }
+
+        return new FontMetrics
+        {
+            Ascent = ascent,
+            Descent = descent,
+            Leading = Math.Max(0, leading),
+            MaxWidth = maxWidth,
+            SpaceWidth = spaceWidth,
+            AverageWidth = avgWidth,
+            SubscriptOffset = descent,
+            SuperscriptOffset = ascent / 2
+        };
+    }
+
+    /// <inheritdoc/>
+    public int GetCharWidth(FontDescriptor descriptor, char character)
+    {
+        var font = GetOrCreateFont(descriptor);
+
+        // Create a small bitmap to measure on
+        using var measureBitmap = new Bitmap(1, 1);
+        measureBitmap.SetResolution(FixedDpi, FixedDpi);
+        using var g = System.Drawing.Graphics.FromImage(measureBitmap);
+        ConfigureGraphicsForDeterminism(g);
+
+        // Use MeasureString with StringFormat to get precise width
+        var format = new StringFormat(StringFormat.GenericTypographic)
+        {
+            FormatFlags = StringFormatFlags.MeasureTrailingSpaces | StringFormatFlags.NoClip
+        };
+
+        var size = g.MeasureString(character.ToString(), font, PointF.Empty, format);
+        return (int)Math.Ceiling(size.Width);
+    }
+
+    /// <inheritdoc/>
+    public int GetStringWidth(FontDescriptor descriptor, string text)
+    {
+        if (string.IsNullOrEmpty(text)) return 0;
+
+        var font = GetOrCreateFont(descriptor);
+
+        using var measureBitmap = new Bitmap(1, 1);
+        measureBitmap.SetResolution(FixedDpi, FixedDpi);
+        using var g = System.Drawing.Graphics.FromImage(measureBitmap);
+        ConfigureGraphicsForDeterminism(g);
+
+        var format = new StringFormat(StringFormat.GenericTypographic)
+        {
+            FormatFlags = StringFormatFlags.MeasureTrailingSpaces | StringFormatFlags.NoClip
+        };
+
+        var size = g.MeasureString(text, font, PointF.Empty, format);
+        return (int)Math.Ceiling(size.Width);
+    }
+
+    /// <inheritdoc/>
+    public GlyphData RenderGlyph(FontDescriptor descriptor, char character)
+    {
+        var font = GetOrCreateFont(descriptor);
+        var metrics = GetMetrics(descriptor);
+        int width = GetCharWidth(descriptor, character);
+
+        if (width <= 0) width = 1;
+
+        int height = metrics.Ascent + metrics.Descent;
+        if (height <= 0) height = 1;
+
+        // Create bitmap for rendering
+        using var bitmap = new Bitmap(width, height);
+        bitmap.SetResolution(FixedDpi, FixedDpi);
+
+        using (var g = System.Drawing.Graphics.FromImage(bitmap))
+        {
+            ConfigureGraphicsForDeterminism(g);
+
+            // Clear to white (background)
+            g.Clear(Color.White);
+
+            // Draw character in black at baseline
+            var format = new StringFormat(StringFormat.GenericTypographic)
+            {
+                FormatFlags = StringFormatFlags.NoClip
+            };
+
+            g.DrawString(character.ToString(), font, Brushes.Black, 0, 0, format);
+        }
+
+        // Convert to 1bpp
+        var bitmapData = ConvertTo1Bpp(bitmap, height);
+
+        return new GlyphData
+        {
+            Character = character,
+            Width = width,
+            Bitmap = bitmapData,
+            Height = height,
+            BitmapWidth = width
+        };
+    }
+
+    /// <inheritdoc/>
+    public StrikeFontData BuildStrikeFont(FontDescriptor descriptor, int minAscii = 0, int maxAscii = 255)
+    {
+        // Check cache first
+        var cacheKey = new FontCacheKey
+        {
+            FamilyName = descriptor.FamilyName,
+            SizePixels = descriptor.SizePixels,
+            Dpi = FixedDpi,
+            Bold = descriptor.Bold,
+            Italic = descriptor.Italic,
+            HintingEnabled = false
+        };
+
+        if (_fontCache.TryGetValue(cacheKey, out var cached))
+            return cached;
+
+        var metrics = GetMetrics(descriptor);
+        int charCount = maxAscii - minAscii + 1;
+        int fontHeight = metrics.Ascent + metrics.Descent;
+
+        // First pass: measure all character widths and compute total width
+        int[] widths = new int[charCount];
+        int totalWidth = 0;
+
+        for (int i = 0; i < charCount; i++)
+        {
+            char c = (char)(minAscii + i);
+            int w = GetCharWidth(descriptor, c);
+            if (w <= 0) w = 1; // Ensure at least 1 pixel width
+            widths[i] = w;
+            totalWidth += w;
+        }
+
+        // Ensure totalWidth is reasonable
+        if (totalWidth <= 0) totalWidth = charCount;
+
+        // Build xTable (includes sentinel at end)
+        int[] xTable = new int[charCount + 1];
+        int x = 0;
+        for (int i = 0; i < charCount; i++)
+        {
+            xTable[i] = x;
+            x += widths[i];
+        }
+        xTable[charCount] = x; // Sentinel
+
+        int strikeLength = x;
+        int raster = (strikeLength + 15) / 16;
+
+        // Create the combined glyphs bitmap
+        using var glyphsBitmap = new Bitmap(strikeLength, fontHeight);
+        glyphsBitmap.SetResolution(FixedDpi, FixedDpi);
+
+        using (var g = System.Drawing.Graphics.FromImage(glyphsBitmap))
+        {
+            ConfigureGraphicsForDeterminism(g);
+            g.Clear(Color.White);
+
+            var font = GetOrCreateFont(descriptor);
+            var format = new StringFormat(StringFormat.GenericTypographic)
+            {
+                FormatFlags = StringFormatFlags.NoClip
+            };
+
+            // Render each character at its position
+            for (int i = 0; i < charCount; i++)
+            {
+                char c = (char)(minAscii + i);
+                g.DrawString(c.ToString(), font, Brushes.Black, xTable[i], 0, format);
+            }
+        }
+
+        // Convert entire bitmap to 1bpp packed into 16-bit words
+        ushort[] glyphsData = ConvertBitmapTo1BppWords(glyphsBitmap, strikeLength, fontHeight);
+
+        // Build the StrikeFontData
+        var strikeFontData = new StrikeFontData
+        {
+            Name = $"{descriptor.FamilyName}-{descriptor.SizePixels}",
+            Metrics = metrics,
+            MinAscii = minAscii,
+            MaxAscii = maxAscii,
+            XTable = xTable,
+            GlyphsBitmap = glyphsData,
+            StrikeLength = strikeLength,
+            XOffset = 0,
+            Emphasis = (descriptor.Bold ? 1 : 0) | (descriptor.Italic ? 2 : 0),
+            Type = 0,
+            WidthTable = widths
+        };
+
+        _fontCache[cacheKey] = strikeFontData;
+        return strikeFontData;
+    }
+
+    /// <inheritdoc/>
+    public FontIdentity GetFontIdentity(FontDescriptor descriptor)
+    {
+        var font = GetOrCreateFont(descriptor);
+        return new FontIdentity
+        {
+            FamilyName = font.FontFamily.Name,
+            FilePath = null, // GDI+ doesn't expose font file path easily
+            FileHash = null,
+            Weight = descriptor.Bold ? 700 : 400,
+            Style = descriptor.Italic ? "Italic" : "Normal",
+            Dpi = FixedDpi,
+            HintingEnabled = false
+        };
+    }
+
+    /// <summary>
+    /// Configures Graphics for deterministic rendering (no antialiasing, fixed DPI).
+    /// </summary>
+    private static void ConfigureGraphicsForDeterminism(System.Drawing.Graphics g)
+    {
+        g.TextRenderingHint = TextRenderingHint.SingleBitPerPixel;
+        g.SmoothingMode = SmoothingMode.None;
+        g.InterpolationMode = InterpolationMode.NearestNeighbor;
+        g.PixelOffsetMode = PixelOffsetMode.None;
+        g.CompositingQuality = CompositingQuality.HighSpeed;
+    }
+
+    /// <summary>
+    /// Converts a bitmap to 1bpp data stored in 16-bit words.
+    /// </summary>
+    private static ushort[] ConvertTo1Bpp(Bitmap bitmap, int height)
+    {
+        int width = bitmap.Width;
+        int wordsPerRow = (width + 15) / 16;
+        ushort[] result = new ushort[wordsPerRow * height];
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                // Threshold: if brightness < 128, it's "on" (black)
+                bool isOn = (pixel.R + pixel.G + pixel.B) / 3 < 128;
+                if (isOn)
+                {
+                    int wordIndex = y * wordsPerRow + x / 16;
+                    int bitIndex = 15 - (x % 16); // MSB first within word
+                    result[wordIndex] |= (ushort)(1 << bitIndex);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Converts a bitmap to 1bpp words for the entire glyphs form.
+    /// </summary>
+    private static ushort[] ConvertBitmapTo1BppWords(Bitmap bitmap, int width, int height)
+    {
+        int wordsPerRow = (width + 15) / 16;
+        ushort[] result = new ushort[wordsPerRow * height];
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                // Threshold: if brightness < 128, it's "on" (black)
+                bool isOn = (pixel.R + pixel.G + pixel.B) / 3 < 128;
+                if (isOn)
+                {
+                    int wordIndex = y * wordsPerRow + x / 16;
+                    int bitIndex = 15 - (x % 16); // MSB first within word
+                    result[wordIndex] |= (ushort)(1 << bitIndex);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        foreach (var font in _fontObjectCache.Values)
+        {
+            font.Dispose();
+        }
+        _fontObjectCache.Clear();
+        _fontCache.Clear();
+
+        GC.SuppressFinalize(this);
+    }
+}
