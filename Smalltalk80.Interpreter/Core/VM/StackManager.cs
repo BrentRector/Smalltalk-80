@@ -17,7 +17,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 internal class StackManager(
     ISmalltalkHeapManager heapManager,
     VMMetadata metadata,
-    IVMHelpers helpers,
+    IObjectMetadataAccessor helpers,
     Func<SmalltalkOOP> getActiveContext,
     Func<bool> getSelectorTraceEnabled,
     Func<int> getPushTraceCounter,

@@ -7,7 +7,7 @@ namespace Smalltalk80.Interpreter.Core;
 /// Provides common functionality for instance variable counting, class lookup, and variable name resolution.
 /// All methods work from JSON bundle data to avoid hard-coding assumptions.
 /// </summary>
-public static class ClassHierarchyUtils
+public static class ClassHierarchyTraversal
 {
     /// <summary>
     /// Calculates the total instance variable count for a class including inherited ones.

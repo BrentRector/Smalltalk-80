@@ -1,6 +1,9 @@
 using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.Core.VM.Interpreter;
+using Smalltalk80.Interpreter.Core.VM.Caching;
+using Smalltalk80.Interpreter.Core.VM.Diagnostics;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Attributes;
 
@@ -28,7 +31,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// NO access to cold start proxy data (_symbols[], ColdStartBundle, unfrozen registries).
 /// </summary>
 [RuntimeOnly(Reason = "Executes Smalltalk bytecode at runtime, must use heap-only access")]
-public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDebugHelpers, ICacheManager, IPrimitiveMessageSender
+public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICacheManager, IPrimitiveMessageSender
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly RuntimeHeapAccessor _runtimeHeapAccess;
@@ -41,6 +44,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     private readonly IBytecodeInterpreter _bytecodeInterpreter;
     private readonly IVMDebugger _debugger;
     private readonly IPrimitiveRegistry _primitiveRegistry;
+    private readonly SelectorCache _selectorCache;
+    private readonly NonLocalReturnHandler _nlrHandler;
+    private readonly ExecutionTracer _tracer;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -48,66 +54,21 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     // Primitive success flag (Blue Book specification)
     private bool _primitiveSuccess;
 
-    // Instruction execution counter for debugging infinite loops
-    private long _instructionCount = 0;
-    private const long MAX_INSTRUCTIONS = 500000;  // Halt at 500K instructions (infinite loop threshold)
-
     /// <summary>Gets the total number of instructions executed by this VM instance.</summary>
-    public long InstructionCount => _instructionCount;
+    public long InstructionCount => _tracer.InstructionCount;
 
     /// <summary>Resets the instruction counter to zero. Used before executing init expressions.</summary>
-    public void ResetInstructionCount() => _instructionCount = 0;
-
-    // Cursor creation loop diagnostics
-
-    // Call outcome used for NLR propagation and context switching in trampoline interpreter
-    private enum CallOutcomeKind { Normal, NonLocalReturn, VMException, ContextSwitch }
-
-    private readonly struct CallOutcome
-    {
-        public readonly CallOutcomeKind Kind;
-        public readonly SmalltalkOOP Value;
-        public readonly SmalltalkOOP TargetContextOop;
-        public readonly Exception? VMEx;
-
-        private CallOutcome(CallOutcomeKind kind, SmalltalkOOP value, SmalltalkOOP target, Exception? vmEx)
-        {
-            Kind = kind;
-            Value = value;
-            TargetContextOop = target;
-            VMEx = vmEx;
-        }
-
-        public static CallOutcome Normal(SmalltalkOOP value) => new(CallOutcomeKind.Normal, value, SmalltalkOOP.Null, null);
-        public static CallOutcome NonLocalReturn(SmalltalkOOP target, SmalltalkOOP value) => new(CallOutcomeKind.NonLocalReturn, value, target, null);
-        public static CallOutcome VMException(Exception ex) => new(CallOutcomeKind.VMException, SmalltalkOOP.Null, SmalltalkOOP.Null, ex);
-        public static CallOutcome ContextSwitch() => new(CallOutcomeKind.ContextSwitch, SmalltalkOOP.Null, SmalltalkOOP.Null, null);
-    }
-
-    // Trampoline interpreter execution status
-    private enum InterpreterStatus
-    {
-        Continue,  // Context switched - keep executing
-        Return,    // Execution complete - return value
-        Yield      // Temporary pause (for future use)
-    }
+    public void ResetInstructionCount() => _tracer.ResetInstructionCount();
 
     // Trampoline state - used to avoid recursive ExecuteBytecodeLoop calls
+    // (CallOutcome, CallOutcomeKind, InterpreterStatus moved to Interpreter/ExecutionState.cs)
     private SmalltalkOOP _returnValue;  // Return value from execution
     private SmalltalkOOP _initialContextOOP;  // Starting context for this execution
     private bool _contextSwitchPending;  // Signal that a context switch occurred (for trampoline)
     private bool _contextSwitchedByPrimitive;  // Primitive created new context (e.g., block invocation)
 
-    // Non-local return state (replaces exception-based unwinding)
-    private bool _nonLocalReturnPending;  // NLR in progress
-    private SmalltalkOOP _nlrValue;  // Value to return
-    private SmalltalkOOP _nlrTargetContext;  // Context to unwind to
+    // Non-local return state is now managed by _nlrHandler
 
-    // Cached selector OOPs for arithmetic bytecodes (0xB0-0xBF) - indexed by bytecode & 0x0F
-    private SmalltalkOOP[]? _arithmeticSelectorOOPs;
-
-    // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
-    private SmalltalkOOP[]? _specialSelectorOOPs;
 
     // Blue Book architectural constants are defined in VMConstants.cs
     // All context field indices are now static constants shared across the VM
@@ -116,25 +77,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     public bool VerboseDebug { get; set; } = false;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
-    // Selector trace mechanism - shows nested method calls and returns
-    private bool _selectorTraceEnabled = false;
-    
     // Public property to enable bytecode tracing from outside
     public bool EnableBytecodeTracing
     {
-        get => _selectorTraceEnabled;
-        set
-        {
-            _selectorTraceEnabled = value;
-            _bytecodeInstructionCounter = 0; // Reset counters when enabling
-            _pushTraceCounter = 0;
-        }
+        get => _tracer.SelectorTraceEnabled;
+        set => _tracer.SelectorTraceEnabled = value;
     }
-    
-    private int _bytecodeInstructionCounter = 0;
-    private int _pushTraceCounter = 0;
-    private int _selectorTraceDepth = 0;
-    private readonly Stack<(string className, string selector, int depth)> _selectorTraceStack = new();
 
     public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
     {
@@ -145,26 +93,29 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         _metadata = metadata;
         _platformBridge = platformBridge;
 
+        // Initialize tracer first as other components may need it
+        _tracer = new ExecutionTracer();
+
         _contextManager = new ContextManager(
             heapManager,
             metadata,
             _layoutResolver,
-            this // IVMHelpers
+            this // IObjectMetadataAccessor
         );
 
         _stackManager = new StackManager(
             heapManager,
             metadata,
-            this, // IVMHelpers
+            this, // IObjectMetadataAccessor
             () => _contextManager.ActiveContext,
-            () => _selectorTraceEnabled,
-            () => _pushTraceCounter,
-            () => _pushTraceCounter++
+            () => _tracer.SelectorTraceEnabled,
+            () => _tracer.PushTraceCounter,
+            () => _tracer.IncrementPushTraceCounter()
         );
 
         _messageDispatcher = new MessageDispatcher(
             heapManager,
-            this // IVMHelpers
+            this // IObjectMetadataAccessor
         );
 
         _bytecodeInterpreter = new BytecodeInterpreter(
@@ -177,12 +128,18 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         _debugger = new VMDebugger(
             heapManager,
             _contextManager,
-            this // IVMDebugHelpers
+            this // IBytecodeContext
         );
 
         // Initialize primitive registry with new IPrimitive implementations
         // All 110 primitives migrated to IPrimitive pattern (2025-11-18)
         _primitiveRegistry = Primitives.PrimitiveRegistry.CreateWithNewPrimitives();
+
+        // Initialize selector cache (populated later via InitializeSelectorCaches)
+        _selectorCache = new SelectorCache(heapManager);
+
+        // Initialize NLR handler
+        _nlrHandler = new NonLocalReturnHandler();
     }
 
     /// <summary>
@@ -191,100 +148,13 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     /// </summary>
     public void InitializeSelectorCaches()
     {
-        // Initialize arithmetic selector OOPs (bytecodes 0xB0-0xBF)
-        string[] arithmeticSelectors = new[]
-        {
-            "+", "-", "<", ">", "<=", ">=", "=", "~=",
-            "*", "/", "\\\\", "@", "bitShift:", "//", "bitAnd:", "bitOr:"
-        };
-
-        _arithmeticSelectorOOPs = new SmalltalkOOP[16];
-        for (int i = 0; i < arithmeticSelectors.Length; i++)
-        {
-            _arithmeticSelectorOOPs[i] = LookupSymbolInHeap(arithmeticSelectors[i]);
-        }
-
-        // Initialize special selector OOPs (bytecodes 0xC0-0xCF)
-        string[] specialSelectors = new[]
-        {
-            "at:", "at:put:", "size", "next", "nextPut:", "atEnd",
-            "==", "class", "blockCopy:", "value", "value:", "do:",
-            "new", "new:", "x", "y"
-        };
-
-        _specialSelectorOOPs = new SmalltalkOOP[16];
-        for (int i = 0; i < specialSelectors.Length; i++)
-        {
-            _specialSelectorOOPs[i] = LookupSymbolInHeap(specialSelectors[i]);
-        }
+        // Delegate to SelectorCache component
+        _selectorCache.Initialize();
 
         // Pass selector caches to bytecode interpreter
-        _bytecodeInterpreter.InitializeSelectorCaches(_arithmeticSelectorOOPs, _specialSelectorOOPs);
-    }
-
-    /// <summary>
-    /// Looks up a symbol in the Smalltalk heap by searching USTable.
-    /// CRITICAL: Uses heap-only access, no C# proxy data.
-    /// </summary>
-    private SmalltalkOOP LookupSymbolInHeap(string symbolName)
-    {
-        // Get USTable OOP
-        // NOTE: During VM initialization (cold start), GlobalRegistry is valid and contains USTable
-        // This is acceptable because VM initialization happens during cold start, not runtime
-        if (!GlobalRegistry.TryGet("USTable", out var ustableOOP))
-        {
-            throw new InvalidOperationException("USTable not found - cannot initialize selector caches. " +
-                "This method should only be called during cold start initialization.");
-        }
-
-        // USTable is an Array in the Smalltalk heap containing Symbol OOPs
-        int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
-
-        // Convert search string to bytes (Latin-1 encoding)
-        byte[] searchBytes = System.Text.Encoding.Latin1.GetBytes(symbolName);
-
-        // Search through USTable (Array-of-Arrays structure for collision chaining)
-        for (int i = 0; i < ustableSize; i++)
-        {
-            var bucketOOP = _heapManager.GetIndexedOOP(ustableOOP, i);
-
-            // Skip nil buckets (empty slots)
-            if (bucketOOP == nilOOP)
-                continue;
-
-            // Bucket is an Array of Symbols - iterate through it
-            int bucketSize = _heapManager.GetIndexedSize(bucketOOP);
-            for (int k = 0; k < bucketSize; k++)
-            {
-                var symbolOOP = _heapManager.GetIndexedOOP(bucketOOP, k);
-
-                // Skip nil slots (shouldn't happen, but defensive)
-                if (symbolOOP == nilOOP || symbolOOP.IsSmallInteger)
-                    continue;
-
-                // Compare Symbol bytes in heap
-                int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
-                if (symbolLength == searchBytes.Length)
-                {
-                    bool match = true;
-                    for (int j = 0; j < searchBytes.Length; j++)
-                    {
-                        byte symbolByte = _heapManager.GetIndexedByte(symbolOOP, j);
-                        if (symbolByte != searchBytes[j])
-                        {
-                            match = false;
-                            break;
-                        }
-                    }
-
-                    if (match)
-                        return symbolOOP;
-                }
-            }
-        }
-
-        throw new InvalidOperationException($"Symbol '{symbolName}' not found in USTable during selector cache initialization");
+        _bytecodeInterpreter.InitializeSelectorCaches(
+            _selectorCache.ArithmeticSelectors!,
+            _selectorCache.SpecialSelectors!);
     }
 
     /// <summary>
@@ -301,31 +171,21 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     /// <summary>
     /// Enables selector trace for debugging - shows all method calls and returns with nesting.
     /// </summary>
-    public void EnableSelectorTrace()
-    {
-        _selectorTraceEnabled = true;
-        _selectorTraceDepth = 0;
-        _selectorTraceStack.Clear();
-    }
+    public void EnableSelectorTrace() => _tracer.StartSelectorTrace();
 
     /// <summary>
     /// Disables selector trace.
     /// </summary>
-    public void DisableSelectorTrace()
-    {
-        _selectorTraceEnabled = false;
-        _selectorTraceDepth = 0;
-        _selectorTraceStack.Clear();
-    }
+    public void DisableSelectorTrace() => _tracer.StopSelectorTrace();
 
     /// <summary>
     /// Prints a trace message with proper indentation based on call depth.
     /// </summary>
     private void TraceMessage(string message)
     {
-        if (_selectorTraceEnabled)
+        if (_tracer.SelectorTraceEnabled)
         {
-            string indent = new string(' ', _selectorTraceDepth * 2);
+            string indent = new string(' ', _tracer.SelectorTraceDepth * 2);
             // Console.WriteLine($"{indent}{message}");
         }
     }
@@ -416,11 +276,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         //     Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_contextManager.ActiveContext}");
 
         // If NLR is pending, continue unwinding instead of executing bytecodes
-        if (_nonLocalReturnPending)
+        if (_nlrHandler.IsPending)
         {
             // if (_verboseDebugMode)
             //     Console.WriteLine($"[ExecuteBytecodeStep] NLR pending, continuing unwinding");
-            return HandleReturn(_nlrValue);
+            return HandleReturn(_nlrHandler.Value);
         }
 
         int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
@@ -491,27 +351,25 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
             // Increment and check instruction counter (one count per bytecode executed)
-            _instructionCount++;
-            
+            if (!_tracer.IncrementInstructionCount())
+            {
+                _tracer.ThrowIfInfiniteLoop();
+            }
+
             // Report progress every 10K instructions during potential infinite loops (only when tracing is enabled)
-            if (_selectorTraceEnabled && _instructionCount % 10000 == 0)
+            if (_tracer.ShouldTraceInstructionPeriodic())
             {
                 var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
                 var ctxReceiverOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_RECEIVER_INDEX);
                 var className = GetClassName(GetClass(ctxReceiverOOP));
-                Console.WriteLine($"[{_instructionCount / 1000}K instructions] In: {className}>>{methodLocalId}, IP={ip-1}");
+                _tracer.TraceInstructionPeriodic(className, methodLocalId, ip - 1);
             }
-            
+
             // Special trace around the critical range
-            if (_selectorTraceEnabled && _instructionCount >= 2020 && _instructionCount <= 2045)
+            if (_tracer.ShouldTraceBytecodeRange())
             {
                 var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
-                Console.WriteLine($"[BYTECODE #{_instructionCount}] IP={ip-1}, opcode=0x{bytecode:X2}, method={methodLocalId}");
-            }
-            
-            if (_instructionCount >= MAX_INSTRUCTIONS)
-            {
-                throw new InvalidOperationException($"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
+                _tracer.TraceBytecodeRange(ip - 1, bytecode, methodLocalId);
             }
 
             // Execute the bytecode using the bytecode interpreter
@@ -528,14 +386,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
                 }
 
                 // Method returned - handle the return
-                // For non-local returns, the value was already popped and stored in _nlrValue
+                // For non-local returns, the value was already popped and stored in NLR handler
                 SmalltalkOOP returnValue;
-                if (_nonLocalReturnPending)
+                if (_nlrHandler.IsPending)
                 {
                     // Non-local return: value already popped by RETURN_*_POP bytecode
-                    returnValue = _nlrValue;
+                    returnValue = _nlrHandler.Value;
                     // if (_verboseDebugMode)
-                    //     Console.WriteLine($"[ExecuteBytecodeStep] Non-local return pending, using _nlrValue: {returnValue}");
+                    //     Console.WriteLine($"[ExecuteBytecodeStep] Non-local return pending, using _nlrHandler.Value: {returnValue}");
                 }
                 else
                 {
@@ -568,22 +426,19 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         SmalltalkOOP senderOOP;
 
         // Handle non-local returns (NLR)
-        if (_nonLocalReturnPending)
+        if (_nlrHandler.IsPending)
         {
             // if (_verboseDebugMode)
-            //     Console.WriteLine($"[HandleReturn NLR] Unwinding from {_contextManager.ActiveContext} to target {_nlrTargetContext}, value={_nlrValue}");
+            //     Console.WriteLine($"[HandleReturn NLR] Unwinding from {_contextManager.ActiveContext} to target {_nlrHandler.TargetContext}, value={_nlrHandler.Value}");
 
             // Check if current context is the NLR target
-            if (_contextManager.ActiveContext == _nlrTargetContext)
+            if (_nlrHandler.IsTargetReached(_contextManager.ActiveContext))
             {
                 // if (_verboseDebugMode)
                 //     Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_contextManager.ActiveContext}");
 
-                // Target reached - clear NLR state and push value
-                _nonLocalReturnPending = false;
-                SmalltalkOOP nlrValue = _nlrValue;
-                _nlrValue = default;
-                _nlrTargetContext = default;
+                // Target reached - clear NLR state and get the value
+                SmalltalkOOP nlrValue = _nlrHandler.Complete();
 
                 // Get sender to continue execution
                 senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
@@ -627,7 +482,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             if (senderOOP == SpecialObjectsArray.Instance.Nil)
             {
                 throw new InvalidOperationException(
-                    $"Non-local return target context {_nlrTargetContext} not found in sender chain. " +
+                    $"Non-local return target context {_nlrHandler.TargetContext} not found in sender chain. " +
                     $"Target may have already returned.");
             }
 
@@ -659,10 +514,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
 
         // Selector trace: log method return
-        if (_selectorTraceEnabled && _selectorTraceStack.Count > 0)
+        if (_tracer.SelectorTraceEnabled && _tracer.HasSelectorTraceEntries)
         {
-            var (className, selector, depth) = _selectorTraceStack.Pop();
-            _selectorTraceDepth = depth;  // Restore depth before decrement
+            var (className, selector, depth) = _tracer.PopSelectorTrace();
+            _tracer.SetSelectorTraceDepth(depth);  // Restore depth before decrement
             string returnValueStr = returnValue.IsSmallInteger
                 ? returnValue.AsSmallInteger().ToString()
                 : $"OOP({returnValue.RawValue})";
@@ -798,10 +653,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             byte bytecode = bytecodes[ip++];
             
             // DEBUG: Trace first 100 bytecodes when tracing is enabled
-            if (_selectorTraceEnabled && _bytecodeInstructionCounter < 100)
+            if (_tracer.SelectorTraceEnabled && _tracer.BytecodeInstructionCounter < 100)
             {
-                _bytecodeInstructionCounter++;
-                
+                _tracer.IncrementBytecodeCounter();
+
                 // Peek ahead for extended opcodes
                 string opcodeDesc = $"0x{bytecode:X2}";
                 if (bytecode == 0x80 && ip < bytecodes.Length)
@@ -821,8 +676,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
                 {
                     opcodeDesc = BytecodeDisassembler.GetOpcodeName(bytecode) ?? opcodeDesc;
                 }
-                
-                Console.WriteLine($"[BYTECODE #{_bytecodeInstructionCounter}] IP={(ip-1)}, {opcodeDesc}");
+
+                Console.WriteLine($"[BYTECODE #{_tracer.BytecodeInstructionCounter}] IP={(ip-1)}, {opcodeDesc}");
             }
 
             // For extended opcodes, peek ahead and show the full instruction
@@ -856,11 +711,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             if (!continueExecution)
             {
                 // Check if this is a non-local return (block return bytecodes 0x7D/0x7E)
-                // If so, the return value is already in _nlrValue and we must not pop again
-                if (_nonLocalReturnPending)
+                // If so, the return value is already in NLR handler and we must not pop again
+                if (_nlrHandler.IsPending)
                 {
-                    // Non-local return: value already popped and stored in _nlrValue
-                    return _nlrValue;
+                    // Non-local return: value already popped and stored in NLR handler
+                    return _nlrHandler.Value;
                 }
                 // Normal return: pop the result and return it
                 return Pop();
@@ -928,7 +783,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         {
             Console.WriteLine($"[InvokeBlockInternal] Context switch: {previousContext} -> {blockContextOOP}");
             Console.WriteLine($"  Block has {argCount} args, {tempCount} temps");
-            Console.WriteLine($"  lexicalParent = {previousContext}");
+            Console.WriteLine($"  sender = {previousContext}");
         }
 
         // Signal context switch to primitive caller
@@ -937,19 +792,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         // Return nil as sentinel (actual result will be pushed by HandleReturn)
         return SpecialObjectsArray.Instance.Nil;
     }
-
-    /// <summary>
-    /// Creates a MethodContext for executing a block, backed by a BlockContext.
-    /// This implements Approach B from the documentation.
-    /// </summary>
-    // REMOVED: CreateBlockExecutionContext - obsolete in single-context architecture
-    private SmalltalkOOP CreateBlockExecutionContext(SmalltalkOOP blockMethodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP blockContextOOP, SmalltalkOOP senderContextOOP)
-    {
-        throw new NotImplementedException("CreateBlockExecutionContext is obsolete in single-context architecture. Blocks should use CreateMethodContext with lexicalParent field.");
-    }
-
-
-
 
 
     /// <summary>
@@ -969,7 +811,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
     /// <summary>
     /// Parses a CompiledMethod header word according to the Smalltalk-80 specification.
-    /// MethodHeaderInfo record is defined in IVMHelpers.cs.
+    /// MethodHeaderInfo record is defined in IObjectMetadataAccessor.cs.
     /// </summary>
     private MethodHeaderInfo ParseMethodHeader(SmalltalkOOP methodOOP)
     {
@@ -1055,46 +897,64 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         );
     }
 
-    // Explicit interface implementations for IVMHelpers
+    // Explicit interface implementations for IObjectMetadataAccessor
     // These delegate to the existing private methods while maintaining encapsulation
-    SmalltalkOOP IVMHelpers.GetClass(SmalltalkOOP objectOOP) => GetClass(objectOOP);
-    string IVMHelpers.GetClassName(SmalltalkOOP classOOP) => GetClassName(classOOP);
-    SmalltalkOOP IVMHelpers.FindMethodContext(SmalltalkOOP contextOOP) => _contextManager.FindMethodContext(contextOOP);
-    MethodHeaderInfo IVMHelpers.ParseMethodHeader(SmalltalkOOP methodOOP) => ParseMethodHeader(methodOOP);
+    SmalltalkOOP IObjectMetadataAccessor.GetClass(SmalltalkOOP objectOOP) => GetClass(objectOOP);
+    string IObjectMetadataAccessor.GetClassName(SmalltalkOOP classOOP) => GetClassName(classOOP);
+    SmalltalkOOP IObjectMetadataAccessor.FindMethodContext(SmalltalkOOP contextOOP) => _contextManager.FindMethodContext(contextOOP);
+    MethodHeaderInfo IObjectMetadataAccessor.ParseMethodHeader(SmalltalkOOP methodOOP) => ParseMethodHeader(methodOOP);
+
+    // IStackOperations implementation
+    void IStackOperations.Push(SmalltalkOOP valueOOP) => Push(valueOOP);
+    SmalltalkOOP IStackOperations.Pop() => Pop();
+    SmalltalkOOP IStackOperations.Peek() => Peek();
+
+    // INonLocalReturnState implementation
+    bool INonLocalReturnState.NonLocalReturnPending
+    {
+        get => _nlrHandler.IsPending;
+        set => _nlrHandler.SetPending(value);
+    }
+
+    SmalltalkOOP INonLocalReturnState.NLRTargetContext
+    {
+        get => _nlrHandler.TargetContext;
+        set => _nlrHandler.SetTargetContext(value);
+    }
+
+    SmalltalkOOP INonLocalReturnState.NLRValue
+    {
+        get => _nlrHandler.Value;
+        set => _nlrHandler.SetValue(value);
+    }
+
+    // IMethodAccess implementation
+    SmalltalkOOP IMethodAccess.GetMethodLiteral(SmalltalkOOP methodOOP, int index) => GetMethodLiteral(methodOOP, index);
+    byte[] IMethodAccess.GetMethodBytecodes(SmalltalkOOP methodOOP) => GetMethodBytecodes(methodOOP);
+
+    // IMessageSender implementation
+    bool IMessageSender.SendMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
+    {
+        var outcome = SendMessage(receiverOOP, selectorOOP, args);
+        return ConsumeCallOutcome(outcome);
+    }
+
+    bool IMessageSender.SendSuperMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
+    {
+        var outcome = SendSuperMessage(receiverOOP, selectorOOP, args);
+        return ConsumeCallOutcome(outcome);
+    }
 
     // IBytecodeContext implementation
     string? IBytecodeContext.GetSymbolName(SmalltalkOOP symbolOOP) => GetSymbolName(symbolOOP);
     string? IBytecodeContext.GetLocalId(SmalltalkOOP objectOOP) => GetLocalId(objectOOP);
-    SmalltalkOOP IBytecodeContext.GetMethodLiteral(SmalltalkOOP methodOOP, int index) => GetMethodLiteral(methodOOP, index);
-    byte[] IBytecodeContext.GetMethodBytecodes(SmalltalkOOP methodOOP) => GetMethodBytecodes(methodOOP);
     SmalltalkOOP IBytecodeContext.GetTemporaryVariable(SmalltalkOOP contextOOP, int index) => GetTemporaryVariable(contextOOP, index);
     void IBytecodeContext.SetTemporaryVariable(SmalltalkOOP contextOOP, int index, SmalltalkOOP valueOOP) => SetTemporaryVariable(contextOOP, index, valueOOP);
-    void IBytecodeContext.Push(SmalltalkOOP valueOOP) => Push(valueOOP);
-    SmalltalkOOP IBytecodeContext.Pop() => Pop();
-    SmalltalkOOP IBytecodeContext.Peek() => Peek();
     SmalltalkOOP IBytecodeContext.ResolveAndPatchPoolVariable(SmalltalkOOP poolLiteralOOP, SmalltalkOOP methodOOP, int literalIndex, SmalltalkOOP poolNameSymbol, SmalltalkOOP keySymbol)
         => ResolveAndPatchPoolVariable(poolLiteralOOP, methodOOP, literalIndex, poolNameSymbol, keySymbol);
     SmalltalkOOP IBytecodeContext.LookupInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbol)
         => LookupInDictionary(dictionaryOOP, keySymbol);
     SmalltalkOOP IBytecodeContext.ActiveContext => _contextManager.ActiveContext;
-
-    bool IBytecodeContext.NonLocalReturnPending
-    {
-        get => _nonLocalReturnPending;
-        set => _nonLocalReturnPending = value;
-    }
-
-    SmalltalkOOP IBytecodeContext.NLRTargetContext
-    {
-        get => _nlrTargetContext;
-        set => _nlrTargetContext = value;
-    }
-
-    SmalltalkOOP IBytecodeContext.NLRValue
-    {
-        get => _nlrValue;
-        set => _nlrValue = value;
-    }
 
     bool IBytecodeContext.ContextSwitchPending
     {
@@ -1107,28 +967,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     bool IBytecodeContext.IsInSenderChain(SmalltalkOOP targetOOP, SmalltalkOOP startOOP)
         => _contextManager.IsInSenderChain(targetOOP, startOOP);
 
-    bool IBytecodeContext.SendMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
-    {
-        var outcome = SendMessage(receiverOOP, selectorOOP, args);
-        return ConsumeCallOutcome(outcome);
-    }
-
-    bool IBytecodeContext.SendSuperMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
-    {
-        var outcome = SendSuperMessage(receiverOOP, selectorOOP, args);
-        return ConsumeCallOutcome(outcome);
-    }
-
     void IBytecodeContext.AddAssociationToClassPoolIfNeeded(SmalltalkOOP classOOP, SmalltalkOOP associationOOP)
         => AddAssociationToClassPoolIfNeeded(classOOP, associationOOP);
-
-    // IVMDebugHelpers explicit interface implementations
-    SmalltalkOOP IVMDebugHelpers.GetClass(SmalltalkOOP objectOOP) => GetClass(objectOOP);
-    string IVMDebugHelpers.GetClassName(SmalltalkOOP classOOP) => GetClassName(classOOP);
-    string? IVMDebugHelpers.GetSymbolName(SmalltalkOOP symbolOOP) => GetSymbolName(symbolOOP);
-    string? IVMDebugHelpers.GetLocalId(SmalltalkOOP objectOOP) => GetLocalId(objectOOP);
-    SmalltalkOOP IVMDebugHelpers.GetMethodLiteral(SmalltalkOOP methodOOP, int index) => GetMethodLiteral(methodOOP, index);
-    byte[] IVMDebugHelpers.GetMethodBytecodes(SmalltalkOOP methodOOP) => GetMethodBytecodes(methodOOP);
 
     /// <summary>
     /// Pushes a value onto the operand stack.
@@ -1399,7 +1239,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
                 // throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
                 return outcome.Value;
             case CallOutcomeKind.VMException:
-                throw outcome.VMEx!;
+                throw outcome.VMException!;
             default:
                 throw new InvalidOperationException("Unknown CallOutcome kind");
         }

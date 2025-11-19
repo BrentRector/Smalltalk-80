@@ -13,7 +13,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 internal sealed class VMDebugger(
     ISmalltalkHeapManager heapManager,
     IContextManager contextManager,
-    IVMDebugHelpers helpers) : IVMDebugger
+    IBytecodeContext helpers) : IVMDebugger
 {
     /// <inheritdoc/>
     public void DumpSenderChain(SmalltalkOOP contextOOP, int maxDepth)

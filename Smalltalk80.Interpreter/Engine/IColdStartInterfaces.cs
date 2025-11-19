@@ -64,8 +64,9 @@ public interface IColdStartLoader
     /// <summary>
     /// Gets the localId to OOP mapping (available after Run() completes).
     /// Maps compiler-generated localIds to allocated heap OOPs.
+    /// Returns null after ReleaseResources() is called.
     /// </summary>
-    IReadOnlyDictionary<string, SmalltalkOOP> LocalIdToObjectId { get; }
+    IReadOnlyDictionary<string, SmalltalkOOP>? LocalIdToObjectId { get; }
 
     /// <summary>
     /// Gets the cold start execution report with metrics and timing.
@@ -74,8 +75,9 @@ public interface IColdStartLoader
 
     /// <summary>
     /// Gets all phases for inspection/testing.
+    /// Returns null after ReleaseResources() is called.
     /// </summary>
-    IReadOnlyList<IPhase> Phases { get; }
+    IReadOnlyList<IPhase>? Phases { get; }
 }
 
 /// <summary>

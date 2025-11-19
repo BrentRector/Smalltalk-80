@@ -278,7 +278,7 @@ public class ObjectGraphAllocator
     /// </summary>
     private int CalculateInstanceVariableCount(string className)
     {
-        return ClassHierarchyUtils.CalculateTotalInstanceVariableCount(className, _bundle);
+        return ClassHierarchyTraversal.CalculateTotalInstanceVariableCount(className, _bundle);
     }
 
     /// <summary>

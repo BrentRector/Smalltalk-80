@@ -34,19 +34,19 @@ public class ColdStartOrchestrator : IColdStartLoader
     /// Maps localId strings to allocated OOP values.
     /// Shared across all phases for object resolution.
     /// </summary>
-    private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = new();
+    private Dictionary<string, SmalltalkOOP>? _localIdToObjectId = new();
 
     /// <summary>
     /// Tracks which fields have been initialized to prevent double-initialization.
     /// Shared across phases that set instance variables.
     /// </summary>
-    private readonly HashSet<(SmalltalkOOP objectOOP, int fieldIndex)> _initializedFields = new();
+    private HashSet<(SmalltalkOOP objectOOP, int fieldIndex)>? _initializedFields = new();
 
     /// <summary>
     /// List of phases for inspection/testing.
     /// Populated during Run().
     /// </summary>
-    private readonly List<IPhase> _phases = new();
+    private List<IPhase>? _phases = new();
 
     /// <summary>
     /// Gets the layout resolver (available after Phase 2 completes).
@@ -55,8 +55,9 @@ public class ColdStartOrchestrator : IColdStartLoader
 
     /// <summary>
     /// Gets the localId to OOP mapping (available after Run() completes).
+    /// Returns null after ReleaseResources() is called.
     /// </summary>
-    public IReadOnlyDictionary<string, SmalltalkOOP> LocalIdToObjectId => _localIdToObjectId;
+    public IReadOnlyDictionary<string, SmalltalkOOP>? LocalIdToObjectId => _localIdToObjectId;
 
     /// <summary>
     /// Gets the semantic allocator.
@@ -70,8 +71,9 @@ public class ColdStartOrchestrator : IColdStartLoader
 
     /// <summary>
     /// Gets all phases for inspection/testing.
+    /// Returns null after ReleaseResources() is called.
     /// </summary>
-    public IReadOnlyList<IPhase> Phases => _phases;
+    public IReadOnlyList<IPhase>? Phases => _phases;
 
     // InitExpressionsArrayOOP removed - accessible via SpecialObjectsArray.Instance.InitExpressionMethods
 
@@ -126,6 +128,10 @@ public class ColdStartOrchestrator : IColdStartLoader
         {
             // Configure heap manager with class name field index for GetClassName() to work
             ConfigureHeapManager();
+
+        // Ensure collections are available
+        if (_phases == null || _localIdToObjectId == null || _initializedFields == null)
+            throw new InvalidOperationException("ColdStartOrchestrator has been released and cannot be run again");
 
         // Clear any previous phases (for re-runs)
         _phases.Clear();
@@ -209,8 +215,11 @@ public class ColdStartOrchestrator : IColdStartLoader
             // Create snapshot writer to capture failure details
             try
             {
-                var snapshotWriter = new SnapshotWriter(_heapManager, _bundle, _localIdToObjectId);
-                snapshotWriter.WriteSnapshot(_bundlePath, _report.Failure, ex);
+                if (_localIdToObjectId != null)
+                {
+                    var snapshotWriter = new SnapshotWriter(_heapManager, _bundle, _localIdToObjectId);
+                    snapshotWriter.WriteSnapshot(_bundlePath, _report.Failure, ex);
+                }
             }
             catch
             {
@@ -257,6 +266,27 @@ public class ColdStartOrchestrator : IColdStartLoader
     }
 
     /// <summary>
+    /// Releases .NET resources used during cold start to allow GC collection.
+    /// Call this after cold start and init expressions are complete.
+    /// The orchestrator should not be used after this method is called.
+    /// </summary>
+    public void ReleaseResources()
+    {
+        // Clear and release the large collections
+        _localIdToObjectId?.Clear();
+        _localIdToObjectId = null;
+
+        _initializedFields?.Clear();
+        _initializedFields = null;
+
+        _phases?.Clear();
+        _phases = null;
+
+        // Note: _bundle is owned by the caller, we don't release it here
+        // Note: _heapManager and _allocator are still needed for runtime
+    }
+
+    /// <summary>
     /// Computes a simple hash of the bundle for tracking.
     /// Format: "symbolCount-classCount-methodCount"
     /// </summary>
@@ -274,7 +304,7 @@ public class ColdStartOrchestrator : IColdStartLoader
         if (_heapManager is SmalltalkHeapManager concreteHeapManager)
         {
             // Find the index of the 'name' field in Class
-            int nameFieldIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "name", _bundle);
+            int nameFieldIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Class", "name", _bundle);
             if (nameFieldIndex >= 0)
             {
                 concreteHeapManager.SetClassNameFieldIndex(nameFieldIndex);

@@ -3,6 +3,7 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 
@@ -10,8 +11,17 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 /// Resolves FieldValue descriptors to SmalltalkOOP values.
 /// Handles all value types: nil, true, false, smallInt, objectRef, stringRef, symbolRef.
 /// </summary>
-public class FieldValueResolver(Phase5Context context) : IFieldValueResolver
+public class FieldValueResolver : IFieldValueResolver
 {
+    private readonly Phase5Context _context;
+    private readonly SymbolService _symbolService;
+
+    public FieldValueResolver(Phase5Context context)
+    {
+        _context = context;
+        _symbolService = new SymbolService(context.Bundle);
+    }
+
     public SmalltalkOOP Resolve(FieldValue? value)
     {
         if (value == null)
@@ -19,7 +29,7 @@ public class FieldValueResolver(Phase5Context context) : IFieldValueResolver
 
         if (value.Type == "objectRef")
         {
-            return context.LocalIdToObjectId[value.LocalId!];
+            return _context.LocalIdToObjectId[value.LocalId!];
         }
 
         return value.Type switch
@@ -28,8 +38,8 @@ public class FieldValueResolver(Phase5Context context) : IFieldValueResolver
             "true" => SpecialObjectsArray.Instance.True,
             "false" => SpecialObjectsArray.Instance.False,
             "smallInt" => SmalltalkOOP.FromSmallInteger((int)value.Value!),
-            "stringRef" => context.Allocator.AllocateString(context.Bundle.Strings[value.Index!.Value]),
-            "symbolRef" => SymbolRegistry.GetSymbolOOP(value.Index!.Value),
+            "stringRef" => _context.Allocator.AllocateString(_context.Bundle.Strings[value.Index!.Value]),
+            "symbolRef" => _symbolService.GetSymbolOOPByIndex(value.Index!.Value),
             _ => throw new InvalidOperationException($"Unknown field value type: {value.Type}")
         };
     }

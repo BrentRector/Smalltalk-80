@@ -6,7 +6,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// <summary>
 /// Shared VM utility functions used by both cold start and runtime primitives.
 /// </summary>
-public static class VMUtilities
+public static class IdentityHashUtility
 {
     /// <summary>
     /// Computes the identity hash for a Symbol (or any object).

@@ -2,6 +2,7 @@ using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.Core.VM.Interpreter;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -85,9 +86,9 @@ public partial class VirtualMachine
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
         if (primitiveNumber > 0)
         {
-            if (_selectorTraceEnabled && _instructionCount >= 2000 && _instructionCount < 2100)
+            if (_tracer.ShouldTracePrimitive())
             {
-                Console.WriteLine($"[PRIMITIVE #{_instructionCount}] Trying primitive {primitiveNumber} in {GetLocalId(methodInfo.MethodOOP)}");
+                _tracer.TracePrimitiveAttempt(primitiveNumber, GetLocalId(methodInfo.MethodOOP) ?? "unknown");
             }
 
             // Get current instruction pointer for primitives that need it
@@ -99,25 +100,25 @@ public partial class VirtualMachine
 
             if (_primitiveSuccess)
             {
-                if (_selectorTraceEnabled && _instructionCount >= 2000 && _instructionCount < 2100)
+                if (_tracer.ShouldTracePrimitive())
                 {
-                    Console.WriteLine($"[PRIMITIVE #{_instructionCount}] Primitive {primitiveNumber} succeeded");
+                    _tracer.TracePrimitiveSuccess(primitiveNumber);
                 }
                 return CallOutcome.Normal(primitiveResult);
             }
-            else if (_selectorTraceEnabled && _instructionCount < 50000)
+            else if (_tracer.ShouldTracePrimitiveFailure())
             {
                 // Log primitive failures during tracing
-                Console.WriteLine($"[PRIMITIVE FAILED] Primitive {primitiveNumber} failed in {GetLocalId(methodInfo.MethodOOP)}");
+                _tracer.TracePrimitiveFailure(primitiveNumber, selectorName ?? "unknown");
             }
         }
 
         // Log method sends during tracing
-        if (_selectorTraceEnabled && _instructionCount < 5000)
+        if (_tracer.ShouldTraceSend())
         {
             var recvClass = GetClassName(GetClass(receiverOOP));
             var currentMethod = GetLocalId(_heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_METHOD_INDEX)) ?? "unknown";
-            Console.WriteLine($"[SEND #{_instructionCount}] {recvClass}>>{selectorName} (from {currentMethod})");
+            _tracer.TraceSendEntry(recvClass, selectorName ?? "unknown", currentMethod);
 
             // Special alert for error: sends
             if (selectorName == "error:")
@@ -221,10 +222,9 @@ public partial class VirtualMachine
         if (primitiveNumber > 0)
         {
             // Count primitive execution as one instruction
-            _instructionCount++;
-            if (_instructionCount >= MAX_INSTRUCTIONS)
+            if (!_tracer.IncrementInstructionCount())
             {
-                throw new InvalidOperationException($"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
+                _tracer.ThrowIfInfiniteLoop();
             }
 
             // Get current instruction pointer for primitives that need it
@@ -268,12 +268,12 @@ public partial class VirtualMachine
         _contextManager.SetActiveContext(_contextManager.CreateMethodContext(methodInfo.MethodOOP, receiverOOP, args, _contextManager.ActiveContext));
 
         // Selector trace: log method entry
-        if (_selectorTraceEnabled)
+        if (_tracer.SelectorTraceEnabled)
         {
             string className = GetClassName(classOOP) ?? "?";
             TraceMessage($"-> {className}>>{selectorName}");
-            _selectorTraceStack.Push((className, selectorName!, _selectorTraceDepth));
-            _selectorTraceDepth++;
+            _tracer.PushSelectorTrace(className, selectorName!, _tracer.SelectorTraceDepth);
+            _tracer.IncrementTraceDepth();
         }
 
 
@@ -302,7 +302,7 @@ public partial class VirtualMachine
 
         if (outcome.Kind == CallOutcomeKind.VMException)
         {
-            throw outcome.VMEx!;
+            throw outcome.VMException!;
         }
 
         if (outcome.Kind == CallOutcomeKind.ContextSwitch)
@@ -315,10 +315,10 @@ public partial class VirtualMachine
         // Non-local return
         if (outcome.Kind == CallOutcomeKind.NonLocalReturn)
         {
-            // Console.WriteLine($"[CONSUME NLR] target={outcome.TargetContextOop}, activeContext={_contextManager.ActiveContext}, match={outcome.TargetContextOop == _contextManager.ActiveContext}");
+            // Console.WriteLine($"[CONSUME NLR] target={outcome.TargetContext}, activeContext={_contextManager.ActiveContext}, match={outcome.TargetContext == _contextManager.ActiveContext}");
 
             // If NLR targets this context, this context must return immediately with the provided value.
-            if (outcome.TargetContextOop == _contextManager.ActiveContext)
+            if (outcome.TargetContext == _contextManager.ActiveContext)
             {
                 // Console.WriteLine($"[NLR TARGET MATCH] Stopping execution, returning value={outcome.Value}");
                 // push the return value and signal method-return
@@ -327,8 +327,8 @@ public partial class VirtualMachine
             }
 
             // Otherwise propagate as exception for callers to handle / continue unwinding
-            // Console.WriteLine($"[NLR PROPAGATE] Rethrowing exception to continue unwinding to {outcome.TargetContextOop}");
-            throw new NonLocalReturnException(outcome.Value, outcome.TargetContextOop);
+            // Console.WriteLine($"[NLR PROPAGATE] Rethrowing exception to continue unwinding to {outcome.TargetContext}");
+            throw new NonLocalReturnException(outcome.Value, outcome.TargetContext);
         }
 
         throw new InvalidOperationException("Unhandled CallOutcome kind");

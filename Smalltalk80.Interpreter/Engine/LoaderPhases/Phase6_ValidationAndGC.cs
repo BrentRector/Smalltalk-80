@@ -278,7 +278,7 @@ public class Phase6_ValidationAndGC : IPhase
                 }
 
                 // Validate bytecode array size
-                byte[] expectedBytecodes = ClassHierarchyUtils.DecodeBytecodes(method.Bytecodes);
+                byte[] expectedBytecodes = ClassHierarchyTraversal.DecodeBytecodes(method.Bytecodes);
                 int actualBytecodeSize = _allocator.GetIndexedSize(bytecodeArrayOOP);
 
                 if (actualBytecodeSize != expectedBytecodes.Length)

@@ -4,8 +4,8 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
-using System.Text;
-using System.Linq;
+using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
+using Smalltalk80.Interpreter.Engine.Services;
 using System.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
@@ -32,6 +32,10 @@ public class Phase3_ObjectAllocation : IPhase
     private readonly IReadOnlyList<string> _symbols;
     private readonly ColdstartReport _report;
     private readonly IDiagnosticHub? _diagnostics;
+
+    // Helper classes for decomposed functionality
+    private readonly DictionaryInstaller _dictionaryInstaller;
+    private readonly FieldValueResolver _fieldValueResolver;
 
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
@@ -62,6 +66,16 @@ public class Phase3_ObjectAllocation : IPhase
         _symbols = bundle.Symbols;
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _diagnostics = diagnostics;
+
+        // Initialize services and helper classes
+        var symbolService = new SymbolService(bundle);
+        var fieldValueService = new FieldValueService(bundle, symbolService);
+        var dictionaryService = new DictionaryService(allocator, bundle);
+
+        _fieldValueResolver = new FieldValueResolver(allocator, bundle, localIdToObjectId, diagnostics, fieldValueService);
+        _dictionaryInstaller = new DictionaryInstaller(
+            localIdToObjectId, initializedFields,
+            _fieldValueResolver.InternSymbol, dictionaryService);
     }
 
     /// <summary>
@@ -84,8 +98,6 @@ public class Phase3_ObjectAllocation : IPhase
 
     public void Run()
     {
-// Console.WriteLine("Phase 3: Object Allocation and Initialization");
-
         // Section 1: Allocation (ALL object creation happens here)
         AllocateSentinelObjects();
         AllocateSpecialObjects();
@@ -110,14 +122,11 @@ public class Phase3_ObjectAllocation : IPhase
         // Section 4: Nil Initialization
         InitializeUnsetInstanceVariables();
         LogInitializationCheckpoint();
-
-// Console.WriteLine("  Phase 3 complete: All objects allocated and initialized");
     }
 
     private void LogAllocationCheckpoint()
     {
         int objectCount = _localIdToObjectId.Count + 3;  // +3 for nil/true/false in GlobalRegistry
-// Console.WriteLine($"  ✓ Allocation checkpoint: {objectCount} objects allocated");
 
         // Record Phase3 metrics
         if (_report.Metrics.Phase3Metrics == null)
@@ -132,7 +141,6 @@ public class Phase3_ObjectAllocation : IPhase
         // Count all objects that now have class references
         // This includes classes, metaclasses, symbols, and allocated objects
         int classRefCount = _bundle.Classes.Length + SymbolRegistry.AllSymbols().Count() + _localIdToObjectId.Count;
-// Console.WriteLine($"  ✓ Class reference checkpoint: {classRefCount} class references set");
 
         // Record Phase3 metrics
         if (_report.Metrics.Phase3Metrics == null)
@@ -144,9 +152,6 @@ public class Phase3_ObjectAllocation : IPhase
 
     private void LogInitializationCheckpoint()
     {
-        // Initialize unset instance variables completes Phase 3
-// Console.WriteLine($"  ✓ Initialization checkpoint: All unset fields initialized to nil");
-
         // Record Phase3 metrics
         if (_report.Metrics.Phase3Metrics == null)
         {
@@ -210,7 +215,7 @@ public class Phase3_ObjectAllocation : IPhase
     private void InitializeProcessorSchedulerFields(SmalltalkOOP processorSchedulerOOP, SmalltalkOOP nilOOP)
     {
         // Get instance variable count for ProcessorScheduler
-        int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("ProcessorScheduler", _bundle);
+        int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("ProcessorScheduler", _bundle);
 
         // Initialize all instance variables to nil
         // This prevents Phase Y from overwriting with nil (it only sets uninitialized fields)
@@ -242,7 +247,7 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // Initialize Dictionary instance variables (tally = 0)
-        int dictInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("Dictionary", _bundle);
+        int dictInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("Dictionary", _bundle);
         for (int i = 0; i < dictInstVarCount; i++)
         {
             _allocator.SetInstanceVariable(undeclaredOOP, i, nilOOP);
@@ -250,7 +255,7 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // Set tally to 0 (will be incremented as Associations are added in Phase 5)
-        int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
+        int tallyIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
         if (tallyIndex >= 0)
         {
             var zeroOOP = SmalltalkOOP.FromSmallInteger(0);
@@ -290,7 +295,7 @@ public class Phase3_ObjectAllocation : IPhase
         var strikeFontOOP = _allocator.AllocateFixedObject("StrikeFont");
 
         // Initialize all StrikeFont fields to nil
-        int strikeFontInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("StrikeFont", _bundle);
+        int strikeFontInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("StrikeFont", _bundle);
         for (int i = 0; i < strikeFontInstVarCount; i++)
         {
             _allocator.SetInstanceVariable(strikeFontOOP, i, nilOOP);
@@ -299,29 +304,29 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Set minimal StrikeFont properties to prevent errors
         // name: "DefaultFont"
-        int nameIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "name", _bundle);
+        int nameIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("StrikeFont", "name", _bundle);
         if (nameIndex >= 0)
         {
-            var fontNameOOP = InternString("DefaultFont");
+            var fontNameOOP = _fieldValueResolver.InternString("DefaultFont");
             _allocator.SetInstanceVariable(strikeFontOOP, nameIndex, fontNameOOP);
         }
 
         // ascent: 12
-        int ascentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "ascent", _bundle);
+        int ascentIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("StrikeFont", "ascent", _bundle);
         if (ascentIndex >= 0)
         {
             _allocator.SetInstanceVariable(strikeFontOOP, ascentIndex, SmalltalkOOP.FromSmallInteger(12));
         }
 
         // descent: 4
-        int descentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "descent", _bundle);
+        int descentIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("StrikeFont", "descent", _bundle);
         if (descentIndex >= 0)
         {
             _allocator.SetInstanceVariable(strikeFontOOP, descentIndex, SmalltalkOOP.FromSmallInteger(4));
         }
 
         // maxWidth: 8
-        int maxWidthIndex = ClassHierarchyUtils.FindInstanceVariableIndex("StrikeFont", "maxWidth", _bundle);
+        int maxWidthIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("StrikeFont", "maxWidth", _bundle);
         if (maxWidthIndex >= 0)
         {
             _allocator.SetInstanceVariable(strikeFontOOP, maxWidthIndex, SmalltalkOOP.FromSmallInteger(8));
@@ -336,10 +341,10 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Get TextStyle instance variable indices
         // TextStyle has: fontArray, lineGrid, baseline, alignment, firstIndent, restIndent, rightIndent, tabsArray, marginTabsArray, outputMedium
-        int fontArrayIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "fontArray", _bundle);
-        int lineGridIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "lineGrid", _bundle);
-        int baselineIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "baseline", _bundle);
-        int alignmentIndex = ClassHierarchyUtils.FindInstanceVariableIndex("TextStyle", "alignment", _bundle);
+        int fontArrayIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("TextStyle", "fontArray", _bundle);
+        int lineGridIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("TextStyle", "lineGrid", _bundle);
+        int baselineIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("TextStyle", "baseline", _bundle);
+        int alignmentIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("TextStyle", "alignment", _bundle);
 
         // Initialize critical TextStyle fields
         if (fontArrayIndex >= 0)
@@ -367,7 +372,7 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // Initialize remaining TextStyle fields to nil
-        int textStyleInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("TextStyle", _bundle);
+        int textStyleInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("TextStyle", _bundle);
         for (int i = 0; i < textStyleInstVarCount; i++)
         {
             if (!_initializedFields.Contains((textStyleOOP, i)))
@@ -384,21 +389,18 @@ public class Phase3_ObjectAllocation : IPhase
         // Step 5: Find existing DefaultTextStyle Association and update its value
         // The compiler should have created an Association for DefaultTextStyle (either in
         // TextConstants pool or Undeclared), we just need to find it and set the value
-        bool foundAndUpdated = FindAndUpdateAssociationValue("DefaultTextStyle", textStyleOOP);
+        bool foundAndUpdated = _dictionaryInstaller.FindAndUpdateAssociationValue("DefaultTextStyle", textStyleOOP);
 
         if (!foundAndUpdated)
         {
             // Association doesn't exist - create one and add to Undeclared
-// Console.WriteLine($"  DefaultTextStyle Association not found in bundle, adding to Undeclared");
-            var defaultTextStyleSymbol = InternSymbol("DefaultTextStyle");
-            var defaultTextStyleAssoc = AllocateAssociationWithSemanticAllocator(defaultTextStyleSymbol, textStyleOOP);
+            var defaultTextStyleSymbol = _fieldValueResolver.InternSymbol("DefaultTextStyle");
+            var defaultTextStyleAssoc = _dictionaryInstaller.AllocateAssociation(defaultTextStyleSymbol, textStyleOOP);
 
             // Add to Undeclared dictionary (will be migrated to proper location by runtime)
             var undeclaredOOP = GlobalRegistry.Get("Undeclared");
-            InstallAssociationInDictionary(undeclaredOOP, defaultTextStyleAssoc, "DefaultTextStyle");
+            _dictionaryInstaller.InstallInDictionary(undeclaredOOP, defaultTextStyleAssoc, "DefaultTextStyle");
         }
-
-// Console.WriteLine($"  Created DefaultTextStyle with stub StrikeFont for PopUpMenu support");
     }
 
     #endregion
@@ -430,8 +432,6 @@ public class Phase3_ObjectAllocation : IPhase
 
             objectsAllocated++;
         }
-
-// Console.WriteLine($"  Allocated {objectsAllocated} special objects from bundle");
     }
 
     /// <summary>
@@ -451,198 +451,6 @@ public class Phase3_ObjectAllocation : IPhase
         };
 
         return objectOOP;
-    }
-
-    /// <summary>
-    /// Allocates an Association object (key-value pair) using ObjectGraphAllocator.
-    /// </summary>
-    private SmalltalkOOP AllocateAssociationWithSemanticAllocator(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
-    {
-        var associationOOP = _allocator.AllocateFixedObject("Association");
-
-        // Set instance variables: [0] = key, [1] = value (assuming standard Association layout)
-        _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
-        _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
-
-        return associationOOP;
-    }
-
-    /// <summary>
-    /// Installs an association in SystemDictionary using hash-based slot finding.
-    /// CRITICAL: Must use same algorithm as Dictionary>>findKeyOrNil: so runtime lookups work!
-    /// </summary>
-    private void InstallAssociationInSystemDictionary(SmalltalkOOP associationOOP, string name)
-    {
-        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-        int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
-        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
-
-        // Get the key symbol from the Association (slot 0)
-        var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
-
-        // Use hash-based lookup to find correct slot (same algorithm as Dictionary>>findKeyOrNil:)
-        // Smalltalk: location _ key hash \\ length + 1 (then convert to 0-based index)
-        int hash = GetSymbolHash(keySymbolOOP);
-        int location = (hash % systemDictSize + systemDictSize) % systemDictSize; // Handle negative hash
-
-        // Probe for nil slot or matching key (linear probing)
-        int pass = 1;
-        int startLocation = location;
-        while (true)
-        {
-            var probe = _allocator.GetIndexedOOP(systemDictOOP, location);
-
-            if (probe == nilOOP)
-            {
-                // Found empty slot - install association
-                _allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
-                return;
-            }
-
-            // Check if Association with same key already exists
-            var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                // Slot already contains Association for this key - update it
-                _allocator.SetIndexedOOP(systemDictOOP, location, associationOOP);
-                return;
-            }
-
-            // Linear probe to next slot
-            location = (location + 1) % systemDictSize;
-
-            // Check if we've wrapped around
-            if (location == startLocation)
-            {
-                pass++;
-                if (pass > 2)
-                {
-                    throw new InvalidOperationException($"SystemDictionary is full - cannot install {name} association after 2 passes");
-                }
-            }
-        }
-    }
-
-    private int GetSymbolHash(SmalltalkOOP symbolOOP)
-    {
-        // Symbol>>hash uses Primitive 75: returns half the object pointer
-        // Blue Book: "Answer with a SmallInteger whose value is half of the receiver's object pointer"
-        // This is an IDENTITY hash based on OOP, NOT a string content hash!
-        return VMUtilities.ComputeIdentityHash(symbolOOP);
-    }
-
-    /// <summary>
-    /// Installs an Association in any Dictionary object (including pool dictionaries and Undeclared).
-    /// Uses hash-based lookup to match Dictionary>>findKeyOrNil: algorithm.
-    /// </summary>
-    private void InstallAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string name)
-    {
-        int dictSize = _allocator.GetIndexedSize(dictionaryOOP);
-        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
-
-        // Get the key symbol from the Association (slot 0)
-        var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
-
-        // Use hash-based lookup (same algorithm as Dictionary>>findKeyOrNil:)
-        int hash = GetSymbolHash(keySymbolOOP);
-        int location = (hash % dictSize + dictSize) % dictSize;
-
-        // Linear probing
-        int pass = 1;
-        int startLocation = location;
-        bool incrementTally = true;
-
-        while (true)
-        {
-            var probe = _allocator.GetIndexedOOP(dictionaryOOP, location);
-
-            if (probe == nilOOP)
-            {
-                // Found empty slot - install association
-                _allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
-
-                // Increment tally field
-                if (incrementTally)
-                {
-                    int tallyIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Dictionary", "tally", _bundle);
-                    if (tallyIndex >= 0)
-                    {
-                        var currentTallyOOP = _allocator.GetInstanceVariable(dictionaryOOP, tallyIndex);
-                        int currentTally = currentTallyOOP.IsSmallInteger ? currentTallyOOP.AsSmallInteger() : 0;
-                        _allocator.SetInstanceVariable(dictionaryOOP, tallyIndex, SmalltalkOOP.FromSmallInteger(currentTally + 1));
-                    }
-                }
-
-                return;
-            }
-
-            // Check if Association with same key already exists
-            var probeKeyOOP = _allocator.GetInstanceVariable(probe, 0);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                // Update existing Association
-                _allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
-
-                incrementTally = false;
-                return;
-            }
-
-            // Linear probe
-            location = (location + 1) % dictSize;
-
-            if (location == startLocation)
-            {
-                pass++;
-                if (pass > 2)
-                {
-                    throw new InvalidOperationException($"Dictionary is full - cannot install {name} association after 2 passes");
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Finds an Association by key in all allocated objects and updates its value.
-    /// Searches through all objects looking for Association instances with matching key.
-    /// </summary>
-    private bool FindAndUpdateAssociationValue(string keyName, SmalltalkOOP newValueOOP)
-    {
-        var keySymbol = InternSymbol(keyName);
-        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-
-        // Search through all allocated objects (both bundle objects and sentinel objects)
-        foreach (var kvp in _localIdToObjectId)
-        {
-            var objectOOP = kvp.Value;
-
-            try
-            {
-                // Check if this is an Association object
-                var classOOP = _allocator.GetSlot(objectOOP, 0);
-                if (classOOP == associationClassOOP)
-                {
-                    // Get the key (instance variable 0)
-                    var assocKeyOOP = _allocator.GetInstanceVariable(objectOOP, 0);
-
-                    // Check if key matches
-                    if (assocKeyOOP == keySymbol)
-                    {
-                        // Update the value (instance variable 1)
-                        _allocator.SetInstanceVariable(objectOOP, 1, newValueOOP);
-                        _initializedFields.Add((objectOOP, 1));
-// Console.WriteLine($"  Updated existing {keyName} Association value to oop={newValueOOP.RawValue}");
-                        return true;
-                    }
-                }
-            }
-            catch
-            {
-                // Skip objects that don't have the expected structure
-                continue;
-            }
-        }
-
-        return false;
     }
 
     #endregion
@@ -681,16 +489,6 @@ public class Phase3_ObjectAllocation : IPhase
                 if (_localIdToObjectId.TryGetValue(metaclassLocalId, out SmalltalkOOP metaclassOOP))
                 {
                     _allocator.SetSlot(classOOP, 0, metaclassOOP);
-
-                    // Debug: Show first few and class:Point and class:MethodDictionary specifically
-                    if (classReferencesSet < 5 || instanceClassName == "Point" || instanceClassName == "MethodDictionary")
-                    {
-// Console.WriteLine($"    Set {cls.LocalId}.class = {metaclassLocalId} (classOOP={classOOP}, metaclassOOP={metaclassOOP})");
-                    }
-                }
-                else
-                {
-// Console.WriteLine($"WARNING: Could not find metaclass for {instanceClassName}");
                 }
             }
 
@@ -718,8 +516,6 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Step 4: Set class references for symbols, strings, and other runtime objects
         SetRuntimeObjectClassReferences();
-
-// Console.WriteLine($"  Set {classReferencesSet} class references");
     }
 
     private void SetSingletonClassReference(string globalName, string className)
@@ -761,7 +557,7 @@ public class Phase3_ObjectAllocation : IPhase
             var arrayClassOOP = arrayClassId;
             _allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
         }
-        
+
         // CRITICAL FIX: Set class references for Associations created in Phase 3
         // These include:
         // - Undeclared Association (line 229)
@@ -769,7 +565,7 @@ public class Phase3_ObjectAllocation : IPhase
         // - Pool dictionary Associations (line 386)
         SetAssociationClassReferences();
     }
-    
+
     /// <summary>
     /// Sets class references for all Association objects allocated in Phase 3.
     /// Associations are created during sentinel object allocation and special object allocation,
@@ -783,7 +579,7 @@ public class Phase3_ObjectAllocation : IPhase
         var dictionaryClassOOP = GlobalRegistry.LookupClassOOP("Dictionary");
         int associationsFixed = 0;
         int dictionariesFixed = 0;
-        
+
         // Scan through ALL allocated objects in the heap (including runtime-allocated ones)
         foreach (var objectOOP in _heapManager.EnumerateObjectTable())
         {
@@ -792,19 +588,19 @@ public class Phase3_ObjectAllocation : IPhase
                 // Skip SmallIntegers
                 if (objectOOP.IsSmallInteger)
                     continue;
-                
+
                 // Check if class pointer is unset (OOP(0) or nil)
                 var currentClassOOP = _allocator.GetSlot(objectOOP, 0);
-                
+
                 // Skip if class pointer already set to a non-zero/non-nil value
                 if (currentClassOOP != default(SmalltalkOOP) && currentClassOOP != SpecialObjectsArray.Instance.Nil)
                     continue;
-                
+
                 // Check object format to determine class
                 var format = _allocator.GetObjectFormat(objectOOP);
                 int instVarCount = _allocator.GetInstanceVariableCount(objectOOP);
                 int indexedSize = _allocator.GetIndexedSize(objectOOP);
-                
+
                 // Association: 2 instance vars, Pointer format, no indexed data
                 if (format == ObjectFormat.Pointer && instVarCount == 2 && indexedSize == 0)
                 {
@@ -863,7 +659,7 @@ public class Phase3_ObjectAllocation : IPhase
 
             // Get the number of instance variables for this type of class object
             string classOfClassName = cls.IsMetaclass ? "Metaclass" : "Class";
-            int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(classOfClassName, _bundle);
+            int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount(classOfClassName, _bundle);
 
             // Initialize ONLY uninitialized instance variables to nil
             for (int i = 0; i < instVarCount; i++)
@@ -872,16 +668,6 @@ public class Phase3_ObjectAllocation : IPhase
                 {
                     _allocator.SetInstanceVariable(classOOP, i, nilOOP);
                     instanceVariablesInitialized++;
-
-                    // Verify Object.superclass is being set to nil
-                    if (!cls.IsMetaclass && _bundle.Symbols[cls.NameIndex] == "Object")
-                    {
-                        int superclassIndex = ClassHierarchyUtils.FindInstanceVariableIndex("Class", "superclass", _bundle);
-                        if (i == superclassIndex)
-                        {
-// Console.WriteLine($"    Initialized class:Object.superclass = nil (field index {i})");
-                        }
-                    }
                 }
             }
         }
@@ -899,7 +685,7 @@ public class Phase3_ObjectAllocation : IPhase
                 continue;
 
             string className = _bundle.Symbols[obj.ClassNameIndex];
-            int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(className, _bundle);
+            int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount(className, _bundle);
 
             // First: Initialize ALL instance variables to nil
             for (int i = 0; i < instVarCount; i++)
@@ -911,14 +697,14 @@ public class Phase3_ObjectAllocation : IPhase
             // Second: Override with JSON field values
             for (int i = 0; i < obj.Fields.Length; i++)
             {
-                var valueOOP = ResolveFieldValue(obj.Fields[i]);
+                var valueOOP = _fieldValueResolver.ResolveFieldValue(obj.Fields[i]);
                 _allocator.SetInstanceVariable(objectOOP, i, valueOOP);
             }
 
             // Third: Set indexed fields if any
             for (int i = 0; i < obj.IndexedFields.Length; i++)
             {
-                var valueOOP = ResolveFieldValue(obj.IndexedFields[i]);
+                var valueOOP = _fieldValueResolver.ResolveFieldValue(obj.IndexedFields[i]);
                 _allocator.SetIndexedOOP(objectOOP, i, valueOOP);
             }
         }
@@ -928,15 +714,13 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Step 5: Initialize Dictionary indexed slots to nil
         InitializeDictionaryIndexedSlots(nilOOP);
-
-// Console.WriteLine($"  Initialized {instanceVariablesInitialized} instance variables to nil");
     }
 
     private void InitializeSingletonInstanceVariables(string globalName, string className, SmalltalkOOP nilOOP)
     {
         if (GlobalRegistry.TryGet(globalName, out SmalltalkOOP objectId))
         {
-            int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount(className, _bundle);
+            int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount(className, _bundle);
             var objectOOP = objectId;
 
             // Only initialize uninitialized instance variables
@@ -955,7 +739,7 @@ public class Phase3_ObjectAllocation : IPhase
         // Initialize SystemDictionary instance variables
         if (GlobalRegistry.TryGet("Smalltalk", out SmalltalkOOP systemDictId))
         {
-            int instVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("SystemDictionary", _bundle);
+            int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("SystemDictionary", _bundle);
             var systemDictOOP = systemDictId;
 
             // Only initialize uninitialized instance variables
@@ -992,7 +776,7 @@ public class Phase3_ObjectAllocation : IPhase
 
             // Find classPool instance variable
             string templateClassName = "Class";
-            int classPoolIndex = ClassHierarchyUtils.FindInstanceVariableIndex(templateClassName, "classPool", _bundle);
+            int classPoolIndex = ClassHierarchyTraversal.FindInstanceVariableIndex(templateClassName, "classPool", _bundle);
             if (classPoolIndex < 0)
                 continue;
 
@@ -1017,200 +801,6 @@ public class Phase3_ObjectAllocation : IPhase
 
     #endregion
 
-    #region Helper Methods
-
-    /// <summary>
-    /// Resolves a field value from the discriminated union to an OOP.
-    /// </summary>
-    private SmalltalkOOP ResolveFieldValue(FieldValue value)
-    {
-        return value.Type switch
-        {
-            "nil" => SpecialObjectsArray.Instance.Nil,
-            "true" => SpecialObjectsArray.Instance.True,
-            "false" => SpecialObjectsArray.Instance.False,
-            "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(value.Value!)),
-            "largePositiveInteger" => throw new NotImplementedException("LargePositiveInteger not yet supported"),
-            "largeNegativeInteger" => throw new NotImplementedException("LargeNegativeInteger not yet supported"),
-            "float" => AllocateFloat(GetFloatValue(value.Value!)),
-            "symbolRef" => InternSymbol(_symbols[value.Index!.Value]),
-            "stringRef" => InternString(_bundle.Strings[value.Index!.Value]),
-            "objectRef" => _localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : SpecialObjectsArray.Instance.Nil,
-            "character" => AllocateCharacter(value.CodePoint!.Value),
-            "bytes" => AllocateByteArray(value.Encoding!, value.Data!),
-            _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")
-        };
-    }
-
-    /// <summary>
-    /// Extracts an integer value from a JsonElement or int.
-    /// </summary>
-    private int GetIntValue(object value)
-    {
-        return value switch
-        {
-            System.Text.Json.JsonElement e => e.GetInt32(),
-            int i => i,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to int")
-        };
-    }
-
-    /// <summary>
-    /// Extracts a double value from a JsonElement or double.
-    /// </summary>
-    private double GetFloatValue(object value)
-    {
-        return value switch
-        {
-            System.Text.Json.JsonElement e => e.GetDouble(),
-            double d => d,
-            float f => f,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to double")
-        };
-    }
-
-    /// <summary>
-    /// Interns a symbol using the symbol table from Phase 1.
-    /// </summary>
-    private SmalltalkOOP InternSymbol(string name)
-    {
-        // Find the symbol in the SymbolRegistry (created in Phase 1)
-        for (int i = 0; i < _bundle.Symbols.Length; i++)
-        {
-            if (_bundle.Symbols[i] == name)
-            {
-                return SymbolRegistry.GetSymbolOOP(i);
-            }
-        }
-
-        throw new InvalidOperationException($"Symbol '{name}' not found in symbol table. Ensure Phase 1 (Symbol Interning) completed successfully.");
-    }
-
-    /// <summary>
-    /// Interns a string by creating a ByteIndexed object.
-    /// </summary>
-    private SmalltalkOOP InternString(string value)
-    {
-        // Encode string as UTF-8 bytes
-        byte[] stringBytes = Encoding.UTF8.GetBytes(value);
-
-        // Allocate ByteIndexed object to hold the string text
-        var stringOOP = _allocator.AllocateString("String", stringBytes.Length);
-
-        // Store the string text as bytes
-        for (int i = 0; i < stringBytes.Length; i++)
-        {
-            _allocator.SetIndexedByte(stringOOP, i, stringBytes[i]);
-        }
-
-        // Set String class reference (since we're after class reference init)
-        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
-        _allocator.SetObjectClass(stringOOP, stringClassOOP);
-
-        return stringOOP;
-    }
-
-    /// <summary>
-    /// Allocates a Character object.
-    /// </summary>
-    private SmalltalkOOP AllocateCharacter(int codePoint)
-    {
-        var characterOOP = _allocator.AllocateFixedObject("Character");
-
-        // Store the code point in the Character object (assuming it's stored in first instance variable)
-        var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
-        _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
-
-        // Set Character class reference
-        var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
-        _allocator.SetObjectClass(characterOOP, characterClassOOP);
-
-        return characterOOP;
-    }
-
-    /// <summary>
-    /// Allocates a ByteArray object.
-    /// </summary>
-    private SmalltalkOOP AllocateByteArray(string encoding, string data)
-    {
-        // Decode the data based on encoding
-        byte[] bytes = encoding.ToLower() switch
-        {
-            "base64" => Convert.FromBase64String(data),
-            "hex" => ConvertHexStringToBytes(data),
-            _ => throw new InvalidOperationException($"Unsupported byte array encoding: {encoding}")
-        };
-
-        var byteArrayOOP = _allocator.AllocateByteArray("ByteArray", bytes.Length);
-
-        // Store the bytes
-        for (int i = 0; i < bytes.Length; i++)
-        {
-            _allocator.SetIndexedByte(byteArrayOOP, i, bytes[i]);
-        }
-
-        // Set ByteArray class reference
-        var byteArrayClassOOP = GlobalRegistry.LookupClassOOP("ByteArray");
-        _allocator.SetObjectClass(byteArrayOOP, byteArrayClassOOP);
-
-        return byteArrayOOP;
-    }
-
-    /// <summary>
-    /// Allocates a Float object using ObjectGraphAllocator.
-    /// Float must be WordIndexed with 4 words (16-bit each) per Blue Book specification.
-    /// </summary>
-    private SmalltalkOOP AllocateFloat(double value)
-    {
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = $"Creating Float value={value}",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-
-        // Use ObjectGraphAllocator's AllocateFloat which correctly creates WordIndexed Float with 4 words
-        var floatOOP = _allocator.AllocateFloat(value);
-
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = $"Created floatOOP={floatOOP}, format={_heapManager.GetObjectFormat(floatOOP)}, size={_heapManager.GetIndexedSize(floatOOP)}",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-
-        // Set Float class reference
-        var floatClassOOP = GlobalRegistry.LookupClassOOP("Float");
-        _allocator.SetObjectClass(floatOOP, floatClassOOP);
-
-        return floatOOP;
-    }
-
-    /// <summary>
-    /// Converts a hex string to byte array.
-    /// </summary>
-    private byte[] ConvertHexStringToBytes(string hex)
-    {
-        // Remove any whitespace or separators
-        hex = hex.Replace(" ", "").Replace("-", "").Replace(":", "");
-
-        if (hex.Length % 2 != 0)
-            throw new ArgumentException("Hex string must have even number of characters");
-
-        byte[] bytes = new byte[hex.Length / 2];
-        for (int i = 0; i < bytes.Length; i++)
-        {
-            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-        }
-        return bytes;
-    }
-
-    #endregion
-
     #region Behavior.subclasses Field Population
 
     /// <summary>
@@ -1230,8 +820,6 @@ public class Phase3_ObjectAllocation : IPhase
     /// </summary>
     private void PopulateSubclassesField()
     {
-// Console.WriteLine("  Populating Behavior.subclasses fields...");
-
         int setCount = 0;
         int totalSubclassRefs = 0;
 
@@ -1317,8 +905,6 @@ public class Phase3_ObjectAllocation : IPhase
             }
         }
 
-// Console.WriteLine($"    Populated subclasses for {setCount} classes with children");
-// Console.WriteLine($"    Total subclass references: {totalSubclassRefs}");
         _report.AddValidation("Phase 3", "Behavior.subclasses populated", true);
     }
 
@@ -1395,7 +981,7 @@ public class Phase3_ObjectAllocation : IPhase
             }
 
             // Get symbol OOP for the key
-            SmalltalkOOP keySymbolOOP = InternSymbol(undeclaredVar.Key);
+            SmalltalkOOP keySymbolOOP = _fieldValueResolver.InternSymbol(undeclaredVar.Key);
 
             // Use AssociationRegistry to create canonical Association
             // This ensures Phase 4 and Phase 5 will get the SAME Association object
@@ -1414,7 +1000,7 @@ public class Phase3_ObjectAllocation : IPhase
                     valueOOP = nilOOP;  // Default to nil for truly undeclared variables
                 }
 
-                return AllocateAssociationWithSemanticAllocator(keySymbolOOP, valueOOP);
+                return _dictionaryInstaller.AllocateAssociation(keySymbolOOP, valueOOP);
             });
 
             createdCount++;
@@ -1465,7 +1051,7 @@ public class Phase3_ObjectAllocation : IPhase
             var associationOOP = AssociationRegistry.GetAll()[undeclaredVar.Key];
 
             // Install in Undeclared dictionary using hash-based insertion
-            InstallAssociationInDictionary(undeclaredOOP, associationOOP, undeclaredVar.Key);
+            _dictionaryInstaller.InstallInDictionary(undeclaredOOP, associationOOP, undeclaredVar.Key);
             installedInUndeclared++;
         }
 

@@ -30,7 +30,7 @@ public class RuntimeObjectCreator(
         context.Allocator.SetObjectClass(strikeFontOOP, strikeFontClassOOP);
 
         // Initialize all StrikeFont fields to nil
-        int strikeFontInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("StrikeFont", context.Bundle);
+        int strikeFontInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("StrikeFont", context.Bundle);
         for (int i = 0; i < strikeFontInstVarCount; i++)
         {
             context.Allocator.SetInstanceVariable(strikeFontOOP, i, nilOOP);
@@ -61,7 +61,7 @@ public class RuntimeObjectCreator(
         SetInstanceVarByName(textStyleOOP, "TextStyle", "alignment", SmalltalkOOP.FromSmallInteger(0));
 
         // Initialize remaining fields to nil
-        int textStyleInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("TextStyle", context.Bundle);
+        int textStyleInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("TextStyle", context.Bundle);
         for (int i = 0; i < textStyleInstVarCount; i++)
         {
             if (!context.InitializedFields.Contains((textStyleOOP, i)))
@@ -139,7 +139,7 @@ public class RuntimeObjectCreator(
         SetInstanceVarByName(displayScreenOOP, "Form", "offset", pointOOP);
 
         // Initialize remaining fields to nil
-        int displayScreenInstVarCount = ClassHierarchyUtils.CalculateTotalInstanceVariableCount("DisplayScreen", context.Bundle);
+        int displayScreenInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("DisplayScreen", context.Bundle);
         for (int i = 0; i < displayScreenInstVarCount; i++)
         {
             if (!context.InitializedFields.Contains((displayScreenOOP, i)))
@@ -172,7 +172,7 @@ public class RuntimeObjectCreator(
 
     private void SetInstanceVarByName(SmalltalkOOP objectOOP, string className, string varName, SmalltalkOOP value)
     {
-        int index = ClassHierarchyUtils.FindInstanceVariableIndex(className, varName, context.Bundle);
+        int index = ClassHierarchyTraversal.FindInstanceVariableIndex(className, varName, context.Bundle);
         if (index >= 0)
         {
             context.Allocator.SetInstanceVariable(objectOOP, index, value);

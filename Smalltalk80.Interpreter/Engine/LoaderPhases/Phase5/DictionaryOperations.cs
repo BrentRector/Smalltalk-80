@@ -158,7 +158,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
     /// </summary>
     public int GetSymbolHash(SmalltalkOOP symbolOOP)
     {
-        return VMUtilities.ComputeIdentityHash(symbolOOP);
+        return IdentityHashUtility.ComputeIdentityHash(symbolOOP);
     }
 
     /// <summary>
