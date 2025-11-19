@@ -30,15 +30,16 @@ Target architecture:
 
 **Priority**: High
 **Effort**: High (3-5 days, but achieves proper architecture)
+**Status**: ✅ COMPLETED (Phases 1-4, ~300 lines reduced)
 
 **Tasks**:
 - [x] Phase 1: Extract state records (NonLocalReturnState, ExecutionState)
-- [ ] Phase 2: Extract ExecutionTracer (all debug/trace logic) - *component created, integration pending*
-- [ ] Phase 3: Extract SelectorCache (arithmetic/special selectors)
-- [ ] Phase 4: Extract NonLocalReturnHandler (NLR state machine)
-- [ ] Phase 5: Extract InterpreterEngine (execution loop)
-- [ ] Phase 6: Interface cleanup (reduce from 5 to 2 interfaces)
-- [ ] Phase 7: Final cleanup and documentation
+- [x] Phase 2: Extract ExecutionTracer (all debug/trace logic)
+- [x] Phase 3: Extract SelectorCache (arithmetic/special selectors)
+- [x] Phase 4: Extract NonLocalReturnHandler (NLR state machine)
+- [x] Phase 5: InterpreterEngine - SKIPPED (high risk, execution loop tightly coupled)
+- [x] Phase 6: Interface cleanup - EVALUATED (interfaces follow ISP, minimal gain)
+- [x] Phase 7: Final cleanup and documentation
 
 ---
 
