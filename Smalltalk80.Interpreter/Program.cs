@@ -237,7 +237,7 @@ public static class Program
                     // "Form initialize" - ENABLED to test DefaultTextStyle font bootstrap
                     "Object initialize",                     // ❌ Method not found: Sensor cursorPoint (GUI required)
                     // "TextList initialize" - ENABLED to test DefaultTextStyle copy (runs last)
-                    "VariableNode initialize",               // ❌ Infinite loop (500K+ instructions)
+                    // "VariableNode initialize" - ENABLED to test compiler infrastructure setup
                 };
 
                 // Build index lists for each phase (preserving source file order)
