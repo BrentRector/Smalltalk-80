@@ -278,15 +278,17 @@ internal class BytecodeInterpreter(
             case Bytecode.RETURN_SELF_POP:
                 // Blue Book: Return self from block's home MethodContext (non-local return)
                 {
-                    // Check if we're in a BlockContext by reading slot 5 (home field)
-                    var homeOOP = heapManager.GetInstanceVariable(
-                        context.ActiveContext,
-                        VMConstants.BLOCKCONTEXT_HOME_INDEX  // Slot 5
-                    );
+                    // Properly check if we're in a BlockContext by checking the class
+                    var contextClassOOP = heapManager.GetClassOOP(context.ActiveContext);
 
-                    // If home is not nil, we're in a BlockContext
-                    if (homeOOP != SpecialObjectsArray.Instance.Nil)
+                    if (contextClassOOP == metadata.BlockContextClassOOP)
                     {
+                        // We're in a BlockContext - get home and perform non-local return
+                        var homeOOP = heapManager.GetInstanceVariable(
+                            context.ActiveContext,
+                            VMConstants.BLOCKCONTEXT_HOME_INDEX
+                        );
+
                         // Non-local return from BlockContext to home MethodContext
                         var targetContextOOP = homeOOP;
 
@@ -317,15 +319,17 @@ internal class BytecodeInterpreter(
                 {
                     var returnValue = context.Pop();
 
-                    // Check if we're in a BlockContext by reading slot 5 (home field)
-                    var homeOOP = heapManager.GetInstanceVariable(
-                        context.ActiveContext,
-                        VMConstants.BLOCKCONTEXT_HOME_INDEX  // Slot 5: home MethodContext
-                    );
+                    // Properly check if we're in a BlockContext by checking the class
+                    var contextClassOOP = heapManager.GetClassOOP(context.ActiveContext);
 
-                    if (homeOOP != SpecialObjectsArray.Instance.Nil)
+                    if (contextClassOOP == metadata.BlockContextClassOOP)
                     {
-                        // We're in a BlockContext - perform non-local return
+                        // We're in a BlockContext - get home and perform non-local return
+                        var homeOOP = heapManager.GetInstanceVariable(
+                            context.ActiveContext,
+                            VMConstants.BLOCKCONTEXT_HOME_INDEX
+                        );
+
                         var targetContextOOP = homeOOP;
 
                         // Validate target is in sender chain (safety check)
