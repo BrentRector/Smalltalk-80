@@ -240,6 +240,10 @@ public partial class VirtualMachine
                 $"Method not found: {selectorName ?? "<unknown>"} in class {className} OOP({classOOP.RawValue})");
         }
 
+        // Record method call for infinite loop debugging
+        string recvClassName = GetClassName(classOOP) ?? "?";
+        _tracer.RecordMethodCall(recvClassName, selectorName ?? "?");
+
         // Log ALL message sends during tracing (before primitive check)
         if (_tracer.ShouldTraceSend())
         {
