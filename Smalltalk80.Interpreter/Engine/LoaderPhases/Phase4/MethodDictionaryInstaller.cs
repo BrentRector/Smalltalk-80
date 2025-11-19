@@ -16,6 +16,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 /// <param name="bundle">The cold start bundle containing class and method data.</param>
 /// <param name="allocator">The object graph allocator for creating objects.</param>
 /// <param name="localIdToObjectId">Mapping from local IDs to allocated object OOPs.</param>
+/// <param name="symbolService">The symbol service for symbol lookups.</param>
 /// <param name="diagnostics">Optional diagnostic hub for logging.</param>
 internal class MethodDictionaryInstaller(
     ColdStartBundle bundle,
