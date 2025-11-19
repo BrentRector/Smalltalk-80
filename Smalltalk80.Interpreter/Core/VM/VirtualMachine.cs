@@ -44,6 +44,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     private readonly IVMDebugger _debugger;
     private readonly IPrimitiveRegistry _primitiveRegistry;
     private readonly SelectorCache _selectorCache;
+    private readonly NonLocalReturnHandler _nlrHandler;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -68,10 +69,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     private bool _contextSwitchPending;  // Signal that a context switch occurred (for trampoline)
     private bool _contextSwitchedByPrimitive;  // Primitive created new context (e.g., block invocation)
 
-    // Non-local return state (replaces exception-based unwinding)
-    private bool _nonLocalReturnPending;  // NLR in progress
-    private SmalltalkOOP _nlrValue;  // Value to return
-    private SmalltalkOOP _nlrTargetContext;  // Context to unwind to
+    // Non-local return state is now managed by _nlrHandler
 
 
     // Blue Book architectural constants are defined in VMConstants.cs
@@ -151,6 +149,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
         // Initialize selector cache (populated later via InitializeSelectorCaches)
         _selectorCache = new SelectorCache(heapManager);
+
+        // Initialize NLR handler
+        _nlrHandler = new NonLocalReturnHandler();
     }
 
     /// <summary>
@@ -297,11 +298,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         //     Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_contextManager.ActiveContext}");
 
         // If NLR is pending, continue unwinding instead of executing bytecodes
-        if (_nonLocalReturnPending)
+        if (_nlrHandler.IsPending)
         {
             // if (_verboseDebugMode)
             //     Console.WriteLine($"[ExecuteBytecodeStep] NLR pending, continuing unwinding");
-            return HandleReturn(_nlrValue);
+            return HandleReturn(_nlrHandler.Value);
         }
 
         int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
@@ -409,14 +410,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
                 }
 
                 // Method returned - handle the return
-                // For non-local returns, the value was already popped and stored in _nlrValue
+                // For non-local returns, the value was already popped and stored in NLR handler
                 SmalltalkOOP returnValue;
-                if (_nonLocalReturnPending)
+                if (_nlrHandler.IsPending)
                 {
                     // Non-local return: value already popped by RETURN_*_POP bytecode
-                    returnValue = _nlrValue;
+                    returnValue = _nlrHandler.Value;
                     // if (_verboseDebugMode)
-                    //     Console.WriteLine($"[ExecuteBytecodeStep] Non-local return pending, using _nlrValue: {returnValue}");
+                    //     Console.WriteLine($"[ExecuteBytecodeStep] Non-local return pending, using _nlrHandler.Value: {returnValue}");
                 }
                 else
                 {
@@ -449,22 +450,19 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         SmalltalkOOP senderOOP;
 
         // Handle non-local returns (NLR)
-        if (_nonLocalReturnPending)
+        if (_nlrHandler.IsPending)
         {
             // if (_verboseDebugMode)
-            //     Console.WriteLine($"[HandleReturn NLR] Unwinding from {_contextManager.ActiveContext} to target {_nlrTargetContext}, value={_nlrValue}");
+            //     Console.WriteLine($"[HandleReturn NLR] Unwinding from {_contextManager.ActiveContext} to target {_nlrHandler.TargetContext}, value={_nlrHandler.Value}");
 
             // Check if current context is the NLR target
-            if (_contextManager.ActiveContext == _nlrTargetContext)
+            if (_nlrHandler.IsTargetReached(_contextManager.ActiveContext))
             {
                 // if (_verboseDebugMode)
                 //     Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_contextManager.ActiveContext}");
 
-                // Target reached - clear NLR state and push value
-                _nonLocalReturnPending = false;
-                SmalltalkOOP nlrValue = _nlrValue;
-                _nlrValue = default;
-                _nlrTargetContext = default;
+                // Target reached - clear NLR state and get the value
+                SmalltalkOOP nlrValue = _nlrHandler.Complete();
 
                 // Get sender to continue execution
                 senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
@@ -508,7 +506,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             if (senderOOP == SpecialObjectsArray.Instance.Nil)
             {
                 throw new InvalidOperationException(
-                    $"Non-local return target context {_nlrTargetContext} not found in sender chain. " +
+                    $"Non-local return target context {_nlrHandler.TargetContext} not found in sender chain. " +
                     $"Target may have already returned.");
             }
 
@@ -737,11 +735,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             if (!continueExecution)
             {
                 // Check if this is a non-local return (block return bytecodes 0x7D/0x7E)
-                // If so, the return value is already in _nlrValue and we must not pop again
-                if (_nonLocalReturnPending)
+                // If so, the return value is already in NLR handler and we must not pop again
+                if (_nlrHandler.IsPending)
                 {
-                    // Non-local return: value already popped and stored in _nlrValue
-                    return _nlrValue;
+                    // Non-local return: value already popped and stored in NLR handler
+                    return _nlrHandler.Value;
                 }
                 // Normal return: pop the result and return it
                 return Pop();
@@ -948,20 +946,20 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
     bool IBytecodeContext.NonLocalReturnPending
     {
-        get => _nonLocalReturnPending;
-        set => _nonLocalReturnPending = value;
+        get => _nlrHandler.IsPending;
+        set => _nlrHandler.SetPending(value);
     }
 
     SmalltalkOOP IBytecodeContext.NLRTargetContext
     {
-        get => _nlrTargetContext;
-        set => _nlrTargetContext = value;
+        get => _nlrHandler.TargetContext;
+        set => _nlrHandler.SetTargetContext(value);
     }
 
     SmalltalkOOP IBytecodeContext.NLRValue
     {
-        get => _nlrValue;
-        set => _nlrValue = value;
+        get => _nlrHandler.Value;
+        set => _nlrHandler.SetValue(value);
     }
 
     bool IBytecodeContext.ContextSwitchPending
