@@ -6,6 +6,7 @@ using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
+using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
@@ -36,6 +37,7 @@ public class Phase4_MethodCompilation : IPhase
     // Helper classes for decomposed functionality
     private readonly LiteralResolver _literalResolver;
     private readonly MethodDictionaryInstaller _dictionaryInstaller;
+    private readonly SymbolService _symbolService;
 
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
@@ -77,8 +79,9 @@ public class Phase4_MethodCompilation : IPhase
         _diagnostics = diagnostics;
 
         // Initialize helper classes
+        _symbolService = new SymbolService(bundle);
         _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId);
-        _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, diagnostics);
+        _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, _symbolService, diagnostics);
     }
 
     /// <summary>
