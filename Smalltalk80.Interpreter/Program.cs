@@ -426,8 +426,6 @@ public static class Program
                     var expr = bundle.InitExpressions[index];
                     var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
 
-                    bool isTextInit = expr.Source == "Text initialize";
-
                     // Show what we're executing
                     Console.Write($"  [{index}] {expr.Source}... ");
 
@@ -461,11 +459,6 @@ public static class Program
                             Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS");
                         }
 
-                        // Install DefaultTextStyle into the TextConstants that Text initialize created
-                        if (isTextInit)
-                        {
-                            InstallDefaultTextStyleIntoTextConstants(heapManager);
-                        }
                     }
                     else
                     {
@@ -996,118 +989,4 @@ public static class Program
         };
     }
 
-    /// <summary>
-    /// Installs DefaultTextStyle into the TextConstants dictionary after Text initialize runs.
-    /// Text initialize creates a new TextConstants dictionary, so we need to install
-    /// DefaultTextStyle into that dictionary, not the one Phase 5 created.
-    /// </summary>
-    private static void InstallDefaultTextStyleIntoTextConstants(ISmalltalkHeapManager heapManager)
-    {
-        // Find TextConstants in SystemDictionary (the one Text initialize created)
-        var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
-        int systemDictSize = heapManager.GetIndexedSize(systemDictOOP);
-
-        // Find TextConstants symbol OOP
-        SmalltalkOOP? textConstantsSymbolOOP = null;
-        foreach (var (_, symbolOOP) in SymbolRegistry.AllSymbols())
-        {
-            int size = heapManager.GetIndexedSize(symbolOOP);
-            var bytes = new byte[size];
-            for (int i = 0; i < size; i++)
-            {
-                bytes[i] = heapManager.GetIndexedByte(symbolOOP, i);
-            }
-            if (System.Text.Encoding.UTF8.GetString(bytes) == "TextConstants")
-            {
-                textConstantsSymbolOOP = symbolOOP;
-                break;
-            }
-        }
-
-        if (!textConstantsSymbolOOP.HasValue)
-        {
-            Console.WriteLine("  ERROR: TextConstants symbol not found!");
-            return;
-        }
-
-        // Find TextConstants dictionary in SystemDictionary
-        SmalltalkOOP? textConstantsDictOOP = null;
-        for (int i = 0; i < systemDictSize; i++)
-        {
-            var assocOOP = heapManager.GetIndexedOOP(systemDictOOP, i);
-            if (assocOOP == SpecialObjectsArray.Instance.Nil)
-                continue;
-
-            var keyOOP = heapManager.GetSlot(assocOOP, 1); // Association.key
-            if (keyOOP == textConstantsSymbolOOP.Value)
-            {
-                textConstantsDictOOP = heapManager.GetSlot(assocOOP, 2); // Association.value
-                break;
-            }
-        }
-
-        if (!textConstantsDictOOP.HasValue)
-        {
-            Console.WriteLine("  ERROR: TextConstants dictionary not found in SystemDictionary!");
-            return;
-        }
-
-        Console.WriteLine($"  Found TextConstants dictionary OOP: {textConstantsDictOOP.Value}");
-
-        // Get DefaultTextStyle Association from AssociationRegistry
-        var allAssociations = AssociationRegistry.GetAll();
-        if (!allAssociations.TryGetValue("DefaultTextStyle", out var defaultTextStyleAssocOOP))
-        {
-            Console.WriteLine("  ERROR: DefaultTextStyle Association not found in AssociationRegistry!");
-            return;
-        }
-
-        // Get the TextStyle value that Phase 5 created
-        var textStyleOOP = heapManager.GetSlot(defaultTextStyleAssocOOP, 2); // Association.value
-        Console.WriteLine($"  DefaultTextStyle Association OOP: {defaultTextStyleAssocOOP}, Value OOP: {textStyleOOP}");
-
-        // Install the Association into TextConstants using hash-based insertion
-        var keySymbolOOP = heapManager.GetSlot(defaultTextStyleAssocOOP, 1); // Association.key
-        int hash = IdentityHashUtility.ComputeIdentityHash(keySymbolOOP);
-        int dictSize = heapManager.GetIndexedSize(textConstantsDictOOP.Value);
-        int location = ((hash % dictSize) + dictSize) % dictSize;
-
-        // Linear probe to find empty slot
-        int startLocation = location;
-        while (true)
-        {
-            var probe = heapManager.GetIndexedOOP(textConstantsDictOOP.Value, location);
-            if (probe == SpecialObjectsArray.Instance.Nil)
-            {
-                // Found empty slot - install
-                heapManager.SetIndexedOOP(textConstantsDictOOP.Value, location, defaultTextStyleAssocOOP);
-
-                // Increment tally
-                var tallyOOP = heapManager.GetSlot(textConstantsDictOOP.Value, 1);
-                if (tallyOOP.IsSmallInteger)
-                {
-                    int newTally = tallyOOP.AsSmallInteger() + 1;
-                    heapManager.SetSlot(textConstantsDictOOP.Value, 1, SmalltalkOOP.FromSmallInteger(newTally));
-                }
-
-                Console.WriteLine($"  Installed DefaultTextStyle at slot {location} (hash={hash}, dictSize={dictSize})");
-                return;
-            }
-
-            // Check if already installed
-            var probeKeyOOP = heapManager.GetSlot(probe, 1);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                Console.WriteLine($"  DefaultTextStyle already exists at slot {location}");
-                return;
-            }
-
-            location = (location + 1) % dictSize;
-            if (location == startLocation)
-            {
-                Console.WriteLine("  ERROR: TextConstants dictionary is full!");
-                return;
-            }
-        }
-    }
 }
