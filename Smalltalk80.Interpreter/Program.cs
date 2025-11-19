@@ -470,6 +470,10 @@ public static class Program
                         if (isTextInit)
                         {
                             DumpTextConstantsState(heapManager, "AFTER Text initialize");
+
+                            // Install DefaultTextStyle into the TextConstants that Text initialize created
+                            Console.WriteLine("\n[Post-Text-Init] Installing DefaultTextStyle into TextConstants...");
+                            InstallDefaultTextStyleIntoTextConstants(heapManager);
                         }
                     }
                     else
