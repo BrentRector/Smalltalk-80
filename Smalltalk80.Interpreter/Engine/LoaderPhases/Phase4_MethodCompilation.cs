@@ -1,11 +1,11 @@
 using System.Diagnostics;
-using System.Text.Json;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
@@ -28,18 +28,14 @@ public class Phase4_MethodCompilation : IPhase
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
     private readonly ISmalltalkHeapManager _heapManager;
-    private readonly LayoutResolver _layoutResolver;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
-    private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
     private readonly IReadOnlyList<string> _symbols;
-    private readonly IReadOnlyList<string> _strings;
     private readonly ColdstartReport _report;
     private readonly IDiagnosticHub? _diagnostics;
 
-    // Pool variable binding Array deduplication registry
-    // Key: "PoolDictionaryName:KeySymbol", Value: 2-element Array OOP (#PoolName, #Key)
-    // These are NOT Associations - they are binding metadata for VM runtime resolution
-    private readonly Dictionary<string, SmalltalkOOP> _poolVariableBindings = new();
+    // Helper classes for decomposed functionality
+    private readonly LiteralResolver _literalResolver;
+    private readonly MethodDictionaryInstaller _dictionaryInstaller;
 
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
@@ -51,6 +47,17 @@ public class Phase4_MethodCompilation : IPhase
     /// </summary>
     public int PhaseNumber => 4;
 
+    /// <summary>
+    /// Initializes a new instance of the Phase4_MethodCompilation class.
+    /// </summary>
+    /// <param name="bundle">The cold start bundle containing all class and method data.</param>
+    /// <param name="allocator">The object graph allocator for creating objects.</param>
+    /// <param name="heapManager">The heap manager for memory operations.</param>
+    /// <param name="layoutResolver">The layout resolver for class layouts.</param>
+    /// <param name="localIdToObjectId">Mapping from local IDs to allocated object OOPs.</param>
+    /// <param name="initializedFields">Set of initialized fields to track.</param>
+    /// <param name="report">The coldstart report for metrics.</param>
+    /// <param name="diagnostics">Optional diagnostic hub for logging.</param>
     public Phase4_MethodCompilation(
         ColdStartBundle bundle,
         ObjectGraphAllocator allocator,
@@ -64,13 +71,14 @@ public class Phase4_MethodCompilation : IPhase
         _bundle = bundle;
         _allocator = allocator;
         _heapManager = heapManager;
-        _layoutResolver = layoutResolver;
         _localIdToObjectId = localIdToObjectId;
-        _initializedFields = initializedFields;
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _symbols = bundle.Symbols;
-        _strings = bundle.Strings;
         _diagnostics = diagnostics;
+
+        // Initialize helper classes
+        _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId);
+        _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, diagnostics);
     }
 
     /// <summary>
@@ -91,12 +99,15 @@ public class Phase4_MethodCompilation : IPhase
         return new List<string>();
     }
 
+    /// <summary>
+    /// Executes the phase: allocates dictionaries, compiles methods, creates init expressions, and installs methods.
+    /// </summary>
     public void Run()
     {
         // ====================================================================
         // STEP 1: ALLOCATE METHOD DICTIONARIES (from Phase7)
         // ====================================================================
-        AllocateMethodDictionaries();
+        _dictionaryInstaller.AllocateMethodDictionaries();
 
         // ====================================================================
         // STEP 2: COMPILE AND INSTALL METHODS (from Phase8)
@@ -115,84 +126,7 @@ public class Phase4_MethodCompilation : IPhase
         // ====================================================================
         // STEP 4: INSTALL METHODS INTO DICTIONARIES (from Phase9)
         // ====================================================================
-        InstallMethodsIntoDictionaries();
-    }
-
-    // ====================================================================
-    // STEP 1: METHOD DICTIONARY ALLOCATION (from Phase7)
-    // ====================================================================
-
-    private void AllocateMethodDictionaries()
-    {
-        // Group methods by home class to count them
-        var methodCounts = new Dictionary<string, int>();
-        foreach (var method in _bundle.Methods)
-        {
-            if (method.HomeClassLocalId != null)
-            {
-                methodCounts[method.HomeClassLocalId] = methodCounts.GetValueOrDefault(method.HomeClassLocalId, 0) + 1;
-            }
-        }
-
-        int allocatedDictionaries = 0;
-
-        foreach (var cls in _bundle.Classes)
-        {
-            if (!_localIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
-            {
-// Console.WriteLine($"WARNING: Class not found in localIdToObjectId: {cls.LocalId}");
-                continue;
-            }
-
-            // Count methods for this class
-            int methodCount = methodCounts.GetValueOrDefault(cls.LocalId, 0);
-
-            // Allocate method dictionary with room for growth (next power of 2, min 8)
-            int dictionarySize = Math.Max(8, NextPowerOfTwo(methodCount * 2)); // 50% load factor
-
-            SmalltalkOOP methodDictOOP = AllocateMethodDictionary(dictionarySize);
-
-            // Set the method dictionary as instance variable 1 in the class
-            _allocator.SetInstanceVariable(classOOP, 1, methodDictOOP);
-
-            allocatedDictionaries++;
-        }
-    }
-
-    /// <summary>
-    /// Allocates a MethodDictionary object with the specified capacity.
-    /// MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
-    /// </summary>
-    private SmalltalkOOP AllocateMethodDictionary(int capacity)
-    {
-        // Find MethodDictionary class definition
-        var methodDictClassDefinition = FindClassDefinition("MethodDictionary");
-        if (methodDictClassDefinition == null)
-        {
-            throw new InvalidOperationException("MethodDictionary class not found in bundle");
-        }
-
-        // Allocate the MethodDictionary object (PointerIndexed with capacity for keys)
-        var methodDictClassOOP = GlobalRegistry.LookupClassOOP("MethodDictionary");
-        var methodDictOOP = _allocator.AllocateArray(methodDictClassOOP, capacity);
-
-        // Allocate valueArray (Array of CompiledMethod)
-        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        var valuesArrayOOP = _allocator.AllocateArray(arrayClassOOP, capacity);
-        _allocator.SetInstanceVariable(methodDictOOP, 0, valuesArrayOOP);
-
-        // Set tally to 0 (no methods installed yet)
-        var tallyOOP = SmalltalkOOP.FromSmallInteger(0);
-        _allocator.SetInstanceVariable(methodDictOOP, 1, tallyOOP);
-
-        // Initialize all indexed fields (keys) to nil
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
-        for (int i = 0; i < capacity; i++)
-        {
-            _allocator.SetIndexedOOP(methodDictOOP, i, nilOOP);
-        }
-
-        return methodDictOOP;
+        _dictionaryInstaller.InstallMethodsIntoDictionaries();
     }
 
     // ====================================================================
@@ -246,8 +180,6 @@ public class Phase4_MethodCompilation : IPhase
                 }
             }
         }
-
-// Console.WriteLine($"[Phase4] Built blockOwnerMap with {blockOwnerMap.Count} block ownership entries");
 
         // Store blockOwnerMap in GlobalRegistry for runtime access
         GlobalRegistry.Set("blockOwnerMap", blockOwnerMap);
@@ -309,17 +241,13 @@ public class Phase4_MethodCompilation : IPhase
             {
                 try
                 {
-                    var literalOOP = ResolveLiteralValueAsOOP(method.Literals[i]);
+                    var literalOOP = _literalResolver.ResolveLiteralValueAsOOP(method.Literals[i]);
                     // Patch literal in CompiledMethod: literals start at indexed slot 1 (slot 0 is header)
                     _allocator.SetIndexedOOP(methodOOP, i + 1, literalOOP);
                 }
                 catch (Exception)
                 {
-// Console.WriteLine($"ERROR resolving literal {i} in method {method.LocalId}");
-// Console.WriteLine($"  Literal type: {method.Literals[i].Type}");
                     var index = method.Literals[i].Index;
-                    if (index.HasValue)
-// Console.WriteLine($"  Index: {index.Value}");
                     throw;
                 }
             }
@@ -337,6 +265,9 @@ public class Phase4_MethodCompilation : IPhase
     /// Primary approach: Parse from source (reliable and simple).
     /// Fallback: Search literals for Association and extract class name from key.
     /// </summary>
+    /// <param name="expr">The init expression descriptor.</param>
+    /// <param name="literalOOPs">The resolved literal OOPs.</param>
+    /// <returns>The home class local ID.</returns>
     private string ExtractHomeClassFromInitExpression(InitExpression expr, SmalltalkOOP[] literalOOPs)
     {
         // Primary: Parse from source if available
@@ -383,6 +314,9 @@ public class Phase4_MethodCompilation : IPhase
     /// "Cursor extent:fromArray:offset:" -> "Cursor"
     /// "Float class initialize" -> "Float class" (explicit class-side)
     /// </summary>
+    /// <param name="source">The source string of the init expression.</param>
+    /// <returns>The parsed class name.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when source is null or empty.</exception>
     private string ParseClassNameFromInitExpression(string? source)
     {
         if (string.IsNullOrEmpty(source))
@@ -414,6 +348,13 @@ public class Phase4_MethodCompilation : IPhase
     /// Creates a CompiledMethod object with homeClass fixed slot and separate ByteArray for bytecodes.
     /// Layout: Fixed slot 0 = homeClass, Indexed slots = [header] [literal1] [literal2] ... [literalN] [bytecodeArrayOOP]
     /// </summary>
+    /// <param name="method">The method descriptor from the bundle.</param>
+    /// <param name="literalOOPs">The resolved literal OOPs.</param>
+    /// <param name="bytecodes">The compiled bytecodes.</param>
+    /// <param name="compiledMethodClassOOP">The CompiledMethod class OOP.</param>
+    /// <param name="byteArrayClassOOP">The ByteArray class OOP.</param>
+    /// <returns>The created CompiledMethod OOP.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when home class cannot be resolved.</exception>
     private SmalltalkOOP CreateCompiledMethod(
         MethodDescriptor method,
         SmalltalkOOP[] literalOOPs,
@@ -490,94 +431,6 @@ public class Phase4_MethodCompilation : IPhase
     }
 
     /// <summary>
-    /// Resolves a literal value from the discriminated union to a SmalltalkOOP.
-    /// v1.0.3: Supports "compiledMethod" for nested blocks.
-    /// </summary>
-    private SmalltalkOOP ResolveLiteralValueAsOOP(LiteralValue literal)
-    {
-        var result = literal.Type switch
-        {
-            "symbol" => InternSymbol(_symbols[literal.Index!.Value]),
-            "string" => InternString(_strings[literal.Index!.Value]),
-            "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
-            "float" => AllocateFloat(GetFloatValue(literal.Value!)),
-            "nil" => SpecialObjectsArray.Instance.Nil,
-            "true" => SpecialObjectsArray.Instance.True,
-            "false" => SpecialObjectsArray.Instance.False,
-            "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1) ? objOOP1 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
-            "compiledMethod" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP2) ? objOOP2 : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),
-            "character" => AllocateCharacter(literal.CodePoint!.Value),
-            "bytes" => AllocateByteArray(literal.Encoding!, literal.Data!),
-            "association" => ResolveVariableLiteral(literal.Association!),
-            "array" => AllocateArray(literal.Elements!.Select(l => ResolveLiteralValueAsOOP(l)).ToArray()),
-            _ => throw new InvalidOperationException($"Unknown literal type: {literal.Type}")
-        };
-
-        return result;
-    }
-
-    /// <summary>
-    /// Resolves a variable literal - either a pool variable Array or global Association.
-    /// 
-    /// POOL VARIABLES: Creates a 2-element Array (#PoolDictionaryName, #Key).
-    /// These are NOT Associations - they are binding metadata for runtime resolution.
-    /// At runtime, the VM will:
-    /// 1. Resolve pool dictionary name to actual dictionary object
-    /// 2. Look up key in that dictionary  
-    /// 
-    /// GLOBAL VARIABLES: Creates an Association with key and nil value.
-    /// The AssociationRegistry ensures canonicalization.
-    /// </summary>
-    private SmalltalkOOP ResolveVariableLiteral(AssociationLiteral assoc)
-    {
-        var keySymbol = InternSymbol(_symbols[assoc.KeyIndex]);
-        string keyName = _symbols[assoc.KeyIndex];
-
-        // POOL VARIABLES: Create 2-element Array (#PoolName, #Key) - NOT an Association
-        if (assoc.PoolDictionaryName != null)
-        {
-            // Deduplication key: "PoolDictionaryName:KeySymbol"
-            string dedupKey = $"{assoc.PoolDictionaryName}:{keyName}";
-
-            if (_poolVariableBindings.TryGetValue(dedupKey, out var existingArrayOOP))
-            {
-                // Reuse existing pool variable binding Array
-                return existingArrayOOP;
-            }
-
-            // Create new pool variable binding Array: (#PoolDictionaryName, #Key)
-            var poolNameSymbol = InternSymbol(assoc.PoolDictionaryName);
-            var poolBindingArray = AllocateArray(new[] { poolNameSymbol, keySymbol });
-
-            // Register for deduplication
-            _poolVariableBindings[dedupKey] = poolBindingArray;
-
-            return poolBindingArray;
-        }
-
-        // GLOBAL VARIABLES: Use AssociationRegistry for canonicalization
-        // VALUE MIGRATION POLICY: Validate that incoming Association has nil value
-        var incomingValueOOP = assoc.ValueRef?.LocalId != null
-            ? _localIdToObjectId[assoc.ValueRef.LocalId]
-            : SpecialObjectsArray.Instance.Nil;
-
-        // Warn if incoming value is non-nil (policy violation - silent)
-        // Policy: Association literals should have nil values at compile time
-
-        // Use AssociationRegistry for canonicalization
-        var result = AssociationRegistry.GetOrCreate(keyName, () =>
-        {
-            // Create new Association: key=Symbol, value=nil
-            // Always use nil value per VALUE MIGRATION POLICY
-            var assocOOP = AllocateAssociation(keySymbol, SpecialObjectsArray.Instance.Nil);
-
-            return assocOOP;
-        });
-
-        return result;
-    }
-
-    /// <summary>
     /// Validates that all Association literals are properly canonicalized.
     /// </summary>
     private void ValidateAssociationCanonicalization()
@@ -626,7 +479,7 @@ public class Phase4_MethodCompilation : IPhase
                 // Track this Association by key
                 if (!associationsByKey.ContainsKey(keyName))
                 {
-                    associationsByKey[keyName] = new List<(string, SmalltalkOOP)>();
+                    associationsByKey[keyName] = [];
                 }
                 associationsByKey[keyName].Add((method.LocalId, assocOOP));
             }
@@ -673,28 +526,6 @@ public class Phase4_MethodCompilation : IPhase
             throw new InvalidOperationException(errorMessage);
         }
 
-        // Calculate deduplication statistics
-        int duplicatesAvoided = totalAssociations - canonicalAssociations;
-        double dedupRatio = totalAssociations > 0 ? (double)canonicalAssociations / totalAssociations : 1.0;
-        double memoryReduction = totalAssociations > 0 ? (1.0 - dedupRatio) : 0.0;
-
-// Console.WriteLine($"[Phase4] Association canonicalization validation PASSED:");
-// Console.WriteLine($"  Total Association literals in methods: {totalAssociations}");
-// Console.WriteLine($"  Canonical Associations created: {AssociationRegistry.Count}");
-// Console.WriteLine($"  Duplicate Associations avoided: {duplicatesAvoided}");
-// Console.WriteLine($"  Canonicalization ratio: {dedupRatio:P1}");
-// Console.WriteLine($"  Memory reduction: {memoryReduction:P1}");
-// Console.WriteLine($"  Associations with non-nil values: {nonNilValueCount}");
-
-        // VALUE MIGRATION POLICY WARNING
-        if (nonNilValueCount > 0)
-        {
-// Console.WriteLine($"\n[Phase4] WARNING: {nonNilValueCount} Association(s) have non-nil values!");
-// Console.WriteLine($"  Association literals should have nil values at compile time.");
-// Console.WriteLine($"  Values should only be set at runtime via bytecode 0x09.");
-// Console.WriteLine($"  This may indicate a compiler anomaly or special cold-start initialization.");
-        }
-
         // STRICT REACHABILITY VALIDATION
         ValidateAssociationReachability(associationsByKey);
     }
@@ -702,6 +533,7 @@ public class Phase4_MethodCompilation : IPhase
     /// <summary>
     /// Validates that all Association OOPs are reachable from canonical sources.
     /// </summary>
+    /// <param name="associationsByKey">Dictionary of associations grouped by key name.</param>
     private void ValidateAssociationReachability(Dictionary<string, List<(string methodId, SmalltalkOOP assocOOP)>> associationsByKey)
     {
         var reachableAssociations = new HashSet<SmalltalkOOP>();
@@ -782,15 +614,14 @@ public class Phase4_MethodCompilation : IPhase
                               string.Join("\n", unreachableAssociations);
             throw new InvalidOperationException(errorMessage);
         }
-
-// Console.WriteLine($"[Phase4] Association reachability validation PASSED:");
-// Console.WriteLine($"  All {associationsByKey.Sum(kvp => kvp.Value.Count)} Association literals are reachable from canonical sources.");
-
     }
 
     /// <summary>
     /// Validates that an Association object has correct structure.
     /// </summary>
+    /// <param name="assocOOP">The Association object pointer to validate.</param>
+    /// <param name="methodId">The method ID for error reporting.</param>
+    /// <exception cref="InvalidOperationException">Thrown when Association structure is invalid.</exception>
     private void ValidateAssociationStructure(SmalltalkOOP assocOOP, string methodId)
     {
         // Check object format
@@ -863,16 +694,15 @@ public class Phase4_MethodCompilation : IPhase
         }
 
         // NOTE: Store init expressions in ORIGINAL bundle order
-        // Program.cs handles the execution ordering (initialize → comments → other)
+        // Program.cs handles the execution ordering (initialize -> comments -> other)
         // We must maintain 1:1 index mapping between bundle.InitExpressions and InitExpressionMethods array
-// Console.WriteLine($"[Phase4] Creating {_bundle.InitExpressions.Length} init expression methods in bundle order");
 
         var initExprMethods = new List<SmalltalkOOP>();
 
         foreach (var expr in _bundle.InitExpressions)
         {
             // Resolve literals using the SAME canonicalization mechanism as regular methods
-            var literalOOPs = expr.Literals.Select(ResolveLiteralValueAsOOP).ToArray();
+            var literalOOPs = expr.Literals.Select(_literalResolver.ResolveLiteralValueAsOOP).ToArray();
 
             // Determine homeClass from the resolved literals (not by parsing source!)
             // Init expressions like "BinaryChoiceView initialize" have first literal = Association for the class
@@ -888,7 +718,7 @@ public class Phase4_MethodCompilation : IPhase
                     HomeClassLocalId = homeClassLocalId,
                     SelectorIndex = 0,
                     Header = expr.Header,
-                    Literals = Array.Empty<LiteralValue>(), // already resolved
+                    Literals = [],
                     Bytecodes = expr.Bytecodes
                 },
                 literalOOPs,
@@ -911,389 +741,5 @@ public class Phase4_MethodCompilation : IPhase
 
         // Store in SpecialObjectsArray for runtime access
         SpecialObjectsArray.SetInitExpressionMethods(initArrayOOP);
-    }
-
-    // ====================================================================
-    // STEP 4: METHOD DICTIONARY INSTALLATION (from Phase9)
-    // ====================================================================
-
-    private void InstallMethodsIntoDictionaries()
-    {
-        int installedMethods = 0;
-        int skippedBlocks = 0;
-        int skippedMethods = 0;
-
-        foreach (var method in _bundle.Methods)
-        {
-            // Skip blocks - blocks are compiled inline in method bytecode, not separate CompiledMethods
-            if (string.IsNullOrEmpty(method.HomeClassLocalId))
-            {
-                skippedBlocks++;
-                continue;
-            }
-
-            // Get the CompiledMethod object created earlier
-            if (!_localIdToObjectId.TryGetValue(method.LocalId, out SmalltalkOOP methodOOP))
-            {
-                _diagnostics?.Emit(new DiagnosticMessageEvent
-                {
-                    Severity = MessageSeverity.Warning,
-                    Category = "Phase4",
-                    Message = $"Method not found in localIdToObjectId: {method.LocalId}",
-                    Timestamp = Stopwatch.GetTimestamp(),
-                    InstructionCount = 0
-                });
-                skippedMethods++;
-                continue;
-            }
-
-            // Resolve the home class object
-            if (!_localIdToObjectId.TryGetValue(method.HomeClassLocalId, out SmalltalkOOP classOOP))
-            {
-                _diagnostics?.Emit(new DiagnosticMessageEvent
-                {
-                    Severity = MessageSeverity.Warning,
-                    Category = "Phase4",
-                    Message = $"Home class not found: {method.HomeClassLocalId}",
-                    Timestamp = Stopwatch.GetTimestamp(),
-                    InstructionCount = 0
-                });
-                skippedMethods++;
-                continue;
-            }
-
-            // Get the class's method dictionary (instance variable index 1, slot 2 in Behavior)
-            // Instance variable indexing: index N = slot N+1 (slot 0 is class pointer)
-            // Behavior instance variables: [0]=superclass, [1]=methodDict, [2]=format, [3]=subclasses
-            var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1); // methodDict is at instance var index 1
-
-            if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
-            {
-                _diagnostics?.Emit(new DiagnosticMessageEvent
-                {
-                    Severity = MessageSeverity.Warning,
-                    Category = "Phase4",
-                    Message = $"Class {method.HomeClassLocalId} has nil methodDict",
-                    Timestamp = Stopwatch.GetTimestamp(),
-                    InstructionCount = 0
-                });
-                skippedMethods++;
-                continue;
-            }
-
-            // Get the selector symbol
-            string selectorName = _symbols[method.SelectorIndex];
-            SmalltalkOOP selectorSymbolOOP = GetSymbolOOP(selectorName);
-
-            // Install the method in the method dictionary
-            InstallMethodInDictionary(methodDictOOP, selectorSymbolOOP, methodOOP);
-            installedMethods++;
-        }
-    }
-
-    /// <summary>
-    /// Gets the OOP for a symbol that was interned in Phase 1.
-    /// </summary>
-    private SmalltalkOOP GetSymbolOOP(string symbolName)
-    {
-        // Find the symbol in the symbol table from Phase 1
-        for (int i = 0; i < _bundle.Symbols.Length; i++)
-        {
-            if (_bundle.Symbols[i] == symbolName)
-            {
-                return SymbolRegistry.GetSymbolOOP(i);
-            }
-        }
-
-        throw new InvalidOperationException($"Symbol '{symbolName}' not found in symbol table.");
-    }
-
-    /// <summary>
-    /// Installs a method into a method dictionary using IdentityDictionary structure.
-    /// MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
-    /// </summary>
-    private void InstallMethodInDictionary(SmalltalkOOP methodDictOOP, SmalltalkOOP selectorSymbolOOP, SmalltalkOOP methodOOP)
-    {
-        // MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
-        var valuesArrayOOP = _allocator.GetInstanceVariable(methodDictOOP, 0);
-        var tallyOOP = _allocator.GetInstanceVariable(methodDictOOP, 1);
-
-        if (valuesArrayOOP == SpecialObjectsArray.Instance.Nil)
-        {
-            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has nil valueArray");
-        }
-
-        int dictionarySize = _allocator.GetIndexedSize(methodDictOOP);
-        int valuesArraySize = _allocator.GetIndexedSize(valuesArrayOOP);
-
-        if (dictionarySize != valuesArraySize)
-        {
-            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has mismatched sizes: keys={dictionarySize}, values={valuesArraySize}");
-        }
-
-        // Find an empty slot or existing entry for this selector
-        int targetIndex = -1;
-        for (int i = 0; i < dictionarySize; i++)
-        {
-            var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
-
-            if (keyOOP == SpecialObjectsArray.Instance.Nil)
-            {
-                // Empty slot found
-                targetIndex = i;
-                break;
-            }
-            else if (keyOOP == selectorSymbolOOP)
-            {
-                // Existing entry for this selector - replace it
-                targetIndex = i;
-                break;
-            }
-        }
-
-        if (targetIndex == -1)
-        {
-            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} is full - no empty slots available");
-        }
-
-        // Check if this is a new entry (for tally update)
-        var existingKeyOOP = _allocator.GetIndexedOOP(methodDictOOP, targetIndex);
-        bool isNewEntry = existingKeyOOP == SpecialObjectsArray.Instance.Nil;
-
-        // Install the method
-        _allocator.SetIndexedOOP(methodDictOOP, targetIndex, selectorSymbolOOP);
-        _allocator.SetIndexedOOP(valuesArrayOOP, targetIndex, methodOOP);
-
-        // Update tally if we used a new slot
-        if (isNewEntry)
-        {
-            int currentTally = tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger() : 0;
-            var newTallyOOP = SmalltalkOOP.FromSmallInteger(currentTally + 1);
-            _allocator.SetInstanceVariable(methodDictOOP, 1, newTallyOOP);
-        }
-    }
-
-    // ====================================================================
-    // HELPER METHODS (used across multiple steps)
-    // ====================================================================
-
-    /// <summary>
-    /// Extracts an integer value from a JsonElement or int.
-    /// </summary>
-    private int GetIntValue(object value)
-    {
-        return value switch
-        {
-            JsonElement e => e.GetInt32(),
-            int i => i,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to int")
-        };
-    }
-
-    /// <summary>
-    /// Extracts a double value from a JsonElement or double.
-    /// </summary>
-    private double GetFloatValue(object value)
-    {
-        return value switch
-        {
-            JsonElement e => e.GetDouble(),
-            double d => d,
-            float f => f,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to double")
-        };
-    }
-
-    /// <summary>
-    /// Interns a symbol using the symbol table from Phase 1.
-    /// </summary>
-    private SmalltalkOOP InternSymbol(string name)
-    {
-        // Find the symbol in the SymbolRegistry (created in Phase 1)
-        for (int i = 0; i < _bundle.Symbols.Length; i++)
-        {
-            if (_bundle.Symbols[i] == name)
-            {
-                return SymbolRegistry.GetSymbolOOP(i);
-            }
-        }
-
-        throw new InvalidOperationException($"Symbol '{name}' not found in symbol table.");
-    }
-
-    /// <summary>
-    /// Allocates a String object (NOT interned - each call creates a new String).
-    /// In Smalltalk-80, Strings are mutable and NOT interned.
-    /// </summary>
-    private SmalltalkOOP InternString(string value)
-    {
-        // Allocate string object (AllocateString handles the bytes internally)
-        var stringOOP = _allocator.AllocateString(value);
-        // Set String class reference (coldstart phases can use GlobalRegistry)
-        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
-        _allocator.SetObjectClass(stringOOP, stringClassOOP);
-        return stringOOP;
-    }
-
-    /// <summary>
-    /// Allocates a Float object using ObjectGraphAllocator.
-    /// Float must be WordIndexed with 4 words (16-bit each) per Blue Book specification.
-    /// </summary>
-    private SmalltalkOOP AllocateFloat(double value)
-    {
-        // Use ObjectGraphAllocator's AllocateFloat which correctly creates WordIndexed Float with 4 words
-        var floatOOP = _allocator.AllocateFloat(value);
-
-        // Set Float class reference
-        var floatClassOOP = GlobalRegistry.LookupClassOOP("Float");
-        _allocator.SetObjectClass(floatOOP, floatClassOOP);
-
-        return floatOOP;
-    }
-
-    /// <summary>
-    /// Allocates a Character object.
-    /// </summary>
-    private SmalltalkOOP AllocateCharacter(int codePoint)
-    {
-        // Look up Character class layout
-        var characterClassDefinition = ClassHierarchyTraversal.FindClassDefinition("Character", _bundle);
-        if (characterClassDefinition == null)
-        {
-            throw new InvalidOperationException("Character class not found in bundle");
-        }
-
-        var characterOOP = _allocator.AllocateFixedObject("Character");
-        // Set Character class reference
-        var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
-        _allocator.SetObjectClass(characterOOP, characterClassOOP);
-
-        // Store the code point in the Character object
-        var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
-        _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
-
-        return characterOOP;
-    }
-
-    /// <summary>
-    /// Allocates a ByteArray object.
-    /// </summary>
-    private SmalltalkOOP AllocateByteArray(string encoding, string data)
-    {
-        // Look up ByteArray class layout
-        var byteArrayClassDefinition = ClassHierarchyTraversal.FindClassDefinition("ByteArray", _bundle);
-        if (byteArrayClassDefinition == null)
-        {
-            throw new InvalidOperationException("ByteArray class not found in bundle");
-        }
-
-        // Decode the data based on encoding
-        byte[] bytes = encoding.ToLower() switch
-        {
-            "base64" => Convert.FromBase64String(data),
-            "hex" => ConvertHexStringToBytes(data),
-            _ => throw new InvalidOperationException($"Unsupported byte array encoding: {encoding}")
-        };
-
-        var byteArrayOOP = _allocator.AllocateByteArray("ByteArray", bytes);
-        // Set ByteArray class reference
-        var byteArrayClassOOP = GlobalRegistry.LookupClassOOP("ByteArray");
-        _allocator.SetObjectClass(byteArrayOOP, byteArrayClassOOP);
-
-        // Bytes already stored during allocation
-
-        return byteArrayOOP;
-    }
-
-    /// <summary>
-    /// Allocates an Array object.
-    /// </summary>
-    private SmalltalkOOP AllocateArray(SmalltalkOOP[] elementOOPs)
-    {
-        // Look up Array class layout
-        var arrayClassDefinition = ClassHierarchyTraversal.FindClassDefinition("Array", _bundle);
-        if (arrayClassDefinition == null)
-        {
-            throw new InvalidOperationException("Array class not found in bundle");
-        }
-
-        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        var arrayOOP = _allocator.AllocateArray(arrayClassOOP, elementOOPs.Length);
-        // Class reference automatically set by new AllocateArray API
-
-        // Store the elements
-        for (int i = 0; i < elementOOPs.Length; i++)
-        {
-            _allocator.SetIndexedOOP(arrayOOP, i, elementOOPs[i]);
-        }
-
-        return arrayOOP;
-    }
-
-    /// <summary>
-    /// Allocates an Association object (key-value pair).
-    /// </summary>
-    private SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
-    {
-        // Look up Association class layout from bundle data
-        var associationClassDefinition = ClassHierarchyTraversal.FindClassDefinition("Association", _bundle);
-        if (associationClassDefinition == null)
-        {
-            throw new InvalidOperationException("Association class not found in bundle");
-        }
-
-        var associationOOP = _allocator.AllocateFixedObject("Association");
-        // Set Association class reference
-        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        _allocator.SetObjectClass(associationOOP, associationClassOOP);
-
-        // Set instance variables: [0] = key, [1] = value
-        _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
-        _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
-
-        return associationOOP;
-    }
-
-    /// <summary>
-    /// Converts a hex string to byte array.
-    /// </summary>
-    private byte[] ConvertHexStringToBytes(string hex)
-    {
-        // Remove any whitespace or separators
-        hex = hex.Replace(" ", "").Replace("-", "").Replace(":", "");
-
-        if (hex.Length % 2 != 0)
-            throw new ArgumentException("Hex string must have even number of characters");
-
-        byte[] bytes = new byte[hex.Length / 2];
-        for (int i = 0; i < bytes.Length; i++)
-        {
-            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-        }
-        return bytes;
-    }
-
-    /// <summary>
-    /// Finds a class definition by name in the bundle.
-    /// </summary>
-    private ClassDescriptor? FindClassDefinition(string className)
-    {
-        return _bundle.Classes.FirstOrDefault(c =>
-            !c.IsMetaclass && _bundle.Symbols[c.NameIndex] == className);
-    }
-
-    /// <summary>
-    /// Returns the next power of 2 greater than or equal to the given value.
-    /// </summary>
-    private int NextPowerOfTwo(int value)
-    {
-        if (value <= 1) return 1;
-
-        int power = 1;
-        while (power < value)
-        {
-            power *= 2;
-        }
-        return power;
     }
 }
