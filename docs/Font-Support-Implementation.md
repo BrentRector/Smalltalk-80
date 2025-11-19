@@ -284,12 +284,85 @@ Note: In the current implementation, DefaultTextStyle is bootstrapped from C# du
 - StrikeFonts for sizes 10, 12, 14
 - DefaultTextStyle registration in TextConstants
 
-### Phase 2: Determinism & Validation ✅ MOSTLY COMPLETE
+### Phase 2: Determinism & Validation ✅ COMPLETE
 - Fixed DPI at 96
 - Disabled ClearType/antialiasing
 - Font caching by (family, sizePx, dpi, hinting)
 - Font identity recording
-- **TODO**: Validation test suite
+- Validation test suite (C# and Smalltalk)
+
+## Validation Test Plan
+
+### Test Files
+
+- **C# Tests**: `Smalltalk80.Interpreter/Tests/FontBridgeTests.cs`
+- **Smalltalk Tests**: `Smalltalk-80 Source/Tests/FontValidationTests.st`
+
+### Running Tests
+
+**C# Tests:**
+```csharp
+FontBridgeTests.RunAllTests();
+```
+
+**Smalltalk Tests:**
+```smalltalk
+FontValidationTests runAll
+```
+
+### Phase 1 Tests: Bootstrap with WinForms/GDI+
+
+| Test | C# | Smalltalk | Description |
+|------|-----|-----------|-------------|
+| Metrics Consistency | ✓ | ✓ | ascent + descent + leading > 0 |
+| Width Sanity | ✓ | ✓ | 'm' >= 'i', positive widths |
+| Glyph Rasterization | ✓ | - | Bitmap not null, valid dimensions |
+| StrikeFont Build | ✓ | - | xTable monotonic, valid structure |
+| DefaultTextStyle Exists | - | ✓ | Pool variable present |
+| Font Array | - | ✓ | fontArray has fonts |
+| String Widths | ✓ | ✓ | "Hello" > "Hi" |
+
+### Phase 2 Tests: Determinism & Validation
+
+| Test | C# | Smalltalk | Description |
+|------|-----|-----------|-------------|
+| DPI Lock | ✓ | - | RenderingDpi = 96 |
+| Atlas Hashing | ✓ | - | Same font → same hash |
+| Cache Consistency | ✓ | - | Cached results match |
+| Baseline Alignment | - | ✓ | baseline = ascent |
+| Width Determinism | - | ✓ | Same string → same width |
+| Metrics Consistency | - | ✓ | lineGrid >= ascent + descent |
+
+### Phase 3 Tests: DirectWrite (Future)
+
+| Test | Description |
+|------|-------------|
+| Ligature Shaping | "ffi" < "f" + "f" + "i" |
+| RTL Script | Arabic/Hebrew glyph order |
+| Kerning | "AV" < "A" + "V" |
+
+### Phase 4 Tests: Advanced Typography (Future)
+
+| Test | Description |
+|------|-------------|
+| Fallback Chain | Emoji → fallback font |
+| Combining Marks | "á" composed correctly |
+| Variable Fonts | Weight interpolation |
+
+### Atlas Hashing Utility
+
+For detecting non-determinism across runs:
+
+```csharp
+var font = bridge.BuildStrikeFont(descriptor);
+var rowHashes = FontBridgeTests.ComputeRowHashes(font);
+
+// Compare with previous run
+for (int i = 0; i < rowHashes.Length; i++)
+{
+    Console.WriteLine($"Row {i}: {rowHashes[i]}");
+}
+```
 
 ### Phase 3: DirectWrite Integration (Future)
 - DirectWriteFontBridge for accuracy and shaping
