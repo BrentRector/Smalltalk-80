@@ -174,17 +174,28 @@ public static class SimpleObjectPrimitives
             if (classOOP.IsSmallInteger || classOOP == SpecialObjectsArray.Instance.Nil)
                 return PrimitiveResult.Fail();
 
-            var formatOOP = context.HeapManager.GetInstanceVariable(classOOP, 2);
+            // Read format from class using GetSlot to bypass bounds check
+            // Class slot layout: [0]=class, [1]=superclass, [2]=methodDict, [3]=format
+            var formatOOP = context.HeapManager.GetSlot(classOOP, 3);
             if (!formatOOP.IsSmallInteger)
                 return PrimitiveResult.Fail();
 
             var formatWord = new FormatWord(formatOOP.AsSmallInteger());
             int count = formatWord.FixedFields;
 
+            // DEBUG: Check for mismatch between cached and format-based count
+            int cachedCount = context.HeapManager.GetInstanceVariableCount(context.Receiver);
+            if (cachedCount != count)
+            {
+                Console.WriteLine($"[PRIMITIVE 73 MISMATCH] {context.Receiver}: cached={cachedCount}, format={count}, classFormat=0x{formatOOP.AsSmallInteger():X4}");
+            }
+
             // Smalltalk indices are 1-based
             if (index < 1 || index > count) return PrimitiveResult.Fail();
 
-            var value = context.HeapManager.GetInstanceVariable(context.Receiver, index - 1);
+            // Use GetSlot directly to bypass cached bounds check
+            // Object slot layout: [0]=class, [1..count]=instance variables
+            var value = context.HeapManager.GetSlot(context.Receiver, index);
             return PrimitiveResult.Ok(value);
         }
     }
@@ -206,7 +217,9 @@ public static class SimpleObjectPrimitives
             if (classOOP.IsSmallInteger || classOOP == SpecialObjectsArray.Instance.Nil)
                 return PrimitiveResult.Fail();
 
-            var formatOOP = context.HeapManager.GetInstanceVariable(classOOP, 2);
+            // Read format from class using GetSlot to bypass bounds check
+            // Class slot layout: [0]=class, [1]=superclass, [2]=methodDict, [3]=format
+            var formatOOP = context.HeapManager.GetSlot(classOOP, 3);
             if (!formatOOP.IsSmallInteger)
                 return PrimitiveResult.Fail();
 
@@ -216,7 +229,9 @@ public static class SimpleObjectPrimitives
             // Smalltalk indices are 1-based
             if (index < 1 || index > count) return PrimitiveResult.Fail();
 
-            context.HeapManager.SetInstanceVariable(context.Receiver, index - 1, value);
+            // Use SetSlot directly to bypass cached bounds check
+            // Object slot layout: [0]=class, [1..count]=instance variables
+            context.HeapManager.SetSlot(context.Receiver, index, value);
             return PrimitiveResult.Ok(value);
         }
     }
