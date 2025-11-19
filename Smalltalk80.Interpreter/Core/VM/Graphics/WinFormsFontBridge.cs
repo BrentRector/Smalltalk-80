@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
+using System.Runtime.Versioning;
 
 namespace Smalltalk80.Interpreter.Core.VM.Graphics;
 
@@ -8,6 +9,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Graphics;
 /// GDI+/WinForms implementation of IFontBridge.
 /// Uses System.Drawing for font operations with deterministic settings.
 /// </summary>
+[SupportedOSPlatform("windows")]
 public class WinFormsFontBridge : IFontBridge, IDisposable
 {
     private const int FixedDpi = 96;

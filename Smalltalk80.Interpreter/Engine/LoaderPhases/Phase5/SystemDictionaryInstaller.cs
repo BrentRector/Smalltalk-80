@@ -215,30 +215,23 @@ public class SystemDictionaryInstaller(
 
     private SmalltalkOOP AllocateEmptyDictionary(int capacity)
     {
-        // Dictionary has 2 named instance variables (tally, array) plus indexed slots
+        // Dictionary inherits from Set which has indexed slots directly
+        // (not a separate array instance variable)
         var dictionaryClassOOP = GlobalRegistry.LookupClassOOP("Dictionary");
-        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         var nilOOP = SpecialObjectsArray.Instance.Nil;
 
-        // Allocate the Dictionary object
-        var dictOOP = context.Allocator.AllocateFixedObject("Dictionary");
+        // Allocate Dictionary with indexed slots for hash table entries
+        var dictOOP = context.Allocator.AllocateArray("Dictionary", capacity);
         context.Allocator.SetObjectClass(dictOOP, dictionaryClassOOP);
 
-        // Set tally to 0
+        // Set tally to 0 (only named instance variable in Set/Dictionary)
         context.Allocator.SetInstanceVariable(dictOOP, 0, SmalltalkOOP.FromSmallInteger(0));
 
-        // Create the backing array
-        var arrayOOP = context.Allocator.AllocateArray("Array", capacity);
-        context.Allocator.SetObjectClass(arrayOOP, arrayClassOOP);
-
-        // Initialize array to nil
+        // Initialize indexed slots to nil
         for (int i = 0; i < capacity; i++)
         {
-            context.Allocator.SetIndexedOOP(arrayOOP, i, nilOOP);
+            context.Allocator.SetIndexedOOP(dictOOP, i, nilOOP);
         }
-
-        // Set the array reference
-        context.Allocator.SetInstanceVariable(dictOOP, 1, arrayOOP);
 
         return dictOOP;
     }
