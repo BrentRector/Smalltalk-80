@@ -168,23 +168,18 @@ public static class SimpleObjectPrimitives
             if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
 
             int index = context.Arguments[0].AsSmallInteger();
-            int count = context.HeapManager.GetInstanceVariableCount(context.Receiver);
 
-            // If object's cached count is 0, read from class format directly
-            // This handles objects where the count wasn't properly cached
-            if (count == 0)
-            {
-                var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
-                if (!classOOP.IsSmallInteger && classOOP != SpecialObjectsArray.Instance.Nil)
-                {
-                    var formatOOP = context.HeapManager.GetInstanceVariable(classOOP, 2);
-                    if (formatOOP.IsSmallInteger)
-                    {
-                        var formatWord = new FormatWord(formatOOP.AsSmallInteger());
-                        count = formatWord.FixedFields;
-                    }
-                }
-            }
+            // Always read count from class format - this is the authoritative source
+            var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+            if (classOOP.IsSmallInteger || classOOP == SpecialObjectsArray.Instance.Nil)
+                return PrimitiveResult.Fail();
+
+            var formatOOP = context.HeapManager.GetInstanceVariable(classOOP, 2);
+            if (!formatOOP.IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            var formatWord = new FormatWord(formatOOP.AsSmallInteger());
+            int count = formatWord.FixedFields;
 
             // Smalltalk indices are 1-based
             if (index < 1 || index > count) return PrimitiveResult.Fail();
@@ -205,23 +200,18 @@ public static class SimpleObjectPrimitives
 
             int index = context.Arguments[0].AsSmallInteger();
             var value = context.Arguments[1];
-            int count = context.HeapManager.GetInstanceVariableCount(context.Receiver);
 
-            // If object's cached count is 0, read from class format directly
-            // This handles objects where the count wasn't properly cached
-            if (count == 0)
-            {
-                var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
-                if (!classOOP.IsSmallInteger && classOOP != SpecialObjectsArray.Instance.Nil)
-                {
-                    var formatOOP = context.HeapManager.GetInstanceVariable(classOOP, 2);
-                    if (formatOOP.IsSmallInteger)
-                    {
-                        var formatWord = new FormatWord(formatOOP.AsSmallInteger());
-                        count = formatWord.FixedFields;
-                    }
-                }
-            }
+            // Always read count from class format - this is the authoritative source
+            var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+            if (classOOP.IsSmallInteger || classOOP == SpecialObjectsArray.Instance.Nil)
+                return PrimitiveResult.Fail();
+
+            var formatOOP = context.HeapManager.GetInstanceVariable(classOOP, 2);
+            if (!formatOOP.IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            var formatWord = new FormatWord(formatOOP.AsSmallInteger());
+            int count = formatWord.FixedFields;
 
             // Smalltalk indices are 1-based
             if (index < 1 || index > count) return PrimitiveResult.Fail();
