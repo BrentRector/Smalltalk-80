@@ -47,6 +47,18 @@ The Smalltalk VM never directly exposes Windows font objects. Instead:
 - Converts them into VM-native StrikeFont/TextStyle objects
 - Registers them in TextConstants for consistent, canonical font model
 
+### Font Rendering Flow
+
+![Font Interactions](Smalltalk%20Image%20Files/Font%20Interactions.png)
+
+The diagram shows the interaction between Smalltalk and Windows layers:
+
+1. **TextStyle** contains an array of fonts, selects **StrikeFont** by size
+2. **StrikeFont** handles text rendering and glyph lookup
+3. **FontBridge Interface** mediates between Smalltalk and Windows
+4. **Windows** provides the actual font rendering engine
+5. **Result glyphs** are cached and returned to Smalltalk
+
 ## Architecture
 
 ### Component Structure
