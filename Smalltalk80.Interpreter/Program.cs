@@ -222,7 +222,6 @@ public static class Program
                 // Skip list for init expressions requiring runtime features not available during bootstrap
                 var skipList = new HashSet<string>
                 {
-                    "FormEditor initialize",                 // ❌ Pool variable 'DefaultLineGrid' not found in TextConstants
                     "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
                     "FormMenuView initialize",               // ❌ Pool variable 'Disk' not found in FilePool
                     "ChangeListController initialize",       // ❌ CopyBits indexed word out of range

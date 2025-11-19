@@ -103,8 +103,9 @@ public static class InitExpressionOrdering
             "WindowsFileSystem class",
             "WorkspaceView class",
 
-            // LEVEL 1: 5 classes that depend on Level 0
+            // LEVEL 1: 6 classes that depend on Level 0
             "BitEditor class",      // depends on: OrderedCollection, Point
+            "FormEditor class",     // depends on: TextConstants (DefaultLineGrid)
             "Debugger class",       // depends on: NotifierView, Project
             "FormMenuView class",   // depends on: DisplayScreen
             "LargePositiveInteger class",  // depends on: DigitBuffer
@@ -132,13 +133,13 @@ public static class InitExpressionOrdering
         // Since the dependency order list doesn't contain comment markers,
         // we need to manually split based on known level sizes from the comments:
         // LEVEL 0: 81 classes (indices 0-80)
-        // LEVEL 1: 5 classes (indices 81-85)
-        // LEVEL 2: 1 class (index 86)
+        // LEVEL 1: 6 classes (indices 81-86)
+        // LEVEL 2: 1 class (index 87)
         var levels = new List<List<string>>
         {
             dependencyOrder.Take(81).ToList(),      // Level 0
-            dependencyOrder.Skip(81).Take(5).ToList(), // Level 1
-            dependencyOrder.Skip(86).ToList()       // Level 2
+            dependencyOrder.Skip(81).Take(6).ToList(), // Level 1
+            dependencyOrder.Skip(87).ToList()       // Level 2
         };
 
         // Process each level
