@@ -123,6 +123,13 @@ public class RuntimeObjectCreator(
             {
                 // Install in TextConstants using dictionary operations
                 dictionaryOps.InstallAssociation(textConstantsOOP, defaultTextStyleAssoc, "DefaultTextStyle");
+
+                // Remove DefaultTextStyle from Undeclared (with proper hash chain fixup)
+                if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
+                {
+                    var keySymbolOOP = context.Allocator.GetInstanceVariable(defaultTextStyleAssoc, 0);
+                    dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, "DefaultTextStyle");
+                }
             }
 
             context.Diagnostics?.Emit(new DiagnosticMessageEvent

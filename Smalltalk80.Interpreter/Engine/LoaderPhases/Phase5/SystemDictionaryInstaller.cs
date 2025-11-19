@@ -180,7 +180,12 @@ public class SystemDictionaryInstaller(
         context.Allocator.SetInstanceVariable(poolAssocOOP, 1, poolDictOOP);
         InstallInSystemDictionary(poolAssocOOP, poolName);
 
-        // Note: We don't migrate associations here - Smalltalk init expressions will populate the pool
+        // Remove pool dictionary Association from Undeclared (with proper hash chain fixup)
+        if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
+        {
+            var keySymbolOOP = context.Allocator.GetInstanceVariable(poolAssocOOP, 0);
+            dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, poolName);
+        }
 
         context.Diagnostics?.Emit(new DiagnosticMessageEvent
         {
