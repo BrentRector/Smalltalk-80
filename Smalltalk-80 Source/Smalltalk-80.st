@@ -1861,7 +1861,7 @@ instSize
 	variables) of the receiver."
 
 	<primitive: 117>
-	^(format bitShift: -4) bitAnd: 2047!
+	^format bitAnd: 255!
 isBits
 	"Answer whether the receiver contains just bits (not pointers)."
 
