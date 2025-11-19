@@ -29,6 +29,17 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
         int hash = GetSymbolHash(keySymbolOOP);
         int location = (hash % dictSize + dictSize) % dictSize;
 
+        // Debug: Show hash calculation for TextConstants
+        if (keyName == "TextConstants")
+        {
+            Console.WriteLine($"[Phase5 Hash Debug] Installing '{keyName}':");
+            Console.WriteLine($"  Symbol OOP: {keySymbolOOP}");
+            Console.WriteLine($"  Hash (ToObjectTableIndex): {hash}");
+            Console.WriteLine($"  Dict size: {dictSize}");
+            Console.WriteLine($"  Computed slot (0-based): {location}");
+            Console.WriteLine($"  Smalltalk index (1-based): {location + 1}");
+        }
+
         // Probe for nil slot or matching key (linear probing)
         int pass = 1;
         int startLocation = location;
