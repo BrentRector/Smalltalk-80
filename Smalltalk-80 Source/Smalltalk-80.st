@@ -39072,7 +39072,7 @@ initialize
 
 	Text initialize."
 
-	(Smalltalk includes: #TextConstants) 
+	(Smalltalk includesKey: #TextConstants)
 		ifFalse: [Smalltalk at: #TextConstants put: (Dictionary new: 32)].
 	TextConstants at: #CaretForm  
 		 		 put: (Cursor
