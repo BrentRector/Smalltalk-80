@@ -904,39 +904,57 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     SmalltalkOOP IVMHelpers.FindMethodContext(SmalltalkOOP contextOOP) => _contextManager.FindMethodContext(contextOOP);
     MethodHeaderInfo IVMHelpers.ParseMethodHeader(SmalltalkOOP methodOOP) => ParseMethodHeader(methodOOP);
 
-    // IBytecodeContext implementation
-    string? IBytecodeContext.GetSymbolName(SmalltalkOOP symbolOOP) => GetSymbolName(symbolOOP);
-    string? IBytecodeContext.GetLocalId(SmalltalkOOP objectOOP) => GetLocalId(objectOOP);
-    SmalltalkOOP IBytecodeContext.GetMethodLiteral(SmalltalkOOP methodOOP, int index) => GetMethodLiteral(methodOOP, index);
-    byte[] IBytecodeContext.GetMethodBytecodes(SmalltalkOOP methodOOP) => GetMethodBytecodes(methodOOP);
-    SmalltalkOOP IBytecodeContext.GetTemporaryVariable(SmalltalkOOP contextOOP, int index) => GetTemporaryVariable(contextOOP, index);
-    void IBytecodeContext.SetTemporaryVariable(SmalltalkOOP contextOOP, int index, SmalltalkOOP valueOOP) => SetTemporaryVariable(contextOOP, index, valueOOP);
-    void IBytecodeContext.Push(SmalltalkOOP valueOOP) => Push(valueOOP);
-    SmalltalkOOP IBytecodeContext.Pop() => Pop();
-    SmalltalkOOP IBytecodeContext.Peek() => Peek();
-    SmalltalkOOP IBytecodeContext.ResolveAndPatchPoolVariable(SmalltalkOOP poolLiteralOOP, SmalltalkOOP methodOOP, int literalIndex, SmalltalkOOP poolNameSymbol, SmalltalkOOP keySymbol)
-        => ResolveAndPatchPoolVariable(poolLiteralOOP, methodOOP, literalIndex, poolNameSymbol, keySymbol);
-    SmalltalkOOP IBytecodeContext.LookupInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbol)
-        => LookupInDictionary(dictionaryOOP, keySymbol);
-    SmalltalkOOP IBytecodeContext.ActiveContext => _contextManager.ActiveContext;
+    // IStackOperations implementation
+    void IStackOperations.Push(SmalltalkOOP valueOOP) => Push(valueOOP);
+    SmalltalkOOP IStackOperations.Pop() => Pop();
+    SmalltalkOOP IStackOperations.Peek() => Peek();
 
-    bool IBytecodeContext.NonLocalReturnPending
+    // INonLocalReturnState implementation
+    bool INonLocalReturnState.NonLocalReturnPending
     {
         get => _nlrHandler.IsPending;
         set => _nlrHandler.SetPending(value);
     }
 
-    SmalltalkOOP IBytecodeContext.NLRTargetContext
+    SmalltalkOOP INonLocalReturnState.NLRTargetContext
     {
         get => _nlrHandler.TargetContext;
         set => _nlrHandler.SetTargetContext(value);
     }
 
-    SmalltalkOOP IBytecodeContext.NLRValue
+    SmalltalkOOP INonLocalReturnState.NLRValue
     {
         get => _nlrHandler.Value;
         set => _nlrHandler.SetValue(value);
     }
+
+    // IMethodAccess implementation
+    SmalltalkOOP IMethodAccess.GetMethodLiteral(SmalltalkOOP methodOOP, int index) => GetMethodLiteral(methodOOP, index);
+    byte[] IMethodAccess.GetMethodBytecodes(SmalltalkOOP methodOOP) => GetMethodBytecodes(methodOOP);
+
+    // IMessageSender implementation
+    bool IMessageSender.SendMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
+    {
+        var outcome = SendMessage(receiverOOP, selectorOOP, args);
+        return ConsumeCallOutcome(outcome);
+    }
+
+    bool IMessageSender.SendSuperMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
+    {
+        var outcome = SendSuperMessage(receiverOOP, selectorOOP, args);
+        return ConsumeCallOutcome(outcome);
+    }
+
+    // IBytecodeContext implementation
+    string? IBytecodeContext.GetSymbolName(SmalltalkOOP symbolOOP) => GetSymbolName(symbolOOP);
+    string? IBytecodeContext.GetLocalId(SmalltalkOOP objectOOP) => GetLocalId(objectOOP);
+    SmalltalkOOP IBytecodeContext.GetTemporaryVariable(SmalltalkOOP contextOOP, int index) => GetTemporaryVariable(contextOOP, index);
+    void IBytecodeContext.SetTemporaryVariable(SmalltalkOOP contextOOP, int index, SmalltalkOOP valueOOP) => SetTemporaryVariable(contextOOP, index, valueOOP);
+    SmalltalkOOP IBytecodeContext.ResolveAndPatchPoolVariable(SmalltalkOOP poolLiteralOOP, SmalltalkOOP methodOOP, int literalIndex, SmalltalkOOP poolNameSymbol, SmalltalkOOP keySymbol)
+        => ResolveAndPatchPoolVariable(poolLiteralOOP, methodOOP, literalIndex, poolNameSymbol, keySymbol);
+    SmalltalkOOP IBytecodeContext.LookupInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbol)
+        => LookupInDictionary(dictionaryOOP, keySymbol);
+    SmalltalkOOP IBytecodeContext.ActiveContext => _contextManager.ActiveContext;
 
     bool IBytecodeContext.ContextSwitchPending
     {
@@ -948,18 +966,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
     bool IBytecodeContext.IsInSenderChain(SmalltalkOOP targetOOP, SmalltalkOOP startOOP)
         => _contextManager.IsInSenderChain(targetOOP, startOOP);
-
-    bool IBytecodeContext.SendMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
-    {
-        var outcome = SendMessage(receiverOOP, selectorOOP, args);
-        return ConsumeCallOutcome(outcome);
-    }
-
-    bool IBytecodeContext.SendSuperMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
-    {
-        var outcome = SendSuperMessage(receiverOOP, selectorOOP, args);
-        return ConsumeCallOutcome(outcome);
-    }
 
     void IBytecodeContext.AddAssociationToClassPoolIfNeeded(SmalltalkOOP classOOP, SmalltalkOOP associationOOP)
         => AddAssociationToClassPoolIfNeeded(classOOP, associationOOP);
