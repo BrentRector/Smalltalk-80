@@ -32,7 +32,7 @@ internal class StackManager(
         if (getSelectorTraceEnabled())
         {
             incrementPushTraceCounter();
-            if (getPushTraceCounter() <= 10)
+            if (false) // Disabled - too verbose
             {
                 // Format: "oop=#### (ClassName)" for objects, "SmallInteger(#)" for small integers
                 string valueStr;

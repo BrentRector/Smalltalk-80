@@ -98,7 +98,7 @@ public class ExecutionTracer
     /// Checks if we should trace bytecode execution (narrow range for debugging).
     /// </summary>
     public bool ShouldTraceBytecodeRange()
-        => _selectorTraceEnabled && _instructionCount >= 2020 && _instructionCount <= 2045;
+        => false; // Disabled - too verbose
 
     /// <summary>
     /// Checks if we should trace primitive execution.
