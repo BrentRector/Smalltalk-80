@@ -11,9 +11,7 @@ namespace Smalltalk80.Interpreter.Engine.Services;
 /// Implements hash-based installation using the same algorithm as Smalltalk-80 Dictionary>>findKeyOrNil:.
 /// </summary>
 /// <remarks>
-/// This service does NOT allocate new objects - it only installs existing Associations
-/// into dictionaries. Object allocation remains in the phase-specific code to ensure
-/// proper class reference tracking.
+/// This service handles Association allocation and dictionary installation operations.
 /// </remarks>
 public class DictionaryService
 {
@@ -40,6 +38,74 @@ public class DictionaryService
     public int GetSymbolHash(SmalltalkOOP symbolOOP)
     {
         return IdentityHashUtility.ComputeIdentityHash(symbolOOP);
+    }
+
+    /// <summary>
+    /// Allocates an Association object (key-value pair) using ObjectGraphAllocator.
+    /// </summary>
+    /// <param name="keyOOP">The symbol key for the Association.</param>
+    /// <param name="valueOOP">The value for the Association.</param>
+    /// <returns>The newly allocated Association OOP.</returns>
+    public SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
+    {
+        var associationOOP = _allocator.AllocateFixedObject("Association");
+
+        // Set instance variables: [0] = key, [1] = value (assuming standard Association layout)
+        _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
+        _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
+
+        return associationOOP;
+    }
+
+    /// <summary>
+    /// Finds an Association by key in all allocated objects and updates its value.
+    /// Searches through all objects looking for Association instances with matching key.
+    /// </summary>
+    /// <param name="keyName">The key name to search for.</param>
+    /// <param name="newValueOOP">The new value to set.</param>
+    /// <param name="localIdToObjectId">The mapping from local IDs to allocated OOPs.</param>
+    /// <param name="symbolInternerFunc">Function to intern symbols.</param>
+    /// <returns>The (oop, slot) tuple if found and updated, or null if not found.</returns>
+    public (SmalltalkOOP oop, int slot)? FindAndUpdateAssociationValue(
+        string keyName,
+        SmalltalkOOP newValueOOP,
+        Dictionary<string, SmalltalkOOP> localIdToObjectId,
+        Func<string, SmalltalkOOP> symbolInternerFunc)
+    {
+        var keySymbol = symbolInternerFunc(keyName);
+        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
+
+        // Search through all allocated objects (both bundle objects and sentinel objects)
+        foreach (var kvp in localIdToObjectId)
+        {
+            var objectOOP = kvp.Value;
+
+            try
+            {
+                // Check if this is an Association object
+                var classOOP = _allocator.GetSlot(objectOOP, 0);
+                if (classOOP == associationClassOOP)
+                {
+                    // Get the key (instance variable 0)
+                    var assocKeyOOP = _allocator.GetInstanceVariable(objectOOP, 0);
+
+                    // Check if key matches
+                    if (assocKeyOOP == keySymbol)
+                    {
+                        // Update the value (instance variable 1)
+                        _allocator.SetInstanceVariable(objectOOP, 1, newValueOOP);
+                        return (objectOOP, 1);
+                    }
+                }
+            }
+            catch
+            {
+                // Skip objects that don't have the expected structure
+                continue;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

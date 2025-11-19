@@ -13,7 +13,6 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
 /// using the same algorithms as Smalltalk-80 Dictionary>>findKeyOrNil:.
 /// </summary>
 internal class DictionaryInstaller(
-    ObjectGraphAllocator allocator,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
     HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
     Func<string, SmalltalkOOP> symbolInternerFunc,
@@ -27,13 +26,7 @@ internal class DictionaryInstaller(
     /// <returns>The newly allocated Association OOP.</returns>
     public SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
-        var associationOOP = allocator.AllocateFixedObject("Association");
-
-        // Set instance variables: [0] = key, [1] = value (assuming standard Association layout)
-        allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
-        allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
-
-        return associationOOP;
+        return dictionaryService.AllocateAssociation(keyOOP, valueOOP);
     }
 
     /// <summary>
@@ -79,38 +72,13 @@ internal class DictionaryInstaller(
     /// <returns>True if Association was found and updated, false otherwise.</returns>
     public bool FindAndUpdateAssociationValue(string keyName, SmalltalkOOP newValueOOP)
     {
-        var keySymbol = symbolInternerFunc(keyName);
-        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
+        var result = dictionaryService.FindAndUpdateAssociationValue(
+            keyName, newValueOOP, localIdToObjectId, symbolInternerFunc);
 
-        // Search through all allocated objects (both bundle objects and sentinel objects)
-        foreach (var kvp in localIdToObjectId)
+        if (result.HasValue)
         {
-            var objectOOP = kvp.Value;
-
-            try
-            {
-                // Check if this is an Association object
-                var classOOP = allocator.GetSlot(objectOOP, 0);
-                if (classOOP == associationClassOOP)
-                {
-                    // Get the key (instance variable 0)
-                    var assocKeyOOP = allocator.GetInstanceVariable(objectOOP, 0);
-
-                    // Check if key matches
-                    if (assocKeyOOP == keySymbol)
-                    {
-                        // Update the value (instance variable 1)
-                        allocator.SetInstanceVariable(objectOOP, 1, newValueOOP);
-                        initializedFields.Add((objectOOP, 1));
-                        return true;
-                    }
-                }
-            }
-            catch
-            {
-                // Skip objects that don't have the expected structure
-                continue;
-            }
+            initializedFields.Add(result.Value);
+            return true;
         }
 
         return false;
