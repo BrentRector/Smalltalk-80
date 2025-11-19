@@ -244,20 +244,23 @@ public partial class VirtualMachine
         string recvClassName = GetClassName(classOOP) ?? "?";
         _tracer.RecordMethodCall(recvClassName, selectorName ?? "?");
 
+        // ALWAYS catch error: sends to halt on first error for debugging
+        if (selectorName == "error:")
+        {
+            Console.WriteLine($"\n*** SMALLTALK ERROR BEING RAISED ***");
+            Console.WriteLine($"  Receiver class: {recvClassName}");
+            Console.WriteLine($"  Instruction count: {_tracer.InstructionCount}");
+            Console.WriteLine("\nSmalltalk Context Chain:");
+            _debugger.DumpSenderChain(_contextManager.ActiveContext, 20);
+            throw new InvalidOperationException($"Smalltalk error: message sent to {recvClassName}>>error:");
+        }
+
         // Log ALL message sends during tracing (before primitive check)
         if (_tracer.ShouldTraceSend())
         {
             var recvClass = GetClassName(classOOP);
             var currentMethod = GetCurrentMethodLocalId();
             _tracer.TraceSendEntry(recvClass, selectorName ?? "unknown", currentMethod);
-
-            // Special alert for error: sends
-            if (selectorName == "error:")
-            {
-                Console.WriteLine($"  *** ERROR BEING RAISED ***");
-                // Halt on first error to enable debugging
-                throw new InvalidOperationException($"Smalltalk error: message sent to {recvClass}>>error:");
-            }
         }
 
         // Check if the method has a primitive
