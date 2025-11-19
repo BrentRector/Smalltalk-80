@@ -1,3 +1,4 @@
+using Smalltalk80.Core;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 
@@ -64,14 +65,17 @@ public readonly struct ClassView
     /// <summary>Gets the shared pools array.</summary>
     public SmalltalkOOP SharedPools => _heap.GetInstanceVariable(_oop, 8);
 
+    /// <summary>Gets the FormatWord for semantic format decoding.</summary>
+    public FormatWord FormatWord => new FormatWord(Format);
+
     /// <summary>Gets the number of fixed instance variables.</summary>
-    public int InstanceVariableCount => (Format >> 1) & 0xFF;
+    public int InstanceVariableCount => FormatWord.FixedFields;
 
     /// <summary>Gets whether instances are indexable.</summary>
-    public bool IsIndexable => (Format & 0x8000) != 0;
+    public bool IsIndexable => FormatWord.IsIndexable;
 
     /// <summary>Gets whether instances have pointer fields (vs bytes/words).</summary>
-    public bool HasPointerFields => (Format & 0x4000) == 0;
+    public bool HasPointerFields => FormatWord.IsPointers;
 
     /// <summary>Gets the class name as a string.</summary>
     public string GetClassName()

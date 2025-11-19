@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Smalltalk80.Compiler;
 using Smalltalk80.Compiler.AST;
+using Smalltalk80.Core;
 
 namespace Smalltalk80.Compiler.CodeGen;
 
@@ -448,42 +449,12 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     }
 
     /// <summary>
-    /// Calculates the format word for a class per Smalltalk-80 source code expectations:
-    /// Bits 0-7:   fixedFields (number of fixed instance variables, 0-255)
-    /// Bit 12:     isIndexable (1=has indexed fields, 0=fixed size only)
-    /// Bit 13:     isWords     (1=word-addressed, 0=byte-addressed)
-    /// Bit 14:     isPointers  (1=contains pointers, 0=contains values)
-    ///
-    /// This matches what the Smalltalk source expects:
-    /// - instSize: ^format bitAnd: 255
-    /// - isBits: ^format noMask: -16384 (bit 14 = 0)
-    /// - isBytes: ^format noMask: 8192 (bit 13 = 0)
-    /// - isVariable: ^(format bitAnd: 4096) ~= 0 (bit 12 = 1)
+    /// Calculates the format word for a class using the FormatWord semantic wrapper.
+    /// See FormatWord class documentation for bit layout details.
     /// </summary>
     private static int CalculateFormatWord(string subclassKind, int fixedFieldCount)
     {
-        int format = 0;
-
-        // Fixed field count in bits 0-7 (max 255)
-        format |= (fixedFieldCount & 0xFF);
-
-        // Set bits 12-14 based on subclass kind
-        int typeFlags = subclassKind switch
-        {
-            // Fixed pointer object: isPointers=1, isWords=0, isIndexable=0
-            "subclass:" => 0x4000,  // bit 14
-            // Pointer-indexed: isPointers=1, isWords=0, isIndexable=1
-            "variableSubclass:" => 0x5000,  // bits 14 + 12
-            // Word-indexed: isPointers=0, isWords=1, isIndexable=1
-            "variableWordSubclass:" => 0x3000,  // bits 13 + 12
-            // Byte-indexed: isPointers=0, isWords=0, isIndexable=1
-            "variableByteSubclass:" => 0x1000,  // bit 12
-            // Default to fixed pointer
-            _ => 0x4000
-        };
-        format |= typeFlags;
-
-        return format;
+        return FormatWord.FromSubclassKind(subclassKind, fixedFieldCount).Value;
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using Smalltalk80.Core;
 using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -1183,27 +1184,19 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             throw new InvalidOperationException($"Class {classNameClean} format field is not a SmallInteger: {formatOOP}");
         }
 
-        int formatValue = formatOOP.AsSmallInteger();
+        // Decode format using the FormatWord semantic wrapper
+        var formatWord = new FormatWord(formatOOP.AsSmallInteger());
+        int fixedSize = formatWord.FixedFields;
 
-        // Decode format field per Smalltalk-80 source expectations:
-        // Bits 0-7:   fixedFields (number of fixed instance variables, 0-255)
-        // Bit 12:     isIndexable (1=has indexed fields, 0=fixed size only)
-        // Bit 13:     isWords     (1=word-addressed, 0=byte-addressed)
-        // Bit 14:     isPointers  (1=contains pointers, 0=contains values)
-        bool isPointers = (formatValue & 0x4000) != 0;
-        bool isWords = (formatValue & 0x2000) != 0;
-        bool isIndexable = (formatValue & 0x1000) != 0;
-        int fixedSize = formatValue & 0xFF;      // Bits 0-7
-
-        // Decode object format from Blue Book flags
+        // Convert to ObjectFormat enum
         ObjectFormat format;
-        if (isPointers)
+        if (formatWord.IsPointers)
         {
-            format = isIndexable ? ObjectFormat.PointerIndexed : ObjectFormat.Pointer;
+            format = formatWord.IsIndexable ? ObjectFormat.PointerIndexed : ObjectFormat.Pointer;
         }
-        else if (isIndexable)
+        else if (formatWord.IsIndexable)
         {
-            format = isWords ? ObjectFormat.WordIndexed : ObjectFormat.ByteIndexed;
+            format = formatWord.IsWords ? ObjectFormat.WordIndexed : ObjectFormat.ByteIndexed;
         }
         else
         {

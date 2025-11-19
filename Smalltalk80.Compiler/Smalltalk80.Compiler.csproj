@@ -36,9 +36,10 @@
     <Compile Include="Generated\*.cs" />
   </ItemGroup>
 
-  <!-- Link to shared bytecode definitions -->
+  <!-- Link to shared definitions -->
   <ItemGroup>
     <Compile Include="..\Shared\Core\Bytecodes\BytecodeDefinitions.cs" Link="Core\Bytecodes\BytecodeDefinitions.cs" />
+    <Compile Include="..\Shared\Core\FormatWord.cs" Link="Core\FormatWord.cs" />
   </ItemGroup>
 
   <!-- Ensure Generated folder exists and regenerate parser if needed -->
