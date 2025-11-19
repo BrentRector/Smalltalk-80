@@ -15,6 +15,8 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 /// <param name="bundle">The cold start bundle containing symbols and strings.</param>
 /// <param name="allocator">The object graph allocator for creating objects.</param>
 /// <param name="localIdToObjectId">Mapping from local IDs to allocated object OOPs.</param>
+/// <param name="symbolService">The symbol service for symbol lookups.</param>
+/// <param name="fieldValueService">The field value service for value conversion.</param>
 internal class LiteralResolver(
     ColdStartBundle bundle,
     ObjectGraphAllocator allocator,
