@@ -183,11 +183,11 @@ public static class SimpleObjectPrimitives
             var formatWord = new FormatWord(formatOOP.AsSmallInteger());
             int count = formatWord.FixedFields;
 
-            // DEBUG: Check for mismatch between cached and format-based count
-            int cachedCount = context.HeapManager.GetInstanceVariableCount(context.Receiver);
-            if (cachedCount != count)
+            // DEBUG: Trace Form instVarAt: calls
+            if (formatOOP.AsSmallInteger() == 0x4004)
             {
-                Console.WriteLine($"[PRIMITIVE 73 MISMATCH] {context.Receiver}: cached={cachedCount}, format={count}, classFormat=0x{formatOOP.AsSmallInteger():X4}");
+                int cachedCount = context.HeapManager.GetInstanceVariableCount(context.Receiver);
+                Console.WriteLine($"[PRIMITIVE 73] Form instVarAt: {index}, count={count}, cached={cachedCount}");
             }
 
             // Smalltalk indices are 1-based
