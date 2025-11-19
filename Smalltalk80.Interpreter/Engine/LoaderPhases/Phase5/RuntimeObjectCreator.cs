@@ -110,18 +110,26 @@ public class RuntimeObjectCreator(
             baseline = 10;
         }
 
-        // Install the DefaultTextStyle in TextConstants
+        // Install the DefaultTextStyle in TextConstants pool dictionary
         var allAssociations = AssociationRegistry.GetAll();
         if (allAssociations.TryGetValue("DefaultTextStyle", out SmalltalkOOP defaultTextStyleAssoc))
         {
+            // Set the Association's value to the TextStyle object
             context.Allocator.SetInstanceVariable(defaultTextStyleAssoc, 1, textStyleOOP);
             context.InitializedFields.Add((defaultTextStyleAssoc, 1));
+
+            // Install the Association in TextConstants pool dictionary
+            if (GlobalRegistry.TryGet("TextConstants", out var textConstantsOOP))
+            {
+                // Install in TextConstants using dictionary operations
+                dictionaryOps.InstallAssociation(textConstantsOOP, defaultTextStyleAssoc, "DefaultTextStyle");
+            }
 
             context.Diagnostics?.Emit(new DiagnosticMessageEvent
             {
                 Severity = MessageSeverity.Info,
                 Category = "Phase5",
-                Message = $"Created DefaultTextStyle (oop={textStyleOOP.RawValue}) with lineGrid={lineGrid}, baseline={baseline}",
+                Message = $"Created DefaultTextStyle (oop={textStyleOOP}) with lineGrid={lineGrid}, baseline={baseline}",
                 Timestamp = Stopwatch.GetTimestamp(),
                 InstructionCount = 0
             });
