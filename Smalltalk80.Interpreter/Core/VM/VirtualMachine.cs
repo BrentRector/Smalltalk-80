@@ -1191,19 +1191,23 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         int formatValue = formatOOP.AsSmallInteger();
 
-        // Decode format field per ColdStartJsonGenerator.CalculateFormatWord()
-        // Bits 13-12: Instance Specification (00=no fields, 01=pointers, 10=words, 11=bytes)
-        // Bit 3: Pointer flag (1 = indexed portion contains pointers)
-        int instanceSpec = (formatValue >> 12) & 0x3;  // Bits 13-12
-        int fixedSize = (formatValue >> 6) & 0x3F;      // Bits 11-6
-        bool hasPointerIndexedSlots = (formatValue & 0x08) != 0;  // Bit 3
+        // Decode format field per COLDSTART-PHASES-DETAILED.md:
+        // Bits 0-7:   Instance variable count (0-255)
+        // Bits 12-13: Instance specification
+        int fixedSize = formatValue & 0xFF;              // Bits 0-7
+        int instanceSpec = (formatValue >> 12) & 0x3;    // Bits 12-13
 
+        // Decode object format:
+        // 0 = No indexed (fixed size) - Pointer
+        // 1 = PointerIndexed
+        // 2 = WordIndexed
+        // 3 = ByteIndexed
         ObjectFormat format = instanceSpec switch
         {
-            0 => ObjectFormat.Pointer,          // Fixed-size pointer object
-            1 => ObjectFormat.Pointer,          // 01 = pointer fields (subclass:)
-            2 => hasPointerIndexedSlots ? ObjectFormat.PointerIndexed : ObjectFormat.WordIndexed,  // 10 = variableSubclass: (PointerIndexed) or variableWordSubclass: (WordIndexed)
-            3 => ObjectFormat.ByteIndexed,      // 11 = byte-indexed (variableByteSubclass:)
+            0 => ObjectFormat.Pointer,
+            1 => ObjectFormat.PointerIndexed,
+            2 => ObjectFormat.WordIndexed,
+            3 => ObjectFormat.ByteIndexed,
             _ => throw new InvalidOperationException($"Invalid instanceSpec {instanceSpec} in format {formatValue:X4}")
         };
 

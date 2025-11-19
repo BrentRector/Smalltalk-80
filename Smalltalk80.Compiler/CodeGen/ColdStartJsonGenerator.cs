@@ -449,40 +449,33 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
 
     /// <summary>
     /// Calculates the format word for a class.
-    /// Per Blue Book Chapter 16 and Interpreter-Architecture.md:
-    /// Bits 15-14: Unused (00)
-    /// Bits 13-12: Instance Specification (00=no fields, 01=pointers, 10=words, 11=bytes)
-    /// Bits 11-6:  Fixed fields count (0-63) - INCLUDES ALL INHERITED INSTANCE VARIABLES
-    /// Bit 5:      Unused
-    /// Bit 4:      Indexable flag (1 = has indexed portion)
-    /// Bit 3:      Pointer flag (1 = indexed portion contains pointers)
-    /// Bits 2-0:   Unused
+    /// Per COLDSTART-PHASES-DETAILED.md specification:
+    /// Bits 0-7:   Instance variable count (0-255)
+    /// Bits 8-11:  Size of indexed portion for fixed-size objects (0-15)
+    /// Bits 12-13: Instance specification:
+    ///             0 = No indexed instance variables (fixed size)
+    ///             1 = Indexed instance variables are pointers (PointerIndexed)
+    ///             2 = Indexed instance variables are words (WordIndexed)
+    ///             3 = Indexed instance variables are bytes (ByteIndexed)
+    /// Bits 14-15: Reserved (0)
     /// </summary>
     private static int CalculateFormatWord(string subclassKind, int fixedFieldCount)
     {
         int format = 0;
 
-        // Instance specification (bits 13-12)
+        // Instance variable count (bits 0-7)
+        format |= (fixedFieldCount & 0xFF);
+
+        // Instance specification (bits 12-13)
         int instSpec = subclassKind switch
         {
-            "subclass:" => 0x01,                 // 01 = only pointer fields
-            "variableSubclass:" => 0x02,         // 10 = word-indexable (with pointers)
-            "variableByteSubclass:" => 0x03,     // 11 = byte-indexable
-            "variableWordSubclass:" => 0x02,     // 10 = word-indexable (no pointers)
-            _ => 0x01                            // Default to pointer fields
+            "subclass:" => 0x00,                 // 00 = no indexed portion (fixed size)
+            "variableSubclass:" => 0x01,         // 01 = pointer-indexed
+            "variableByteSubclass:" => 0x03,     // 11 = byte-indexed
+            "variableWordSubclass:" => 0x02,     // 10 = word-indexed
+            _ => 0x00                            // Default to fixed size
         };
         format |= (instSpec << 12);
-
-        // Fixed fields count (bits 11-6)
-        format |= ((fixedFieldCount & 0x3F) << 6);
-
-        // Indexable flag (bit 4)
-        if (subclassKind.StartsWith("variable"))
-            format |= 0x10;
-
-        // Pointer flag (bit 3) - set for subclass: and variableSubclass:
-        if (subclassKind == "subclass:" || subclassKind == "variableSubclass:")
-            format |= 0x08;
 
         return format;
     }

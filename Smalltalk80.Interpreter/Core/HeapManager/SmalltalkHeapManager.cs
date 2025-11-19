@@ -110,23 +110,24 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (!formatOOP.IsSmallInteger)
             throw new InvalidOperationException($"Class format field must be a SmallInteger, got {formatOOP}");
 
-        // Decode the format SmallInteger
+        // Decode the format SmallInteger per COLDSTART-PHASES-DETAILED.md:
+        // Bits 0-7:   Instance variable count (0-255)
+        // Bits 12-13: Instance specification
         int formatValue = formatOOP.AsSmallInteger();
 
-        int instanceSpec = (formatValue >> 12) & 0x03;
-        int instanceVariableCount = (formatValue >> 6) & 0x3F; // Bits 6-11
-        bool isIndexable = (formatValue & 0x10) != 0;
-        bool hasPointers = (formatValue & 0x08) != 0;
+        int instanceVariableCount = formatValue & 0xFF;           // Bits 0-7
+        int instanceSpec = (formatValue >> 12) & 0x03;            // Bits 12-13
 
-        // Decode object format using the same logic as Phase2
+        // Decode object format:
+        // 0 = No indexed (fixed size) - Pointer
+        // 1 = PointerIndexed
+        // 2 = WordIndexed
+        // 3 = ByteIndexed
         ObjectFormat format = instanceSpec switch
         {
             0x00 => ObjectFormat.Pointer,
-            0x01 => ObjectFormat.Pointer,
-            0x02 when hasPointers && isIndexable => ObjectFormat.PointerIndexed,
-            0x02 when hasPointers && !isIndexable => ObjectFormat.Pointer,
-            0x02 when !hasPointers && isIndexable => ObjectFormat.WordIndexed,
-            0x02 when !hasPointers && !isIndexable => ObjectFormat.Pointer,
+            0x01 => ObjectFormat.PointerIndexed,
+            0x02 => ObjectFormat.WordIndexed,
             0x03 => ObjectFormat.ByteIndexed,
             _ => throw new InvalidOperationException($"Unknown format instanceSpec: {instanceSpec:X2}")
         };

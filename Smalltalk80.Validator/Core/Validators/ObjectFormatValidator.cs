@@ -62,23 +62,27 @@ public class ObjectFormatValidator : IValidator
                 continue;
             }
 
-            // Blue Book format word interpretation
+            // Format word interpretation per COLDSTART-PHASES-DETAILED.md:
+            // Bits 0-7:   Instance variable count (0-255)
+            // Bits 12-13: Instance specification (0=fixed, 1=pointer-indexed, 2=word-indexed, 3=byte-indexed)
             var instanceSpec = (classFormat >> 12) & 0x03;
-            var fixedFields = (classFormat >> 6) & 0x3F;
-            var isIndexable = (classFormat & 0x10) != 0;
-            var hasPointers = (classFormat & 0x08) != 0;
+            var fixedFields = classFormat & 0xFF;
 
             var formatHint = obj.GetStringProp("formatHint");
             if (formatHint != null)
             {
                 // Validate formatHint is compatible with format word
+                // 0 = No indexed (fixed size) - Pointer
+                // 1 = PointerIndexed
+                // 2 = WordIndexed
+                // 3 = ByteIndexed
                 bool isCompatible = formatHint switch
                 {
-                    "pointers" => (instanceSpec == 0x01) || (instanceSpec == 0x02 && hasPointers),
-                    "words" => instanceSpec == 0x02 && !hasPointers,
+                    "pointers" => instanceSpec == 0x00 || instanceSpec == 0x01,
+                    "words" => instanceSpec == 0x02,
                     "bytes" => instanceSpec == 0x03,
-                    "blockContext" => instanceSpec == 0x02 && hasPointers && isIndexable,
-                    "compiledMethod" => instanceSpec == 0x02 && !hasPointers && isIndexable,
+                    "blockContext" => instanceSpec == 0x01,
+                    "compiledMethod" => instanceSpec == 0x03,  // ByteIndexed for bytecodes
                     "custom" => true,
                     _ => false
                 };
@@ -88,7 +92,7 @@ public class ObjectFormatValidator : IValidator
                     diagnostics.Add(new Diagnostic(
                         ErrorCodes.ObjectFormatInvalid,
                         Severity.Warning,
-                        $"Object formatHint '{formatHint}' is incompatible with class format (instanceSpec={instanceSpec:X}, indexable={isIndexable}, pointers={hasPointers})",
+                        $"Object formatHint '{formatHint}' is incompatible with class format (instanceSpec={instanceSpec})",
                         new[] { new Location("objects", localId) },
                 "Update formatHint to match class format"));
                 }
