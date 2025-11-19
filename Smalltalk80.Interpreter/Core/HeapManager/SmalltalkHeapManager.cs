@@ -110,27 +110,33 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (!formatOOP.IsSmallInteger)
             throw new InvalidOperationException($"Class format field must be a SmallInteger, got {formatOOP}");
 
-        // Decode the format SmallInteger per COLDSTART-PHASES-DETAILED.md:
-        // Bits 0-7:   Instance variable count (0-255)
-        // Bits 12-13: Instance specification
+        // Decode the format SmallInteger per Blue Book Chapter 27:
+        // Bit 0:      isPointers  (1=contains pointers, 0=contains values)
+        // Bit 1:      isWords     (1=word-addressed, 0=byte-addressed)
+        // Bit 2:      isIndexable (1=has indexed fields, 0=fixed size only)
+        // Bits 4-14:  fixedFields (number of fixed instance variables, 0-2047)
         int formatValue = formatOOP.AsSmallInteger();
 
-        int instanceVariableCount = formatValue & 0xFF;           // Bits 0-7
-        int instanceSpec = (formatValue >> 12) & 0x03;            // Bits 12-13
+        bool isPointers = (formatValue & 0x01) != 0;
+        bool isWords = (formatValue & 0x02) != 0;
+        bool isIndexable = (formatValue & 0x04) != 0;
+        int instanceVariableCount = (formatValue >> 4) & 0x7FF;   // Bits 4-14
 
-        // Decode object format:
-        // 0 = No indexed (fixed size) - Pointer
-        // 1 = PointerIndexed
-        // 2 = WordIndexed
-        // 3 = ByteIndexed
-        ObjectFormat format = instanceSpec switch
+        // Decode object format from Blue Book flags
+        ObjectFormat format;
+        if (isPointers)
         {
-            0x00 => ObjectFormat.Pointer,
-            0x01 => ObjectFormat.PointerIndexed,
-            0x02 => ObjectFormat.WordIndexed,
-            0x03 => ObjectFormat.ByteIndexed,
-            _ => throw new InvalidOperationException($"Unknown format instanceSpec: {instanceSpec:X2}")
-        };
+            format = isIndexable ? ObjectFormat.PointerIndexed : ObjectFormat.Pointer;
+        }
+        else if (isIndexable)
+        {
+            format = isWords ? ObjectFormat.WordIndexed : ObjectFormat.ByteIndexed;
+        }
+        else
+        {
+            // Non-pointer, non-indexable (shouldn't occur in practice)
+            format = ObjectFormat.Pointer;
+        }
 
         // Allocate the object with the decoded format
         SmalltalkOOP newInstanceOOP = AllocateObject(format, instanceVariableCount, indexedSize);

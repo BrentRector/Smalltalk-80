@@ -1176,13 +1176,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Console.WriteLine($"[AllocateObject] className={classNameClean}, classOOP={classOOP}, indexedSize={indexedSize}");
 
         // Read the format field from the class object to determine the proper ObjectFormat
-        // Classes have instance variable "format" which contains encoding per ColdStartJsonGenerator:
-        //   Bits 13-12: instanceSpec (0=reserved, 1=Pointer, 2=PointerIndexed, 3=ByteIndexed)
-        //   Bits 11-6: fixedSize (number of instance variables for instances - not the class!)
-        //   Bit 4: indexable flag
-        //   Bit 3: pointer flag
-
-        // Per Blue Book, all classes (Behavior subclasses) have format at instance variable index 2
+        // Per Blue Book Chapter 27, all classes (Behavior subclasses) have format at instance variable index 2
         var formatOOP = _heapManager.GetInstanceVariable(classOOP, VMConstants.BEHAVIOR_FORMAT_INDEX);
         if (!formatOOP.IsSmallInteger)
         {
@@ -1191,25 +1185,31 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         int formatValue = formatOOP.AsSmallInteger();
 
-        // Decode format field per COLDSTART-PHASES-DETAILED.md:
-        // Bits 0-7:   Instance variable count (0-255)
-        // Bits 12-13: Instance specification
-        int fixedSize = formatValue & 0xFF;              // Bits 0-7
-        int instanceSpec = (formatValue >> 12) & 0x3;    // Bits 12-13
+        // Decode format field per Blue Book Chapter 27:
+        // Bit 0:      isPointers  (1=contains pointers, 0=contains values)
+        // Bit 1:      isWords     (1=word-addressed, 0=byte-addressed)
+        // Bit 2:      isIndexable (1=has indexed fields, 0=fixed size only)
+        // Bits 4-14:  fixedFields (number of fixed instance variables, 0-2047)
+        bool isPointers = (formatValue & 0x01) != 0;
+        bool isWords = (formatValue & 0x02) != 0;
+        bool isIndexable = (formatValue & 0x04) != 0;
+        int fixedSize = (formatValue >> 4) & 0x7FF;      // Bits 4-14
 
-        // Decode object format:
-        // 0 = No indexed (fixed size) - Pointer
-        // 1 = PointerIndexed
-        // 2 = WordIndexed
-        // 3 = ByteIndexed
-        ObjectFormat format = instanceSpec switch
+        // Decode object format from Blue Book flags
+        ObjectFormat format;
+        if (isPointers)
         {
-            0 => ObjectFormat.Pointer,
-            1 => ObjectFormat.PointerIndexed,
-            2 => ObjectFormat.WordIndexed,
-            3 => ObjectFormat.ByteIndexed,
-            _ => throw new InvalidOperationException($"Invalid instanceSpec {instanceSpec} in format {formatValue:X4}")
-        };
+            format = isIndexable ? ObjectFormat.PointerIndexed : ObjectFormat.Pointer;
+        }
+        else if (isIndexable)
+        {
+            format = isWords ? ObjectFormat.WordIndexed : ObjectFormat.ByteIndexed;
+        }
+        else
+        {
+            // Non-pointer, non-indexable (shouldn't occur in practice)
+            format = ObjectFormat.Pointer;
+        }
 
         // Allocate the object
         var objectOOP = _heapManager.AllocateObject(format, fixedSize, indexedSize);

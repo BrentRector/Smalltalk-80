@@ -551,14 +551,20 @@ SetInstanceVariableUsingPrimitive(classOOP, formatFieldIndex, formatOOP);
 // Tracks: (classOOP, formatFieldIndex)
 ```
 
-**Format Encoding** (from Blue Book):
-- Bits 0-7: Number of instance variables
-- Bits 8-11: Object format (0=pointer, 2=byte indexed, 3=word indexed, etc.)
+**Format Encoding** (per Blue Book Chapter 27):
+- Bit 0: isPointers (1=contains pointers, 0=contains values)
+- Bit 1: isWords (1=word-addressed, 0=byte-addressed)
+- Bit 2: isIndexable (1=has indexed fields, 0=fixed size only)
+- Bit 3: reserved
+- Bits 4-14: fixedFields (number of fixed instance variables, 0-2047)
+- Bit 15: reserved
 
 **Example**:
 ```
-Point has 2 instance variables (x, y), pointer format
-format = 2 (decimal) = 0000 0010 (binary)
+Point has 2 instance variables (x, y), fixed pointer format
+format = (2 << 4) | 0x01 = 33 (decimal) = 0010 0001 (binary)
+  Bit 0: 1 (isPointers)
+  Bits 4-14: 2 (fixedFields)
 ```
 
 #### 4.3: ClassPool Dictionary (instance classes only, if has class variables)

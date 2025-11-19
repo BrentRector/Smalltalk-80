@@ -666,11 +666,11 @@ Suggestion: Pool dictionary must exist
 **What it validates:**
 - `formatHint` is compatible with class format word
 - Field counts match class fixed field count
-- Blue Book format word interpretation:
-  - Bits 12-13: instanceSpec (0x00-0x03)
-  - Bit 4: isIndexable
-  - Bit 3: hasPointers
-  - Bits 6-11: fixedFields (0-63)
+- Blue Book format word interpretation (Chapter 27):
+  - Bit 0: isPointers (1=contains pointers)
+  - Bit 1: isWords (1=word-addressed)
+  - Bit 2: isIndexable (1=has indexed fields)
+  - Bits 4-14: fixedFields (0-2047)
 
 **Error codes:**
 - `STV-OBJECT-FORMAT-INVALID` - Format mismatch or invalid field count

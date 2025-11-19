@@ -448,34 +448,36 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     }
 
     /// <summary>
-    /// Calculates the format word for a class.
-    /// Per COLDSTART-PHASES-DETAILED.md specification:
-    /// Bits 0-7:   Instance variable count (0-255)
-    /// Bits 8-11:  Size of indexed portion for fixed-size objects (0-15)
-    /// Bits 12-13: Instance specification:
-    ///             0 = No indexed instance variables (fixed size)
-    ///             1 = Indexed instance variables are pointers (PointerIndexed)
-    ///             2 = Indexed instance variables are words (WordIndexed)
-    ///             3 = Indexed instance variables are bytes (ByteIndexed)
-    /// Bits 14-15: Reserved (0)
+    /// Calculates the format word for a class per Blue Book Chapter 27 specification:
+    /// Bit 0:      isPointers  (1=contains pointers, 0=contains values)
+    /// Bit 1:      isWords     (1=word-addressed, 0=byte-addressed)
+    /// Bit 2:      isIndexable (1=has indexed fields, 0=fixed size only)
+    /// Bit 3:      reserved
+    /// Bits 4-14:  fixedFields (number of fixed instance variables, 0-2047)
+    /// Bit 15:     reserved
     /// </summary>
     private static int CalculateFormatWord(string subclassKind, int fixedFieldCount)
     {
         int format = 0;
 
-        // Instance variable count (bits 0-7)
-        format |= (fixedFieldCount & 0xFF);
+        // Fixed field count in bits 4-14 (max 2047)
+        format |= (fixedFieldCount & 0x7FF) << 4;
 
-        // Instance specification (bits 12-13)
-        int instSpec = subclassKind switch
+        // Set bits 0-2 based on subclass kind
+        int typeFlags = subclassKind switch
         {
-            "subclass:" => 0x00,                 // 00 = no indexed portion (fixed size)
-            "variableSubclass:" => 0x01,         // 01 = pointer-indexed
-            "variableByteSubclass:" => 0x03,     // 11 = byte-indexed
-            "variableWordSubclass:" => 0x02,     // 10 = word-indexed
-            _ => 0x00                            // Default to fixed size
+            // Fixed pointer object: isPointers=1, isWords=0, isIndexable=0
+            "subclass:" => 0x01,
+            // Pointer-indexed: isPointers=1, isWords=0, isIndexable=1
+            "variableSubclass:" => 0x05,
+            // Word-indexed: isPointers=0, isWords=1, isIndexable=1
+            "variableWordSubclass:" => 0x06,
+            // Byte-indexed: isPointers=0, isWords=0, isIndexable=1
+            "variableByteSubclass:" => 0x04,
+            // Default to fixed pointer
+            _ => 0x01
         };
-        format |= (instSpec << 12);
+        format |= typeFlags;
 
         return format;
     }

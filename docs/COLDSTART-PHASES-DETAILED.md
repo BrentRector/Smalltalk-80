@@ -122,25 +122,38 @@
 
 ### Field Encoding Details
 
-**format** (16-bit word):
+**format** (16-bit word per Blue Book Chapter 27):
 ```
-Bits 0-7:   Instance variable count (0-255)
-Bits 8-11:  Size of indexed portion for fixed-size objects (0-15)
-Bits 12-13: Instance specification:
-            0 = No indexed instance variables (fixed size)
-            1 = Indexed instance variables are pointers (PointerIndexed)
-            2 = Indexed instance variables are words (WordIndexed)
-            3 = Indexed instance variables are bytes (ByteIndexed)
-Bits 14-15: Reserved (0)
+Bit 0:      isPointers  (1=contains pointers, 0=contains values)
+Bit 1:      isWords     (1=word-addressed, 0=byte-addressed)
+Bit 2:      isIndexable (1=has indexed fields, 0=fixed size only)
+Bit 3:      reserved
+Bits 4-14:  fixedFields (number of fixed instance variables, 0-2047)
+Bit 15:     reserved
 ```
 
-**Example**: `format: 16530` = `0x4092`
+**Type flag combinations**:
+- `0x01` = Fixed pointer object (isPointers=1, isIndexable=0)
+- `0x05` = Pointer-indexed (isPointers=1, isIndexable=1)
+- `0x06` = Word-indexed (isWords=1, isIndexable=1)
+- `0x04` = Byte-indexed (isIndexable=1)
+
+**Example**: A class with 10 fixed instance variables (fixed pointer object)
 ```
-Binary: 0100 0000 1001 0010
-Bits 0-7:   0x92 = 146 (instance variable count)
-Bits 8-11:  0 (no fixed indexed size)
-Bits 12-13: 01 (PointerIndexed)
-Bits 14-15: 0 (reserved)
+format = (10 << 4) | 0x01 = 160 + 1 = 161 = 0x00A1
+Binary: 0000 0000 1010 0001
+Bit 0:      1 (isPointers)
+Bit 1:      0 (not isWords)
+Bit 2:      0 (not isIndexable)
+Bits 4-14:  10 (fixedFields = 10)
+```
+
+**Example**: Array class (pointer-indexed, 0 fixed fields)
+```
+format = (0 << 4) | 0x05 = 0x0005
+Binary: 0000 0000 0000 0101
+Bits 0-2:   101 (isPointers=1, isIndexable=1)
+Bits 4-14:  0 (no fixed fields)
 ```
 
 **header.word** (16-bit CompiledMethod header):
