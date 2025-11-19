@@ -1860,7 +1860,8 @@ instSize
 	"Answer the number of named instance variables (as opposed to indexed
 	variables) of the receiver."
 
-	^format bitAnd: 255!
+	<primitive: 117>
+	^(format bitShift: -4) bitAnd: 2047!
 isBits
 	"Answer whether the receiver contains just bits (not pointers)."
 
