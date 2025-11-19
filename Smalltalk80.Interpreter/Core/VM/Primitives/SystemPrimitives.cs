@@ -1,3 +1,4 @@
+using Smalltalk80.Core;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.HeapManager;
 
@@ -110,6 +111,28 @@ public static class SystemOperations
             }
 
             return PrimitiveResult.Ok(context.Receiver);
+        }
+    }
+
+    /// <summary>Primitive 117: Behavior instSize - Get number of named instance variables</summary>
+    public class InstSize : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+
+            // Receiver is a class (Behavior) - get its format field
+            // Behavior instance variable layout: [0]=superclass, [1]=methodDict, [2]=format
+            var formatOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 2);
+            if (!formatOOP.IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            // Use FormatWord to decode the instance variable count (bits 0-7)
+            var formatWord = new FormatWord(formatOOP.AsSmallInteger());
+            int instSize = formatWord.FixedFields;
+
+            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(instSize));
         }
     }
 

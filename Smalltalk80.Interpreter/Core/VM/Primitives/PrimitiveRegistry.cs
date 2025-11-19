@@ -241,6 +241,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(114, new SystemOperations.ExitToDebugger());
         registry.Register(115, new SystemOperations.OopsLeft());
         registry.Register(116, new SystemOperations.SignalAtOopsLeftWordsLeft());
+        registry.Register(117, new SystemOperations.InstSize());
         registry.Register(128, new SystemOperations.SomeInstance());
         registry.Register(129, new SystemOperations.NextInstance());
         registry.Register(130, new SystemOperations.BecomeForward());
