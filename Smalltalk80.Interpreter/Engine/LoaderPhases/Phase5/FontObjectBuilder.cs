@@ -214,16 +214,17 @@ public class FontObjectBuilder
 
     /// <summary>
     /// Creates the stopConditions array for CharacterScanner.
-    /// This is an array of 256 nils (no special stop conditions).
+    /// Needs 258 entries for indices 1-258 (Smalltalk 1-based).
+    /// EndOfRun = 257, CrossedX = 258 are used as sentinel indices.
     /// </summary>
     private SmalltalkOOP CreateStopConditionsArray()
     {
         var nilOOP = SpecialObjectsArray.Instance.Nil;
-        var arrayOOP = _context.Allocator.AllocateArray("Array", 256);
+        var arrayOOP = _context.Allocator.AllocateArray("Array", 258);
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         _context.Allocator.SetObjectClass(arrayOOP, arrayClassOOP);
 
-        for (int i = 0; i < 256; i++)
+        for (int i = 0; i < 258; i++)
         {
             _context.Allocator.SetIndexedOOP(arrayOOP, i, nilOOP);
         }
