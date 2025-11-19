@@ -524,16 +524,23 @@ internal class BytecodeInterpreter(
                     // Debug: Check if receiver is a SmallInteger before accessing instance variables
                     if (receiverOOP.IsSmallInteger)
                     {
-                        // Get method info for debugging
-                        var currentMethodOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.CONTEXT_METHOD_INDEX);
-                        var selectorOOP = context.GetMethodLiteral(currentMethodOOP, 1); // Selector is literal[0], at index 1
-                        var selectorName = context.GetSymbolName(selectorOOP) ?? "?";
-
                         Console.WriteLine($"\n*** PUSH_IVAR on SmallInteger receiver ***");
                         Console.WriteLine($"  Receiver value: {receiverOOP.AsSmallInteger()}");
                         Console.WriteLine($"  Instance variable index: {index}");
-                        Console.WriteLine($"  Method selector: {selectorName}");
                         Console.WriteLine($"  Current context: {context.ActiveContext}");
+
+                        // Get method info for debugging - but check if method slot is valid first
+                        var currentMethodOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.CONTEXT_METHOD_INDEX);
+                        if (currentMethodOOP.IsSmallInteger)
+                        {
+                            Console.WriteLine($"  ERROR: Context method slot contains SmallInteger: {currentMethodOOP.AsSmallInteger()}");
+                        }
+                        else
+                        {
+                            var selectorOOP = context.GetMethodLiteral(currentMethodOOP, 1); // Selector is literal[0], at index 1
+                            var selectorName = context.GetSymbolName(selectorOOP) ?? "?";
+                            Console.WriteLine($"  Method selector: {selectorName}");
+                        }
                     }
 
                     var valueOOP = heapManager.GetInstanceVariable(receiverOOP, index);
