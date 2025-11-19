@@ -6,6 +6,7 @@ using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
 
@@ -18,7 +19,8 @@ internal class FieldValueResolver(
     ObjectGraphAllocator allocator,
     ColdStartBundle bundle,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
-    IDiagnosticHub? diagnostics)
+    IDiagnosticHub? diagnostics,
+    FieldValueService fieldValueService)
 {
     private readonly IReadOnlyList<string> _symbols = bundle.Symbols;
 
@@ -54,12 +56,7 @@ internal class FieldValueResolver(
     /// <returns>The integer value.</returns>
     public int GetIntValue(object value)
     {
-        return value switch
-        {
-            System.Text.Json.JsonElement e => e.GetInt32(),
-            int i => i,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to int")
-        };
+        return fieldValueService.GetIntValue(value);
     }
 
     /// <summary>
@@ -69,13 +66,7 @@ internal class FieldValueResolver(
     /// <returns>The double value.</returns>
     public double GetFloatValue(object value)
     {
-        return value switch
-        {
-            System.Text.Json.JsonElement e => e.GetDouble(),
-            double d => d,
-            float f => f,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to double")
-        };
+        return fieldValueService.GetFloatValue(value);
     }
 
     /// <summary>
@@ -85,16 +76,7 @@ internal class FieldValueResolver(
     /// <returns>The interned symbol OOP.</returns>
     public SmalltalkOOP InternSymbol(string name)
     {
-        // Find the symbol in the SymbolRegistry (created in Phase 1)
-        for (int i = 0; i < bundle.Symbols.Length; i++)
-        {
-            if (bundle.Symbols[i] == name)
-            {
-                return SymbolRegistry.GetSymbolOOP(i);
-            }
-        }
-
-        throw new InvalidOperationException($"Symbol '{name}' not found in symbol table. Ensure Phase 1 (Symbol Interning) completed successfully.");
+        return fieldValueService.GetSymbolOOP(name);
     }
 
     /// <summary>
@@ -217,17 +199,6 @@ internal class FieldValueResolver(
     /// <returns>The byte array.</returns>
     public byte[] ConvertHexStringToBytes(string hex)
     {
-        // Remove any whitespace or separators
-        hex = hex.Replace(" ", "").Replace("-", "").Replace(":", "");
-
-        if (hex.Length % 2 != 0)
-            throw new ArgumentException("Hex string must have even number of characters");
-
-        byte[] bytes = new byte[hex.Length / 2];
-        for (int i = 0; i < bytes.Length; i++)
-        {
-            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-        }
-        return bytes;
+        return fieldValueService.ConvertHexStringToBytes(hex);
     }
 }

@@ -67,9 +67,12 @@ public class Phase3_ObjectAllocation : IPhase
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _diagnostics = diagnostics;
 
-        // Initialize helper classes
-        _fieldValueResolver = new FieldValueResolver(allocator, bundle, localIdToObjectId, diagnostics);
+        // Initialize services and helper classes
+        var symbolService = new SymbolService(bundle);
+        var fieldValueService = new FieldValueService(bundle, symbolService);
         var dictionaryService = new DictionaryService(allocator, bundle);
+
+        _fieldValueResolver = new FieldValueResolver(allocator, bundle, localIdToObjectId, diagnostics, fieldValueService);
         _dictionaryInstaller = new DictionaryInstaller(
             allocator, localIdToObjectId, initializedFields,
             _fieldValueResolver.InternSymbol, dictionaryService);
