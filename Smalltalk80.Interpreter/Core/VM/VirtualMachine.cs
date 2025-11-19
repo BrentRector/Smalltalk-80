@@ -3,6 +3,7 @@ using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core.VM.Interpreter;
 using Smalltalk80.Interpreter.Core.VM.Caching;
+using Smalltalk80.Interpreter.Core.VM.Diagnostics;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Attributes;
 
@@ -45,6 +46,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     private readonly IPrimitiveRegistry _primitiveRegistry;
     private readonly SelectorCache _selectorCache;
     private readonly NonLocalReturnHandler _nlrHandler;
+    private readonly ExecutionTracer _tracer;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -52,15 +54,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     // Primitive success flag (Blue Book specification)
     private bool _primitiveSuccess;
 
-    // Instruction execution counter for debugging infinite loops
-    private long _instructionCount = 0;
-    private const long MAX_INSTRUCTIONS = 500000;  // Halt at 500K instructions (infinite loop threshold)
-
     /// <summary>Gets the total number of instructions executed by this VM instance.</summary>
-    public long InstructionCount => _instructionCount;
+    public long InstructionCount => _tracer.InstructionCount;
 
     /// <summary>Resets the instruction counter to zero. Used before executing init expressions.</summary>
-    public void ResetInstructionCount() => _instructionCount = 0;
+    public void ResetInstructionCount() => _tracer.ResetInstructionCount();
 
     // Trampoline state - used to avoid recursive ExecuteBytecodeLoop calls
     // (CallOutcome, CallOutcomeKind, InterpreterStatus moved to Interpreter/ExecutionState.cs)
@@ -79,25 +77,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     public bool VerboseDebug { get; set; } = false;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
-    // Selector trace mechanism - shows nested method calls and returns
-    private bool _selectorTraceEnabled = false;
-    
     // Public property to enable bytecode tracing from outside
     public bool EnableBytecodeTracing
     {
-        get => _selectorTraceEnabled;
-        set
-        {
-            _selectorTraceEnabled = value;
-            _bytecodeInstructionCounter = 0; // Reset counters when enabling
-            _pushTraceCounter = 0;
-        }
+        get => _tracer.SelectorTraceEnabled;
+        set => _tracer.SelectorTraceEnabled = value;
     }
-    
-    private int _bytecodeInstructionCounter = 0;
-    private int _pushTraceCounter = 0;
-    private int _selectorTraceDepth = 0;
-    private readonly Stack<(string className, string selector, int depth)> _selectorTraceStack = new();
 
     public VirtualMachine(ISmalltalkHeapManager heapManager, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
     {
@@ -107,6 +92,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
         RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
         _metadata = metadata;
         _platformBridge = platformBridge;
+
+        // Initialize tracer first as other components may need it
+        _tracer = new ExecutionTracer();
 
         _contextManager = new ContextManager(
             heapManager,
@@ -120,9 +108,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             metadata,
             this, // IVMHelpers
             () => _contextManager.ActiveContext,
-            () => _selectorTraceEnabled,
-            () => _pushTraceCounter,
-            () => _pushTraceCounter++
+            () => _tracer.SelectorTraceEnabled,
+            () => _tracer.PushTraceCounter,
+            () => _tracer.IncrementPushTraceCounter()
         );
 
         _messageDispatcher = new MessageDispatcher(
@@ -183,31 +171,21 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
     /// <summary>
     /// Enables selector trace for debugging - shows all method calls and returns with nesting.
     /// </summary>
-    public void EnableSelectorTrace()
-    {
-        _selectorTraceEnabled = true;
-        _selectorTraceDepth = 0;
-        _selectorTraceStack.Clear();
-    }
+    public void EnableSelectorTrace() => _tracer.StartSelectorTrace();
 
     /// <summary>
     /// Disables selector trace.
     /// </summary>
-    public void DisableSelectorTrace()
-    {
-        _selectorTraceEnabled = false;
-        _selectorTraceDepth = 0;
-        _selectorTraceStack.Clear();
-    }
+    public void DisableSelectorTrace() => _tracer.StopSelectorTrace();
 
     /// <summary>
     /// Prints a trace message with proper indentation based on call depth.
     /// </summary>
     private void TraceMessage(string message)
     {
-        if (_selectorTraceEnabled)
+        if (_tracer.SelectorTraceEnabled)
         {
-            string indent = new string(' ', _selectorTraceDepth * 2);
+            string indent = new string(' ', _tracer.SelectorTraceDepth * 2);
             // Console.WriteLine($"{indent}{message}");
         }
     }
@@ -373,27 +351,25 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             _heapManager.SetInstanceVariable(_contextManager.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
             // Increment and check instruction counter (one count per bytecode executed)
-            _instructionCount++;
-            
+            if (!_tracer.IncrementInstructionCount())
+            {
+                _tracer.ThrowIfInfiniteLoop();
+            }
+
             // Report progress every 10K instructions during potential infinite loops (only when tracing is enabled)
-            if (_selectorTraceEnabled && _instructionCount % 10000 == 0)
+            if (_tracer.ShouldTraceInstructionPeriodic())
             {
                 var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
                 var ctxReceiverOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_RECEIVER_INDEX);
                 var className = GetClassName(GetClass(ctxReceiverOOP));
-                Console.WriteLine($"[{_instructionCount / 1000}K instructions] In: {className}>>{methodLocalId}, IP={ip-1}");
+                _tracer.TraceInstructionPeriodic(className, methodLocalId, ip - 1);
             }
-            
+
             // Special trace around the critical range
-            if (_selectorTraceEnabled && _instructionCount >= 2020 && _instructionCount <= 2045)
+            if (_tracer.ShouldTraceBytecodeRange())
             {
                 var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
-                Console.WriteLine($"[BYTECODE #{_instructionCount}] IP={ip-1}, opcode=0x{bytecode:X2}, method={methodLocalId}");
-            }
-            
-            if (_instructionCount >= MAX_INSTRUCTIONS)
-            {
-                throw new InvalidOperationException($"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
+                _tracer.TraceBytecodeRange(ip - 1, bytecode, methodLocalId);
             }
 
             // Execute the bytecode using the bytecode interpreter
@@ -538,10 +514,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
 
 
         // Selector trace: log method return
-        if (_selectorTraceEnabled && _selectorTraceStack.Count > 0)
+        if (_tracer.SelectorTraceEnabled && _tracer.HasSelectorTraceEntries)
         {
-            var (className, selector, depth) = _selectorTraceStack.Pop();
-            _selectorTraceDepth = depth;  // Restore depth before decrement
+            var (className, selector, depth) = _tracer.PopSelectorTrace();
+            _tracer.SetSelectorTraceDepth(depth);  // Restore depth before decrement
             string returnValueStr = returnValue.IsSmallInteger
                 ? returnValue.AsSmallInteger().ToString()
                 : $"OOP({returnValue.RawValue})";
@@ -677,10 +653,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
             byte bytecode = bytecodes[ip++];
             
             // DEBUG: Trace first 100 bytecodes when tracing is enabled
-            if (_selectorTraceEnabled && _bytecodeInstructionCounter < 100)
+            if (_tracer.SelectorTraceEnabled && _tracer.BytecodeInstructionCounter < 100)
             {
-                _bytecodeInstructionCounter++;
-                
+                _tracer.IncrementBytecodeCounter();
+
                 // Peek ahead for extended opcodes
                 string opcodeDesc = $"0x{bytecode:X2}";
                 if (bytecode == 0x80 && ip < bytecodes.Length)
@@ -700,8 +676,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, IVMDe
                 {
                     opcodeDesc = BytecodeDisassembler.GetOpcodeName(bytecode) ?? opcodeDesc;
                 }
-                
-                Console.WriteLine($"[BYTECODE #{_bytecodeInstructionCounter}] IP={(ip-1)}, {opcodeDesc}");
+
+                Console.WriteLine($"[BYTECODE #{_tracer.BytecodeInstructionCounter}] IP={(ip-1)}, {opcodeDesc}");
             }
 
             // For extended opcodes, peek ahead and show the full instruction

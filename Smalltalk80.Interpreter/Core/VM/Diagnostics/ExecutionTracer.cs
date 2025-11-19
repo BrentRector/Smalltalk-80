@@ -190,4 +190,30 @@ public class ExecutionTracer
         _selectorTraceEnabled = false;
         _selectorTraceDepth = 0;
     }
+
+    /// <summary>
+    /// Pushes a selector trace entry onto the stack.
+    /// </summary>
+    public void PushSelectorTrace(string className, string selector, int depth)
+    {
+        _selectorTraceStack.Push((className, selector, depth));
+    }
+
+    /// <summary>
+    /// Pops a selector trace entry from the stack.
+    /// </summary>
+    public (string className, string selector, int depth) PopSelectorTrace()
+    {
+        return _selectorTraceStack.Pop();
+    }
+
+    /// <summary>
+    /// Gets whether the selector trace stack has entries.
+    /// </summary>
+    public bool HasSelectorTraceEntries => _selectorTraceStack.Count > 0;
+
+    /// <summary>
+    /// Sets the selector trace depth directly.
+    /// </summary>
+    public void SetSelectorTraceDepth(int depth) => _selectorTraceDepth = depth;
 }
