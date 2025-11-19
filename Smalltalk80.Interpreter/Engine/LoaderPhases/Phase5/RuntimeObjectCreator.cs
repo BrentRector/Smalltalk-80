@@ -24,17 +24,18 @@ public class RuntimeObjectCreator(
     /// </summary>
     public void CreateDefaultTextStyle()
     {
-        // Use the FontObjectBuilder and WinFormsFontBridge to create proper fonts
+        // Use the FontObjectBuilder and FontBridgeFactory to create proper fonts
         var fontBuilder = new FontObjectBuilder(context);
 
-        // Try to use real fonts via GDI+, fall back to stub if unavailable
+        // Use platform-appropriate font bridge (WinForms on Windows, Null otherwise)
         SmalltalkOOP textStyleOOP;
         int lineGrid;
         int baseline;
 
         try
         {
-            using var fontBridge = new WinFormsFontBridge();
+            using var fontBridge = FontBridgeFactory.Create() as IDisposable;
+            var bridge = fontBridge as IFontBridge ?? FontBridgeFactory.CreateNull();
 
             // Create canonical font sizes (10, 12, 14)
             var fontDescriptors = new[]
@@ -49,18 +50,18 @@ public class RuntimeObjectCreator(
             foreach (var descriptor in fontDescriptors)
             {
                 // Check if font is available
-                if (!fontBridge.ResolveFace(descriptor))
+                if (!bridge.ResolveFace(descriptor))
                 {
                     // Fall back to a common font
                     var fallbackDescriptor = new FontDescriptor("Arial", descriptor.SizePixels);
-                    if (!fontBridge.ResolveFace(fallbackDescriptor))
+                    if (!bridge.ResolveFace(fallbackDescriptor))
                     {
                         // Use stub font as last resort
                         continue;
                     }
                 }
 
-                var fontData = fontBridge.BuildStrikeFont(descriptor);
+                var fontData = bridge.BuildStrikeFont(descriptor);
                 var strikeFontOOP = fontBuilder.CreateStrikeFont(fontData);
                 strikeFontOOPs.Add(strikeFontOOP);
 
@@ -78,7 +79,7 @@ public class RuntimeObjectCreator(
             if (strikeFontOOPs.Count > 0)
             {
                 // Use the 12px font metrics for TextStyle (or first available)
-                var primaryFontData = fontBridge.BuildStrikeFont(fontDescriptors[Math.Min(1, fontDescriptors.Length - 1)]);
+                var primaryFontData = bridge.BuildStrikeFont(fontDescriptors[Math.Min(1, fontDescriptors.Length - 1)]);
                 lineGrid = primaryFontData.Metrics.Ascent + primaryFontData.Metrics.Descent + primaryFontData.Metrics.Leading;
                 baseline = primaryFontData.Metrics.Ascent;
 

@@ -227,6 +227,14 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(105, new StringPrimitives.StringReplace());
         registry.Register(106, new StringPrimitives.AsSymbol());
 
+        // Font primitives (147-150)
+        // These provide performance optimizations for text operations.
+        // StrikeFont can also compute these values via Smalltalk code using xTable.
+        registry.Register(147, new FontPrimitives.CharacterWidth());
+        registry.Register(148, new FontPrimitives.StringWidth());
+        registry.Register(149, new FontPrimitives.FontAscent());
+        registry.Register(150, new FontPrimitives.FontDescent());
+
         // System primitives (112-139)
         registry.Register(112, new SystemOperations.CoreLeft());
         registry.Register(113, new SystemOperations.Quit());

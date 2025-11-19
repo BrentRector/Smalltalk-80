@@ -6,6 +6,47 @@
 
 This document describes the font support implementation for the Smalltalk-80 interpreter, which enables proper text rendering during cold start by bootstrapping the `DefaultTextStyle` pool variable with real `StrikeFont` objects.
 
+## Host vs Smalltalk Responsibilities
+
+### Host System (Windows/WinForms)
+
+The host operating system provides:
+- **Font discovery**: APIs to enumerate installed fonts (families, styles, weights)
+- **Metrics**: Ascent, descent, line spacing, baseline, per-character advance widths
+- **Shaping**: Complex script handling via DirectWrite (ligatures, kerning, RTL)
+- **Rasterization**: Glyph outlines to bitmaps with hinting and antialiasing
+- **DPI scaling**: System DPI settings (96, 120, etc.)
+
+### Smalltalk System
+
+Smalltalk expects:
+- **Canonical representation**: StrikeFont objects - compact bitmap atlases with per-glyph metrics
+- **Pool variables**: DefaultTextStyle in TextConstants, holding StrikeFonts keyed by size
+- **Primitives**: widthOfCharacter:, widthOfString:, ascent, descent, leading, drawString:
+- **Determinism**: Reproducible metrics and rendering across runs
+
+### Interaction Flow
+
+1. **Initialization (Bootstrap)**
+   - VM calls host APIs (WinForms/GDI+) to resolve font faces
+   - Metrics and glyphs are extracted and cached
+   - StrikeFont objects are built and inserted into DefaultTextStyle
+
+2. **Primitive Execution**
+   - `widthOfCharacter:` → lookup width table built from host metrics
+   - `drawString:` → BitBlt glyph bitmaps into Smalltalk display form
+
+3. **Determinism Enforcement**
+   - VM fixes DPI at 96 and disables ClearType
+   - Glyphs thresholded to 1bpp before storage in StrikeFont
+
+### Key Design Principle
+
+The Smalltalk VM never directly exposes Windows font objects. Instead:
+- It queries Windows for metrics and glyphs
+- Converts them into VM-native StrikeFont/TextStyle objects
+- Registers them in TextConstants for consistent, canonical font model
+
 ## Architecture
 
 ### Component Structure
@@ -13,7 +54,8 @@ This document describes the font support implementation for the Smalltalk-80 int
 ```
 Core/VM/Graphics/
 ├── IFontBridge.cs          # Interface and data structures
-├── WinFormsFontBridge.cs   # GDI+ implementation
+├── WinFormsFontBridge.cs   # GDI+ implementation (Windows)
+├── FontBridgeFactory.cs    # Platform abstraction factory + NullFontBridge
 ├── BitBltEngine.cs         # Existing BitBlt for glyph rendering
 
 Engine/LoaderPhases/Phase5/
@@ -21,7 +63,8 @@ Engine/LoaderPhases/Phase5/
 ├── RuntimeObjectCreator.cs # Bootstrap routine (CreateDefaultTextStyle)
 
 Core/VM/Primitives/
-├── FontPrimitives.cs       # Optional performance optimizations
+├── FontPrimitives.cs       # Performance optimizations (primitives 147-150)
+├── PrimitiveRegistry.cs    # Registers font primitives
 ```
 
 ### Key Interfaces
