@@ -104,11 +104,31 @@ public static class GraphicsOperations
             if (bitsOOP == SpecialObjectsArray.Instance.Nil || bitsOOP.IsSmallInteger)
                 return (Memory<byte>.Empty, 0, 0);
 
+            // Check object format to determine how to extract bits
+            var format = context.HeapManager.GetObjectFormat(bitsOOP);
             int size = context.HeapManager.GetIndexedSize(bitsOOP);
-            byte[] bits = new byte[size];
-            for (int i = 0; i < size; i++)
+            byte[] bits;
+
+            if (format == HeapManager.ObjectFormat.WordIndexed)
             {
-                bits[i] = context.HeapManager.GetIndexedByte(bitsOOP, i);
+                // WordArray: each element is a 16-bit word, convert to bytes
+                bits = new byte[size * 2];
+                for (int i = 0; i < size; i++)
+                {
+                    ushort word = context.HeapManager.GetIndexedWord(bitsOOP, i);
+                    // Big-endian byte order (Smalltalk convention)
+                    bits[i * 2] = (byte)(word >> 8);
+                    bits[i * 2 + 1] = (byte)(word & 0xFF);
+                }
+            }
+            else
+            {
+                // ByteArray or other: read as bytes directly
+                bits = new byte[size];
+                for (int i = 0; i < size; i++)
+                {
+                    bits[i] = context.HeapManager.GetIndexedByte(bitsOOP, i);
+                }
             }
 
             return (bits, width, height);
