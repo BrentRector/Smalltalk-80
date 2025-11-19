@@ -168,7 +168,7 @@ public class SystemDictionaryInstaller(
 
     private void CreateAndPopulatePoolDictionary(string poolName, HashSet<string> variableNames, List<string> declaringClasses)
     {
-        // Allocate Dictionary with enough capacity for variables
+        // Allocate empty Dictionary - Smalltalk code will populate it
         int capacity = Math.Max(8, variableNames.Count * 2);
         var poolDictOOP = AllocateEmptyDictionary(capacity);
 
@@ -180,34 +180,13 @@ public class SystemDictionaryInstaller(
         context.Allocator.SetInstanceVariable(poolAssocOOP, 1, poolDictOOP);
         InstallInSystemDictionary(poolAssocOOP, poolName);
 
-        // Get Undeclared dictionary for migration
-        GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP);
-
-        // Migrate associations from Undeclared to the pool dictionary
-        int migratedCount = 0;
-        foreach (var varName in variableNames)
-        {
-            // Get or create canonical association for this variable
-            var varAssocOOP = associationManager.GetOrCreateCanonical(varName);
-
-            // Install in pool dictionary
-            dictionaryOps.InstallAssociation(poolDictOOP, varAssocOOP, varName);
-
-            // Remove from Undeclared if present
-            if (undeclaredOOP != default)
-            {
-                var keySymbolOOP = context.Allocator.GetInstanceVariable(varAssocOOP, 0);
-                dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, varName);
-            }
-
-            migratedCount++;
-        }
+        // Note: We don't migrate associations here - Smalltalk init expressions will populate the pool
 
         context.Diagnostics?.Emit(new DiagnosticMessageEvent
         {
             Severity = MessageSeverity.Info,
             Category = "Phase5",
-            Message = $"Created pool dictionary {poolName} with {migratedCount} variables (used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})",
+            Message = $"Created pool dictionary {poolName} (capacity {capacity}, used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})",
             Timestamp = Stopwatch.GetTimestamp(),
             InstructionCount = 0
         });

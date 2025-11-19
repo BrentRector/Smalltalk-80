@@ -40,9 +40,9 @@ public class RuntimeObjectCreator(
             // Create canonical font sizes (10, 12, 14)
             var fontDescriptors = new[]
             {
-                new FontDescriptor("Courier New", 10),
-                new FontDescriptor("Courier New", 12),
-                new FontDescriptor("Courier New", 14)
+                new FontDescriptor("Consolas", 10),
+                new FontDescriptor("Consolas", 12),
+                new FontDescriptor("Consolas", 14)
             };
 
             var strikeFontOOPs = new List<SmalltalkOOP>();
