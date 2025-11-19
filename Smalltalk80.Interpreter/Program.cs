@@ -220,24 +220,10 @@ public static class Program
                 };
 
                 // Skip list for init expressions requiring runtime features not available during bootstrap
-                // Form initialize is kept enabled to test DefaultTextStyle font bootstrap
+                // TESTING: Empty skip list to test all expressions
                 var skipList = new HashSet<string>
                 {
-                    "Delay initialize",                      // ❌ Infinite loop - forkAt: creates process with [true] whileTrue
-                    // "BitEditor initialize" - ENABLED to test PopUpMenu labels: with font support (runs last)
-                    "FormMenuView initialize",               // ❌ Infinite loop - Form readFrom: (file I/O)
-                    "ChangeListController initialize",       // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "FormEditor initialize",                 // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "NotifierController initialize",         // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "ParagraphEditor initialize",            // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "ProjectController initialize",          // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "ScreenController initialize",           // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "StandardSystemController initialize",   // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "StringHolderController initialize",     // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "Form initialize" - ENABLED to test DefaultTextStyle font bootstrap
-                    "Object initialize",                     // ❌ Method not found: Sensor cursorPoint (GUI required)
-                    // "TextList initialize" - ENABLED to test DefaultTextStyle copy (runs last)
-                    // "VariableNode initialize" - ENABLED to test compiler infrastructure setup
+                    // All expressions enabled for testing
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -480,20 +466,21 @@ public static class Program
                             Console.WriteLine(result.Diagnostic.StackTrace);
                         }
 
-                        Console.WriteLine($"\n✓ Successfully executed {succeeded} expression(s) before this failure");
-                        if (successfulExpressions.Count > 0)
-                        {
-                            Console.WriteLine($"\nSuccessful expressions:");
-                            foreach (var (idx, source) in successfulExpressions)
-                            {
-                                Console.WriteLine($"  [{idx}] {source}");
-                            }
-                        }
-
-                        // FAIL FAST - stop execution here
-                        Console.WriteLine($"\n⚠️  Execution stopped at first failure to enable debugging");
-                        Console.WriteLine($"⚠️  Enable VM debug output and re-run to diagnose this specific failure");
-                        return;
+                        // TESTING: Don't stop on first failure - continue to see which expressions succeed
+                        // Console.WriteLine($"\n✓ Successfully executed {succeeded} expression(s) before this failure");
+                        // if (successfulExpressions.Count > 0)
+                        // {
+                        //     Console.WriteLine($"\nSuccessful expressions:");
+                        //     foreach (var (idx, source) in successfulExpressions)
+                        //     {
+                        //         Console.WriteLine($"  [{idx}] {source}");
+                        //     }
+                        // }
+                        //
+                        // // FAIL FAST - stop execution here
+                        // Console.WriteLine($"\n⚠️  Execution stopped at first failure to enable debugging");
+                        // Console.WriteLine($"⚠️  Enable VM debug output and re-run to diagnose this specific failure");
+                        // return;
                     }
                 }
 
