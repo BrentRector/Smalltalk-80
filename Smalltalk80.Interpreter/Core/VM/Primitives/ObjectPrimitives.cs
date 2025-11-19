@@ -198,28 +198,6 @@ public static class SimpleObjectPrimitives
         }
     }
 
-    /// <summary>Primitive 117: Behavior instSize - get instance variable count from format</summary>
-    public class InstSize : IPrimitive
-    {
-        public PrimitiveResult Execute(PrimitiveExecutionContext context)
-        {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-
-            // Receiver is a class/behavior - read its format field (instance variable 2)
-            var formatOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 2);
-
-            if (!formatOOP.IsSmallInteger) return PrimitiveResult.Fail();
-
-            int formatValue = formatOOP.AsSmallInteger();
-
-            // Extract instance variable count from Blue Book format (bits 4-14)
-            int instVarCount = (formatValue >> 4) & 0x7FF;
-
-            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(instVarCount));
-        }
-    }
-
     /// <summary>Primitive 63: String at: - access character from string</summary>
     public class StringAt : IPrimitive
     {

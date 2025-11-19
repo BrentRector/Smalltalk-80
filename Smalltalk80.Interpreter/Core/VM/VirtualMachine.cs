@@ -1185,15 +1185,15 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         int formatValue = formatOOP.AsSmallInteger();
 
-        // Decode format field per Blue Book Chapter 27:
-        // Bit 0:      isPointers  (1=contains pointers, 0=contains values)
-        // Bit 1:      isWords     (1=word-addressed, 0=byte-addressed)
-        // Bit 2:      isIndexable (1=has indexed fields, 0=fixed size only)
-        // Bits 4-14:  fixedFields (number of fixed instance variables, 0-2047)
-        bool isPointers = (formatValue & 0x01) != 0;
-        bool isWords = (formatValue & 0x02) != 0;
-        bool isIndexable = (formatValue & 0x04) != 0;
-        int fixedSize = (formatValue >> 4) & 0x7FF;      // Bits 4-14
+        // Decode format field per Smalltalk-80 source expectations:
+        // Bits 0-7:   fixedFields (number of fixed instance variables, 0-255)
+        // Bit 12:     isIndexable (1=has indexed fields, 0=fixed size only)
+        // Bit 13:     isWords     (1=word-addressed, 0=byte-addressed)
+        // Bit 14:     isPointers  (1=contains pointers, 0=contains values)
+        bool isPointers = (formatValue & 0x4000) != 0;
+        bool isWords = (formatValue & 0x2000) != 0;
+        bool isIndexable = (formatValue & 0x1000) != 0;
+        int fixedSize = formatValue & 0xFF;      // Bits 0-7
 
         // Decode object format from Blue Book flags
         ObjectFormat format;
