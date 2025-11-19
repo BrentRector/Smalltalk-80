@@ -112,38 +112,30 @@ public class RuntimeObjectCreator(
 
         // Install the DefaultTextStyle in TextConstants pool dictionary
         var allAssociations = AssociationRegistry.GetAll();
-        Console.WriteLine($"[DefaultTextStyle] AssociationRegistry has {allAssociations.Count} associations");
-        Console.WriteLine($"[DefaultTextStyle] Looking for 'DefaultTextStyle' in AssociationRegistry...");
 
         if (allAssociations.TryGetValue("DefaultTextStyle", out SmalltalkOOP defaultTextStyleAssoc))
         {
             var keySymbolOOP = context.Allocator.GetInstanceVariable(defaultTextStyleAssoc, 0);
-            Console.WriteLine($"[DefaultTextStyle] Found Association OOP={defaultTextStyleAssoc}, key symbol OOP={keySymbolOOP}");
 
             // Set the Association's value to the TextStyle object
             context.Allocator.SetInstanceVariable(defaultTextStyleAssoc, 1, textStyleOOP);
             context.InitializedFields.Add((defaultTextStyleAssoc, 1));
-            Console.WriteLine($"[DefaultTextStyle] Set Association value to TextStyle OOP={textStyleOOP}");
 
             // Install the Association in TextConstants pool dictionary
             if (GlobalRegistry.TryGet("TextConstants", out var textConstantsOOP))
             {
-                Console.WriteLine($"[DefaultTextStyle] Found TextConstants OOP={textConstantsOOP}");
-
                 // Install in TextConstants using dictionary operations
                 dictionaryOps.InstallAssociation(textConstantsOOP, defaultTextStyleAssoc, "DefaultTextStyle");
-                Console.WriteLine($"[DefaultTextStyle] Installed Association in TextConstants");
 
                 // Remove DefaultTextStyle from Undeclared (with proper hash chain fixup)
                 if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
                 {
                     dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, "DefaultTextStyle");
-                    Console.WriteLine($"[DefaultTextStyle] Removed from Undeclared");
                 }
             }
             else
             {
-                Console.WriteLine($"[DefaultTextStyle] ERROR: TextConstants not found in GlobalRegistry!");
+                throw new InvalidOperationException("TextConstants not found in GlobalRegistry during DefaultTextStyle setup");
             }
 
             context.Diagnostics?.Emit(new DiagnosticMessageEvent
@@ -157,8 +149,7 @@ public class RuntimeObjectCreator(
         }
         else
         {
-            Console.WriteLine($"[DefaultTextStyle] ERROR: Association not found in AssociationRegistry!");
-            GlobalRegistry.Register("DefaultTextStyle", textStyleOOP);
+            throw new InvalidOperationException("DefaultTextStyle Association not found in AssociationRegistry");
         }
     }
 
