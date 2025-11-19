@@ -236,7 +236,7 @@ public static class Program
                     "StringHolderController initialize",     // ❌ Infinite loop - PopUpMenu labels: (GUI)
                     // "Form initialize" - ENABLED to test DefaultTextStyle font bootstrap
                     "Object initialize",                     // ❌ Method not found: Sensor cursorPoint (GUI required)
-                    "TextList initialize",                   // ❌ Infinite loop (500K+ instructions)
+                    // "TextList initialize" - ENABLED to test DefaultTextStyle copy (runs last)
                     "VariableNode initialize",               // ❌ Infinite loop (500K+ instructions)
                 };
 
@@ -314,27 +314,46 @@ public static class Program
                     var dependencyOrder = InitExpressionOrdering.GetDependencyOrder();
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
-                    // Move "Form initialize" to run last (tests DefaultTextStyle font bootstrap)
+                    // Move "Form initialize" and "TextList initialize" to run last (tests DefaultTextStyle)
+                    // TextList initialize tests DefaultTextStyle copy which is a good validation
                     int formInitIndex = -1;
+                    int textListInitIndex = -1;
                     for (int i = 0; i < phase1Indices.Count; i++)
                     {
                         var expr = bundle.InitExpressions[phase1Indices[i]];
                         if (expr.Source == "Form initialize")
                         {
                             formInitIndex = i;
-                            break;
                         }
+                        else if (expr.Source == "TextList initialize")
+                        {
+                            textListInitIndex = i;
+                        }
+                    }
+                    // Remove in reverse order to preserve indices
+                    var lastIndices = new List<int>();
+                    if (textListInitIndex >= 0)
+                    {
+                        lastIndices.Add(phase1Indices[textListInitIndex]);
                     }
                     if (formInitIndex >= 0)
                     {
-                        int formIdx = phase1Indices[formInitIndex];
-                        phase1Indices.RemoveAt(formInitIndex);
-                        phase1Indices.Add(formIdx);
+                        lastIndices.Insert(0, phase1Indices[formInitIndex]);
                     }
+                    // Remove from current positions (in reverse index order)
+                    var indicesToRemove = new List<int>();
+                    if (formInitIndex >= 0) indicesToRemove.Add(formInitIndex);
+                    if (textListInitIndex >= 0) indicesToRemove.Add(textListInitIndex);
+                    foreach (var idx in indicesToRemove.OrderByDescending(x => x))
+                    {
+                        phase1Indices.RemoveAt(idx);
+                    }
+                    // Add at end: Form first, then TextList
+                    phase1Indices.AddRange(lastIndices);
 
                     Console.WriteLine($"\n=== Dependency-Ordered Init Expression Execution ===");
                     Console.WriteLine($"  Total: {phase1Indices.Count} initialize expressions");
-                    Console.WriteLine($"  Order: SmallInteger → ... → LargeNegativeInteger → Form (last)");
+                    Console.WriteLine($"  Order: SmallInteger → ... → Form → TextList (last)");
                     Console.WriteLine($"  See: InitExpression-DependencyAnalysis.md");
                     Console.WriteLine();
                 }
