@@ -1873,13 +1873,31 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
         
         // 2. Look up key in pool dictionary
+        var keyString = GetSymbolString(keySymbol);
+        Console.WriteLine($"[POOL VAR] Looking up '{keyString}' (symbol OOP={keySymbol}) in pool dictionary OOP={poolDictOOP}");
+
         var resolvedValueOOP = LookupInDictionary(poolDictOOP, keySymbol);
-        
+
         if (resolvedValueOOP == SpecialObjectsArray.Instance.Nil)
         {
-            // Key not found in pool dictionary - this is an error
+            // Key not found in pool dictionary - dump dictionary contents for debugging
             var poolNameString = GetSymbolString(poolNameSymbol);
-            var keyString = GetSymbolString(keySymbol);
+            Console.WriteLine($"[POOL VAR] ERROR: '{keyString}' not found in '{poolNameString}'");
+
+            // Dump all keys in the dictionary to see what symbols are there
+            int dictSize = _heapManager.GetIndexedSize(poolDictOOP);
+            Console.WriteLine($"[POOL VAR] Dictionary has {dictSize} slots. Dumping non-nil entries:");
+            for (int i = 0; i < dictSize; i++)
+            {
+                var entry = _heapManager.GetIndexedOOP(poolDictOOP, i);
+                if (entry != SpecialObjectsArray.Instance.Nil)
+                {
+                    var entryKey = _heapManager.GetInstanceVariable(entry, 0);
+                    var entryKeyName = GetSymbolString(entryKey);
+                    Console.WriteLine($"[POOL VAR]   [{i}] key='{entryKeyName}' (OOP={entryKey})");
+                }
+            }
+
             throw new InvalidOperationException($"Pool variable '{keyString}' not found in pool dictionary '{poolNameString}'");
         }
         
