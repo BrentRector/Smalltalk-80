@@ -1911,37 +1911,51 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// <summary>
     /// Looks up a key (Symbol) in a Dictionary and returns the value.
     /// Returns nil if key not found.
+    /// Uses hash-based lookup matching Smalltalk's Dictionary>>at: semantics.
     /// </summary>
     private SmalltalkOOP LookupInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbol)
     {
         // Dictionary is a variableSubclass of Set with:
         //   Instance variable [0]: tally (inherited from Set)
         //   Indexed slots [0..N]: Association array
-        // The indexed portion IS the dictionary array, not a separate instance variable
         int arraySize = _heapManager.GetIndexedSize(dictionaryOOP);
-        
-        // Linear search through dictionary indexed slots
-        for (int i = 0; i < arraySize; i++)
+        if (arraySize == 0) return SpecialObjectsArray.Instance.Nil;
+
+        // Compute hash using identity hash (Primitive 75 semantics: OOP >> 1)
+        int hash = keySymbol.IsSmallInteger
+            ? keySymbol.AsSmallInteger() & 0x3FFFFFFF
+            : keySymbol.ToObjectTableIndex();
+
+        // Find starting slot (matching Smalltalk's findKeyOrNil:)
+        int startIndex = ((hash % arraySize) + arraySize) % arraySize;
+        int index = startIndex;
+
+        // Linear probe until we find the key or hit nil
+        do
         {
-            var elementOOP = _heapManager.GetIndexedOOP(dictionaryOOP, i);
-            
+            var elementOOP = _heapManager.GetIndexedOOP(dictionaryOOP, index);
+
             if (elementOOP == SpecialObjectsArray.Instance.Nil)
             {
-                continue; // Empty slot
+                // Empty slot - key not in dictionary
+                return SpecialObjectsArray.Instance.Nil;
             }
-            
+
             // Element should be an Association
             var assocKeyOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            
+
             if (assocKeyOOP == keySymbol)
             {
                 // Found it - return the value
                 var assocValueOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
                 return assocValueOOP;
             }
-        }
-        
-        // Not found
+
+            // Linear probe to next slot
+            index = (index + 1) % arraySize;
+        } while (index != startIndex);
+
+        // Wrapped around completely - not found
         return SpecialObjectsArray.Instance.Nil;
     }
 
