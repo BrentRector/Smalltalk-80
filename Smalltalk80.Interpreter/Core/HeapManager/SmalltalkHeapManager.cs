@@ -127,6 +127,12 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         var formatWord = new FormatWord(formatOOP.AsSmallInteger());
         int instanceVariableCount = formatWord.FixedFields;
 
+        // DEBUG: Trace Form allocations
+        if (formatOOP.AsSmallInteger() == 0x4004) // Form's format
+        {
+            Console.WriteLine($"[ALLOCATE] Form instance: format=0x{formatOOP.AsSmallInteger():X4}, instVarCount={instanceVariableCount}");
+        }
+
         // Convert to ObjectFormat enum
         ObjectFormat format;
         if (formatWord.IsPointers)
