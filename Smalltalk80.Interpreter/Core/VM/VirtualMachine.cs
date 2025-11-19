@@ -1908,22 +1908,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Return the Association's value
         var resolvedValueOOP = _heapManager.GetInstanceVariable(resolvedAssocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-
-        // Debug: Show what value is being returned for Character-related pool variables
-        if (keyString == "Ctrls" || keyString == "CtrlS" || keyString == "Ctrlz" ||
-            keyString == "Space" || keyString == "Tab" || keyString == "CR")
-        {
-            if (resolvedValueOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[POOL VAR] WARNING: '{keyString}' is SmallInteger {resolvedValueOOP.AsSmallInteger()} (should be Character!)");
-            }
-            else
-            {
-                var valueClass = GetClassName(_heapManager.GetClassOOP(resolvedValueOOP));
-                Console.WriteLine($"[POOL VAR] '{keyString}' value class: {valueClass}, OOP={resolvedValueOOP}");
-            }
-        }
-
         return resolvedValueOOP;
     }
 
