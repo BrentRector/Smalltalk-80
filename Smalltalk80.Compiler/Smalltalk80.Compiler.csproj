@@ -18,9 +18,10 @@
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
   </ItemGroup>
   
-  <!-- Grammar file included for reference -->
+  <!-- Grammar files included for reference -->
   <ItemGroup>
-    <None Include="Grammar\Smalltalk80.g4" />
+    <None Include="Grammar\Smalltalk80Lexer.g4" />
+    <None Include="Grammar\Smalltalk80Parser.g4" />
     <None Include="ANTLR4\antlr-4.13.2-complete.jar" />
   </ItemGroup>
 
@@ -45,8 +46,8 @@
   <!-- Ensure Generated folder exists and regenerate parser if needed -->
   <Target Name="EnsureGeneratedFiles"
           BeforeTargets="BeforeCompile"
-          Inputs="Grammar\Smalltalk80.g4"
-          Outputs="Generated\Smalltalk80Parser.cs">
+          Inputs="Grammar\Smalltalk80Lexer.g4;Grammar\Smalltalk80Parser.g4"
+          Outputs="Generated\Smalltalk80Lexer.cs;Generated\Smalltalk80Parser.cs">
 
     <Message Text="Parser files not found. Generating..." Importance="high"
              Condition="!Exists('Generated\Smalltalk80Parser.cs')" />
