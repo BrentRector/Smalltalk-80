@@ -20,6 +20,28 @@ namespace Smalltalk80.Interpreter.Core.VM;
 public partial class VirtualMachine
 {
     /// <summary>
+    /// Gets the current method's local ID from the active context.
+    /// Properly handles both MethodContexts and BlockContexts.
+    /// For BlockContexts, traverses to the home MethodContext to get the method.
+    /// </summary>
+    private string GetCurrentMethodLocalId()
+    {
+        var contextOOP = _contextManager.ActiveContext;
+
+        // Check if this is a BlockContext
+        var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
+        if (contextClassOOP == _metadata.BlockContextClassOOP)
+        {
+            // Get home MethodContext
+            contextOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+        }
+
+        // Get method from the (home) MethodContext
+        var methodOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_METHOD_INDEX);
+        return GetLocalId(methodOOP) ?? "unknown";
+    }
+
+    /// <summary>
     /// Sends a super message to the receiver.
     /// Looks up the method in the superclass of the class containing the currently executing method.
     /// Returns a CallOutcome that signals whether a non-local return occurred.
@@ -117,7 +139,7 @@ public partial class VirtualMachine
         if (_tracer.ShouldTraceSend())
         {
             var recvClass = GetClassName(GetClass(receiverOOP));
-            var currentMethod = GetLocalId(_heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_METHOD_INDEX)) ?? "unknown";
+            var currentMethod = GetCurrentMethodLocalId();
             _tracer.TraceSendEntry(recvClass, selectorName ?? "unknown", currentMethod);
 
             // Special alert for error: sends
@@ -220,7 +242,7 @@ public partial class VirtualMachine
         if (_tracer.ShouldTraceSend())
         {
             var recvClass = GetClassName(classOOP);
-            var currentMethod = GetLocalId(_heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_METHOD_INDEX)) ?? "unknown";
+            var currentMethod = GetCurrentMethodLocalId();
             _tracer.TraceSendEntry(recvClass, selectorName ?? "unknown", currentMethod);
 
             // Special alert for error: sends
