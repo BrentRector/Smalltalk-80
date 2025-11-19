@@ -1152,7 +1152,8 @@ public static class Program
         Console.WriteLine($"  Found TextConstants dictionary OOP: {textConstantsDictOOP.Value}");
 
         // Get DefaultTextStyle Association from AssociationRegistry
-        if (!AssociationRegistry.TryGet("DefaultTextStyle", out var defaultTextStyleAssocOOP))
+        var allAssociations = AssociationRegistry.GetAll();
+        if (!allAssociations.TryGetValue("DefaultTextStyle", out var defaultTextStyleAssocOOP))
         {
             Console.WriteLine("  ERROR: DefaultTextStyle Association not found in AssociationRegistry!");
             return;
@@ -1164,7 +1165,7 @@ public static class Program
 
         // Install the Association into TextConstants using hash-based insertion
         var keySymbolOOP = heapManager.GetSlot(defaultTextStyleAssocOOP, 1); // Association.key
-        int hash = keySymbolOOP.ToObjectTableIndex();
+        int hash = IdentityHashUtility.ComputeIdentityHash(keySymbolOOP);
         int dictSize = heapManager.GetIndexedSize(textConstantsDictOOP.Value);
         int location = ((hash % dictSize) + dictSize) % dictSize;
 
