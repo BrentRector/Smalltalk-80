@@ -5,6 +5,7 @@ using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
+using Smalltalk80.Interpreter.Engine.Services;
 using System.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
@@ -32,9 +33,10 @@ public class Phase3_ObjectAllocation : IPhase
     private readonly ColdstartReport _report;
     private readonly IDiagnosticHub? _diagnostics;
 
-    // Helper classes for decomposed functionality
-    private readonly DictionaryInstaller _dictionaryInstaller;
-    private readonly FieldValueResolver _fieldValueResolver;
+    // Shared services
+    private readonly SymbolService _symbolService;
+    private readonly DictionaryService _dictionaryService;
+    private readonly FieldValueService _fieldValueService;
 
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
@@ -54,6 +56,9 @@ public class Phase3_ObjectAllocation : IPhase
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
         ColdstartReport report,
+        SymbolService symbolService,
+        DictionaryService dictionaryService,
+        FieldValueService fieldValueService,
         IDiagnosticHub? diagnostics = null)
     {
         _bundle = bundle;
@@ -66,11 +71,10 @@ public class Phase3_ObjectAllocation : IPhase
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _diagnostics = diagnostics;
 
-        // Initialize helper classes
-        _fieldValueResolver = new FieldValueResolver(allocator, bundle, localIdToObjectId, diagnostics);
-        _dictionaryInstaller = new DictionaryInstaller(
-            allocator, bundle, localIdToObjectId, initializedFields,
-            _fieldValueResolver.InternSymbol);
+        // Use shared services
+        _symbolService = symbolService ?? throw new ArgumentNullException(nameof(symbolService));
+        _dictionaryService = dictionaryService ?? throw new ArgumentNullException(nameof(dictionaryService));
+        _fieldValueService = fieldValueService ?? throw new ArgumentNullException(nameof(fieldValueService));
     }
 
     /// <summary>
@@ -302,7 +306,7 @@ public class Phase3_ObjectAllocation : IPhase
         int nameIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("StrikeFont", "name", _bundle);
         if (nameIndex >= 0)
         {
-            var fontNameOOP = _fieldValueResolver.InternString("DefaultFont");
+            var fontNameOOP = _fieldValueService.InternString("DefaultFont");
             _allocator.SetInstanceVariable(strikeFontOOP, nameIndex, fontNameOOP);
         }
 
@@ -384,17 +388,17 @@ public class Phase3_ObjectAllocation : IPhase
         // Step 5: Find existing DefaultTextStyle Association and update its value
         // The compiler should have created an Association for DefaultTextStyle (either in
         // TextConstants pool or Undeclared), we just need to find it and set the value
-        bool foundAndUpdated = _dictionaryInstaller.FindAndUpdateAssociationValue("DefaultTextStyle", textStyleOOP);
+        bool foundAndUpdated = _dictionaryService.FindAndUpdateAssociationValue("DefaultTextStyle", textStyleOOP);
 
         if (!foundAndUpdated)
         {
             // Association doesn't exist - create one and add to Undeclared
-            var defaultTextStyleSymbol = _fieldValueResolver.InternSymbol("DefaultTextStyle");
-            var defaultTextStyleAssoc = _dictionaryInstaller.AllocateAssociation(defaultTextStyleSymbol, textStyleOOP);
+            var defaultTextStyleSymbol = _symbolService.InternSymbol("DefaultTextStyle");
+            var defaultTextStyleAssoc = _dictionaryService.AllocateAssociation(defaultTextStyleSymbol, textStyleOOP);
 
             // Add to Undeclared dictionary (will be migrated to proper location by runtime)
             var undeclaredOOP = GlobalRegistry.Get("Undeclared");
-            _dictionaryInstaller.InstallInDictionary(undeclaredOOP, defaultTextStyleAssoc, "DefaultTextStyle");
+            _dictionaryService.InstallAssociation(undeclaredOOP, defaultTextStyleAssoc, "DefaultTextStyle");
         }
     }
 
@@ -692,14 +696,14 @@ public class Phase3_ObjectAllocation : IPhase
             // Second: Override with JSON field values
             for (int i = 0; i < obj.Fields.Length; i++)
             {
-                var valueOOP = _fieldValueResolver.ResolveFieldValue(obj.Fields[i]);
+                var valueOOP = _fieldValueService.ResolveFieldValue(obj.Fields[i]);
                 _allocator.SetInstanceVariable(objectOOP, i, valueOOP);
             }
 
             // Third: Set indexed fields if any
             for (int i = 0; i < obj.IndexedFields.Length; i++)
             {
-                var valueOOP = _fieldValueResolver.ResolveFieldValue(obj.IndexedFields[i]);
+                var valueOOP = _fieldValueService.ResolveFieldValue(obj.IndexedFields[i]);
                 _allocator.SetIndexedOOP(objectOOP, i, valueOOP);
             }
         }
@@ -976,7 +980,7 @@ public class Phase3_ObjectAllocation : IPhase
             }
 
             // Get symbol OOP for the key
-            SmalltalkOOP keySymbolOOP = _fieldValueResolver.InternSymbol(undeclaredVar.Key);
+            SmalltalkOOP keySymbolOOP = _symbolService.InternSymbol(undeclaredVar.Key);
 
             // Use AssociationRegistry to create canonical Association
             // This ensures Phase 4 and Phase 5 will get the SAME Association object
@@ -995,7 +999,7 @@ public class Phase3_ObjectAllocation : IPhase
                     valueOOP = nilOOP;  // Default to nil for truly undeclared variables
                 }
 
-                return _dictionaryInstaller.AllocateAssociation(keySymbolOOP, valueOOP);
+                return _dictionaryService.AllocateAssociation(keySymbolOOP, valueOOP);
             });
 
             createdCount++;
@@ -1046,7 +1050,7 @@ public class Phase3_ObjectAllocation : IPhase
             var associationOOP = AssociationRegistry.GetAll()[undeclaredVar.Key];
 
             // Install in Undeclared dictionary using hash-based insertion
-            _dictionaryInstaller.InstallInDictionary(undeclaredOOP, associationOOP, undeclaredVar.Key);
+            _dictionaryService.InstallAssociation(undeclaredOOP, associationOOP, undeclaredVar.Key);
             installedInUndeclared++;
         }
 

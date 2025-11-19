@@ -4,6 +4,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 
@@ -14,16 +15,22 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 /// <param name="bundle">The cold start bundle containing symbols and strings.</param>
 /// <param name="allocator">The object graph allocator for creating objects.</param>
 /// <param name="localIdToObjectId">Mapping from local IDs to allocated object OOPs.</param>
+/// <param name="symbolService">The symbol service for symbol lookups.</param>
+/// <param name="fieldValueService">The field value service for value resolution.</param>
 internal class LiteralResolver(
     ColdStartBundle bundle,
     ObjectGraphAllocator allocator,
-    Dictionary<string, SmalltalkOOP> localIdToObjectId)
+    Dictionary<string, SmalltalkOOP> localIdToObjectId,
+    SymbolService symbolService,
+    FieldValueService fieldValueService)
 {
     private readonly ColdStartBundle _bundle = bundle;
     private readonly ObjectGraphAllocator _allocator = allocator;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols = bundle.Symbols;
     private readonly IReadOnlyList<string> _strings = bundle.Strings;
+    private readonly SymbolService _symbolService = symbolService;
+    private readonly FieldValueService _fieldValueService = fieldValueService;
 
     // Pool variable binding Array deduplication registry
     // Key: "PoolDictionaryName:KeySymbol", Value: 2-element Array OOP (#PoolName, #Key)
@@ -41,19 +48,19 @@ internal class LiteralResolver(
     {
         var result = literal.Type switch
         {
-            "symbol" => InternSymbol(_symbols[literal.Index!.Value]),
-            "string" => InternString(_strings[literal.Index!.Value]),
-            "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
-            "float" => AllocateFloat(GetFloatValue(literal.Value!)),
+            "symbol" => _symbolService.InternSymbol(_symbols[literal.Index!.Value]),
+            "string" => _fieldValueService.InternString(_strings[literal.Index!.Value]),
+            "smallInt" => SmalltalkOOP.FromSmallInteger(_fieldValueService.GetIntValue(literal.Value!)),
+            "float" => _fieldValueService.AllocateFloat(_fieldValueService.GetFloatValue(literal.Value!)),
             "nil" => SpecialObjectsArray.Instance.Nil,
             "true" => SpecialObjectsArray.Instance.True,
             "false" => SpecialObjectsArray.Instance.False,
             "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1) ? objOOP1 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
             "compiledMethod" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP2) ? objOOP2 : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),
-            "character" => AllocateCharacter(literal.CodePoint!.Value),
-            "bytes" => AllocateByteArray(literal.Encoding!, literal.Data!),
+            "character" => _fieldValueService.AllocateCharacter(literal.CodePoint!.Value),
+            "bytes" => _fieldValueService.AllocateByteArray(literal.Encoding!, literal.Data!),
             "association" => ResolveVariableLiteral(literal.Association!),
-            "array" => AllocateArray(literal.Elements!.Select(l => ResolveLiteralValueAsOOP(l)).ToArray()),
+            "array" => _fieldValueService.AllocateArray(literal.Elements!.Select(l => ResolveLiteralValueAsOOP(l)).ToArray()),
             _ => throw new InvalidOperationException($"Unknown literal type: {literal.Type}")
         };
 
@@ -76,7 +83,7 @@ internal class LiteralResolver(
     /// <returns>The resolved object pointer (Array for pool variables, Association for globals).</returns>
     public SmalltalkOOP ResolveVariableLiteral(AssociationLiteral assoc)
     {
-        var keySymbol = InternSymbol(_symbols[assoc.KeyIndex]);
+        var keySymbol = _symbolService.InternSymbol(_symbols[assoc.KeyIndex]);
         string keyName = _symbols[assoc.KeyIndex];
 
         // POOL VARIABLES: Create 2-element Array (#PoolName, #Key) - NOT an Association
@@ -92,8 +99,8 @@ internal class LiteralResolver(
             }
 
             // Create new pool variable binding Array: (#PoolDictionaryName, #Key)
-            var poolNameSymbol = InternSymbol(assoc.PoolDictionaryName);
-            var poolBindingArray = AllocateArray([poolNameSymbol, keySymbol]);
+            var poolNameSymbol = _symbolService.InternSymbol(assoc.PoolDictionaryName);
+            var poolBindingArray = _fieldValueService.AllocateArray([poolNameSymbol, keySymbol]);
 
             // Register for deduplication
             _poolVariableBindings[dedupKey] = poolBindingArray;

@@ -4,6 +4,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 
@@ -34,6 +35,9 @@ public class Phase5Orchestrator : IPhase
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
         ColdstartReport report,
+        SymbolService symbolService,
+        DictionaryService dictionaryService,
+        FieldValueService fieldValueService,
         IDiagnosticHub? diagnostics = null)
     {
         _context = new Phase5Context(
@@ -46,9 +50,9 @@ public class Phase5Orchestrator : IPhase
             report,
             diagnostics);
 
-        // Create shared services
+        // Create Phase5-specific adapters that use the shared services
         var fieldValueResolver = new FieldValueResolver(_context);
-        var associationManager = new AssociationManager(_context);
+        var associationManager = new AssociationManager(_context, symbolService, dictionaryService);
         var dictionaryOps = new DictionaryOperations(_context);
 
         // Create main components

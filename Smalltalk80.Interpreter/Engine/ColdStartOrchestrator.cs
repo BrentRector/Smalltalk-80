@@ -1,5 +1,6 @@
 using Smalltalk80.Interpreter.Engine.LoaderPhases;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
+using Smalltalk80.Interpreter.Engine.Services;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.HeapManager;
@@ -52,6 +53,11 @@ public class ColdStartOrchestrator : IColdStartLoader
     /// Gets the layout resolver (available after Phase 2 completes).
     /// </summary>
     public LayoutResolver? LayoutResolver { get; private set; }
+
+    // Shared services created after Phase 1
+    private SymbolService? _symbolService;
+    private DictionaryService? _dictionaryService;
+    private FieldValueService? _fieldValueService;
 
     /// <summary>
     /// Gets the localId to OOP mapping (available after Run() completes).
@@ -140,6 +146,9 @@ public class ColdStartOrchestrator : IColdStartLoader
 
             // Freeze symbol registry - no more symbol registration after this point
             SymbolRegistry.Freeze();
+
+            // Create shared services now that symbols are available
+            _symbolService = new SymbolService(_bundle);
         });
 
         // Phase 2: Class Infrastructure
@@ -150,6 +159,12 @@ public class ColdStartOrchestrator : IColdStartLoader
         {
             phase2.Run();
             LayoutResolver = phase2.LayoutResolver;
+
+            // Create remaining services now that localIdToObjectId exists
+            _dictionaryService = new DictionaryService(
+                _allocator, _bundle, _localIdToObjectId, _initializedFields, _symbolService!, _diagnostics);
+            _fieldValueService = new FieldValueService(
+                _allocator, _bundle, _localIdToObjectId, _symbolService!, _diagnostics);
         });
 
         // Phase 3: Object Allocation
@@ -157,7 +172,7 @@ public class ColdStartOrchestrator : IColdStartLoader
         if (LayoutResolver == null)
             throw new InvalidOperationException("LayoutResolver not initialized after Phase 2");
 
-        var phase3 = new Phase3_ObjectAllocation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics);
+        var phase3 = new Phase3_ObjectAllocation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _symbolService!, _dictionaryService!, _fieldValueService!, _diagnostics);
         _phases.Add(phase3);
         RunPhase(phase3.Name, () =>
         {
@@ -166,7 +181,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 4: Method Compilation
         // Compiles all methods, installs in dictionaries, prepares init expressions
-        var phase4 = new Phase4_MethodCompilation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics);
+        var phase4 = new Phase4_MethodCompilation(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _symbolService!, _fieldValueService!, _diagnostics);
         _phases.Add(phase4);
         RunPhase(phase4.Name, () =>
         {
@@ -176,7 +191,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches
-        var phase5 = new Phase5Orchestrator(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics);
+        var phase5 = new Phase5Orchestrator(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _symbolService!, _dictionaryService!, _fieldValueService!, _diagnostics);
         _phases.Add(phase5);
         RunPhase(phase5.Name, () =>
         {

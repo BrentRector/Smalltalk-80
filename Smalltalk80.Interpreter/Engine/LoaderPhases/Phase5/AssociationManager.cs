@@ -3,6 +3,7 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 
@@ -10,19 +11,30 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 /// Manages Association creation and maintains canonical identity through AssociationRegistry.
 /// Ensures only one Association per global variable name exists.
 /// </summary>
-public class AssociationManager(Phase5Context context) : IAssociationManager
+public class AssociationManager : IAssociationManager
 {
+    private readonly Phase5Context _context;
+    private readonly SymbolService _symbolService;
+    private readonly DictionaryService _dictionaryService;
+
+    public AssociationManager(Phase5Context context, SymbolService symbolService, DictionaryService dictionaryService)
+    {
+        _context = context;
+        _symbolService = symbolService;
+        _dictionaryService = dictionaryService;
+    }
+
     /// <summary>
     /// Gets or creates a canonical Association for the given key name.
     /// Uses AssociationRegistry to ensure identity.
     /// </summary>
     public SmalltalkOOP GetOrCreateCanonical(string keyName)
     {
-        SmalltalkOOP keySymbolOOP = GetSymbolOOP(keyName);
+        SmalltalkOOP keySymbolOOP = _symbolService.InternSymbol(keyName);
 
         return AssociationRegistry.GetOrCreate(keyName, () =>
         {
-            return Allocate(keySymbolOOP, SpecialObjectsArray.Instance.Nil);
+            return _dictionaryService.AllocateAssociation(keySymbolOOP, SpecialObjectsArray.Instance.Nil);
         });
     }
 
@@ -31,17 +43,7 @@ public class AssociationManager(Phase5Context context) : IAssociationManager
     /// </summary>
     public SmalltalkOOP Allocate(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
-        var associationOOP = context.Allocator.AllocateFixedObject("Association");
-
-        // Set Association class reference
-        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        context.Allocator.SetObjectClass(associationOOP, associationClassOOP);
-
-        // Set instance variables: [0] = key, [1] = value
-        context.Allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
-        context.Allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
-
-        return associationOOP;
+        return _dictionaryService.AllocateAssociation(keyOOP, valueOOP);
     }
 
     /// <summary>
@@ -49,14 +51,6 @@ public class AssociationManager(Phase5Context context) : IAssociationManager
     /// </summary>
     public SmalltalkOOP GetSymbolOOP(string symbolName)
     {
-        for (int i = 0; i < context.Bundle.Symbols.Length; i++)
-        {
-            if (context.Bundle.Symbols[i] == symbolName)
-            {
-                return SymbolRegistry.GetSymbolOOP(i);
-            }
-        }
-
-        throw new InvalidOperationException($"Symbol '{symbolName}' not found in symbol table");
+        return _symbolService.InternSymbol(symbolName);
     }
 }
