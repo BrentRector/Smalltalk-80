@@ -220,27 +220,25 @@ public static class Program
                 };
 
                 // Skip list for init expressions requiring runtime features not available during bootstrap
+                // TESTING: Temporarily empty to run all init expressions and identify failures
                 var skipList = new HashSet<string>
                 {
-                    // Known failures - require features not available during bootstrap:
-                    "Delay initialize",                      // ❌ Infinite loop - forkAt: creates process with [true] whileTrue
-                    "BitEditor initialize",                  // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "FormMenuView initialize",               // ❌ Infinite loop - Form readFrom: (file I/O)
-                    "ChangeListController initialize",       // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "FormEditor initialize",                 // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "NotifierController initialize",         // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "ParagraphEditor initialize",            // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "ProjectController initialize",          // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "ScreenController initialize",           // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "StandardSystemController initialize",   // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "StringHolderController initialize",     // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "Form initialize",                       // ❌ Infinite loop (4M+ instructions, cycling through multiple methods)
-                    
-                    // All remaining failures documented:
-                    "Object initialize",                  // ❌ Method not found: Sensor cursorPoint (GUI required)
-                    // "Text initialize",                    // ⚠️ DEBUG - enable to test Association OOP
-                    "TextList initialize",                // ❌ Infinite loop (500K+ instructions)
-                    "VariableNode initialize",            // ❌ Infinite loop (500K+ instructions)
+                    // All skipped init expressions now enabled to identify which still fail:
+                    // "Delay initialize",                      // ❌ Infinite loop - forkAt: creates process with [true] whileTrue
+                    // "BitEditor initialize",                  // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "FormMenuView initialize",               // ❌ Infinite loop - Form readFrom: (file I/O)
+                    // "ChangeListController initialize",       // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "FormEditor initialize",                 // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "NotifierController initialize",         // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "ParagraphEditor initialize",            // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "ProjectController initialize",          // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "ScreenController initialize",           // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "StandardSystemController initialize",   // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "StringHolderController initialize",     // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "Form initialize",                       // ❌ Infinite loop (4M+ instructions, cycling through multiple methods)
+                    // "Object initialize",                     // ❌ Method not found: Sensor cursorPoint (GUI required)
+                    // "TextList initialize",                   // ❌ Infinite loop (500K+ instructions)
+                    // "VariableNode initialize",               // ❌ Infinite loop (500K+ instructions)
                 };
 
                 // Build index lists for each phase (preserving source file order)
