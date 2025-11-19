@@ -17,18 +17,21 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 /// <param name="localIdToObjectId">Mapping from local IDs to allocated object OOPs.</param>
 /// <param name="symbolService">The symbol service for symbol lookups.</param>
 /// <param name="fieldValueService">The field value service for value conversion.</param>
+/// <param name="dictionaryService">The dictionary service for Association allocation.</param>
 internal class LiteralResolver(
     ColdStartBundle bundle,
     ObjectGraphAllocator allocator,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
     SymbolService symbolService,
-    FieldValueService fieldValueService)
+    FieldValueService fieldValueService,
+    DictionaryService dictionaryService)
 {
     private readonly ColdStartBundle _bundle = bundle;
     private readonly ObjectGraphAllocator _allocator = allocator;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = localIdToObjectId;
     private readonly SymbolService _symbolService = symbolService;
     private readonly FieldValueService _fieldValueService = fieldValueService;
+    private readonly DictionaryService _dictionaryService = dictionaryService;
     private readonly IReadOnlyList<string> _symbols = bundle.Symbols;
     private readonly IReadOnlyList<string> _strings = bundle.Strings;
 
@@ -295,23 +298,7 @@ internal class LiteralResolver(
     /// <exception cref="InvalidOperationException">Thrown when Association class not found.</exception>
     public SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
-        // Look up Association class layout from bundle data
-        var associationClassDefinition = ClassHierarchyTraversal.FindClassDefinition("Association", _bundle);
-        if (associationClassDefinition == null)
-        {
-            throw new InvalidOperationException("Association class not found in bundle");
-        }
-
-        var associationOOP = _allocator.AllocateFixedObject("Association");
-        // Set Association class reference
-        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        _allocator.SetObjectClass(associationOOP, associationClassOOP);
-
-        // Set instance variables: [0] = key, [1] = value
-        _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
-        _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
-
-        return associationOOP;
+        return _dictionaryService.AllocateAssociation(keyOOP, valueOOP);
     }
 
     /// <summary>

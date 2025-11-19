@@ -81,7 +81,8 @@ public class Phase4_MethodCompilation : IPhase
         // Initialize services and helper classes
         _symbolService = new SymbolService(bundle);
         var fieldValueService = new FieldValueService(bundle, _symbolService);
-        _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId, _symbolService, fieldValueService);
+        var dictionaryService = new DictionaryService(allocator, bundle);
+        _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId, _symbolService, fieldValueService, dictionaryService);
         _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, _symbolService, diagnostics);
     }
 
