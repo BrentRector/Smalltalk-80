@@ -11,7 +11,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Interpreter;
 /// The return value must be returned from the block's home method, not just the block.
 /// This requires unwinding the context stack until the target MethodContext is reached.
 /// </remarks>
-public class NonLocalReturnHandler
+internal class NonLocalReturnHandler
 {
     // Mutable state managed by this handler
     private bool _isPending;
