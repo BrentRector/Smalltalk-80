@@ -5,7 +5,6 @@ using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
-using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 
@@ -16,19 +15,16 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 /// <param name="bundle">The cold start bundle containing class and method data.</param>
 /// <param name="allocator">The object graph allocator for creating objects.</param>
 /// <param name="localIdToObjectId">Mapping from local IDs to allocated object OOPs.</param>
-/// <param name="symbolService">The symbol service for symbol lookups.</param>
 /// <param name="diagnostics">Optional diagnostic hub for logging.</param>
 internal class MethodDictionaryInstaller(
     ColdStartBundle bundle,
     ObjectGraphAllocator allocator,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
-    SymbolService symbolService,
     IDiagnosticHub? diagnostics = null)
 {
     private readonly ColdStartBundle _bundle = bundle;
     private readonly ObjectGraphAllocator _allocator = allocator;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = localIdToObjectId;
-    private readonly SymbolService _symbolService = symbolService;
     private readonly IDiagnosticHub? _diagnostics = diagnostics;
 
     /// <summary>
@@ -194,7 +190,16 @@ internal class MethodDictionaryInstaller(
     /// <exception cref="InvalidOperationException">Thrown when symbol not found in symbol table.</exception>
     public SmalltalkOOP GetSymbolOOP(string symbolName)
     {
-        return _symbolService.InternSymbol(symbolName);
+        // Find the symbol in the symbol table from Phase 1
+        for (int i = 0; i < _bundle.Symbols.Length; i++)
+        {
+            if (_bundle.Symbols[i] == symbolName)
+            {
+                return SymbolRegistry.GetSymbolOOP(i);
+            }
+        }
+
+        throw new InvalidOperationException($"Symbol '{symbolName}' not found in symbol table.");
     }
 
     /// <summary>

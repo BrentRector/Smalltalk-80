@@ -6,7 +6,6 @@ using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
-using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
@@ -33,10 +32,6 @@ public class Phase4_MethodCompilation : IPhase
     private readonly IReadOnlyList<string> _symbols;
     private readonly ColdstartReport _report;
     private readonly IDiagnosticHub? _diagnostics;
-
-    // Shared services
-    private readonly SymbolService _symbolService;
-    private readonly FieldValueService _fieldValueService;
 
     // Helper classes for decomposed functionality
     private readonly LiteralResolver _literalResolver;
@@ -71,8 +66,6 @@ public class Phase4_MethodCompilation : IPhase
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
         ColdstartReport report,
-        SymbolService symbolService,
-        FieldValueService fieldValueService,
         IDiagnosticHub? diagnostics = null)
     {
         _bundle = bundle;
@@ -83,13 +76,9 @@ public class Phase4_MethodCompilation : IPhase
         _symbols = bundle.Symbols;
         _diagnostics = diagnostics;
 
-        // Use shared services
-        _symbolService = symbolService ?? throw new ArgumentNullException(nameof(symbolService));
-        _fieldValueService = fieldValueService ?? throw new ArgumentNullException(nameof(fieldValueService));
-
-        // Initialize helper classes (still using some local helpers for now)
-        _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId, symbolService, fieldValueService);
-        _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, symbolService, diagnostics);
+        // Initialize helper classes
+        _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId);
+        _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, diagnostics);
     }
 
     /// <summary>
