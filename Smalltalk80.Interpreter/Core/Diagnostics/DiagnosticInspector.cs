@@ -1,9 +1,7 @@
-using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Engine;
 
 namespace Smalltalk80.Interpreter.Core.Diagnostics;
 
@@ -16,7 +14,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Diagnoses Float class variables by comparing expected vs actual values.
     /// </summary>
-    public static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, ColdStartOrchestrator loader, ColdStartBundle bundle)
+    public static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
     {
         try
         {
@@ -217,7 +215,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Diagnoses Cursor class variables.
     /// </summary>
-    public static void DiagnoseCursorClassVariables(ISmalltalkHeapManager heapManager, ColdStartOrchestrator loader, ColdStartBundle bundle)
+    public static void DiagnoseCursorClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
     {
         try
         {
