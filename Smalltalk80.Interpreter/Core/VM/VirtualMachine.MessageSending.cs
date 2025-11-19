@@ -216,6 +216,20 @@ public partial class VirtualMachine
                 $"Method not found: {selectorName ?? "<unknown>"} in class {className} OOP({classOOP.RawValue})");
         }
 
+        // Log ALL message sends during tracing (before primitive check)
+        if (_tracer.ShouldTraceSend())
+        {
+            var recvClass = GetClassName(classOOP);
+            var currentMethod = GetLocalId(_heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_METHOD_INDEX)) ?? "unknown";
+            _tracer.TraceSendEntry(recvClass, selectorName ?? "unknown", currentMethod);
+
+            // Special alert for error: sends
+            if (selectorName == "error:")
+            {
+                Console.WriteLine($"  *** ERROR BEING RAISED ***");
+            }
+        }
+
         // Check if the method has a primitive
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
 

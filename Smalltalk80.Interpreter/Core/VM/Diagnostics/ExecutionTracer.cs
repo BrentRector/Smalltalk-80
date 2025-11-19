@@ -110,7 +110,7 @@ public class ExecutionTracer
     /// Checks if we should trace message sends.
     /// </summary>
     public bool ShouldTraceSend()
-        => _selectorTraceEnabled && _instructionCount < 5000;
+        => _selectorTraceEnabled && _instructionCount < 10000;
 
     /// <summary>
     /// Checks if we should trace primitive failures.
