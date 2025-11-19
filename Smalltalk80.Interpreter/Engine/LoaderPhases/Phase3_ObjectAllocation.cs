@@ -71,7 +71,7 @@ public class Phase3_ObjectAllocation : IPhase
         _fieldValueResolver = new FieldValueResolver(allocator, bundle, localIdToObjectId, diagnostics);
         var dictionaryService = new DictionaryService(allocator, bundle);
         _dictionaryInstaller = new DictionaryInstaller(
-            allocator, bundle, localIdToObjectId, initializedFields,
+            allocator, localIdToObjectId, initializedFields,
             _fieldValueResolver.InternSymbol, dictionaryService);
     }
 

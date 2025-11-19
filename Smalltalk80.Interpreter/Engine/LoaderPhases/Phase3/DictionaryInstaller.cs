@@ -14,7 +14,6 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
 /// </summary>
 internal class DictionaryInstaller(
     ObjectGraphAllocator allocator,
-    ColdStartBundle bundle,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
     HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
     Func<string, SmalltalkOOP> symbolInternerFunc,
