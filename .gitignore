@@ -20,11 +20,16 @@ x86/
 bld/
 [Bb]in/
 # Exception: Allow coldstart.json in bin folders (reference bundle for interpreter)
+# Must un-ignore parent directories first for the file exceptions to work
+!bin/
+bin/*
+!bin/Debug/
+bin/Debug/*
+!bin/Debug/net9.0/
+bin/Debug/net9.0/*
 !bin/Debug/net9.0/coldstart.json
 !bin/Debug/net9.0/coldstart_with_tests.json
-# Exception: Allow coldstart files in Compiler output directory
-!Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json
-!Smalltalk80.Compiler/bin/Debug/net9.0/coldstart_with_tests.json
+!bin/Debug/net9.0/coldstart_with_runner.json
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
