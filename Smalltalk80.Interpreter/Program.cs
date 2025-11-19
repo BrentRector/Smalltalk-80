@@ -220,10 +220,14 @@ public static class Program
                 };
 
                 // Skip list for init expressions requiring runtime features not available during bootstrap
-                // TESTING: Empty skip list to test all expressions
                 var skipList = new HashSet<string>
                 {
-                    // All expressions enabled for testing
+                    "FormEditor initialize",                 // ❌ Pool variable 'DefaultLineGrid' not found in TextConstants
+                    "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
+                    "FormMenuView initialize",               // ❌ Pool variable 'Disk' not found in FilePool
+                    "ChangeListController initialize",       // ❌ CopyBits indexed word out of range
+                    "Delay initialize",                      // ❌ SortedCollection new: primitiveFailed
+                    "ParagraphEditor initialize",            // ❌ CopyBits indexed word out of range
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -466,21 +470,20 @@ public static class Program
                             Console.WriteLine(result.Diagnostic.StackTrace);
                         }
 
-                        // TESTING: Don't stop on first failure - continue to see which expressions succeed
-                        // Console.WriteLine($"\n✓ Successfully executed {succeeded} expression(s) before this failure");
-                        // if (successfulExpressions.Count > 0)
-                        // {
-                        //     Console.WriteLine($"\nSuccessful expressions:");
-                        //     foreach (var (idx, source) in successfulExpressions)
-                        //     {
-                        //         Console.WriteLine($"  [{idx}] {source}");
-                        //     }
-                        // }
-                        //
-                        // // FAIL FAST - stop execution here
-                        // Console.WriteLine($"\n⚠️  Execution stopped at first failure to enable debugging");
-                        // Console.WriteLine($"⚠️  Enable VM debug output and re-run to diagnose this specific failure");
-                        // return;
+                        Console.WriteLine($"\n✓ Successfully executed {succeeded} expression(s) before this failure");
+                        if (successfulExpressions.Count > 0)
+                        {
+                            Console.WriteLine($"\nSuccessful expressions:");
+                            foreach (var (idx, source) in successfulExpressions)
+                            {
+                                Console.WriteLine($"  [{idx}] {source}");
+                            }
+                        }
+
+                        // FAIL FAST - stop execution here
+                        Console.WriteLine($"\n⚠️  Execution stopped at first failure to enable debugging");
+                        Console.WriteLine($"⚠️  Enable VM debug output and re-run to diagnose this specific failure");
+                        return;
                     }
                 }
 
