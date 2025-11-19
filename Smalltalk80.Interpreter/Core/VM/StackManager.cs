@@ -23,6 +23,8 @@ internal class StackManager(
     Func<int> getPushTraceCounter,
     Action incrementPushTraceCounter) : IStackManager
 {
+    // Suppress unused parameter warning - getPushTraceCounter available for future diagnostics
+    private readonly Func<int> _getPushTraceCounter = getPushTraceCounter;
     /// <inheritdoc />
     public void Push(SmalltalkOOP valueOOP)
     {
