@@ -149,6 +149,15 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         // Set the new instance's class reference (slot 0) to the class
         SetSlot(newInstanceOOP, 0, classOOP);
 
+        // DEBUG: Verify the allocated object has the correct instance variable count
+        var verifyEntry = _tableManager.GetObjectTableEntry(newInstanceOOP);
+        if (verifyEntry.InstanceVariableCountExplicit != instanceVariableCount)
+        {
+            throw new InvalidOperationException(
+                $"FATAL: Allocated object {newInstanceOOP} has InstanceVariableCountExplicit={verifyEntry.InstanceVariableCountExplicit} " +
+                $"but expected {instanceVariableCount} (format=0x{formatOOP.AsSmallInteger():X4})");
+        }
+
         // Initialize all instance variables to nil
         SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
 
