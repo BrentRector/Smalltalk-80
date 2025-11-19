@@ -505,14 +505,30 @@ internal class BytecodeInterpreter(
     {
         byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
         int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
         int ip = ipOOP.AsSmallInteger();
         byte subOp = bytecodes[ip++];
         heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
-        var receiverOOP = heapManager.GetInstanceVariable(context.ActiveContext, receiverIndex);
+        // Check if this is a BlockContext - they retrieve receiver from home MethodContext
+        var contextClassOOP = heapManager.GetClassOOP(context.ActiveContext);
+        bool isBlockContext = contextClassOOP == metadata.BlockContextClassOOP;
+
+        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
+        SmalltalkOOP receiverOOP;
+
+        if (isBlockContext)
+        {
+            // BlockContext: receiver from home MethodContext (slot 5 in BlockContext is HOME, not receiver!)
+            var homeOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+            receiverOOP = heapManager.GetInstanceVariable(homeOOP, receiverIndex);
+        }
+        else
+        {
+            // MethodContext: receiver is at slot 4
+            receiverOOP = heapManager.GetInstanceVariable(context.ActiveContext, receiverIndex);
+        }
 
         switch (subOp)
         {
