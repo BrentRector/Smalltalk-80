@@ -39072,7 +39072,7 @@ initialize
 
 	Text initialize."
 
-	(Smalltalk includesKey: #TextConstants)
+	(Smalltalk includes: TextConstants)
 		ifFalse: [Smalltalk at: #TextConstants put: (Dictionary new: 32)].
 	TextConstants at: #CaretForm  
 		 		 put: (Cursor
@@ -39229,7 +39229,8 @@ string: aString runs: anArray
 	^self basicNew setString: aString setRuns: anArray! !
 
 Text initialize!
-StringHolder subclass: #TextCollector
+
+StringHolder subclass: #TextCollector
 	instanceVariableNames: 'entryStream '
 	classVariableNames: ''
 	poolDictionaries: ''
