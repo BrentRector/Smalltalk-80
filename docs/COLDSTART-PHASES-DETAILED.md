@@ -122,38 +122,48 @@
 
 ### Field Encoding Details
 
-**format** (16-bit word per Blue Book Chapter 27):
+**format** (16-bit word per Smalltalk-80 source code expectations):
+
+> **Note**: This encoding differs from Blue Book Chapter 27. We use this format because
+> the Smalltalk-80.st source code methods (instSize, isBits, isBytes, isVariable) expect it.
+> The cardinal rule is: never modify Smalltalk-80.st; adapt the implementation instead.
+
 ```
-Bit 0:      isPointers  (1=contains pointers, 0=contains values)
-Bit 1:      isWords     (1=word-addressed, 0=byte-addressed)
-Bit 2:      isIndexable (1=has indexed fields, 0=fixed size only)
-Bit 3:      reserved
-Bits 4-14:  fixedFields (number of fixed instance variables, 0-2047)
+Bits 0-7:   fixedFields (number of fixed instance variables, 0-255)
+Bits 8-11:  reserved
+Bit 12:     isIndexable (1=has indexed fields, 0=fixed size only)
+Bit 13:     isWords     (1=word-addressed, 0=byte-addressed)
+Bit 14:     isPointers  (1=contains pointers, 0=contains values)
 Bit 15:     reserved
 ```
 
+This matches the Smalltalk source expectations:
+- `instSize`: `^format bitAnd: 255` (bits 0-7)
+- `isBits`: `^format noMask: -16384` (bit 14 = 0)
+- `isBytes`: `^format noMask: 8192` (bit 13 = 0)
+- `isVariable`: `^(format bitAnd: 4096) ~= 0` (bit 12 = 1)
+
 **Type flag combinations**:
-- `0x01` = Fixed pointer object (isPointers=1, isIndexable=0)
-- `0x05` = Pointer-indexed (isPointers=1, isIndexable=1)
-- `0x06` = Word-indexed (isWords=1, isIndexable=1)
-- `0x04` = Byte-indexed (isIndexable=1)
+- `0x4000` = Fixed pointer object (isPointers=1, isIndexable=0)
+- `0x5000` = Pointer-indexed (isPointers=1, isIndexable=1)
+- `0x3000` = Word-indexed (isWords=1, isIndexable=1)
+- `0x1000` = Byte-indexed (isIndexable=1)
 
 **Example**: A class with 10 fixed instance variables (fixed pointer object)
 ```
-format = (10 << 4) | 0x01 = 160 + 1 = 161 = 0x00A1
-Binary: 0000 0000 1010 0001
-Bit 0:      1 (isPointers)
-Bit 1:      0 (not isWords)
-Bit 2:      0 (not isIndexable)
-Bits 4-14:  10 (fixedFields = 10)
+format = 10 | 0x4000 = 16394 = 0x400A
+Binary: 0100 0000 0000 1010
+Bits 0-7:   10 (fixedFields = 10)
+Bit 14:     1 (isPointers)
 ```
 
 **Example**: Array class (pointer-indexed, 0 fixed fields)
 ```
-format = (0 << 4) | 0x05 = 0x0005
-Binary: 0000 0000 0000 0101
-Bits 0-2:   101 (isPointers=1, isIndexable=1)
-Bits 4-14:  0 (no fixed fields)
+format = 0 | 0x5000 = 20480 = 0x5000
+Binary: 0101 0000 0000 0000
+Bit 12:     1 (isIndexable)
+Bit 14:     1 (isPointers)
+Bits 0-7:   0 (no fixed fields)
 ```
 
 **header.word** (16-bit CompiledMethod header):
@@ -1835,16 +1845,18 @@ class:Array.superclass = class:ArrayedCollection
 
 The format field encodes the object layout specification for instances of this class.
 
-**Format Word Encoding** (16 bits):
+**Format Word Encoding** (16 bits per Smalltalk-80 source expectations):
+
+> **Note**: This encoding differs from Blue Book Chapter 27 but matches what the
+> Smalltalk-80.st source code methods expect.
+
 ```
 Bits 0-7:   Instance variable count (0-255)
-Bits 8-11:  Size of indexed portion (0-15, only used for CompiledMethod)
-Bits 12-13: Instance specification:
-            0 = No indexed portion (fixed-size objects)
-            1 = PointerIndexed (Array, MethodDictionary, etc.)
-            2 = WordIndexed (Bitmap, IntegerArray)
-            3 = ByteIndexed (String, Symbol, ByteArray)
-Bits 14-15: Reserved (must be 0)
+Bits 8-11:  Reserved
+Bit 12:     isIndexable (1=has indexed fields)
+Bit 13:     isWords (1=word-addressed)
+Bit 14:     isPointers (1=contains pointers)
+Bit 15:     Reserved
 ```
 
 ```csharp
@@ -1855,10 +1867,11 @@ foreach (var cls in bundle.Classes)
     // Decode the format word from JSON
     ushort formatWord = cls.Format;
 
-    // Extract components
+    // Extract components per Smalltalk source expectations
     int instVarCount = formatWord & 0xFF;                    // Bits 0-7
-    int indexedSize = (formatWord >> 8) & 0x0F;             // Bits 8-11
-    int instSpec = (formatWord >> 12) & 0x03;               // Bits 12-13
+    bool isIndexable = (formatWord & 0x1000) != 0;           // Bit 12
+    bool isWords = (formatWord & 0x2000) != 0;               // Bit 13
+    bool isPointers = (formatWord & 0x4000) != 0;            // Bit 14
 
     // Convert to SmallInteger OOP (tag with 1 in low bit)
     SmalltalkOOP formatOOP = SmalltalkOOP.FromSmallInteger(formatWord);

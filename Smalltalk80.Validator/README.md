@@ -666,11 +666,12 @@ Suggestion: Pool dictionary must exist
 **What it validates:**
 - `formatHint` is compatible with class format word
 - Field counts match class fixed field count
-- Blue Book format word interpretation (Chapter 27):
-  - Bit 0: isPointers (1=contains pointers)
-  - Bit 1: isWords (1=word-addressed)
-  - Bit 2: isIndexable (1=has indexed fields)
-  - Bits 4-14: fixedFields (0-2047)
+- Format word interpretation (per Smalltalk-80 source expectations, differs from Blue Book):
+  - Bits 0-7: fixedFields (0-255)
+  - Bits 8-11: reserved
+  - Bit 12: isIndexable (1=has indexed fields)
+  - Bit 13: isWords (1=word-addressed)
+  - Bit 14: isPointers (1=contains pointers)
 
 **Error codes:**
 - `STV-OBJECT-FORMAT-INVALID` - Format mismatch or invalid field count
