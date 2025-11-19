@@ -224,7 +224,7 @@ public static class Program
                 var skipList = new HashSet<string>
                 {
                     "Delay initialize",                      // ❌ Infinite loop - forkAt: creates process with [true] whileTrue
-                    "BitEditor initialize",                  // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "BitEditor initialize" - ENABLED to test PopUpMenu labels: with font support (runs last)
                     "FormMenuView initialize",               // ❌ Infinite loop - Form readFrom: (file I/O)
                     "ChangeListController initialize",       // ❌ Infinite loop - PopUpMenu labels: (GUI)
                     "FormEditor initialize",                 // ❌ Infinite loop - PopUpMenu labels: (GUI)
@@ -314,46 +314,43 @@ public static class Program
                     var dependencyOrder = InitExpressionOrdering.GetDependencyOrder();
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
-                    // Move "Form initialize" and "TextList initialize" to run last (tests DefaultTextStyle)
-                    // TextList initialize tests DefaultTextStyle copy which is a good validation
-                    int formInitIndex = -1;
-                    int textListInitIndex = -1;
-                    for (int i = 0; i < phase1Indices.Count; i++)
+                    // Move font/GUI-dependent expressions to run last (tests DefaultTextStyle)
+                    // Order: Form → TextList → BitEditor (each tests more font functionality)
+                    var runLastExpressions = new List<string>
                     {
-                        var expr = bundle.InitExpressions[phase1Indices[i]];
-                        if (expr.Source == "Form initialize")
-                        {
-                            formInitIndex = i;
-                        }
-                        else if (expr.Source == "TextList initialize")
-                        {
-                            textListInitIndex = i;
-                        }
-                    }
-                    // Remove in reverse order to preserve indices
+                        "Form initialize",      // Tests Form creation with glyphs
+                        "TextList initialize",  // Tests DefaultTextStyle copy
+                        "BitEditor initialize"  // Tests PopUpMenu labels: with font support
+                    };
+
                     var lastIndices = new List<int>();
-                    if (textListInitIndex >= 0)
-                    {
-                        lastIndices.Add(phase1Indices[textListInitIndex]);
-                    }
-                    if (formInitIndex >= 0)
-                    {
-                        lastIndices.Insert(0, phase1Indices[formInitIndex]);
-                    }
-                    // Remove from current positions (in reverse index order)
                     var indicesToRemove = new List<int>();
-                    if (formInitIndex >= 0) indicesToRemove.Add(formInitIndex);
-                    if (textListInitIndex >= 0) indicesToRemove.Add(textListInitIndex);
+
+                    foreach (var exprName in runLastExpressions)
+                    {
+                        for (int i = 0; i < phase1Indices.Count; i++)
+                        {
+                            var expr = bundle.InitExpressions[phase1Indices[i]];
+                            if (expr.Source == exprName)
+                            {
+                                lastIndices.Add(phase1Indices[i]);
+                                indicesToRemove.Add(i);
+                                break;
+                            }
+                        }
+                    }
+
+                    // Remove from current positions (in reverse index order)
                     foreach (var idx in indicesToRemove.OrderByDescending(x => x))
                     {
                         phase1Indices.RemoveAt(idx);
                     }
-                    // Add at end: Form first, then TextList
+                    // Add at end in order
                     phase1Indices.AddRange(lastIndices);
 
                     Console.WriteLine($"\n=== Dependency-Ordered Init Expression Execution ===");
                     Console.WriteLine($"  Total: {phase1Indices.Count} initialize expressions");
-                    Console.WriteLine($"  Order: SmallInteger → ... → Form → TextList (last)");
+                    Console.WriteLine($"  Order: SmallInteger → ... → Form → TextList → BitEditor (last)");
                     Console.WriteLine($"  See: InitExpression-DependencyAnalysis.md");
                     Console.WriteLine();
                 }
