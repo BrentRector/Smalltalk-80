@@ -24,7 +24,7 @@ namespace Smalltalk80.Interpreter.Engine.Services;
 /// - Array (collections)
 /// - Object references
 /// </remarks>
-internal class FieldValueService
+public class FieldValueService
 {
     private readonly ObjectGraphAllocator _allocator;
     private readonly ColdStartBundle _bundle;

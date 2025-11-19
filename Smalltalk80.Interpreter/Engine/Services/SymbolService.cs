@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.Schema;
 
@@ -13,7 +14,7 @@ namespace Smalltalk80.Interpreter.Engine.Services;
 /// Symbols are interned during Phase 1 and stored in the SymbolRegistry.
 /// This service provides a unified interface for looking up symbols by name or index.
 /// </remarks>
-internal class SymbolService
+public class SymbolService
 {
     private readonly ColdStartBundle _bundle;
 

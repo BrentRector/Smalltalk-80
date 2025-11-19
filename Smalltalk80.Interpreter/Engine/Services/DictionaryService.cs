@@ -20,7 +20,7 @@ namespace Smalltalk80.Interpreter.Engine.Services;
 /// - Tally management
 /// - Collision repair during removal (fixCollisionsFrom:)
 /// </remarks>
-internal class DictionaryService
+public class DictionaryService
 {
     private readonly ObjectGraphAllocator _allocator;
     private readonly ColdStartBundle _bundle;
