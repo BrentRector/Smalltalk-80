@@ -255,6 +255,54 @@ dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
 
 Expected: Returns `1191` (120 tests pass)
 
+## Smalltalk Code
+
+### TextStyle class>>initialize
+
+This method can be used to create DefaultTextStyle from Smalltalk side:
+
+```smalltalk
+TextStyle class>>initialize
+    | defaultFonts defaultStyle |
+    defaultFonts := Array with: (StrikeFont new: 12).
+    defaultStyle := self new.
+    defaultStyle newFontArray: defaultFonts.
+    TextConstants at: #DefaultTextStyle put: defaultStyle.
+
+TextStyle initialize!
+```
+
+Note: In the current implementation, DefaultTextStyle is bootstrapped from C# during Phase 5 of cold start, before Smalltalk code executes.
+
+## Phased Implementation Roadmap
+
+### Phase 1: Bootstrap with WinForms/GDI+ ✅ COMPLETED
+- IFontBridge and WinFormsFontBridge implementation
+- Font metrics and character widths via System.Drawing
+- Glyph rendering with Graphics.DrawString
+- 1bpp threshold for canonical StrikeFonts
+- StrikeFonts for sizes 10, 12, 14
+- DefaultTextStyle registration in TextConstants
+
+### Phase 2: Determinism & Validation ✅ MOSTLY COMPLETE
+- Fixed DPI at 96
+- Disabled ClearType/antialiasing
+- Font caching by (family, sizePx, dpi, hinting)
+- Font identity recording
+- **TODO**: Validation test suite
+
+### Phase 3: DirectWrite Integration (Future)
+- DirectWriteFontBridge for accuracy and shaping
+- DirectWrite for font discovery, metrics, shaping
+- Direct2D/WIC for rasterization
+- Glyph ID and advance mapping
+
+### Phase 4: Advanced Typography (Future)
+- Unicode shaping, kerning, ligatures, RTL scripts
+- Font fallback chains
+- Combining marks and emoji support
+- Extended TextStyle with shaping flags
+
 ## References
 
 - [Blue Book Chapter 18: Graphics Kernel](http://www.mirandabanda.org/bluebook/bluebook_chapter18.html)
