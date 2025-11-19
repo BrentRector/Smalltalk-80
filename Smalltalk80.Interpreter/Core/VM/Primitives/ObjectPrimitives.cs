@@ -1,3 +1,4 @@
+using Smalltalk80.Core;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.HeapManager;
 
@@ -167,12 +168,27 @@ public static class SimpleObjectPrimitives
             if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
 
             int index = context.Arguments[0].AsSmallInteger();
-            int count = context.HeapManager.GetInstanceVariableCount(context.Receiver);
+
+            // Always read count from class format - this is the authoritative source
+            var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+            if (classOOP.IsSmallInteger || classOOP == SpecialObjectsArray.Instance.Nil)
+                return PrimitiveResult.Fail();
+
+            // Read format from class using GetSlot to bypass bounds check
+            // Class slot layout: [0]=class, [1]=superclass, [2]=methodDict, [3]=format
+            var formatOOP = context.HeapManager.GetSlot(classOOP, 3);
+            if (!formatOOP.IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            var formatWord = new FormatWord(formatOOP.AsSmallInteger());
+            int count = formatWord.FixedFields;
 
             // Smalltalk indices are 1-based
             if (index < 1 || index > count) return PrimitiveResult.Fail();
 
-            var value = context.HeapManager.GetInstanceVariable(context.Receiver, index - 1);
+            // Use GetSlot directly to bypass cached bounds check
+            // Object slot layout: [0]=class, [1..count]=instance variables
+            var value = context.HeapManager.GetSlot(context.Receiver, index);
             return PrimitiveResult.Ok(value);
         }
     }
@@ -188,12 +204,27 @@ public static class SimpleObjectPrimitives
 
             int index = context.Arguments[0].AsSmallInteger();
             var value = context.Arguments[1];
-            int count = context.HeapManager.GetInstanceVariableCount(context.Receiver);
+
+            // Always read count from class format - this is the authoritative source
+            var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+            if (classOOP.IsSmallInteger || classOOP == SpecialObjectsArray.Instance.Nil)
+                return PrimitiveResult.Fail();
+
+            // Read format from class using GetSlot to bypass bounds check
+            // Class slot layout: [0]=class, [1]=superclass, [2]=methodDict, [3]=format
+            var formatOOP = context.HeapManager.GetSlot(classOOP, 3);
+            if (!formatOOP.IsSmallInteger)
+                return PrimitiveResult.Fail();
+
+            var formatWord = new FormatWord(formatOOP.AsSmallInteger());
+            int count = formatWord.FixedFields;
 
             // Smalltalk indices are 1-based
             if (index < 1 || index > count) return PrimitiveResult.Fail();
 
-            context.HeapManager.SetInstanceVariable(context.Receiver, index - 1, value);
+            // Use SetSlot directly to bypass cached bounds check
+            // Object slot layout: [0]=class, [1..count]=instance variables
+            context.HeapManager.SetSlot(context.Receiver, index, value);
             return PrimitiveResult.Ok(value);
         }
     }

@@ -134,11 +134,13 @@ The `coldstart.json` file contains a complete serialization of the Smalltalk-80 
 - **superNameIndex**: Index into `symbols[]` for superclass name (`null` only for Object)
 - **isMetaclass**: `true` for metaclasses (`meta:*`), `false` for regular classes
 - **metaclassOfLocalId**: For metaclasses, the localId of the instance class (e.g., `"class:Object"` for `"meta:Object"`)
-- **format**: 16-bit encoded format word:
-  - Bits 0-7: Fixed instance variable count
-  - Bits 8-11: Indexed size (for fixed-size indexed classes)
-  - Bits 12-13: Instance specification (0=fixed, 1=pointer-indexable, 2=word-indexable, 3=byte-indexable)
-  - Bits 14-15: Reserved
+- **format**: 16-bit encoded format word (per Smalltalk-80 source expectations, differs from Blue Book):
+  - Bits 0-7: fixedFields (number of fixed instance variables, 0-255)
+  - Bits 8-11: reserved
+  - Bit 12: isIndexable (1=has indexed fields, 0=fixed size only)
+  - Bit 13: isWords (1=word-addressed, 0=byte-addressed)
+  - Bit 14: isPointers (1=contains pointers, 0=contains values)
+  - Bit 15: reserved
 - **instVarNames**: Indices into `symbols[]` for instance variable names (in order)
 - **classVarNames**: Indices into `symbols[]` for class variable names
 - **poolLocalIds**: References to shared pool dictionaries

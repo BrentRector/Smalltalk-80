@@ -93,7 +93,8 @@ public static class CommandLineParser
         if (coldStartFile == null)
         {
             string exeDir = AppDomain.CurrentDomain.BaseDirectory;
-            string? compilerOutput = Path.Combine(exeDir, "..", "net9.0", "coldstart.json");
+            // Navigate from interpreter output to compiler output and normalize the path
+            string compilerOutput = Path.GetFullPath(Path.Combine(exeDir, "..", "net9.0", "coldstart.json"));
             if (File.Exists(compilerOutput))
             {
                 coldStartFile = compilerOutput;

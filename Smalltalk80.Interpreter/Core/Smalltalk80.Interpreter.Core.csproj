@@ -6,10 +6,12 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   
-  <!-- Shared bytecode definitions -->
+  <!-- Shared definitions -->
   <ItemGroup>
-    <Compile Include="..\..\Shared\Core\Bytecodes\BytecodeDefinitions.cs" 
+    <Compile Include="..\..\Shared\Core\Bytecodes\BytecodeDefinitions.cs"
              Link="Core\Bytecodes\BytecodeDefinitions.cs" />
+    <Compile Include="..\..\Shared\Core\FormatWord.cs"
+             Link="Core\FormatWord.cs" />
   </ItemGroup>
   
   <!-- Temporarily exclude files that still reference old heap manager -->
@@ -21,5 +23,6 @@
   <!-- Core dependencies -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
   </ItemGroup>
 </Project>

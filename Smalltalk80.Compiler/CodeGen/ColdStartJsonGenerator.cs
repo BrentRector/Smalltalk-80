@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Smalltalk80.Compiler;
 using Smalltalk80.Compiler.AST;
+using Smalltalk80.Core;
 
 namespace Smalltalk80.Compiler.CodeGen;
 
@@ -448,43 +449,12 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     }
 
     /// <summary>
-    /// Calculates the format word for a class.
-    /// Per Blue Book Chapter 16 and Interpreter-Architecture.md:
-    /// Bits 15-14: Unused (00)
-    /// Bits 13-12: Instance Specification (00=no fields, 01=pointers, 10=words, 11=bytes)
-    /// Bits 11-6:  Fixed fields count (0-63) - INCLUDES ALL INHERITED INSTANCE VARIABLES
-    /// Bit 5:      Unused
-    /// Bit 4:      Indexable flag (1 = has indexed portion)
-    /// Bit 3:      Pointer flag (1 = indexed portion contains pointers)
-    /// Bits 2-0:   Unused
+    /// Calculates the format word for a class using the FormatWord semantic wrapper.
+    /// See FormatWord class documentation for bit layout details.
     /// </summary>
     private static int CalculateFormatWord(string subclassKind, int fixedFieldCount)
     {
-        int format = 0;
-
-        // Instance specification (bits 13-12)
-        int instSpec = subclassKind switch
-        {
-            "subclass:" => 0x01,                 // 01 = only pointer fields
-            "variableSubclass:" => 0x02,         // 10 = word-indexable (with pointers)
-            "variableByteSubclass:" => 0x03,     // 11 = byte-indexable
-            "variableWordSubclass:" => 0x02,     // 10 = word-indexable (no pointers)
-            _ => 0x01                            // Default to pointer fields
-        };
-        format |= (instSpec << 12);
-
-        // Fixed fields count (bits 11-6)
-        format |= ((fixedFieldCount & 0x3F) << 6);
-
-        // Indexable flag (bit 4)
-        if (subclassKind.StartsWith("variable"))
-            format |= 0x10;
-
-        // Pointer flag (bit 3) - set for subclass: and variableSubclass:
-        if (subclassKind == "subclass:" || subclassKind == "variableSubclass:")
-            format |= 0x08;
-
-        return format;
+        return FormatWord.FromSubclassKind(subclassKind, fixedFieldCount).Value;
     }
 
     /// <summary>

@@ -62,23 +62,27 @@ public class ObjectFormatValidator : IValidator
                 continue;
             }
 
-            // Blue Book format word interpretation
-            var instanceSpec = (classFormat >> 12) & 0x03;
-            var fixedFields = (classFormat >> 6) & 0x3F;
-            var isIndexable = (classFormat & 0x10) != 0;
-            var hasPointers = (classFormat & 0x08) != 0;
+            // Format word interpretation per Blue Book Chapter 27:
+            // Bit 0:      isPointers  (1=contains pointers, 0=contains values)
+            // Bit 1:      isWords     (1=word-addressed, 0=byte-addressed)
+            // Bit 2:      isIndexable (1=has indexed fields, 0=fixed size only)
+            // Bits 4-14:  fixedFields (number of fixed instance variables, 0-2047)
+            bool isPointers = (classFormat & 0x01) != 0;
+            bool isWords = (classFormat & 0x02) != 0;
+            bool isIndexable = (classFormat & 0x04) != 0;
+            var fixedFields = (classFormat >> 4) & 0x7FF;
 
             var formatHint = obj.GetStringProp("formatHint");
             if (formatHint != null)
             {
-                // Validate formatHint is compatible with format word
+                // Validate formatHint is compatible with Blue Book format flags
                 bool isCompatible = formatHint switch
                 {
-                    "pointers" => (instanceSpec == 0x01) || (instanceSpec == 0x02 && hasPointers),
-                    "words" => instanceSpec == 0x02 && !hasPointers,
-                    "bytes" => instanceSpec == 0x03,
-                    "blockContext" => instanceSpec == 0x02 && hasPointers && isIndexable,
-                    "compiledMethod" => instanceSpec == 0x02 && !hasPointers && isIndexable,
+                    "pointers" => isPointers,
+                    "words" => !isPointers && isWords && isIndexable,
+                    "bytes" => !isPointers && !isWords && isIndexable,
+                    "blockContext" => isPointers && isIndexable,
+                    "compiledMethod" => !isPointers && !isWords && isIndexable,  // ByteIndexed for bytecodes
                     "custom" => true,
                     _ => false
                 };
@@ -88,7 +92,7 @@ public class ObjectFormatValidator : IValidator
                     diagnostics.Add(new Diagnostic(
                         ErrorCodes.ObjectFormatInvalid,
                         Severity.Warning,
-                        $"Object formatHint '{formatHint}' is incompatible with class format (instanceSpec={instanceSpec:X}, indexable={isIndexable}, pointers={hasPointers})",
+                        $"Object formatHint '{formatHint}' is incompatible with class format (isPointers={isPointers}, isWords={isWords}, isIndexable={isIndexable})",
                         new[] { new Location("objects", localId) },
                 "Update formatHint to match class format"));
                 }

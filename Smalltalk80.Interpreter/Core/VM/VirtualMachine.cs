@@ -1,3 +1,4 @@
+using Smalltalk80.Core;
 using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -1176,36 +1177,32 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Console.WriteLine($"[AllocateObject] className={classNameClean}, classOOP={classOOP}, indexedSize={indexedSize}");
 
         // Read the format field from the class object to determine the proper ObjectFormat
-        // Classes have instance variable "format" which contains encoding per ColdStartJsonGenerator:
-        //   Bits 13-12: instanceSpec (0=reserved, 1=Pointer, 2=PointerIndexed, 3=ByteIndexed)
-        //   Bits 11-6: fixedSize (number of instance variables for instances - not the class!)
-        //   Bit 4: indexable flag
-        //   Bit 3: pointer flag
-
-        // Per Blue Book, all classes (Behavior subclasses) have format at instance variable index 2
+        // Per Blue Book Chapter 27, all classes (Behavior subclasses) have format at instance variable index 2
         var formatOOP = _heapManager.GetInstanceVariable(classOOP, VMConstants.BEHAVIOR_FORMAT_INDEX);
         if (!formatOOP.IsSmallInteger)
         {
             throw new InvalidOperationException($"Class {classNameClean} format field is not a SmallInteger: {formatOOP}");
         }
 
-        int formatValue = formatOOP.AsSmallInteger();
+        // Decode format using the FormatWord semantic wrapper
+        var formatWord = new FormatWord(formatOOP.AsSmallInteger());
+        int fixedSize = formatWord.FixedFields;
 
-        // Decode format field per ColdStartJsonGenerator.CalculateFormatWord()
-        // Bits 13-12: Instance Specification (00=no fields, 01=pointers, 10=words, 11=bytes)
-        // Bit 3: Pointer flag (1 = indexed portion contains pointers)
-        int instanceSpec = (formatValue >> 12) & 0x3;  // Bits 13-12
-        int fixedSize = (formatValue >> 6) & 0x3F;      // Bits 11-6
-        bool hasPointerIndexedSlots = (formatValue & 0x08) != 0;  // Bit 3
-
-        ObjectFormat format = instanceSpec switch
+        // Convert to ObjectFormat enum
+        ObjectFormat format;
+        if (formatWord.IsPointers)
         {
-            0 => ObjectFormat.Pointer,          // Fixed-size pointer object
-            1 => ObjectFormat.Pointer,          // 01 = pointer fields (subclass:)
-            2 => hasPointerIndexedSlots ? ObjectFormat.PointerIndexed : ObjectFormat.WordIndexed,  // 10 = variableSubclass: (PointerIndexed) or variableWordSubclass: (WordIndexed)
-            3 => ObjectFormat.ByteIndexed,      // 11 = byte-indexed (variableByteSubclass:)
-            _ => throw new InvalidOperationException($"Invalid instanceSpec {instanceSpec} in format {formatValue:X4}")
-        };
+            format = formatWord.IsIndexable ? ObjectFormat.PointerIndexed : ObjectFormat.Pointer;
+        }
+        else if (formatWord.IsIndexable)
+        {
+            format = formatWord.IsWords ? ObjectFormat.WordIndexed : ObjectFormat.ByteIndexed;
+        }
+        else
+        {
+            // Non-pointer, non-indexable (shouldn't occur in practice)
+            format = ObjectFormat.Pointer;
+        }
 
         // Allocate the object
         var objectOOP = _heapManager.AllocateObject(format, fixedSize, indexedSize);

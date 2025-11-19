@@ -220,25 +220,24 @@ public static class Program
                 };
 
                 // Skip list for init expressions requiring runtime features not available during bootstrap
-                // TESTING: Temporarily empty to run all init expressions and identify failures
+                // Form initialize is kept enabled to test DefaultTextStyle font bootstrap
                 var skipList = new HashSet<string>
                 {
-                    // All skipped init expressions now enabled to identify which still fail:
-                    // "Delay initialize",                      // ❌ Infinite loop - forkAt: creates process with [true] whileTrue
-                    // "BitEditor initialize",                  // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "FormMenuView initialize",               // ❌ Infinite loop - Form readFrom: (file I/O)
-                    // "ChangeListController initialize",       // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "FormEditor initialize",                 // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "NotifierController initialize",         // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "ParagraphEditor initialize",            // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "ProjectController initialize",          // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "ScreenController initialize",           // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "StandardSystemController initialize",   // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "StringHolderController initialize",     // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "Form initialize",                       // ❌ Infinite loop (4M+ instructions, cycling through multiple methods)
-                    // "Object initialize",                     // ❌ Method not found: Sensor cursorPoint (GUI required)
-                    // "TextList initialize",                   // ❌ Infinite loop (500K+ instructions)
-                    // "VariableNode initialize",               // ❌ Infinite loop (500K+ instructions)
+                    "Delay initialize",                      // ❌ Infinite loop - forkAt: creates process with [true] whileTrue
+                    "BitEditor initialize",                  // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "FormMenuView initialize",               // ❌ Infinite loop - Form readFrom: (file I/O)
+                    "ChangeListController initialize",       // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "FormEditor initialize",                 // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "NotifierController initialize",         // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "ParagraphEditor initialize",            // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "ProjectController initialize",          // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "ScreenController initialize",           // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "StandardSystemController initialize",   // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    "StringHolderController initialize",     // ❌ Infinite loop - PopUpMenu labels: (GUI)
+                    // "Form initialize" - ENABLED to test DefaultTextStyle font bootstrap
+                    "Object initialize",                     // ❌ Method not found: Sensor cursorPoint (GUI required)
+                    "TextList initialize",                   // ❌ Infinite loop (500K+ instructions)
+                    "VariableNode initialize",               // ❌ Infinite loop (500K+ instructions)
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -315,9 +314,27 @@ public static class Program
                     var dependencyOrder = InitExpressionOrdering.GetDependencyOrder();
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
+                    // Move "Form initialize" to run last (tests DefaultTextStyle font bootstrap)
+                    int formInitIndex = -1;
+                    for (int i = 0; i < phase1Indices.Count; i++)
+                    {
+                        var expr = bundle.InitExpressions[phase1Indices[i]];
+                        if (expr.Source == "Form initialize")
+                        {
+                            formInitIndex = i;
+                            break;
+                        }
+                    }
+                    if (formInitIndex >= 0)
+                    {
+                        int formIdx = phase1Indices[formInitIndex];
+                        phase1Indices.RemoveAt(formInitIndex);
+                        phase1Indices.Add(formIdx);
+                    }
+
                     Console.WriteLine($"\n=== Dependency-Ordered Init Expression Execution ===");
                     Console.WriteLine($"  Total: {phase1Indices.Count} initialize expressions");
-                    Console.WriteLine($"  Order: SmallInteger → ... → LargeNegativeInteger");
+                    Console.WriteLine($"  Order: SmallInteger → ... → LargeNegativeInteger → Form (last)");
                     Console.WriteLine($"  See: InitExpression-DependencyAnalysis.md");
                     Console.WriteLine();
                 }
@@ -398,6 +415,7 @@ public static class Program
 
                     // Reset instruction count before each expression
                     vm.ResetInstructionCount();
+
                     var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
                     long instructionCount = vm.InstructionCount;
 

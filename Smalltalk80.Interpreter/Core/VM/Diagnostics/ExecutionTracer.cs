@@ -98,7 +98,7 @@ public class ExecutionTracer
     /// Checks if we should trace bytecode execution (narrow range for debugging).
     /// </summary>
     public bool ShouldTraceBytecodeRange()
-        => _selectorTraceEnabled && _instructionCount >= 2020 && _instructionCount <= 2045;
+        => false; // Disabled - too verbose
 
     /// <summary>
     /// Checks if we should trace primitive execution.
@@ -110,7 +110,7 @@ public class ExecutionTracer
     /// Checks if we should trace message sends.
     /// </summary>
     public bool ShouldTraceSend()
-        => _selectorTraceEnabled && _instructionCount < 5000;
+        => _selectorTraceEnabled && _instructionCount < 10000;
 
     /// <summary>
     /// Checks if we should trace primitive failures.
@@ -124,6 +124,11 @@ public class ExecutionTracer
     public void TraceSendEntry(string receiverClass, string selectorName, string fromMethod)
     {
         if (!ShouldTraceSend()) return;
+
+        // Only show sends from within Form class or Object>>shallowCopy methods
+        if (!fromMethod.Contains("Form>>") && !fromMethod.Contains("Form_class>>") && !fromMethod.Contains("Object>>shallowCopy"))
+            return;
+
         Console.WriteLine($"[SEND #{_instructionCount}] {receiverClass}>>{selectorName} (from {fromMethod})");
     }
 

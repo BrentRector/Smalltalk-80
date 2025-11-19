@@ -44,6 +44,14 @@ public sealed class ObjectTableEntry
     /// </summary>
     public SmalltalkOOP ClassOOP { get; set; }
 
+    /// <summary>
+    /// Instance variable storage for ByteIndexed/WordIndexed objects.
+    /// These formats store indexed data in ManagedStorage (byte[] or ushort[])
+    /// but also need to store OOP instance variables (e.g., Form has bits, width, height, offset).
+    /// For Pointer/PointerIndexed, instance variables are in the OOP array so this is null.
+    /// </summary>
+    public SmalltalkOOP[]? InstanceVariableStorage { get; set; }
+
     // Typed accessor methods for managed storage
 
     /// <summary>Gets storage as byte array (for ByteIndexed format).</summary>
