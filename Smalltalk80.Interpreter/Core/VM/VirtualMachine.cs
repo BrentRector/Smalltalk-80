@@ -1930,10 +1930,24 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         int startIndex = ((hash % arraySize) + arraySize) % arraySize;
         int index = startIndex;
 
+        // Debug: show hash computation
+        var keyName = GetSymbolString(keySymbol);
+        if (keyName == "DefaultMask")
+        {
+            Console.WriteLine($"[LOOKUP DEBUG] Looking for '{keyName}'");
+            Console.WriteLine($"[LOOKUP DEBUG]   keySymbol OOP: {keySymbol}, RawValue: {keySymbol.RawValue}");
+            Console.WriteLine($"[LOOKUP DEBUG]   hash: {hash}, arraySize: {arraySize}, startIndex: {startIndex}");
+        }
+
         // Linear probe until we find the key or hit nil
         do
         {
             var elementOOP = _heapManager.GetIndexedOOP(dictionaryOOP, index);
+
+            if (keyName == "DefaultMask")
+            {
+                Console.WriteLine($"[LOOKUP DEBUG]   Checking slot {index}: element={elementOOP}");
+            }
 
             if (elementOOP == SpecialObjectsArray.Instance.Nil)
             {
@@ -1943,6 +1957,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
             // Element should be an Association
             var assocKeyOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+
+            if (keyName == "DefaultMask")
+            {
+                Console.WriteLine($"[LOOKUP DEBUG]   Association key OOP: {assocKeyOOP}, matches: {assocKeyOOP == keySymbol}");
+            }
 
             if (assocKeyOOP == keySymbol)
             {
