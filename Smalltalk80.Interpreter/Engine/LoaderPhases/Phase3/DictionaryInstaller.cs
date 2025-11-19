@@ -1,4 +1,3 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core;
@@ -13,7 +12,6 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
 /// </summary>
 internal class DictionaryInstaller(
     ObjectGraphAllocator allocator,
-    ISmalltalkHeapManager heapManager,
     ColdStartBundle bundle,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
     HashSet<(SmalltalkOOP oop, int slot)> initializedFields,

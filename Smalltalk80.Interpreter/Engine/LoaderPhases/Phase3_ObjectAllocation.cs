@@ -69,7 +69,7 @@ public class Phase3_ObjectAllocation : IPhase
         // Initialize helper classes
         _fieldValueResolver = new FieldValueResolver(allocator, bundle, localIdToObjectId, diagnostics);
         _dictionaryInstaller = new DictionaryInstaller(
-            allocator, heapManager, bundle, localIdToObjectId, initializedFields,
+            allocator, bundle, localIdToObjectId, initializedFields,
             _fieldValueResolver.InternSymbol);
     }
 
