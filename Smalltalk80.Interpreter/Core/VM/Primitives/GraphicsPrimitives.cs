@@ -109,7 +109,7 @@ public static class GraphicsOperations
             int size = context.HeapManager.GetIndexedSize(bitsOOP);
             byte[] bits;
 
-            if (format == HeapManager.ObjectFormat.WordIndexed)
+            if (format == ObjectFormat.WordIndexed)
             {
                 // WordArray: each element is a 16-bit word, convert to bytes
                 bits = new byte[size * 2];
