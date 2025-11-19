@@ -1,3 +1,4 @@
+using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.VM;

@@ -147,7 +147,7 @@ public class SystemDictionaryInstaller(
                 if (literal.Type == "association" && literal.Association?.PoolDictionaryName != null)
                 {
                     string poolName = literal.Association.PoolDictionaryName;
-                    string varName = literal.Association.Key!;
+                    string varName = context.Bundle.Symbols[literal.Association.KeyIndex];
 
                     if (!poolVariables.ContainsKey(poolName))
                     {
