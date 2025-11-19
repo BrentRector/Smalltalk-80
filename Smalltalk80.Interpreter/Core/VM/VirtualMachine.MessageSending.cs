@@ -146,6 +146,8 @@ public partial class VirtualMachine
             if (selectorName == "error:")
             {
                 Console.WriteLine($"  *** ERROR BEING RAISED ***");
+                // Halt on first error to enable debugging
+                throw new InvalidOperationException($"Smalltalk error: message sent to {recvClass}>>error:");
             }
         }
 
@@ -249,6 +251,8 @@ public partial class VirtualMachine
             if (selectorName == "error:")
             {
                 Console.WriteLine($"  *** ERROR BEING RAISED ***");
+                // Halt on first error to enable debugging
+                throw new InvalidOperationException($"Smalltalk error: message sent to {recvClass}>>error:");
             }
         }
 
