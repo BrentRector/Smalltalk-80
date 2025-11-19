@@ -1,3 +1,4 @@
+using Smalltalk80.Core;
 using Smalltalk80.Interpreter.Core.Memory;
 using Smalltalk80.Interpreter.Core.HeapManager;
 
@@ -169,6 +170,22 @@ public static class SimpleObjectPrimitives
             int index = context.Arguments[0].AsSmallInteger();
             int count = context.HeapManager.GetInstanceVariableCount(context.Receiver);
 
+            // If object's cached count is 0, read from class format directly
+            // This handles objects where the count wasn't properly cached
+            if (count == 0)
+            {
+                var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+                if (!classOOP.IsSmallInteger && classOOP != SpecialObjectsArray.Instance.Nil)
+                {
+                    var formatOOP = context.HeapManager.GetInstanceVariable(classOOP, 2);
+                    if (formatOOP.IsSmallInteger)
+                    {
+                        var formatWord = new FormatWord(formatOOP.AsSmallInteger());
+                        count = formatWord.FixedFields;
+                    }
+                }
+            }
+
             // Smalltalk indices are 1-based
             if (index < 1 || index > count) return PrimitiveResult.Fail();
 
@@ -189,6 +206,22 @@ public static class SimpleObjectPrimitives
             int index = context.Arguments[0].AsSmallInteger();
             var value = context.Arguments[1];
             int count = context.HeapManager.GetInstanceVariableCount(context.Receiver);
+
+            // If object's cached count is 0, read from class format directly
+            // This handles objects where the count wasn't properly cached
+            if (count == 0)
+            {
+                var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+                if (!classOOP.IsSmallInteger && classOOP != SpecialObjectsArray.Instance.Nil)
+                {
+                    var formatOOP = context.HeapManager.GetInstanceVariable(classOOP, 2);
+                    if (formatOOP.IsSmallInteger)
+                    {
+                        var formatWord = new FormatWord(formatOOP.AsSmallInteger());
+                        count = formatWord.FixedFields;
+                    }
+                }
+            }
 
             // Smalltalk indices are 1-based
             if (index < 1 || index > count) return PrimitiveResult.Fail();
