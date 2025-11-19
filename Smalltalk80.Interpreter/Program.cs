@@ -693,7 +693,7 @@ public static class Program
     /// </summary>
     private static SmalltalkOOP FindMethodLiteral(ColdStartOrchestrator loader, ColdStartBundle bundle, string methodLocalId, int literalIndex)
     {
-        if (loader.LocalIdToObjectId.TryGetValue(methodLocalId, out var methodOOP))
+        if (loader.LocalIdToObjectId?.TryGetValue(methodLocalId, out var methodOOP) == true)
         {
             return loader.Allocator.GetIndexedOOP(methodOOP, literalIndex + 1); // +1 to skip header
         }
