@@ -1901,28 +1901,43 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         //   Indexed slots [0..N]: Association array
         // The indexed portion IS the dictionary array, not a separate instance variable
         int arraySize = _heapManager.GetIndexedSize(dictionaryOOP);
-        
+
+        // Get key string for fallback comparison (in case symbols aren't canonicalized)
+        string? keyString = null;
+
         // Linear search through dictionary indexed slots
         for (int i = 0; i < arraySize; i++)
         {
             var elementOOP = _heapManager.GetIndexedOOP(dictionaryOOP, i);
-            
+
             if (elementOOP == SpecialObjectsArray.Instance.Nil)
             {
                 continue; // Empty slot
             }
-            
+
             // Element should be an Association
             var assocKeyOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            
+
+            // First try fast OOP identity comparison
             if (assocKeyOOP == keySymbol)
             {
                 // Found it - return the value
                 var assocValueOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
                 return assocValueOOP;
             }
+
+            // Fallback: compare by string content (handles non-canonicalized symbols)
+            // This is slower but ensures correctness
+            keyString ??= GetSymbolString(keySymbol);
+            var assocKeyString = GetSymbolString(assocKeyOOP);
+            if (assocKeyString == keyString)
+            {
+                // Found it by string comparison - return the value
+                var assocValueOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                return assocValueOOP;
+            }
         }
-        
+
         // Not found
         return SpecialObjectsArray.Instance.Nil;
     }
