@@ -426,12 +426,7 @@ public static class Program
                     var expr = bundle.InitExpressions[index];
                     var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
 
-                    // Debug: Dump TextConstants state before/after Text initialize
                     bool isTextInit = expr.Source == "Text initialize";
-                    if (isTextInit)
-                    {
-                        DumpTextConstantsState(heapManager, "BEFORE Text initialize");
-                    }
 
                     // Show what we're executing
                     Console.Write($"  [{index}] {expr.Source}... ");
@@ -466,13 +461,9 @@ public static class Program
                             Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS");
                         }
 
-                        // Debug: Dump TextConstants state after Text initialize
+                        // Install DefaultTextStyle into the TextConstants that Text initialize created
                         if (isTextInit)
                         {
-                            DumpTextConstantsState(heapManager, "AFTER Text initialize");
-
-                            // Install DefaultTextStyle into the TextConstants that Text initialize created
-                            Console.WriteLine("\n[Post-Text-Init] Installing DefaultTextStyle into TextConstants...");
                             InstallDefaultTextStyleIntoTextConstants(heapManager);
                         }
                     }
@@ -1003,94 +994,6 @@ public static class Program
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
             BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext")
         };
-    }
-
-    /// <summary>
-    /// Dumps TextConstants state for debugging symbol canonicalization issues.
-    /// Shows the OOP, capacity, and tally of TextConstants in SystemDictionary.
-    /// </summary>
-    private static void DumpTextConstantsState(ISmalltalkHeapManager heapManager, string label)
-    {
-        Console.WriteLine($"\n[DEBUG] {label}");
-
-        var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
-        int systemDictSize = heapManager.GetIndexedSize(systemDictOOP);
-
-        // Find TextConstants symbol OOP
-        SmalltalkOOP? textConstantsSymbolOOP = null;
-        foreach (var (_, symbolOOP) in SymbolRegistry.AllSymbols())
-        {
-            int size = heapManager.GetIndexedSize(symbolOOP);
-            var bytes = new byte[size];
-            for (int i = 0; i < size; i++)
-            {
-                bytes[i] = heapManager.GetIndexedByte(symbolOOP, i);
-            }
-            if (System.Text.Encoding.UTF8.GetString(bytes) == "TextConstants")
-            {
-                textConstantsSymbolOOP = symbolOOP;
-                break;
-            }
-        }
-
-        if (!textConstantsSymbolOOP.HasValue)
-        {
-            Console.WriteLine($"  TextConstants symbol not found in SymbolRegistry!");
-            return;
-        }
-
-        Console.WriteLine($"  TextConstants symbol OOP: {textConstantsSymbolOOP.Value}");
-
-        // Search SystemDictionary for TextConstants
-        SmalltalkOOP? textConstantsDictOOP = null;
-        for (int i = 0; i < systemDictSize; i++)
-        {
-            var assocOOP = heapManager.GetIndexedOOP(systemDictOOP, i);
-            if (assocOOP == SpecialObjectsArray.Instance.Nil)
-                continue;
-
-            var keyOOP = heapManager.GetSlot(assocOOP, 1); // Association.key
-            if (keyOOP == textConstantsSymbolOOP.Value)
-            {
-                var valueOOP = heapManager.GetSlot(assocOOP, 2); // Association.value
-                textConstantsDictOOP = valueOOP;
-                Console.WriteLine($"  Found in SystemDictionary at slot {i}:");
-                Console.WriteLine($"    Association OOP: {assocOOP}");
-                Console.WriteLine($"    Key OOP: {keyOOP}");
-                Console.WriteLine($"    Value (Dict) OOP: {valueOOP}");
-
-                // Get dictionary info
-                if (valueOOP != SpecialObjectsArray.Instance.Nil && !valueOOP.IsSmallInteger)
-                {
-                    int capacity = heapManager.GetIndexedSize(valueOOP);
-                    var tallyOOP = heapManager.GetSlot(valueOOP, 1); // Dictionary.tally
-                    Console.WriteLine($"    Dict capacity: {capacity}");
-                    Console.WriteLine($"    Dict tally: {(tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger().ToString() : tallyOOP.ToString())}");
-                }
-                break;
-            }
-        }
-
-        if (!textConstantsDictOOP.HasValue)
-        {
-            Console.WriteLine($"  TextConstants NOT found in SystemDictionary!");
-        }
-
-        // Also check GlobalRegistry
-        if (GlobalRegistry.TryGet("TextConstants", out var registeredOOP))
-        {
-            Console.WriteLine($"  GlobalRegistry TextConstants OOP: {registeredOOP}");
-            if (textConstantsDictOOP.HasValue && registeredOOP != textConstantsDictOOP.Value)
-            {
-                Console.WriteLine($"  *** MISMATCH: GlobalRegistry != SystemDictionary ***");
-            }
-        }
-        else
-        {
-            Console.WriteLine($"  TextConstants NOT in GlobalRegistry!");
-        }
-
-        Console.WriteLine();
     }
 
     /// <summary>

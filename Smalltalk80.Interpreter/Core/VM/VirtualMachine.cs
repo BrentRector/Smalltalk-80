@@ -1874,31 +1874,13 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         
         // 2. Look up key in pool dictionary - get the Association, not just the value
         // This allows us to distinguish "not found" from "value is nil"
-        var keyString = GetSymbolString(keySymbol);
-        Console.WriteLine($"[POOL VAR] Looking up '{keyString}' (symbol OOP={keySymbol}) in pool dictionary OOP={poolDictOOP}");
-
         var resolvedAssocOOP = LookupAssociationInDictionary(poolDictOOP, keySymbol);
 
         if (resolvedAssocOOP == SpecialObjectsArray.Instance.Nil)
         {
-            // Key not found in pool dictionary - dump dictionary contents for debugging
+            // Key not found in pool dictionary
             var poolNameString = GetSymbolString(poolNameSymbol);
-            Console.WriteLine($"[POOL VAR] ERROR: '{keyString}' not found in '{poolNameString}'");
-
-            // Dump all keys in the dictionary to see what symbols are there
-            int dictSize = _heapManager.GetIndexedSize(poolDictOOP);
-            Console.WriteLine($"[POOL VAR] Dictionary has {dictSize} slots. Dumping non-nil entries:");
-            for (int i = 0; i < dictSize; i++)
-            {
-                var entry = _heapManager.GetIndexedOOP(poolDictOOP, i);
-                if (entry != SpecialObjectsArray.Instance.Nil)
-                {
-                    var entryKey = _heapManager.GetInstanceVariable(entry, 0);
-                    var entryKeyName = GetSymbolString(entryKey);
-                    Console.WriteLine($"[POOL VAR]   [{i}] key='{entryKeyName}' (OOP={entryKey})");
-                }
-            }
-
+            var keyString = GetSymbolString(keySymbol);
             throw new InvalidOperationException($"Pool variable '{keyString}' not found in pool dictionary '{poolNameString}'");
         }
 
