@@ -769,8 +769,14 @@ namespace Smalltalk80.Compiler
             if (keywordMessage != null)
             {
                 // Pass receiverIsSuper flag to handle super sends correctly
-                // This is necessary when there are no binary messages but the receiver is super
+                // This is necessary ONLY when:
+                // 1. The messageBase is super, AND
+                // 2. There are NO unary messages, AND
+                // 3. There are NO binary messages
                 // (e.g., "^super extent:fromArray:offset:")
+                //
+                // But NOT for cases like "super new compositionRectangle:..." where
+                // the keyword message's receiver is the result of "super new", not super itself.
                 var receiverIsSuper = false;
                 if (binaryExpr != null)
                 {
@@ -778,7 +784,14 @@ namespace Smalltalk80.Compiler
                     if (unaryExpr != null)
                     {
                         var messageBase = unaryExpr.messageBase();
-                        receiverIsSuper = IsReceiverSuper(messageBase);
+                        var unaryMessages = unaryExpr.unaryMessage();
+                        var binaryMessages = binaryExpr.binaryMessage();
+
+                        // Only mark as super send if there are no intervening messages
+                        bool hasNoUnaryMessages = unaryMessages == null || unaryMessages.Length == 0;
+                        bool hasNoBinaryMessages = binaryMessages == null || binaryMessages.Length == 0;
+
+                        receiverIsSuper = IsReceiverSuper(messageBase) && hasNoUnaryMessages && hasNoBinaryMessages;
                     }
                 }
                 CompileKeywordMessage(keywordMessage, receiverIsSuper);
