@@ -1919,7 +1919,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             }
             else
             {
-                var valueClass = GetClassName(_heapManager.GetObjectClass(resolvedValueOOP));
+                var valueClass = GetClassName(_heapManager.GetClassOOP(resolvedValueOOP));
                 Console.WriteLine($"[POOL VAR] '{keyString}' value class: {valueClass}, OOP={resolvedValueOOP}");
             }
         }

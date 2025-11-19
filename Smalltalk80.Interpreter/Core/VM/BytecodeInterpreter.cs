@@ -525,18 +525,15 @@ internal class BytecodeInterpreter(
                     if (receiverOOP.IsSmallInteger)
                     {
                         // Get method info for debugging
-                        var methodOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.METHOD_CONTEXT_METHOD_INDEX);
-                        var selectorOOP = heapManager.GetInstanceVariable(methodOOP, VMConstants.COMPILED_METHOD_SELECTOR_INDEX);
-                        var selectorName = vm.GetSymbolString(selectorOOP) ?? "?";
+                        var currentMethodOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.CONTEXT_METHOD_INDEX);
+                        var selectorOOP = context.GetMethodLiteral(currentMethodOOP, 1); // Selector is literal[0], at index 1
+                        var selectorName = context.GetSymbolName(selectorOOP) ?? "?";
 
                         Console.WriteLine($"\n*** PUSH_IVAR on SmallInteger receiver ***");
                         Console.WriteLine($"  Receiver value: {receiverOOP.AsSmallInteger()}");
                         Console.WriteLine($"  Instance variable index: {index}");
                         Console.WriteLine($"  Method selector: {selectorName}");
-                        Console.WriteLine($"  Instruction count: {vm.Tracer.InstructionCount}");
-
-                        // Dump the sender chain to see how we got here
-                        vm.Debugger.DumpSenderChain(context.ActiveContext, 10);
+                        Console.WriteLine($"  Current context: {context.ActiveContext}");
                     }
 
                     var valueOOP = heapManager.GetInstanceVariable(receiverOOP, index);
