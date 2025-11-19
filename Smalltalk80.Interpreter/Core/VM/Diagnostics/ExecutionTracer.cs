@@ -125,8 +125,8 @@ public class ExecutionTracer
     {
         if (!ShouldTraceSend()) return;
 
-        // Only show sends from within Form class methods
-        if (!fromMethod.Contains("Form>>") && !fromMethod.Contains("Form_class>>"))
+        // Only show sends from within Form class or Object>>shallowCopy methods
+        if (!fromMethod.Contains("Form>>") && !fromMethod.Contains("Form_class>>") && !fromMethod.Contains("Object>>shallowCopy"))
             return;
 
         Console.WriteLine($"[SEND #{_instructionCount}] {receiverClass}>>{selectorName} (from {fromMethod})");
