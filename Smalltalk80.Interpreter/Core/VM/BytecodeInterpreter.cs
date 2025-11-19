@@ -279,9 +279,9 @@ internal class BytecodeInterpreter(
                 // Blue Book: Return self from block's home MethodContext (non-local return)
                 {
                     // Properly check if we're in a BlockContext by checking the class
-                    var contextClassOOP = heapManager.GetClassOOP(context.ActiveContext);
+                    var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
 
-                    if (contextClassOOP == metadata.BlockContextClassOOP)
+                    if (activeClassOOP == metadata.BlockContextClassOOP)
                     {
                         // We're in a BlockContext - get home and perform non-local return
                         var homeOOP = heapManager.GetInstanceVariable(
@@ -320,9 +320,9 @@ internal class BytecodeInterpreter(
                     var returnValue = context.Pop();
 
                     // Properly check if we're in a BlockContext by checking the class
-                    var contextClassOOP = heapManager.GetClassOOP(context.ActiveContext);
+                    var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
 
-                    if (contextClassOOP == metadata.BlockContextClassOOP)
+                    if (activeClassOOP == metadata.BlockContextClassOOP)
                     {
                         // We're in a BlockContext - get home and perform non-local return
                         var homeOOP = heapManager.GetInstanceVariable(
