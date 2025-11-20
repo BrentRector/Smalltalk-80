@@ -200,34 +200,37 @@ internal class BytecodeInterpreter(
             var valueOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
 
             // DEBUG: Check if we're pushing an Association as a value (bug indicator)
-            var valueClassOOP = heapManager.GetClassOOP(valueOOP);
-            var associationClassOOP2 = runtimeHeapAccess.GetClass("Association");
-            if (valueClassOOP == associationClassOOP2)
+            if (!valueOOP.IsSmallInteger)
             {
-                string? keyName = null;
-                if (!keyOOP.IsSmallInteger)
+                var valueClassOOP = heapManager.GetClassOOP(valueOOP);
+                var associationClassOOP2 = runtimeHeapAccess.GetClass("Association");
+                if (valueClassOOP == associationClassOOP2)
                 {
-                    var keyClass = heapManager.GetClassOOP(keyOOP);
-                    var symbolClass = runtimeHeapAccess.GetClass("Symbol");
-                    if (keyClass == symbolClass)
+                    string? keyName = null;
+                    if (!keyOOP.IsSmallInteger)
                     {
-                        keyName = context.GetSymbolName(keyOOP);
+                        var keyClass = heapManager.GetClassOOP(keyOOP);
+                        var symbolClass = runtimeHeapAccess.GetClass("Symbol");
+                        if (keyClass == symbolClass)
+                        {
+                            keyName = context.GetSymbolName(keyOOP);
+                        }
                     }
-                }
-                Console.WriteLine($"[PUSH_LITERAL_VAR] WARNING: Association value is another Association!");
-                Console.WriteLine($"  Outer Association: {literalOOP} key='{keyName ?? keyOOP.ToString()}'");
-                Console.WriteLine($"  Value (inner Association): {valueOOP}");
+                    Console.WriteLine($"[PUSH_LITERAL_VAR] WARNING: Association value is another Association!");
+                    Console.WriteLine($"  Outer Association: {literalOOP} key='{keyName ?? keyOOP.ToString()}'");
+                    Console.WriteLine($"  Value (inner Association): {valueOOP}");
 
-                // Try to get the inner Association's key
-                var innerKeyOOP = heapManager.GetInstanceVariable(valueOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                if (!innerKeyOOP.IsSmallInteger)
-                {
-                    var innerKeyClass = heapManager.GetClassOOP(innerKeyOOP);
-                    var symbolClass2 = runtimeHeapAccess.GetClass("Symbol");
-                    if (innerKeyClass == symbolClass2)
+                    // Try to get the inner Association's key
+                    var innerKeyOOP = heapManager.GetInstanceVariable(valueOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                    if (!innerKeyOOP.IsSmallInteger)
                     {
-                        var innerKeyName = context.GetSymbolName(innerKeyOOP);
-                        Console.WriteLine($"  Inner Association key: '{innerKeyName}'");
+                        var innerKeyClass = heapManager.GetClassOOP(innerKeyOOP);
+                        var symbolClass2 = runtimeHeapAccess.GetClass("Symbol");
+                        if (innerKeyClass == symbolClass2)
+                        {
+                            var innerKeyName = context.GetSymbolName(innerKeyOOP);
+                            Console.WriteLine($"  Inner Association key: '{innerKeyName}'");
+                        }
                     }
                 }
             }
