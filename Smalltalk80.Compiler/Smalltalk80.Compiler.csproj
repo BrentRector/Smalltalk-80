@@ -40,7 +40,11 @@
   <!-- Link to shared definitions -->
   <ItemGroup>
     <Compile Include="..\Shared\Core\Bytecodes\BytecodeDefinitions.cs" Link="Core\Bytecodes\BytecodeDefinitions.cs" />
-    <Compile Include="..\Shared\Core\FormatWord.cs" Link="Core\FormatWord.cs" />
+  </ItemGroup>
+
+  <!-- Reference to Shared.Types for FormatWord -->
+  <ItemGroup>
+    <ProjectReference Include="..\Smalltalk80.Interpreter.Shared.Types\Smalltalk80.Interpreter.Shared.Types.csproj" />
   </ItemGroup>
 
   <!-- Ensure Generated folder exists and regenerate parser if needed -->
