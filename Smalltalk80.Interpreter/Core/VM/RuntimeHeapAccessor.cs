@@ -391,4 +391,20 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
         }
         return Encoding.Latin1.GetString(bytes);
     }
+
+    /// <summary>
+    /// Gets the field index for a named field in a class by walking the heap.
+    /// This is used by primitives at runtime - the heap is the source of truth.
+    /// </summary>
+    /// <param name="classOOP">The class OOP to query</param>
+    /// <param name="fieldName">The field name to find</param>
+    /// <returns>The zero-based field index, or -1 if not found</returns>
+    public virtual int GetFieldIndex(SmalltalkOOP classOOP, string fieldName)
+    {
+        // Build the field list for this class by walking the heap
+        var fields = AccumulateInstanceVariableNames(classOOP);
+
+        // Find the index of the requested field
+        return fields.IndexOf(fieldName);
+    }
 }

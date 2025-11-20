@@ -103,26 +103,42 @@ public readonly struct PrimitiveExecutionContext
     }
 
     /// <summary>
-    /// Gets a field value from an object using the layout resolver.
+    /// Gets a field value from an object by querying the runtime heap for field layout.
+    /// The Smalltalk heap is the authoritative source of class structure at runtime.
     /// </summary>
     public SmalltalkOOP GetFieldValue(SmalltalkOOP oop, string className, string fieldName)
     {
-        if (LayoutResolver == null)
-            throw new InvalidOperationException("LayoutResolver not available");
+        if (RuntimeHeapAccess == null)
+            throw new InvalidOperationException("RuntimeHeapAccess not available");
 
-        int fieldIndex = LayoutResolver.GetFieldIndex(className, fieldName);
+        // Get the class OOP from the heap
+        var classOOP = HeapManager.GetClassOOP(oop);
+
+        // Query the heap for the field index
+        int fieldIndex = RuntimeHeapAccess.GetFieldIndex(classOOP, fieldName);
+        if (fieldIndex < 0)
+            throw new InvalidOperationException($"Field '{fieldName}' not found in class '{className}'");
+
         return HeapManager.GetInstanceVariable(oop, fieldIndex);
     }
 
     /// <summary>
-    /// Sets a field value in an object using the layout resolver.
+    /// Sets a field value in an object by querying the runtime heap for field layout.
+    /// The Smalltalk heap is the authoritative source of class structure at runtime.
     /// </summary>
     public void SetFieldValue(SmalltalkOOP oop, string className, string fieldName, SmalltalkOOP value)
     {
-        if (LayoutResolver == null)
-            throw new InvalidOperationException("LayoutResolver not available");
+        if (RuntimeHeapAccess == null)
+            throw new InvalidOperationException("RuntimeHeapAccess not available");
 
-        int fieldIndex = LayoutResolver.GetFieldIndex(className, fieldName);
+        // Get the class OOP from the heap
+        var classOOP = HeapManager.GetClassOOP(oop);
+
+        // Query the heap for the field index
+        int fieldIndex = RuntimeHeapAccess.GetFieldIndex(classOOP, fieldName);
+        if (fieldIndex < 0)
+            throw new InvalidOperationException($"Field '{fieldName}' not found in class '{className}'");
+
         HeapManager.SetInstanceVariable(oop, fieldIndex, value);
     }
 

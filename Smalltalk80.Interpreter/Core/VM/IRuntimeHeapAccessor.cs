@@ -52,4 +52,13 @@ public interface IRuntimeHeapAccessor
     /// </summary>
     /// <returns>Dictionary mapping "class:ClassName" to list of field names.</returns>
     Dictionary<string, List<string>> BuildFieldMap();
+
+    /// <summary>
+    /// Gets the field index for a named field in a class by walking the heap.
+    /// This is used by primitives at runtime - the heap is the source of truth.
+    /// </summary>
+    /// <param name="classOOP">The class OOP to query.</param>
+    /// <param name="fieldName">The field name to find.</param>
+    /// <returns>The zero-based field index, or -1 if not found.</returns>
+    int GetFieldIndex(SmalltalkOOP classOOP, string fieldName);
 }
