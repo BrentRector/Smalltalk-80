@@ -38,7 +38,7 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Registers a well-known global object OOP.
-    /// Also updates SpecialObjectsArray.Instance for singleton values.
+    /// Used during cold start to track special objects (nil, true, false, etc).
     /// THROWS after Freeze() - only for cold start use.
     /// </summary>
     public static void Register(string name, SmalltalkOOP oop)

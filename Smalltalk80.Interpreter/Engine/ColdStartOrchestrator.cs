@@ -243,20 +243,26 @@ public class ColdStartOrchestrator : IColdStartLoader
     /// Builds VM metadata from the loaded cold start data.
     /// Must be called after Run() completes.
     /// </summary>
-    public VMMetadata BuildVMMetadata()
+    /// <param name="initExpressionMethods">Optional InitExpressionMethods array OOP (set during Phase 4).</param>
+    public VMMetadata BuildVMMetadata(SmalltalkOOP initExpressionMethods = default)
     {
         if (LayoutResolver == null)
             throw new InvalidOperationException("Cannot build VM metadata before cold start completes");
 
         int thisClassIdx = LayoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
 
-        // Build KnownObjects from SpecialObjectsArray
-        var soa = SpecialObjectsArray.Instance;
+        // Get special objects from GlobalRegistry (allocated during cold start phases)
+        var nilOOP = GlobalRegistry.Get("nil");
+        var trueOOP = GlobalRegistry.Get("true");
+        var falseOOP = GlobalRegistry.Get("false");
+        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
+        var processorSchedulerOOP = GlobalRegistry.Get("ProcessorScheduler");
+
         var knownObjects = new KnownObjects(
-            nil: soa.Nil,
-            @true: soa.True,
-            @false: soa.False,
-            smalltalk: soa.Smalltalk
+            nil: nilOOP,
+            @true: trueOOP,
+            @false: falseOOP,
+            smalltalk: smalltalkOOP
         );
 
         var metadata = new VMMetadata
@@ -278,8 +284,8 @@ public class ColdStartOrchestrator : IColdStartLoader
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
             BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
             KnownObjects = knownObjects,
-            ProcessorScheduler = soa.ProcessorScheduler,
-            InitExpressionMethods = soa.InitExpressionMethods
+            ProcessorScheduler = processorSchedulerOOP,
+            InitExpressionMethods = initExpressionMethods
         };
 
         return metadata;
