@@ -513,10 +513,16 @@ directory: aFileDirectory directoryName: aString
 
 directoryFromName: fileDesignator setFileName: localNameBlock
     "Answer the file directory from the designator and evaluate block with filename."
-    | directory stream |
+    | directory fileName sepIndex |
     directory _ Disk.
-    stream _ ReadStream on: fileDesignator.
-    localNameBlock value: (stream upTo: nil).
+    "Extract just the filename from the path"
+    sepIndex _ fileDesignator findLast: [:c | c = $\ or: [c = $/]].
+    sepIndex = 0
+        ifTrue: [fileName _ fileDesignator]
+        ifFalse: [
+            fileName _ fileDesignator copyFrom: sepIndex + 1 to: fileDesignator size.
+            "Could also extract directory path here if needed"].
+    localNameBlock value: fileName.
     ^directory! !
 
 !WindowsFileDirectory class methodsFor: 'accessing'!
