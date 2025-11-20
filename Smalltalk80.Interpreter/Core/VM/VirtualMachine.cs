@@ -1680,7 +1680,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Get USTable (Universal Symbol Table) from GlobalRegistry
         // Get USTable from heap (via the Smalltalk global dictionary)
-        var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var smalltalkDictOOP = _knownObjects.Smalltalk;
         var ustableOOP = _runtimeHeapAccess.LookupGlobalByName(smalltalkDictOOP, "USTable");
         if (ustableOOP == _knownObjects.Nil)
         {
@@ -1740,7 +1740,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // NOT from GlobalRegistry (which is a cold start snapshot that becomes stale)
 
         // Get Smalltalk SystemDictionary from SpecialObjectsArray
-        var smalltalkOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var smalltalkOOP = _knownObjects.Smalltalk;
         if (smalltalkOOP == _knownObjects.Nil)
         {
             // SystemDictionary not yet created (shouldn't happen after cold start)
@@ -1846,7 +1846,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private SmalltalkOOP ResolveAndPatchPoolVariable(SmalltalkOOP poolLiteralOOP, SmalltalkOOP methodOOP, int literalIndex, SmalltalkOOP poolNameSymbol, SmalltalkOOP keySymbol)
     {
         // 1. Resolve pool dictionary name to actual dictionary object
-        var smalltalkDict = SpecialObjectsArray.Instance.Smalltalk;
+        var smalltalkDict = _knownObjects.Smalltalk;
         var poolDictOOP = LookupInDictionary(smalltalkDict, poolNameSymbol);
         
         if (poolDictOOP == _knownObjects.Nil)
@@ -1857,7 +1857,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             Console.WriteLine($"[POOL VAR FALLBACK] Pool dictionary '{poolNameString}' not found, checking Undeclared");
 
             // Look up in Undeclared dictionary
-            var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+            var systemDictOOP = _knownObjects.Smalltalk;
             var undeclaredOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, "Undeclared");
             if (undeclaredOOP != _knownObjects.Nil)
             {

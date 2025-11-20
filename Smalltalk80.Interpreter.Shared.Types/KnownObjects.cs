@@ -29,12 +29,20 @@ public readonly struct KnownObjects
     public required SmalltalkOOP False { get; init; }
 
     /// <summary>
+    /// The Smalltalk global (SystemDictionary instance).
+    /// Root of all classes, methods, symbols, and global variables.
+    /// Used for global variable lookups and symbol table access.
+    /// </summary>
+    public required SmalltalkOOP Smalltalk { get; init; }
+
+    /// <summary>
     /// Creates a KnownObjects instance with all required objects.
     /// </summary>
-    public KnownObjects(SmalltalkOOP nil, SmalltalkOOP @true, SmalltalkOOP @false)
+    public KnownObjects(SmalltalkOOP nil, SmalltalkOOP @true, SmalltalkOOP @false, SmalltalkOOP smalltalk)
     {
         Nil = nil;
         True = @true;
         False = @false;
+        Smalltalk = smalltalk;
     }
 }
