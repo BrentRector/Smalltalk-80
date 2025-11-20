@@ -110,9 +110,11 @@ public static class InitExpressionOrdering
             "LargePositiveInteger class",  // depends on: DigitBuffer
             "Spline class",         // depends on: Point
 
-            // LEVEL 2: 2 classes that depend on Level 1
+            // LEVEL 2: 1 class that depends on Level 1
             "LargeNegativeInteger class",  // depends on: LargePositiveInteger
-            "Delay class"                  // depends on: SortedCollection (runs last)
+
+            // LEVEL 3: 1 class that runs last (for debugging)
+            "Delay class"                  // runs last for debugging
         };
     }
 
@@ -134,12 +136,14 @@ public static class InitExpressionOrdering
         // we need to manually split based on known level sizes from the comments:
         // LEVEL 0: 80 classes (indices 0-79)
         // LEVEL 1: 6 classes (indices 80-85)
-        // LEVEL 2: 2 classes (indices 86-87)
+        // LEVEL 2: 1 class (index 86)
+        // LEVEL 3: 1 class (index 87) - runs last
         var levels = new List<List<string>>
         {
             dependencyOrder.Take(80).ToList(),      // Level 0
             dependencyOrder.Skip(80).Take(6).ToList(), // Level 1
-            dependencyOrder.Skip(86).ToList()       // Level 2
+            dependencyOrder.Skip(86).Take(1).ToList(), // Level 2
+            dependencyOrder.Skip(87).ToList()       // Level 3
         };
 
         // Process each level
