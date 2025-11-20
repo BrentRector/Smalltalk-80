@@ -9,7 +9,7 @@ Tests are organized into functional categories using xUnit's `[Trait]` attribute
 | Category | Test Count | Description |
 |----------|-----------|-------------|
 | **Primitives** | 258 | All primitive operation tests (arithmetic, comparison, control, strings, floats, etc.) |
-| **HeapManager** | 116 | Heap management, object allocation, GC tests |
+| **HeapManager** | 118 | Heap management, object allocation, GC tests |
 | **VM** | TBD | Virtual machine core: message dispatch, execution state |
 | **Context** | TBD | Context management and execution context tests |
 | **Compiler** | TBD | Bytecode compiler tests: emitter, variable resolution, temp frames |
@@ -119,7 +119,7 @@ dotnet test
 - Control flow (BlockCopy, BlockValue, Signal, Wait, Resume, Suspend)
 - System operations (Snapshot, Quit, etc.)
 
-### HeapManager: ✅ 116/116 Passing (100%)
+### HeapManager: ✅ 118/118 Passing (100%)
 - Object allocation (Pointer, PointerIndexed, ByteIndexed, WordIndexed formats)
 - Object table management (allocation, validation, enumeration)
 - Garbage collection (mark, sweep, compaction)
