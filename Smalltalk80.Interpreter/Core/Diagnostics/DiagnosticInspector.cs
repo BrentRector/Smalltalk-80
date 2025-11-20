@@ -511,7 +511,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Inspects the File class>>initialize method's literal frame.
     /// </summary>
-    public static void InspectFileInitializeLiterals(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    public static void InspectFileInitializeLiterals(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -537,7 +537,7 @@ public static class DiagnosticInspector
             Console.WriteLine($"  Found at index {fileInitIndex}");
 
             // Get the CompiledMethod OOP from the InitExpressionMethods array
-            var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
+            var initArrayOOP = metadata.InitExpressionMethods;
             if (initArrayOOP == metadata.KnownObjects.Nil)
             {
                 Console.WriteLine("  InitExpressionMethods array is nil");
