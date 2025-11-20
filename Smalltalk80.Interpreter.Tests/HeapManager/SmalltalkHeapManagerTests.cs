@@ -1,7 +1,6 @@
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Xunit;
-using FormatWord = Smalltalk80.Core.FormatWord;
 
 namespace Smalltalk80.Interpreter.Tests.HeapManager;
 
@@ -175,7 +174,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange - Create a class object with format field
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        var formatWord = FormatWord.CreateFixedPointer(2);
+        var formatWord = Smalltalk80.Core.FormatWord.CreateFixedPointer(2);
         _heapManager.SetInstanceVariable(classOOP, 2, SmalltalkOOP.FromSmallInteger(formatWord.Value));
 
         // Act
@@ -192,7 +191,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        var formatWord = FormatWord.CreatePointerIndexed(1);
+        var formatWord = Smalltalk80.Core.FormatWord.CreatePointerIndexed(1);
         _heapManager.SetInstanceVariable(classOOP, 2, SmalltalkOOP.FromSmallInteger(formatWord.Value));
 
         // Act
@@ -209,7 +208,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        var formatWord = FormatWord.CreateByteIndexed(0);
+        var formatWord = Smalltalk80.Core.FormatWord.CreateByteIndexed(0);
         _heapManager.SetInstanceVariable(classOOP, 2, SmalltalkOOP.FromSmallInteger(formatWord.Value));
 
         // Act
@@ -225,7 +224,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        var formatWord = FormatWord.CreateWordIndexed(0);
+        var formatWord = Smalltalk80.Core.FormatWord.CreateWordIndexed(0);
         _heapManager.SetInstanceVariable(classOOP, 2, SmalltalkOOP.FromSmallInteger(formatWord.Value));
 
         // Act
@@ -252,7 +251,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        var formatWord = FormatWord.CreateFixedPointer(2);
+        var formatWord = Smalltalk80.Core.FormatWord.CreateFixedPointer(2);
         _heapManager.SetInstanceVariable(classOOP, 2, SmalltalkOOP.FromSmallInteger(formatWord.Value));
 
         // Act
@@ -287,7 +286,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        var formatWord = FormatWord.CreateFixedPointer(1);
+        var formatWord = Smalltalk80.Core.FormatWord.CreateFixedPointer(1);
         _heapManager.SetInstanceVariable(classOOP, 2, SmalltalkOOP.FromSmallInteger(formatWord.Value));
         var instanceOOP = _heapManager.AllocateInstanceOf(classOOP, 0);
 
@@ -1047,7 +1046,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        var formatWord = FormatWord.CreateFixedPointer(1);
+        var formatWord = Smalltalk80.Core.FormatWord.CreateFixedPointer(1);
         _heapManager.SetInstanceVariable(classOOP, 2, SmalltalkOOP.FromSmallInteger(formatWord.Value));
 
         var instance1 = _heapManager.AllocateInstanceOf(classOOP, 0);
@@ -1066,7 +1065,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        var formatWord = FormatWord.CreateFixedPointer(1);
+        var formatWord = Smalltalk80.Core.FormatWord.CreateFixedPointer(1);
         _heapManager.SetInstanceVariable(classOOP, 2, SmalltalkOOP.FromSmallInteger(formatWord.Value));
 
         // Act
@@ -1081,7 +1080,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        var formatWord = FormatWord.CreateFixedPointer(1);
+        var formatWord = Smalltalk80.Core.FormatWord.CreateFixedPointer(1);
         _heapManager.SetInstanceVariable(classOOP, 2, SmalltalkOOP.FromSmallInteger(formatWord.Value));
 
         var instance1 = _heapManager.AllocateInstanceOf(classOOP, 0);
@@ -1101,7 +1100,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        var formatWord = FormatWord.CreateFixedPointer(1);
+        var formatWord = Smalltalk80.Core.FormatWord.CreateFixedPointer(1);
         _heapManager.SetInstanceVariable(classOOP, 2, SmalltalkOOP.FromSmallInteger(formatWord.Value));
 
         var instance = _heapManager.AllocateInstanceOf(classOOP, 0);
