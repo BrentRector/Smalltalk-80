@@ -1622,30 +1622,30 @@ public class SmalltalkHeapManagerTests : IDisposable
     }
 
     [Fact]
-    public void ImplicitConversion_RawIntValue_CreatesObjectPointer()
+    public void operator_IntToOOP_CreatesObjectPointer()
     {
         // Arrange
         int rawValue = 42;
 
-        // Act - Implicit conversion from int
+        // Act - Implicit int-to-OOP conversion operator
         SmalltalkOOP oop = rawValue;
 
-        // Assert - Should create object pointer, not SmallInteger
+        // Assert - Should create object pointer with raw value
         Assert.Equal(42, oop.RawValue);
         Assert.False(oop.IsSmallInteger);
         Assert.True(oop.IsObjectPointer);
     }
 
     [Fact]
-    public void ImplicitConversion_ZeroValue_CreatesNullOOP()
+    public void operator_ZeroValue_CreatesNullOOP()
     {
         // Arrange
         int zero = 0;
 
-        // Act
+        // Act - Implicit conversion with zero
         SmalltalkOOP oop = zero;
 
-        // Assert
+        // Assert - Zero creates null OOP
         Assert.Equal(SmalltalkOOP.Null, oop);
         Assert.Equal(0, oop.RawValue);
     }

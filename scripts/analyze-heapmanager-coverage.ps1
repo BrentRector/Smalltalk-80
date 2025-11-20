@@ -40,8 +40,9 @@ Get-ChildItem "$heapManagerDir/*.cs" -File | Where-Object {
     $content = Get-Content $_.FullName -Raw
 
     # Find all public methods (excluding constructors, properties, and interface implementations)
-    # Match: public <returnType> MethodName(
-    $matches = [regex]::Matches($content, 'public\s+(?:virtual\s+)?(?:override\s+)?(\w+(?:<[^>]+>)?)\s+(\w+)\s*\(')
+    # Match: public [static] [virtual] [override] <returnType> MethodName(
+    # Also match: public static implicit operator TypeName(
+    $matches = [regex]::Matches($content, 'public\s+(?:static\s+)?(?:virtual\s+)?(?:override\s+)?(?:implicit\s+)?(?:explicit\s+)?(\w+(?:<[^>]+>)?)\s+(\w+)\s*\(')
 
     $methods = @()
     foreach ($match in $matches) {
