@@ -19,19 +19,27 @@ internal class GarbageCollector : IGarbageCollector
         _heap = heap;
     }
 
-    public void SetGCRoots(SmalltalkOOP[] rootObjects)
+    public void AddGCRoot(SmalltalkOOP oop)
     {
-        _gcRoots = rootObjects?.ToArray() ?? Array.Empty<SmalltalkOOP>();
-    }
-
-    public void AddGCRoots(SmalltalkOOP[] additionalRoots)
-    {
-        if (additionalRoots == null || additionalRoots.Length == 0)
+        // Check if already in roots
+        if (_gcRoots.Contains(oop))
             return;
 
-        var newRoots = new SmalltalkOOP[_gcRoots.Length + additionalRoots.Length];
+        var newRoots = new SmalltalkOOP[_gcRoots.Length + 1];
         _gcRoots.CopyTo(newRoots, 0);
-        additionalRoots.CopyTo(newRoots, _gcRoots.Length);
+        newRoots[_gcRoots.Length] = oop;
+        _gcRoots = newRoots;
+    }
+
+    public void RemoveGCRoot(SmalltalkOOP oop)
+    {
+        int index = Array.IndexOf(_gcRoots, oop);
+        if (index < 0)
+            return; // Not found
+
+        var newRoots = new SmalltalkOOP[_gcRoots.Length - 1];
+        Array.Copy(_gcRoots, 0, newRoots, 0, index);
+        Array.Copy(_gcRoots, index + 1, newRoots, index, _gcRoots.Length - index - 1);
         _gcRoots = newRoots;
     }
 
@@ -40,16 +48,9 @@ internal class GarbageCollector : IGarbageCollector
         return _gcRoots.ToArray();
     }
 
-    public void MarkObject(SmalltalkOOP objectOOP)
+    public void ClearGCRoots()
     {
-        if (objectOOP.IsSmallInteger)
-            return; // SmallIntegers don't need marking
-
-        if (!_tableManager.IsValidObjectOOP(objectOOP))
-            return; // Invalid OOPs are ignored
-
-        var entry = _tableManager.GetObjectTableEntry(objectOOP);
-        entry.IsMarked = true;
+        _gcRoots = Array.Empty<SmalltalkOOP>();
     }
 
     public SmalltalkOOP[] GetUnreachableObjects()
@@ -95,88 +96,52 @@ internal class GarbageCollector : IGarbageCollector
     public GCStatistics GarbageCollect()
     {
         var stopwatch = Stopwatch.StartNew();
-        var blocks = _tableManager.GetBlocks();
 
-        // Phase 1: Count objects before collection
+        // Count objects before collection
         int objectsBeforeCollection = _tableManager.GetActiveObjectCount();
 
-        // Phase 2: Clear all mark bits
-        foreach (var block in blocks)
-        {
-            for (int i = 0; i < ObjectTableBlock.BlockSize; i++)
-            {
-                if (block.Entries[i] != null)
-                    block.Entries[i]!.IsMarked = false;
-            }
-        }
-
+        // Steps 1-3: Clear marks → Mark reachable → Find unreachable
         double markStartTime = stopwatch.Elapsed.TotalMilliseconds;
-
-        // Phase 3: Mark from configured roots
-        foreach (var rootOOP in _gcRoots)
-        {
-            MarkObjectRecursively(rootOOP);
-        }
-
+        var unreachableObjects = GetUnreachableObjects();
         double markEndTime = stopwatch.Elapsed.TotalMilliseconds;
         double markTime = markEndTime - markStartTime;
 
-        // Phase 4: Sweep unmarked objects
+        // Step 4: Collect unreachable objects
         var collectedByFormat = new Dictionary<ObjectFormat, int>();
         long estimatedBytesFreed = 0;
-        int objectsCollected = 0;
-
-        var firstCollectedIds = new List<int>();
         var collectedObjectDetails = new List<(int oop, ObjectFormat format, int size, string? className)>();
 
-        for (int blockIndex = 0; blockIndex < blocks.Count; blockIndex++)
+        foreach (var oop in unreachableObjects)
         {
-            var block = blocks[blockIndex];
-            for (int i = 0; i < ObjectTableBlock.BlockSize; i++)
+            var entry = _tableManager.GetObjectTableEntry(oop);
+
+            // Track collection statistics
+            collectedByFormat[entry.FormatExplicit] = collectedByFormat.GetValueOrDefault(entry.FormatExplicit) + 1;
+            estimatedBytesFreed += entry.SizeInWordsExplicit * 4;
+
+            // Track detailed info about first 50 collected objects
+            if (collectedObjectDetails.Count < 50)
             {
-                var entry = block.Entries[i];
-                if (entry != null && !entry.IsMarked)
+                int objectId = oop.ToObjectTableIndex();
+                string? className = null;
+                try
                 {
-                    // Track collection statistics
-                    collectedByFormat[entry.FormatExplicit] = collectedByFormat.GetValueOrDefault(entry.FormatExplicit) + 1;
-                    estimatedBytesFreed += entry.SizeInWordsExplicit * 4;
-                    objectsCollected++;
-
-                    // Track collected object IDs for debugging (use canonical mapping)
-                    int objectId = blockIndex * ObjectTableBlock.BlockSize + i + 1;
-                    if (firstCollectedIds.Count < 20)
-                    {
-                        firstCollectedIds.Add(objectId);
-                    }
-
-                    // Track detailed info about collected objects
-                    if (collectedObjectDetails.Count < 50)
-                    {
-                        var oop = SmalltalkOOP.FromObjectTableIndex(objectId);
-                        string? className = null;
-                        try
-                        {
-                            className = _heap.GetClassName(oop);
-                        }
-                        catch
-                        {
-                            className = "<unknown>";
-                        }
-                        collectedObjectDetails.Add((objectId, entry.FormatExplicit, entry.SizeInWordsExplicit, className));
-                    }
-
-                    // Clear managed storage (allows .NET GC to reclaim memory)
-                    entry.ManagedStorage = null;
-                    entry.InstanceVariableStorage = null;
-
-                    // Push freed index back to free list for reuse
-                    _tableManager.FreeObjectTableIndex(objectId);
-
-                    // Free the ObjectTable entry
-                    block.Entries[i] = null;
-                    block.ActiveCount--;
+                    className = _heap.GetClassName(oop);
                 }
+                catch
+                {
+                    className = "<unknown>";
+                }
+                collectedObjectDetails.Add((objectId, entry.FormatExplicit, entry.SizeInWordsExplicit, className));
             }
+
+            // Clear managed storage (allows .NET GC to reclaim memory)
+            entry.ManagedStorage = null;
+            entry.InstanceVariableStorage = null;
+
+            // Free the object
+            int objectId = oop.ToObjectTableIndex();
+            _tableManager.FreeObjectTableIndex(objectId);
         }
 
         double sweepEndTime = stopwatch.Elapsed.TotalMilliseconds;
@@ -189,7 +154,7 @@ internal class GarbageCollector : IGarbageCollector
         {
             TotalObjects = objectsBeforeCollection,
             LiveObjects = objectsAfterCollection,
-            CollectedObjects = objectsCollected,
+            CollectedObjects = unreachableObjects.Length,
             MarkTimeMs = markTime,
             SweepTimeMs = sweepTime,
             TotalTimeMs = stopwatch.Elapsed.TotalMilliseconds,
@@ -200,7 +165,7 @@ internal class GarbageCollector : IGarbageCollector
         };
     }
 
-    public GCStatistics GetGCStatistics()
+    public GCStatistics GetStatistics()
     {
         var objectsByFormat = new Dictionary<ObjectFormat, int>();
         long estimatedMemoryUsage = 0;

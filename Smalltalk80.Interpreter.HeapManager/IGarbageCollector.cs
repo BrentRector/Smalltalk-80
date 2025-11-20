@@ -3,22 +3,34 @@ using Smalltalk80.Interpreter.Shared.Types;
 namespace Smalltalk80.Interpreter.HeapManager;
 
 /// <summary>
-/// Interface for mark-and-sweep garbage collection.
-/// Manages GC roots and performs collection cycles.
+/// Generic garbage collector interface with zero semantic knowledge of Smalltalk.
+/// Manages opaque OOP roots and performs mark-sweep collection.
+///
+/// GC Operations:
+/// 1. Clear all marks
+/// 2. Mark reachable objects (from roots)
+/// 3. Find unreachable objects
+/// 4. Collect unreachable objects
+///
+/// GetUnreachableObjects() performs steps 1-3 without collection (for testing).
+/// GarbageCollect() performs all 4 steps (full collection).
 /// </summary>
 public interface IGarbageCollector
 {
-    /// <summary>
-    /// Sets the GC root objects array. The GC will start its reachability walk from these objects.
-    /// This replaces any previously set root objects.
-    /// </summary>
-    void SetGCRoots(SmalltalkOOP[] rootObjects);
+    // ========================================
+    // Root Management
+    // ========================================
 
     /// <summary>
-    /// Adds additional OOPs to the current GC roots array.
-    /// Useful for temporarily adding objects during specific operations.
+    /// Adds an OOP to the GC roots.
+    /// The GC will start its reachability walk from all registered roots.
     /// </summary>
-    void AddGCRoots(SmalltalkOOP[] additionalRoots);
+    void AddGCRoot(SmalltalkOOP oop);
+
+    /// <summary>
+    /// Removes an OOP from the GC roots.
+    /// </summary>
+    void RemoveGCRoot(SmalltalkOOP oop);
 
     /// <summary>
     /// Gets the current GC roots array (defensive copy).
@@ -26,18 +38,18 @@ public interface IGarbageCollector
     SmalltalkOOP[] GetGCRoots();
 
     /// <summary>
-    /// Marks an object as reachable during GC mark phase.
+    /// Clears all GC roots.
+    /// Use with caution - without roots, all objects become unreachable.
     /// </summary>
-    void MarkObject(SmalltalkOOP objectOOP);
+    void ClearGCRoots();
+
+    // ========================================
+    // Collection
+    // ========================================
 
     /// <summary>
-    /// DEBUG: Performs GC marking phase only and returns unreachable objects without collecting them.
-    /// Returns array of OOPs that would be collected during a full GC.
-    /// </summary>
-    SmalltalkOOP[] GetUnreachableObjects();
-
-    /// <summary>
-    /// Performs mark-and-sweep garbage collection using the configured root objects.
+    /// Performs full mark-and-sweep garbage collection using registered roots.
+    /// Steps: Clear marks → Mark reachable → Find unreachable → Collect.
     /// Returns detailed statistics about the collection.
     /// </summary>
     GCStatistics GarbageCollect();
@@ -45,5 +57,16 @@ public interface IGarbageCollector
     /// <summary>
     /// Gets current GC statistics without performing collection.
     /// </summary>
-    GCStatistics GetGCStatistics();
+    GCStatistics GetStatistics();
+
+    // ========================================
+    // Debug and Testing
+    // ========================================
+
+    /// <summary>
+    /// DEBUG: Performs GC marking phase only and returns unreachable objects without collecting them.
+    /// Steps: Clear marks → Mark reachable → Find unreachable (no collection).
+    /// Returns array of OOPs that would be collected during a full GC.
+    /// </summary>
+    SmalltalkOOP[] GetUnreachableObjects();
 }

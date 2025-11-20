@@ -4,11 +4,11 @@ using Smalltalk80.Interpreter.Shared.Types;
 namespace Smalltalk80.Interpreter.HeapManager;
 
 /// <summary>
-/// Implementation of ISmalltalkHeapManager providing low-level Smalltalk object management.
+/// Implementation of ISmalltalkHeap providing low-level Smalltalk object management.
 /// Uses tagged OOPs for SmallIntegers and ObjectTable indirection for heap objects.
 /// Delegates to specialized components for GC, table management, and become operations.
 /// </summary>
-public class SmalltalkHeapManager : ISmalltalkHeapManager
+public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
 {
     private readonly IObjectTableManager _tableManager;
     private readonly IGarbageCollector _garbageCollector;
@@ -45,6 +45,16 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     /// Gets the OOP for the Nil singleton.
     /// </summary>
     public SmalltalkOOP GetNil() => _nilOOP;
+
+    /// <summary>
+    /// Gets the garbage collector subsystem for root management and collection.
+    /// </summary>
+    public IGarbageCollector GC => _garbageCollector;
+
+    /// <summary>
+    /// Gets the become handler subsystem for object identity swapping.
+    /// </summary>
+    public IBecomeHandler Become => _becomeHandler;
 
     /// <summary>
     /// Configures the instance variable index for the class name field.
@@ -626,15 +636,33 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
 
     #endregion
 
-    #region GC Delegation
+    #region GC Delegation (ISmalltalkHeapManager compatibility)
 
-    public void MarkObject(SmalltalkOOP objectOOP) => _garbageCollector.MarkObject(objectOOP);
-    public void SetGCRoots(SmalltalkOOP[] rootObjects) => _garbageCollector.SetGCRoots(rootObjects);
-    public void AddGCRoots(SmalltalkOOP[] additionalRoots) => _garbageCollector.AddGCRoots(additionalRoots);
+    // Legacy methods for ISmalltalkHeapManager compatibility
+    // New code should use heap.GC.* instead
+    public void SetGCRoots(SmalltalkOOP[] rootObjects)
+    {
+        _garbageCollector.ClearGCRoots();
+        if (rootObjects != null)
+        {
+            foreach (var oop in rootObjects)
+                _garbageCollector.AddGCRoot(oop);
+        }
+    }
+
+    public void AddGCRoots(SmalltalkOOP[] additionalRoots)
+    {
+        if (additionalRoots != null)
+        {
+            foreach (var oop in additionalRoots)
+                _garbageCollector.AddGCRoot(oop);
+        }
+    }
+
     public SmalltalkOOP[] GetGCRoots() => _garbageCollector.GetGCRoots();
     public SmalltalkOOP[] GetUnreachableObjects() => _garbageCollector.GetUnreachableObjects();
     public GCStatistics GarbageCollect() => _garbageCollector.GarbageCollect();
-    public GCStatistics GetGCStatistics() => _garbageCollector.GetGCStatistics();
+    public GCStatistics GetGCStatistics() => _garbageCollector.GetStatistics();
 
     #endregion
 
