@@ -1,5 +1,6 @@
 extern alias CompilerLib;
 
+using Bytecode = CompilerLib::Smalltalk80.Core.Bytecodes.Bytecode;
 using ExtendedSubOp = CompilerLib::Smalltalk80.Core.Bytecodes.ExtendedSubOp;
 using Smalltalk80.Compiler;
 using Smalltalk80.Core.Bytecodes;
@@ -22,12 +23,12 @@ public class BytecodeEmitterTests
         var emitter = new BytecodeEmitter();
 
         // Act
-        emitter.Emit(0x70);
+        emitter.Emit((byte)Bytecode.PUSH_SELF);
 
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x70, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.PUSH_SELF, bytecodes[0]);
     }
 
     [Fact]
@@ -37,12 +38,12 @@ public class BytecodeEmitterTests
         var emitter = new BytecodeEmitter();
 
         // Act
-        emitter.Emit(0x70);
+        emitter.Emit((byte)Bytecode.PUSH_SELF);
 
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x70, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.PUSH_SELF, bytecodes[0]);
     }
 
     [Fact]
@@ -52,14 +53,14 @@ public class BytecodeEmitterTests
         var emitter = new BytecodeEmitter();
 
         // Act
-        emitter.EmitBytes(0x10, 0x11, 0x12);
+        emitter.EmitBytes((byte)Bytecode.PUSH_TEMP_0, (byte)(Bytecode.PUSH_TEMP_0 + 1), (byte)(Bytecode.PUSH_TEMP_0 + 2));
 
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Equal(3, bytecodes.Length);
-        Assert.Equal(0x10, bytecodes[0]);
-        Assert.Equal(0x11, bytecodes[1]);
-        Assert.Equal(0x12, bytecodes[2]);
+        Assert.Equal((byte)Bytecode.PUSH_TEMP_0, bytecodes[0]);
+        Assert.Equal((byte)(Bytecode.PUSH_TEMP_0 + 1), bytecodes[1]);
+        Assert.Equal((byte)(Bytecode.PUSH_TEMP_0 + 2), bytecodes[2]);
     }
 
     [Fact]
@@ -69,12 +70,12 @@ public class BytecodeEmitterTests
         var emitter = new BytecodeEmitter();
 
         // Act
-        emitter.EmitByte(0x73);
+        emitter.EmitByte((byte)Bytecode.PUSH_NIL);
 
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x73, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.PUSH_NIL, bytecodes[0]);
     }
 
     #endregion
@@ -93,7 +94,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x70, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.PUSH_SELF, bytecodes[0]);
     }
 
     [Fact]
@@ -108,7 +109,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x73, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.PUSH_NIL, bytecodes[0]);
     }
 
     [Fact]
@@ -123,7 +124,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x71, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.PUSH_TRUE, bytecodes[0]);
     }
 
     [Fact]
@@ -138,14 +139,14 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x72, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.PUSH_FALSE, bytecodes[0]);
     }
 
     [Theory]
-    [InlineData(-1, 0x74)]
-    [InlineData(0, 0x75)]
-    [InlineData(1, 0x76)]
-    [InlineData(2, 0x77)]
+    [InlineData(-1, Bytecode.PUSH_MINUS_ONE)]
+    [InlineData(0, Bytecode.PUSH_ZERO)]
+    [InlineData(1, Bytecode.PUSH_ONE)]
+    [InlineData(2, Bytecode.PUSH_TWO)]
     public void PushSmallInteger_SpecialValues_EmitsOptimizedBytecodes(int value, byte expectedBytecode)
     {
         // Arrange
@@ -172,8 +173,8 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.True(bytecodes.Length >= 1);
-        // Should use PUSH_LITERAL_CONST bytecode (0x20-0x3F range)
-        Assert.True((bytecodes[0] >= 0x20 && bytecodes[0] <= 0x3F) || bytecodes[0] == 0x80);
+        // Should use PUSH_LITERAL_CONST bytecode
+        Assert.True((bytecodes[0] >= (byte)Bytecode.PUSH_LITERAL_CONST_0 && bytecodes[0] <= (byte)Bytecode.PUSH_LITERAL_CONST_31) || bytecodes[0] == (byte)Bytecode.EXTENDED_PREFIX);
     }
 
     [Fact]
@@ -188,7 +189,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x05, bytecodes[0]);
+        Assert.Equal((byte)(Bytecode.PUSH_IVAR_0 + 5), bytecodes[0]);
     }
 
     [Fact]
@@ -203,7 +204,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Equal(3, bytecodes.Length);
-        Assert.Equal(0x80, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.EXTENDED_PREFIX, bytecodes[0]);
         Assert.Equal((byte)ExtendedSubOp.PUSH_IVAR, bytecodes[1]);
         Assert.Equal(20, bytecodes[2]);
     }
@@ -220,7 +221,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x13, bytecodes[0]);
+        Assert.Equal((byte)(Bytecode.PUSH_TEMP_0 + 3), bytecodes[0]);
     }
 
     [Fact]
@@ -235,7 +236,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Equal(3, bytecodes.Length);
-        Assert.Equal(0x80, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.EXTENDED_PREFIX, bytecodes[0]);
         Assert.Equal((byte)ExtendedSubOp.PUSH_TEMP, bytecodes[1]);
         Assert.Equal(20, bytecodes[2]);
     }
@@ -252,7 +253,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x89, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.PUSH_ACTIVE_CONTEXT, bytecodes[0]);
     }
 
     #endregion
@@ -271,7 +272,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x63, bytecodes[0]);
+        Assert.Equal((byte)(Bytecode.POP_STORE_IVAR_0 + 3), bytecodes[0]);
     }
 
     [Fact]
@@ -286,7 +287,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Equal(3, bytecodes.Length);
-        Assert.Equal(0x80, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.EXTENDED_PREFIX, bytecodes[0]);
         Assert.Equal((byte)ExtendedSubOp.POP_STORE_IVAR, bytecodes[1]);
         Assert.Equal(15, bytecodes[2]);
     }
@@ -303,7 +304,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x6D, bytecodes[0]);
+        Assert.Equal((byte)(Bytecode.POP_STORE_TEMP_0 + 5), bytecodes[0]);
     }
 
     [Fact]
@@ -318,7 +319,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Equal(3, bytecodes.Length);
-        Assert.Equal(0x80, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.EXTENDED_PREFIX, bytecodes[0]);
         Assert.Equal((byte)ExtendedSubOp.POP_STORE_TEMP, bytecodes[1]);
         Assert.Equal(10, bytecodes[2]);
     }
@@ -339,7 +340,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Equal(2, bytecodes.Length);
-        Assert.Equal(0x80, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.EXTENDED_PREFIX, bytecodes[0]);
         Assert.Equal((byte)ExtendedSubOp.POP, bytecodes[1]);
     }
 
@@ -355,7 +356,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Equal(2, bytecodes.Length);
-        Assert.Equal(0x80, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.EXTENDED_PREFIX, bytecodes[0]);
         Assert.Equal((byte)ExtendedSubOp.DUP, bytecodes[1]);
     }
 
@@ -375,7 +376,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x78, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.RETURN_SELF, bytecodes[0]);
     }
 
     [Fact]
@@ -390,7 +391,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x7C, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.RETURN_TOP, bytecodes[0]);
     }
 
     [Fact]
@@ -405,7 +406,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x7E, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.RETURN_TOP_POP, bytecodes[0]);
     }
 
     [Fact]
@@ -420,7 +421,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x79, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.RETURN_TRUE, bytecodes[0]);
     }
 
     [Fact]
@@ -435,7 +436,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x7A, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.RETURN_FALSE, bytecodes[0]);
     }
 
     [Fact]
@@ -450,7 +451,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal(0x7B, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.RETURN_NIL, bytecodes[0]);
     }
 
     #endregion
@@ -458,12 +459,12 @@ public class BytecodeEmitterTests
     #region Send Operations Tests
 
     [Theory]
-    [InlineData("+", 176)]
-    [InlineData("-", 177)]
-    [InlineData("<", 178)]
-    [InlineData(">", 179)]
-    [InlineData("=", 182)]
-    [InlineData("*", 184)]
+    [InlineData("+", Bytecode.SEND_ARITH_PLUS)]
+    [InlineData("-", Bytecode.SEND_ARITH_MINUS)]
+    [InlineData("<", Bytecode.SEND_ARITH_LT)]
+    [InlineData(">", Bytecode.SEND_ARITH_GT)]
+    [InlineData("=", Bytecode.SEND_ARITH_EQ)]
+    [InlineData("*", Bytecode.SEND_ARITH_TIMES)]
     public void EmitSend_ArithmeticSelectors_EmitsSpecialBytecodes(string selector, int expectedBytecode)
     {
         // Arrange
@@ -479,11 +480,11 @@ public class BytecodeEmitterTests
     }
 
     [Theory]
-    [InlineData("at:", 192)]
-    [InlineData("size", 194)]
-    [InlineData("class", 199)]
-    [InlineData("value", 201)]
-    [InlineData("new", 204)]
+    [InlineData("at:", Bytecode.SEND_SPECIAL_AT)]
+    [InlineData("size", Bytecode.SEND_SPECIAL_SIZE)]
+    [InlineData("class", Bytecode.SEND_SPECIAL_CLASS)]
+    [InlineData("value", Bytecode.SEND_SPECIAL_VALUE)]
+    [InlineData("new", Bytecode.SEND_SPECIAL_NEW)]
     public void EmitSend_SpecialSelectors_EmitsSpecialBytecodes(string selector, int expectedBytecode)
     {
         // Arrange
@@ -510,8 +511,8 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        // Should be in 0xD0-0xDF range
-        Assert.True(bytecodes[0] >= 0xD0 && bytecodes[0] <= 0xDF);
+        // Should be in SEND_LITERAL_0 range
+        Assert.True(bytecodes[0] >= (byte)Bytecode.SEND_LITERAL_0_BASE && bytecodes[0] <= (byte)Bytecode.SEND_LITERAL_0_MAX);
     }
 
     [Fact]
@@ -526,8 +527,8 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        // Should be in 0xE0-0xEF range
-        Assert.True(bytecodes[0] >= 0xE0 && bytecodes[0] <= 0xEF);
+        // Should be in SEND_LITERAL_1 range
+        Assert.True(bytecodes[0] >= (byte)Bytecode.SEND_LITERAL_1_BASE && bytecodes[0] <= (byte)Bytecode.SEND_LITERAL_1_MAX);
     }
 
     [Fact]
@@ -542,8 +543,8 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        // Should be in 0xF0-0xFF range
-        Assert.True(bytecodes[0] >= 0xF0 && bytecodes[0] <= 0xFF);
+        // Should be in SEND_LITERAL_2 range
+        Assert.True(bytecodes[0] >= (byte)Bytecode.SEND_LITERAL_2_BASE && bytecodes[0] <= (byte)Bytecode.SEND_LITERAL_2_MAX);
     }
 
     [Fact]
@@ -558,7 +559,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Equal(3, bytecodes.Length);
-        Assert.Equal(0x80, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.EXTENDED_PREFIX, bytecodes[0]);
         Assert.Equal((byte)ExtendedSubOp.SEND_SUPER_0, bytecodes[1]);
     }
 
@@ -745,7 +746,7 @@ public class BytecodeEmitterTests
 
         // Assert
         var bytecodes = emitter.GetBytecodes();
-        Assert.Equal(0xA8, bytecodes[5]);  // Long unconditional backward jump
+        Assert.Equal(0xA8, bytecodes[5]);  // Long unconditional backward jump (0xA8 - no specific enum for this)
     }
 
     [Fact]
@@ -872,7 +873,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Equal(3, bytecodes.Length);
-        Assert.Equal(0x80, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.EXTENDED_PREFIX, bytecodes[0]);
         Assert.Equal((byte)ExtendedSubOp.POP_STORE_LITERAL_VAR, bytecodes[1]);
     }
 
