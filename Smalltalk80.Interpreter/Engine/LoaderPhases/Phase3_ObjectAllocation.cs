@@ -185,7 +185,12 @@ public class Phase3_ObjectAllocation : IPhase
 
         // CRITICAL: Set the class reference - AllocateFixedObject doesn't set it!
         var processorSchedulerClassOOP = GlobalRegistry.LookupClassOOP("ProcessorScheduler");
+        Console.WriteLine($"[Phase3] ProcessorScheduler CLASS OOP = {processorSchedulerClassOOP}");
         _allocator.SetObjectClass(processorSchedulerOOP, processorSchedulerClassOOP);
+
+        // Verify class was set
+        var verifyClass = _allocator.GetClassOOP(processorSchedulerOOP);
+        Console.WriteLine($"[Phase3] After SetObjectClass, class = {verifyClass}");
 
         Console.WriteLine($"[Phase3] Created ProcessorScheduler singleton: {processorSchedulerOOP}");
         GlobalRegistry.Register("ProcessorScheduler", processorSchedulerOOP);
@@ -239,6 +244,7 @@ public class Phase3_ObjectAllocation : IPhase
         // Set quiescentProcessLists (index 0)
         _allocator.SetInstanceVariable(processorSchedulerOOP, 0, arrayOOP);
         _initializedFields.Add((processorSchedulerOOP, 0));
+        Console.WriteLine($"[Phase3] Set quiescentProcessLists = {arrayOOP}");
 
         // 2. Create initial/main Process for activeProcess
         // Process has: suspendedContext (index 0), priority (index 1), myList (index 2)
@@ -252,6 +258,12 @@ public class Phase3_ObjectAllocation : IPhase
         // Set activeProcess (index 1)
         _allocator.SetInstanceVariable(processorSchedulerOOP, 1, processOOP);
         _initializedFields.Add((processorSchedulerOOP, 1));
+        Console.WriteLine($"[Phase3] Set activeProcess = {processOOP}");
+
+        // Verify fields were set
+        var verifyField0 = _allocator.GetInstanceVariable(processorSchedulerOOP, 0);
+        var verifyField1 = _allocator.GetInstanceVariable(processorSchedulerOOP, 1);
+        Console.WriteLine($"[Phase3] Verify: quiescentProcessLists = {verifyField0}, activeProcess = {verifyField1}");
     }
 
     /// <summary>
