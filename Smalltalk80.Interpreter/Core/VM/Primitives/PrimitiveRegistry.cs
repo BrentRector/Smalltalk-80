@@ -249,6 +249,33 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(133, new SystemOperations.ForceGC());
         registry.Register(139, new SystemOperations.NextObject());
 
+        // File system primitives (120-160)
+        // Note: Some numbers from Smalltalk source were relocated to avoid conflicts
+        registry.Register(120, new FileOperations.PathParse());
+        registry.Register(121, new FileOperations.FileOpen());
+        registry.Register(122, new FileOperations.FileClose());
+        registry.Register(123, new FileOperations.FileRead());
+        registry.Register(124, new FileOperations.FileSeek());
+        registry.Register(125, new FileOperations.FileDelete());
+        registry.Register(126, new FileOperations.FileMove());
+        registry.Register(127, new FileOperations.CreateDirectory());
+        registry.Register(135, new FileOperations.GetDrives());
+        registry.Register(136, new FileOperations.FileWrite());
+        registry.Register(137, new FileOperations.GetCurrentDirectory());
+        registry.Register(138, new FileOperations.SetCurrentDirectory());
+        registry.Register(140, new FileOperations.RemoveDirectory());
+        registry.Register(141, new FileOperations.FindFirst());
+        registry.Register(142, new FileOperations.FindNext());
+        registry.Register(143, new FileOperations.FindClose());
+        registry.Register(144, new FileOperations.GetFileSize());
+        registry.Register(145, new FileOperations.GetFilePosition());
+        registry.Register(146, new FileOperations.DirectoryList());
+        registry.Register(151, new FileOperations.FileFlush());
+        registry.Register(152, new FileOperations.ReadFileAsString());
+        registry.Register(153, new FileOperations.WriteStringToFile());
+        registry.Register(154, new FileOperations.GetFileAttributes());
+        registry.Register(155, new FileOperations.FileExists());
+
         return registry;
     }
 }
