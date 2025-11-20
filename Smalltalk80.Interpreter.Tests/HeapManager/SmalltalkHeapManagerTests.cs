@@ -1544,11 +1544,12 @@ public class SmalltalkHeapManagerTests : IDisposable
     public void Equals_SameObjectPointer_ReturnsTrue()
     {
         // Arrange
-        var obj = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        var obj1 = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        var obj2 = obj1; // Same OOP value
 
         // Act & Assert - Same OOP should equal itself
-        Assert.True(obj.Equals(obj));
-        Assert.True(obj == obj);
+        Assert.True(obj1.Equals(obj2));
+        Assert.True(obj1 == obj2);
     }
 
     [Fact]
