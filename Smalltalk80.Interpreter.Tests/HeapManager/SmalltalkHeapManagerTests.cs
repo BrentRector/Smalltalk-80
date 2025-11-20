@@ -2,6 +2,7 @@ using Smalltalk80.Core;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
 using Xunit;
+using FormatWord = Smalltalk80.Core.FormatWord;
 
 namespace Smalltalk80.Interpreter.Tests.HeapManager;
 

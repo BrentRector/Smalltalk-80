@@ -39,7 +39,7 @@ public class ContextManagerTests
         ));
 
         // Initialize RuntimeSpecialObjects for tests
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(MockBehavior.Loose, null!, null!);
+        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("MethodContext")).Returns(_methodContextClassOOP);
         RuntimeSpecialObjects.Instance.Initialize(mockRuntimeAccess.Object);
 

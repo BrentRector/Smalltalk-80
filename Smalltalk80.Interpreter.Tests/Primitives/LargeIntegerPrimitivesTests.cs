@@ -35,7 +35,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
 
     private Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccess()
     {
-        var mock = new Mock<RuntimeHeapAccessor>(MockBehavior.Loose, null!, null!);
+        var mock = new Mock<RuntimeHeapAccessor>();
         mock.Setup(r => r.GetClass("LargePositiveInteger")).Returns(ObjectOOP(1000));
         mock.Setup(r => r.GetClass("LargeNegativeInteger")).Returns(ObjectOOP(1001));
         return mock;

@@ -21,9 +21,8 @@ public class SystemPrimitivesTests : PrimitiveTestBase
         mockHeap.Setup(h => h.GetGCStatistics()).Returns(new GCStatistics
         {
             TotalObjects = 1000,
-            FreedObjects = 0,
-            FreeSlots = 0,
-            UsedSlots = 1000
+            CollectedObjects = 0,
+            FreeObjectTableEntries = 0
         });
         mockHeap.Setup(h => h.GetObjectTableSize()).Returns(10000);
 

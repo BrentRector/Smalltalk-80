@@ -1,4 +1,5 @@
 using Smalltalk80.Compiler;
+using Smalltalk80.Core.Bytecodes;
 using Xunit;
 
 namespace Smalltalk80.Interpreter.Tests.Compiler;
@@ -168,8 +169,8 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.True(bytecodes.Length >= 1);
-        // Should use PUSH_LITERAL_CONST bytecode
-        Assert.True(BytecodeUtil.IsPushLiteralConst(bytecodes[0]) || bytecodes[0] == 0x80);
+        // Should use PUSH_LITERAL_CONST bytecode (0x20-0x3F range)
+        Assert.True((bytecodes[0] >= 0x20 && bytecodes[0] <= 0x3F) || bytecodes[0] == 0x80);
     }
 
     [Fact]
