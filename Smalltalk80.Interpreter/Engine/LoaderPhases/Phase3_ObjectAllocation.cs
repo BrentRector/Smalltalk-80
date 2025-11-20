@@ -101,12 +101,14 @@ public class Phase3_ObjectAllocation : IPhase
         // Section 1: Allocation (ALL object creation happens here)
         AllocateSentinelObjects();
         AllocateSpecialObjects();
+        TraceProcessorSchedulerClass("After Section 1 (Allocation)");
 
         // Phase 3.5: Pre-create Associations for Undeclared Variables
         // CRITICAL: This runs BEFORE class pointer fix to ensure all Associations
         // are created before SetClassReferencesForAllObjects() runs.
         // This way, the class pointer fix happens in ONE pass for ALL Associations.
         PreCreateUndeclaredAssociations();
+        TraceProcessorSchedulerClass("After Phase 3.5 (Associations)");
 
         // NOTE: DefaultTextStyle creation moved to Phase 5 (after AssociationRegistry is populated)
 
@@ -114,14 +116,26 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Section 2: Class Reference Setting (ONE fix for ALL objects including Phase 3.5 Associations)
         SetClassReferencesForAllObjects();
+        TraceProcessorSchedulerClass("After Section 2 (Class References)");
         LogClassReferenceCheckpoint();
 
         // Section 3: Populate Behavior.subclasses field
         PopulateSubclassesField();
+        TraceProcessorSchedulerClass("After Section 3 (Subclasses)");
 
         // Section 4: Nil Initialization
         InitializeUnsetInstanceVariables();
+        TraceProcessorSchedulerClass("After Section 4 (Nil Init)");
         LogInitializationCheckpoint();
+    }
+
+    private void TraceProcessorSchedulerClass(string checkpoint)
+    {
+        if (GlobalRegistry.TryGet("ProcessorScheduler", out var processorOOP))
+        {
+            var classOOP = _allocator.GetClassOOP(processorOOP);
+            Console.WriteLine($"[Phase3 TRACE] {checkpoint}: ProcessorScheduler class = {classOOP}");
+        }
     }
 
     private void LogAllocationCheckpoint()
