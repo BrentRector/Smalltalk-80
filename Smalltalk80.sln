@@ -23,6 +23,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Smalltalk80.Interpreter.Eng
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Smalltalk80.Interpreter.Tests", "Smalltalk80.Interpreter.Tests\Smalltalk80.Interpreter.Tests.csproj", "{F3A4B5C6-D7E8-49FA-BAF3-4B5C6D7E8F9A}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Smalltalk80.Interpreter.Shared.Types", "Smalltalk80.Interpreter.Shared.Types\Smalltalk80.Interpreter.Shared.Types.csproj", "{A1B2C3D4-E5F6-47A8-B9C1-2D3E4F5A6B7C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Smalltalk80.Interpreter.HeapManager", "Smalltalk80.Interpreter.HeapManager\Smalltalk80.Interpreter.HeapManager.csproj", "{B2C3D4E5-F6A7-48B9-C1D2-3E4F5A6B7C8D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -67,6 +71,14 @@ Global
 		{F3A4B5C6-D7E8-49FA-BAF3-4B5C6D7E8F9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F3A4B5C6-D7E8-49FA-BAF3-4B5C6D7E8F9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F3A4B5C6-D7E8-49FA-BAF3-4B5C6D7E8F9A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B2C3D4-E5F6-47A8-B9C1-2D3E4F5A6B7C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-E5F6-47A8-B9C1-2D3E4F5A6B7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-E5F6-47A8-B9C1-2D3E4F5A6B7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-E5F6-47A8-B9C1-2D3E4F5A6B7C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B2C3D4E5-F6A7-48B9-C1D2-3E4F5A6B7C8D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2C3D4E5-F6A7-48B9-C1D2-3E4F5A6B7C8D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2C3D4E5-F6A7-48B9-C1D2-3E4F5A6B7C8D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2C3D4E5-F6A7-48B9-C1D2-3E4F5A6B7C8D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
