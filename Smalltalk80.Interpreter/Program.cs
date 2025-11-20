@@ -225,7 +225,6 @@ public static class Program
                     "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
                     "FormMenuView initialize",               // ❌ Pool variable 'Disk' not found in FilePool
                     "ChangeListController initialize",       // ❌ CopyBits indexed word out of range
-                    "Delay initialize",                      // ❌ SortedCollection new: primitiveFailed
                     "ParagraphEditor initialize",            // ❌ CopyBits indexed word out of range
                 };
 
