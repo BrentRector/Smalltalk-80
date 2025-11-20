@@ -472,62 +472,27 @@ public static class Program
                 Console.WriteLine($"  Succeeded: {succeeded}");
                 Console.WriteLine($"  Failed: {failed}");
                 Console.WriteLine($"  Skipped: {skippedIndices.Count} (require runtime features)");
-                Console.WriteLine($"  Comment expressions: {phase2Indices.Count} (not executed)");
-
-                // Run GC after init expressions to collect temporary objects
-                Console.WriteLine($"\n=== Running GC after init expressions ===");
-                var gcStatsAfter = heapManager.GarbageCollect();
-                Console.WriteLine($"  {gcStatsAfter.GetSummary()}");
-                if (gcStatsAfter.CollectedObjects > 0)
-                {
-                    Console.WriteLine($"  {gcStatsAfter.GetFormatBreakdown()}");
-                }
 
                 // Note: Test expressions already executed as init expressions above
                 // No need to re-run them here
 
-                // Phase 2: Execute comment: expressions (run after all initialize! expressions)
-                // Only enabled comment expressions will run - start with one to test
-                // Use prefix matching since Source includes full comment text
-                var enabledCommentPrefixes = new List<string>
-                {
-                    "Object comment:",  // Start with one simple comment expression
-                };
-
-                // Filter phase2Indices to only include enabled expressions (prefix match)
-                var enabledPhase2Indices = phase2Indices
-                    .Where(i => {
-                        var expr = bundle.InitExpressions[i];
-                        return expr.Source != null &&
-                               enabledCommentPrefixes.Any(prefix => expr.Source.StartsWith(prefix));
-                    })
-                    .ToList();
-
-                if (enabledPhase2Indices.Count > 0)
+                // Phase 2: Execute ALL comment: expressions (run after all initialize! expressions)
+                if (phase2Indices.Count > 0)
                 {
                     Console.WriteLine($"\n=== Phase 2: Class Documentation ===");
-                    Console.WriteLine($"  Executing {enabledPhase2Indices.Count} of {phase2Indices.Count} comment: expression(s)");
-                    Console.WriteLine();
 
                     int phase2Succeeded = 0;
-                    foreach (int index in enabledPhase2Indices)
+                    int phase2Failed = 0;
+                    foreach (int index in phase2Indices)
                     {
                         var expr = bundle.InitExpressions[index];
                         var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
-
-                        // Show abbreviated source for comments (they're long)
-                        string displaySource = expr.Source ?? expr.LocalId;
-                        if (displaySource.Length > 80)
-                        {
-                            displaySource = displaySource.Substring(0, 77) + "...";
-                        }
-                        Console.WriteLine($"[{index}] {displaySource}");
 
                         var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
 
                         if (result.Status != InitStatus.Success)
                         {
-                            failed++;
+                            phase2Failed++;
                             Console.WriteLine($"\n❌ FAILED: {expr.Source}");
                             Console.WriteLine($"   Status: {result.Status}");
                             if (result.Diagnostic?.Message != null)
@@ -536,23 +501,29 @@ public static class Program
                             }
 
                             Console.WriteLine($"\n=== Phase 2 Execution Failed ===");
-                            Console.WriteLine($"  Phase 1: {succeeded} succeeded");
-                            Console.WriteLine($"  Phase 2: {phase2Succeeded} succeeded, {failed} failed");
+                            Console.WriteLine($"  {phase2Succeeded}/{phase2Indices.Count} succeeded. {phase2Failed}/{phase2Indices.Count} failed.");
                             Console.WriteLine($"  Fast-fail: Stopping execution");
                             return;
                         }
 
                         phase2Succeeded++;
-                        succeeded++;
                     }
 
-                    Console.WriteLine($"\n✓ Phase 2 Complete: {phase2Succeeded} comment: expression(s) executed successfully");
-                    Console.WriteLine($"  Remaining disabled: {phase2Indices.Count - enabledPhase2Indices.Count}");
+                    Console.WriteLine($"  {phase2Succeeded}/{phase2Indices.Count} succeeded. {phase2Failed}/{phase2Indices.Count} failed.");
                 }
                 else
                 {
                     Console.WriteLine($"\n=== Phase 2: Class Documentation ===");
-                    Console.WriteLine($"  No comment expressions enabled ({phase2Indices.Count} available)");
+                    Console.WriteLine($"  No comment expressions in bundle");
+                }
+
+                // Run GC after all init expressions to collect temporary objects
+                Console.WriteLine($"\n=== Running GC after init expressions ===");
+                var gcStatsAfter = heapManager.GarbageCollect();
+                Console.WriteLine($"  {gcStatsAfter.GetSummary()}");
+                if (gcStatsAfter.CollectedObjects > 0)
+                {
+                    Console.WriteLine($"  {gcStatsAfter.GetFormatBreakdown()}");
                 }
             }
 
