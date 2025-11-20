@@ -335,12 +335,6 @@ public static class Program
                     }
                     // Add at end in order
                     phase1Indices.AddRange(lastIndices);
-
-                    Console.WriteLine($"\n=== Dependency-Ordered Init Expression Execution ===");
-                    Console.WriteLine($"  Total: {phase1Indices.Count} initialize expressions");
-                    Console.WriteLine($"  Order: SmallInteger → ... → Form → TextList → BitEditor → ParagraphEditor (last)");
-                    Console.WriteLine($"  See: InitExpression-DependencyAnalysis.md");
-                    Console.WriteLine();
                 }
 
                 int succeeded = 0;
