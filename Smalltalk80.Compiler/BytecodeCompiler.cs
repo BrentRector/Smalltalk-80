@@ -824,6 +824,15 @@ namespace Smalltalk80.Compiler
                     var msg = binaryMessages[i];
                     var selector = msg.binarySelector().GetText();
 
+                    // For super sends, pre-add selector to literal frame BEFORE compiling arguments.
+                    // This is critical because super sends always need the selector in the literal frame
+                    // (they can't use special bytecodes), and argument literal indices depend on
+                    // selectors.Count being accurate.
+                    if (i == 0 && receiverIsSuper)
+                    {
+                        emitter.AddLiteral(new Symbol(selector));
+                    }
+
                     // Compile the argument (unaryExpr)
                     var argExpr = msg.unaryExpr();
                     if (argExpr != null)
@@ -946,6 +955,15 @@ namespace Smalltalk80.Compiler
                 {
                     isTailRecursive = true;
                 }
+            }
+
+            // For super sends, pre-add selector to literal frame BEFORE compiling arguments.
+            // This is critical because super sends always need the selector in the literal frame
+            // (they can't use special bytecodes), and argument literal indices depend on
+            // selectors.Count being accurate.
+            if (isSuper)
+            {
+                emitter.AddLiteral(new Symbol(selector));
             }
 
             // Compile arguments (push onto stack)

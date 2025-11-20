@@ -226,7 +226,6 @@ public static class Program
                     "FormMenuView initialize",               // ❌ Pool variable 'Disk' not found in FilePool
                     "ChangeListController initialize",       // ❌ CopyBits indexed word out of range
                     "ParagraphEditor initialize",            // ❌ CopyBits indexed word out of range
-                    "Delay initialize",                      // ❌ Super send bug: Symbol passed instead of SmallInteger 10
                 };
 
                 // Build index lists for each phase (preserving source file order)
