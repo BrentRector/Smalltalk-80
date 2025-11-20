@@ -487,6 +487,9 @@ public static class Program
                 {
                     Console.WriteLine($"\n=== Phase 2: Class Documentation ===");
 
+                    // Suppress verbose infinite loop output for comment expressions
+                    Smalltalk80.Interpreter.Core.VM.Diagnostics.ExecutionTracer.SuppressInfiniteLoopTrace = true;
+
                     int phase2Succeeded = 0;
                     int phase2Failed = 0;
                     int phase2Skipped = 0;
@@ -520,6 +523,9 @@ public static class Program
 
                     int phase2Total = phase2Indices.Count - phase2Skipped;
                     Console.WriteLine($"  {phase2Succeeded}/{phase2Total} succeeded. {phase2Failed}/{phase2Total} failed. {phase2Skipped} skipped.");
+
+                    // Reset suppression
+                    Smalltalk80.Interpreter.Core.VM.Diagnostics.ExecutionTracer.SuppressInfiniteLoopTrace = false;
                 }
                 else
                 {
