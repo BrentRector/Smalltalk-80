@@ -235,7 +235,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
         if (totalWidth <= 0) totalWidth = charCount;
 
         // Build xTable (includes sentinel at end)
-        int[] xTable = new int[charCount + 1];
+        // Smalltalk widthOf: can access xTable at: (maxAscii + 1) + 2, so we need charCount + 2 entries
+        int[] xTable = new int[charCount + 2];
         int x = 0;
         for (int i = 0; i < charCount; i++)
         {
@@ -243,6 +244,7 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             x += widths[i];
         }
         xTable[charCount] = x; // Sentinel
+        xTable[charCount + 1] = x; // Extra sentinel for edge case
 
         int strikeLength = x;
         int raster = (strikeLength + 15) / 16;

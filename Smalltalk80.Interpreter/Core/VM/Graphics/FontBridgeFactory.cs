@@ -79,11 +79,12 @@ public class NullFontBridge : IFontBridge
         int charWidth = GetCharWidth(descriptor, ' ');
 
         // Build xTable with uniform widths
-        int[] xTable = new int[charCount + 1];
+        // Smalltalk widthOf: can access xTable at: (maxAscii + 1) + 2, so we need charCount + 2 entries
+        int[] xTable = new int[charCount + 2];
         int[] widthTable = new int[charCount];
-        for (int i = 0; i <= charCount; i++)
+        for (int i = 0; i <= charCount + 1; i++)
         {
-            xTable[i] = i * charWidth;
+            xTable[i] = Math.Min(i, charCount) * charWidth;
             if (i < charCount) widthTable[i] = charWidth;
         }
 

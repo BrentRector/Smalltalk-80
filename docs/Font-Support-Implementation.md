@@ -358,25 +358,33 @@ Note: In the current implementation, DefaultTextStyle is bootstrapped from C# du
 - Disabled ClearType/antialiasing
 - Font caching by (family, sizePx, dpi, hinting)
 - Font identity recording
-- Validation test suite (C# and Smalltalk)
+- Validation test suite (Smalltalk tests created)
+
+### Recent Progress (November 2025)
+- Form initialization now works correctly
+- CopyBits (primitive 96) handles WordArray bits properly
+- Graphics primitives fully functional
 
 ## Validation Test Plan
 
 ### Test Files
 
-- **C# Tests**: `Smalltalk80.Interpreter/Tests/FontBridgeTests.cs`
-- **Smalltalk Tests**: `Smalltalk-80 Source/Tests/FontValidationTests.st`
+- **C# Tests**: `Smalltalk80.Interpreter/Tests/FontBridgeTests.cs` - *Not yet created*
+- **Smalltalk Tests**: `Smalltalk-80 Source/Tests/FontValidationTests.st` - ✅ Exists
 
 ### Running Tests
-
-**C# Tests:**
-```csharp
-FontBridgeTests.RunAllTests();
-```
 
 **Smalltalk Tests:**
 ```smalltalk
 FontValidationTests runAll
+```
+
+Run during cold start by including `FontValidationTests.st` in the test bundle.
+
+**C# Tests (Future):**
+When created, tests would be run as:
+```csharp
+FontBridgeTests.RunAllTests();
 ```
 
 ### Phase 1 Tests: Bootstrap with WinForms/GDI+

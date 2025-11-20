@@ -1872,59 +1872,90 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             throw new InvalidOperationException($"Pool dictionary not found: {poolNameString}, and variable '{GetSymbolString(keySymbol)}' not in Undeclared");
         }
         
-        // 2. Look up key in pool dictionary
-        var resolvedValueOOP = LookupInDictionary(poolDictOOP, keySymbol);
-        
-        if (resolvedValueOOP == SpecialObjectsArray.Instance.Nil)
+        // 2. Look up key in pool dictionary - get the Association, not just the value
+        // This allows us to distinguish "not found" from "value is nil"
+        var resolvedAssocOOP = LookupAssociationInDictionary(poolDictOOP, keySymbol);
+
+        if (resolvedAssocOOP == SpecialObjectsArray.Instance.Nil)
         {
-            // Key not found in pool dictionary - this is an error
+            // Key not found in pool dictionary
             var poolNameString = GetSymbolString(poolNameSymbol);
             var keyString = GetSymbolString(keySymbol);
             throw new InvalidOperationException($"Pool variable '{keyString}' not found in pool dictionary '{poolNameString}'");
         }
-        
+
         // 3. Patch literal: Replace poolNameSymbol with poolDictOOP
         // This makes subsequent executions faster (no name lookup)
         _heapManager.SetIndexedOOP(poolLiteralOOP, 0, poolDictOOP);
-        
+
+        // Return the Association's value
+        var resolvedValueOOP = _heapManager.GetInstanceVariable(resolvedAssocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
         return resolvedValueOOP;
+    }
+
+    /// <summary>
+    /// Looks up a key (Symbol) in a Dictionary and returns the Association OOP.
+    /// Returns nil if key not found.
+    /// Uses hash-based lookup matching Smalltalk's Dictionary>>at: semantics.
+    /// </summary>
+    private SmalltalkOOP LookupAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbol)
+    {
+        // Dictionary is a variableSubclass of Set with:
+        //   Instance variable [0]: tally (inherited from Set)
+        //   Indexed slots [0..N]: Association array
+        int arraySize = _heapManager.GetIndexedSize(dictionaryOOP);
+        if (arraySize == 0) return SpecialObjectsArray.Instance.Nil;
+
+        // Compute hash using identity hash (Primitive 75 semantics: OOP >> 1)
+        int hash = keySymbol.IsSmallInteger
+            ? keySymbol.AsSmallInteger() & 0x3FFFFFFF
+            : keySymbol.ToObjectTableIndex();
+
+        // Find starting slot (matching Smalltalk's findKeyOrNil:)
+        int startIndex = ((hash % arraySize) + arraySize) % arraySize;
+        int index = startIndex;
+
+        // Linear probe until we find the key or hit nil
+        do
+        {
+            var elementOOP = _heapManager.GetIndexedOOP(dictionaryOOP, index);
+
+            if (elementOOP == SpecialObjectsArray.Instance.Nil)
+            {
+                // Empty slot - key not in dictionary
+                return SpecialObjectsArray.Instance.Nil;
+            }
+
+            // Element should be an Association
+            var assocKeyOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+
+            if (assocKeyOOP == keySymbol)
+            {
+                // Found it - return the Association OOP
+                return elementOOP;
+            }
+
+            // Linear probe to next slot
+            index = (index + 1) % arraySize;
+        } while (index != startIndex);
+
+        // Wrapped around completely - not found
+        return SpecialObjectsArray.Instance.Nil;
     }
 
     /// <summary>
     /// Looks up a key (Symbol) in a Dictionary and returns the value.
     /// Returns nil if key not found.
+    /// Uses hash-based lookup matching Smalltalk's Dictionary>>at: semantics.
     /// </summary>
     private SmalltalkOOP LookupInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbol)
     {
-        // Dictionary is a variableSubclass of Set with:
-        //   Instance variable [0]: tally (inherited from Set)
-        //   Indexed slots [0..N]: Association array
-        // The indexed portion IS the dictionary array, not a separate instance variable
-        int arraySize = _heapManager.GetIndexedSize(dictionaryOOP);
-        
-        // Linear search through dictionary indexed slots
-        for (int i = 0; i < arraySize; i++)
+        var assocOOP = LookupAssociationInDictionary(dictionaryOOP, keySymbol);
+        if (assocOOP == SpecialObjectsArray.Instance.Nil)
         {
-            var elementOOP = _heapManager.GetIndexedOOP(dictionaryOOP, i);
-            
-            if (elementOOP == SpecialObjectsArray.Instance.Nil)
-            {
-                continue; // Empty slot
-            }
-            
-            // Element should be an Association
-            var assocKeyOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            
-            if (assocKeyOOP == keySymbol)
-            {
-                // Found it - return the value
-                var assocValueOOP = _heapManager.GetInstanceVariable(elementOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-                return assocValueOOP;
-            }
+            return SpecialObjectsArray.Instance.Nil;
         }
-        
-        // Not found
-        return SpecialObjectsArray.Instance.Nil;
+        return _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
     }
 
     /// <summary>

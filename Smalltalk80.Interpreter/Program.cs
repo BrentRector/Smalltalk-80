@@ -220,24 +220,12 @@ public static class Program
                 };
 
                 // Skip list for init expressions requiring runtime features not available during bootstrap
-                // Form initialize is kept enabled to test DefaultTextStyle font bootstrap
                 var skipList = new HashSet<string>
                 {
-                    "Delay initialize",                      // ❌ Infinite loop - forkAt: creates process with [true] whileTrue
-                    "BitEditor initialize",                  // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "FormMenuView initialize",               // ❌ Infinite loop - Form readFrom: (file I/O)
-                    "ChangeListController initialize",       // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "FormEditor initialize",                 // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "NotifierController initialize",         // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "ParagraphEditor initialize",            // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "ProjectController initialize",          // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "ScreenController initialize",           // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "StandardSystemController initialize",   // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    "StringHolderController initialize",     // ❌ Infinite loop - PopUpMenu labels: (GUI)
-                    // "Form initialize" - ENABLED to test DefaultTextStyle font bootstrap
-                    "Object initialize",                     // ❌ Method not found: Sensor cursorPoint (GUI required)
-                    "TextList initialize",                   // ❌ Infinite loop (500K+ instructions)
-                    "VariableNode initialize",               // ❌ Infinite loop (500K+ instructions)
+                    "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
+                    "FormMenuView initialize",               // ❌ Pool variable 'Disk' not found in FilePool
+                    "ChangeListController initialize",       // ❌ CopyBits indexed word out of range
+                    "ParagraphEditor initialize",            // ❌ CopyBits indexed word out of range
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -314,27 +302,43 @@ public static class Program
                     var dependencyOrder = InitExpressionOrdering.GetDependencyOrder();
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
-                    // Move "Form initialize" to run last (tests DefaultTextStyle font bootstrap)
-                    int formInitIndex = -1;
-                    for (int i = 0; i < phase1Indices.Count; i++)
+                    // Move font/GUI-dependent expressions to run last (tests DefaultTextStyle)
+                    // Order: Form → TextList → BitEditor (each tests more font functionality)
+                    var runLastExpressions = new List<string>
                     {
-                        var expr = bundle.InitExpressions[phase1Indices[i]];
-                        if (expr.Source == "Form initialize")
+                        "Form initialize",      // Tests Form creation with glyphs
+                        "TextList initialize",  // Tests DefaultTextStyle copy
+                        "BitEditor initialize"  // Tests PopUpMenu labels: with font support
+                    };
+
+                    var lastIndices = new List<int>();
+                    var indicesToRemove = new List<int>();
+
+                    foreach (var exprName in runLastExpressions)
+                    {
+                        for (int i = 0; i < phase1Indices.Count; i++)
                         {
-                            formInitIndex = i;
-                            break;
+                            var expr = bundle.InitExpressions[phase1Indices[i]];
+                            if (expr.Source == exprName)
+                            {
+                                lastIndices.Add(phase1Indices[i]);
+                                indicesToRemove.Add(i);
+                                break;
+                            }
                         }
                     }
-                    if (formInitIndex >= 0)
+
+                    // Remove from current positions (in reverse index order)
+                    foreach (var idx in indicesToRemove.OrderByDescending(x => x))
                     {
-                        int formIdx = phase1Indices[formInitIndex];
-                        phase1Indices.RemoveAt(formInitIndex);
-                        phase1Indices.Add(formIdx);
+                        phase1Indices.RemoveAt(idx);
                     }
+                    // Add at end in order
+                    phase1Indices.AddRange(lastIndices);
 
                     Console.WriteLine($"\n=== Dependency-Ordered Init Expression Execution ===");
                     Console.WriteLine($"  Total: {phase1Indices.Count} initialize expressions");
-                    Console.WriteLine($"  Order: SmallInteger → ... → LargeNegativeInteger → Form (last)");
+                    Console.WriteLine($"  Order: SmallInteger → ... → Form → TextList → BitEditor (last)");
                     Console.WriteLine($"  See: InitExpression-DependencyAnalysis.md");
                     Console.WriteLine();
                 }
@@ -442,6 +446,7 @@ public static class Program
                         {
                             Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS");
                         }
+
                     }
                     else
                     {
@@ -971,4 +976,5 @@ public static class Program
             BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext")
         };
     }
+
 }

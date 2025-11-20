@@ -278,15 +278,17 @@ internal class BytecodeInterpreter(
             case Bytecode.RETURN_SELF_POP:
                 // Blue Book: Return self from block's home MethodContext (non-local return)
                 {
-                    // Check if we're in a BlockContext by reading slot 5 (home field)
-                    var homeOOP = heapManager.GetInstanceVariable(
-                        context.ActiveContext,
-                        VMConstants.BLOCKCONTEXT_HOME_INDEX  // Slot 5
-                    );
+                    // Properly check if we're in a BlockContext by checking the class
+                    var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
 
-                    // If home is not nil, we're in a BlockContext
-                    if (homeOOP != SpecialObjectsArray.Instance.Nil)
+                    if (activeClassOOP == metadata.BlockContextClassOOP)
                     {
+                        // We're in a BlockContext - get home and perform non-local return
+                        var homeOOP = heapManager.GetInstanceVariable(
+                            context.ActiveContext,
+                            VMConstants.BLOCKCONTEXT_HOME_INDEX
+                        );
+
                         // Non-local return from BlockContext to home MethodContext
                         var targetContextOOP = homeOOP;
 
@@ -317,15 +319,17 @@ internal class BytecodeInterpreter(
                 {
                     var returnValue = context.Pop();
 
-                    // Check if we're in a BlockContext by reading slot 5 (home field)
-                    var homeOOP = heapManager.GetInstanceVariable(
-                        context.ActiveContext,
-                        VMConstants.BLOCKCONTEXT_HOME_INDEX  // Slot 5: home MethodContext
-                    );
+                    // Properly check if we're in a BlockContext by checking the class
+                    var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
 
-                    if (homeOOP != SpecialObjectsArray.Instance.Nil)
+                    if (activeClassOOP == metadata.BlockContextClassOOP)
                     {
-                        // We're in a BlockContext - perform non-local return
+                        // We're in a BlockContext - get home and perform non-local return
+                        var homeOOP = heapManager.GetInstanceVariable(
+                            context.ActiveContext,
+                            VMConstants.BLOCKCONTEXT_HOME_INDEX
+                        );
+
                         var targetContextOOP = homeOOP;
 
                         // Validate target is in sender chain (safety check)
@@ -501,14 +505,30 @@ internal class BytecodeInterpreter(
     {
         byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
         int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
         int ip = ipOOP.AsSmallInteger();
         byte subOp = bytecodes[ip++];
         heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
-        var receiverOOP = heapManager.GetInstanceVariable(context.ActiveContext, receiverIndex);
+        // Check if this is a BlockContext - they retrieve receiver from home MethodContext
+        var contextClassOOP = heapManager.GetClassOOP(context.ActiveContext);
+        bool isBlockContext = contextClassOOP == metadata.BlockContextClassOOP;
+
+        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
+        SmalltalkOOP receiverOOP;
+
+        if (isBlockContext)
+        {
+            // BlockContext: receiver from home MethodContext (slot 5 in BlockContext is HOME, not receiver!)
+            var homeOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+            receiverOOP = heapManager.GetInstanceVariable(homeOOP, receiverIndex);
+        }
+        else
+        {
+            // MethodContext: receiver is at slot 4
+            receiverOOP = heapManager.GetInstanceVariable(context.ActiveContext, receiverIndex);
+        }
 
         switch (subOp)
         {

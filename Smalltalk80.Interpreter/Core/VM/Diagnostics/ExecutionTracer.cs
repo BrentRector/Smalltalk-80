@@ -10,6 +10,10 @@ public class ExecutionTracer
     private long _instructionCount;
     private const long MAX_INSTRUCTIONS = 500000;  // Halt at 500K instructions (infinite loop threshold)
 
+    // Circular buffer for recent method calls (for debugging infinite loops)
+    private readonly string[] _recentCalls = new string[100];
+    private int _recentCallIndex = 0;
+
     // Verbose debug mode for current init expression
     private bool _verboseDebugMode;
 
@@ -77,12 +81,34 @@ public class ExecutionTracer
     }
 
     /// <summary>
+    /// Records a method call for debugging infinite loops.
+    /// </summary>
+    public void RecordMethodCall(string className, string selector)
+    {
+        _recentCalls[_recentCallIndex] = $"{className}>>{selector}";
+        _recentCallIndex = (_recentCallIndex + 1) % _recentCalls.Length;
+    }
+
+    /// <summary>
     /// Throws if instruction count has exceeded the maximum.
     /// </summary>
     public void ThrowIfInfiniteLoop()
     {
         if (_instructionCount >= MAX_INSTRUCTIONS)
         {
+            // Dump recent method calls to help debug the infinite loop
+            Console.WriteLine("\n=== INFINITE LOOP DETECTED - Last 100 method calls ===");
+            int startIndex = _recentCallIndex;
+            for (int i = 0; i < _recentCalls.Length; i++)
+            {
+                int idx = (startIndex + i) % _recentCalls.Length;
+                if (_recentCalls[idx] != null)
+                {
+                    Console.WriteLine($"  [{i}] {_recentCalls[idx]}");
+                }
+            }
+            Console.WriteLine("=== END OF METHOD CALL TRACE ===\n");
+
             throw new InvalidOperationException(
                 $"Infinite loop detected: {_instructionCount} instructions exceeded threshold of {MAX_INSTRUCTIONS}");
         }

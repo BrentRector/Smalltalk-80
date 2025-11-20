@@ -17,7 +17,7 @@ public static class InitExpressionOrdering
     {
         return new List<string>
         {
-            // LEVEL 0: 81 classes with no dependencies (alphabetically sorted within level)
+            // LEVEL 0: 80 classes with no dependencies (alphabetically sorted within level)
             // ESSENTIAL CLASSES FIRST (required for basic VM functionality)
             "Character class",        // ESSENTIAL: Required for CharacterTable (String>>at: primitive)
             "Float class",            // ESSENTIAL: Required for Float constants (Pi, E, etc.)
@@ -50,7 +50,6 @@ public static class InitExpressionOrdering
             "FileList class",
             "Form class",
             "FormButtonView class",
-            "FormEditor class",
             "FormView class",
             "InputSensor class",       // REQUIRED BEFORE Object: Object>>confirm: uses Sensor cursorPoint
             "InputState class",
@@ -103,15 +102,19 @@ public static class InitExpressionOrdering
             "WindowsFileSystem class",
             "WorkspaceView class",
 
-            // LEVEL 1: 5 classes that depend on Level 0
+            // LEVEL 1: 6 classes that depend on Level 0
             "BitEditor class",      // depends on: OrderedCollection, Point
+            "FormEditor class",     // depends on: TextConstants (DefaultLineGrid)
             "Debugger class",       // depends on: NotifierView, Project
             "FormMenuView class",   // depends on: DisplayScreen
             "LargePositiveInteger class",  // depends on: DigitBuffer
             "Spline class",         // depends on: Point
 
             // LEVEL 2: 1 class that depends on Level 1
-            "LargeNegativeInteger class"   // depends on: LargePositiveInteger
+            "LargeNegativeInteger class",  // depends on: LargePositiveInteger
+
+            // LEVEL 3: 1 class that runs last (for debugging)
+            "Delay class"                  // runs last for debugging
         };
     }
 
@@ -131,14 +134,16 @@ public static class InitExpressionOrdering
         // Group classes by dependency level
         // Since the dependency order list doesn't contain comment markers,
         // we need to manually split based on known level sizes from the comments:
-        // LEVEL 0: 81 classes (indices 0-80)
-        // LEVEL 1: 5 classes (indices 81-85)
+        // LEVEL 0: 80 classes (indices 0-79)
+        // LEVEL 1: 6 classes (indices 80-85)
         // LEVEL 2: 1 class (index 86)
+        // LEVEL 3: 1 class (index 87) - runs last
         var levels = new List<List<string>>
         {
-            dependencyOrder.Take(81).ToList(),      // Level 0
-            dependencyOrder.Skip(81).Take(5).ToList(), // Level 1
-            dependencyOrder.Skip(86).ToList()       // Level 2
+            dependencyOrder.Take(80).ToList(),      // Level 0
+            dependencyOrder.Skip(80).Take(6).ToList(), // Level 1
+            dependencyOrder.Skip(86).Take(1).ToList(), // Level 2
+            dependencyOrder.Skip(87).ToList()       // Level 3
         };
 
         // Process each level

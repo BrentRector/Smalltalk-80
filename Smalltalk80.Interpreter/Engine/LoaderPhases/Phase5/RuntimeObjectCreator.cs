@@ -112,8 +112,11 @@ public class RuntimeObjectCreator(
 
         // Install the DefaultTextStyle in TextConstants pool dictionary
         var allAssociations = AssociationRegistry.GetAll();
+
         if (allAssociations.TryGetValue("DefaultTextStyle", out SmalltalkOOP defaultTextStyleAssoc))
         {
+            var keySymbolOOP = context.Allocator.GetInstanceVariable(defaultTextStyleAssoc, 0);
+
             // Set the Association's value to the TextStyle object
             context.Allocator.SetInstanceVariable(defaultTextStyleAssoc, 1, textStyleOOP);
             context.InitializedFields.Add((defaultTextStyleAssoc, 1));
@@ -127,9 +130,12 @@ public class RuntimeObjectCreator(
                 // Remove DefaultTextStyle from Undeclared (with proper hash chain fixup)
                 if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
                 {
-                    var keySymbolOOP = context.Allocator.GetInstanceVariable(defaultTextStyleAssoc, 0);
                     dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, "DefaultTextStyle");
                 }
+            }
+            else
+            {
+                throw new InvalidOperationException("TextConstants not found in GlobalRegistry during DefaultTextStyle setup");
             }
 
             context.Diagnostics?.Emit(new DiagnosticMessageEvent
@@ -143,7 +149,7 @@ public class RuntimeObjectCreator(
         }
         else
         {
-            GlobalRegistry.Register("DefaultTextStyle", textStyleOOP);
+            throw new InvalidOperationException("DefaultTextStyle Association not found in AssociationRegistry");
         }
     }
 
