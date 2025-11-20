@@ -101,14 +101,12 @@ public class Phase3_ObjectAllocation : IPhase
         // Section 1: Allocation (ALL object creation happens here)
         AllocateSentinelObjects();
         AllocateSpecialObjects();
-        TraceProcessorSchedulerClass("After Section 1 (Allocation)");
 
         // Phase 3.5: Pre-create Associations for Undeclared Variables
         // CRITICAL: This runs BEFORE class pointer fix to ensure all Associations
         // are created before SetClassReferencesForAllObjects() runs.
         // This way, the class pointer fix happens in ONE pass for ALL Associations.
         PreCreateUndeclaredAssociations();
-        TraceProcessorSchedulerClass("After Phase 3.5 (Associations)");
 
         // NOTE: DefaultTextStyle creation moved to Phase 5 (after AssociationRegistry is populated)
 
@@ -116,28 +114,14 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Section 2: Class Reference Setting (ONE fix for ALL objects including Phase 3.5 Associations)
         SetClassReferencesForAllObjects();
-        TraceProcessorSchedulerClass("After Section 2 (Class References)");
         LogClassReferenceCheckpoint();
 
         // Section 3: Populate Behavior.subclasses field
         PopulateSubclassesField();
-        TraceProcessorSchedulerClass("After Section 3 (Subclasses)");
 
         // Section 4: Nil Initialization
         InitializeUnsetInstanceVariables();
-        TraceProcessorSchedulerClass("After Section 4 (Nil Init)");
         LogInitializationCheckpoint();
-    }
-
-    private void TraceProcessorSchedulerClass(string checkpoint)
-    {
-        if (GlobalRegistry.TryGet("ProcessorScheduler", out var processorOOP))
-        {
-            var classOOP = _allocator.GetClassOOP(processorOOP);
-            var field0 = _allocator.GetInstanceVariable(processorOOP, 0);
-            var field1 = _allocator.GetInstanceVariable(processorOOP, 1);
-            Console.WriteLine($"[Phase3 TRACE] {checkpoint}: class={classOOP}, field0={field0}, field1={field1}");
-        }
     }
 
     private void LogAllocationCheckpoint()
@@ -201,14 +185,8 @@ public class Phase3_ObjectAllocation : IPhase
 
         // CRITICAL: Set the class reference - AllocateFixedObject doesn't set it!
         var processorSchedulerClassOOP = GlobalRegistry.LookupClassOOP("ProcessorScheduler");
-        Console.WriteLine($"[Phase3] ProcessorScheduler CLASS OOP = {processorSchedulerClassOOP}");
         _allocator.SetObjectClass(processorSchedulerOOP, processorSchedulerClassOOP);
 
-        // Verify class was set
-        var verifyClass = _allocator.GetClassOOP(processorSchedulerOOP);
-        Console.WriteLine($"[Phase3] After SetObjectClass, class = {verifyClass}");
-
-        Console.WriteLine($"[Phase3] Created ProcessorScheduler singleton: {processorSchedulerOOP}");
         GlobalRegistry.Register("ProcessorScheduler", processorSchedulerOOP);
 
         // Initialize ProcessorScheduler fields that should NOT be nil
@@ -269,7 +247,6 @@ public class Phase3_ObjectAllocation : IPhase
         // Set quiescentProcessLists
         _allocator.SetInstanceVariable(processorSchedulerOOP, quiescentProcessListsIndex, arrayOOP);
         _initializedFields.Add((processorSchedulerOOP, quiescentProcessListsIndex));
-        Console.WriteLine($"[Phase3] Set quiescentProcessLists = {arrayOOP}");
 
         // 2. Create initial/main Process for activeProcess
         // Use ClassHierarchyTraversal to get correct indices from bundle data
@@ -295,12 +272,6 @@ public class Phase3_ObjectAllocation : IPhase
         // Set activeProcess
         _allocator.SetInstanceVariable(processorSchedulerOOP, activeProcessIndex, processOOP);
         _initializedFields.Add((processorSchedulerOOP, activeProcessIndex));
-        Console.WriteLine($"[Phase3] Set activeProcess = {processOOP}");
-
-        // Verify fields were set
-        var verifyField0 = _allocator.GetInstanceVariable(processorSchedulerOOP, quiescentProcessListsIndex);
-        var verifyField1 = _allocator.GetInstanceVariable(processorSchedulerOOP, activeProcessIndex);
-        Console.WriteLine($"[Phase3] Verify: quiescentProcessLists = {verifyField0}, activeProcess = {verifyField1}");
     }
 
     /// <summary>
@@ -681,15 +652,6 @@ public class Phase3_ObjectAllocation : IPhase
                 // Association: 2 instance vars, Pointer format, no indexed data
                 if (format == ObjectFormat.Pointer && instVarCount == 2 && indexedSize == 0)
                 {
-                    // DEBUG: Check if this is ProcessorScheduler being incorrectly treated as Association
-                    if (GlobalRegistry.TryGet("ProcessorScheduler", out var processorOOP) && objectOOP == processorOOP)
-                    {
-                        Console.WriteLine($"[Phase3] WARNING: About to overwrite ProcessorScheduler class!");
-                        Console.WriteLine($"  objectOOP = {objectOOP}");
-                        Console.WriteLine($"  currentClassOOP = {currentClassOOP}");
-                        Console.WriteLine($"  default(SmalltalkOOP) = {default(SmalltalkOOP)}");
-                        Console.WriteLine($"  nil = {SpecialObjectsArray.Instance.Nil}");
-                    }
                     _allocator.SetSlot(objectOOP, 0, associationClassOOP);
                     associationsFixed++;
                 }
@@ -1088,22 +1050,8 @@ public class Phase3_ObjectAllocation : IPhase
 
                 var assocOOP = _dictionaryInstaller.AllocateAssociation(keySymbolOOP, valueOOP);
 
-                // DEBUG: Track specific globals
-                if (undeclaredVar.Key == "Processor" || undeclaredVar.Key == "ProcessorScheduler")
-                {
-                    Console.WriteLine($"[Phase3] Created canonical Association for '{undeclaredVar.Key}':");
-                    Console.WriteLine($"  Association OOP = {assocOOP}");
-                    Console.WriteLine($"  Value OOP = {valueOOP}");
-                }
-
                 return assocOOP;
             });
-
-            // DEBUG: Log if we got an existing Association
-            if (undeclaredVar.Key == "Processor" || undeclaredVar.Key == "ProcessorScheduler")
-            {
-                Console.WriteLine($"[Phase3] Canonical Association for '{undeclaredVar.Key}' = {resultAssocOOP}");
-            }
 
             createdCount++;
         }

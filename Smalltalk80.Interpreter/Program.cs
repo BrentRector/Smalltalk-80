@@ -225,7 +225,6 @@ public static class Program
                     "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
                     "FormMenuView initialize",               // ❌ Pool variable 'Disk' not found in FilePool
                     "ChangeListController initialize",       // ❌ CopyBits indexed word out of range
-                    "ParagraphEditor initialize",            // ❌ CopyBits indexed word out of range
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -303,12 +302,13 @@ public static class Program
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
                     // Move font/GUI-dependent expressions to run last (tests DefaultTextStyle)
-                    // Order: Form → TextList → BitEditor (each tests more font functionality)
+                    // Order: Form → TextList → BitEditor → ParagraphEditor (each tests more font functionality)
                     var runLastExpressions = new List<string>
                     {
-                        "Form initialize",      // Tests Form creation with glyphs
-                        "TextList initialize",  // Tests DefaultTextStyle copy
-                        "BitEditor initialize"  // Tests PopUpMenu labels: with font support
+                        "Form initialize",           // Tests Form creation with glyphs
+                        "TextList initialize",       // Tests DefaultTextStyle copy
+                        "BitEditor initialize",      // Tests PopUpMenu labels: with font support
+                        "ParagraphEditor initialize" // Tests text editing (moved from skip list)
                     };
 
                     var lastIndices = new List<int>();
@@ -338,7 +338,7 @@ public static class Program
 
                     Console.WriteLine($"\n=== Dependency-Ordered Init Expression Execution ===");
                     Console.WriteLine($"  Total: {phase1Indices.Count} initialize expressions");
-                    Console.WriteLine($"  Order: SmallInteger → ... → Form → TextList → BitEditor (last)");
+                    Console.WriteLine($"  Order: SmallInteger → ... → Form → TextList → BitEditor → ParagraphEditor (last)");
                     Console.WriteLine($"  See: InitExpression-DependencyAnalysis.md");
                     Console.WriteLine();
                 }
