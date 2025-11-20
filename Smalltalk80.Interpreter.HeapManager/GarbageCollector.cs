@@ -114,6 +114,7 @@ internal class GarbageCollector : IGarbageCollector
         foreach (var oop in unreachableObjects)
         {
             var entry = _tableManager.GetObjectTableEntry(oop);
+            int objectId = oop.ToObjectTableIndex();
 
             // Track collection statistics
             collectedByFormat[entry.FormatExplicit] = collectedByFormat.GetValueOrDefault(entry.FormatExplicit) + 1;
@@ -122,7 +123,6 @@ internal class GarbageCollector : IGarbageCollector
             // Track detailed info about first 50 collected objects
             if (collectedObjectDetails.Count < 50)
             {
-                int objectId = oop.ToObjectTableIndex();
                 string? className = null;
                 try
                 {
@@ -140,7 +140,6 @@ internal class GarbageCollector : IGarbageCollector
             entry.InstanceVariableStorage = null;
 
             // Free the object
-            int objectId = oop.ToObjectTableIndex();
             _tableManager.FreeObjectTableIndex(objectId);
         }
 
