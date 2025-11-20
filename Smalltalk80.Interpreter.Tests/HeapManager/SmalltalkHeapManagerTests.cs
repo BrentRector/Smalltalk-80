@@ -921,13 +921,48 @@ public class SmalltalkHeapManagerTests : IDisposable
     }
 
     [Fact]
-    public void MarkObject_ValidObjectOOP_DoesNotThrow()
+    public void MarkObject_UnmarkedObject_AppearsInUnreachableList()
     {
-        // Arrange
-        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        // Arrange - Create object but don't mark it or add to roots
+        var unmarkedObj = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        _heapManager.SetGCRoots(Array.Empty<SmalltalkOOP>());
 
-        // Act & Assert - Valid OOPs should be marked without errors
-        _heapManager.MarkObject(oop);
+        // Act
+        var unreachable = _heapManager.GetUnreachableObjects();
+
+        // Assert - Unmarked object should be in unreachable list
+        Assert.Contains(unmarkedObj, unreachable);
+    }
+
+    [Fact]
+    public void MarkObject_MarkedObjectInRoots_DoesNotAppearInUnreachableList()
+    {
+        // Arrange - Create object and add to GC roots
+        var markedObj = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        _heapManager.SetGCRoots(new[] { markedObj });
+
+        // Act
+        var unreachable = _heapManager.GetUnreachableObjects();
+
+        // Assert - Object reachable from roots should NOT be in unreachable list
+        Assert.DoesNotContain(markedObj, unreachable);
+    }
+
+    [Fact]
+    public void MarkObject_ReachableFromRoot_DoesNotAppearInUnreachableList()
+    {
+        // Arrange - Create root with child reference
+        var root = _heapManager.AllocateObject(ObjectFormat.Pointer, 1, 0);
+        var child = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        _heapManager.SetInstanceVariable(root, 0, child);
+        _heapManager.SetGCRoots(new[] { root });
+
+        // Act
+        var unreachable = _heapManager.GetUnreachableObjects();
+
+        // Assert - Child reachable from root should NOT be in unreachable list
+        Assert.DoesNotContain(child, unreachable);
+        Assert.DoesNotContain(root, unreachable);
     }
 
     [Fact]
