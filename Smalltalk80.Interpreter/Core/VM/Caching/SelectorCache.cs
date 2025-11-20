@@ -79,7 +79,7 @@ public class SelectorCache
 
         // USTable is an Array in the Smalltalk heap containing Symbol OOPs
         int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = metadata.KnownObjects.Nil;
 
         // Convert search string to bytes (Latin-1 encoding)
         byte[] searchBytes = System.Text.Encoding.Latin1.GetBytes(symbolName);

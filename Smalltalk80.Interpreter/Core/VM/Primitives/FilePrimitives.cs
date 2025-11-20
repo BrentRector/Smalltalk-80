@@ -209,8 +209,8 @@ public static class FileOperations
             bool success = FileHandleManager.CloseFile(handle);
 
             return success
-                ? PrimitiveResult.Ok(SpecialObjectsArray.Instance.True)
-                : PrimitiveResult.Ok(SpecialObjectsArray.Instance.False);
+                ? PrimitiveResult.Ok(metadata.KnownObjects.True)
+                : PrimitiveResult.Ok(metadata.KnownObjects.False);
         }
     }
 
@@ -388,11 +388,11 @@ public static class FileOperations
             try
             {
                 File.Delete(path);
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.True);
+                return PrimitiveResult.Ok(metadata.KnownObjects.True);
             }
             catch
             {
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.False);
+                return PrimitiveResult.Ok(metadata.KnownObjects.False);
             }
         }
     }
@@ -423,11 +423,11 @@ public static class FileOperations
             try
             {
                 File.Move(oldPath, newPath);
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.True);
+                return PrimitiveResult.Ok(metadata.KnownObjects.True);
             }
             catch
             {
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.False);
+                return PrimitiveResult.Ok(metadata.KnownObjects.False);
             }
         }
     }
@@ -453,11 +453,11 @@ public static class FileOperations
             try
             {
                 Directory.CreateDirectory(path);
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.True);
+                return PrimitiveResult.Ok(metadata.KnownObjects.True);
             }
             catch
             {
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.False);
+                return PrimitiveResult.Ok(metadata.KnownObjects.False);
             }
         }
     }
@@ -484,11 +484,11 @@ public static class FileOperations
             try
             {
                 Directory.Delete(path, false); // Non-recursive
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.True);
+                return PrimitiveResult.Ok(metadata.KnownObjects.True);
             }
             catch
             {
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.False);
+                return PrimitiveResult.Ok(metadata.KnownObjects.False);
             }
         }
     }
@@ -516,7 +516,7 @@ public static class FileOperations
             {
                 if (!File.Exists(path) && !Directory.Exists(path))
                 {
-                    return PrimitiveResult.Ok(SpecialObjectsArray.Instance.Nil);
+                    return PrimitiveResult.Ok(metadata.KnownObjects.Nil);
                 }
 
                 var info = new FileInfo(path);
@@ -539,13 +539,13 @@ public static class FileOperations
 
                 // IsDirectory
                 context.HeapManager.SetIndexedOOP(resultOOP, 2,
-                    isDirectory ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False);
+                    isDirectory ? metadata.KnownObjects.True : metadata.KnownObjects.False);
 
                 return PrimitiveResult.Ok(resultOOP);
             }
             catch
             {
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.Nil);
+                return PrimitiveResult.Ok(metadata.KnownObjects.Nil);
             }
         }
     }
@@ -684,7 +684,7 @@ public static class FileOperations
 
             if (fileName == null)
             {
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.Nil);
+                return PrimitiveResult.Ok(metadata.KnownObjects.Nil);
             }
 
             return PrimitiveResult.Ok(CreateString(context, fileName));
@@ -711,8 +711,8 @@ public static class FileOperations
             bool success = DirectoryEnumerator.FindClose(handle);
 
             return success
-                ? PrimitiveResult.Ok(SpecialObjectsArray.Instance.True)
-                : PrimitiveResult.Ok(SpecialObjectsArray.Instance.False);
+                ? PrimitiveResult.Ok(metadata.KnownObjects.True)
+                : PrimitiveResult.Ok(metadata.KnownObjects.False);
         }
     }
 
@@ -760,11 +760,11 @@ public static class FileOperations
             try
             {
                 Directory.SetCurrentDirectory(path);
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.True);
+                return PrimitiveResult.Ok(metadata.KnownObjects.True);
             }
             catch
             {
-                return PrimitiveResult.Ok(SpecialObjectsArray.Instance.False);
+                return PrimitiveResult.Ok(metadata.KnownObjects.False);
             }
         }
     }
@@ -790,8 +790,8 @@ public static class FileOperations
 
             bool exists = File.Exists(path) || Directory.Exists(path);
             return exists
-                ? PrimitiveResult.Ok(SpecialObjectsArray.Instance.True)
-                : PrimitiveResult.Ok(SpecialObjectsArray.Instance.False);
+                ? PrimitiveResult.Ok(metadata.KnownObjects.True)
+                : PrimitiveResult.Ok(metadata.KnownObjects.False);
         }
     }
 

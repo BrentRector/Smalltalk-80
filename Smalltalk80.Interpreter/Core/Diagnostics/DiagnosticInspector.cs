@@ -91,7 +91,7 @@ public static class DiagnosticInspector
             // Get the classPool instance variable (Dictionary containing class variables)
             var classPoolOOP = heapManager.GetInstanceVariable(floatClassOOP, 7);
 
-            if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+            if (classPoolOOP == metadata.KnownObjects.Nil)
             {
                 return "classPool is nil";
             }
@@ -114,7 +114,7 @@ public static class DiagnosticInspector
             for (int i = 0; i < size; i++)
             {
                 var assocOOP = heapManager.GetIndexedOOP(classPoolOOP, i);
-                if (assocOOP == SpecialObjectsArray.Instance.Nil)
+                if (assocOOP == metadata.KnownObjects.Nil)
                     continue;
 
                 // Association has key at slot 1, value at slot 2
@@ -244,7 +244,7 @@ public static class DiagnosticInspector
             // Get classPool instance variable (Dictionary containing class variables)
             var classPoolOOP = heapManager.GetInstanceVariable(cursorClassOOP, 7);
 
-            if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+            if (classPoolOOP == metadata.KnownObjects.Nil)
             {
                 Console.WriteLine("  classPool is nil - no class variables created yet");
                 return;
@@ -275,7 +275,7 @@ public static class DiagnosticInspector
             for (int i = 0; i < size; i++)
             {
                 var assocOOP = heapManager.GetIndexedOOP(classPoolOOP, i);
-                if (assocOOP == SpecialObjectsArray.Instance.Nil)
+                if (assocOOP == metadata.KnownObjects.Nil)
                     continue;
 
                 // Association has key at slot 1, value at slot 2
@@ -316,7 +316,7 @@ public static class DiagnosticInspector
         {
             // Test classes: Array, Point, Process (various inheritance depths)
             string[] testClasses = { "Array", "Point", "Process", "Dictionary" };
-            var nilOOP = SpecialObjectsArray.Instance.Nil;
+            var nilOOP = metadata.KnownObjects.Nil;
 
             foreach (var className in testClasses)
             {
@@ -538,7 +538,7 @@ public static class DiagnosticInspector
 
             // Get the CompiledMethod OOP from the InitExpressionMethods array
             var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
-            if (initArrayOOP == SpecialObjectsArray.Instance.Nil)
+            if (initArrayOOP == metadata.KnownObjects.Nil)
             {
                 Console.WriteLine("  InitExpressionMethods array is nil");
                 return;
@@ -573,17 +573,17 @@ public static class DiagnosticInspector
                     }
 
                     // Check special values
-                    if (literalOOP == SpecialObjectsArray.Instance.Nil)
+                    if (literalOOP == metadata.KnownObjects.Nil)
                     {
                         Console.WriteLine($"        nil");
                         continue;
                     }
-                    if (literalOOP == SpecialObjectsArray.Instance.True)
+                    if (literalOOP == metadata.KnownObjects.True)
                     {
                         Console.WriteLine($"        true");
                         continue;
                     }
-                    if (literalOOP == SpecialObjectsArray.Instance.False)
+                    if (literalOOP == metadata.KnownObjects.False)
                     {
                         Console.WriteLine($"        false");
                         continue;
@@ -610,7 +610,7 @@ public static class DiagnosticInspector
                             Console.WriteLine($"          Field[1] (value?): {valueOOP}");
 
                             // Try to read key as Symbol
-                            if (!keyOOP.IsSmallInteger && keyOOP != SpecialObjectsArray.Instance.Nil)
+                            if (!keyOOP.IsSmallInteger && keyOOP != metadata.KnownObjects.Nil)
                             {
                                 try
                                 {
@@ -638,7 +638,7 @@ public static class DiagnosticInspector
                             {
                                 Console.WriteLine($"          Value is SmallInteger: {valueOOP.AsSmallInteger()}");
                             }
-                            else if (valueOOP == SpecialObjectsArray.Instance.Nil)
+                            else if (valueOOP == metadata.KnownObjects.Nil)
                             {
                                 Console.WriteLine($"          Value is nil");
                             }

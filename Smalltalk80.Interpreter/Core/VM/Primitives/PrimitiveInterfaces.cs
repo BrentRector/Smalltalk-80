@@ -26,11 +26,11 @@ public readonly struct PrimitiveResult
     public static PrimitiveResult Ok(SmalltalkOOP value) => new(true, value);
 
     /// <summary>Creates a failed result (value will be nil).</summary>
-    public static PrimitiveResult Fail() => new(false, SpecialObjectsArray.Instance.Nil);
+    public static PrimitiveResult Fail() => new(false, metadata.KnownObjects.Nil);
 
     /// <summary>Creates a result from a boolean condition.</summary>
     public static PrimitiveResult FromBool(bool condition) =>
-        condition ? Ok(SpecialObjectsArray.Instance.True) : Ok(SpecialObjectsArray.Instance.False);
+        condition ? Ok(metadata.KnownObjects.True) : Ok(metadata.KnownObjects.False);
 }
 
 /// <summary>
@@ -219,7 +219,7 @@ public readonly struct PrimitiveExecutionContext
             return RuntimeHeapAccess.GetClass(name);
 
         // For globals, look up in SystemDictionary
-        var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var systemDictOOP = metadata.KnownObjects.Smalltalk;
         return RuntimeHeapAccess.LookupGlobalByName(systemDictOOP, name);
     }
 }

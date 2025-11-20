@@ -241,7 +241,7 @@ public sealed class ObjectTable
 
             foreach (var rootOOP in roots)
             {
-                if (rootOOP != SmalltalkOOP.Null && rootOOP.IsObjectPointer)
+                if (rootOOP != heapManager.GetNil() && rootOOP.IsObjectPointer)
                 {
                     workList.Enqueue(rootOOP);
                 }
@@ -276,7 +276,7 @@ public sealed class ObjectTable
 
                         // Count non-nil InstanceVariables[4]
                         var instVarNamesRef = data.InstanceVariables[4];
-                        if (instVarNamesRef != SmalltalkOOP.Null && instVarNamesRef.IsObjectPointer)
+                        if (instVarNamesRef != heapManager.GetNil() && instVarNamesRef.IsObjectPointer)
                         {
                             class9withInstVars++;
                         }
@@ -287,7 +287,7 @@ public sealed class ObjectTable
 
                         // Count non-nil InstanceVariables[4]
                         var instVarNamesRef = data.InstanceVariables[4];
-                        if (instVarNamesRef != SmalltalkOOP.Null && instVarNamesRef.IsObjectPointer)
+                        if (instVarNamesRef != heapManager.GetNil() && instVarNamesRef.IsObjectPointer)
                         {
                             class7withInstVars++;
                         }
@@ -312,7 +312,7 @@ public sealed class ObjectTable
         bool enableDetailedLogging = false; // TODO: Re-enable when RuntimeOptions is added
 
         // Trace class reference
-        if (data.ClassRef != SmalltalkOOP.Null && data.ClassRef.IsObjectPointer)
+        if (data.ClassRef != heapManager.GetNil() && data.ClassRef.IsObjectPointer)
         {
             workList.Enqueue(data.ClassRef);
         }
@@ -329,7 +329,7 @@ public sealed class ObjectTable
 
             foreach (var varRef in data.InstanceVariables)
             {
-                if (varRef != SmalltalkOOP.Null && varRef.IsObjectPointer)
+                if (varRef != heapManager.GetNil() && varRef.IsObjectPointer)
                 {
                     workList.Enqueue(varRef);
                 }
@@ -343,7 +343,7 @@ public sealed class ObjectTable
             {
                 foreach (var indexedRef in indexedRefs)
                 {
-                    if (indexedRef != SmalltalkOOP.Null && indexedRef.IsObjectPointer)
+                    if (indexedRef != heapManager.GetNil() && indexedRef.IsObjectPointer)
                     {
                         workList.Enqueue(indexedRef);
                     }

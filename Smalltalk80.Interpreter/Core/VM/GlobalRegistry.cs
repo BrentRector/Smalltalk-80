@@ -178,9 +178,9 @@ public static class GlobalRegistry
     {
         _globals.Clear();
         _objects.Clear();
-        NilOOP = SmalltalkOOP.Null;
-        TrueOOP = SmalltalkOOP.Null;
-        FalseOOP = SmalltalkOOP.Null;
-        SystemDictionaryOOP = SmalltalkOOP.Null;
+        NilOOP = heapManager.GetNil();
+        TrueOOP = heapManager.GetNil();
+        FalseOOP = heapManager.GetNil();
+        SystemDictionaryOOP = heapManager.GetNil();
     }
 }

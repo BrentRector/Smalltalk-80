@@ -82,7 +82,7 @@ public static class StringPrimitives
             if (context.RuntimeHeapAccess == null) return PrimitiveResult.Fail();
             var symbolOOP = context.RuntimeHeapAccess.InternSymbol(stringValue);
 
-            if (symbolOOP == SpecialObjectsArray.Instance.Nil)
+            if (symbolOOP == metadata.KnownObjects.Nil)
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(symbolOOP);

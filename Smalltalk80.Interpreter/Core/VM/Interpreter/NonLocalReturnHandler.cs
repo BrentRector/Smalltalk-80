@@ -34,8 +34,8 @@ internal class NonLocalReturnHandler
     public NonLocalReturnHandler()
     {
         _isPending = false;
-        _value = SmalltalkOOP.Null;
-        _targetContext = SmalltalkOOP.Null;
+        _value = heapManager.GetNil();
+        _targetContext = heapManager.GetNil();
     }
 
     /// <summary>
@@ -84,8 +84,8 @@ internal class NonLocalReturnHandler
     {
         var value = _value;
         _isPending = false;
-        _value = SmalltalkOOP.Null;
-        _targetContext = SmalltalkOOP.Null;
+        _value = heapManager.GetNil();
+        _targetContext = heapManager.GetNil();
         return value;
     }
 

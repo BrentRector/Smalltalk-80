@@ -20,18 +20,18 @@ internal class MessageDispatcher(
         int depth = 0;
         const int maxDepth = 20;
 
-        while (currentClassOOP != SpecialObjectsArray.Instance.Nil && depth < maxDepth)
+        while (currentClassOOP != metadata.KnownObjects.Nil && depth < maxDepth)
         {
             string currentClassName = helpers.GetClassName(currentClassOOP);
 
             // Get the method dictionary from the class
             var methodDictOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_METHODDICT_INDEX);
 
-            if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
+            if (methodDictOOP == metadata.KnownObjects.Nil)
             {
                 // No method dictionary, try superclass
                 var superclassOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
-                if (superclassOOP == SpecialObjectsArray.Instance.Nil)
+                if (superclassOOP == metadata.KnownObjects.Nil)
                 {
                     break;
                 }
@@ -43,7 +43,7 @@ internal class MessageDispatcher(
 
             // Get values array from method dictionary
             var valuesArrayOOP = heapManager.GetInstanceVariable(methodDictOOP, 0);
-            if (valuesArrayOOP == SpecialObjectsArray.Instance.Nil)
+            if (valuesArrayOOP == metadata.KnownObjects.Nil)
             {
                 var superclassOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
                 currentClassOOP = superclassOOP;
@@ -73,7 +73,7 @@ internal class MessageDispatcher(
             for (int i = 0; i < dictSize; i++)
             {
                 var selectorOOP = heapManager.GetIndexedOOP(methodDictOOP, i);
-                if (selectorOOP == SpecialObjectsArray.Instance.Nil)
+                if (selectorOOP == metadata.KnownObjects.Nil)
                 {
                     continue;
                 }
@@ -109,7 +109,7 @@ internal class MessageDispatcher(
     /// <returns>The symbol name as a string, or null if the symbol is nil.</returns>
     private string? GetSymbolName(SmalltalkOOP symbolOOP)
     {
-        if (symbolOOP == SpecialObjectsArray.Instance.Nil)
+        if (symbolOOP == metadata.KnownObjects.Nil)
         {
             return null;
         }

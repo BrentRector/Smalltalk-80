@@ -26,7 +26,7 @@ public static class InputOperations
 
             // Get Point class OOP
             var pointClassOOP = context.RuntimeHeapAccess?.GetClass("Point");
-            if (pointClassOOP == null || pointClassOOP == SpecialObjectsArray.Instance.Nil)
+            if (pointClassOOP == null || pointClassOOP == metadata.KnownObjects.Nil)
                 return PrimitiveResult.Fail();
 
             // Allocate Point instance with 2 instance variables (x, y)
@@ -95,7 +95,7 @@ public static class InputOperations
             var semaphoreOOP = context.Arguments[0];
 
             // SmallIntegers not allowed (except nil)
-            if (semaphoreOOP.IsSmallInteger && semaphoreOOP != SpecialObjectsArray.Instance.Nil)
+            if (semaphoreOOP.IsSmallInteger && semaphoreOOP != metadata.KnownObjects.Nil)
                 return PrimitiveResult.Fail();
 
             // Register semaphore with platform event system

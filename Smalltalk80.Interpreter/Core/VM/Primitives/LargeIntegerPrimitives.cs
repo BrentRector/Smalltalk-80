@@ -83,11 +83,11 @@ public static class LargeIntegerArithmetic
 
         // Check against both LargeInteger classes
         var posClass = context.RuntimeHeapAccess?.GetClass("LargePositiveInteger");
-        if (posClass != null && posClass != SpecialObjectsArray.Instance.Nil && classOOP == posClass)
+        if (posClass != null && posClass != metadata.KnownObjects.Nil && classOOP == posClass)
             return true;
 
         var negClass = context.RuntimeHeapAccess?.GetClass("LargeNegativeInteger");
-        if (negClass != null && negClass != SpecialObjectsArray.Instance.Nil && classOOP == negClass)
+        if (negClass != null && negClass != metadata.KnownObjects.Nil && classOOP == negClass)
             return true;
 
         return false;
@@ -104,7 +104,7 @@ public static class LargeIntegerArithmetic
 
         var classOOP = context.RuntimeHeapAccess?.GetClass(className);
 
-        if (classOOP != null && classOOP != SpecialObjectsArray.Instance.Nil)
+        if (classOOP != null && classOOP != metadata.KnownObjects.Nil)
             return classOOP.Value;
 
         throw new InvalidOperationException(

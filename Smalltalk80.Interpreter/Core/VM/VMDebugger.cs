@@ -26,7 +26,7 @@ internal sealed class VMDebugger(
         var currentOOP = contextOOP;
         int depth = 0;
 
-        while (currentOOP != SmalltalkOOP.Null && currentOOP != SpecialObjectsArray.Instance.Nil && depth < maxDepth)
+        while (currentOOP != heapManager.GetNil() && currentOOP != metadata.KnownObjects.Nil && depth < maxDepth)
         {
             if (currentOOP.IsSmallInteger)
             {
@@ -48,11 +48,11 @@ internal sealed class VMDebugger(
                     var symbolName = helpers.GetSymbolName(selectorOOP);
 
                     // Check if this is a selector (Symbol) or something else (likely a block)
-                    if (symbolName is not null && selectorOOP != SpecialObjectsArray.Instance.Nil)
+                    if (symbolName is not null && selectorOOP != metadata.KnownObjects.Nil)
                     {
                         selectorName = symbolName;
                     }
-                    else if (selectorOOP == SpecialObjectsArray.Instance.Nil)
+                    else if (selectorOOP == metadata.KnownObjects.Nil)
                     {
                         // No literal[0] - this is a block
                         selectorName = "<block>";
@@ -125,7 +125,7 @@ internal sealed class VMDebugger(
             var value = heapManager.GetIndexedOOP(contextManager.ActiveContext, VMConstants.CONTEXT_TEMP_FRAME_START + i);
             string valueDesc = value.IsSmallInteger
                 ? $"SmallInteger({value.AsSmallInteger()})"
-                : value == SpecialObjectsArray.Instance.Nil
+                : value == metadata.KnownObjects.Nil
                     ? "nil"
                     : $"{heapManager.GetClassName(value)} OOP({value})";
             Console.WriteLine($"      [{i}] = {valueDesc}");
@@ -171,17 +171,17 @@ internal sealed class VMDebugger(
             return $"SmallInteger({oop.AsSmallInteger()})";
         }
 
-        if (oop == SpecialObjectsArray.Instance.Nil)
+        if (oop == metadata.KnownObjects.Nil)
         {
             return "nil";
         }
 
-        if (oop == SpecialObjectsArray.Instance.True)
+        if (oop == metadata.KnownObjects.True)
         {
             return "true";
         }
 
-        if (oop == SpecialObjectsArray.Instance.False)
+        if (oop == metadata.KnownObjects.False)
         {
             return "false";
         }
@@ -241,11 +241,11 @@ internal sealed class VMDebugger(
     {
         if (oop.IsSmallInteger)
             return $"SmallInteger({oop.AsSmallInteger()})";
-        if (oop == SpecialObjectsArray.Instance.Nil)
+        if (oop == metadata.KnownObjects.Nil)
             return "nil";
-        if (oop == SpecialObjectsArray.Instance.True)
+        if (oop == metadata.KnownObjects.True)
             return "true";
-        if (oop == SpecialObjectsArray.Instance.False)
+        if (oop == metadata.KnownObjects.False)
             return "false";
 
         try

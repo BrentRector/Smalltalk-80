@@ -104,7 +104,7 @@ internal class ContextManager(
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         // Step 6: Initialize MethodContext fixed fields
-        var callerOOP = callerContextOOP == default ? SpecialObjectsArray.Instance.Nil : callerContextOOP;
+        var callerOOP = callerContextOOP == default ? metadata.KnownObjects.Nil : callerContextOOP;
         heapManager.SetInstanceVariable(contextOOP, senderIndex, callerOOP);
         heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
         heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
@@ -120,13 +120,13 @@ internal class ContextManager(
         // Initialize temps to nil
         for (int i = header.NumArgs; i < header.NumArgs + header.NumTemps; i++)
         {
-            heapManager.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
+            heapManager.SetIndexedOOP(contextOOP, i, metadata.KnownObjects.Nil);
         }
 
         // Initialize execution stack slots to nil
         for (int i = header.NumArgs + header.NumTemps; i < stackSize; i++)
         {
-            heapManager.SetIndexedOOP(contextOOP, i, SpecialObjectsArray.Instance.Nil);
+            heapManager.SetIndexedOOP(contextOOP, i, metadata.KnownObjects.Nil);
         }
 
         return contextOOP;
@@ -161,7 +161,7 @@ internal class ContextManager(
     {
         int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
         var current = startContext;
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = metadata.KnownObjects.Nil;
 
         for (int i = 0; i < 10000; i++)
         {

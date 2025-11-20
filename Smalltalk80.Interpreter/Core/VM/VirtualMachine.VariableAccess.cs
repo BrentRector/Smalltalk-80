@@ -183,7 +183,7 @@ public partial class VirtualMachine
                     VMConstants.BLOCKCONTEXT_HOME_INDEX
                 );
 
-                if (contextOOP == SpecialObjectsArray.Instance.Nil)
+                if (contextOOP == metadata.KnownObjects.Nil)
                 {
                     throw new InvalidOperationException("Home chain broken - no MethodContext found");
                 }
