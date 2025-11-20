@@ -26,7 +26,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// <summary>
     /// Invalidates all runtime caches. Called by primitive 89 (flushCache).
     /// </summary>
-    public void InvalidateAllCaches()
+    public virtual void InvalidateAllCaches()
     {
         _classCache.InvalidateCache();
         RuntimeSpecialObjects.Instance.InvalidateCache();
@@ -35,7 +35,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// <summary>
     /// Gets a class OOP by name, using cache if valid.
     /// </summary>
-    public SmalltalkOOP GetClass(string className)
+    public virtual SmalltalkOOP GetClass(string className)
     {
         return _classCache.GetClass(className);
     }
@@ -60,7 +60,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// Interns a string as a Symbol in the Smalltalk heap.
     /// Searches USTable for existing symbol or returns nil if not found.
     /// </summary>
-    public SmalltalkOOP InternSymbol(string symbolName)
+    public virtual SmalltalkOOP InternSymbol(string symbolName)
     {
         // CRITICAL: USTable is a CLASS VARIABLE of Symbol, not a global!
         // Symbol class definition: classVariableNames: 'SingleCharSymbols USTable'
@@ -144,7 +144,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// Used to break the circular dependency when looking up USTable.
     /// CRITICAL: Cannot use hash-based lookup because Symbol>>hash depends on OOP, not string content!
     /// </summary>
-    public SmalltalkOOP LookupGlobalByName(SmalltalkOOP dictOOP, string globalName)
+    public virtual SmalltalkOOP LookupGlobalByName(SmalltalkOOP dictOOP, string globalName)
     {
         byte[] searchBytes = Encoding.Latin1.GetBytes(globalName);
         int size = _heapManager.GetIndexedSize(dictOOP);
@@ -265,7 +265,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// This enables full runtime reflection and supports runtime class modification.
     /// Equivalent to Smalltalk's allInstVarNames method.
     /// </summary>
-    public Dictionary<string, List<string>> BuildFieldMap()
+    public virtual Dictionary<string, List<string>> BuildFieldMap()
     {
         var fieldMap = new Dictionary<string, List<string>>();
 
