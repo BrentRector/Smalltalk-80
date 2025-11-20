@@ -63,6 +63,9 @@ Get-ChildItem "$heapManagerDir/*.cs" -File | Where-Object {
 
     if ($methods.Count -gt 0) {
         $componentMethods[$component] = $methods
+        if ($Detailed) {
+            Write-Host "DEBUG: Found $($methods.Count) methods in $component" -ForegroundColor Gray
+        }
     }
 }
 
@@ -82,7 +85,7 @@ if (Test-Path $testsFile) {
 
         # Try to extract component from test name
         # Pattern: MethodName_Scenario_ExpectedResult
-        if ($testName -match '^(\w+?)_') {
+        if ($testName -match '^(\w+)_') {
             $methodName = $Matches[1]
 
             # Find which component this method belongs to
