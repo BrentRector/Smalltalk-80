@@ -73,6 +73,15 @@ Get-ChildItem "$heapManagerDir/*.cs" -File | Where-Object {
             continue
         }
 
+        # Skip internal ObjectTableManager infrastructure (tested via public API)
+        if ($component -eq 'ObjectTableManager' -and
+            ($methodName -eq 'AllocateObjectTableIndex' -or
+             $methodName -eq 'GetObjectTableEntry' -or
+             $methodName -eq 'FreeObjectTableIndex' -or
+             $methodName -eq 'GetBlocks')) {
+            continue
+        }
+
         $methods += $methodName
         $totalMethods++
     }
