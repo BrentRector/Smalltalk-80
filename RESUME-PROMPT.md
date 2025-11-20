@@ -1,25 +1,69 @@
 # Resume Prompt - Smalltalk-80 Interpreter Development
 
-**Last Updated**: 2025-11-18
+**Last Updated**: 2025-11-20
 
 ## Current Status
 
-**Interpreter**: ✅ **100% Validated & Ready for Phase 1** - 31/46 init expressions pass (67% success rate)
+**Interpreter**: ✅ **96% Init Expression Success** - 44/46 init expressions pass
 
-**Latest Achievement**: ✅ **Completed Phase 0 Naming Refactoring + Comprehensive Validation**
-- Successfully refactored 53 files across 4 phases
-- All changes validated with 100% success - zero regressions
-- **Created comprehensive diagnostic test suite** (DiagPow10, DiagZero, individual variables)
-- **Validated interpreter is 100% correct** - all 120 BlockContext tests pass (returns 1191)
-- Discovered 1191 is the correct expected value (3 tests return 7 by design)
-- Eliminated legacy Core/Objects/ directory
-- Resolved duplicate class names
-- Organized files into proper directory structure
-- Replaced generic names with descriptive, intent-revealing names
+**Latest Achievement**: ✅ **Init Expression Improvements & Comment Expression Investigation**
+- Init expressions improved from 31/46 to 44/46 (96% success rate)
+- Fixed SymbolRegistry API error handling
+- Fixed VariableResolver to allow system globals assignment (Sensor)
+- Discovered WriteStream>>nextPut: infinite loop bug affecting 210/234 comment expressions
+- All comment expressions skipped until WriteStream bug is fixed
+- FormMenuView and Object initialize remain skipped (require runtime features)
 
-**Ready for**: Architecture Refactoring Phase 1 (VirtualMachine Decomposition)
+**Known Issue**: WriteStream>>nextPut: has infinite loop - needs investigation
+
+**Ready for**: Fix WriteStream bug OR continue Architecture Refactoring Phase 1
 
 **👉 NEW SESSION? START HERE**: Read `SESSION-HANDOFF.md` for complete handoff context and step-by-step instructions.
+
+---
+
+## Recent Work (2025-11-20) - Init Expression & Comment Expression Investigation
+
+### ✅ Init Expression Success Rate Improved to 96%
+
+**Changes Made**:
+1. **SymbolRegistry Improvements**
+   - Added better error handling in `GetSymbolOOP()` with descriptive error messages
+   - `Clear()` only releases memory, does NOT reset frozen state (cold start structures not reusable)
+
+2. **VariableResolver Fix**
+   - Changed well-known system globals to be assignable (`IsAssignable = true`)
+   - Fixes "Cannot assign to Global: Sensor" compiler error
+
+3. **Skip List Updates**
+   - FormMenuView initialize - File operations failing
+   - Object initialize - Requires Sensor cursorPoint
+
+### 🐛 WriteStream Bug Discovered
+
+**Problem**: WriteStream>>nextPut: enters infinite loop when writing strings
+
+**Impact**: 210/234 comment expressions fail with 500K instruction timeout
+
+**Pattern** (from infinite loop trace):
+```
+String>>at:
+WriteStream>>nextPut:
+String>>at:put:
+BlockContext>>whileTrue:
+```
+
+**Workaround**: All comment expressions skipped until bug is fixed
+
+**Next Step**: Investigate WriteStream>>nextPut: implementation - likely stream position not advancing or bounds check failing
+
+### Commits (Branch: claude/fix-symbolregistry-error-016edAJ9tYNCpFARSCtaLJhY)
+
+- `bfad411` - Revert frozen state reset - cold start structures not reusable
+- `2a801ec` - Skip FormMenuView, enable Phase 2 comment expressions
+- `d98f298` - Enable all 234 comment expressions with cleaner output
+- `d275814` - Suppress verbose infinite loop output for comment expressions
+- `2629c45` - Skip all comment expressions due to WriteStream bug
 
 ---
 
@@ -204,7 +248,7 @@ dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
 
 ## Current Init Expression Status
 
-**Passing (31/46 - 67%)**:
+**Passing (44/46 - 96%)**:
 - Character, Float, SmallInteger (numeric/character basics)
 - BinaryChoiceView (GUI foundation)
 - ClassOrganizer, CompiledMethod (system infrastructure)
@@ -212,27 +256,22 @@ dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
 - File, FileDirectory, WindowsFileDirectory, WindowsFileSystem (file system)
 - InputSensor, InputState (input handling)
 - InstructionStream, Scanner, MessageNode, ParseNode (compiler)
-- Paragraph, StringHolder, Symbol, **Text** (text/string support)
+- Paragraph, StringHolder, Symbol, Text (text/string support)
 - ProcessorScheduler, Project (process management)
 - SystemDictionary, SystemTracer (system globals)
 - LargePositiveInteger, LargeNegativeInteger (large integers)
+- Form, TextList, BitEditor (GUI - now working!)
+- ChangeListController, FormEditor, NotifierController, ParagraphEditor
+- ProjectController, ScreenController, StandardSystemController
+- StringHolderController, VariableNode, Delay
 
-**Skipped (15 - require runtime features not available at bootstrap)**:
+**Skipped (2)**:
+- Object initialize - Requires Sensor cursorPoint (GUI)
+- FormMenuView initialize - File operations under investigation
 
-*GUI/PopUpMenu infrastructure (10)*:
-- BitEditor, ChangeListController, FormEditor, NotifierController
-- ParagraphEditor, ProjectController, ScreenController
-- StandardSystemController, StringHolderController
-- FormMenuView (file I/O: Form readFrom:)
-
-*Process/threading primitives (1)*:
-- Delay (forkAt: creates infinite whileTrue loop)
-
-*Complex initialization issues (4)*:
-- Form (infinite loop 4M+ instructions)
-- Object (GUI: confirm: needs Sensor cursorPoint)
-- TextList (infinite loop 500K+ instructions)
-- VariableNode (infinite loop 500K+ instructions)
+**Comment Expressions (234 - all skipped)**:
+- WriteStream>>nextPut: bug causes infinite loop (210/234 fail)
+- Skipped until bug is fixed
 
 ---
 
