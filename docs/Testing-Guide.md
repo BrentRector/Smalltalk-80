@@ -9,7 +9,7 @@ Tests are organized into functional categories using xUnit's `[Trait]` attribute
 | Category | Test Count | Description |
 |----------|-----------|-------------|
 | **Primitives** | 258 | All primitive operation tests (arithmetic, comparison, control, strings, floats, etc.) |
-| **HeapManager** | TBD | Heap management, object allocation, GC tests |
+| **HeapManager** | 85 | Heap management, object allocation, GC tests |
 | **VM** | TBD | Virtual machine core: message dispatch, execution state |
 | **Context** | TBD | Context management and execution context tests |
 | **Compiler** | TBD | Bytecode compiler tests: emitter, variable resolution, temp frames |
@@ -119,8 +119,14 @@ dotnet test
 - Control flow (BlockCopy, BlockValue, Signal, Wait, Resume, Suspend)
 - System operations (Snapshot, Quit, etc.)
 
-### HeapManager: ⏸️ Ready to Enable
-Tests exist and are ready to be enabled and run independently.
+### HeapManager: ✅ 85/85 Passing (100%)
+- Object allocation (Pointer, PointerIndexed, ByteIndexed, WordIndexed formats)
+- Object table management (allocation, validation, enumeration)
+- Garbage collection (mark, sweep, compaction)
+- Object field access (get/set by index and name)
+- Class operations (class retrieval, class name resolution)
+- Become operations (object identity swapping)
+- Memory statistics and monitoring
 
 ### Other Categories: ⏸️ Ready to Enable
 VM, Context, and Compiler tests are categorized and ready for selective execution.
@@ -172,6 +178,53 @@ This will show:
 - Number of primitives implemented vs tested per category
 - Overall coverage percentage
 - List of untested primitives (if any)
+
+**For Linux/Mac users, use the Bash version:**
+
+```bash
+# Basic coverage summary
+bash scripts/analyze-primitive-coverage.sh
+
+# Show detailed breakdown
+bash scripts/analyze-primitive-coverage.sh --detailed
+
+# Show which primitives are untested
+bash scripts/analyze-primitive-coverage.sh --show-untested
+```
+
+#### Quick HeapManager Coverage Analysis
+
+Use the provided HeapManager coverage scripts for quick analysis:
+
+```bash
+# Basic coverage summary (PowerShell)
+pwsh scripts/analyze-heapmanager-coverage.ps1
+
+# Show detailed breakdown
+pwsh scripts/analyze-heapmanager-coverage.ps1 -Detailed
+
+# Show which methods are untested
+pwsh scripts/analyze-heapmanager-coverage.ps1 -ShowUntested
+```
+
+**For Linux/Mac users:**
+
+```bash
+# Basic coverage summary (Bash)
+bash scripts/analyze-heapmanager-coverage.sh
+
+# Show detailed breakdown
+bash scripts/analyze-heapmanager-coverage.sh --detailed
+
+# Show which methods are untested
+bash scripts/analyze-heapmanager-coverage.sh --show-untested
+```
+
+This will show:
+- Number of methods implemented vs tested per component
+- Overall method coverage percentage
+- List of untested methods (if any)
+- Component breakdown (SmalltalkHeapManager, ObjectTableManager, GarbageCollector, etc.)
 
 #### Option 2: .NET Code Coverage (Detailed)
 
