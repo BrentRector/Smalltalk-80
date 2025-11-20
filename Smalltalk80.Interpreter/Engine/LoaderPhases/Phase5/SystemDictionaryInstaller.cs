@@ -227,10 +227,12 @@ public class SystemDictionaryInstaller(
     private void InstallProcessorGlobal(SmalltalkOOP processorSchedulerOOP)
     {
         // DEBUG: Verify we're installing the ProcessorScheduler instance, not an Association
-        var processorSchedulerClass = context.Allocator.GetClassName(context.Allocator.GetClassOOP(processorSchedulerOOP));
+        var classOOP = context.Allocator.GetClassOOP(processorSchedulerOOP);
+        var processorSchedulerClass = context.Allocator.GetClassName(classOOP);
         Console.WriteLine($"[InstallProcessorGlobal] DEBUG:");
         Console.WriteLine($"  processorSchedulerOOP = {processorSchedulerOOP}");
-        Console.WriteLine($"  processorSchedulerOOP class = {processorSchedulerClass}");
+        Console.WriteLine($"  processorSchedulerOOP class OOP = {classOOP}");
+        Console.WriteLine($"  processorSchedulerOOP class name = {processorSchedulerClass}");
 
         if (processorSchedulerClass == "Association")
         {
