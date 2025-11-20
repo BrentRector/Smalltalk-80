@@ -644,6 +644,15 @@ public class Phase3_ObjectAllocation : IPhase
                 // Association: 2 instance vars, Pointer format, no indexed data
                 if (format == ObjectFormat.Pointer && instVarCount == 2 && indexedSize == 0)
                 {
+                    // DEBUG: Check if this is ProcessorScheduler being incorrectly treated as Association
+                    if (objectOOP.ToObjectTableIndex() == 13488 / 2) // oop=13488
+                    {
+                        Console.WriteLine($"[Phase3] WARNING: About to overwrite ProcessorScheduler class!");
+                        Console.WriteLine($"  objectOOP = {objectOOP}");
+                        Console.WriteLine($"  currentClassOOP = {currentClassOOP}");
+                        Console.WriteLine($"  default(SmalltalkOOP) = {default(SmalltalkOOP)}");
+                        Console.WriteLine($"  nil = {SpecialObjectsArray.Instance.Nil}");
+                    }
                     _allocator.SetSlot(objectOOP, 0, associationClassOOP);
                     associationsFixed++;
                 }
