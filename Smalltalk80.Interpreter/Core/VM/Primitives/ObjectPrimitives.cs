@@ -528,7 +528,19 @@ public static class SimpleObjectPrimitives
             if (!context.Arguments[0].IsSmallInteger)
             {
                 var argClass = context.HeapManager.GetClassOOP(context.Arguments[0]);
-                Console.WriteLine($"[Primitive 71] FAIL: Argument not SmallInteger. Arg={context.Arguments[0]}, Class={argClass}");
+                // Try to get class name for better diagnostics
+                string className = "unknown";
+                try
+                {
+                    var nameSymbol = context.HeapManager.GetInstanceVariable(argClass, 6); // Class name at slot 6
+                    if (!nameSymbol.IsSmallInteger)
+                    {
+                        var bytes = context.HeapManager.GetByteArray(nameSymbol);
+                        className = System.Text.Encoding.ASCII.GetString(bytes);
+                    }
+                }
+                catch { }
+                Console.WriteLine($"[Primitive 71] FAIL: Argument not SmallInteger. Arg={context.Arguments[0]}, Class={argClass} ({className})");
                 return PrimitiveResult.Fail();
             }
 
