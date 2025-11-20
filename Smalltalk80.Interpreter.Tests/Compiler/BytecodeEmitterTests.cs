@@ -1,3 +1,6 @@
+extern alias CompilerLib;
+
+using ExtendedSubOp = CompilerLib::Smalltalk80.Core.Bytecodes.ExtendedSubOp;
 using Smalltalk80.Compiler;
 using Smalltalk80.Core.Bytecodes;
 using Xunit;

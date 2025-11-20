@@ -36,7 +36,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var mockHeap = CreateMockHeapManager();
         var newFloatOOP = ObjectOOP(200);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("Float")).Returns(ObjectOOP(50));
         mockHeap.Setup(h => h.AllocateInstanceOf(ObjectOOP(50), 4)).Returns(newFloatOOP);
 
@@ -58,7 +58,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var mockHeap = CreateMockHeapManager();
         var newFloatOOP = ObjectOOP(200);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("Float")).Returns(ObjectOOP(50));
         mockHeap.Setup(h => h.AllocateInstanceOf(ObjectOOP(50), 4)).Returns(newFloatOOP);
 
@@ -113,7 +113,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         SetupFloatObject(mockHeap, float1, 2.5);
         SetupFloatObject(mockHeap, float2, 3.5);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("Float")).Returns(ObjectOOP(50));
         mockHeap.Setup(h => h.AllocateInstanceOf(ObjectOOP(50), 4)).Returns(resultFloat);
 
@@ -138,7 +138,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
 
         SetupFloatObject(mockHeap, floatOOP, 2.5);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("Float")).Returns(ObjectOOP(50));
         mockHeap.Setup(h => h.AllocateInstanceOf(ObjectOOP(50), 4)).Returns(resultFloat);
 
@@ -169,7 +169,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         SetupFloatObject(mockHeap, float1, 5.5);
         SetupFloatObject(mockHeap, float2, 2.0);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("Float")).Returns(ObjectOOP(50));
         mockHeap.Setup(h => h.AllocateInstanceOf(ObjectOOP(50), 4)).Returns(resultFloat);
 
@@ -351,7 +351,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         SetupFloatObject(mockHeap, float1, 2.5);
         SetupFloatObject(mockHeap, float2, 4.0);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("Float")).Returns(ObjectOOP(50));
         mockHeap.Setup(h => h.AllocateInstanceOf(ObjectOOP(50), 4)).Returns(resultFloat);
 
@@ -382,7 +382,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         SetupFloatObject(mockHeap, float1, 10.0);
         SetupFloatObject(mockHeap, float2, 2.5);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("Float")).Returns(ObjectOOP(50));
         mockHeap.Setup(h => h.AllocateInstanceOf(ObjectOOP(50), 4)).Returns(resultFloat);
 
@@ -493,7 +493,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
 
         SetupFloatObject(mockHeap, floatOOP, 3.75);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("Float")).Returns(ObjectOOP(50));
         mockHeap.Setup(h => h.AllocateInstanceOf(ObjectOOP(50), 4)).Returns(resultFloat);
 
@@ -565,7 +565,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
 
         SetupFloatObject(mockHeap, floatOOP, 1.5);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("Float")).Returns(ObjectOOP(50));
         mockHeap.Setup(h => h.AllocateInstanceOf(ObjectOOP(50), 4)).Returns(resultFloat);
 
@@ -590,7 +590,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
 
         SetupFloatObject(mockHeap, floatOOP, 8.0);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
         mockRuntimeAccess.Setup(r => r.GetClass("Float")).Returns(ObjectOOP(50));
         mockHeap.Setup(h => h.AllocateInstanceOf(ObjectOOP(50), 4)).Returns(resultFloat);
 

@@ -36,7 +36,7 @@ public abstract class PrimitiveTestBase
         SmalltalkOOP receiver,
         SmalltalkOOP[] arguments,
         ISmalltalkHeapManager heapManager,
-        RuntimeHeapAccessor? runtimeHeapAccess = null,
+        IRuntimeHeapAccessor? runtimeHeapAccess = null,
         IContextManager? contextManager = null,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,

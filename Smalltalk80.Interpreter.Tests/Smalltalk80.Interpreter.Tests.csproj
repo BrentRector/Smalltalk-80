@@ -18,8 +18,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Smalltalk80.Interpreter\Smalltalk80.Interpreter.csproj" />
-    <ProjectReference Include="..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj" />
+    <ProjectReference Include="..\Smalltalk80.Interpreter\Smalltalk80.Interpreter.csproj">
+      <Aliases>InterpreterCore</Aliases>
+    </ProjectReference>
+    <ProjectReference Include="..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj">
+      <Aliases>CompilerLib</Aliases>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
