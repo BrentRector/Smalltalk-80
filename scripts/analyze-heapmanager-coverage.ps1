@@ -83,7 +83,7 @@ if (Test-Path $testsFile) {
         # Try to extract component from test name
         # Pattern: MethodName_Scenario_ExpectedResult
         if ($testName -match '^(\w+?)_') {
-            $methodName = $matches.Groups[1].Value
+            $methodName = $Matches[1]
 
             # Find which component this method belongs to
             foreach ($comp in $componentMethods.Keys) {
