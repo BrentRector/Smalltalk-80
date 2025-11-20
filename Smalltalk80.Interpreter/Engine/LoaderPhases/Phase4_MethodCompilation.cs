@@ -40,10 +40,19 @@ public class Phase4_MethodCompilation : IPhase
     private readonly MethodDictionaryInstaller _dictionaryInstaller;
     private readonly SymbolService _symbolService;
 
+    // Init expression methods array (allocated during Run())
+    private SmalltalkOOP _initExpressionMethods;
+
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
     /// </summary>
     public string Name => "Phase 4: Method Compilation";
+
+    /// <summary>
+    /// Gets the InitExpressionMethods array OOP (available after Run() completes).
+    /// Returns default(SmalltalkOOP) if no init expressions exist.
+    /// </summary>
+    public SmalltalkOOP InitExpressionMethods => _initExpressionMethods;
 
     /// <summary>
     /// Gets the phase number (1-6).
@@ -683,8 +692,8 @@ public class Phase4_MethodCompilation : IPhase
     {
         if (_bundle.InitExpressions.Length == 0)
         {
-            // No init expressions - store nil
-            SpecialObjectsArray.SetInitExpressionMethods(SpecialObjectsArray.Instance.Nil);
+            // No init expressions - leave as default
+            _initExpressionMethods = default;
             return;
         }
 
@@ -745,7 +754,7 @@ public class Phase4_MethodCompilation : IPhase
             _allocator.SetIndexedOOP(initArrayOOP, i, initExprMethods[i]);
         }
 
-        // Store in SpecialObjectsArray for runtime access
-        SpecialObjectsArray.SetInitExpressionMethods(initArrayOOP);
+        // Store for ColdStartOrchestrator to pass to BuildVMMetadata
+        _initExpressionMethods = initArrayOOP;
     }
 }

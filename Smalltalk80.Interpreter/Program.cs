@@ -182,10 +182,7 @@ public static class Program
                     return;
                 }
 
-                // Get InitExpressionMethods array (allocated during Phase 4)
-                var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
-
-                var vmMetadata = BuildVMMetadata(layoutResolver, initArrayOOP);
+                var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
                 var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
 
@@ -538,10 +535,7 @@ public static class Program
                         return;
                     }
 
-                    // Get InitExpressionMethods array (allocated during Phase 4)
-                    var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
-
-                    var vmMetadata = BuildVMMetadata(layoutResolver, initArrayOOP);
+                    var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
                     var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
                     vm.VerboseDebug = verboseDebug;
@@ -880,7 +874,7 @@ public static class Program
         Console.WriteLine("\n=== END DEBUG OUTPUT ===");
     }
 
-    private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver, SmalltalkOOP initExpressionMethods = default)
+    private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver, ColdStartOrchestrator loader)
     {
         int thisClassIdx = layoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
 
@@ -918,7 +912,7 @@ public static class Program
             BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
             KnownObjects = knownObjects,
             ProcessorScheduler = processorSchedulerOOP,
-            InitExpressionMethods = initExpressionMethods
+            InitExpressionMethods = loader.InitExpressionMethods
         };
     }
 
