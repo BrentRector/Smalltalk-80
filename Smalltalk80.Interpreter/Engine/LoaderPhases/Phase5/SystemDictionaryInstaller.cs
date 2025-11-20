@@ -184,9 +184,9 @@ public class SystemDictionaryInstaller(
         var nilOOP = SpecialObjectsArray.Instance.Nil;
         foreach (var varName in variableNames)
         {
-            // Create Association for this pool variable
-            var keySymbolOOP = associationManager.GetSymbolOOP(varName);
-            var assocOOP = associationManager.Allocate(keySymbolOOP, nilOOP);
+            // Create canonical Association for this pool variable (registered in AssociationRegistry)
+            var assocOOP = associationManager.GetOrCreateCanonical(varName);
+            context.Allocator.SetInstanceVariable(assocOOP, 1, nilOOP);
 
             // Install in pool dictionary
             dictionaryOps.InstallAssociation(poolDictOOP, assocOOP, varName);
