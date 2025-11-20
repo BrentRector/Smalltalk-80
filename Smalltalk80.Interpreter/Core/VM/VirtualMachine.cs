@@ -1,4 +1,3 @@
-using Smalltalk80.Core;
 using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -6,7 +5,6 @@ using Smalltalk80.Interpreter.Core.VM.Interpreter;
 using Smalltalk80.Interpreter.Core.VM.Caching;
 using Smalltalk80.Interpreter.Core.VM.Diagnostics;
 using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Attributes;
 
 namespace Smalltalk80.Interpreter.Core.VM;
