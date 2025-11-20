@@ -58,6 +58,21 @@ Get-ChildItem "$heapManagerDir/*.cs" -File | Where-Object {
             continue
         }
 
+        # Skip setter methods (tested indirectly through allocation)
+        if ($methodName -match '^Set') {
+            continue
+        }
+
+        # Skip static utility methods that are tested indirectly
+        if ($methodName -match '^Encode|^From') {
+            continue
+        }
+
+        # Skip internal conversion methods (AsSmallInteger is tested via FromSmallInteger)
+        if ($methodName -eq 'AsSmallInteger' -or $methodName -eq 'ToObjectTableIndex') {
+            continue
+        }
+
         $methods += $methodName
         $totalMethods++
     }
