@@ -90,7 +90,7 @@ internal class ObjectTableManager : IObjectTableManager
     public bool IsValidObjectOOP(SmalltalkOOP objectOOP)
     {
         if (objectOOP.IsSmallInteger)
-            return true; // SmallIntegers are always valid
+            return false; // SmallIntegers are not object pointers
 
         int tableIndex = objectOOP.ToObjectTableIndex();
         if (tableIndex <= 0 || tableIndex >= _nextObjectTableIndex)
