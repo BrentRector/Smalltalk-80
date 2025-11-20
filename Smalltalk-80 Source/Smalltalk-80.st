@@ -18793,21 +18793,24 @@ FileStream class
 fileNamed: fileDesignator
 	"Answer a FileStream on an old or new File designated by the string fileDesignator."
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:name | fName _ name].
-	^(dir findOrAddKey: fName) asFileStream!
+	| dir fNameHolder |
+	fNameHolder _ Array new: 1.
+	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:name | fNameHolder at: 1 put: name].
+	^(dir findOrAddKey: (fNameHolder at: 1)) asFileStream!
 newFileNamed: fileDesignator
 	"Answer a FileStream on a new File designated by the string fileDesignator.  Error if the argument is not a new file name."
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:name | fName _ name].
-	^(dir addKey: fName) asFileStream!
+	| dir fNameHolder |
+	fNameHolder _ Array new: 1.
+	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:name | fNameHolder at: 1 put: name].
+	^(dir addKey: (fNameHolder at: 1)) asFileStream!
 oldFileNamed: fileDesignator
 	"Answer a FileStream on an old File designated by the string fileDesignator.  Error if the argument is not an old file name."
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:name | fName _ name].
-	^(dir findKey: fName) asFileStream!
+	| dir fNameHolder |
+	fNameHolder _ Array new: 1.
+	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:name | fNameHolder at: 1 put: name].
+	^(dir findKey: (fNameHolder at: 1)) asFileStream!
 on: aFilePage 
 	^self new on: aFilePage! !StringHolder subclass: #FillInTheBlank
 	instanceVariableNames: 'actionBlock actionTaken '
