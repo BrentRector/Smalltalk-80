@@ -217,19 +217,41 @@ public class Phase3_ObjectAllocation : IPhase
 
     /// <summary>
     /// Initializes ProcessorScheduler instance variables with their proper initial values.
+    /// ProcessorScheduler has: quiescentProcessLists (Array of 8 LinkedLists), activeProcess (Process)
     /// </summary>
     private void InitializeProcessorSchedulerFields(SmalltalkOOP processorSchedulerOOP, SmalltalkOOP nilOOP)
     {
-        // Get instance variable count for ProcessorScheduler
-        int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("ProcessorScheduler", _bundle);
+        // 1. Create Array of 8 LinkedLists for quiescentProcessLists (one per priority level)
+        var linkedListClassOOP = GlobalRegistry.LookupClassOOP("LinkedList");
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var arrayOOP = _allocator.AllocateArray(arrayClassOOP, 8);
 
-        // Initialize all instance variables to nil
-        // This prevents Phase Y from overwriting with nil (it only sets uninitialized fields)
-        for (int i = 0; i < instVarCount; i++)
+        for (int i = 0; i < 8; i++)
         {
-            _allocator.SetInstanceVariable(processorSchedulerOOP, i, nilOOP);
-            _initializedFields.Add((processorSchedulerOOP, i));
+            var linkedListOOP = _allocator.AllocateFixedObject("LinkedList");
+            _allocator.SetObjectClass(linkedListOOP, linkedListClassOOP);
+            // LinkedList has: firstLink (index 0), lastLink (index 1)
+            _allocator.SetInstanceVariable(linkedListOOP, 0, nilOOP); // firstLink = nil
+            _allocator.SetInstanceVariable(linkedListOOP, 1, nilOOP); // lastLink = nil
+            _allocator.SetIndexedOOP(arrayOOP, i, linkedListOOP);
         }
+
+        // Set quiescentProcessLists (index 0)
+        _allocator.SetInstanceVariable(processorSchedulerOOP, 0, arrayOOP);
+        _initializedFields.Add((processorSchedulerOOP, 0));
+
+        // 2. Create initial/main Process for activeProcess
+        // Process has: suspendedContext (index 0), priority (index 1), myList (index 2)
+        var processClassOOP = GlobalRegistry.LookupClassOOP("Process");
+        var processOOP = _allocator.AllocateFixedObject("Process");
+        _allocator.SetObjectClass(processOOP, processClassOOP);
+        _allocator.SetInstanceVariable(processOOP, 0, nilOOP);  // suspendedContext = nil (main process isn't suspended)
+        _allocator.SetInstanceVariable(processOOP, 1, SmalltalkOOP.FromSmallInteger(4));  // priority = 4 (UserSchedulingPriority)
+        _allocator.SetInstanceVariable(processOOP, 2, nilOOP);  // myList = nil (active process not on any list)
+
+        // Set activeProcess (index 1)
+        _allocator.SetInstanceVariable(processorSchedulerOOP, 1, processOOP);
+        _initializedFields.Add((processorSchedulerOOP, 1));
     }
 
     /// <summary>
