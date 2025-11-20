@@ -515,46 +515,12 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1)
-            {
-                Console.WriteLine($"[Primitive 71] FAIL: Expected 1 argument, got {context.Arguments.Length}");
-                return PrimitiveResult.Fail();
-            }
-            if (context.Receiver.IsSmallInteger)
-            {
-                Console.WriteLine($"[Primitive 71] FAIL: Receiver is SmallInteger: {context.Receiver}");
-                return PrimitiveResult.Fail();
-            }
-            if (!context.Arguments[0].IsSmallInteger)
-            {
-                var argClass = context.HeapManager.GetClassOOP(context.Arguments[0]);
-                // Try to get class name for better diagnostics
-                string className = "unknown";
-                try
-                {
-                    var nameSymbol = context.HeapManager.GetInstanceVariable(argClass, 6); // Class name at slot 6
-                    if (!nameSymbol.IsSmallInteger)
-                    {
-                        int nameSize = context.HeapManager.GetIndexedSize(nameSymbol);
-                        var bytes = new byte[nameSize];
-                        for (int i = 0; i < nameSize; i++)
-                        {
-                            bytes[i] = context.HeapManager.GetIndexedByte(nameSymbol, i);
-                        }
-                        className = System.Text.Encoding.ASCII.GetString(bytes);
-                    }
-                }
-                catch { }
-                Console.WriteLine($"[Primitive 71] FAIL: Argument not SmallInteger. Arg={context.Arguments[0]}, Class={argClass} ({className})");
-                return PrimitiveResult.Fail();
-            }
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
 
             int size = context.Arguments[0].AsSmallInteger();
-            if (size < 0)
-            {
-                Console.WriteLine($"[Primitive 71] FAIL: Negative size: {size}");
-                return PrimitiveResult.Fail();
-            }
+            if (size < 0) return PrimitiveResult.Fail();
 
             var result = context.HeapManager.AllocateInstanceOf(context.Receiver, size);
             return PrimitiveResult.Ok(result);
