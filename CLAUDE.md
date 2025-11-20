@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-18
+**Last Updated**: 2025-11-20
 
 ## Project Status
 
@@ -8,9 +8,14 @@
 
 - **Build**: 0 errors, 0 warnings
 - **Cold Start**: Phases 1-6 all succeed
-- **Init Expressions**: 31/46 succeed (67% success rate)
+- **Init Expressions**: 44/46 succeed (96% success rate)
+- **Comment Expressions**: Skipped (234 total - WriteStream bug)
 - **BlockContext Tests**: ✅ **120/120 tests PASS** (returns 1191)
 - **VM Core**: Fully functional, verified operational
+
+## Known Issues
+
+**WriteStream>>nextPut: Infinite Loop**: 210/234 comment expressions fail with infinite loop in WriteStream. All comment expressions skipped until bug is fixed.
 
 ## Architecture Documentation
 
@@ -103,9 +108,11 @@ Changes to these files MUST pass the regression test:
 
 ## Init Expression Status
 
-**✅ Passing (31)**: Character, Float, SmallInteger, Text, Symbol, Date, File, Scanner, Debugger, and 22 more
+**✅ Passing (44)**: Character, Float, SmallInteger, Text, Symbol, Date, File, Scanner, Debugger, InputSensor, Cursor, Form, TextList, BitEditor, and 30 more
 
-**⏭️ Skipped (15)**: Require GUI/process/file I/O primitives not available at bootstrap
+**⏭️ Skipped (2)**:
+- Object initialize - Requires Sensor cursorPoint (GUI)
+- FormMenuView initialize - File operations under investigation
 
 ## Development Methodology
 
