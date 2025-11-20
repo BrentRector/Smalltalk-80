@@ -477,11 +477,10 @@ public static class Program
                 // No need to re-run them here
 
                 // Phase 2: Execute ALL comment: expressions (run after all initialize! expressions)
-                // Skip list for comment expressions that fail
+                // Collecting all failures to identify pattern (continue on failure)
                 var skippedCommentPrefixes = new List<string>
                 {
-                    "Benchmark comment:",  // Fails during execution
-                    "BitBlt comment:",     // Fails during execution
+                    // Empty - running all to collect failure list
                 };
 
                 if (phase2Indices.Count > 0)
@@ -509,17 +508,11 @@ public static class Program
                         if (result.Status != InitStatus.Success)
                         {
                             phase2Failed++;
-                            Console.WriteLine($"\n❌ FAILED: {expr.Source}");
-                            Console.WriteLine($"   Status: {result.Status}");
-                            if (result.Diagnostic?.Message != null)
-                            {
-                                Console.WriteLine($"   Error: {result.Diagnostic?.Message}");
-                            }
-
-                            Console.WriteLine($"\n=== Phase 2 Execution Failed ===");
-                            Console.WriteLine($"  {phase2Succeeded}/{phase2Indices.Count} succeeded. {phase2Failed}/{phase2Indices.Count} failed.");
-                            Console.WriteLine($"  Fast-fail: Stopping execution");
-                            return;
+                            // Extract just the class name from "ClassName comment: '...'"
+                            string className = expr.Source?.Split(' ')[0] ?? "Unknown";
+                            Console.WriteLine($"  ❌ {className} comment:");
+                            // Continue to next instead of stopping - collect all failures
+                            continue;
                         }
 
                         phase2Succeeded++;
