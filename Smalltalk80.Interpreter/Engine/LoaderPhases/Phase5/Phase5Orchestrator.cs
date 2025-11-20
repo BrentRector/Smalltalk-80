@@ -88,7 +88,9 @@ public class Phase5Orchestrator : IPhase
         if (GlobalRegistry.TryGet("ProcessorScheduler", out var processorOOP))
         {
             var classOOP = _context.Allocator.GetClassOOP(processorOOP);
-            Console.WriteLine($"[Phase5 TRACE] {checkpoint}: ProcessorScheduler class = {classOOP}");
+            var field0 = _context.Allocator.GetInstanceVariable(processorOOP, 0);
+            var field1 = _context.Allocator.GetInstanceVariable(processorOOP, 1);
+            Console.WriteLine($"[Phase5 TRACE] {checkpoint}: class={classOOP}, field0={field0}, field1={field1}");
         }
     }
 }

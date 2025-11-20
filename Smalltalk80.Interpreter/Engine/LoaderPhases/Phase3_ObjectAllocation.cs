@@ -134,7 +134,9 @@ public class Phase3_ObjectAllocation : IPhase
         if (GlobalRegistry.TryGet("ProcessorScheduler", out var processorOOP))
         {
             var classOOP = _allocator.GetClassOOP(processorOOP);
-            Console.WriteLine($"[Phase3 TRACE] {checkpoint}: ProcessorScheduler class = {classOOP}");
+            var field0 = _allocator.GetInstanceVariable(processorOOP, 0);
+            var field1 = _allocator.GetInstanceVariable(processorOOP, 1);
+            Console.WriteLine($"[Phase3 TRACE] {checkpoint}: class={classOOP}, field0={field0}, field1={field1}");
         }
     }
 

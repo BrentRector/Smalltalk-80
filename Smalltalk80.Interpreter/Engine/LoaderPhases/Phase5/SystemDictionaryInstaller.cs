@@ -228,7 +228,8 @@ public class SystemDictionaryInstaller(
     {
         // DEBUG: Verify we're installing the ProcessorScheduler instance, not an Association
         var classOOP = context.Allocator.GetClassOOP(processorSchedulerOOP);
-        var processorSchedulerClass = context.Allocator.GetClassName(classOOP);
+        // GetClassName expects an INSTANCE - it looks up the class of what you pass
+        var processorSchedulerClass = context.Allocator.GetClassName(processorSchedulerOOP);
         Console.WriteLine($"[InstallProcessorGlobal] DEBUG:");
         Console.WriteLine($"  processorSchedulerOOP = {processorSchedulerOOP}");
         Console.WriteLine($"  processorSchedulerOOP class OOP = {classOOP}");
