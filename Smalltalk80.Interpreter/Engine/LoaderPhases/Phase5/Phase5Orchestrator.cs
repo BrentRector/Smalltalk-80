@@ -66,9 +66,11 @@ public class Phase5Orchestrator : IPhase
     {
         // Step 1: Apply patches
         _patchApplier.Apply(_context.Bundle.Patches);
+        TraceProcessorSchedulerClass("After Step 1 (Patches)");
 
         // Step 2: Create and populate USTable
         _ustableBuilder.Build();
+        TraceProcessorSchedulerClass("After Step 2 (USTable)");
 
         // Step 3: Install global variables in SystemDictionary
         _systemDictInstaller.InstallGlobals();
@@ -79,5 +81,14 @@ public class Phase5Orchestrator : IPhase
 
         // Freeze AssociationRegistry after all globals installed
         AssociationRegistry.Freeze();
+    }
+
+    private void TraceProcessorSchedulerClass(string checkpoint)
+    {
+        if (GlobalRegistry.TryGet("ProcessorScheduler", out var processorOOP))
+        {
+            var classOOP = _context.Allocator.GetClassOOP(processorOOP);
+            Console.WriteLine($"[Phase5 TRACE] {checkpoint}: ProcessorScheduler class = {classOOP}");
+        }
     }
 }
