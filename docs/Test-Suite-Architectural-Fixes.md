@@ -316,6 +316,12 @@ All fixes were implemented in 4 commits on branch `claude/review-refactoring-wor
 4. **de62547** - Fixed 5 remaining primitive tests by providing RuntimeHeapAccessor
    - Added `CreateMockRuntimeHeapAccessor()` helper to PrimitiveTestBase
    - Updated Signal/Wait/Resume/Suspend tests to provide mocked RuntimeHeapAccessor
-   - Fixed last 5 failing tests
+   - Reduced failures but revealed null handling issue
+
+5. **b40496a** - Fixed GetClassNameForObject to properly return null when className is null
+   - Issue: Was concatenating "class:" + null which produces "class:" (not null)
+   - Caused primitives to proceed with invalid class names and throw field lookup errors
+   - Fixed null check to return null directly before concatenation
+   - Fixed last 5 failing tests (Signal, Wait, Resume, Suspend null scenarios)
 
 **Final Result**: 258/258 tests passing (100% success rate)
