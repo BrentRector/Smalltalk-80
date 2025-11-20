@@ -5,6 +5,11 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <!-- Allow test project to access internal types -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Smalltalk80.Interpreter.Tests" />
+  </ItemGroup>
   
   <!-- Shared definitions -->
   <ItemGroup>
