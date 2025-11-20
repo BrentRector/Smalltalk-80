@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Smalltalk80.Interpreter.HeapManager</RootNamespace>
+    <AssemblyName>Smalltalk80.Interpreter.HeapManager</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Description>Heap Manager for Smalltalk-80 Interpreter (object allocation, GC, object table management)</Description>
+    <Authors>Smalltalk-80 Project</Authors>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Smalltalk80.Interpreter.Shared.Types\Smalltalk80.Interpreter.Shared.Types.csproj" />
+  </ItemGroup>
+
+</Project>
