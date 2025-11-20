@@ -242,48 +242,64 @@ public class Phase3_ObjectAllocation : IPhase
     /// </summary>
     private void InitializeProcessorSchedulerFields(SmalltalkOOP processorSchedulerOOP, SmalltalkOOP nilOOP)
     {
+        // Get instance variable indices from bundle data
+        int quiescentProcessListsIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("ProcessorScheduler", "quiescentProcessLists", _bundle);
+        int activeProcessIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("ProcessorScheduler", "activeProcess", _bundle);
+        int firstLinkIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("LinkedList", "firstLink", _bundle);
+        int lastLinkIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("LinkedList", "lastLink", _bundle);
+
         // 1. Create Array of 8 LinkedLists for quiescentProcessLists (one per priority level)
         var linkedListClassOOP = GlobalRegistry.LookupClassOOP("LinkedList");
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         var arrayOOP = _allocator.AllocateArray(arrayClassOOP, 8);
 
+        int linkedListInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("LinkedList", _bundle);
         for (int i = 0; i < 8; i++)
         {
             var linkedListOOP = _allocator.AllocateFixedObject("LinkedList");
             _allocator.SetObjectClass(linkedListOOP, linkedListClassOOP);
-            // LinkedList has: firstLink (index 0), lastLink (index 1)
-            _allocator.SetInstanceVariable(linkedListOOP, 0, nilOOP); // firstLink = nil
-            _allocator.SetInstanceVariable(linkedListOOP, 1, nilOOP); // lastLink = nil
+            // Initialize all instance variables to nil
+            for (int j = 0; j < linkedListInstVarCount; j++)
+            {
+                _allocator.SetInstanceVariable(linkedListOOP, j, nilOOP);
+            }
             _allocator.SetIndexedOOP(arrayOOP, i, linkedListOOP);
         }
 
-        // Set quiescentProcessLists (index 0)
-        _allocator.SetInstanceVariable(processorSchedulerOOP, 0, arrayOOP);
-        _initializedFields.Add((processorSchedulerOOP, 0));
+        // Set quiescentProcessLists
+        _allocator.SetInstanceVariable(processorSchedulerOOP, quiescentProcessListsIndex, arrayOOP);
+        _initializedFields.Add((processorSchedulerOOP, quiescentProcessListsIndex));
         Console.WriteLine($"[Phase3] Set quiescentProcessLists = {arrayOOP}");
 
         // 2. Create initial/main Process for activeProcess
-        // Process inherits from Link, so indices are:
-        //   0: nextLink (from Link)
-        //   1: suspendedContext
-        //   2: priority
-        //   3: myList
+        // Use ClassHierarchyTraversal to get correct indices from bundle data
         var processClassOOP = GlobalRegistry.LookupClassOOP("Process");
         var processOOP = _allocator.AllocateFixedObject("Process");
         _allocator.SetObjectClass(processOOP, processClassOOP);
-        _allocator.SetInstanceVariable(processOOP, 0, nilOOP);  // nextLink = nil (from Link)
-        _allocator.SetInstanceVariable(processOOP, 1, nilOOP);  // suspendedContext = nil (main process isn't suspended)
-        _allocator.SetInstanceVariable(processOOP, 2, SmalltalkOOP.FromSmallInteger(4));  // priority = 4 (UserSchedulingPriority)
-        _allocator.SetInstanceVariable(processOOP, 3, nilOOP);  // myList = nil (active process not on any list)
 
-        // Set activeProcess (index 1)
-        _allocator.SetInstanceVariable(processorSchedulerOOP, 1, processOOP);
-        _initializedFields.Add((processorSchedulerOOP, 1));
+        // Get instance variable indices from bundle (includes inherited variables)
+        int suspendedContextIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Process", "suspendedContext", _bundle);
+        int priorityIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Process", "priority", _bundle);
+        int myListIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Process", "myList", _bundle);
+
+        // Initialize all instance variables to nil first
+        int processInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("Process", _bundle);
+        for (int i = 0; i < processInstVarCount; i++)
+        {
+            _allocator.SetInstanceVariable(processOOP, i, nilOOP);
+        }
+
+        // Set specific values
+        _allocator.SetInstanceVariable(processOOP, priorityIndex, SmalltalkOOP.FromSmallInteger(4));  // priority = 4 (UserSchedulingPriority)
+
+        // Set activeProcess
+        _allocator.SetInstanceVariable(processorSchedulerOOP, activeProcessIndex, processOOP);
+        _initializedFields.Add((processorSchedulerOOP, activeProcessIndex));
         Console.WriteLine($"[Phase3] Set activeProcess = {processOOP}");
 
         // Verify fields were set
-        var verifyField0 = _allocator.GetInstanceVariable(processorSchedulerOOP, 0);
-        var verifyField1 = _allocator.GetInstanceVariable(processorSchedulerOOP, 1);
+        var verifyField0 = _allocator.GetInstanceVariable(processorSchedulerOOP, quiescentProcessListsIndex);
+        var verifyField1 = _allocator.GetInstanceVariable(processorSchedulerOOP, activeProcessIndex);
         Console.WriteLine($"[Phase3] Verify: quiescentProcessLists = {verifyField0}, activeProcess = {verifyField1}");
     }
 
