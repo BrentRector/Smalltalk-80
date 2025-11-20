@@ -67,12 +67,11 @@ public static class SymbolRegistry
     }
 
     /// <summary>
-    /// Clears all registered symbols and resets frozen state.
-    /// Used for testing or reinitialization.
+    /// Clears all registered symbols. Used after cold start to release memory.
+    /// Does NOT reset frozen state - registry remains unusable after freeze.
     /// </summary>
     public static void Clear()
     {
         _symbolIndexToOOP.Clear();
-        _isFrozen = false;
     }
 }
