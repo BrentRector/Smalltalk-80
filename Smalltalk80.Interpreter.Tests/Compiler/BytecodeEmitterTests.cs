@@ -1,6 +1,6 @@
 using Smalltalk80.Compiler;
-using Smalltalk80.Core.Bytecodes;
 using Xunit;
+using Bytecode = Smalltalk80.Core.Bytecodes.Bytecode;
 
 namespace Smalltalk80.Interpreter.Tests.Compiler;
 
