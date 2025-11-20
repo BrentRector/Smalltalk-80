@@ -191,7 +191,12 @@ public readonly struct PrimitiveExecutionContext
     {
         if (objectOOP.IsSmallInteger)
             return "class:SmallInteger";
-        return "class:" + HeapManager.GetClassName(objectOOP);
+
+        var className = HeapManager.GetClassName(objectOOP);
+        if (className == null)
+            return null;
+
+        return "class:" + className;
     }
 
     /// <summary>
