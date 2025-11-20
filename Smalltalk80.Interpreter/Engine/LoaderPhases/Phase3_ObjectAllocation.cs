@@ -182,6 +182,11 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Create ProcessorScheduler singleton
         var processorSchedulerOOP = _allocator.AllocateFixedObject("ProcessorScheduler");
+
+        // CRITICAL: Set the class reference - AllocateFixedObject doesn't set it!
+        var processorSchedulerClassOOP = GlobalRegistry.LookupClassOOP("ProcessorScheduler");
+        _allocator.SetObjectClass(processorSchedulerOOP, processorSchedulerClassOOP);
+
         Console.WriteLine($"[Phase3] Created ProcessorScheduler singleton: {processorSchedulerOOP}");
         GlobalRegistry.Register("ProcessorScheduler", processorSchedulerOOP);
 
