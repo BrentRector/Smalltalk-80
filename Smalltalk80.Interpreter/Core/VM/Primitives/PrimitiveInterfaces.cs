@@ -26,11 +26,11 @@ public readonly struct PrimitiveResult
     public static PrimitiveResult Ok(SmalltalkOOP value) => new(true, value);
 
     /// <summary>Creates a failed result (value will be nil).</summary>
-    public static PrimitiveResult Fail() => new(false, metadata.KnownObjects.Nil);
+    public static PrimitiveResult Fail() => new(false, heapManager.GetNil());
 
     /// <summary>Creates a result from a boolean condition.</summary>
     public static PrimitiveResult FromBool(bool condition) =>
-        condition ? Ok(metadata.KnownObjects.True) : Ok(metadata.KnownObjects.False);
+        condition ? Ok(heapManager.GetNil()) : Ok(heapManager.GetNil());
 }
 
 /// <summary>

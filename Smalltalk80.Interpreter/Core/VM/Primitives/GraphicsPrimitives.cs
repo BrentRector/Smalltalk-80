@@ -86,7 +86,7 @@ public static class GraphicsOperations
         private static (Memory<byte> bits, int width, int height) ExtractFormData(
             PrimitiveExecutionContext context, SmalltalkOOP formOOP)
         {
-            if (formOOP == metadata.KnownObjects.Nil || formOOP.IsSmallInteger)
+            if (formOOP == heapManager.GetNil() || formOOP.IsSmallInteger)
                 return (Memory<byte>.Empty, 0, 0);
 
             // Get Form instance variables: bits (0), width (1), height (2)
@@ -101,7 +101,7 @@ public static class GraphicsOperations
             int height = heightOOP.AsSmallInteger();
 
             // Get bitmap data
-            if (bitsOOP == metadata.KnownObjects.Nil || bitsOOP.IsSmallInteger)
+            if (bitsOOP == heapManager.GetNil() || bitsOOP.IsSmallInteger)
                 return (Memory<byte>.Empty, 0, 0);
 
             // Check object format to determine how to extract bits
@@ -277,7 +277,7 @@ public static class GraphicsOperations
             {
                 // Write clipboard
                 SmalltalkOOP stringOOP = context.Arguments[0];
-                if (stringOOP.IsSmallInteger || stringOOP == metadata.KnownObjects.Nil)
+                if (stringOOP.IsSmallInteger || stringOOP == heapManager.GetNil())
                     return PrimitiveResult.Fail();
 
                 bool success = context.Platform.WriteClipboardFromStringOOP(stringOOP);

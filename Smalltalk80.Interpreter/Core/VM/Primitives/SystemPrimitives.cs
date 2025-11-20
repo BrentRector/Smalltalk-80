@@ -95,7 +95,7 @@ public static class SystemOperations
             if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
 
             // Receiver must be Semaphore object (or nil to disable)
-            if (!context.Receiver.IsSmallInteger && context.Receiver != metadata.KnownObjects.Nil)
+            if (!context.Receiver.IsSmallInteger && context.Receiver != heapManager.GetNil())
             {
                 if (!context.Arguments[0].IsSmallInteger || !context.Arguments[1].IsSmallInteger)
                     return PrimitiveResult.Fail();
@@ -146,7 +146,7 @@ public static class SystemOperations
             // Find first instance of receiver class
             var instance = context.HeapManager.FindInstanceOf(context.Receiver);
 
-            if (instance == metadata.KnownObjects.Nil)
+            if (instance == heapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(instance);
@@ -167,7 +167,7 @@ public static class SystemOperations
             // Find next instance after receiver
             var nextInstance = context.HeapManager.FindNextInstanceOf(receiverClassOOP, context.Receiver);
 
-            if (nextInstance == metadata.KnownObjects.Nil)
+            if (nextInstance == heapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(nextInstance);
@@ -259,7 +259,7 @@ public static class SystemOperations
             }
 
             // No more objects
-            return PrimitiveResult.Ok(metadata.KnownObjects.Nil);
+            return PrimitiveResult.Ok(heapManager.GetNil());
         }
     }
 }

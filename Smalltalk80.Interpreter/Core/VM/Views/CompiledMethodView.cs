@@ -96,7 +96,7 @@ public readonly struct CompiledMethodView
     public int BytecodeLength => _heap.GetIndexedSize(BytecodeArrayOOP);
 
     /// <summary>Checks if this is a valid method (not nil).</summary>
-    public bool IsValid => _oop != metadata.KnownObjects.Nil && !_oop.IsSmallInteger;
+    public bool IsValid => _oop != _heap.GetNil() && !_oop.IsSmallInteger;
 
     /// <summary>
     /// Parses the method header word.

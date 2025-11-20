@@ -98,7 +98,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
 
         // Primitive not found
         ctx.PrimitiveSuccess = false;
-        return metadata.KnownObjects.Nil;
+        return heapManager.GetNil();
     }
 
     /// <summary>

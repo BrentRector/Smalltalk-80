@@ -101,5 +101,5 @@ public readonly struct MethodContextView
     public CompiledMethodView GetMethodView() => new(Method, _heap);
 
     /// <summary>Checks if this is a valid context (not nil).</summary>
-    public bool IsValid => _oop != metadata.KnownObjects.Nil && !_oop.IsSmallInteger;
+    public bool IsValid => _oop != _heap.GetNil() && !_oop.IsSmallInteger;
 }

@@ -68,7 +68,7 @@ public static class SimpleObjectPrimitives
             {
                 // SmallInteger class - need to look it up
                 classOOP = context.RuntimeHeapAccess?.GetClass("SmallInteger")
-                    ?? metadata.KnownObjects.Nil;
+                    ?? heapManager.GetNil();
             }
             else
             {
@@ -170,7 +170,7 @@ public static class SimpleObjectPrimitives
 
             // Always read count from class format - this is the authoritative source
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
-            if (classOOP.IsSmallInteger || classOOP == metadata.KnownObjects.Nil)
+            if (classOOP.IsSmallInteger || classOOP == heapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             // Read format from class using GetSlot to bypass bounds check
@@ -206,7 +206,7 @@ public static class SimpleObjectPrimitives
 
             // Always read count from class format - this is the authoritative source
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
-            if (classOOP.IsSmallInteger || classOOP == metadata.KnownObjects.Nil)
+            if (classOOP.IsSmallInteger || classOOP == heapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             // Read format from class using GetSlot to bypass bounds check
@@ -247,7 +247,7 @@ public static class SimpleObjectPrimitives
 
             // Get Character from CharacterTable (Character class pool variable)
             var characterOOP = GetCharacterForAscii(context, byteValue);
-            if (characterOOP == metadata.KnownObjects.Nil)
+            if (characterOOP == heapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(characterOOP);
@@ -257,24 +257,24 @@ public static class SimpleObjectPrimitives
         private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
         {
             if (context.RuntimeHeapAccess == null)
-                return metadata.KnownObjects.Nil;
+                return heapManager.GetNil();
 
             // Get Character class from SystemDictionary
             var characterClassOOP = context.RuntimeHeapAccess.GetClass("Character");
-            if (characterClassOOP == metadata.KnownObjects.Nil)
-                return metadata.KnownObjects.Nil;
+            if (characterClassOOP == heapManager.GetNil())
+                return heapManager.GetNil();
 
             // Get classPool from Character class (instance variable index 7)
             var classPoolOOP = context.HeapManager.GetInstanceVariable(characterClassOOP, 7);
-            if (classPoolOOP == metadata.KnownObjects.Nil)
-                return metadata.KnownObjects.Nil;
+            if (classPoolOOP == heapManager.GetNil())
+                return heapManager.GetNil();
 
             // Search for CharacterTable in class pool
             int dictSize = context.HeapManager.GetIndexedSize(classPoolOOP);
             for (int i = 0; i < dictSize; i++)
             {
                 var entryOOP = context.HeapManager.GetIndexedOOP(classPoolOOP, i);
-                if (entryOOP == metadata.KnownObjects.Nil)
+                if (entryOOP == heapManager.GetNil())
                     continue;
 
                 var keyOOP = context.HeapManager.GetInstanceVariable(entryOOP, 0);
@@ -292,7 +292,7 @@ public static class SimpleObjectPrimitives
                 }
             }
 
-            return metadata.KnownObjects.Nil;
+            return heapManager.GetNil();
         }
     }
 
@@ -549,7 +549,7 @@ public static class SimpleObjectPrimitives
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
 
             var instance = context.HeapManager.FindInstanceOf(context.Receiver);
-            if (instance == metadata.KnownObjects.Nil)
+            if (instance == heapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(instance);
@@ -567,7 +567,7 @@ public static class SimpleObjectPrimitives
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
             var nextInstance = context.HeapManager.FindNextInstanceOf(classOOP, context.Receiver);
 
-            if (nextInstance == metadata.KnownObjects.Nil)
+            if (nextInstance == heapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(nextInstance);
@@ -603,7 +603,7 @@ public static class SimpleObjectPrimitives
                 context.HeapManager,
                 compiledMethodClassOOP.Value,
                 byteArrayClassOOP.Value,
-                metadata.KnownObjects.Nil,
+                heapManager.GetNil(),
                 headerWord,
                 Array.Empty<SmalltalkOOP>(),
                 bytecodes);

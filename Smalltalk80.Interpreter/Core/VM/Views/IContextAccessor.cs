@@ -137,7 +137,7 @@ public class ContextAccessor : IContextAccessor
 
     public bool IsBlockContext(SmalltalkOOP contextOOP)
     {
-        if (contextOOP.IsSmallInteger || contextOOP == metadata.KnownObjects.Nil)
+        if (contextOOP.IsSmallInteger || contextOOP == _heap.GetNil())
             return false;
 
         var classOOP = _heap.GetClassOOP(contextOOP);

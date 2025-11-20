@@ -80,7 +80,7 @@ public readonly struct ClassView
     public string GetClassName()
     {
         var nameOOP = Name;
-        if (nameOOP == metadata.KnownObjects.Nil || nameOOP.IsSmallInteger)
+        if (nameOOP == _heap.GetNil() || nameOOP.IsSmallInteger)
             return "<anonymous>";
 
         int length = _heap.GetIndexedSize(nameOOP);
@@ -120,5 +120,5 @@ public readonly struct ClassView
     public ClassView GetSuperclassView() => new(Superclass, _heap);
 
     /// <summary>Checks if this is a valid class (not nil).</summary>
-    public bool IsValid => _oop != metadata.KnownObjects.Nil && !_oop.IsSmallInteger;
+    public bool IsValid => _oop != _heap.GetNil() && !_oop.IsSmallInteger;
 }

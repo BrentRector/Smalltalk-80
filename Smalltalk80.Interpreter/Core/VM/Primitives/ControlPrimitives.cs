@@ -93,9 +93,9 @@ public static class ControlPrimitives
             SmalltalkOOP newBlockContext = heapManager.AllocateInstanceOf(blockContextClassOOP, indexedSize);
 
             // Initialize BlockContext fields
-            heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, metadata.KnownObjects.Nil);
-            heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_PC_INDEX, metadata.KnownObjects.Nil);
-            heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, metadata.KnownObjects.Nil);
+            heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, heapManager.GetNil());
+            heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_PC_INDEX, heapManager.GetNil());
+            heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, heapManager.GetNil());
             heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX, blockArgumentCount);
             heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, startPC);
             heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContext);
@@ -159,7 +159,7 @@ public static class ControlPrimitives
             // Switch to the BlockContext
             context.SetActiveContext(blockContext);
 
-            return PrimitiveResult.Ok(metadata.KnownObjects.Nil);
+            return PrimitiveResult.Ok(heapManager.GetNil());
         }
     }
 
@@ -224,7 +224,7 @@ public static class ControlPrimitives
             // Switch to the BlockContext
             context.SetActiveContext(blockContext);
 
-            return PrimitiveResult.Ok(metadata.KnownObjects.Nil);
+            return PrimitiveResult.Ok(heapManager.GetNil());
         }
     }
 
@@ -289,7 +289,7 @@ public static class ControlPrimitives
             SmalltalkOOP firstLinkOop = context.GetFieldValue(context.Receiver, className, "firstLink");
             SmalltalkOOP excessSignalsOop = context.GetFieldValue(context.Receiver, className, "excessSignals");
 
-            if (firstLinkOop == metadata.KnownObjects.Nil)
+            if (firstLinkOop == heapManager.GetNil())
             {
                 // No processes waiting - increment excessSignals
                 if (!excessSignalsOop.IsSmallInteger) return PrimitiveResult.Fail();
@@ -302,7 +302,7 @@ public static class ControlPrimitives
                 // Processes are waiting - wake up the first one
                 SmalltalkOOP processOop = RemoveFirstLink(context, context.Receiver, className);
 
-                if (processOop == metadata.KnownObjects.Nil)
+                if (processOop == heapManager.GetNil())
                     return PrimitiveResult.Fail();
 
                 if (!ResumeProcess(context, processOop))
@@ -344,7 +344,7 @@ public static class ControlPrimitives
                 // No signal available - suspend active process
                 SmalltalkOOP activeProcessOop = GetActiveProcess(context);
 
-                if (activeProcessOop == metadata.KnownObjects.Nil)
+                if (activeProcessOop == heapManager.GetNil())
                     return PrimitiveResult.Fail();
 
                 // Add active process to semaphore's waiting list
@@ -373,7 +373,7 @@ public static class ControlPrimitives
             SmalltalkOOP myListOop = context.GetFieldValue(context.Receiver, className, "myList");
 
             // Fail if already on a list
-            if (myListOop != metadata.KnownObjects.Nil)
+            if (myListOop != heapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             // Resume the process
@@ -410,7 +410,7 @@ public static class ControlPrimitives
                 SmalltalkOOP myListOop = context.GetFieldValue(context.Receiver, className, "myList");
 
                 // Process must be on a list to suspend
-                if (myListOop == metadata.KnownObjects.Nil)
+                if (myListOop == heapManager.GetNil())
                     return PrimitiveResult.Fail();
 
                 // Remove process from its list
@@ -418,7 +418,7 @@ public static class ControlPrimitives
                     return PrimitiveResult.Fail();
 
                 // Clear myList reference
-                context.SetFieldValue(context.Receiver, className, "myList", metadata.KnownObjects.Nil);
+                context.SetFieldValue(context.Receiver, className, "myList", heapManager.GetNil());
 
                 return PrimitiveResult.Ok(context.Receiver);
             }
@@ -448,8 +448,8 @@ public static class ControlPrimitives
     {
         SmalltalkOOP schedulerOop = SpecialObjectsArray.Instance.ProcessorScheduler;
 
-        if (schedulerOop == metadata.KnownObjects.Nil)
-            return metadata.KnownObjects.Nil;
+        if (schedulerOop == heapManager.GetNil())
+            return heapManager.GetNil();
 
         return context.GetFieldValue(schedulerOop, "class:ProcessorScheduler", "activeProcess");
     }
@@ -458,19 +458,19 @@ public static class ControlPrimitives
     {
         SmalltalkOOP firstLinkOop = context.GetFieldValue(listOop, className, "firstLink");
 
-        if (firstLinkOop == metadata.KnownObjects.Nil)
-            return metadata.KnownObjects.Nil;
+        if (firstLinkOop == heapManager.GetNil())
+            return heapManager.GetNil();
 
         SmalltalkOOP nextLinkOop = context.GetFieldValue(firstLinkOop, "class:Link", "nextLink");
 
         context.SetFieldValue(listOop, className, "firstLink", nextLinkOop);
 
-        if (nextLinkOop == metadata.KnownObjects.Nil)
+        if (nextLinkOop == heapManager.GetNil())
         {
-            context.SetFieldValue(listOop, className, "lastLink", metadata.KnownObjects.Nil);
+            context.SetFieldValue(listOop, className, "lastLink", heapManager.GetNil());
         }
 
-        context.SetFieldValue(firstLinkOop, "class:Link", "nextLink", metadata.KnownObjects.Nil);
+        context.SetFieldValue(firstLinkOop, "class:Link", "nextLink", heapManager.GetNil());
 
         // If this is a Process, clear its myList reference
         SmalltalkOOP linkClassOop = context.HeapManager.GetClassOOP(firstLinkOop);
@@ -478,7 +478,7 @@ public static class ControlPrimitives
 
         if (linkClassOop == processClassOop)
         {
-            context.SetFieldValue(firstLinkOop, "class:Process", "myList", metadata.KnownObjects.Nil);
+            context.SetFieldValue(firstLinkOop, "class:Process", "myList", heapManager.GetNil());
         }
 
         return firstLinkOop;
@@ -488,7 +488,7 @@ public static class ControlPrimitives
     {
         SmalltalkOOP lastLinkOop = context.GetFieldValue(listOop, className, "lastLink");
 
-        if (lastLinkOop == metadata.KnownObjects.Nil)
+        if (lastLinkOop == heapManager.GetNil())
         {
             context.SetFieldValue(listOop, className, "firstLink", linkOop);
             context.SetFieldValue(listOop, className, "lastLink", linkOop);
@@ -499,7 +499,7 @@ public static class ControlPrimitives
             context.SetFieldValue(listOop, className, "lastLink", linkOop);
         }
 
-        context.SetFieldValue(linkOop, "class:Link", "nextLink", metadata.KnownObjects.Nil);
+        context.SetFieldValue(linkOop, "class:Link", "nextLink", heapManager.GetNil());
 
         // Set myList if this is a Process
         SmalltalkOOP linkClassOop = context.HeapManager.GetClassOOP(linkOop);
@@ -525,18 +525,18 @@ public static class ControlPrimitives
 
         SmalltalkOOP schedulerOop = SpecialObjectsArray.Instance.ProcessorScheduler;
 
-        if (schedulerOop == metadata.KnownObjects.Nil)
+        if (schedulerOop == heapManager.GetNil())
             return false;
 
         SmalltalkOOP processListsOop = context.GetFieldValue(schedulerOop, "class:ProcessorScheduler", "quiescentProcessLists");
 
-        if (processListsOop == metadata.KnownObjects.Nil)
+        if (processListsOop == heapManager.GetNil())
             return false;
 
         int index = priority - 1;
 
         SmalltalkOOP priorityListOop = context.HeapManager.GetIndexedOOP(processListsOop, index);
-        if (priorityListOop == metadata.KnownObjects.Nil)
+        if (priorityListOop == heapManager.GetNil())
             return false;
 
         AddLastLink(context, priorityListOop, "class:LinkedList", processOop);
@@ -547,21 +547,21 @@ public static class ControlPrimitives
     private static bool RemoveProcessFromList(PrimitiveExecutionContext context, SmalltalkOOP processOop, SmalltalkOOP listOop)
     {
         SmalltalkOOP currentOop = context.GetFieldValue(listOop, "class:LinkedList", "firstLink");
-        SmalltalkOOP previousOop = metadata.KnownObjects.Nil;
+        SmalltalkOOP previousOop = heapManager.GetNil();
 
-        while (currentOop != metadata.KnownObjects.Nil)
+        while (currentOop != heapManager.GetNil())
         {
             if (currentOop == processOop)
             {
                 SmalltalkOOP nextLinkOop = context.GetFieldValue(processOop, "class:Link", "nextLink");
 
-                if (previousOop == metadata.KnownObjects.Nil)
+                if (previousOop == heapManager.GetNil())
                 {
                     context.SetFieldValue(listOop, "class:LinkedList", "firstLink", nextLinkOop);
 
-                    if (nextLinkOop == metadata.KnownObjects.Nil)
+                    if (nextLinkOop == heapManager.GetNil())
                     {
-                        context.SetFieldValue(listOop, "class:LinkedList", "lastLink", metadata.KnownObjects.Nil);
+                        context.SetFieldValue(listOop, "class:LinkedList", "lastLink", heapManager.GetNil());
                     }
                 }
                 else
@@ -575,7 +575,7 @@ public static class ControlPrimitives
                     }
                 }
 
-                context.SetFieldValue(processOop, "class:Link", "nextLink", metadata.KnownObjects.Nil);
+                context.SetFieldValue(processOop, "class:Link", "nextLink", heapManager.GetNil());
 
                 return true;
             }
