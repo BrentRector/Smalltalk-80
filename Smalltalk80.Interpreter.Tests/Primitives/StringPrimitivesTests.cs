@@ -1,6 +1,7 @@
 using Moq;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 
 namespace Smalltalk80.Interpreter.Tests.Primitives;
@@ -228,7 +229,7 @@ public class StringPrimitivesTests : PrimitiveTestBase
             SetupIndexedByte(mockHeap, stringOOP, i, helloBytes[i]);
         }
 
-        var mockRuntime = new Mock<IRuntimeHeapAccessor>();
+        var mockRuntime = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
         mockRuntime.Setup(r => r.InternSymbol("hello")).Returns(symbolOOP);
 
         var context = CreateContext(
@@ -291,7 +292,7 @@ public class StringPrimitivesTests : PrimitiveTestBase
             SetupIndexedByte(mockHeap, stringOOP, i, bytes[i]);
         }
 
-        var mockRuntime = new Mock<IRuntimeHeapAccessor>();
+        var mockRuntime = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
         mockRuntime.Setup(r => r.InternSymbol("unknown")).Returns(Nil);
 
         var context = CreateContext(

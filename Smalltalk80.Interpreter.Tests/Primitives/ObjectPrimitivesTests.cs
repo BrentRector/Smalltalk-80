@@ -1,6 +1,7 @@
 using Moq;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 
 namespace Smalltalk80.Interpreter.Tests.Primitives;
@@ -686,7 +687,7 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var mockHeap = CreateMockHeapManager();
         var smallIntClassOOP = ObjectOOP(42);
 
-        var mockRuntimeAccess = new Mock<IRuntimeHeapAccessor>();
+        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
         mockRuntimeAccess.Setup(r => r.GetClass("SmallInteger")).Returns(smallIntClassOOP);
 
         var context = CreateContext(SmallInt(10), [], mockHeap.Object, mockRuntimeAccess.Object);
