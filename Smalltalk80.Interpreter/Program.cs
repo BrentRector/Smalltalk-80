@@ -880,6 +880,15 @@ public static class Program
     {
         int thisClassIdx = layoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
 
+        // Build KnownObjects from SpecialObjectsArray
+        var soa = SpecialObjectsArray.Instance;
+        var knownObjects = new KnownObjects(
+            nil: soa.Nil,
+            @true: soa.True,
+            @false: soa.False,
+            smalltalk: soa.Smalltalk
+        );
+
         return new VMMetadata
         {
             ClassNameFieldIndex = layoutResolver.GetFieldIndex("class:Class", "name"),
@@ -897,7 +906,10 @@ public static class Program
             ArrayClassOOP = GlobalRegistry.Get("class:Array"),
             CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
-            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext")
+            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
+            KnownObjects = knownObjects,
+            ProcessorScheduler = soa.ProcessorScheduler,
+            InitExpressionMethods = soa.InitExpressionMethods
         };
     }
 

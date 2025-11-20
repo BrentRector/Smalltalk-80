@@ -37,4 +37,8 @@ public record VMMetadata
 
     // Well-known objects for fast VM access (Nil, True, False, Smalltalk)
     public required KnownObjects KnownObjects { get; init; }
+
+    // Special objects that need VM access (GC roots)
+    public required SmalltalkOOP ProcessorScheduler { get; init; }
+    public SmalltalkOOP InitExpressionMethods { get; init; } // Optional, set during Phase 8b
 }

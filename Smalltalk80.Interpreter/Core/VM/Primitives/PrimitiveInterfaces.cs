@@ -73,6 +73,9 @@ public readonly struct PrimitiveExecutionContext
     /// <summary>Gets the message sender for perform primitives.</summary>
     public IPrimitiveMessageSender? MessageSender { get; }
 
+    /// <summary>Gets the VM metadata for accessing special objects and field indices.</summary>
+    public VMMetadata? Metadata { get; }
+
     /// <summary>
     /// Creates a new primitive execution context.
     /// </summary>
@@ -87,7 +90,8 @@ public readonly struct PrimitiveExecutionContext
         RuntimeHeapAccessor? runtimeHeapAccess = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
-        IPrimitiveMessageSender? messageSender = null)
+        IPrimitiveMessageSender? messageSender = null,
+        VMMetadata? metadata = null)
     {
         Receiver = receiver;
         Arguments = arguments;
@@ -100,6 +104,7 @@ public readonly struct PrimitiveExecutionContext
         InstructionPointer = instructionPointer;
         CacheManager = cacheManager;
         MessageSender = messageSender;
+        Metadata = metadata;
     }
 
     /// <summary>

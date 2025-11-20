@@ -250,6 +250,15 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         int thisClassIdx = LayoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
 
+        // Build KnownObjects from SpecialObjectsArray
+        var soa = SpecialObjectsArray.Instance;
+        var knownObjects = new KnownObjects(
+            nil: soa.Nil,
+            @true: soa.True,
+            @false: soa.False,
+            smalltalk: soa.Smalltalk
+        );
+
         var metadata = new VMMetadata
         {
             ClassNameFieldIndex = LayoutResolver.GetFieldIndex("class:Class", "name"),
@@ -267,7 +276,10 @@ public class ColdStartOrchestrator : IColdStartLoader
             ArrayClassOOP = GlobalRegistry.Get("class:Array"),
             CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
-            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext")
+            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
+            KnownObjects = knownObjects,
+            ProcessorScheduler = soa.ProcessorScheduler,
+            InitExpressionMethods = soa.InitExpressionMethods
         };
 
         return metadata;
