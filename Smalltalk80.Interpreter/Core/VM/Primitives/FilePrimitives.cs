@@ -134,16 +134,18 @@ public static class FileOperations
                 string extension = Path.GetExtension(path);
 
                 // Create Array with 3 elements
-                var arrayOOP = context.HeapManager.AllocateArray(3);
+                var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
+                    ?? throw new InvalidOperationException("Cannot find Array class");
+                var arrayOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP, 3);
 
                 // Create strings for each component
                 var dirOOP = CreateString(context, directory);
                 var nameOOP = CreateString(context, fileName);
                 var extOOP = CreateString(context, extension);
 
-                context.HeapManager.SetIndexedVariable(arrayOOP, 0, dirOOP);
-                context.HeapManager.SetIndexedVariable(arrayOOP, 1, nameOOP);
-                context.HeapManager.SetIndexedVariable(arrayOOP, 2, extOOP);
+                context.HeapManager.SetIndexedOOP(arrayOOP, 0, dirOOP);
+                context.HeapManager.SetIndexedOOP(arrayOOP, 1, nameOOP);
+                context.HeapManager.SetIndexedOOP(arrayOOP, 2, extOOP);
 
                 return PrimitiveResult.Ok(arrayOOP);
             }
@@ -241,7 +243,7 @@ public static class FileOperations
             try
             {
                 // Get buffer size
-                int bufferSize = context.HeapManager.GetIndexedVariableCount(bufferOOP);
+                int bufferSize = context.HeapManager.GetIndexedSize(bufferOOP);
                 if (count > bufferSize) count = bufferSize;
 
                 // Read into temporary buffer
@@ -251,7 +253,7 @@ public static class FileOperations
                 // Copy to Smalltalk ByteArray
                 for (int i = 0; i < bytesRead; i++)
                 {
-                    context.HeapManager.SetByte(bufferOOP, i, tempBuffer[i]);
+                    context.HeapManager.SetIndexedByte(bufferOOP, i, tempBuffer[i]);
                 }
 
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(bytesRead));
@@ -292,14 +294,14 @@ public static class FileOperations
             try
             {
                 // Get buffer size
-                int bufferSize = context.HeapManager.GetIndexedVariableCount(bufferOOP);
+                int bufferSize = context.HeapManager.GetIndexedSize(bufferOOP);
                 if (count > bufferSize) count = bufferSize;
 
                 // Copy from Smalltalk ByteArray to temporary buffer
                 byte[] tempBuffer = new byte[count];
                 for (int i = 0; i < count; i++)
                 {
-                    tempBuffer[i] = context.HeapManager.GetByte(bufferOOP, i);
+                    tempBuffer[i] = context.HeapManager.GetIndexedByte(bufferOOP, i);
                 }
 
                 // Write to file
@@ -524,17 +526,19 @@ public static class FileOperations
 
                 // For simplicity, return as an Array with known order:
                 // [0] = size, [1] = attributes, [2] = isDirectory
-                var resultOOP = context.HeapManager.AllocateArray(3);
+                var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
+                    ?? throw new InvalidOperationException("Cannot find Array class");
+                var resultOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP, 3);
 
                 // Size (clamp to SmallInteger range)
                 if (size > 0x3FFFFFFF) size = 0x3FFFFFFF;
-                context.HeapManager.SetIndexedVariable(resultOOP, 0, SmalltalkOOP.FromSmallInteger((int)size));
+                context.HeapManager.SetIndexedOOP(resultOOP, 0, SmalltalkOOP.FromSmallInteger((int)size));
 
                 // Attributes
-                context.HeapManager.SetIndexedVariable(resultOOP, 1, SmalltalkOOP.FromSmallInteger(attributes));
+                context.HeapManager.SetIndexedOOP(resultOOP, 1, SmalltalkOOP.FromSmallInteger(attributes));
 
                 // IsDirectory
-                context.HeapManager.SetIndexedVariable(resultOOP, 2,
+                context.HeapManager.SetIndexedOOP(resultOOP, 2,
                     isDirectory ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False);
 
                 return PrimitiveResult.Ok(resultOOP);
@@ -898,12 +902,14 @@ public static class FileOperations
                 var names = entries.Select(Path.GetFileName).Where(n => n != null).ToArray();
 
                 // Create Array
-                var arrayOOP = context.HeapManager.AllocateArray(names.Length);
+                var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
+                    ?? throw new InvalidOperationException("Cannot find Array class");
+                var arrayOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP, names.Length);
 
                 for (int i = 0; i < names.Length; i++)
                 {
                     var nameOOP = CreateString(context, names[i]!);
-                    context.HeapManager.SetIndexedVariable(arrayOOP, i, nameOOP);
+                    context.HeapManager.SetIndexedOOP(arrayOOP, i, nameOOP);
                 }
 
                 return PrimitiveResult.Ok(arrayOOP);
@@ -911,7 +917,9 @@ public static class FileOperations
             catch
             {
                 // Return empty array on error
-                return PrimitiveResult.Ok(context.HeapManager.AllocateArray(0));
+                var emptyArrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
+                    ?? throw new InvalidOperationException("Cannot find Array class");
+                return PrimitiveResult.Ok(context.HeapManager.AllocateInstanceOf(emptyArrayClassOOP, 0));
             }
         }
     }
@@ -1023,12 +1031,12 @@ public static class FileOperations
 
         try
         {
-            int length = context.HeapManager.GetIndexedVariableCount(stringOOP);
+            int length = context.HeapManager.GetIndexedSize(stringOOP);
             char[] chars = new char[length];
 
             for (int i = 0; i < length; i++)
             {
-                chars[i] = (char)context.HeapManager.GetByte(stringOOP, i);
+                chars[i] = (char)context.HeapManager.GetIndexedByte(stringOOP, i);
             }
 
             return new string(chars);
@@ -1054,7 +1062,7 @@ public static class FileOperations
         // Copy characters as bytes
         for (int i = 0; i < value.Length; i++)
         {
-            context.HeapManager.SetByte(stringOOP, i, (byte)value[i]);
+            context.HeapManager.SetIndexedByte(stringOOP, i, (byte)value[i]);
         }
 
         return stringOOP;
