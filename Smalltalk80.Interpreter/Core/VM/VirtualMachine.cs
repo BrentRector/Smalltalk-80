@@ -34,7 +34,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICacheManager, IPrimitiveMessageSender
 {
     private readonly ISmalltalkHeapManager _heapManager;
-    private readonly KnownObjects _knownObjects;
+    
     private readonly RuntimeHeapAccessor _runtimeHeapAccess;
     private readonly LayoutResolver _layoutResolver;
     private readonly VMMetadata _metadata;
@@ -85,10 +85,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         set => _tracer.SelectorTraceEnabled = value;
     }
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager, KnownObjects knownObjects, LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
+    public VirtualMachine(ISmalltalkHeapManager heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
     {
         _heapManager = heapManager;
-        _knownObjects = knownObjects;
+        
         _layoutResolver = layoutResolver;
         _runtimeHeapAccess = new RuntimeHeapAccessor(heapManager);
         RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
