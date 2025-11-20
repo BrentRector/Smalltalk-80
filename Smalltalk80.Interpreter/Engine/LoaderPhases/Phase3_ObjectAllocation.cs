@@ -263,13 +263,18 @@ public class Phase3_ObjectAllocation : IPhase
         Console.WriteLine($"[Phase3] Set quiescentProcessLists = {arrayOOP}");
 
         // 2. Create initial/main Process for activeProcess
-        // Process has: suspendedContext (index 0), priority (index 1), myList (index 2)
+        // Process inherits from Link, so indices are:
+        //   0: nextLink (from Link)
+        //   1: suspendedContext
+        //   2: priority
+        //   3: myList
         var processClassOOP = GlobalRegistry.LookupClassOOP("Process");
         var processOOP = _allocator.AllocateFixedObject("Process");
         _allocator.SetObjectClass(processOOP, processClassOOP);
-        _allocator.SetInstanceVariable(processOOP, 0, nilOOP);  // suspendedContext = nil (main process isn't suspended)
-        _allocator.SetInstanceVariable(processOOP, 1, SmalltalkOOP.FromSmallInteger(4));  // priority = 4 (UserSchedulingPriority)
-        _allocator.SetInstanceVariable(processOOP, 2, nilOOP);  // myList = nil (active process not on any list)
+        _allocator.SetInstanceVariable(processOOP, 0, nilOOP);  // nextLink = nil (from Link)
+        _allocator.SetInstanceVariable(processOOP, 1, nilOOP);  // suspendedContext = nil (main process isn't suspended)
+        _allocator.SetInstanceVariable(processOOP, 2, SmalltalkOOP.FromSmallInteger(4));  // priority = 4 (UserSchedulingPriority)
+        _allocator.SetInstanceVariable(processOOP, 3, nilOOP);  // myList = nil (active process not on any list)
 
         // Set activeProcess (index 1)
         _allocator.SetInstanceVariable(processorSchedulerOOP, 1, processOOP);
