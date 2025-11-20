@@ -172,12 +172,25 @@ public class SystemDictionaryInstaller(
 
     private void CreateAndPopulatePoolDictionary(string poolName, HashSet<string> variableNames, List<string> declaringClasses)
     {
-        // Allocate empty Dictionary - Smalltalk code will populate it
+        // Allocate Dictionary with capacity for all pool variables
         int capacity = Math.Max(8, variableNames.Count * 2);
         var poolDictOOP = AllocateEmptyDictionary(capacity);
 
         // Register the pool dictionary
         GlobalRegistry.Register(poolName, poolDictOOP);
+
+        // Populate with all referenced pool variables (initialized to nil)
+        // This is required so that pool variable references can be resolved at runtime
+        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        foreach (var varName in variableNames)
+        {
+            // Create Association for this pool variable
+            var keySymbolOOP = SymbolRegistry.GetOrCreate(varName);
+            var assocOOP = context.DictionaryService.AllocateAssociation(keySymbolOOP, nilOOP);
+
+            // Install in pool dictionary
+            dictionaryOps.InstallInDictionary(poolDictOOP, assocOOP, varName);
+        }
 
         // Install pool dictionary in SystemDictionary as a global
         var poolAssocOOP = associationManager.GetOrCreateCanonical(poolName);
