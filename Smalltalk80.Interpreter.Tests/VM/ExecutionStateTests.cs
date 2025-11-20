@@ -1,6 +1,7 @@
 using Xunit;
 using Smalltalk80.Interpreter.Core.VM.Interpreter;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Tests.VM;
 

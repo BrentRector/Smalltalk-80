@@ -1,7 +1,8 @@
 namespace Smalltalk80.Interpreter.Core.Memory;
 
 using System.Runtime.CompilerServices;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 /// <summary>
 /// Segmented Object Table managing Smalltalk object pointers with O(1) allocation.
