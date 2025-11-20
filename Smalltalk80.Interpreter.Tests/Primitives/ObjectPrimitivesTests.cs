@@ -9,6 +9,7 @@ namespace Smalltalk80.Interpreter.Tests.Primitives;
 /// <summary>
 /// Tests for Object primitives (60-79).
 /// </summary>
+[Trait("Category", "Primitives")]
 public class ObjectPrimitivesTests : PrimitiveTestBase
 {
     #region Primitive 60: At

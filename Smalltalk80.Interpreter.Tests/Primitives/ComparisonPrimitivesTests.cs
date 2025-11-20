@@ -8,6 +8,7 @@ namespace Smalltalk80.Interpreter.Tests.Primitives;
 /// <summary>
 /// Tests for comparison primitives (SmallInteger 3-8, and Object identity 110).
 /// </summary>
+[Trait("Category", "Primitives")]
 public class ComparisonPrimitivesTests : PrimitiveTestBase
 {
     #region Primitive 3: LessThan

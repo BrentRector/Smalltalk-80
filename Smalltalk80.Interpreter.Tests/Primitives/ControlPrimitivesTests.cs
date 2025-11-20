@@ -10,6 +10,7 @@ namespace Smalltalk80.Interpreter.Tests.Primitives;
 /// Tests for Control primitives (80-89): blocks, perform, process management, cache.
 /// This is the highest priority test file with 50+ tests.
 /// </summary>
+[Trait("Category", "Primitives")]
 public class ControlPrimitivesTests : PrimitiveTestBase
 {
     #region Primitive 80: BlockCopy - 15 tests

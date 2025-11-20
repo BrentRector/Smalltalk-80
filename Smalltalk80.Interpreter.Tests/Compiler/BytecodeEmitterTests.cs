@@ -12,6 +12,7 @@ namespace Smalltalk80.Interpreter.Tests.Compiler;
 /// Comprehensive unit tests for BytecodeEmitter.
 /// Tests bytecode emission, literal management, and jump operations.
 /// </summary>
+[Trait("Category", "Compiler")]
 public class BytecodeEmitterTests
 {
     #region Basic Emit Tests

@@ -9,6 +9,7 @@ namespace Smalltalk80.Interpreter.Tests.Primitives;
 /// <summary>
 /// Tests for String primitives.
 /// </summary>
+[Trait("Category", "Primitives")]
 public class StringPrimitivesTests : PrimitiveTestBase
 {
     #region Primitive 105: StringReplace

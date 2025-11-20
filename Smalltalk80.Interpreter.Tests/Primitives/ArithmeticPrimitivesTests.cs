@@ -8,6 +8,7 @@ namespace Smalltalk80.Interpreter.Tests.Primitives;
 /// <summary>
 /// Tests for SmallInteger arithmetic primitives (1-17).
 /// </summary>
+[Trait("Category", "Primitives")]
 public class ArithmeticPrimitivesTests : PrimitiveTestBase
 {
     #region Primitive 1: Add

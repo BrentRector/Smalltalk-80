@@ -12,6 +12,7 @@ namespace Smalltalk80.Interpreter.Tests.HeapManager;
 /// Tests cover object allocation, slot access, indexed access, metadata,
 /// garbage collection, instance finding, and become operations.
 /// </summary>
+[Trait("Category", "HeapManager")]
 public class SmalltalkHeapManagerTests : IDisposable
 {
     private readonly SmalltalkHeapManager _heapManager;

@@ -10,6 +10,7 @@ namespace Smalltalk80.Interpreter.Tests.Context;
 /// Comprehensive tests for ContextManager - manages execution contexts for the Smalltalk-80 VM.
 /// Tests cover context creation, pooling, switching, chain traversal, and depth tracking.
 /// </summary>
+[Trait("Category", "Context")]
 public class ContextManagerTests
 {
     #region Test Infrastructure

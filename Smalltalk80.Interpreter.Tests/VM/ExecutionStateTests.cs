@@ -8,6 +8,7 @@ namespace Smalltalk80.Interpreter.Tests.VM;
 /// Comprehensive unit tests for ExecutionState and related types.
 /// Tests execution state management and call outcome handling.
 /// </summary>
+[Trait("Category", "VM")]
 public class ExecutionStateTests
 {
     #region ExecutionState Tests

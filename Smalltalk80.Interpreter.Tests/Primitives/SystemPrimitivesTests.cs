@@ -8,6 +8,7 @@ namespace Smalltalk80.Interpreter.Tests.Primitives;
 /// <summary>
 /// Tests for System primitives (112-139).
 /// </summary>
+[Trait("Category", "Primitives")]
 public class SystemPrimitivesTests : PrimitiveTestBase
 {
     #region Primitive 112: CoreLeft

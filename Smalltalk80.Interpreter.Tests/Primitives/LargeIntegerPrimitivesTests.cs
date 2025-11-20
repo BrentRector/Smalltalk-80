@@ -10,6 +10,7 @@ namespace Smalltalk80.Interpreter.Tests.Primitives;
 /// <summary>
 /// Tests for LargeInteger primitives (21-37).
 /// </summary>
+[Trait("Category", "Primitives")]
 public class LargeIntegerPrimitivesTests : PrimitiveTestBase
 {
     /// <summary>

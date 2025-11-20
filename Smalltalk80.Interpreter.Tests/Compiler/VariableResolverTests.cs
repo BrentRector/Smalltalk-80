@@ -8,6 +8,7 @@ namespace Smalltalk80.Interpreter.Tests.Compiler;
 /// Comprehensive unit tests for VariableResolver.
 /// Tests the 9-step variable resolution priority system for Smalltalk-80.
 /// </summary>
+[Trait("Category", "Compiler")]
 public class VariableResolverTests
 {
     private readonly VariableResolver _resolver = new();

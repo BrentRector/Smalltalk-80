@@ -10,6 +10,7 @@ namespace Smalltalk80.Interpreter.Tests.VM;
 /// Comprehensive unit tests for the MessageDispatcher component.
 /// Tests method lookup in class hierarchy and primitive number extraction.
 /// </summary>
+[Trait("Category", "VM")]
 public class MessageDispatcherTests
 {
     private readonly Mock<ISmalltalkHeapManager> _mockHeapManager;

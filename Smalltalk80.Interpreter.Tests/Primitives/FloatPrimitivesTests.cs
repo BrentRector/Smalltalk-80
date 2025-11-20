@@ -9,6 +9,7 @@ namespace Smalltalk80.Interpreter.Tests.Primitives;
 /// <summary>
 /// Tests for Float primitives (40-54).
 /// </summary>
+[Trait("Category", "Primitives")]
 public class FloatPrimitivesTests : PrimitiveTestBase
 {
     /// <summary>

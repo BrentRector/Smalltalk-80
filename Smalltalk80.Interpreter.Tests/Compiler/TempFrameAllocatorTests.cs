@@ -7,6 +7,7 @@ namespace Smalltalk80.Interpreter.Tests.Compiler;
 /// Comprehensive unit tests for TempFrameAllocator.
 /// Tests the unified temp frame allocation system for Smalltalk-80 methods and blocks.
 /// </summary>
+[Trait("Category", "Compiler")]
 public class TempFrameAllocatorTests
 {
     #region EnterMethodScope Tests
