@@ -182,6 +182,7 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Create ProcessorScheduler singleton
         var processorSchedulerOOP = _allocator.AllocateFixedObject("ProcessorScheduler");
+        Console.WriteLine($"[Phase3] Created ProcessorScheduler singleton: {processorSchedulerOOP}");
         GlobalRegistry.Register("ProcessorScheduler", processorSchedulerOOP);
 
         // Initialize ProcessorScheduler fields that should NOT be nil
@@ -985,7 +986,7 @@ public class Phase3_ObjectAllocation : IPhase
 
             // Use AssociationRegistry to create canonical Association
             // This ensures Phase 4 and Phase 5 will get the SAME Association object
-            AssociationRegistry.GetOrCreate(undeclaredVar.Key, () =>
+            var resultAssocOOP = AssociationRegistry.GetOrCreate(undeclaredVar.Key, () =>
             {
                 // Check if this global has a pre-created object in GlobalRegistry
                 // (e.g., Undeclared, Smalltalk, ProcessorScheduler created in Phase 3)
@@ -1000,8 +1001,24 @@ public class Phase3_ObjectAllocation : IPhase
                     valueOOP = nilOOP;  // Default to nil for truly undeclared variables
                 }
 
-                return _dictionaryInstaller.AllocateAssociation(keySymbolOOP, valueOOP);
+                var assocOOP = _dictionaryInstaller.AllocateAssociation(keySymbolOOP, valueOOP);
+
+                // DEBUG: Track specific globals
+                if (undeclaredVar.Key == "Processor" || undeclaredVar.Key == "ProcessorScheduler")
+                {
+                    Console.WriteLine($"[Phase3] Created canonical Association for '{undeclaredVar.Key}':");
+                    Console.WriteLine($"  Association OOP = {assocOOP}");
+                    Console.WriteLine($"  Value OOP = {valueOOP}");
+                }
+
+                return assocOOP;
             });
+
+            // DEBUG: Log if we got an existing Association
+            if (undeclaredVar.Key == "Processor" || undeclaredVar.Key == "ProcessorScheduler")
+            {
+                Console.WriteLine($"[Phase3] Canonical Association for '{undeclaredVar.Key}' = {resultAssocOOP}");
+            }
 
             createdCount++;
         }
