@@ -886,7 +886,7 @@ find: aFile
 find: aFile ifAbsentDo: aBlock
     "Return aFile if found, otherwise evaluate aBlock."
     | fname |
-    fname _ self checkNameOfFile: aFile.
+    fname _ self checkNameOfFile: aFile fixErrors: true.
     aFile fileName: fname.
     self do: [:each |
         (fname sameAs: each fileName) ifTrue: [^each]].
