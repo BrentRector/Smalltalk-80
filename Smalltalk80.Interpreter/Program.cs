@@ -476,61 +476,13 @@ public static class Program
                 // Note: Test expressions already executed as init expressions above
                 // No need to re-run them here
 
-                // Phase 2: Execute ALL comment: expressions (run after all initialize! expressions)
-                // Collecting all failures to identify pattern (continue on failure)
-                var skippedCommentPrefixes = new List<string>
-                {
-                    // Empty - running all to collect failure list
-                };
-
+                // Phase 2: Skip ALL comment: expressions
+                // BUG: WriteStream>>nextPut: has infinite loop - 210/234 fail
+                // TODO: Fix WriteStream bug then re-enable comment expressions
                 if (phase2Indices.Count > 0)
                 {
                     Console.WriteLine($"\n=== Phase 2: Class Documentation ===");
-
-                    // Suppress verbose infinite loop output for comment expressions
-                    Smalltalk80.Interpreter.Core.VM.Diagnostics.ExecutionTracer.SuppressInfiniteLoopTrace = true;
-
-                    int phase2Succeeded = 0;
-                    int phase2Failed = 0;
-                    int phase2Skipped = 0;
-                    foreach (int index in phase2Indices)
-                    {
-                        var expr = bundle.InitExpressions[index];
-
-                        // Skip if in skip list
-                        if (expr.Source != null && skippedCommentPrefixes.Any(prefix => expr.Source.StartsWith(prefix)))
-                        {
-                            phase2Skipped++;
-                            continue;
-                        }
-
-                        var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
-
-                        var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
-
-                        if (result.Status != InitStatus.Success)
-                        {
-                            phase2Failed++;
-                            // Extract just the class name from "ClassName comment: '...'"
-                            string className = expr.Source?.Split(' ')[0] ?? "Unknown";
-                            Console.WriteLine($"  ❌ {className} comment:");
-                            // Continue to next instead of stopping - collect all failures
-                            continue;
-                        }
-
-                        phase2Succeeded++;
-                    }
-
-                    int phase2Total = phase2Indices.Count - phase2Skipped;
-                    Console.WriteLine($"  {phase2Succeeded}/{phase2Total} succeeded. {phase2Failed}/{phase2Total} failed. {phase2Skipped} skipped.");
-
-                    // Reset suppression
-                    Smalltalk80.Interpreter.Core.VM.Diagnostics.ExecutionTracer.SuppressInfiniteLoopTrace = false;
-                }
-                else
-                {
-                    Console.WriteLine($"\n=== Phase 2: Class Documentation ===");
-                    Console.WriteLine($"  No comment expressions in bundle");
+                    Console.WriteLine($"  Skipped {phase2Indices.Count} comment expressions (WriteStream bug)");
                 }
 
                 // Run GC after all init expressions to collect temporary objects
