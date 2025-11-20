@@ -185,11 +185,11 @@ public class SystemDictionaryInstaller(
         foreach (var varName in variableNames)
         {
             // Create Association for this pool variable
-            var keySymbolOOP = SymbolRegistry.GetOrCreate(varName);
-            var assocOOP = context.DictionaryService.AllocateAssociation(keySymbolOOP, nilOOP);
+            var keySymbolOOP = associationManager.GetSymbolOOP(varName);
+            var assocOOP = associationManager.Allocate(keySymbolOOP, nilOOP);
 
             // Install in pool dictionary
-            dictionaryOps.InstallInDictionary(poolDictOOP, assocOOP, varName);
+            dictionaryOps.InstallAssociation(poolDictOOP, assocOOP, varName);
         }
 
         // Install pool dictionary in SystemDictionary as a global
