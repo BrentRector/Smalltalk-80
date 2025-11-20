@@ -535,7 +535,12 @@ public static class SimpleObjectPrimitives
                     var nameSymbol = context.HeapManager.GetInstanceVariable(argClass, 6); // Class name at slot 6
                     if (!nameSymbol.IsSmallInteger)
                     {
-                        var bytes = context.HeapManager.GetByteArray(nameSymbol);
+                        int nameSize = context.HeapManager.GetIndexedSize(nameSymbol);
+                        var bytes = new byte[nameSize];
+                        for (int i = 0; i < nameSize; i++)
+                        {
+                            bytes[i] = context.HeapManager.GetIndexedByte(nameSymbol, i);
+                        }
                         className = System.Text.Encoding.ASCII.GetString(bytes);
                     }
                 }
