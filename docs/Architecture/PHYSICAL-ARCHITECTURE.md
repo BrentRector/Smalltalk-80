@@ -1,6 +1,6 @@
 # Physical Architecture
 
-**Last Updated**: 2025-11-18
+**Last Updated**: 2025-11-20
 
 This document describes the file system organization, subsystem structure, and dependencies of the Smalltalk-80 interpreter.
 
@@ -47,24 +47,67 @@ Smalltalk80.Interpreter/
 
 ## Subsystem Details
 
-### Core/HeapManager (10 files)
+### Smalltalk80.Interpreter.Shared.Types Assembly (2 files)
 
-Memory management and object allocation.
+**SEPARATE ASSEMBLY** - Core value types with zero dependencies. Layer 0 of the architecture.
 
 | File | Purpose |
 |------|---------|
-| ISmalltalkHeapManager.cs | Main heap interface |
-| SmalltalkHeapManager.cs | Heap implementation (774 lines) |
-| SmalltalkOOP.cs | Object pointer value type |
-| ObjectTableEntry.cs | Table entry structure |
-| IGarbageCollector.cs | GC interface |
-| GarbageCollector.cs | Mark-sweep GC |
-| IObjectTableManager.cs | Table management interface |
-| ObjectTableManager.cs | Table block allocation |
+| SmalltalkOOP.cs | Tagged object reference (SmallInteger or object pointer) |
+| ObjectFormat.cs | Object storage format enum (Pointer, PointerIndexed, ByteIndexed, WordIndexed) |
+
+**Key Type**: `SmalltalkOOP` - readonly struct implementing LSB tagging (LSB=1: SmallInteger, LSB=0: object pointer)
+
+**Nil Encapsulation**: OOP(0) is implementation detail. Use `heap.GetNil()` to access Nil singleton.
+
+---
+
+### Smalltalk80.Interpreter.HeapManager Assembly (11 files)
+
+**SEPARATE ASSEMBLY** - Memory management and object allocation with zero dependencies on VM semantics.
+
+#### Three-Interface Architecture
+
+The heap manager is split into three focused interfaces:
+
+1. **ISmalltalkHeap** - Core heap operations
+   - Object allocation (AllocateObject, AllocateInstanceOf)
+   - Instance variable access with write barriers
+   - Indexed access (OOP, byte, word)
+   - Class pointer access (GetClassOOP, SetClassOOP)
+   - Object metadata (format, size, counts)
+   - Subsystem access via `GC` and `Become` properties
+   - **Note**: GetSlot/SetSlot removed from public API (internal use only)
+
+2. **IGarbageCollector** - Generic GC with zero semantic knowledge
+   - Root management: AddGCRoot, RemoveGCRoot, GetGCRoots, ClearGCRoots
+   - Collection: GarbageCollect() (4 steps: clear marks → mark → find → collect)
+   - Statistics: GetStatistics()
+   - Debug: GetUnreachableObjects() (mark phase only, no collection)
+
+3. **IBecomeHandler** - Object identity swapping
+   - BecomeTwoWay(oop1, oop2) - Primitive 72 support
+   - Separated due to infrequent use (bootstrap-only)
+
+#### Files
+
+| File | Purpose |
+|------|---------|
+| ISmalltalkHeap.cs | Core heap interface (NEW) |
+| ISmalltalkHeapManager.cs | Legacy compatibility interface |
+| SmalltalkHeapManager.cs | Heap implementation (~860 lines) |
+| IGarbageCollector.cs | Generic GC interface (refactored) |
+| GarbageCollector.cs | Mark-sweep GC (refactored) |
 | IBecomeHandler.cs | Identity swap interface |
 | BecomeHandler.cs | Become operations |
+| IObjectTableManager.cs | Table management interface |
+| ObjectTableManager.cs | Table block allocation |
+| ObjectTableEntry.cs | Table entry structure |
+| ObjectTableBlock.cs | Block-based table storage |
 
-**Key Interfaces**: `ISmalltalkHeapManager`, `IGarbageCollector`, `IBecomeHandler`
+**Usage**:
+- New code: `heap.GC.AddGCRoot(oop)`, `heap.Become.BecomeTwoWay(oop1, oop2)`
+- Legacy: `heap.AddGCRoots(array)`, `heap.BecomeTwoWay(oop1, oop2)` (compatibility)
 
 ---
 
@@ -285,38 +328,57 @@ Initialize expression execution after cold start.
 
 ## Dependency Graph
 
+### Layered Architecture
+
 ```
-                    ┌─────────────┐
-                    │   Program   │
-                    └──────┬──────┘
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-     ┌────────────┐  ┌──────────┐  ┌──────────┐
-     │ ColdStart  │  │ Init     │  │ Diagnostic│
-     │ Orchestrator│  │ Executor │  │ Inspector │
-     └──────┬─────┘  └────┬─────┘  └──────────┘
-            │              │
-            ▼              ▼
-     ┌─────────────────────────┐
-     │    VirtualMachine       │
-     │  ┌─────┐ ┌──────────┐  │
-     │  │Stack│ │Bytecode  │  │
-     │  │Mgr  │ │Interpreter│ │
-     │  └─────┘ └──────────┘  │
-     │  ┌───────┐ ┌────────┐  │
-     │  │Context│ │Message │  │
-     │  │Manager│ │Dispatch│  │
-     │  └───────┘ └────────┘  │
-     └───────────┬────────────┘
-                 │
-     ┌───────────┼───────────┐
-     ▼           ▼           ▼
-┌─────────┐ ┌─────────┐ ┌─────────┐
-│ Heap    │ │Primitive│ │ Runtime │
-│ Manager │ │Registry │ │ Access  │
-└─────────┘ └─────────┘ └─────────┘
+┌────────────────────────────────────────────────────┐
+│ Layer 2: Smalltalk80.Interpreter (Core + Engine)  │
+│                                                    │
+│  ┌─────────────┐     ┌──────────────┐            │
+│  │   Program   │────▶│ ColdStart    │            │
+│  └─────────────┘     │ Orchestrator │            │
+│         │            └──────┬───────┘            │
+│         │                   │                     │
+│         ▼                   ▼                     │
+│  ┌─────────────────────────────────┐             │
+│  │     VirtualMachine              │             │
+│  │  ┌─────┐ ┌──────────┐ ┌──────┐ │             │
+│  │  │Stack│ │Bytecode  │ │Msg   │ │             │
+│  │  │Mgr  │ │Interpeter│ │Disp  │ │             │
+│  │  └─────┘ └──────────┘ └──────┘ │             │
+│  └─────────────────────────────────┘             │
+│         │                                         │
+└─────────┼─────────────────────────────────────────┘
+          │
+┌─────────┼─────────────────────────────────────────┐
+│ Layer 1: Smalltalk80.Interpreter.HeapManager      │
+│         ▼                                         │
+│  ┌──────────────────────────────────┐            │
+│  │  SmalltalkHeapManager            │            │
+│  │  ┌───────────┐  ┌─────────────┐ │            │
+│  │  │    GC     │  │   Become    │ │            │
+│  │  │ Collector │  │   Handler   │ │            │
+│  │  └───────────┘  └─────────────┘ │            │
+│  └──────────────────────────────────┘            │
+│         │                                         │
+└─────────┼─────────────────────────────────────────┘
+          │
+┌─────────┼─────────────────────────────────────────┐
+│ Layer 0: Smalltalk80.Interpreter.Shared.Types     │
+│         ▼                                         │
+│  ┌─────────────┐  ┌──────────────┐              │
+│  │SmalltalkOOP │  │ ObjectFormat │              │
+│  └─────────────┘  └──────────────┘              │
+│                                                   │
+└───────────────────────────────────────────────────┘
 ```
+
+### Dependency Rules
+
+- **Layer 0** (Shared.Types): Zero dependencies, pure value types
+- **Layer 1** (HeapManager): Depends only on Shared.Types
+- **Layer 2** (Core): Depends on HeapManager and Shared.Types
+- **No circular dependencies** between layers
 
 ---
 
@@ -370,6 +432,57 @@ public interface IPrimitive
     string Name { get; }
     PrimitiveResult Execute(PrimitiveExecutionContext context);
 }
+```
+
+### 5. Three-Interface Architecture (HeapManager)
+
+The heap manager separates concerns into three focused interfaces:
+
+```csharp
+// Main heap operations
+public interface ISmalltalkHeap
+{
+    SmalltalkOOP GetNil();
+    SmalltalkOOP AllocateObject(ObjectFormat format, int fixedSlots, int indexedSize);
+    SmalltalkOOP GetInstanceVariable(SmalltalkOOP objectOOP, int index);
+    void SetInstanceVariableWithBarrier(SmalltalkOOP objectOOP, int index, SmalltalkOOP value);
+
+    // Subsystem access
+    IGarbageCollector GC { get; }
+    IBecomeHandler Become { get; }
+}
+
+// Generic GC with zero semantic knowledge
+public interface IGarbageCollector
+{
+    void AddGCRoot(SmalltalkOOP oop);
+    void RemoveGCRoot(SmalltalkOOP oop);
+    GCStatistics GarbageCollect();
+    SmalltalkOOP[] GetUnreachableObjects(); // Testing only
+}
+
+// Object identity swapping (bootstrap-only)
+public interface IBecomeHandler
+{
+    void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2);
+}
+```
+
+**Benefits**:
+- Clear separation of concerns (Heap, GC, Become)
+- Generic GC interface with no Smalltalk semantics
+- Cleaner public API (no confusing GetSlot/SetSlot)
+- Testable in isolation
+
+**Usage**:
+```csharp
+// New API
+heap.GC.AddGCRoot(soa.Nil);
+heap.Become.BecomeTwoWay(placeholderNil, realNil);
+
+// Legacy API (compatibility)
+heap.AddGCRoots(new[] { soa.Nil });
+heap.BecomeTwoWay(placeholderNil, realNil);
 ```
 
 ---
