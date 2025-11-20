@@ -69,7 +69,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         };
 
         // CRITICAL: Initialize all OOP slots to nil (Blue Book requirement)
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = SmalltalkOOP.Null;
         if (managedStorage is SmalltalkOOP[] oopArray)
         {
             for (int i = 1; i < oopArray.Length; i++) // Skip slot 0 (class pointer)
@@ -149,7 +149,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         SetSlot(newInstanceOOP, 0, classOOP);
 
         // Initialize all instance variables to nil
-        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+        SmalltalkOOP nilOOP = SmalltalkOOP.Null;
 
         // Track runtime allocations for debugging
         System.Threading.Interlocked.Increment(ref _runtimeAllocationCount);
@@ -158,7 +158,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if (nilOOP.RawValue == 0)
         {
             throw new InvalidOperationException(
-                $"FATAL: SpecialObjectsArray.Instance.Nil is OOP(0)!");
+                $"FATAL: SmalltalkOOP.Null is OOP(0)!");
         }
 
         for (int i = 1; i <= instanceVariableCount; i++)
@@ -656,7 +656,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                 return oop;
         }
 
-        return SpecialObjectsArray.Instance.Nil;
+        return SmalltalkOOP.Null;
     }
 
     public SmalltalkOOP FindNextInstanceOf(SmalltalkOOP classOOP, SmalltalkOOP afterOOP)
@@ -680,7 +680,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                 return oop;
         }
 
-        return SpecialObjectsArray.Instance.Nil;
+        return SmalltalkOOP.Null;
     }
 
     #endregion
