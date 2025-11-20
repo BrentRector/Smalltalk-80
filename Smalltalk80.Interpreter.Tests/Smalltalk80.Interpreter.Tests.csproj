@@ -32,9 +32,10 @@
 
   <ItemGroup>
     <!-- Disable non-primitive tests for Phase 1 - focus on primitives only -->
+    <!-- HeapManager tests re-enabled after architectural review -->
     <Compile Remove="Compiler\**\*.cs" />
     <Compile Remove="Context\**\*.cs" />
-    <Compile Remove="HeapManager\**\*.cs" />
+    <!-- <Compile Remove="HeapManager\**\*.cs" /> -->
     <Compile Remove="VM\**\*.cs" />
   </ItemGroup>
 
