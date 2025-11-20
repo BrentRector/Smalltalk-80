@@ -16894,7 +16894,8 @@ initialize
 	FilePool _ Dictionary new.
 	FilePool at: #Read put: 1.
 	FilePool at: #Write put: 2.
-	FilePool at: #Shorten put: 3! !
+	FilePool at: #Shorten put: 3.
+	FilePool at: #Disk put: WindowsFileDirectory default! !
 
 !File class methodsFor: 'documentation'!
 documentation
@@ -16930,7 +16931,6 @@ documentation
 "! !
 
 File initialize!
-FilePool at: #Disk put: WindowsFileDirectory default!
 Object subclass: #FileDirectory
 	instanceVariableNames: 'directoryName closed '
 	classVariableNames: 'ExternalReferences '
