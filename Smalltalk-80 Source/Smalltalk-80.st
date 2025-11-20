@@ -16930,6 +16930,7 @@ documentation
 "! !
 
 File initialize!
+FilePool at: #Disk put: WindowsFileDirectory default!
 Object subclass: #FileDirectory
 	instanceVariableNames: 'directoryName closed '
 	classVariableNames: 'ExternalReferences '
