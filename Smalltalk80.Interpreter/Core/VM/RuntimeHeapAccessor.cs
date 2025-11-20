@@ -46,7 +46,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// </summary>
     internal SmalltalkOOP LookupClassInHeap(string className)
     {
-        // Step 1: Get Smalltalk dictionary from SpecialObjectsArray
+        // Step 1: Get Smalltalk dictionary from KnownObjects
         var smalltalkDictOOP = metadata.KnownObjects.Smalltalk;
 
         // Step 2: Intern the class name as a Symbol
@@ -269,7 +269,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     {
         var fieldMap = new Dictionary<string, List<string>>();
 
-        // Get Smalltalk dictionary from SpecialObjectsArray
+        // Get Smalltalk dictionary from KnownObjects
         var smalltalkDictOOP = metadata.KnownObjects.Smalltalk;
 
         // Iterate through all global bindings (Associations in SystemDictionary)

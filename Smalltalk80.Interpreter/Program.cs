@@ -195,12 +195,13 @@ public static class Program
                 var executor = new InitExpressionExecutor(
                     heapManager,
                     vm,
+                    vmMetadata,
                     InitPolicy.ContinueAndCollect,  // Continue to run all init expressions including tests
                     defaultTimeoutMs: 5000
                 );
 
-                // Note: Init expressions are pre-allocated during coldstart Phase 8b
-                // and stored in SpecialObjectsArray.InitExpressionMethods.
+                // Note: Init expressions are pre-allocated during coldstart Phase 4
+                // and stored in VMMetadata.InitExpressionMethods.
 
                 // Phase-based execution strategy:
                 // Phase 1: Execute all initialize! expressions (infrastructure setup)
@@ -544,6 +545,7 @@ public static class Program
                     var executor = new InitExpressionExecutor(
                         heapManager,
                         vm,
+                        vmMetadata,
                         InitPolicy.AbortOnFirstError,
                         defaultTimeoutMs: 10000
                     );

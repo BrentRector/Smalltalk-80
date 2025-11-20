@@ -642,7 +642,7 @@ public class Phase3_ObjectAllocation : IPhase
                 var currentClassOOP = _allocator.GetSlot(objectOOP, 0);
 
                 // Skip if class pointer already set to a non-zero/non-nil value
-                if (currentClassOOP != default(SmalltalkOOP) && currentClassOOP != SpecialObjectsArray.Instance.Nil)
+                if (currentClassOOP != default(SmalltalkOOP) && currentClassOOP != GlobalRegistry.Get("nil"))
                     continue;
 
                 // Check object format to determine class
@@ -698,7 +698,7 @@ public class Phase3_ObjectAllocation : IPhase
     private void InitializeUnsetInstanceVariables()
     {
         int instanceVariablesInitialized = 0;
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
 
         // Step 1: Initialize class object instance variables
         foreach (var cls in _bundle.Classes)
@@ -879,7 +879,7 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // Get nil singleton (created in Section 1: AllocateSentinelObjects)
-        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+        SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
 
         // Build subclass map: className -> list of direct subclass OOPs
         var subclassMap = new Dictionary<string, List<SmalltalkOOP>>();
@@ -1008,7 +1008,7 @@ public class Phase3_ObjectAllocation : IPhase
             InstructionCount = 0
         });
 
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
         int createdCount = 0;
         int classNameCount = 0;
         int withPreCreatedValues = 0;

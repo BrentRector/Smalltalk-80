@@ -167,8 +167,8 @@ public class Phase2_ClassInfrastructure : IPhase
             // Emit typed event for detail listeners
             // Get the metaclass OOP for this class (will be nil for metaclasses themselves)
             var metaclassOOP = cls.IsMetaclass
-                ? SpecialObjectsArray.Instance.Nil
-                : (_localIdToObjectId.TryGetValue($"meta:{className}", out var metaOOP) ? metaOOP : SpecialObjectsArray.Instance.Nil);
+                ? GlobalRegistry.Get("nil")
+                : (_localIdToObjectId.TryGetValue($"meta:{className}", out var metaOOP) ? metaOOP : GlobalRegistry.Get("nil"));
 
             _diagnostics?.Emit(new ClassCreatedEvent
             {

@@ -97,9 +97,6 @@ public class ColdStartOrchestrator : IColdStartLoader
         _bundlePath = bundlePath ?? "coldstart.json";
         _diagnostics = diagnostics;
 
-        // Initialize SpecialObjectsArray (will be populated during Phase 3)
-        SpecialObjectsArray.Initialize();
-
         // Initialize the report with bundle metadata
         _report = new ColdstartReport
         {
@@ -204,7 +201,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 6: Validation + GC Verification
         // Comprehensive validation and GC verification to ensure cold start correctness
-        var phase6 = new Phase6_ValidationAndGC(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _report, _diagnostics);
+        var phase6 = new Phase6_ValidationAndGC(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _report, InitExpressionMethods, _diagnostics);
         _phases.Add(phase6);
         RunPhase(phase6.Name, () =>
         {
@@ -426,22 +423,21 @@ public class ColdStartOrchestrator : IColdStartLoader
         var gcRootsList = new List<SmalltalkOOP>();
 
         // Add fundamental sentinels if they exist
-        if (SpecialObjectsArray.Instance.Nil != default)
-            gcRootsList.Add(SpecialObjectsArray.Instance.Nil);
-        if (SpecialObjectsArray.Instance.True != default)
-            gcRootsList.Add(SpecialObjectsArray.Instance.True);
-        if (SpecialObjectsArray.Instance.False != default)
-            gcRootsList.Add(SpecialObjectsArray.Instance.False);
+        if (GlobalRegistry.Get("nil") != default)
+            gcRootsList.Add(GlobalRegistry.Get("nil"));
+        if (GlobalRegistry.Get("true") != default)
+            gcRootsList.Add(GlobalRegistry.Get("true"));
+        if (GlobalRegistry.Get("false") != default)
+            gcRootsList.Add(GlobalRegistry.Get("false"));
 
         // Add Smalltalk SystemDictionary if it exists
         if (GlobalRegistry.SystemDictionaryOOP != default)
             gcRootsList.Add(GlobalRegistry.SystemDictionaryOOP);
 
         // Add init expression methods if they exist
-        if (SpecialObjectsArray.Instance.InitExpressionMethods != default)
+        if (InitExpressionMethods != default)
         {
-            var initMethodsOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
-            gcRootsList.Add(initMethodsOOP);
+            gcRootsList.Add(InitExpressionMethods);
         }
 
         // Set GC roots and get unreachable objects (READ-ONLY - does not collect)

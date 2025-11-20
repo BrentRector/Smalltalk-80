@@ -211,7 +211,7 @@ public class Phase4_MethodCompilation : IPhase
         foreach (var method in _bundle.Methods)
         {
             var bytecodes = ClassHierarchyTraversal.DecodeBytecodes(method.Bytecodes);
-            var nilOOP = SpecialObjectsArray.Instance.Nil;
+            var nilOOP = GlobalRegistry.Get("nil");
             var placeholderLiterals = new SmalltalkOOP[method.Literals.Length];
             for (int i = 0; i < placeholderLiterals.Length; i++)
             {
@@ -483,7 +483,7 @@ public class Phase4_MethodCompilation : IPhase
 
                 // VALUE MIGRATION VALIDATION: Check if Association has non-nil value
                 var valueOOP = _allocator.GetInstanceVariable(assocOOP, 1);
-                if (valueOOP != SpecialObjectsArray.Instance.Nil)
+                if (valueOOP != GlobalRegistry.Get("nil"))
                 {
                     nonNilValueCount++;
                 }
@@ -567,7 +567,7 @@ public class Phase4_MethodCompilation : IPhase
             for (int i = 0; i < sysDictSize; i++)
             {
                 var assocOOP = _allocator.GetIndexedOOP(sysDictOOP, i);
-                if (assocOOP != SpecialObjectsArray.Instance.Nil)
+                if (assocOOP != GlobalRegistry.Get("nil"))
                 {
                     reachableAssociations.Add(assocOOP);
                 }
@@ -587,14 +587,14 @@ public class Phase4_MethodCompilation : IPhase
                 int classPoolIndex = 7; // Standard classPool index
                 var classPoolOOP = _allocator.GetInstanceVariable(classOOP, classPoolIndex);
 
-                if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+                if (classPoolOOP == GlobalRegistry.Get("nil"))
                     continue;
 
                 int poolSize = _allocator.GetIndexedSize(classPoolOOP);
                 for (int i = 0; i < poolSize; i++)
                 {
                     var assocOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
-                    if (assocOOP != SpecialObjectsArray.Instance.Nil)
+                    if (assocOOP != GlobalRegistry.Get("nil"))
                     {
                         reachableAssociations.Add(assocOOP);
                     }

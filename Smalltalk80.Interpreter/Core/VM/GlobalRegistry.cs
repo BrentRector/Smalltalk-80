@@ -52,28 +52,21 @@ public static class GlobalRegistry
 
         _globals[name] = oop;
 
-        // Update well-known properties AND SpecialObjectsArray
+        // Update well-known properties
         switch (name)
         {
             case "nil":
                 NilOOP = oop;
-                SpecialObjectsArray.SetNil(oop);
                 break;
             case "true":
                 TrueOOP = oop;
-                SpecialObjectsArray.SetTrue(oop);
                 break;
             case "false":
                 FalseOOP = oop;
-                SpecialObjectsArray.SetFalse(oop);
                 break;
             case "SystemDictionary":
             case "Smalltalk":
                 SystemDictionaryOOP = oop;
-                SpecialObjectsArray.SetSmalltalk(oop);
-                break;
-            case "ProcessorScheduler":
-                SpecialObjectsArray.SetProcessorScheduler(oop);
                 break;
         }
     }
@@ -178,9 +171,10 @@ public static class GlobalRegistry
     {
         _globals.Clear();
         _objects.Clear();
-        NilOOP = heapManager.GetNil();
-        TrueOOP = heapManager.GetNil();
-        FalseOOP = heapManager.GetNil();
-        SystemDictionaryOOP = heapManager.GetNil();
+        NilOOP = default;
+        TrueOOP = default;
+        FalseOOP = default;
+        SystemDictionaryOOP = default;
+        _isFrozen = false;
     }
 }

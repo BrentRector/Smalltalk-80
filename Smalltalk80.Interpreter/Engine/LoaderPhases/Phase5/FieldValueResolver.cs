@@ -26,7 +26,7 @@ public class FieldValueResolver : IFieldValueResolver
     public SmalltalkOOP Resolve(FieldValue? value)
     {
         if (value == null)
-            return SpecialObjectsArray.Instance.Nil;
+            return GlobalRegistry.Get("nil");
 
         if (value.Type == "objectRef")
         {
@@ -35,9 +35,9 @@ public class FieldValueResolver : IFieldValueResolver
 
         return value.Type switch
         {
-            "nil" => SpecialObjectsArray.Instance.Nil,
-            "true" => SpecialObjectsArray.Instance.True,
-            "false" => SpecialObjectsArray.Instance.False,
+            "nil" => GlobalRegistry.Get("nil"),
+            "true" => GlobalRegistry.Get("true"),
+            "false" => GlobalRegistry.Get("false"),
             "smallInt" => SmalltalkOOP.FromSmallInteger((int)value.Value!),
             "stringRef" => _context.Allocator.AllocateString(_context.Bundle.Strings[value.Index!.Value]),
             "symbolRef" => _symbolService.GetSymbolOOPByIndex(value.Index!.Value),

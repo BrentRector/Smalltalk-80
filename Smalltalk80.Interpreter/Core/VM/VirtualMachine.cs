@@ -1739,7 +1739,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // HEAP-ONLY IMPLEMENTATION: Access Smalltalk global dictionary from heap,
         // NOT from GlobalRegistry (which is a cold start snapshot that becomes stale)
 
-        // Get Smalltalk SystemDictionary from SpecialObjectsArray
+        // Get Smalltalk SystemDictionary from KnownObjects
         var smalltalkOOP = _knownObjects.Smalltalk;
         if (smalltalkOOP == _knownObjects.Nil)
         {

@@ -63,7 +63,7 @@ public class USTableBuilder(Phase5Context context) : IUSTableBuilder
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         context.Allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
 
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
 
         for (int i = 0; i < size; i++)
         {

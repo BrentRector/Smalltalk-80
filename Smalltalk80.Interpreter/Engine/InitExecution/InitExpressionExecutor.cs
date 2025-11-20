@@ -25,17 +25,20 @@ public class InitExpressionExecutor
 {
     private readonly ISmalltalkHeapManager _heapManager;
     private readonly VirtualMachine _vm;
+    private readonly VMMetadata _metadata;
     private readonly InitPolicy _policy;
     private readonly int _defaultTimeoutMs;
 
     public InitExpressionExecutor(
         ISmalltalkHeapManager heapManager,
         VirtualMachine vm,
+        VMMetadata metadata,
         InitPolicy policy = InitPolicy.AbortOnFirstError,
         int defaultTimeoutMs = 5000)
     {
         _heapManager = heapManager;
         _vm = vm;
+        _metadata = metadata;
         _policy = policy;
         _defaultTimeoutMs = defaultTimeoutMs;
     }
@@ -52,18 +55,18 @@ public class InitExpressionExecutor
 
 
     /// <summary>
-    /// Executes all init expressions from SpecialObjectsArray.InitExpressionMethods.
+    /// Executes all init expressions from VMMetadata.InitExpressionMethods.
     /// </summary>
     public InitExecutionReport ExecuteAll(CancellationToken cancellationToken = default)
     {
         var results = new List<InitResult>();
         var totalStopwatch = Stopwatch.StartNew();
 
-        // Get init expression array from SpecialObjectsArray
-        var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
-        if (initArrayOOP == SmalltalkOOP.Null)
+        // Get init expression array from VMMetadata
+        var initArrayOOP = _metadata.InitExpressionMethods;
+        if (initArrayOOP == _heapManager.GetNil())
         {
-            throw new InvalidOperationException("Init expression methods not found in SpecialObjectsArray - coldstart must complete first");
+            throw new InvalidOperationException("Init expression methods not found in VMMetadata - coldstart must complete first");
         }
 
         int count = _heapManager.GetIndexedSize(initArrayOOP);
@@ -198,19 +201,19 @@ public class InitExpressionExecutor
 
     /// <summary>
     /// Gets the canonical receiver for DoIt expressions.
-    /// Per Smalltalk-80 semantics: use Smalltalk global (from SpecialObjectsArray).
+    /// Per Smalltalk-80 semantics: use Smalltalk global (from GlobalRegistry).
     /// </summary>
     private SmalltalkOOP GetCanonicalReceiverForDoIt()
     {
-        // Get Smalltalk global (SystemDictionary) from SpecialObjectsArray
-        return SpecialObjectsArray.Instance.Smalltalk;
+        // Get Smalltalk global (SystemDictionary) from GlobalRegistry
+        return GlobalRegistry.Get("Smalltalk");
     }
 
     private SmalltalkOOP CreateMethodContextForInitExpression(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP)
     {
         // Get MethodContext class OOP - lookup from live heap
         // Find MethodContext class by querying Smalltalk dictionary
-        var smalltalkOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
         var methodContextClassOOP = LookupGlobal(smalltalkOOP, "MethodContext");
         if (methodContextClassOOP == SmalltalkOOP.Null)
         {
@@ -234,7 +237,7 @@ public class InitExpressionExecutor
         // TODO: receiverMapIndex removed - part of obsolete dual-context architecture
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
-        _heapManager.SetSlot(contextOOP, senderIndex + 1, SpecialObjectsArray.Instance.Nil);
+        _heapManager.SetSlot(contextOOP, senderIndex + 1, GlobalRegistry.Get("nil"));
         _heapManager.SetSlot(contextOOP, pcIndex + 1, SmalltalkOOP.FromSmallInteger(0));
         _heapManager.SetSlot(contextOOP, stackpIndex + 1, SmalltalkOOP.FromSmallInteger(0));
         _heapManager.SetSlot(contextOOP, methodIndex + 1, methodOOP);
@@ -245,7 +248,7 @@ public class InitExpressionExecutor
         int indexedBase = METHODCONTEXT_INSTANCE_VAR_COUNT + 1; // +1 for class slot
         for (int i = 0; i < 12; i++)
         {
-            _heapManager.SetSlot(contextOOP, indexedBase + i, SpecialObjectsArray.Instance.Nil);
+            _heapManager.SetSlot(contextOOP, indexedBase + i, GlobalRegistry.Get("nil"));
         }
 
         return contextOOP;
@@ -269,7 +272,7 @@ public class InitExpressionExecutor
         for (int i = 0; i < size; i++)
         {
             var assocOOP = _heapManager.GetIndexedOOP(systemDictOOP, i);
-            if (assocOOP == SpecialObjectsArray.Instance.Nil)
+            if (assocOOP == GlobalRegistry.Get("nil"))
                 continue;
 
             // Association has key at slot 0 (after class slot)
@@ -325,7 +328,7 @@ public class InitExpressionExecutor
     private SmalltalkOOP CreateProcess(SmalltalkOOP suspendedContextOOP, int priority)
     {
         // Get Process class OOP - lookup from live heap
-        var smalltalkOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
         var processClassOOP = LookupGlobal(smalltalkOOP, "Process");
         if (processClassOOP == SmalltalkOOP.Null)
         {
@@ -343,7 +346,7 @@ public class InitExpressionExecutor
         // Set instance variables using fixed indices from VMConstants
         _heapManager.SetSlot(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX + 1, suspendedContextOOP);
         _heapManager.SetSlot(processOOP, VMConstants.PROCESS_PRIORITY_INDEX + 1, SmalltalkOOP.FromSmallInteger(priority));
-        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_MYLIST_INDEX + 1, SpecialObjectsArray.Instance.Nil);
+        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_MYLIST_INDEX + 1, GlobalRegistry.Get("nil"));
 
         return processOOP;
     }

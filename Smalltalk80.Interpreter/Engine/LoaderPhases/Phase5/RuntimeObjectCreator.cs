@@ -159,7 +159,7 @@ public class RuntimeObjectCreator(
     /// </summary>
     private SmalltalkOOP CreateStubTextStyle(FontObjectBuilder fontBuilder)
     {
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
 
         // Create minimal stub StrikeFont
         var strikeFontOOP = context.Allocator.AllocateFixedObject("StrikeFont");
@@ -198,7 +198,7 @@ public class RuntimeObjectCreator(
     /// </summary>
     public void CreateDisplay()
     {
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
 
         // Step 1: Create offset Point (0@0)
         var pointOOP = context.Allocator.AllocateFixedObject("Point");

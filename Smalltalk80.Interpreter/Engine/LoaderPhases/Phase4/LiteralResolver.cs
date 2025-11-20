@@ -56,9 +56,9 @@ internal class LiteralResolver(
             "string" => InternString(_strings[literal.Index!.Value]),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
             "float" => AllocateFloat(GetFloatValue(literal.Value!)),
-            "nil" => SpecialObjectsArray.Instance.Nil,
-            "true" => SpecialObjectsArray.Instance.True,
-            "false" => SpecialObjectsArray.Instance.False,
+            "nil" => GlobalRegistry.Get("nil"),
+            "true" => GlobalRegistry.Get("true"),
+            "false" => GlobalRegistry.Get("false"),
             "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1) ? objOOP1 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
             "compiledMethod" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP2) ? objOOP2 : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),
             "character" => AllocateCharacter(literal.CodePoint!.Value),
@@ -116,7 +116,7 @@ internal class LiteralResolver(
         // VALUE MIGRATION POLICY: Validate that incoming Association has nil value
         var incomingValueOOP = assoc.ValueRef?.LocalId != null
             ? _localIdToObjectId[assoc.ValueRef.LocalId]
-            : SpecialObjectsArray.Instance.Nil;
+            : GlobalRegistry.Get("nil");
 
         // Warn if incoming value is non-nil (policy violation - silent)
         // Policy: Association literals should have nil values at compile time
@@ -126,7 +126,7 @@ internal class LiteralResolver(
         {
             // Create new Association: key=Symbol, value=nil
             // Always use nil value per VALUE MIGRATION POLICY
-            var assocOOP = AllocateAssociation(keySymbol, SpecialObjectsArray.Instance.Nil);
+            var assocOOP = AllocateAssociation(keySymbol, GlobalRegistry.Get("nil"));
 
             return assocOOP;
         });

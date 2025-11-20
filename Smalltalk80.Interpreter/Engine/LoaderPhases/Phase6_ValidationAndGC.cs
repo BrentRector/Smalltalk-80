@@ -4,7 +4,6 @@ using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 
@@ -35,6 +34,7 @@ public class Phase6_ValidationAndGC : IPhase
     private readonly string[] _symbols;
     private readonly ColdstartReport _report;
     private readonly IDiagnosticHub? _diagnostics;
+    private readonly SmalltalkOOP _initExpressionMethods;
 
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
@@ -53,6 +53,7 @@ public class Phase6_ValidationAndGC : IPhase
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         ColdstartReport report,
+        SmalltalkOOP initExpressionMethods,
         IDiagnosticHub? diagnostics = null)
     {
         _bundle = bundle;
@@ -62,6 +63,7 @@ public class Phase6_ValidationAndGC : IPhase
         _localIdToObjectId = localIdToObjectId;
         _report = report ?? throw new ArgumentNullException(nameof(report));
         _diagnostics = diagnostics;
+        _initExpressionMethods = initExpressionMethods;
 
         // Use symbols from bundle for validation
         _symbols = bundle.Symbols;
@@ -123,8 +125,8 @@ public class Phase6_ValidationAndGC : IPhase
         // 5. Cross-reference validation (object references point to valid objects)
         ValidateCrossReferences(results);
 
-        // 6. Validate SpecialObjectsArray integrity
-        ValidateSpecialObjectsArray(results);
+        // 6. Validate well-known objects integrity
+        ValidateWellKnownObjects(results);
 
         // 7. Validate method dictionaries
         ValidateMethodDictionaries(results);
@@ -301,11 +303,11 @@ public class Phase6_ValidationAndGC : IPhase
 // Console.WriteLine("  Validating special objects...");
 
         // Validate nil
-        ValidateSpecialObject("nil", SpecialObjectsArray.Instance.Nil, results);
+        ValidateSpecialObject("nil", GlobalRegistry.Get("nil"), results);
 
         // Validate true/false
-        ValidateSpecialObject("true", SpecialObjectsArray.Instance.True, results);
-        ValidateSpecialObject("false", SpecialObjectsArray.Instance.False, results);
+        ValidateSpecialObject("true", GlobalRegistry.Get("true"), results);
+        ValidateSpecialObject("false", GlobalRegistry.Get("false"), results);
 
         // Validate SystemDictionary
         ValidateSpecialObject("SystemDictionary", GlobalRegistry.SystemDictionaryOOP, results);
@@ -438,56 +440,56 @@ public class Phase6_ValidationAndGC : IPhase
         results.InvalidReferences = invalidReferences;
     }
 
-    private void ValidateSpecialObjectsArray(ValidationResults results)
+    private void ValidateWellKnownObjects(ValidationResults results)
     {
-// Console.WriteLine("  Validating SpecialObjectsArray...");
+// Console.WriteLine("  Validating well-known objects...");
 
         int validatedSlots = 0;
 
         // Validate nil singleton
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
         if (nilOOP.IsSmallInteger)
         {
-            results.AddError("SpecialObjectsArray.Nil is SmallInteger");
+            results.AddError("Nil is SmallInteger");
         }
         else
         {
             var nilClassName = _allocator.GetClassName(nilOOP);
             if (nilClassName != "UndefinedObject")
             {
-                results.AddError($"SpecialObjectsArray.Nil has wrong class: {nilClassName}, expected UndefinedObject");
+                results.AddError($"Nil has wrong class: {nilClassName}, expected UndefinedObject");
             }
             validatedSlots++;
         }
 
         // Validate false singleton
-        var falseOOP = SpecialObjectsArray.Instance.False;
+        var falseOOP = GlobalRegistry.Get("false");
         if (falseOOP == nilOOP || falseOOP.IsSmallInteger)
         {
-            results.AddError("SpecialObjectsArray.False is nil or SmallInteger");
+            results.AddError("False is nil or SmallInteger");
         }
         else
         {
             var falseClassName = _allocator.GetClassName(falseOOP);
             if (falseClassName != "False")
             {
-                results.AddError($"SpecialObjectsArray.False has wrong class: {falseClassName}, expected False");
+                results.AddError($"False has wrong class: {falseClassName}, expected False");
             }
             validatedSlots++;
         }
 
         // Validate true singleton
-        var trueOOP = SpecialObjectsArray.Instance.True;
+        var trueOOP = GlobalRegistry.Get("true");
         if (trueOOP == nilOOP || trueOOP.IsSmallInteger)
         {
-            results.AddError("SpecialObjectsArray.True is nil or SmallInteger");
+            results.AddError("True is nil or SmallInteger");
         }
         else
         {
             var trueClassName = _allocator.GetClassName(trueOOP);
             if (trueClassName != "True")
             {
-                results.AddError($"SpecialObjectsArray.True has wrong class: {trueClassName}, expected True");
+                results.AddError($"True has wrong class: {trueClassName}, expected True");
             }
             validatedSlots++;
         }
@@ -512,13 +514,13 @@ public class Phase6_ValidationAndGC : IPhase
         }
 
         // Validate InitExpressionMethods array
-        var initMethodsOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
+        var initMethodsOOP = _initExpressionMethods;
         if (initMethodsOOP != nilOOP)
         {
             var initMethodsClassName = _allocator.GetClassName(initMethodsOOP);
             if (initMethodsClassName != "Array")
             {
-                results.AddError($"SpecialObjectsArray.InitExpressionMethods has wrong class: {initMethodsClassName}, expected Array");
+                results.AddError($"InitExpressionMethods has wrong class: {initMethodsClassName}, expected Array");
             }
             validatedSlots++;
         }
@@ -544,7 +546,7 @@ public class Phase6_ValidationAndGC : IPhase
             // Get the class's method dictionary (instance variable 1 in Behavior)
             var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1);
 
-            if (methodDictOOP == SpecialObjectsArray.Instance.Nil)
+            if (methodDictOOP == GlobalRegistry.Get("nil"))
             {
                 continue;
             }
@@ -587,7 +589,7 @@ public class Phase6_ValidationAndGC : IPhase
                 for (int i = 0; i < capacity; i++)
                 {
                     var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
-                    if (keyOOP == SpecialObjectsArray.Instance.Nil)
+                    if (keyOOP == GlobalRegistry.Get("nil"))
                         continue;
 
                     var keySymbolName = _allocator.GetSymbolName(keyOOP);
@@ -713,16 +715,16 @@ public class Phase6_ValidationAndGC : IPhase
         // Create proper Smalltalk-80 GC roots - only the fundamental special objects
         var gcRootsList = new List<(string name, SmalltalkOOP oop)>
         {
-            ("nil", SpecialObjectsArray.Instance.Nil),
-            ("false", SpecialObjectsArray.Instance.False),
-            ("true", SpecialObjectsArray.Instance.True),
+            ("nil", GlobalRegistry.Get("nil")),
+            ("false", GlobalRegistry.Get("false")),
+            ("true", GlobalRegistry.Get("true")),
             ("Smalltalk", GlobalRegistry.SystemDictionaryOOP)
         };
 
         // Add init expression methods if allocated
-        if (SpecialObjectsArray.Instance.InitExpressionMethods != SpecialObjectsArray.Instance.Nil)
+        if (_initExpressionMethods != GlobalRegistry.Get("nil"))
         {
-            gcRootsList.Add(("InitExpressionMethods", SpecialObjectsArray.Instance.InitExpressionMethods));
+            gcRootsList.Add(("InitExpressionMethods", _initExpressionMethods));
         }
 
         // Set as GC roots
@@ -833,7 +835,7 @@ public class Phase6_ValidationAndGC : IPhase
                                 if (actualClassName == "CompiledMethod")
                                 {
                                     var homeClassOOP = _heapManager.GetInstanceVariable(arrayOOP, 0);
-                                    if (homeClassOOP == SpecialObjectsArray.Instance.Nil)
+                                    if (homeClassOOP == GlobalRegistry.Get("nil"))
                                     {
                                         homeClassInfo = " [homeClass=NIL!]";
                                     }
@@ -861,7 +863,7 @@ public class Phase6_ValidationAndGC : IPhase
                                     string elemStr;
                                     if (elem.IsSmallInteger)
                                         elemStr = elem.AsSmallInteger().ToString();
-                                    else if (elem == SpecialObjectsArray.Instance.Nil)
+                                    else if (elem == GlobalRegistry.Get("nil"))
                                         elemStr = "nil";
                                     else if (TryGetSymbolName(elem, out var name))
                                         elemStr = $"#{name}";

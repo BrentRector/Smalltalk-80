@@ -34,16 +34,16 @@ internal class FieldValueResolver(
     {
         return value.Type switch
         {
-            "nil" => SpecialObjectsArray.Instance.Nil,
-            "true" => SpecialObjectsArray.Instance.True,
-            "false" => SpecialObjectsArray.Instance.False,
+            "nil" => GlobalRegistry.Get("nil"),
+            "true" => GlobalRegistry.Get("true"),
+            "false" => GlobalRegistry.Get("false"),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(value.Value!)),
             "largePositiveInteger" => throw new NotImplementedException("LargePositiveInteger not yet supported"),
             "largeNegativeInteger" => throw new NotImplementedException("LargeNegativeInteger not yet supported"),
             "float" => AllocateFloat(GetFloatValue(value.Value!)),
             "symbolRef" => InternSymbol(_symbols[value.Index!.Value]),
             "stringRef" => InternString(bundle.Strings[value.Index!.Value]),
-            "objectRef" => localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : SpecialObjectsArray.Instance.Nil,
+            "objectRef" => localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : GlobalRegistry.Get("nil"),
             "character" => AllocateCharacter(value.CodePoint!.Value),
             "bytes" => AllocateByteArray(value.Encoding!, value.Data!),
             _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")
