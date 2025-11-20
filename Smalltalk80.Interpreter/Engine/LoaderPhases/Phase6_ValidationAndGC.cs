@@ -446,9 +446,9 @@ public class Phase6_ValidationAndGC : IPhase
 
         // Validate nil singleton
         var nilOOP = SpecialObjectsArray.Instance.Nil;
-        if (nilOOP == SmalltalkOOP.Null || nilOOP.IsSmallInteger)
+        if (nilOOP.IsSmallInteger)
         {
-            results.AddError("SpecialObjectsArray.Nil is null or SmallInteger");
+            results.AddError("SpecialObjectsArray.Nil is SmallInteger");
         }
         else
         {
@@ -462,9 +462,9 @@ public class Phase6_ValidationAndGC : IPhase
 
         // Validate false singleton
         var falseOOP = SpecialObjectsArray.Instance.False;
-        if (falseOOP == SmalltalkOOP.Null || falseOOP.IsSmallInteger)
+        if (falseOOP == nilOOP || falseOOP.IsSmallInteger)
         {
-            results.AddError("SpecialObjectsArray.False is null or SmallInteger");
+            results.AddError("SpecialObjectsArray.False is nil or SmallInteger");
         }
         else
         {
@@ -478,9 +478,9 @@ public class Phase6_ValidationAndGC : IPhase
 
         // Validate true singleton
         var trueOOP = SpecialObjectsArray.Instance.True;
-        if (trueOOP == SmalltalkOOP.Null || trueOOP.IsSmallInteger)
+        if (trueOOP == nilOOP || trueOOP.IsSmallInteger)
         {
-            results.AddError("SpecialObjectsArray.True is null or SmallInteger");
+            results.AddError("SpecialObjectsArray.True is nil or SmallInteger");
         }
         else
         {
@@ -497,9 +497,9 @@ public class Phase6_ValidationAndGC : IPhase
         {
             results.AddError("Smalltalk (SystemDictionary) not found in GlobalRegistry");
         }
-        else if (systemDictOOP == SmalltalkOOP.Null || systemDictOOP.IsSmallInteger)
+        else if (systemDictOOP == nilOOP || systemDictOOP.IsSmallInteger)
         {
-            results.AddError("Smalltalk (SystemDictionary) is null or SmallInteger");
+            results.AddError("Smalltalk (SystemDictionary) is nil or SmallInteger");
         }
         else
         {
@@ -513,7 +513,7 @@ public class Phase6_ValidationAndGC : IPhase
 
         // Validate InitExpressionMethods array
         var initMethodsOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
-        if (initMethodsOOP != SpecialObjectsArray.Instance.Nil && initMethodsOOP != SmalltalkOOP.Null)
+        if (initMethodsOOP != nilOOP)
         {
             var initMethodsClassName = _allocator.GetClassName(initMethodsOOP);
             if (initMethodsClassName != "Array")
@@ -720,7 +720,7 @@ public class Phase6_ValidationAndGC : IPhase
         };
 
         // Add init expression methods if allocated
-        if (SpecialObjectsArray.Instance.InitExpressionMethods != SmalltalkOOP.Null)
+        if (SpecialObjectsArray.Instance.InitExpressionMethods != SpecialObjectsArray.Instance.Nil)
         {
             gcRootsList.Add(("InitExpressionMethods", SpecialObjectsArray.Instance.InitExpressionMethods));
         }

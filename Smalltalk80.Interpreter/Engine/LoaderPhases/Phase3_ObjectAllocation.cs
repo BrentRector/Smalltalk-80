@@ -831,7 +831,7 @@ public class Phase3_ObjectAllocation : IPhase
 
             // Get the classPool Dictionary OOP
             var classPoolOOP = _allocator.GetInstanceVariable(classOOP, classPoolIndex);
-            if (classPoolOOP == SmalltalkOOP.Null)
+            if (classPoolOOP == _heapManager.GetNil())
                 continue;
 
             // Check if this object is a Dictionary by checking its class OOP

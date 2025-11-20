@@ -13,6 +13,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
     private readonly IObjectTableManager _tableManager;
     private readonly IGarbageCollector _garbageCollector;
     private readonly IBecomeHandler _becomeHandler;
+    private readonly SmalltalkOOP _nilOOP;
 
     // Class name field index (determined from coldstart.json during initialization)
     private int _classNameFieldIndex = -1;
@@ -28,7 +29,22 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         _tableManager = new ObjectTableManager();
         _garbageCollector = new GarbageCollector(_tableManager, this);
         _becomeHandler = new BecomeHandler(_tableManager);
+
+        // Allocate Nil as first object (reserves first ObjectTable slot for Nil)
+        _nilOOP = AllocateObject(
+            format: ObjectFormat.Pointer,
+            fixedSlots: 0,
+            indexedSize: 0
+        );
+
+        // Set class pointer to self-reference (fixed later by become)
+        SetSlot(_nilOOP, 0, _nilOOP);
     }
+
+    /// <summary>
+    /// Gets the OOP for the Nil singleton.
+    /// </summary>
+    public SmalltalkOOP GetNil() => _nilOOP;
 
     /// <summary>
     /// Configures the instance variable index for the class name field.
@@ -68,18 +84,18 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
             _ => throw new ArgumentException($"Unknown object format: {format}")
         };
 
+        // Get ObjectTable index
+        int tableIndex = _tableManager.AllocateObjectTableIndex();
+
         // CRITICAL: Initialize all OOP slots to nil (Blue Book requirement)
-        var nilOOP = SmalltalkOOP.Null;
-        if (managedStorage is SmalltalkOOP[] oopArray)
+        // Skip initialization for the first allocation (Nil itself)
+        if (tableIndex > 0 && managedStorage is SmalltalkOOP[] oopArray)
         {
             for (int i = 1; i < oopArray.Length; i++) // Skip slot 0 (class pointer)
             {
-                oopArray[i] = nilOOP;
+                oopArray[i] = _nilOOP;
             }
         }
-
-        // Get ObjectTable index
-        int tableIndex = _tableManager.AllocateObjectTableIndex();
 
         // Create ObjectTableEntry with managed storage and explicit metadata
         int? originalIndexedSize = (format == ObjectFormat.ByteIndexed) ? indexedSize : null;
@@ -97,9 +113,13 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         if ((format == ObjectFormat.ByteIndexed || format == ObjectFormat.WordIndexed) && fixedSlots > 0)
         {
             entry.InstanceVariableStorage = new SmalltalkOOP[fixedSlots];
-            for (int i = 0; i < fixedSlots; i++)
+            // Initialize to nil (skip for first allocation - Nil itself)
+            if (tableIndex > 0)
             {
-                entry.InstanceVariableStorage[i] = nilOOP;
+                for (int i = 0; i < fixedSlots; i++)
+                {
+                    entry.InstanceVariableStorage[i] = _nilOOP;
+                }
             }
         }
 
@@ -149,21 +169,13 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         SetSlot(newInstanceOOP, 0, classOOP);
 
         // Initialize all instance variables to nil
-        SmalltalkOOP nilOOP = SmalltalkOOP.Null;
-
+        // (Note: AllocateObject already initializes slots, but we do it again for clarity)
         // Track runtime allocations for debugging
         System.Threading.Interlocked.Increment(ref _runtimeAllocationCount);
 
-        // DEBUG: Verify nil OOP is not zero
-        if (nilOOP.RawValue == 0)
-        {
-            throw new InvalidOperationException(
-                $"FATAL: SmalltalkOOP.Null is OOP(0)!");
-        }
-
         for (int i = 1; i <= instanceVariableCount; i++)
         {
-            SetSlot(newInstanceOOP, i, nilOOP);
+            SetSlot(newInstanceOOP, i, _nilOOP);
         }
 
         // Initialize indexed slots to nil for PointerIndexed objects
@@ -171,7 +183,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         {
             for (int i = 0; i < indexedSize; i++)
             {
-                SetIndexedOOP(newInstanceOOP, i, nilOOP);
+                SetIndexedOOP(newInstanceOOP, i, _nilOOP);
             }
         }
 
@@ -656,7 +668,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                 return oop;
         }
 
-        return SmalltalkOOP.Null;
+        return _nilOOP;
     }
 
     public SmalltalkOOP FindNextInstanceOf(SmalltalkOOP classOOP, SmalltalkOOP afterOOP)
@@ -680,7 +692,7 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
                 return oop;
         }
 
-        return SmalltalkOOP.Null;
+        return _nilOOP;
     }
 
     #endregion

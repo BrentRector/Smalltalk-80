@@ -103,8 +103,8 @@ public readonly struct SpecialObjectsArray
     /// <returns>The active process OOP, or Null if not available</returns>
     public SmalltalkOOP GetActiveProcess(ISmalltalkHeapManager heapManager)
     {
-        if (ProcessorScheduler == SmalltalkOOP.Null)
-            return SmalltalkOOP.Null;
+        if (ProcessorScheduler == Nil)
+            return Nil;
 
         // ProcessorScheduler.activeProcess is field index 1 per VMConstants
         return heapManager.GetInstanceVariable(
@@ -118,8 +118,8 @@ public readonly struct SpecialObjectsArray
     /// </summary>
     public SmalltalkOOP[] GetRootsForGC()
     {
-        // Include InitExpressionMethods if it's set (not null)
-        if (InitExpressionMethods != SmalltalkOOP.Null)
+        // Include InitExpressionMethods if it's set (not nil)
+        if (InitExpressionMethods != Nil)
         {
             return new[] { Nil, False, True, Smalltalk, ProcessorScheduler, InitExpressionMethods };
         }
@@ -137,12 +137,12 @@ public readonly struct SpecialObjectsArray
         var activeProcess = GetActiveProcess(heapManager);
         var roots = new List<SmalltalkOOP> { Nil, False, True, Smalltalk, ProcessorScheduler };
 
-        if (InitExpressionMethods != SmalltalkOOP.Null)
+        if (InitExpressionMethods != Nil)
         {
             roots.Add(InitExpressionMethods);
         }
 
-        if (activeProcess != SmalltalkOOP.Null)
+        if (activeProcess != Nil)
         {
             roots.Add(activeProcess);
         }
@@ -192,11 +192,11 @@ public readonly struct SpecialObjectsArray
     {
         // Create empty SOA (will be populated during bootstrap)
         _instance = new SpecialObjectsArray(
-            SmalltalkOOP.Null,
-            SmalltalkOOP.Null,
-            SmalltalkOOP.Null,
-            SmalltalkOOP.Null,
-            SmalltalkOOP.Null
+            default,
+            default,
+            default,
+            default,
+            default
         );
     }
 

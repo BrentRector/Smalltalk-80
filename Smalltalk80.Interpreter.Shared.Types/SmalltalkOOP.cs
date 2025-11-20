@@ -55,9 +55,6 @@ public readonly struct SmalltalkOOP
     /// <summary>Returns the raw tagged value.</summary>
     public int RawValue => _value;
 
-    /// <summary>Null/zero OOP constant.</summary>
-    public static readonly SmalltalkOOP Null = new(0);
-
     public override string ToString() => IsSmallInteger
         ? $"SmallInteger({AsSmallInteger()})"
         : $"oop={_value}";

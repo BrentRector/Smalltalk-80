@@ -270,7 +270,7 @@ internal class GarbageCollector : IGarbageCollector
         {
             // Mark class pointer
             var classOOP = entry.ClassOOP;
-            if (classOOP != SmalltalkOOP.Null)
+            if (classOOP != _heap.GetNil())
             {
                 MarkObjectRecursively(classOOP);
             }

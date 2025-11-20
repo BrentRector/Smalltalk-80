@@ -8,6 +8,10 @@ namespace Smalltalk80.Interpreter.HeapManager;
 /// </summary>
 public interface ISmalltalkHeapManager
 {
+    /// <summary>
+    /// Gets the OOP for the Nil singleton.
+    /// </summary>
+    SmalltalkOOP GetNil();
 
     /// <summary>
     /// Allocates object with specified memory layout.
