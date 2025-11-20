@@ -328,6 +328,48 @@ Initialize expression execution after cold start.
 
 ## Dependency Graph
 
+### Component Flow
+
+```
+                    ┌─────────────┐
+                    │   Program   │
+                    └──────┬──────┘
+                           │
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+     ┌────────────┐  ┌──────────┐  ┌──────────┐
+     │ ColdStart  │  │ Init     │  │ Diagnostic│
+     │Orchestrator│  │ Executor │  │ Inspector │
+     └──────┬─────┘  └────┬─────┘  └──────────┘
+            │              │
+            ▼              ▼
+     ┌─────────────────────────┐
+     │    VirtualMachine       │
+     │  ┌─────┐ ┌──────────┐  │
+     │  │Stack│ │Bytecode  │  │
+     │  │Mgr  │ │Interpreter│ │
+     │  └─────┘ └──────────┘  │
+     │  ┌───────┐ ┌────────┐  │
+     │  │Context│ │Message │  │
+     │  │Manager│ │Dispatch│  │
+     │  └───────┘ └────────┘  │
+     └───────────┬────────────┘
+                 │
+     ┌───────────┼───────────┐
+     ▼           ▼           ▼
+┌──────────┐ ┌─────────┐ ┌─────────┐
+│  Heap    │ │Primitive│ │ Runtime │
+│ Manager  │ │Registry │ │ Access  │
+│          │ └─────────┘ └─────────┘
+│ ┌──────┐ │
+│ │  GC  │ │ (Three-Interface Architecture)
+│ └──────┘ │
+│ ┌──────┐ │
+│ │Become│ │
+│ └──────┘ │
+└──────────┘
+```
+
 ### Layered Architecture
 
 ```
@@ -355,6 +397,7 @@ Initialize expression execution after cold start.
 │         ▼                                         │
 │  ┌──────────────────────────────────┐            │
 │  │  SmalltalkHeapManager            │            │
+│  │  (ISmalltalkHeap)                │            │
 │  │  ┌───────────┐  ┌─────────────┐ │            │
 │  │  │    GC     │  │   Become    │ │            │
 │  │  │ Collector │  │   Handler   │ │            │
