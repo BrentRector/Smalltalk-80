@@ -607,7 +607,8 @@ public class SmalltalkHeapManager : ISmalltalkHeapManager
         {
             ObjectFormat.PointerIndexed => indexedWords,
             ObjectFormat.ByteIndexed => entry.OriginalIndexedSize ?? (indexedWords * 4),
-            ObjectFormat.WordIndexed => indexedWords * 2,
+            // For WordIndexed, return actual array length to avoid rounding errors
+            ObjectFormat.WordIndexed => entry.AsWordArray()?.Length ?? (indexedWords * 2),
             _ => 0
         };
     }
