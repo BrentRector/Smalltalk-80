@@ -1860,6 +1860,7 @@ instSize
 	"Answer the number of named instance variables (as opposed to indexed
 	variables) of the receiver."
 
+	<primitive: 117>
 	^format bitAnd: 255!
 isBits
 	"Answer whether the receiver contains just bits (not pointers)."
@@ -39071,7 +39072,7 @@ initialize
 
 	Text initialize."
 
-	(Smalltalk includesKey: #TextConstants)
+	(Smalltalk includes: TextConstants)
 		ifFalse: [Smalltalk at: #TextConstants put: (Dictionary new: 32)].
 	TextConstants at: #CaretForm  
 		 		 put: (Cursor
@@ -39228,7 +39229,8 @@ string: aString runs: anArray
 	^self basicNew setString: aString setRuns: anArray! !
 
 Text initialize!
-StringHolder subclass: #TextCollector
+
+StringHolder subclass: #TextCollector
 	instanceVariableNames: 'entryStream '
 	classVariableNames: ''
 	poolDictionaries: ''
