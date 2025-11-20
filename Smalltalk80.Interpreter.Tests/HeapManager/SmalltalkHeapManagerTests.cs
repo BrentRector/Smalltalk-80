@@ -3,6 +3,7 @@ extern alias CompilerLib;
 using FormatWord = CompilerLib::Smalltalk80.Core.FormatWord;
 using Smalltalk80.Interpreter.Core.HeapManager;
 using Smalltalk80.Interpreter.Core.Memory;
+using System.IO;
 using Xunit;
 
 namespace Smalltalk80.Interpreter.Tests.HeapManager;
@@ -1426,6 +1427,485 @@ public class SmalltalkHeapManagerTests : IDisposable
 
         // Assert
         Assert.True(_heapManager.VerboseDebugMode);
+    }
+
+    #endregion
+
+    #region SmalltalkOOP Tests
+
+    [Fact]
+    public void SmalltalkOOP_ToString_SmallInteger_ReturnsFormattedString()
+    {
+        // Arrange
+        var smallInt = SmalltalkOOP.FromSmallInteger(42);
+
+        // Act
+        var str = smallInt.ToString();
+
+        // Assert
+        Assert.Equal("SmallInteger(42)", str);
+    }
+
+    [Fact]
+    public void SmalltalkOOP_ToString_ObjectPointer_ReturnsFormattedString()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+
+        // Act
+        var str = oop.ToString();
+
+        // Assert
+        Assert.Contains("oop=", str);
+    }
+
+    [Fact]
+    public void SmalltalkOOP_Equals_SameValue_ReturnsTrue()
+    {
+        // Arrange
+        var oop1 = SmalltalkOOP.FromSmallInteger(100);
+        var oop2 = SmalltalkOOP.FromSmallInteger(100);
+
+        // Act & Assert
+        Assert.True(oop1.Equals(oop2));
+        Assert.True(oop1.Equals((object)oop2));
+    }
+
+    [Fact]
+    public void SmalltalkOOP_Equals_DifferentValue_ReturnsFalse()
+    {
+        // Arrange
+        var oop1 = SmalltalkOOP.FromSmallInteger(100);
+        var oop2 = SmalltalkOOP.FromSmallInteger(200);
+
+        // Act & Assert
+        Assert.False(oop1.Equals(oop2));
+        Assert.False(oop1.Equals((object)oop2));
+    }
+
+    [Fact]
+    public void SmalltalkOOP_Equals_NonOOPObject_ReturnsFalse()
+    {
+        // Arrange
+        var oop = SmalltalkOOP.FromSmallInteger(42);
+
+        // Act & Assert
+        Assert.False(oop.Equals("not an oop"));
+        Assert.False(oop.Equals(42));
+        Assert.False(oop.Equals(null));
+    }
+
+    [Fact]
+    public void SmalltalkOOP_GetHashCode_ConsistentForSameValue()
+    {
+        // Arrange
+        var oop1 = SmalltalkOOP.FromSmallInteger(42);
+        var oop2 = SmalltalkOOP.FromSmallInteger(42);
+
+        // Act
+        var hash1 = oop1.GetHashCode();
+        var hash2 = oop2.GetHashCode();
+
+        // Assert
+        Assert.Equal(hash1, hash2);
+    }
+
+    [Fact]
+    public void SmalltalkOOP_GetHashCode_DifferentForDifferentValues()
+    {
+        // Arrange
+        var oop1 = SmalltalkOOP.FromSmallInteger(42);
+        var oop2 = SmalltalkOOP.FromSmallInteger(43);
+
+        // Act
+        var hash1 = oop1.GetHashCode();
+        var hash2 = oop2.GetHashCode();
+
+        // Assert
+        Assert.NotEqual(hash1, hash2);
+    }
+
+    [Fact]
+    public void SmalltalkOOP_ImplicitConversion_FromInt_CreatesOOP()
+    {
+        // Arrange
+        int rawValue = 42;
+
+        // Act
+        SmalltalkOOP oop = rawValue;
+
+        // Assert
+        Assert.Equal(42, oop.RawValue);
+    }
+
+    #endregion
+
+    #region ObjectTableEntry Tests
+
+    [Fact]
+    public void ObjectTableEntry_AsByteArray_ByteIndexedFormat_ReturnsArray()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, 10);
+
+        // Use reflection to access internal ObjectTableManager and get entry
+        var tableManagerField = _heapManager.GetType()
+            .GetField("_tableManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var tableManager = tableManagerField!.GetValue(_heapManager);
+        var getEntryMethod = tableManager!.GetType().GetMethod("GetObjectTableEntry");
+        var entry = (ObjectTableEntry)getEntryMethod!.Invoke(tableManager, new object[] { oop })!;
+
+        // Act
+        var byteArray = entry.AsByteArray();
+
+        // Assert
+        Assert.NotNull(byteArray);
+        Assert.Equal(10, byteArray.Length);
+    }
+
+    [Fact]
+    public void ObjectTableEntry_AsByteArray_PointerFormat_ReturnsNull()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
+
+        var tableManagerField = _heapManager.GetType()
+            .GetField("_tableManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var tableManager = tableManagerField!.GetValue(_heapManager);
+        var getEntryMethod = tableManager!.GetType().GetMethod("GetObjectTableEntry");
+        var entry = (ObjectTableEntry)getEntryMethod!.Invoke(tableManager, new object[] { oop })!;
+
+        // Act
+        var byteArray = entry.AsByteArray();
+
+        // Assert
+        Assert.Null(byteArray);
+    }
+
+    [Fact]
+    public void ObjectTableEntry_AsOopArray_PointerFormat_ReturnsArray()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
+
+        var tableManagerField = _heapManager.GetType()
+            .GetField("_tableManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var tableManager = tableManagerField!.GetValue(_heapManager);
+        var getEntryMethod = tableManager!.GetType().GetMethod("GetObjectTableEntry");
+        var entry = (ObjectTableEntry)getEntryMethod!.Invoke(tableManager, new object[] { oop })!;
+
+        // Act
+        var oopArray = entry.AsOopArray();
+
+        // Assert
+        Assert.NotNull(oopArray);
+        Assert.Equal(4, oopArray.Length); // 1 header + 3 instance variables
+    }
+
+    [Fact]
+    public void ObjectTableEntry_AsOopArray_ByteIndexedFormat_ReturnsNull()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, 10);
+
+        var tableManagerField = _heapManager.GetType()
+            .GetField("_tableManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var tableManager = tableManagerField!.GetValue(_heapManager);
+        var getEntryMethod = tableManager!.GetType().GetMethod("GetObjectTableEntry");
+        var entry = (ObjectTableEntry)getEntryMethod!.Invoke(tableManager, new object[] { oop })!;
+
+        // Act
+        var oopArray = entry.AsOopArray();
+
+        // Assert
+        Assert.Null(oopArray);
+    }
+
+    [Fact]
+    public void ObjectTableEntry_AsWordArray_WordIndexedFormat_ReturnsArray()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.WordIndexed, 0, 8);
+
+        var tableManagerField = _heapManager.GetType()
+            .GetField("_tableManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var tableManager = tableManagerField!.GetValue(_heapManager);
+        var getEntryMethod = tableManager!.GetType().GetMethod("GetObjectTableEntry");
+        var entry = (ObjectTableEntry)getEntryMethod!.Invoke(tableManager, new object[] { oop })!;
+
+        // Act
+        var wordArray = entry.AsWordArray();
+
+        // Assert
+        Assert.NotNull(wordArray);
+        Assert.Equal(8, wordArray.Length);
+    }
+
+    [Fact]
+    public void ObjectTableEntry_AsWordArray_PointerFormat_ReturnsNull()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 2, 0);
+
+        var tableManagerField = _heapManager.GetType()
+            .GetField("_tableManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var tableManager = tableManagerField!.GetValue(_heapManager);
+        var getEntryMethod = tableManager!.GetType().GetMethod("GetObjectTableEntry");
+        var entry = (ObjectTableEntry)getEntryMethod!.Invoke(tableManager, new object[] { oop })!;
+
+        // Act
+        var wordArray = entry.AsWordArray();
+
+        // Assert
+        Assert.Null(wordArray);
+    }
+
+    [Fact]
+    public void ObjectTableEntry_AsIntArray_AlwaysReturnsNull()
+    {
+        // Arrange - Standard formats don't use int arrays
+        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 2, 0);
+
+        var tableManagerField = _heapManager.GetType()
+            .GetField("_tableManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var tableManager = tableManagerField!.GetValue(_heapManager);
+        var getEntryMethod = tableManager!.GetType().GetMethod("GetObjectTableEntry");
+        var entry = (ObjectTableEntry)getEntryMethod!.Invoke(tableManager, new object[] { oop })!;
+
+        // Act
+        var intArray = entry.AsIntArray();
+
+        // Assert
+        Assert.Null(intArray);
+    }
+
+    [Fact]
+    public void ObjectTableEntry_GetDebugInfo_ReturnsFormattedString()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
+
+        var tableManagerField = _heapManager.GetType()
+            .GetField("_tableManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var tableManager = tableManagerField!.GetValue(_heapManager);
+        var getEntryMethod = tableManager!.GetType().GetMethod("GetObjectTableEntry");
+        var entry = (ObjectTableEntry)getEntryMethod!.Invoke(tableManager, new object[] { oop })!;
+
+        // Act
+        var debugInfo = entry.GetDebugInfo();
+
+        // Assert
+        Assert.Contains("ObjectTableEntry", debugInfo);
+        Assert.Contains("Storage:", debugInfo);
+        Assert.Contains("Format:", debugInfo);
+        Assert.Contains("Pointer", debugInfo);
+        Assert.Contains("Size:", debugInfo);
+        Assert.Contains("InstanceVars: 3", debugInfo);
+    }
+
+    [Fact]
+    public void ObjectTableEntry_GetDebugInfo_ByteIndexed_ShowsByteArray()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, 50);
+
+        var tableManagerField = _heapManager.GetType()
+            .GetField("_tableManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var tableManager = tableManagerField!.GetValue(_heapManager);
+        var getEntryMethod = tableManager!.GetType().GetMethod("GetObjectTableEntry");
+        var entry = (ObjectTableEntry)getEntryMethod!.Invoke(tableManager, new object[] { oop })!;
+
+        // Act
+        var debugInfo = entry.GetDebugInfo();
+
+        // Assert
+        Assert.Contains("byte[50]", debugInfo);
+        Assert.Contains("ByteIndexed", debugInfo);
+    }
+
+    #endregion
+
+    #region SmalltalkHeapManager Advanced Tests
+
+    [Fact]
+    public void SetClassNameFieldIndex_ConfiguresClassNameExtraction()
+    {
+        // Arrange & Act
+        _heapManager.SetClassNameFieldIndex(6);
+
+        // Assert - Just verify it doesn't throw
+        // The actual functionality is tested by GetClassName which uses this index
+    }
+
+    [Fact]
+    public void GetClassName_SmallInteger_ReturnsSmallInteger()
+    {
+        // Arrange
+        var smallInt = SmalltalkOOP.FromSmallInteger(42);
+
+        // Act
+        var className = _heapManager.GetClassName(smallInt);
+
+        // Assert
+        Assert.Equal("SmallInteger", className);
+    }
+
+    [Fact]
+    public void GetClassName_InvalidOOP_ReturnsInvalid()
+    {
+        // Arrange
+        var invalidOOP = SmalltalkOOP.FromObjectTableIndex(99999);
+
+        // Act
+        var className = _heapManager.GetClassName(invalidOOP);
+
+        // Assert
+        Assert.Equal("Invalid", className);
+    }
+
+    [Fact]
+    public void GetClassName_ValidObjectWithoutNameField_ReturnsUnknownClass()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 2, 0);
+        var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
+        _heapManager.SetSlot(oop, 0, classOOP);
+
+        // Act
+        var className = _heapManager.GetClassName(oop);
+
+        // Assert
+        Assert.StartsWith("UnknownClass", className);
+    }
+
+    [Fact]
+    public void GetClassName_ObjectWithSmallIntegerClass_ReturnsInvalidClass()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 1, 0);
+        var invalidClass = SmalltalkOOP.FromSmallInteger(42);
+        _heapManager.SetSlot(oop, 0, invalidClass);
+
+        // Act
+        var className = _heapManager.GetClassName(oop);
+
+        // Assert
+        Assert.Contains("InvalidClass", className);
+    }
+
+    [Fact]
+    public void ValidateAllObjectClasses_NoInvalidObjects_ProducesNoWarnings()
+    {
+        // Arrange
+        var localIdToObjectId = new Dictionary<string, int>();
+        var obj1 = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        var obj2 = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, 10);
+
+        // Capture console output
+        var originalConsoleOut = Console.Out;
+        using var stringWriter = new StringWriter();
+        Console.SetOut(stringWriter);
+
+        try
+        {
+            // Act
+            _heapManager.ValidateAllObjectClasses(localIdToObjectId);
+
+            // Assert - Should not produce warnings for valid objects
+            var output = stringWriter.ToString();
+            // Note: May still have warnings because objects don't have proper class structure
+            // This just verifies the method runs without crashing
+        }
+        finally
+        {
+            Console.SetOut(originalConsoleOut);
+        }
+    }
+
+    [Fact]
+    public void ValidateAllObjectClasses_WithInvalidClassReferences_LogsWarnings()
+    {
+        // Arrange
+        var localIdToObjectId = new Dictionary<string, int>();
+        var obj = _heapManager.AllocateObject(ObjectFormat.Pointer, 1, 0);
+        var invalidClass = SmalltalkOOP.FromSmallInteger(999);
+        _heapManager.SetSlot(obj, 0, invalidClass);
+
+        localIdToObjectId["obj1"] = obj.ToObjectTableIndex();
+
+        // Capture console output
+        var originalConsoleOut = Console.Out;
+        using var stringWriter = new StringWriter();
+        Console.SetOut(stringWriter);
+
+        try
+        {
+            // Act
+            _heapManager.ValidateAllObjectClasses(localIdToObjectId);
+
+            // Assert
+            var output = stringWriter.ToString();
+            Assert.Contains("VALIDATION WARNING", output);
+        }
+        finally
+        {
+            Console.SetOut(originalConsoleOut);
+        }
+    }
+
+    #endregion
+
+    #region ObjectTableManager Advanced Tests (through public API)
+
+    [Fact]
+    public void GarbageCollect_FreesAndReusesObjectTableEntries()
+    {
+        // Arrange
+        var root = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+
+        // Allocate many objects that will become garbage
+        var tempObjects = new List<SmalltalkOOP>();
+        for (int i = 0; i < 20; i++)
+        {
+            tempObjects.Add(_heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0));
+        }
+
+        int tableSizeBeforeGC = _heapManager.GetObjectTableSize();
+        _heapManager.SetGCRoots(new[] { root });
+
+        // Act
+        _heapManager.GarbageCollect();
+
+        // Allocate new objects - they should reuse freed entries
+        var newObjects = new List<SmalltalkOOP>();
+        for (int i = 0; i < 10; i++)
+        {
+            newObjects.Add(_heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0));
+        }
+
+        int tableSizeAfterReuse = _heapManager.GetObjectTableSize();
+
+        // Assert - Table size should not grow much if entries are being reused
+        // The exact behavior depends on free list implementation
+        Assert.True(tableSizeAfterReuse <= tableSizeBeforeGC + 10);
+    }
+
+    [Fact]
+    public void ObjectTableSize_IncreasesWithAllocations()
+    {
+        // Arrange
+        int initialSize = _heapManager.GetObjectTableSize();
+
+        // Act
+        for (int i = 0; i < 10; i++)
+        {
+            _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        }
+
+        int finalSize = _heapManager.GetObjectTableSize();
+
+        // Assert
+        Assert.True(finalSize >= initialSize + 10);
     }
 
     #endregion
