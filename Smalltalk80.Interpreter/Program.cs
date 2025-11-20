@@ -488,16 +488,18 @@ public static class Program
 
                 // Phase 2: Execute comment: expressions (run after all initialize! expressions)
                 // Only enabled comment expressions will run - start with one to test
-                var enabledCommentExpressions = new HashSet<string>
+                // Use prefix matching since Source includes full comment text
+                var enabledCommentPrefixes = new List<string>
                 {
                     "Object comment:",  // Start with one simple comment expression
                 };
 
-                // Filter phase2Indices to only include enabled expressions
+                // Filter phase2Indices to only include enabled expressions (prefix match)
                 var enabledPhase2Indices = phase2Indices
                     .Where(i => {
                         var expr = bundle.InitExpressions[i];
-                        return expr.Source != null && enabledCommentExpressions.Contains(expr.Source);
+                        return expr.Source != null &&
+                               enabledCommentPrefixes.Any(prefix => expr.Source.StartsWith(prefix));
                     })
                     .ToList();
 
