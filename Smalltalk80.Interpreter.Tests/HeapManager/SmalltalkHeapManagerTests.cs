@@ -919,6 +919,77 @@ public class SmalltalkHeapManagerTests : IDisposable
         Assert.Contains(y, unreachable);
     }
 
+    [Fact]
+    public void MarkObject_ValidObjectOOP_MarksObject()
+    {
+        // Arrange
+        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+
+        // Act
+        _heapManager.MarkObject(oop);
+
+        // Assert - Verify object is marked by checking it's not in unreachable list
+        _heapManager.SetGCRoots(Array.Empty<SmalltalkOOP>());
+        var unreachable = _heapManager.GetUnreachableObjects();
+        Assert.DoesNotContain(oop, unreachable);
+    }
+
+    [Fact]
+    public void MarkObject_SmallInteger_DoesNotThrow()
+    {
+        // Arrange
+        var smallInt = SmalltalkOOP.FromSmallInteger(42);
+
+        // Act & Assert - SmallIntegers should be safely ignored
+        _heapManager.MarkObject(smallInt);
+    }
+
+    [Fact]
+    public void MarkObject_InvalidOOP_DoesNotThrow()
+    {
+        // Arrange
+        var invalidOOP = SmalltalkOOP.FromObjectTableIndex(99999);
+
+        // Act & Assert - Invalid OOPs should be safely ignored
+        _heapManager.MarkObject(invalidOOP);
+    }
+
+    [Fact]
+    public void GetGCStatistics_ReturnsCurrentHeapStatistics()
+    {
+        // Arrange
+        var obj1 = _heapManager.AllocateObject(ObjectFormat.Pointer, 2, 0);
+        var obj2 = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, 100);
+        var obj3 = _heapManager.AllocateObject(ObjectFormat.WordIndexed, 0, 50);
+
+        // Act
+        var stats = _heapManager.GetGCStatistics();
+
+        // Assert
+        Assert.True(stats.TotalObjects >= 3); // At least our 3 objects plus nil/true/false
+        Assert.Equal(stats.TotalObjects, stats.LiveObjects); // No collection performed
+        Assert.Equal(0, stats.CollectedObjects); // No collection performed
+        Assert.Equal(0, stats.MarkTimeMs);
+        Assert.Equal(0, stats.SweepTimeMs);
+        Assert.Equal(0, stats.TotalTimeMs);
+        Assert.True(stats.FreeObjectTableEntries >= 0);
+    }
+
+    [Fact]
+    public void GetGCStatistics_AfterAllocation_ReflectsNewObjects()
+    {
+        // Arrange
+        var statsBefore = _heapManager.GetGCStatistics();
+
+        // Act
+        _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        var statsAfter = _heapManager.GetGCStatistics();
+
+        // Assert
+        Assert.Equal(statsBefore.TotalObjects + 1, statsAfter.TotalObjects);
+        Assert.Equal(statsBefore.LiveObjects + 1, statsAfter.LiveObjects);
+    }
+
     #endregion
 
     #region Free List Reuse
