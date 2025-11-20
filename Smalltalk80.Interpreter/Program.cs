@@ -223,7 +223,6 @@ public static class Program
                 var skipList = new HashSet<string>
                 {
                     "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
-                    "FormMenuView initialize",               // ❌ Pool variable 'Disk' not found in FilePool
                 };
 
                 // Build index lists for each phase (preserving source file order)
