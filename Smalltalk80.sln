@@ -21,7 +21,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Smalltalk80.Interpreter.Cor
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Smalltalk80.Interpreter.Engine", "Smalltalk80.Interpreter\Engine\Smalltalk80.Interpreter.Engine.csproj", "{E2F3A4B5-C6D7-48E9-A9F2-3A4B5C6D7E8F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Smalltalk80.Interpreter.Tests", "Smalltalk80.Interpreter\Tests\Smalltalk80.Interpreter.Tests.csproj", "{F3A4B5C6-D7E8-49FA-BAF3-4B5C6D7E8F9A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Smalltalk80.Interpreter.Tests", "Smalltalk80.Interpreter.Tests\Smalltalk80.Interpreter.Tests.csproj", "{F3A4B5C6-D7E8-49FA-BAF3-4B5C6D7E8F9A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
