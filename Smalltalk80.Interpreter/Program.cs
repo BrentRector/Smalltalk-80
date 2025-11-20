@@ -481,6 +481,7 @@ public static class Program
                 var skippedCommentPrefixes = new List<string>
                 {
                     "Benchmark comment:",  // Fails during execution
+                    "BitBlt comment:",     // Fails during execution
                 };
 
                 if (phase2Indices.Count > 0)
