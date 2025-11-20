@@ -49,7 +49,13 @@ public static class SymbolRegistry
     /// </summary>
     public static SmalltalkOOP GetSymbolOOP(int symbolIndex)
     {
-        return _symbolIndexToOOP[symbolIndex];
+        if (!_symbolIndexToOOP.TryGetValue(symbolIndex, out var symbolOOP))
+        {
+            throw new KeyNotFoundException(
+                $"SymbolRegistry.GetSymbolOOP: Symbol index {symbolIndex} not found. " +
+                $"Registry contains {_symbolIndexToOOP.Count} symbols.");
+        }
+        return symbolOOP;
     }
 
     /// <summary>
@@ -61,10 +67,12 @@ public static class SymbolRegistry
     }
 
     /// <summary>
-    /// Clears all registered symbols. Used for testing or reinitialization.
+    /// Clears all registered symbols and resets frozen state.
+    /// Used for testing or reinitialization.
     /// </summary>
     public static void Clear()
     {
         _symbolIndexToOOP.Clear();
+        _isFrozen = false;
     }
 }
