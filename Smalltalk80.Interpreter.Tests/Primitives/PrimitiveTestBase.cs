@@ -183,4 +183,18 @@ public abstract class PrimitiveTestBase
     {
         mock.Setup(h => h.GetIndexedByte(objectOOP, index)).Returns(value);
     }
+
+    /// <summary>
+    /// Creates a basic mock RuntimeHeapAccessor that returns -1 for all field lookups.
+    /// Tests can set up specific field indices as needed.
+    /// </summary>
+    protected static Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccessor(Mock<ISmalltalkHeapManager> mockHeap)
+    {
+        var mock = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+
+        // Default: return -1 (field not found) for any field lookup
+        mock.Setup(r => r.GetFieldIndex(It.IsAny<SmalltalkOOP>(), It.IsAny<string>())).Returns(-1);
+
+        return mock;
+    }
 }

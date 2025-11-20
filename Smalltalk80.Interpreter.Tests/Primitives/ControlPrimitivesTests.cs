@@ -1067,7 +1067,8 @@ public class ControlPrimitivesTests : PrimitiveTestBase
 
         mockHeap.Setup(h => h.GetClassName(semaphoreOOP)).Returns((string)null!);
 
-        var context = CreateContext(semaphoreOOP, [], mockHeap.Object);
+        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        var context = CreateContext(semaphoreOOP, [], mockHeap.Object, mockRuntime.Object);
 
         var result = primitive.Execute(context);
 
@@ -1082,14 +1083,13 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var semaphoreOOP = ObjectOOP(100);
 
         SetupClassName(mockHeap, semaphoreOOP, "Semaphore");
-        // Mock layout resolver for field access - need to handle this differently
 
-        var context = CreateContext(semaphoreOOP, [], mockHeap.Object);
+        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        var context = CreateContext(semaphoreOOP, [], mockHeap.Object, mockRuntime.Object);
 
-        // This test verifies basic argument validation
+        // This test verifies that GetFieldIndex returns -1, causing the primitive to fail
         var result = primitive.Execute(context);
 
-        // Without proper field setup, this should fail due to missing layout resolver
         AssertFailure(result);
     }
 
@@ -1132,7 +1132,8 @@ public class ControlPrimitivesTests : PrimitiveTestBase
 
         mockHeap.Setup(h => h.GetClassName(semaphoreOOP)).Returns((string)null!);
 
-        var context = CreateContext(semaphoreOOP, [], mockHeap.Object);
+        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        var context = CreateContext(semaphoreOOP, [], mockHeap.Object, mockRuntime.Object);
 
         var result = primitive.Execute(context);
 
@@ -1178,7 +1179,8 @@ public class ControlPrimitivesTests : PrimitiveTestBase
 
         mockHeap.Setup(h => h.GetClassName(processOOP)).Returns((string)null!);
 
-        var context = CreateContext(processOOP, [], mockHeap.Object);
+        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        var context = CreateContext(processOOP, [], mockHeap.Object, mockRuntime.Object);
 
         var result = primitive.Execute(context);
 
@@ -1224,7 +1226,8 @@ public class ControlPrimitivesTests : PrimitiveTestBase
 
         mockHeap.Setup(h => h.GetClassName(processOOP)).Returns((string)null!);
 
-        var context = CreateContext(processOOP, [], mockHeap.Object);
+        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        var context = CreateContext(processOOP, [], mockHeap.Object, mockRuntime.Object);
 
         var result = primitive.Execute(context);
 
