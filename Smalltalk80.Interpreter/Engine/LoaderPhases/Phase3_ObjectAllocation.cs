@@ -645,7 +645,7 @@ public class Phase3_ObjectAllocation : IPhase
                 if (format == ObjectFormat.Pointer && instVarCount == 2 && indexedSize == 0)
                 {
                     // DEBUG: Check if this is ProcessorScheduler being incorrectly treated as Association
-                    if (objectOOP.ToObjectTableIndex() == 13488 / 2) // oop=13488
+                    if (GlobalRegistry.TryGet("ProcessorScheduler", out var processorOOP) && objectOOP == processorOOP)
                     {
                         Console.WriteLine($"[Phase3] WARNING: About to overwrite ProcessorScheduler class!");
                         Console.WriteLine($"  objectOOP = {objectOOP}");
