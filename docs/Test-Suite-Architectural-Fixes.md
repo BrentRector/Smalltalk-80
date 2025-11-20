@@ -322,6 +322,14 @@ All fixes were implemented in 4 commits on branch `claude/review-refactoring-wor
    - Issue: Was concatenating "class:" + null which produces "class:" (not null)
    - Caused primitives to proceed with invalid class names and throw field lookup errors
    - Fixed null check to return null directly before concatenation
-   - Fixed last 5 failing tests (Signal, Wait, Resume, Suspend null scenarios)
+   - Fixed 4 failing tests (Signal_NullClassName, Wait_NullClassName, Resume_NullClassName, Suspend_NullClassName)
+   - Result: 257/258 tests passing (1 remaining failure)
+
+6. **5c71b6b** - Fixed Signal_NonSmallIntegerExcessSignals_Fails test to properly mock field access
+   - Issue: Test wasn't setting up RuntimeHeapAccessor mocks for field indices
+   - GetFieldValue() threw "Field not found" instead of allowing primitive to fail gracefully
+   - Fixed by setting up proper mocks for GetFieldIndex and GetInstanceVariable
+   - Test now properly validates that primitive fails when excessSignals is not a SmallInteger
+   - Fixed final failing test
 
 **Final Result**: 258/258 tests passing (100% success rate)
