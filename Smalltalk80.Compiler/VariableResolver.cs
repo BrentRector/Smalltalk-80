@@ -326,7 +326,7 @@ namespace Smalltalk80.Compiler
                 return new ResolutionResult(
                     VariableType.Global,
                     -1,  // Literal index assigned by caller
-                    false,  // System globals are generally read-only
+                    true,  // System globals need to be assignable during initialization
                     varName
                 );
             }
