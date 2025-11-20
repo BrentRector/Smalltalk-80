@@ -205,7 +205,7 @@ internal class BytecodeInterpreter(
             if (valueClassOOP == associationClassOOP2)
             {
                 string? keyName = null;
-                if (keyOOP.IsHeapObject)
+                if (!keyOOP.IsSmallInteger)
                 {
                     var keyClass = heapManager.GetClassOOP(keyOOP);
                     var symbolClass = runtimeHeapAccess.GetClass("Symbol");
@@ -220,7 +220,7 @@ internal class BytecodeInterpreter(
 
                 // Try to get the inner Association's key
                 var innerKeyOOP = heapManager.GetInstanceVariable(valueOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                if (innerKeyOOP.IsHeapObject)
+                if (!innerKeyOOP.IsSmallInteger)
                 {
                     var innerKeyClass = heapManager.GetClassOOP(innerKeyOOP);
                     var symbolClass2 = runtimeHeapAccess.GetClass("Symbol");
