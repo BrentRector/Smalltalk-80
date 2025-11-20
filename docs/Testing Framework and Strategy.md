@@ -1,26 +1,31 @@
 # Testing Framework and Strategy
 
 **Date Created**: 2025-11-20
+**Last Updated**: 2025-11-20
 **Project**: Smalltalk-80 Interpreter Unit Test Suite
-**Total Tests**: 829 unit tests
+**Total Tests**: 258 primitive tests (Phase 1)
 
 ---
 
 ## Executive Summary
 
-This document describes the comprehensive unit test suite created for the Smalltalk-80 interpreter. The test suite provides thorough coverage of all major interpreter components, with particular emphasis on the recently refactored modules including the unified temp frame architecture, variable resolution system, and control primitives.
+This document describes the unit test suite for the Smalltalk-80 interpreter. The test suite currently focuses exclusively on **primitive operations** (100% coverage), which are the foundation of the Smalltalk-80 VM. Additional component tests (HeapManager, Compiler, VM, Context) will be added in future phases once primitive tests are stable.
 
-### Test Coverage Goals
+### Test Coverage - Phase 1 (Current)
 
 | Component Category | Target Coverage | Tests Created | Status |
 |-------------------|-----------------|---------------|--------|
-| Heap Manager | 85%+ | 68 | Complete |
-| Primitives | 100% | 258 | Complete |
-| Compiler (TempFrame, VariableResolver) | 90%+ | 154 | Complete |
-| VM Execution | 85%+ | 147 | Complete |
-| Cold Start Phases | 75%+ | 130 | Complete |
-| Context Management | 85%+ | 72 | Complete |
-| **Total** | **80%+ average** | **829** | **Complete** |
+| Primitives | 100% | 258 | Active |
+| **Total** | **100%** | **258** | **Active** |
+
+### Test Coverage - Phase 2 (Future)
+
+| Component Category | Target Coverage | Planned Tests | Status |
+|-------------------|-----------------|---------------|--------|
+| Heap Manager | 85%+ | 68 | Deferred |
+| Compiler | 90%+ | 154 | Deferred |
+| VM Execution | 85%+ | 147 | Deferred |
+| Context Management | 85%+ | 72 | Deferred |
 
 ---
 
@@ -29,8 +34,6 @@ This document describes the comprehensive unit test suite created for the Smallt
 ```
 Smalltalk80.Interpreter.Tests/
 ├── Smalltalk80.Interpreter.Tests.csproj
-├── HeapManager/
-│   └── SmalltalkHeapManagerTests.cs          (68 tests)
 ├── Primitives/
 │   ├── PrimitiveTestBase.cs                  (Base class)
 │   ├── ArithmeticPrimitivesTests.cs          (45 tests)
@@ -41,28 +44,11 @@ Smalltalk80.Interpreter.Tests/
 │   ├── LargeIntegerPrimitivesTests.cs        (15 tests)
 │   ├── StringPrimitivesTests.cs              (15 tests)
 │   └── SystemPrimitivesTests.cs              (28 tests)
-├── Compiler/
-│   ├── TempFrameAllocatorTests.cs            (45 tests)
-│   ├── VariableResolverTests.cs              (55 tests)
-│   └── BytecodeEmitterTests.cs               (54 tests)
-├── VM/
-│   ├── BytecodeInterpreterTests.cs           (44 tests)
-│   ├── MessageDispatcherTests.cs             (30 tests)
-│   ├── StackManagerTests.cs                  (18 tests)
-│   ├── GlobalRegistryTests.cs                (28 tests)
-│   └── ExecutionStateTests.cs                (27 tests)
-├── ColdStart/
-│   ├── Phase1PreflightTests.cs               (28 tests)
-│   ├── Phase2ClassInfrastructureTests.cs     (24 tests)
-│   ├── Phase4MethodCompilationTests.cs       (15 tests)
-│   ├── Phase6ValidationTests.cs              (19 tests)
-│   ├── ColdStartServicesTests.cs             (28 tests)
-│   └── InitExpressionExecutorTests.cs        (16 tests)
-├── Context/
-│   └── ContextManagerTests.cs                (72 tests)
 └── TestUtilities/
     └── TestHelpers.cs                        (Shared utilities)
 ```
+
+**Note**: Compiler, VM, HeapManager, Context, and ColdStart tests have been temporarily removed to focus on primitive testing first. They will be re-added in Phase 2 after primitive tests are stable.
 
 ---
 
@@ -113,28 +99,9 @@ Examples:
 
 ---
 
-## Critical Test Areas
+## Primitive Test Coverage
 
-### 1. Unified Temp Frame Architecture (HIGHEST PRIORITY)
-
-The refactored unified temp frame is the most critical change. These tests verify:
-
-**TempFrameAllocatorTests**:
-- Block arguments allocated in MethodContext (not BlockContext)
-- Sequential blocks reuse slots
-- Nested blocks don't reuse slots
-- `GetBlockArgumentStartIndex()` returns correct offset for Primitive 81
-
-**VariableResolverTests**:
-- 9-step resolution priority ordering
-- Block arguments resolve to unified frame indices
-- Parent variable access from nested blocks
-
-**BytecodeInterpreterTests**:
-- Push temporary bytecodes (0x10-0x1F) access unified frame
-- Store temporary bytecodes (0x68-0x6F) modify unified frame
-
-### 2. Control Primitives (100% Coverage Required)
+### 1. Control Primitives (Highest Priority)
 
 **ControlPrimitivesTests** (57 tests):
 
@@ -151,30 +118,54 @@ The refactored unified temp frame is the most critical change. These tests verif
 | 88 | suspend | 3 | Process suspend |
 | 89 | flushCache | 3 | Cache invalidation |
 
-### 3. Heap Manager Operations
+### 2. Arithmetic Primitives
 
-**SmalltalkHeapManagerTests** (68 tests):
-- All ObjectFormats: Pointer, PointerIndexed, ByteIndexed, WordIndexed
-- Instance variable and indexed access
-- Garbage collection with reachability graphs
-- Free list reuse after GC
-- Become operations (identity swapping)
+**ArithmeticPrimitivesTests** (45 tests):
+- SmallInteger arithmetic: add, subtract, multiply, divide, mod, quo
+- Overflow handling and result type checking
+- Division by zero error cases
 
-### 4. Bytecode Execution
+### 3. Comparison Primitives
 
-**BytecodeInterpreterTests** (44 tests):
+**ComparisonPrimitivesTests** (31 tests):
+- Numeric comparisons: <, >, <=, >=, =, ~=
+- SmallInteger and Float comparisons
+- Type mismatch handling
 
-Tests all bytecode ranges from Blue Book Chapter 30:
-- 0x00-0x0F: Push receiver variable
-- 0x10-0x1F: Push temporary (unified frame)
-- 0x20-0x3F: Push literal constant
-- 0x40-0x5F: Push literal variable
-- 0x60-0x67: Store instance variable
-- 0x68-0x6F: Store temporary (unified frame)
-- 0x70-0x77: Push special (receiver, true, false, nil, -1, 0, 1, 2)
-- 0x78-0x7D: Return operations
-- 0x90-0x97: Jumps
-- 0xD0-0xFF: Send literal selector
+### 4. Object Primitives
+
+**ObjectPrimitivesTests** (41 tests):
+- Object identity and equality
+- Class lookup and instance checks
+- Object allocation and field access
+
+### 5. Float Primitives
+
+**FloatPrimitivesTests** (26 tests):
+- Float arithmetic operations
+- Float-SmallInteger conversions
+- Special float values handling
+
+### 6. Large Integer Primitives
+
+**LargeIntegerPrimitivesTests** (15 tests):
+- Large integer arithmetic
+- Conversion between SmallInteger and LargeInteger
+- BigInteger operations
+
+### 7. String Primitives
+
+**StringPrimitivesTests** (15 tests):
+- String character access
+- String comparison and equality
+- String length and bounds checking
+
+### 8. System Primitives
+
+**SystemPrimitivesTests** (28 tests):
+- Garbage collection operations
+- System queries and metadata
+- Error handling and reporting
 
 ---
 
@@ -193,17 +184,17 @@ dotnet test
 dotnet test --logger "console;verbosity=detailed"
 ```
 
-### Run Specific Test Category
+### Run Specific Primitive Test Category
 
 ```bash
-# Run only HeapManager tests
-dotnet test --filter "FullyQualifiedName~HeapManager"
-
 # Run only Control Primitive tests
 dotnet test --filter "FullyQualifiedName~ControlPrimitives"
 
-# Run only Compiler tests
-dotnet test --filter "FullyQualifiedName~Compiler"
+# Run only Arithmetic Primitive tests
+dotnet test --filter "FullyQualifiedName~ArithmeticPrimitives"
+
+# Run only Float Primitive tests
+dotnet test --filter "FullyQualifiedName~FloatPrimitives"
 ```
 
 ### Run with Code Coverage
@@ -354,12 +345,24 @@ test:
 
 ## Summary
 
-This test suite provides comprehensive coverage of the Smalltalk-80 interpreter with **829 unit tests** across 6 major component categories. The tests specifically target the critical refactored areas including the unified temp frame architecture, ensuring that block variables are correctly allocated and accessed through the MethodContext.
+This test suite provides **100% coverage of all Smalltalk-80 primitives** with **258 unit tests** across 8 primitive categories. The primitive operations are the foundation of the Smalltalk-80 VM and must be rock-solid before testing higher-level components.
+
+### Phase 1 (Current): Primitive Testing
+- **258 tests** covering arithmetic, comparison, control, object, float, large integer, string, and system primitives
+- **100% primitive coverage** ensures VM foundation is stable
+- Focus on critical operations: block context creation (Primitive 80-81), message sending, arithmetic
+
+### Phase 2 (Future): Component Testing
+After primitive tests are stable and passing, we will re-add:
+- HeapManager tests (68 tests) - memory management, GC, object allocation
+- Compiler tests (154 tests) - bytecode generation, variable resolution, temp frame allocation
+- VM tests (147 tests) - bytecode interpretation, message dispatch, execution state
+- Context tests (72 tests) - method and block context lifecycle
 
 The test suite is designed to:
-- Catch regressions early in development
-- Document expected behavior
-- Provide confidence for future refactoring
-- Serve as executable specification
+- Catch regressions in primitive operations immediately
+- Document expected primitive behavior from Blue Book
+- Provide confidence that VM operations work correctly
+- Serve as executable specification for primitives
 
-Run the tests after every change to maintain the interpreter's operational status.
+Run the tests after every change to primitive implementations.

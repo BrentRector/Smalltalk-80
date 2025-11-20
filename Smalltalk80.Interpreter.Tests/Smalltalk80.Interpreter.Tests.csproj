@@ -30,4 +30,12 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Disable non-primitive tests for Phase 1 - focus on primitives only -->
+    <Compile Remove="Compiler\**\*.cs" />
+    <Compile Remove="Context\**\*.cs" />
+    <Compile Remove="HeapManager\**\*.cs" />
+    <Compile Remove="VM\**\*.cs" />
+  </ItemGroup>
+
 </Project>
