@@ -223,9 +223,6 @@ public static class Program
                 var skipList = new HashSet<string>
                 {
                     "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
-                    "FormMenuView initialize",               // ❌ Pool variable 'Disk' not found in FilePool
-                    "ChangeListController initialize",       // ❌ CopyBits indexed word out of range
-                    "ParagraphEditor initialize",            // ❌ CopyBits indexed word out of range
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -306,9 +303,9 @@ public static class Program
                     // Order: Form → TextList → BitEditor (each tests more font functionality)
                     var runLastExpressions = new List<string>
                     {
-                        "Form initialize",      // Tests Form creation with glyphs
-                        "TextList initialize",  // Tests DefaultTextStyle copy
-                        "BitEditor initialize"  // Tests PopUpMenu labels: with font support
+                        "Form initialize",           // Tests Form creation with glyphs
+                        "TextList initialize",       // Tests DefaultTextStyle copy
+                        "BitEditor initialize"       // Tests PopUpMenu labels: with font support
                     };
 
                     var lastIndices = new List<int>();
@@ -335,12 +332,6 @@ public static class Program
                     }
                     // Add at end in order
                     phase1Indices.AddRange(lastIndices);
-
-                    Console.WriteLine($"\n=== Dependency-Ordered Init Expression Execution ===");
-                    Console.WriteLine($"  Total: {phase1Indices.Count} initialize expressions");
-                    Console.WriteLine($"  Order: SmallInteger → ... → Form → TextList → BitEditor (last)");
-                    Console.WriteLine($"  See: InitExpression-DependencyAnalysis.md");
-                    Console.WriteLine();
                 }
 
                 int succeeded = 0;
@@ -406,7 +397,6 @@ public static class Program
 
                 succeeded = 0;
                 failed = 0;
-                var successfulExpressions = new List<(int index, string source)>();
 
                 // Execute with per-expression status output
                 foreach (int index in reorderedIndices)
@@ -426,7 +416,6 @@ public static class Program
                     if (result.Status == InitStatus.Success)
                     {
                         succeeded++;
-                        successfulExpressions.Add((index, expr.Source ?? ""));
 
                         // For Block test classes and diagnostic tests, show the actual return value
                         if (expr.Source != null && ((expr.Source.Contains("Block") && expr.Source.Contains("Test")) || expr.Source.Contains("Diag")))
@@ -469,14 +458,6 @@ public static class Program
                         }
 
                         Console.WriteLine($"\n✓ Successfully executed {succeeded} expression(s) before this failure");
-                        if (successfulExpressions.Count > 0)
-                        {
-                            Console.WriteLine($"\nSuccessful expressions:");
-                            foreach (var (idx, source) in successfulExpressions)
-                            {
-                                Console.WriteLine($"  [{idx}] {source}");
-                            }
-                        }
 
                         // FAIL FAST - stop execution here
                         Console.WriteLine($"\n⚠️  Execution stopped at first failure to enable debugging");
