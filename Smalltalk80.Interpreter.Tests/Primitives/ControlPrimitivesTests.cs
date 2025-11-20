@@ -1081,13 +1081,27 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var primitive = new ControlPrimitives.Signal();
         var mockHeap = CreateMockHeapManager();
         var semaphoreOOP = ObjectOOP(100);
+        var semaphoreClassOOP = ObjectOOP(200);
+        var nonSmallIntOOP = ObjectOOP(999);  // Non-SmallInteger OOP
 
         SetupClassName(mockHeap, semaphoreOOP, "Semaphore");
+        mockHeap.Setup(h => h.GetClassOOP(semaphoreOOP)).Returns(semaphoreClassOOP);
 
         var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        // Setup field indices for Semaphore fields
+        mockRuntime.Setup(r => r.GetFieldIndex(semaphoreClassOOP, "firstLink")).Returns(0);
+        mockRuntime.Setup(r => r.GetFieldIndex(semaphoreClassOOP, "excessSignals")).Returns(1);
+
+        // firstLink is nil (no processes waiting)
+        mockHeap.Setup(h => h.GetInstanceVariable(semaphoreOOP, 0))
+            .Returns(SpecialObjectsArray.Instance.Nil);
+
+        // excessSignals is not a SmallInteger (should cause failure)
+        mockHeap.Setup(h => h.GetInstanceVariable(semaphoreOOP, 1))
+            .Returns(nonSmallIntOOP);
+
         var context = CreateContext(semaphoreOOP, [], mockHeap.Object, mockRuntime.Object);
 
-        // This test verifies that GetFieldIndex returns -1, causing the primitive to fail
         var result = primitive.Execute(context);
 
         AssertFailure(result);
