@@ -41,7 +41,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
     public SmalltalkOOP ExecuteLegacy(int primitiveNumber, IPrimitiveContext ctx, SmalltalkOOP receiver, SmalltalkOOP[] args)
     {
         // Call extended version with no extra dependencies
-        return ExecuteLegacyExtended(primitiveNumber, ctx, receiver, args, null, null);
+        return ExecuteLegacyExtended(primitiveNumber, ctx, receiver, args, null, null, metadata: null);
     }
 
     /// <summary>
@@ -58,7 +58,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         IContextManager? contextManager = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
-        IPrimitiveMessageSender? messageSender = null)
+        IPrimitiveMessageSender? messageSender = null,
+        VMMetadata? metadata = null)
     {
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
@@ -76,7 +77,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 contextManager: contextManager,
                 instructionPointer: instructionPointer,
                 cacheManager: cacheManager,
-                messageSender: messageSender
+                messageSender: messageSender,
+                metadata: metadata
             );
 
             var result = primitive.Execute(execContext);
