@@ -66,11 +66,9 @@ public class Phase5Orchestrator : IPhase
     {
         // Step 1: Apply patches
         _patchApplier.Apply(_context.Bundle.Patches);
-        TraceProcessorSchedulerClass("After Step 1 (Patches)");
 
         // Step 2: Create and populate USTable
         _ustableBuilder.Build();
-        TraceProcessorSchedulerClass("After Step 2 (USTable)");
 
         // Step 3: Install global variables in SystemDictionary
         _systemDictInstaller.InstallGlobals();
