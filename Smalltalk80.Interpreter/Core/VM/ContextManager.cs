@@ -80,39 +80,40 @@ internal class ContextManager(
         // See VMConstants.CONTEXT_* for field indices
         const int METHODCONTEXT_INSTANCE_VAR_COUNT = 6;
 
+        // TEMPORARILY DISABLED: Context pooling disabled for testing
         // Check class+size-specific pool for matching context
-        var poolKey = (methodContextClassOOP, stackSize);
-        if (_contextPools.TryGetValue(poolKey, out var pool) && pool.Count > 0)
-        {
-            contextOOP = pool.Pop();
-
-            // Verify pooled context is safe to reuse
-            if (contextOOP == _activeContextOOP || IsInSenderChain(contextOOP, _activeContextOOP))
-            {
-                // Active or in sender chain - put it back and allocate new
-                pool.Push(contextOOP);
-                contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
-                heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
-                _poolMisses++;  // Safety check failed, count as miss
-            }
-            else if (heapManager.GetClassOOP(contextOOP) != methodContextClassOOP)
-            {
-                // Class mismatch - pool corruption detected, discard and allocate new
-                contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
-                heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
-                _poolMisses++;  // Pool corruption, count as miss
-            }
-            else
-            {
-                _poolHits++;  // Successfully reused from pool
-            }
-        }
-        else
-        {
+        // var poolKey = (methodContextClassOOP, stackSize);
+        // if (_contextPools.TryGetValue(poolKey, out var pool) && pool.Count > 0)
+        // {
+        //     contextOOP = pool.Pop();
+        //
+        //     // Verify pooled context is safe to reuse
+        //     if (contextOOP == _activeContextOOP || IsInSenderChain(contextOOP, _activeContextOOP))
+        //     {
+        //         // Active or in sender chain - put it back and allocate new
+        //         pool.Push(contextOOP);
+        //         contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
+        //         heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
+        //         _poolMisses++;  // Safety check failed, count as miss
+        //     }
+        //     else if (heapManager.GetClassOOP(contextOOP) != methodContextClassOOP)
+        //     {
+        //         // Class mismatch - pool corruption detected, discard and allocate new
+        //         contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
+        //         heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
+        //         _poolMisses++;  // Pool corruption, count as miss
+        //     }
+        //     else
+        //     {
+        //         _poolHits++;  // Successfully reused from pool
+        //     }
+        // }
+        // else
+        // {
             contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
             heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
             _poolMisses++;  // Pool empty or doesn't exist
-        }
+        // }
 
         // Increment context depth and check limit
         _activeContextCount++;
