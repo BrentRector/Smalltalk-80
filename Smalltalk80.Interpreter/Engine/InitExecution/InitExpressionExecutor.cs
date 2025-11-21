@@ -292,13 +292,14 @@ public class InitExpressionExecutor
 
             // STEP 7: Run GC - SHOULD collect (MethodContext, CompiledMethod, ByteArray no longer reachable)
             Console.WriteLine($"\n[STEP 7] Running GC (SHOULD collect init expression)...");
+            Console.WriteLine($"  [DEBUG] Expected to collect: CompiledMethod {compiledMethodOOP}, MethodContext {methodContextOOP}");
             var gcStatsAfter = _heapManager.GC.GarbageCollect();
             Console.WriteLine($"  GC collected {gcStatsAfter.CollectedObjects} objects (expected 3 - MethodContext, CompiledMethod, ByteArray)");
 
             // Show what was collected
             if (gcStatsAfter.CollectedObjects > 0)
             {
-                Console.WriteLine($"  [DEBUG] Collected objects:");
+                Console.WriteLine($"  [DEBUG] Actually collected:");
                 foreach (var obj in gcStatsAfter.CollectedObjectDetails.Take(10))
                 {
                     Console.WriteLine($"    {obj.oop} (class: {obj.className ?? "unknown"})");
@@ -306,14 +307,26 @@ public class InitExpressionExecutor
             }
 
             // Verify the CompiledMethod was collected
-            if (IsObjectAlive(compiledMethodOOP))
+            bool compiledMethodAlive = IsObjectAlive(compiledMethodOOP);
+            bool methodContextAlive = IsObjectAlive(methodContextOOP);
+
+            if (compiledMethodAlive)
             {
-                Console.WriteLine($"  ⚠️  WARNING: CompiledMethod still alive (should have been collected)");
-                Console.WriteLine($"  This may indicate the method is still referenced somewhere");
+                Console.WriteLine($"  ❌ CRITICAL: CompiledMethod {compiledMethodOOP} still ALIVE (should have been collected!)");
+                Console.WriteLine($"     This indicates the method is still referenced somewhere (VM cache? Process?)");
             }
             else
             {
-                Console.WriteLine($"  ✓ CompiledMethod collected (correctly unreachable)");
+                Console.WriteLine($"  ✓ CompiledMethod {compiledMethodOOP} collected (correctly unreachable)");
+            }
+
+            if (methodContextAlive)
+            {
+                Console.WriteLine($"  ❌ CRITICAL: MethodContext {methodContextOOP} still ALIVE (should have been collected!)");
+            }
+            else
+            {
+                Console.WriteLine($"  ✓ MethodContext {methodContextOOP} collected (correctly unreachable)");
             }
 
             stopwatch.Stop();
