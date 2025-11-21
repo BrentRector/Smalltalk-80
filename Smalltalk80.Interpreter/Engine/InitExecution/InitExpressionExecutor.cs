@@ -228,6 +228,16 @@ public class InitExpressionExecutor
 
             // STEP 4: Run GC - should NOT collect (reachable via activeProcess → suspendedContext → method)
             Console.WriteLine($"\n[STEP 4] Running GC (should NOT collect init expression)...");
+
+            // Check oop=6750's class reference BEFORE GC
+            var trackedOOP = new SmalltalkOOP(6750);
+            if (_heapManager.IsValidObjectOOP(trackedOOP))
+            {
+                var classOOP = _heapManager.GetClassOOP(trackedOOP);
+                var className = _heapManager.GetClassName(trackedOOP);
+                Console.WriteLine($"  [BEFORE GC] oop=6750 class={classOOP}, className=\"{className}\"");
+            }
+
             var gcStatsBefore = _heapManager.GC.GarbageCollect();
             Console.WriteLine($"  GC collected {gcStatsBefore.CollectedObjects} objects (expected 0 - everything reachable)");
 

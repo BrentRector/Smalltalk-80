@@ -614,7 +614,11 @@ public class Phase3_ObjectAllocation : IPhase
 
             if (trackedOOPs.Contains(symbolOOP))
             {
-                Console.WriteLine($"[PHASE3 CLASS FIX] Set class reference for tracked symbol {symbolOOP} (index={index}) to Symbol class");
+                // Verify the class reference was set correctly
+                var verifyClassOOP = _heapManager.GetClassOOP(symbolOOP);
+                var verifyClassName = _heapManager.GetClassName(symbolOOP);
+                Console.WriteLine($"[PHASE3 CLASS FIX] Set class reference for tracked symbol {symbolOOP} (index={index})");
+                Console.WriteLine($"  symbolClassOOP={symbolClassOOP}, verified class={verifyClassOOP}, className=\"{verifyClassName}\"");
             }
         }
 
