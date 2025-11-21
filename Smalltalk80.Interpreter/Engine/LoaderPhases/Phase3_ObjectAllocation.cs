@@ -287,10 +287,14 @@ public class Phase3_ObjectAllocation : IPhase
 
         // Set specific values
         _allocator.SetInstanceVariable(processOOP, priorityIndex, SmalltalkOOP.FromSmallInteger(4));  // priority = 4 (UserSchedulingPriority)
+        // NOTE: suspendedContext remains nil (set above in the loop)
 
         // Set activeProcess
         _allocator.SetInstanceVariable(processorSchedulerOOP, activeProcessIndex, processOOP);
         _initializedFields.Add((processorSchedulerOOP, activeProcessIndex));
+
+        Console.WriteLine($"  [Phase 3] Created initial Process {processOOP} with priority=4, suspendedContext=nil");
+        Console.WriteLine($"  [Phase 3] Set Processor.activeProcess = {processOOP}");
     }
 
     /// <summary>
