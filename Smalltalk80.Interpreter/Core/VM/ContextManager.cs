@@ -29,8 +29,9 @@ internal class ContextManager(
     private int _activeContextCount;
     private const int MaxContextDepth = 5000;
 
-    // Context pooling - reuse recently returned contexts to reduce GC pressure
-    private readonly Dictionary<int, Stack<SmalltalkOOP>> _contextPools = [];
+    // Context pooling - separate pools for MethodContext and BlockContext by size
+    // Key: (classOOP, size), Value: Stack of context OOPs
+    private readonly Dictionary<(SmalltalkOOP classOOP, int size), Stack<SmalltalkOOP>> _contextPools = [];
     private const int MaxPooledContextsPerSize = 20;
 
     // Pool statistics - track hit rate
@@ -79,8 +80,9 @@ internal class ContextManager(
         // See VMConstants.CONTEXT_* for field indices
         const int METHODCONTEXT_INSTANCE_VAR_COUNT = 6;
 
-        // Check size-specific pool for matching context
-        if (_contextPools.TryGetValue(stackSize, out var pool) && pool.Count > 0)
+        // Check class+size-specific pool for matching context
+        var poolKey = (methodContextClassOOP, stackSize);
+        if (_contextPools.TryGetValue(poolKey, out var pool) && pool.Count > 0)
         {
             contextOOP = pool.Pop();
 
@@ -217,11 +219,15 @@ internal class ContextManager(
             return;
         }
 
+        // Get context class and size for pool key
+        SmalltalkOOP classOOP = heapManager.GetClassOOP(contextOOP);
         int size = heapManager.GetIndexedSize(contextOOP);
-        if (!_contextPools.TryGetValue(size, out var poolForSize))
+        var poolKey = (classOOP, size);
+
+        if (!_contextPools.TryGetValue(poolKey, out var poolForSize))
         {
             poolForSize = new Stack<SmalltalkOOP>();
-            _contextPools[size] = poolForSize;
+            _contextPools[poolKey] = poolForSize;
         }
 
         if (poolForSize.Count < MaxPooledContextsPerSize)
@@ -279,7 +285,7 @@ internal class ContextManager(
     {
         // Calculate total contexts in all pools
         int totalPooled = 0;
-        foreach (var (size, pool) in _contextPools)
+        foreach (var (key, pool) in _contextPools)
         {
             totalPooled += pool.Count;
         }
@@ -312,7 +318,7 @@ internal class ContextManager(
     /// </summary>
     private void ClearAllPools()
     {
-        foreach (var (size, pool) in _contextPools)
+        foreach (var (key, pool) in _contextPools)
         {
             pool.Clear();
         }
