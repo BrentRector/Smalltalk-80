@@ -242,7 +242,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         {
             string className = GetClassName(objectOOP) ?? "UnknownClass";
             throw new ArgumentOutOfRangeException(nameof(index),
-                $"Instance variable index {index} (index) out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
+                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
         }
 
         return ReadSlot(entry, 1 + index);
@@ -265,7 +265,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         {
             string className = GetClassName(objectOOP) ?? "UnknownClass";
             throw new ArgumentOutOfRangeException(nameof(index),
-                $"Instance variable index {index} (index) out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
+                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
         }
 
         WriteSlot(entry, 1 + index, value);
@@ -284,7 +284,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         {
             string className = GetClassName(objectOOP) ?? "UnknownClass";
             throw new ArgumentOutOfRangeException(nameof(index),
-                $"Instance variable index {index} (index) out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
+                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
         }
 
         WriteSlot(entry, 1 + index, value);
