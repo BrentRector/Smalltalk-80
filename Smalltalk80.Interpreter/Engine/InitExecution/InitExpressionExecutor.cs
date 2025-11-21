@@ -341,8 +341,8 @@ public class InitExpressionExecutor
         // Total: 4 instance variables (nextLink, suspendedContext, priority, myList)
         const int PROCESS_INSTANCE_VAR_COUNT = 4;
 
-        // Allocate Process object
-        var processOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
+        // Allocate Process object (fixed size, not indexed)
+        var processOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
         _heapManager.SetClassOOP(processOOP, processClassOOP);
 
         // Set instance variables using fixed indices from VMConstants
