@@ -810,26 +810,18 @@ public class Phase6_ValidationAndGC : IPhase
         // Update report metrics
         _report.Metrics.TotalObjectsAllocated = gcStats.TotalObjects;
         _report.Metrics.TotalObjectsReachable = gcStats.LiveObjects;
+        _report.Metrics.GCPassed = (gcStats.CollectedObjects == 1);
 
-        // Cold start expects FEW collected objects:
-        // 1) Placeholder nil from heap manager initialization (always 1)
-        // 2) Test init expression method + bytecodes compiled in Phase 4 (3-5 objects)
-        // Total expected: 4-6 objects
-        // Note: InitExpressionMethods array is NOT a GC root, so test expression should be collected
-        int expectedMin = 3;
-        int expectedMax = 10;
-        _report.Metrics.GCPassed = (gcStats.CollectedObjects >= expectedMin && gcStats.CollectedObjects <= expectedMax);
-
-        Console.WriteLine($"  GC collected {gcStats.CollectedObjects} objects (expected {expectedMin}-{expectedMax})");
-        Console.WriteLine($"  - Should include: placeholder nil + test init expression method + bytecodes");
-
-        if (gcStats.CollectedObjects < expectedMin || gcStats.CollectedObjects > expectedMax)
+        // Cold start expects exactly 1 collected object (the placeholder nil from heap manager initialization)
+        // After become: swaps the placeholder with the real UndefinedObject, the placeholder becomes unreachable
+        // NOTE: No init expressions compiled during cold start, so no other objects to collect
+        if (gcStats.CollectedObjects != 1)
         {
             _diagnostics?.Emit(new DiagnosticMessageEvent
             {
                 Severity = MessageSeverity.Error,
                 Category = "Phase6",
-                Message = $"COLD START FAILED: GC collected {gcStats.CollectedObjects} objects! Expected {expectedMin}-{expectedMax} objects (placeholder nil + test init expression).",
+                Message = $"COLD START FAILED: GC collected {gcStats.CollectedObjects} objects! Expected exactly 1 object (placeholder nil after become:).",
                 Timestamp = Stopwatch.GetTimestamp(),
                 InstructionCount = 0
             });
@@ -960,7 +952,7 @@ public class Phase6_ValidationAndGC : IPhase
 
             throw new InvalidOperationException(
                 $"COLD START BUG: GC collected {gcStats.CollectedObjects} objects. " +
-                $"Expected {expectedMin}-{expectedMax} objects (placeholder nil + test init expression).");
+                $"Expected exactly 1 object (placeholder nil after become:).");
         }
 
 // Console.WriteLine($"  ✓ GC Verification passed: {gcStats.LiveObjects} objects reachable, 1 placeholder nil collected as expected");

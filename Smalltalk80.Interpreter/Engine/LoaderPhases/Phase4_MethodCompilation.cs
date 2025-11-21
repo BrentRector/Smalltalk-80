@@ -689,75 +689,17 @@ public class Phase4_MethodCompilation : IPhase
 
     private void CreateInitExpressionMethods()
     {
-        if (_bundle.InitExpressions.Length == 0)
+        // NEW APPROACH: Don't compile ANY init expressions during cold start!
+        // They will be compiled on-demand during execution when they're reachable
+        // via Processor.activeProcess. This avoids GC collection issues.
+
+        if (_bundle.InitExpressions.Length > 0)
         {
-            // No init expressions - leave as default
-            _initExpressionMethods = default;
-            return;
+            Console.WriteLine($"  NOTE: Skipping init expression compilation (will compile on-demand)");
+            Console.WriteLine($"  Total init expressions in bundle: {_bundle.InitExpressions.Length}");
         }
 
-        // NEW APPROACH: Don't pre-compile ALL init expressions (they would be collected by GC)
-        // Instead, compile just ONE test expression to validate Phase 4 machinery
-        // Init expressions will be compiled on-demand during execution when they're
-        // reachable via Processor.activeProcess
-
-        Console.WriteLine($"  NOTE: Compiling ONLY first init expression (on-demand compilation for others)");
-        Console.WriteLine($"  Total init expressions in bundle: {_bundle.InitExpressions.Length}");
-
-        // Look up CompiledMethod and ByteArray classes
-        if (!_localIdToObjectId.TryGetValue("class:CompiledMethod", out var compiledMethodClassOOP))
-        {
-            throw new InvalidOperationException("CompiledMethod class not found in _localIdToObjectId");
-        }
-
-        if (!_localIdToObjectId.TryGetValue("class:ByteArray", out var byteArrayClassOOP))
-        {
-            throw new InvalidOperationException("ByteArray class not found in _localIdToObjectId");
-        }
-
-        var initExprMethods = new List<SmalltalkOOP>();
-
-        // Compile ONLY the first init expression as a test
-        var expr = _bundle.InitExpressions[0];
-
-        Console.WriteLine($"  Compiling test expression: {expr.Source}");
-
-        // Resolve literals using the SAME canonicalization mechanism as regular methods
-        var literalOOPs = expr.Literals.Select(_literalResolver.ResolveLiteralValueAsOOP).ToArray();
-
-        // Determine homeClass from the resolved literals (not by parsing source!)
-        // Init expressions like "BinaryChoiceView initialize" have first literal = Association for the class
-        // We extract the metaclass from the Association's value
-        string homeClassLocalId = ExtractHomeClassFromInitExpression(expr, literalOOPs);
-
-        // Create a CompiledMethod object for the init expression
-        var bytecodes = ClassHierarchyTraversal.DecodeBytecodes(expr.Bytecodes);
-        SmalltalkOOP initMethodOOP = CreateCompiledMethod(
-            new MethodDescriptor
-            {
-                LocalId = expr.LocalId,
-                HomeClassLocalId = homeClassLocalId,
-                SelectorIndex = 0,
-                Header = expr.Header,
-                Literals = [],
-                Bytecodes = expr.Bytecodes
-            },
-            literalOOPs,
-            bytecodes,
-            compiledMethodClassOOP,
-            byteArrayClassOOP);
-
-        initExprMethods.Add(initMethodOOP);
-        _localIdToObjectId[expr.LocalId] = initMethodOOP;
-
-        Console.WriteLine($"  ✓ Compiled 1/{_bundle.InitExpressions.Length} init expressions");
-
-        // Create array to hold the test init expression method
-        var arrayClassOOP = _localIdToObjectId["class:Array"];
-        var initArrayOOP = _allocator.AllocateArray(arrayClassOOP, 1);
-        _allocator.SetIndexedOOP(initArrayOOP, 0, initExprMethods[0]);
-
-        // Store for ColdStartOrchestrator to pass to BuildVMMetadata
-        _initExpressionMethods = initArrayOOP;
+        // Set to nil - no pre-compiled init expressions
+        _initExpressionMethods = _heapManager.GetNil();
     }
 }
