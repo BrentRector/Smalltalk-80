@@ -136,6 +136,7 @@ public class InitExpressionExecutor
 
             // Step 3: Create MethodContext for init expression
             SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
+            Console.WriteLine($"[ExecuteInitExpression] methodContextOOP returned={methodContextOOP}");
 
             // Step 4: Create Process with this context
             SmalltalkOOP processOOP = CreateProcess(methodContextOOP, priority: 4);
@@ -256,6 +257,10 @@ public class InitExpressionExecutor
         {
             _heapManager.SetIndexedOOP(contextOOP, i, _heapManager.GetNil());
         }
+
+        // DEBUG: Verify what we're returning
+        Console.WriteLine($"[CreateMethodContext] Created contextOOP={contextOOP}");
+        Console.WriteLine($"[CreateMethodContext] context class={_heapManager.GetClassName(contextOOP)}");
 
         return contextOOP;
     }
