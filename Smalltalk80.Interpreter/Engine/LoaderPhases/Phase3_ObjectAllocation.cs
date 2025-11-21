@@ -183,13 +183,18 @@ public class Phase3_ObjectAllocation : IPhase
         // - initialNilOOP now contains the real UndefinedObject data
         // - realNilOOP now contains the placeholder data (which we don't care about)
         // - All objects allocated in Phase1/2 that reference initialNilOOP now see the real nil
+        Console.WriteLine($"  [Phase 3] Before become: initialNilOOP={initialNilOOP}, realNilOOP={realNilOOP}");
         var heap = (ISmalltalkHeap)_heapManager;
         heap.Become.BecomeTwoWay(initialNilOOP, realNilOOP);
+        Console.WriteLine($"  [Phase 3] After become: placeholder nil OOP={realNilOOP} (should be collected by Phase 6 GC)");
 
         // Register the initial nil OOP (which now points to real UndefinedObject after Become)
         GlobalRegistry.Register("nil", initialNilOOP);
         GlobalRegistry.Register("true", trueOOP);
         GlobalRegistry.Register("false", falseOOP);
+
+        // Track placeholder nil OOP for GC verification in Phase 6
+        GlobalRegistry.Register("_placeholderNil", realNilOOP);
 
         // Initialize SystemDictionary slots with nil (created in Phase 2 but couldn't be initialized until now)
         InitializeSystemDictionaryWithNil(initialNilOOP);

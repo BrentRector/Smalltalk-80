@@ -185,11 +185,11 @@ public class InitExpressionExecutor
     /// Executes an init expression with on-demand compilation and GC verification.
     /// This method:
     /// 1. Compiles the init expression from bundle on-demand
-    /// 2. Wires it to Processor.activeProcess
-    /// 3. Runs GC to verify it's NOT collected (reachable via activeProcess)
+    /// 2. Creates a MethodContext and wires it to the existing activeProcess.suspendedContext
+    /// 3. Runs GC to verify init expression NOT collected (reachable via Processor → activeProcess → suspendedContext → method)
     /// 4. Executes the init expression
-    /// 5. Unwires from activeProcess
-    /// 6. Runs GC to verify it IS collected (no longer reachable)
+    /// 5. Clears Process.suspendedContext (Process remains as activeProcess)
+    /// 6. Runs GC to verify init expression IS collected (MethodContext, CompiledMethod, ByteArray now unreachable)
     /// </summary>
     public InitResult ExecuteInitExpressionOnDemand(
         InitExpression expr,
@@ -209,25 +209,27 @@ public class InitExpressionExecutor
             SmalltalkOOP compiledMethodOOP = compiler.CompileInitExpression(expr);
             Console.WriteLine($"  ✓ Compiled method: {compiledMethodOOP}");
 
-            // STEP 2: Create MethodContext and Process
-            Console.WriteLine($"\n[STEP 2] Creating MethodContext and Process...");
+            // STEP 2: Create MethodContext
+            Console.WriteLine($"\n[STEP 2] Creating MethodContext...");
             SmalltalkOOP receiverOOP = GetCanonicalReceiverForDoIt();
             SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
-            SmalltalkOOP processOOP = CreateProcess(methodContextOOP, priority: 4);
-            Console.WriteLine($"  ✓ Process created: {processOOP}");
             Console.WriteLine($"  ✓ MethodContext: {methodContextOOP}");
             Console.WriteLine($"  ✓ CompiledMethod: {compiledMethodOOP}");
 
-            // STEP 3: Wire to Processor.activeProcess
-            Console.WriteLine($"\n[STEP 3] Wiring to Processor.activeProcess...");
+            // STEP 3: Get existing activeProcess and wire MethodContext to it
+            Console.WriteLine($"\n[STEP 3] Wiring MethodContext to existing activeProcess...");
             var schedulerOOP = _metadata.ProcessorScheduler;
-            _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, processOOP);
-            Console.WriteLine($"  ✓ Set Processor.activeProcess = {processOOP}");
+            SmalltalkOOP processOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+            Console.WriteLine($"  Found existing activeProcess: {processOOP}");
 
-            // STEP 4: Run GC - should NOT collect (reachable via activeProcess)
+            // Set the process's suspendedContext to our new MethodContext
+            _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, methodContextOOP);
+            Console.WriteLine($"  ✓ Set Process.suspendedContext = {methodContextOOP}");
+
+            // STEP 4: Run GC - should NOT collect (reachable via activeProcess → suspendedContext → method)
             Console.WriteLine($"\n[STEP 4] Running GC (should NOT collect init expression)...");
             var gcStatsBefore = _heapManager.GC.GarbageCollect();
-            Console.WriteLine($"  GC collected {gcStatsBefore.CollectedObjects} objects");
+            Console.WriteLine($"  GC collected {gcStatsBefore.CollectedObjects} objects (expected 0 - everything reachable)");
 
             // Verify the CompiledMethod is still alive
             if (!IsObjectAlive(compiledMethodOOP))
@@ -273,15 +275,15 @@ public class InitExpressionExecutor
                 return InitResult.Exception(expr.LocalId, sex.ExceptionOop, sex.Message, stackTrace, stopwatch.ElapsedMilliseconds);
             }
 
-            // STEP 6: Unwire from Processor.activeProcess
-            Console.WriteLine($"\n[STEP 6] Unwiring from Processor.activeProcess...");
-            _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, _heapManager.GetNil());
-            Console.WriteLine($"  ✓ Cleared Processor.activeProcess");
+            // STEP 6: Clear the Process's suspendedContext
+            Console.WriteLine($"\n[STEP 6] Clearing Process.suspendedContext...");
+            _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, _heapManager.GetNil());
+            Console.WriteLine($"  ✓ Cleared Process.suspendedContext (Process {processOOP} remains active)");
 
-            // STEP 7: Run GC - SHOULD collect (no longer reachable)
+            // STEP 7: Run GC - SHOULD collect (MethodContext, CompiledMethod, ByteArray no longer reachable)
             Console.WriteLine($"\n[STEP 7] Running GC (SHOULD collect init expression)...");
             var gcStatsAfter = _heapManager.GC.GarbageCollect();
-            Console.WriteLine($"  GC collected {gcStatsAfter.CollectedObjects} objects");
+            Console.WriteLine($"  GC collected {gcStatsAfter.CollectedObjects} objects (expected 3 - MethodContext, CompiledMethod, ByteArray)");
 
             // Verify the CompiledMethod was collected
             if (IsObjectAlive(compiledMethodOOP))
