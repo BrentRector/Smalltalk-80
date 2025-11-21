@@ -285,6 +285,7 @@ public class StringPrimitivesTests : PrimitiveTestBase
         var primitive = new StringPrimitives.AsSymbol();
         var mockHeap = CreateMockHeapManager();
         var stringOOP = ObjectOOP(100);
+        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
 
         byte[] bytes = System.Text.Encoding.Latin1.GetBytes("unknown");
         SetupIndexedSize(mockHeap, stringOOP, bytes.Length);
@@ -294,7 +295,7 @@ public class StringPrimitivesTests : PrimitiveTestBase
         }
 
         var mockRuntime = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
-        mockRuntime.Setup(r => r.InternSymbol("unknown")).Returns(Nil);
+        mockRuntime.Setup(r => r.InternSymbol("unknown")).Returns(nilOOP);
 
         var context = CreateContext(
             stringOOP,

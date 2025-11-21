@@ -1094,8 +1094,9 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         mockRuntime.Setup(r => r.GetFieldIndex(semaphoreClassOOP, "excessSignals")).Returns(1);
 
         // firstLink is nil (no processes waiting)
+        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
         mockHeap.Setup(h => h.GetInstanceVariable(semaphoreOOP, 0))
-            .Returns(Nil);
+            .Returns(nilOOP);
 
         // excessSignals is not a SmallInteger (should cause failure)
         mockHeap.Setup(h => h.GetInstanceVariable(semaphoreOOP, 1))

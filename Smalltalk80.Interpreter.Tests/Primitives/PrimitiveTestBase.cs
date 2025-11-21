@@ -30,46 +30,67 @@ public abstract class PrimitiveTestBase
     }
 
     /// <summary>
-    /// Test metadata with known objects for primitive testing.
+    /// Creates test metadata with allocated objects from a real heap.
+    /// Use this when primitives need actual VMMetadata with valid OOPs.
     /// </summary>
-    protected static readonly VMMetadata TestMetadata = new VMMetadata
+    protected static VMMetadata CreateTestMetadata(SmalltalkHeapManager heap)
     {
-        // Known objects for Nil, True, False, Smalltalk
-        KnownObjects = new KnownObjects(
-            nil: SmalltalkOOP.FromObjectTableIndex(0),      // Nil
-            @true: SmalltalkOOP.FromObjectTableIndex(1),     // True
-            @false: SmalltalkOOP.FromObjectTableIndex(2),    // False
-            smalltalk: SmalltalkOOP.FromObjectTableIndex(3)  // Smalltalk dictionary
-        ),
-        ProcessorScheduler = SmalltalkOOP.FromObjectTableIndex(4),
+        // Allocate actual objects in the heap
+        var nilOOP = heap.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        var trueOOP = heap.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        var falseOOP = heap.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        var smalltalkOOP = heap.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        var processorSchedulerOOP = heap.AllocateObject(ObjectFormat.Pointer, 0, 0);
 
-        // Class field indices (standard Blue Book layout)
-        ClassNameFieldIndex = 6,
-        ClassSuperclassFieldIndex = 0,
-        ClassMethodDictFieldIndex = 1,
-        ClassFormatFieldIndex = 2,
+        // Allocate class objects
+        var classClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var metaclassClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 6, 0);
+        var symbolClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var stringClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var arrayClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var compiledMethodClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var smallIntegerClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var blockContextClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
 
-        // Metaclass field index
-        MetaclassThisClassFieldIndex = 5,
+        return new VMMetadata
+        {
+            KnownObjects = new KnownObjects(
+                nil: nilOOP,
+                @true: trueOOP,
+                @false: falseOOP,
+                smalltalk: smalltalkOOP
+            ),
+            ProcessorScheduler = processorSchedulerOOP,
 
-        // MethodDictionary field indices
-        MethodDictTallyFieldIndex = 0,
-        MethodDictKeysFieldIndex = 1,
-        MethodDictValuesFieldIndex = 2,
+            // Class field indices (standard Blue Book layout)
+            ClassNameFieldIndex = 6,
+            ClassSuperclassFieldIndex = 0,
+            ClassMethodDictFieldIndex = 1,
+            ClassFormatFieldIndex = 2,
 
-        // Well-known class OOPs (test dummy values)
-        ClassClassOOP = SmalltalkOOP.FromObjectTableIndex(10),
-        MetaclassClassOOP = SmalltalkOOP.FromObjectTableIndex(11),
-        SymbolClassOOP = SmalltalkOOP.FromObjectTableIndex(12),
-        StringClassOOP = SmalltalkOOP.FromObjectTableIndex(13),
-        ArrayClassOOP = SmalltalkOOP.FromObjectTableIndex(14),
-        CompiledMethodClassOOP = SmalltalkOOP.FromObjectTableIndex(15),
-        SmallIntegerClassOOP = SmalltalkOOP.FromObjectTableIndex(16),
-        BlockContextClassOOP = SmalltalkOOP.FromObjectTableIndex(17)
-    };
+            // Metaclass field index
+            MetaclassThisClassFieldIndex = 5,
+
+            // MethodDictionary field indices
+            MethodDictTallyFieldIndex = 0,
+            MethodDictKeysFieldIndex = 1,
+            MethodDictValuesFieldIndex = 2,
+
+            // Well-known class OOPs
+            ClassClassOOP = classClassOOP,
+            MetaclassClassOOP = metaclassClassOOP,
+            SymbolClassOOP = symbolClassOOP,
+            StringClassOOP = stringClassOOP,
+            ArrayClassOOP = arrayClassOOP,
+            CompiledMethodClassOOP = compiledMethodClassOOP,
+            SmallIntegerClassOOP = smallIntegerClassOOP,
+            BlockContextClassOOP = blockContextClassOOP
+        };
+    }
 
     /// <summary>
     /// Creates a PrimitiveExecutionContext with the specified receiver and arguments.
+    /// For tests that need metadata, call CreateTestMetadata() first and pass it in.
     /// </summary>
     protected static PrimitiveExecutionContext CreateContext(
         SmalltalkOOP receiver,
@@ -94,7 +115,7 @@ public abstract class PrimitiveTestBase
             instructionPointer: instructionPointer,
             cacheManager: cacheManager,
             messageSender: messageSender,
-            metadata: metadata ?? TestMetadata);
+            metadata: metadata);
     }
 
     /// <summary>
@@ -104,23 +125,13 @@ public abstract class PrimitiveTestBase
 
     /// <summary>
     /// Creates a non-SmallInteger OOP (object pointer) from a raw value.
+    /// Use this for test OOPs when you need valid OOP structures but don't need real heap objects.
     /// </summary>
     protected static SmalltalkOOP ObjectOOP(int rawValue) => new SmalltalkOOP(rawValue << 1);
 
-    /// <summary>
-    /// Gets the Nil OOP for testing (uses test metadata).
-    /// </summary>
-    protected static SmalltalkOOP Nil => TestMetadata.KnownObjects.Nil;
-
-    /// <summary>
-    /// Gets the True OOP for testing (uses test metadata).
-    /// </summary>
-    protected static SmalltalkOOP True => TestMetadata.KnownObjects.True;
-
-    /// <summary>
-    /// Gets the False OOP for testing (uses test metadata).
-    /// </summary>
-    protected static SmalltalkOOP False => TestMetadata.KnownObjects.False;
+    // NOTE: Tests that need Nil/True/False should either:
+    // 1. Create metadata with CreateTestMetadata() and use metadata.KnownObjects.Nil/True/False
+    // 2. Use ObjectOOP(n) to create test OOPs for mocking purposes
 
     /// <summary>
     /// Asserts that a PrimitiveResult is successful.

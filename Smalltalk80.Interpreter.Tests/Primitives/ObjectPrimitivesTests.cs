@@ -609,8 +609,9 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var primitive = new SimpleObjectPrimitives.SomeInstance();
         var mockHeap = CreateMockHeapManager();
         var classOOP = ObjectOOP(100);
+        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
 
-        mockHeap.Setup(h => h.FindInstanceOf(classOOP)).Returns(Nil);
+        mockHeap.Setup(h => h.FindInstanceOf(classOOP)).Returns(nilOOP);
 
         var context = CreateContext(classOOP, [], mockHeap.Object);
 
@@ -649,9 +650,10 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var mockHeap = CreateMockHeapManager();
         var objectOOP = ObjectOOP(100);
         var classOOP = ObjectOOP(50);
+        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
-        mockHeap.Setup(h => h.FindNextInstanceOf(classOOP, objectOOP)).Returns(Nil);
+        mockHeap.Setup(h => h.FindNextInstanceOf(classOOP, objectOOP)).Returns(nilOOP);
 
         var context = CreateContext(objectOOP, [], mockHeap.Object);
 
