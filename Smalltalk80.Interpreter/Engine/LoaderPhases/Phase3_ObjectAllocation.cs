@@ -651,11 +651,11 @@ public class Phase3_ObjectAllocation : IPhase
                 if (objectOOP.IsSmallInteger)
                     continue;
 
-                // Check if class pointer is unset (OOP(0) or nil)
+                // Check if class pointer is unset (nil)
                 var currentClassOOP = _allocator.GetSlot(objectOOP, 0);
 
-                // Skip if class pointer already set to a non-zero/non-nil value
-                if (currentClassOOP != default(SmalltalkOOP) && currentClassOOP != GlobalRegistry.Get("nil"))
+                // Skip if class pointer already set (not nil)
+                if (currentClassOOP != GlobalRegistry.Get("nil"))
                     continue;
 
                 // Check object format to determine class

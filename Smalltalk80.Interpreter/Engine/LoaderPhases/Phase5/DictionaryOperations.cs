@@ -38,7 +38,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
         {
             var probe = context.Allocator.GetIndexedOOP(dictionaryOOP, location);
 
-            if (probe == nilOOP || probe == default(SmalltalkOOP))
+            if (probe == nilOOP)
             {
                 // Found empty slot - install association
                 context.Allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);

@@ -183,10 +183,10 @@ public class InitExpressionExecutor
     {
         error = null;
 
-        // Basic validation - check it's not null
-        if (methodOOP == default(SmalltalkOOP))
+        // Basic validation - check it's not nil
+        if (methodOOP == _metadata.KnownObjects.Nil)
         {
-            error = "Method OOP is null (0)";
+            error = "Method OOP is nil";
             return false;
         }
 
