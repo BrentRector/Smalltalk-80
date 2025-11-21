@@ -199,49 +199,35 @@ public class InitExpressionExecutor
         var effectiveTimeout = timeoutMs ?? _defaultTimeoutMs;
         var stopwatch = Stopwatch.StartNew();
 
-        Console.WriteLine($"\n=== On-Demand Init Expression Execution ===");
-        Console.WriteLine($"Expression: {expr.Source}");
+        Console.Write($"  {expr.Source}...");
 
         try
         {
-            // STEP 1: Compile init expression on-demand
-            Console.WriteLine($"\n[STEP 1] Compiling init expression on-demand...");
+            // Compile init expression on-demand
             SmalltalkOOP compiledMethodOOP = compiler.CompileInitExpression(expr);
-            Console.WriteLine($"  ✓ Compiled method: {compiledMethodOOP}");
 
-            // STEP 2: Create MethodContext
-            Console.WriteLine($"\n[STEP 2] Creating MethodContext...");
+            // Create MethodContext
             SmalltalkOOP receiverOOP = GetCanonicalReceiverForDoIt();
             SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
-            Console.WriteLine($"  ✓ MethodContext: {methodContextOOP}");
-            Console.WriteLine($"  ✓ CompiledMethod: {compiledMethodOOP}");
 
-            // STEP 3: Get existing activeProcess and wire MethodContext to it
-            Console.WriteLine($"\n[STEP 3] Wiring MethodContext to existing activeProcess...");
+            // Get existing activeProcess and wire MethodContext to it
             var schedulerOOP = _metadata.ProcessorScheduler;
             SmalltalkOOP processOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
-            Console.WriteLine($"  Found existing activeProcess: {processOOP}");
 
             // Set the process's suspendedContext to our new MethodContext
             _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, methodContextOOP);
-            Console.WriteLine($"  ✓ Set Process.suspendedContext = {methodContextOOP}");
 
-            // STEP 4: Run GC - should NOT collect (reachable via activeProcess → suspendedContext → method)
-            Console.WriteLine($"\n[STEP 4] Running GC (should NOT collect init expression)...");
-
+            // Run GC - should NOT collect (reachable via activeProcess → suspendedContext → method)
             var gcStatsBefore = _heapManager.GC.GarbageCollect();
-            Console.WriteLine($"  GC collected {gcStatsBefore.CollectedObjects} objects (expected 0 - everything reachable)");
 
             // Verify the CompiledMethod is still alive
             if (!IsObjectAlive(compiledMethodOOP))
             {
-                Console.WriteLine($"  ❌ FAILED: CompiledMethod was collected! (should be reachable via activeProcess)");
+                Console.WriteLine($" ❌ FAILED (CompiledMethod collected during reachability check)");
                 return InitResult.FatalError(expr.LocalId, "CompiledMethod was incorrectly collected during GC");
             }
-            Console.WriteLine($"  ✓ CompiledMethod still alive (correctly reachable)");
 
-            // STEP 5: Execute the init expression
-            Console.WriteLine($"\n[STEP 5] Executing init expression...");
+            // Execute the init expression
             SmalltalkOOP resultOOP;
             try
             {
@@ -254,73 +240,53 @@ public class InitExpressionExecutor
                 {
                     resultOOP = ResumeProcess(processOOP);
                 }
-                Console.WriteLine($"  ✓ Execution succeeded, result: {resultOOP}");
             }
             catch (OperationCanceledException)
             {
                 stopwatch.Stop();
-                Console.WriteLine($"  ❌ Execution timed out");
+                Console.WriteLine($" ❌ TIMEOUT");
                 return InitResult.Timeout(expr.LocalId, stopwatch.ElapsedMilliseconds);
             }
             catch (PrimitiveFailureException pex)
             {
                 stopwatch.Stop();
-                Console.WriteLine($"  ❌ Primitive failure: {pex.Message}");
+                Console.WriteLine($" ❌ PRIMITIVE FAILURE: {pex.Message}");
                 return InitResult.PrimitiveFailure(expr.LocalId, pex.PrimitiveIndex, pex.Message, stopwatch.ElapsedMilliseconds);
             }
             catch (SmalltalkException sex)
             {
                 stopwatch.Stop();
-                Console.WriteLine($"  ❌ Smalltalk exception: {sex.Message}");
+                Console.WriteLine($" ❌ EXCEPTION: {sex.Message}");
                 string stackTrace = CaptureStackTrace(sex);
                 return InitResult.Exception(expr.LocalId, sex.ExceptionOop, sex.Message, stackTrace, stopwatch.ElapsedMilliseconds);
             }
 
-            // STEP 6: Clear the Process's suspendedContext
-            Console.WriteLine($"\n[STEP 6] Clearing Process.suspendedContext...");
+            // Clear the Process's suspendedContext
             _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, _heapManager.GetNil());
-            Console.WriteLine($"  ✓ Cleared Process.suspendedContext (Process {processOOP} remains active)");
 
-            // STEP 7: Run GC - SHOULD collect (MethodContext, CompiledMethod, ByteArray no longer reachable)
-            Console.WriteLine($"\n[STEP 7] Running GC (SHOULD collect init expression)...");
+            // Run GC - SHOULD collect (MethodContext, CompiledMethod, ByteArray no longer reachable)
             var gcStatsAfter = _heapManager.GC.GarbageCollect();
-            Console.WriteLine($"  GC collected {gcStatsAfter.CollectedObjects} objects (expected 3 - MethodContext, CompiledMethod, ByteArray)");
 
             // Verify the CompiledMethod was collected
             bool compiledMethodAlive = IsObjectAlive(compiledMethodOOP);
             bool methodContextAlive = IsObjectAlive(methodContextOOP);
 
-            if (compiledMethodAlive)
-            {
-                Console.WriteLine($"  ❌ CRITICAL: CompiledMethod {compiledMethodOOP} still ALIVE (should have been collected!)");
-                Console.WriteLine($"     This indicates the method is still referenced somewhere (VM cache? Process?)");
-            }
-            else
-            {
-                Console.WriteLine($"  ✓ CompiledMethod {compiledMethodOOP} collected (correctly unreachable)");
-            }
-
-            if (methodContextAlive)
-            {
-                Console.WriteLine($"  ❌ CRITICAL: MethodContext {methodContextOOP} still ALIVE (should have been collected!)");
-            }
-            else
-            {
-                Console.WriteLine($"  ✓ MethodContext {methodContextOOP} collected (correctly unreachable)");
-            }
-
             stopwatch.Stop();
-            Console.WriteLine($"\n=== Init Expression Execution Complete ===");
-            Console.WriteLine($"  Status: SUCCESS");
-            Console.WriteLine($"  Elapsed: {stopwatch.ElapsedMilliseconds}ms");
+
+            if (compiledMethodAlive || methodContextAlive)
+            {
+                Console.WriteLine($" ❌ FAILED (objects not collected)");
+                return InitResult.FatalError(expr.LocalId, $"CompiledMethod or MethodContext still alive after execution");
+            }
+
+            Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, GC: {gcStatsBefore.CollectedObjects}/{gcStatsAfter.CollectedObjects})");
 
             return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
-            Console.WriteLine($"\n=== Init Expression Execution Failed ===");
-            Console.WriteLine($"  Error: {ex.Message}");
+            Console.WriteLine($" ❌ ERROR: {ex.Message}");
             return InitResult.FatalError(expr.LocalId, $"{ex.GetType().Name}: {ex.Message}\n\nStack trace:\n{ex.StackTrace}");
         }
     }
