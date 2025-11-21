@@ -32,7 +32,7 @@ public class FontObjectBuilder
         // Allocate StrikeFont object
         var strikeFontOOP = _context.Allocator.AllocateFixedObject("StrikeFont");
         var strikeFontClassOOP = GlobalRegistry.LookupClassOOP("StrikeFont");
-        _context.Allocator.SetObjectClass(strikeFontOOP, strikeFontClassOOP);
+        _context.Allocator.SetClassOOP(strikeFontOOP, strikeFontClassOOP);
 
         // Initialize all fields to nil first
         int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("StrikeFont", _context.Bundle);
@@ -89,7 +89,7 @@ public class FontObjectBuilder
         // Allocate TextStyle object
         var textStyleOOP = _context.Allocator.AllocateFixedObject("TextStyle");
         var textStyleClassOOP = GlobalRegistry.LookupClassOOP("TextStyle");
-        _context.Allocator.SetObjectClass(textStyleOOP, textStyleClassOOP);
+        _context.Allocator.SetClassOOP(textStyleOOP, textStyleClassOOP);
 
         // Initialize all fields to nil first
         int instVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("TextStyle", _context.Bundle);
@@ -102,7 +102,7 @@ public class FontObjectBuilder
         // Create fontArray
         var fontArrayOOP = _context.Allocator.AllocateArray("Array", fonts.Length);
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        _context.Allocator.SetObjectClass(fontArrayOOP, arrayClassOOP);
+        _context.Allocator.SetClassOOP(fontArrayOOP, arrayClassOOP);
         for (int i = 0; i < fonts.Length; i++)
         {
             _context.Allocator.SetIndexedOOP(fontArrayOOP, i, fonts[i]);
@@ -136,12 +136,12 @@ public class FontObjectBuilder
         int wordCount = fontData.GlyphsBitmap.Length;
         var formOOP = _context.Allocator.AllocateObject("Form", ObjectFormat.Pointer, 4); // 4 named inst vars
         var formClassOOP = GlobalRegistry.LookupClassOOP("Form");
-        _context.Allocator.SetObjectClass(formOOP, formClassOOP);
+        _context.Allocator.SetClassOOP(formOOP, formClassOOP);
 
         // Create WordArray for bits
         var bitsOOP = _context.Allocator.AllocateObject("WordArray", ObjectFormat.WordIndexed, wordCount);
         var wordArrayClassOOP = GlobalRegistry.LookupClassOOP("WordArray");
-        _context.Allocator.SetObjectClass(bitsOOP, wordArrayClassOOP);
+        _context.Allocator.SetClassOOP(bitsOOP, wordArrayClassOOP);
 
         // Copy glyph data into WordArray
         for (int i = 0; i < wordCount; i++)
@@ -169,7 +169,7 @@ public class FontObjectBuilder
     {
         var arrayOOP = _context.Allocator.AllocateArray("Array", values.Length);
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        _context.Allocator.SetObjectClass(arrayOOP, arrayClassOOP);
+        _context.Allocator.SetClassOOP(arrayOOP, arrayClassOOP);
 
         for (int i = 0; i < values.Length; i++)
         {
@@ -187,7 +187,7 @@ public class FontObjectBuilder
         byte[] bytes = System.Text.Encoding.Latin1.GetBytes(value);
         var stringOOP = _context.Allocator.AllocateString("String", bytes.Length);
         var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
-        _context.Allocator.SetObjectClass(stringOOP, stringClassOOP);
+        _context.Allocator.SetClassOOP(stringOOP, stringClassOOP);
 
         for (int i = 0; i < bytes.Length; i++)
         {
@@ -204,7 +204,7 @@ public class FontObjectBuilder
     {
         var pointOOP = _context.Allocator.AllocateFixedObject("Point");
         var pointClassOOP = GlobalRegistry.LookupClassOOP("Point");
-        _context.Allocator.SetObjectClass(pointOOP, pointClassOOP);
+        _context.Allocator.SetClassOOP(pointOOP, pointClassOOP);
 
         SetInstanceVarByName(pointOOP, "Point", "x", SmalltalkOOP.FromSmallInteger(x));
         SetInstanceVarByName(pointOOP, "Point", "y", SmalltalkOOP.FromSmallInteger(y));
@@ -222,7 +222,7 @@ public class FontObjectBuilder
         var nilOOP = GlobalRegistry.Get("nil");
         var arrayOOP = _context.Allocator.AllocateArray("Array", 258);
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        _context.Allocator.SetObjectClass(arrayOOP, arrayClassOOP);
+        _context.Allocator.SetClassOOP(arrayOOP, arrayClassOOP);
 
         for (int i = 0; i < 258; i++)
         {
@@ -241,7 +241,7 @@ public class FontObjectBuilder
         int tabWidth = 24;
         var arrayOOP = _context.Allocator.AllocateArray("Array", tabCount);
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        _context.Allocator.SetObjectClass(arrayOOP, arrayClassOOP);
+        _context.Allocator.SetClassOOP(arrayOOP, arrayClassOOP);
 
         for (int i = 0; i < tabCount; i++)
         {

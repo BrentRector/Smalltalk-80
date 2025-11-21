@@ -178,7 +178,7 @@ internal class LiteralResolver(
         var stringOOP = _allocator.AllocateString(value);
         // Set String class reference (coldstart phases can use GlobalRegistry)
         var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
-        _allocator.SetObjectClass(stringOOP, stringClassOOP);
+        _allocator.SetClassOOP(stringOOP, stringClassOOP);
         return stringOOP;
     }
 
@@ -195,7 +195,7 @@ internal class LiteralResolver(
 
         // Set Float class reference
         var floatClassOOP = GlobalRegistry.LookupClassOOP("Float");
-        _allocator.SetObjectClass(floatOOP, floatClassOOP);
+        _allocator.SetClassOOP(floatOOP, floatClassOOP);
 
         return floatOOP;
     }
@@ -218,7 +218,7 @@ internal class LiteralResolver(
         var characterOOP = _allocator.AllocateFixedObject("Character");
         // Set Character class reference
         var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
-        _allocator.SetObjectClass(characterOOP, characterClassOOP);
+        _allocator.SetClassOOP(characterOOP, characterClassOOP);
 
         // Store the code point in the Character object
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
@@ -254,7 +254,7 @@ internal class LiteralResolver(
         var byteArrayOOP = _allocator.AllocateByteArray("ByteArray", bytes);
         // Set ByteArray class reference
         var byteArrayClassOOP = GlobalRegistry.LookupClassOOP("ByteArray");
-        _allocator.SetObjectClass(byteArrayOOP, byteArrayClassOOP);
+        _allocator.SetClassOOP(byteArrayOOP, byteArrayClassOOP);
 
         // Bytes already stored during allocation
 

@@ -100,7 +100,7 @@ internal class FieldValueResolver(
 
         // Set String class reference (since we're after class reference init)
         var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
-        allocator.SetObjectClass(stringOOP, stringClassOOP);
+        allocator.SetClassOOP(stringOOP, stringClassOOP);
 
         return stringOOP;
     }
@@ -120,7 +120,7 @@ internal class FieldValueResolver(
 
         // Set Character class reference
         var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
-        allocator.SetObjectClass(characterOOP, characterClassOOP);
+        allocator.SetClassOOP(characterOOP, characterClassOOP);
 
         return characterOOP;
     }
@@ -151,7 +151,7 @@ internal class FieldValueResolver(
 
         // Set ByteArray class reference
         var byteArrayClassOOP = GlobalRegistry.LookupClassOOP("ByteArray");
-        allocator.SetObjectClass(byteArrayOOP, byteArrayClassOOP);
+        allocator.SetClassOOP(byteArrayOOP, byteArrayClassOOP);
 
         return byteArrayOOP;
     }
@@ -187,7 +187,7 @@ internal class FieldValueResolver(
 
         // Set Float class reference
         var floatClassOOP = GlobalRegistry.LookupClassOOP("Float");
-        allocator.SetObjectClass(floatOOP, floatClassOOP);
+        allocator.SetClassOOP(floatOOP, floatClassOOP);
 
         return floatOOP;
     }

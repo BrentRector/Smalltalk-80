@@ -199,7 +199,7 @@ public class Phase3_ObjectAllocation : IPhase
 
         // CRITICAL: Set the class reference - AllocateFixedObject doesn't set it!
         var processorSchedulerClassOOP = GlobalRegistry.LookupClassOOP("ProcessorScheduler");
-        _allocator.SetObjectClass(processorSchedulerOOP, processorSchedulerClassOOP);
+        _allocator.SetClassOOP(processorSchedulerOOP, processorSchedulerClassOOP);
 
         GlobalRegistry.Register("ProcessorScheduler", processorSchedulerOOP);
 
@@ -249,7 +249,7 @@ public class Phase3_ObjectAllocation : IPhase
         for (int i = 0; i < 8; i++)
         {
             var linkedListOOP = _allocator.AllocateFixedObject("LinkedList");
-            _allocator.SetObjectClass(linkedListOOP, linkedListClassOOP);
+            _allocator.SetClassOOP(linkedListOOP, linkedListClassOOP);
             // Initialize all instance variables to nil
             for (int j = 0; j < linkedListInstVarCount; j++)
             {
@@ -266,7 +266,7 @@ public class Phase3_ObjectAllocation : IPhase
         // Use ClassHierarchyTraversal to get correct indices from bundle data
         var processClassOOP = GlobalRegistry.LookupClassOOP("Process");
         var processOOP = _allocator.AllocateFixedObject("Process");
-        _allocator.SetObjectClass(processOOP, processClassOOP);
+        _allocator.SetClassOOP(processOOP, processClassOOP);
 
         // Get instance variable indices from bundle (includes inherited variables)
         int suspendedContextIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Process", "suspendedContext", _bundle);

@@ -223,7 +223,7 @@ public class SystemDictionaryInstaller(
 
         // Allocate Dictionary with indexed slots for hash table entries
         var dictOOP = context.Allocator.AllocateArray("Dictionary", capacity);
-        context.Allocator.SetObjectClass(dictOOP, dictionaryClassOOP);
+        context.Allocator.SetClassOOP(dictOOP, dictionaryClassOOP);
 
         // Set tally to 0 (only named instance variable in Set/Dictionary)
         context.Allocator.SetInstanceVariable(dictOOP, 0, SmalltalkOOP.FromSmallInteger(0));

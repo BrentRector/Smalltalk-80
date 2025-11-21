@@ -52,7 +52,7 @@ public class DictionaryService
 
         // Set Association class reference
         var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        _allocator.SetObjectClass(associationOOP, associationClassOOP);
+        _allocator.SetClassOOP(associationOOP, associationClassOOP);
 
         // Set instance variables: [0] = key, [1] = value (assuming standard Association layout)
         _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);

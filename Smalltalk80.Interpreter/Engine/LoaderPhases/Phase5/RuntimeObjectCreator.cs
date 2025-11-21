@@ -163,7 +163,7 @@ public class RuntimeObjectCreator(
         // Create minimal stub StrikeFont
         var strikeFontOOP = context.Allocator.AllocateFixedObject("StrikeFont");
         var strikeFontClassOOP = GlobalRegistry.LookupClassOOP("StrikeFont");
-        context.Allocator.SetObjectClass(strikeFontOOP, strikeFontClassOOP);
+        context.Allocator.SetClassOOP(strikeFontOOP, strikeFontClassOOP);
 
         // Initialize all StrikeFont fields to nil
         int strikeFontInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("StrikeFont", context.Bundle);
@@ -202,7 +202,7 @@ public class RuntimeObjectCreator(
         // Step 1: Create offset Point (0@0)
         var pointOOP = context.Allocator.AllocateFixedObject("Point");
         var pointClassOOP = GlobalRegistry.LookupClassOOP("Point");
-        context.Allocator.SetObjectClass(pointOOP, pointClassOOP);
+        context.Allocator.SetClassOOP(pointOOP, pointClassOOP);
 
         SetInstanceVarByName(pointOOP, "Point", "x", SmalltalkOOP.FromSmallInteger(0));
         SetInstanceVarByName(pointOOP, "Point", "y", SmalltalkOOP.FromSmallInteger(0));
@@ -216,7 +216,7 @@ public class RuntimeObjectCreator(
 
         var displayBitmapOOP = context.Allocator.AllocateObject("DisplayBitmap", ObjectFormat.WordIndexed, totalWords);
         var displayBitmapClassOOP = GlobalRegistry.LookupClassOOP("DisplayBitmap");
-        context.Allocator.SetObjectClass(displayBitmapOOP, displayBitmapClassOOP);
+        context.Allocator.SetClassOOP(displayBitmapOOP, displayBitmapClassOOP);
 
         // Initialize bitmap to zeros
         for (int i = 0; i < totalWords; i++)
@@ -229,7 +229,7 @@ public class RuntimeObjectCreator(
         // Step 3: Create DisplayScreen object
         var displayScreenOOP = context.Allocator.AllocateFixedObject("DisplayScreen");
         var displayScreenClassOOP = GlobalRegistry.LookupClassOOP("DisplayScreen");
-        context.Allocator.SetObjectClass(displayScreenOOP, displayScreenClassOOP);
+        context.Allocator.SetClassOOP(displayScreenOOP, displayScreenClassOOP);
 
         // Set Form instance variables
         SetInstanceVarByName(displayScreenOOP, "Form", "bits", displayBitmapOOP);
@@ -290,7 +290,7 @@ public class RuntimeObjectCreator(
         }
 
         var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
-        context.Allocator.SetObjectClass(stringOOP, stringClassOOP);
+        context.Allocator.SetClassOOP(stringOOP, stringClassOOP);
 
         return stringOOP;
     }

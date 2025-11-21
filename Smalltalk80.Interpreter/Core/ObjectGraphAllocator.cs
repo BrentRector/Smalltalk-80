@@ -179,7 +179,7 @@ public class ObjectGraphAllocator
     /// <summary>
     /// Sets the class OOP in slot 0 (used to fix placeholder references).
     /// </summary>
-    public void SetObjectClass(SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
+    public void SetClassOOP(SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
     {
         _heapManager.SetClassOOP(objectOOP, classOOP);
     }
