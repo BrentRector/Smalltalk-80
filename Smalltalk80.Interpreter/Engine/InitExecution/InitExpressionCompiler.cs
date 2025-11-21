@@ -158,12 +158,12 @@ public class InitExpressionCompiler
         SmalltalkOOP byteArrayClassOOP)
     {
         // Decode header to get field counts
-        uint header = expr.Header;
-        int literalCount = (int)((header >> 9) & 0x3F);  // Bits 9-14: literal count
+        int headerWord = expr.Header.Word;  // Get the actual 16-bit header value
+        int literalCount = expr.Header.LiteralCount;
 
         // Create ByteArray for bytecodes
         int bytecodeWordCount = (bytecodes.Length + 1) / 2; // Round up to word boundary
-        var bytecodeArrayOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, bytecodeWordCount);
+        var bytecodeArrayOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots: 0, indexedSize: bytecodeWordCount);
         _heapManager.SetClassOOP(bytecodeArrayOOP, byteArrayClassOOP);
 
         for (int i = 0; i < bytecodes.Length; i++)
@@ -176,13 +176,13 @@ public class InitExpressionCompiler
         int methodLiteralCount = literalCount + 1; // +1 for header
         var methodOOP = _heapManager.AllocateObject(
             ObjectFormat.PointerIndexed,
-            instanceVariableCount: 0,
+            fixedSlots: 0,
             indexedSize: methodLiteralCount);
 
         _heapManager.SetClassOOP(methodOOP, compiledMethodClassOOP);
 
         // Set header (first indexed slot)
-        _heapManager.SetIndexedOOP(methodOOP, 0, SmalltalkOOP.FromSmallInteger((int)header));
+        _heapManager.SetIndexedOOP(methodOOP, 0, SmalltalkOOP.FromSmallInteger(headerWord));
 
         // Set literals (remaining indexed slots)
         for (int i = 0; i < literalOOPs.Length && i < literalCount; i++)
@@ -211,27 +211,53 @@ public class InitExpressionCompiler
     {
         switch (literalValue.Type)
         {
-            case LiteralType.SmallInteger:
-                return SmalltalkOOP.FromSmallInteger(literalValue.IntValue ?? 0);
+            case "smallInt":
+                // Value is an int for SmallInteger
+                if (literalValue.Value is int intValue)
+                    return SmalltalkOOP.FromSmallInteger(intValue);
+                if (literalValue.Value is long longValue)
+                    return SmalltalkOOP.FromSmallInteger((int)longValue);
+                throw new InvalidOperationException($"Invalid SmallInteger value: {literalValue.Value}");
 
-            case LiteralType.Symbol:
-                // Symbols should already exist in the heap from cold start
-                return FindSymbol(literalValue.StringValue ?? "");
+            case "symbol":
+                // Symbols use Index to look up in bundle's symbol table
+                if (literalValue.Index.HasValue)
+                {
+                    string symbolText = _bundle.Symbols[literalValue.Index.Value];
+                    return FindSymbol(symbolText);
+                }
+                throw new InvalidOperationException("Symbol literal missing Index");
 
-            case LiteralType.Association:
-                // Look up association by key in SystemDictionary
-                var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
-                var keySymbolOOP = FindSymbol(literalValue.StringValue ?? "");
-                return FindAssociation(smalltalkOOP, keySymbolOOP);
+            case "association":
+                // Association has a key (symbol) and value
+                if (literalValue.Association != null)
+                {
+                    string keySymbolText = _bundle.Symbols[literalValue.Association.KeyIndex];
+                    var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
+                    var keySymbolOOP = FindSymbol(keySymbolText);
+                    return FindAssociation(smalltalkOOP, keySymbolOOP);
+                }
+                throw new InvalidOperationException("Association literal missing Association data");
 
-            case LiteralType.Nil:
+            case "nil":
                 return _heapManager.GetNil();
 
-            case LiteralType.True:
+            case "true":
                 return GlobalRegistry.Get("true");
 
-            case LiteralType.False:
+            case "false":
                 return GlobalRegistry.Get("false");
+
+            case "compiledMethod":
+                // For block literals - they reference a method by localId
+                // This should have been resolved during cold start
+                if (literalValue.LocalId != null)
+                {
+                    // Blocks reference methods that should already exist
+                    // This is a runtime limitation - we can't resolve these on-demand
+                    throw new InvalidOperationException($"Block literals (compiledMethod) cannot be resolved at runtime: {literalValue.LocalId}");
+                }
+                throw new InvalidOperationException("CompiledMethod literal missing LocalId");
 
             default:
                 throw new InvalidOperationException($"Unsupported literal type at runtime: {literalValue.Type}");
