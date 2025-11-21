@@ -85,7 +85,7 @@ public class InitExpressionExecutor
 
             // Run GC after each init expression to validate collection of temporary objects
             // (Process and MethodContext are abandoned after each expression completes)
-            var gcStats = _heapManager.GC.GarbageCollect();
+            var gcStats = _heapManager.GarbageCollect();
             Console.WriteLine($"[GC after {initId}] Collected {gcStats.CollectedObjects} objects, {gcStats.TotalObjects} total, {gcStats.ReachableObjects} reachable");
 
             if (result.Status != InitStatus.Success && _policy == InitPolicy.AbortOnFirstError)
