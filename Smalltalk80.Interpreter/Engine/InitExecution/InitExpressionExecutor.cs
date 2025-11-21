@@ -291,26 +291,35 @@ public class InitExpressionExecutor
 
                 // Check GC roots - see if our objects are directly in roots
                 var gcRoots = _heapManager.GC.GetGCRoots();
-                Console.WriteLine($"    GC has {gcRoots.Length} roots");
-                bool foundMethod = false;
-                bool foundContext = false;
+                Console.WriteLine($"    GC has {gcRoots.Length} roots:");
                 for (int i = 0; i < gcRoots.Length; i++)
                 {
-                    if (gcRoots[i] == compiledMethodOOP)
+                    var rootClass = _heapManager.GetClassOOP(gcRoots[i]);
+                    var rootClassName = _heapManager.GetClassName(rootClass);
+                    Console.WriteLine($"      Root #{i}: {gcRoots[i]} (class={rootClassName})");
+                }
+
+                // Check if methodContext is in the sender chain of any GC root context
+                foreach (var root in gcRoots)
+                {
+                    var rootClass = _heapManager.GetClassOOP(root);
+                    var rootClassName = _heapManager.GetClassName(rootClass);
+                    if (rootClassName == "MethodContext" || rootClassName == "BlockContext")
                     {
-                        Console.WriteLine($"    FOUND: CompiledMethod is GC root #{i}!");
-                        foundMethod = true;
-                    }
-                    if (gcRoots[i] == methodContextOOP)
-                    {
-                        Console.WriteLine($"    FOUND: MethodContext is GC root #{i}!");
-                        foundContext = true;
+                        // Walk sender chain from this root
+                        var current = root;
+                        var nilOOP = _heapManager.GetNil();
+                        for (int depth = 0; depth < 50 && current != nilOOP; depth++)
+                        {
+                            if (current == methodContextOOP)
+                            {
+                                Console.WriteLine($"    FOUND: MethodContext is in sender chain of root {root} at depth {depth}!");
+                                break;
+                            }
+                            current = _heapManager.GetInstanceVariable(current, VMConstants.CONTEXT_SENDER_INDEX);
+                        }
                     }
                 }
-                if (!foundMethod && compiledMethodAlive)
-                    Console.WriteLine($"    CompiledMethod not in GC roots (reachable indirectly)");
-                if (!foundContext && methodContextAlive)
-                    Console.WriteLine($"    MethodContext not in GC roots (reachable indirectly)");
 
                 return InitResult.FatalError(expr.LocalId, $"CompiledMethod or MethodContext still alive after execution");
             }
