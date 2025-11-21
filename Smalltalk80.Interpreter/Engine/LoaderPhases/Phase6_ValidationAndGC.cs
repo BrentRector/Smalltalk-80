@@ -713,6 +713,9 @@ public class Phase6_ValidationAndGC : IPhase
     private void SetupGCRoots()
     {
         // Create proper Smalltalk-80 GC roots - only the fundamental special objects
+        // These are the objects that the garbage collector uses as starting points for reachability analysis
+        // NOTE: We use SetGCRoots() for bulk setting during cold start. For incremental additions at runtime,
+        // use: ((ISmalltalkHeap)_heapManager).GC.AddGCRoot(oop)
         var gcRootsList = new List<(string name, SmalltalkOOP oop)>
         {
             ("nil", GlobalRegistry.Get("nil")),
@@ -727,7 +730,7 @@ public class Phase6_ValidationAndGC : IPhase
             gcRootsList.Add(("InitExpressionMethods", _initExpressionMethods));
         }
 
-        // Set as GC roots
+        // Set as GC roots (bulk operation - replaces any previous roots)
         var gcRoots = gcRootsList.Select(r => r.oop).ToArray();
         _heapManager.SetGCRoots(gcRoots);
 

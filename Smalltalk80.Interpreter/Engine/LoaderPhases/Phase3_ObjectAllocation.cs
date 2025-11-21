@@ -2,7 +2,6 @@ using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
@@ -169,17 +168,31 @@ public class Phase3_ObjectAllocation : IPhase
     /// </summary>
     private void AllocateSentinelObjects()
     {
+        // Get the initial nil OOP that was allocated during heap manager construction
+        var initialNilOOP = _heapManager.GetNil();
+
         // Create minimal dependency singletons: nil, true, false
-        var nilOOP = _allocator.AllocateFixedObject("UndefinedObject");
+        // Allocate the REAL UndefinedObject instance with proper class reference
+        var realNilOOP = _allocator.AllocateFixedObject("UndefinedObject");
         var trueOOP = _allocator.AllocateFixedObject("True");
         var falseOOP = _allocator.AllocateFixedObject("False");
 
-        GlobalRegistry.Register("nil", nilOOP);
+        // CRITICAL: Swap initial nil with real UndefinedObject using Become operation
+        // This ensures all existing references to initial nil now point to the real UndefinedObject
+        // After this operation:
+        // - initialNilOOP now contains the real UndefinedObject data
+        // - realNilOOP now contains the placeholder data (which we don't care about)
+        // - All objects allocated in Phase1/2 that reference initialNilOOP now see the real nil
+        var heap = (ISmalltalkHeap)_heapManager;
+        heap.Become.BecomeTwoWay(initialNilOOP, realNilOOP);
+
+        // Register the initial nil OOP (which now points to real UndefinedObject after Become)
+        GlobalRegistry.Register("nil", initialNilOOP);
         GlobalRegistry.Register("true", trueOOP);
         GlobalRegistry.Register("false", falseOOP);
 
         // Initialize SystemDictionary slots with nil (created in Phase 2 but couldn't be initialized until now)
-        InitializeSystemDictionaryWithNil(nilOOP);
+        InitializeSystemDictionaryWithNil(initialNilOOP);
 
         // Create ProcessorScheduler singleton
         var processorSchedulerOOP = _allocator.AllocateFixedObject("ProcessorScheduler");
