@@ -98,9 +98,9 @@ public class PrimitiveRegistry : IPrimitiveRegistry
             return result.Value;
         }
 
-        // Primitive not found
+        // Primitive not found - return nil
         ctx.PrimitiveSuccess = false;
-        return default(SmalltalkOOP);
+        return metadata?.KnownObjects.Nil ?? default(SmalltalkOOP);
     }
 
     /// <summary>
