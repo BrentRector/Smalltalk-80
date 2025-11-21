@@ -410,10 +410,10 @@ public static class Program
                 }
 
                 int firstIndex = phase1Indices[0];
-                var expr = bundle.InitExpressions[firstIndex];
+                var firstExpr = bundle.InitExpressions[firstIndex];
 
                 Console.WriteLine($"=== STEP 1: Compile Init Expression On-Demand ===");
-                Console.WriteLine($"  Expression: {expr.Source}");
+                Console.WriteLine($"  Expression: {firstExpr.Source}");
 
                 // TODO: Compile the init expression here on-demand
                 // For now, skip execution since compilation logic needs to be implemented
@@ -425,10 +425,10 @@ public static class Program
                 return;
 
                 // PLACEHOLDER for future implementation:
-                // var initMethodOOP = CompileInitExpressionOnDemand(expr);
+                // var initMethodOOP = CompileInitExpressionOnDemand(firstExpr);
                 // WireToProcess(initMethodOOP);
                 // RunGC(); // Should NOT collect
-                // var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+                // var result = executor.ExecuteInitExpression(firstExpr.LocalId, initMethodOOP);
                 // UnwireFromProcess();
                 // RunGC(); // SHOULD collect
             }
