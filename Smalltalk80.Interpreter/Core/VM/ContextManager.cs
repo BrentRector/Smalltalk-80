@@ -33,6 +33,11 @@ internal class ContextManager(
     private readonly Dictionary<int, Stack<SmalltalkOOP>> _contextPools = [];
     private const int MaxPooledContextsPerSize = 20;
 
+    // Pool statistics - track hit rate
+    private long _poolHits = 0;
+    private long _poolMisses = 0;
+    private long _poolEvictions = 0;  // Contexts discarded due to pool full
+
     /// <inheritdoc />
     public SmalltalkOOP ActiveContext => _activeContextOOP;
 
@@ -85,12 +90,18 @@ internal class ContextManager(
                 pool.Push(contextOOP);
                 contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
                 heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
+                _poolMisses++;  // Safety check failed, count as miss
+            }
+            else
+            {
+                _poolHits++;  // Successfully reused from pool
             }
         }
         else
         {
             contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
             heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
+            _poolMisses++;  // Pool empty or doesn't exist
         }
 
         // Increment context depth and check limit
@@ -217,6 +228,10 @@ internal class ContextManager(
         {
             poolForSize.Push(contextOOP);
         }
+        else
+        {
+            _poolEvictions++;  // Pool full, context discarded
+        }
     }
 
     /// <summary>
@@ -248,7 +263,41 @@ internal class ContextManager(
         // Hub only dispatches GCStart events (our registered type)
         // Safe to cast without checking
         var gcStart = (GCStartEvent)evt;
+
+        // Display statistics before clearing pools
+        DisplayPoolStatistics();
+
         ClearAllPools();
+    }
+
+    /// <summary>
+    /// Displays pool statistics if any contexts were pooled since last GC.
+    /// Shows hit rate, miss rate, and eviction count.
+    /// </summary>
+    private void DisplayPoolStatistics()
+    {
+        // Calculate total contexts in all pools
+        int totalPooled = 0;
+        foreach (var (size, pool) in _contextPools)
+        {
+            totalPooled += pool.Count;
+        }
+
+        // Only display if there are pooled contexts
+        if (totalPooled == 0)
+        {
+            return;
+        }
+
+        long totalRequests = _poolHits + _poolMisses;
+        if (totalRequests == 0)
+        {
+            return;
+        }
+
+        double hitRate = (_poolHits * 100.0) / totalRequests;
+
+        Console.WriteLine($"    Context Pool: {totalPooled} contexts, {_poolHits}/{totalRequests} hits ({hitRate:F1}%), {_poolEvictions} evicted");
     }
 
     /// <summary>
@@ -256,6 +305,7 @@ internal class ContextManager(
     /// This prevents use-after-free bugs where GC collects pooled contexts
     /// and heap reallocates the OOP to a different object type.
     /// Pools naturally rebuild as methods return after GC.
+    /// Also resets pool statistics for next cycle.
     /// </summary>
     private void ClearAllPools()
     {
@@ -263,5 +313,10 @@ internal class ContextManager(
         {
             pool.Clear();
         }
+
+        // Reset statistics for next cycle
+        _poolHits = 0;
+        _poolMisses = 0;
+        _poolEvictions = 0;
     }
 }
