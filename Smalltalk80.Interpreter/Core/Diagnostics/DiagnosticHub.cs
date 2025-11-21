@@ -117,6 +117,16 @@ public class DiagnosticHub : IDiagnosticHub
             AllocationEvent => DiagnosticEventTypes.ObjectAllocate,
             GCEvent => DiagnosticEventTypes.GarbageCollect,
 
+            // Granular GC events
+            GCStartEvent => DiagnosticEventTypes.GCStart,
+            GCMarkPhaseStartEvent => DiagnosticEventTypes.GCMarkPhaseStart,
+            GCMarkPhaseEndEvent => DiagnosticEventTypes.GCMarkPhaseEnd,
+            GCSweepPhaseStartEvent => DiagnosticEventTypes.GCSweepPhaseStart,
+            GCSweepPhaseEndEvent => DiagnosticEventTypes.GCSweepPhaseEnd,
+            GCEndEvent => DiagnosticEventTypes.GCEnd,
+            GCObjectMarkedEvent => DiagnosticEventTypes.GCObjectMarked,
+            GCObjectCollectedEvent => DiagnosticEventTypes.GCObjectCollected,
+
             _ => DiagnosticEventTypes.None
         };
     }

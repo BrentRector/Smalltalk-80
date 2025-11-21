@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.HeapManager;
@@ -24,10 +25,10 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     // Verbose debug mode control
     public bool VerboseDebugMode { get; set; } = false;
 
-    public SmalltalkHeapManager()
+    public SmalltalkHeapManager(IDiagnosticHub? diagnostics = null)
     {
         _tableManager = new ObjectTableManager();
-        _garbageCollector = new GarbageCollector(_tableManager, this);
+        _garbageCollector = new GarbageCollector(_tableManager, this, diagnostics);
         _becomeHandler = new BecomeHandler(_tableManager);
 
         // Allocate Nil as first object (reserves first ObjectTable slot for Nil)

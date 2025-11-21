@@ -131,7 +131,7 @@ public static class Program
 
             // Create the heap manager
             Console.WriteLine("Initializing heap manager...");
-            var heapManager = new SmalltalkHeapManager();
+            var heapManager = new SmalltalkHeapManager(diagnostics);
 
             // Create and run the loader
             Console.WriteLine("Starting cold start loader (6-phase)...");
@@ -199,6 +199,7 @@ public static class Program
                     heapManager,
                     vm,
                     vmMetadata,
+                    diagnostics,  // Pass diagnostic hub for GC events
                     InitPolicy.ContinueAndCollect,  // Continue to run all init expressions including tests
                     defaultTimeoutMs: 5000
                 );
@@ -496,6 +497,7 @@ public static class Program
                         heapManager,
                         vm,
                         vmMetadata,
+                        diagnostics,  // Pass diagnostic hub for GC events
                         InitPolicy.AbortOnFirstError,
                         defaultTimeoutMs: 10000
                     );

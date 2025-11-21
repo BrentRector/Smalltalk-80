@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -27,17 +29,20 @@ public class InitExpressionExecutor
     private readonly VMMetadata _metadata;
     private readonly InitPolicy _policy;
     private readonly int _defaultTimeoutMs;
+    private readonly IDiagnosticHub? _diagnostics;
 
     public InitExpressionExecutor(
         ISmalltalkHeap heapManager,
         VirtualMachine vm,
         VMMetadata metadata,
+        IDiagnosticHub? diagnostics = null,
         InitPolicy policy = InitPolicy.AbortOnFirstError,
         int defaultTimeoutMs = 5000)
     {
         _heapManager = heapManager;
         _vm = vm;
         _metadata = metadata;
+        _diagnostics = diagnostics;
         _policy = policy;
         _defaultTimeoutMs = defaultTimeoutMs;
     }
@@ -264,8 +269,22 @@ public class InitExpressionExecutor
             // Clear the Process's suspendedContext
             _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, _heapManager.GetNil());
 
+            // Register GC detail listener if diagnostics available
+            GCDetailListener? gcListener = null;
+            if (_diagnostics != null)
+            {
+                gcListener = new GCDetailListener();
+                _diagnostics.Register(gcListener, DiagnosticEventTypes.GCStart | DiagnosticEventTypes.GCEnd | DiagnosticEventTypes.GCObjectCollected);
+            }
+
             // Run GC - SHOULD collect (MethodContext, CompiledMethod, ByteArray no longer reachable)
             var gcStatsAfter = _heapManager.GC.GarbageCollect();
+
+            // Unregister listener
+            if (gcListener != null && _diagnostics != null)
+            {
+                _diagnostics.Unregister(gcListener);
+            }
 
             // Verify the CompiledMethod was collected
             bool compiledMethodAlive = IsObjectAlive(compiledMethodOOP);
@@ -279,25 +298,11 @@ public class InitExpressionExecutor
                 return InitResult.FatalError(expr.LocalId, $"CompiledMethod or MethodContext still alive after execution");
             }
 
-            // Show what was collected if suspicious (expected: 3 objects minimum)
+            // Show simple GC summary (listener shows details)
             if (gcStatsAfter.CollectedObjects > 10)
             {
                 Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, GC: {gcStatsBefore.CollectedObjects}/{gcStatsAfter.CollectedObjects})");
                 Console.WriteLine($"    WARNING: Collected {gcStatsAfter.CollectedObjects} objects (expected ~3)");
-
-                // Group collected objects by class - show ALL classes, not just top 10
-                var classCounts = gcStatsAfter.CollectedObjectDetails
-                    .GroupBy(obj => obj.className ?? "unknown")
-                    .Select(g => new { ClassName = g.Key, Count = g.Count() })
-                    .OrderByDescending(x => x.Count)
-                    .ToList();
-
-                int accountedFor = classCounts.Sum(x => x.Count);
-                Console.WriteLine($"    All collected classes ({accountedFor}/{gcStatsAfter.CollectedObjects} accounted):");
-                foreach (var item in classCounts)
-                {
-                    Console.WriteLine($"      {item.ClassName}: {item.Count}");
-                }
             }
             else
             {
