@@ -182,6 +182,155 @@ public class InitExpressionExecutor
     }
 
     /// <summary>
+    /// Executes an init expression with on-demand compilation and GC verification.
+    /// This method:
+    /// 1. Compiles the init expression from bundle on-demand
+    /// 2. Wires it to Processor.activeProcess
+    /// 3. Runs GC to verify it's NOT collected (reachable via activeProcess)
+    /// 4. Executes the init expression
+    /// 5. Unwires from activeProcess
+    /// 6. Runs GC to verify it IS collected (no longer reachable)
+    /// </summary>
+    public InitResult ExecuteInitExpressionOnDemand(
+        InitExpression expr,
+        InitExpressionCompiler compiler,
+        int? timeoutMs = null)
+    {
+        var effectiveTimeout = timeoutMs ?? _defaultTimeoutMs;
+        var stopwatch = Stopwatch.StartNew();
+
+        Console.WriteLine($"\n=== On-Demand Init Expression Execution ===");
+        Console.WriteLine($"Expression: {expr.Source}");
+
+        try
+        {
+            // STEP 1: Compile init expression on-demand
+            Console.WriteLine($"\n[STEP 1] Compiling init expression on-demand...");
+            SmalltalkOOP compiledMethodOOP = compiler.CompileInitExpression(expr);
+            Console.WriteLine($"  ✓ Compiled method: {compiledMethodOOP}");
+
+            // STEP 2: Create MethodContext and Process
+            Console.WriteLine($"\n[STEP 2] Creating MethodContext and Process...");
+            SmalltalkOOP receiverOOP = GetCanonicalReceiverForDoIt();
+            SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
+            SmalltalkOOP processOOP = CreateProcess(methodContextOOP, priority: 4);
+            Console.WriteLine($"  ✓ Process created: {processOOP}");
+            Console.WriteLine($"  ✓ MethodContext: {methodContextOOP}");
+            Console.WriteLine($"  ✓ CompiledMethod: {compiledMethodOOP}");
+
+            // STEP 3: Wire to Processor.activeProcess
+            Console.WriteLine($"\n[STEP 3] Wiring to Processor.activeProcess...");
+            var schedulerOOP = _metadata.ProcessorScheduler;
+            _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, processOOP);
+            Console.WriteLine($"  ✓ Set Processor.activeProcess = {processOOP}");
+
+            // STEP 4: Run GC - should NOT collect (reachable via activeProcess)
+            Console.WriteLine($"\n[STEP 4] Running GC (should NOT collect init expression)...");
+            var gcStatsBefore = _heapManager.GC.GarbageCollect();
+            Console.WriteLine($"  GC collected {gcStatsBefore.CollectedObjects} objects");
+
+            // Verify the CompiledMethod is still alive
+            if (!IsObjectAlive(compiledMethodOOP))
+            {
+                Console.WriteLine($"  ❌ FAILED: CompiledMethod was collected! (should be reachable via activeProcess)");
+                return InitResult.FatalError(expr.LocalId, "CompiledMethod was incorrectly collected during GC");
+            }
+            Console.WriteLine($"  ✓ CompiledMethod still alive (correctly reachable)");
+
+            // STEP 5: Execute the init expression
+            Console.WriteLine($"\n[STEP 5] Executing init expression...");
+            SmalltalkOOP resultOOP;
+            try
+            {
+                if (effectiveTimeout > 0)
+                {
+                    using var cts = new CancellationTokenSource(effectiveTimeout);
+                    resultOOP = ExecuteWithTimeout(processOOP, cts.Token);
+                }
+                else
+                {
+                    resultOOP = ResumeProcess(processOOP);
+                }
+                Console.WriteLine($"  ✓ Execution succeeded, result: {resultOOP}");
+            }
+            catch (OperationCanceledException)
+            {
+                stopwatch.Stop();
+                Console.WriteLine($"  ❌ Execution timed out");
+                return InitResult.Timeout(expr.LocalId, stopwatch.ElapsedMilliseconds);
+            }
+            catch (PrimitiveFailureException pex)
+            {
+                stopwatch.Stop();
+                Console.WriteLine($"  ❌ Primitive failure: {pex.Message}");
+                return InitResult.PrimitiveFailure(expr.LocalId, pex.PrimitiveIndex, pex.Message, stopwatch.ElapsedMilliseconds);
+            }
+            catch (SmalltalkException sex)
+            {
+                stopwatch.Stop();
+                Console.WriteLine($"  ❌ Smalltalk exception: {sex.Message}");
+                string stackTrace = CaptureStackTrace(sex);
+                return InitResult.Exception(expr.LocalId, sex.ExceptionOop, sex.Message, stackTrace, stopwatch.ElapsedMilliseconds);
+            }
+
+            // STEP 6: Unwire from Processor.activeProcess
+            Console.WriteLine($"\n[STEP 6] Unwiring from Processor.activeProcess...");
+            _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, _heapManager.GetNil());
+            Console.WriteLine($"  ✓ Cleared Processor.activeProcess");
+
+            // STEP 7: Run GC - SHOULD collect (no longer reachable)
+            Console.WriteLine($"\n[STEP 7] Running GC (SHOULD collect init expression)...");
+            var gcStatsAfter = _heapManager.GC.GarbageCollect();
+            Console.WriteLine($"  GC collected {gcStatsAfter.CollectedObjects} objects");
+
+            // Verify the CompiledMethod was collected
+            if (IsObjectAlive(compiledMethodOOP))
+            {
+                Console.WriteLine($"  ⚠️  WARNING: CompiledMethod still alive (should have been collected)");
+                Console.WriteLine($"  This may indicate the method is still referenced somewhere");
+            }
+            else
+            {
+                Console.WriteLine($"  ✓ CompiledMethod collected (correctly unreachable)");
+            }
+
+            stopwatch.Stop();
+            Console.WriteLine($"\n=== Init Expression Execution Complete ===");
+            Console.WriteLine($"  Status: SUCCESS");
+            Console.WriteLine($"  Elapsed: {stopwatch.ElapsedMilliseconds}ms");
+
+            return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            Console.WriteLine($"\n=== Init Expression Execution Failed ===");
+            Console.WriteLine($"  Error: {ex.Message}");
+            return InitResult.FatalError(expr.LocalId, $"{ex.GetType().Name}: {ex.Message}\n\nStack trace:\n{ex.StackTrace}");
+        }
+    }
+
+    /// <summary>
+    /// Checks if an object is still alive (not collected by GC).
+    /// </summary>
+    private bool IsObjectAlive(SmalltalkOOP oop)
+    {
+        if (oop.IsSmallInteger)
+            return true; // SmallIntegers are immediate values, always "alive"
+
+        try
+        {
+            // Try to access the object's class - if it's been collected, this will fail
+            var classOOP = _heapManager.GetClassOOP(oop);
+            return classOOP != _heapManager.GetNil();
+        }
+        catch
+        {
+            return false; // Object no longer exists
+        }
+    }
+
+    /// <summary>
     /// Validates that a CompiledMethod OOP is suitable for init expression execution.
     /// </summary>
     private bool ValidateCompiledMethod(SmalltalkOOP methodOOP, out string? error)

@@ -412,25 +412,49 @@ public static class Program
                 int firstIndex = phase1Indices[0];
                 var firstExpr = bundle.InitExpressions[firstIndex];
 
-                Console.WriteLine($"=== STEP 1: Compile Init Expression On-Demand ===");
-                Console.WriteLine($"  Expression: {firstExpr.Source}");
-
-                // TODO: Compile the init expression here on-demand
-                // For now, skip execution since compilation logic needs to be implemented
-                Console.WriteLine($"  ⚠️  On-demand compilation not yet implemented");
-                Console.WriteLine($"  Skipping init expression execution for now");
+                Console.WriteLine($"\n=== Testing On-Demand Init Expression Compilation ===");
+                Console.WriteLine($"  First expression: [{firstIndex}] {firstExpr.Source}");
                 Console.WriteLine();
-                Console.WriteLine($"=== Init Expression Testing Skipped ===");
-                Console.WriteLine($"  Next step: Implement on-demand compilation in InitExpressionExecutor");
-                return;
 
-                // PLACEHOLDER for future implementation:
-                // var initMethodOOP = CompileInitExpressionOnDemand(firstExpr);
-                // WireToProcess(initMethodOOP);
-                // RunGC(); // Should NOT collect
-                // var result = executor.ExecuteInitExpression(firstExpr.LocalId, initMethodOOP);
-                // UnwireFromProcess();
-                // RunGC(); // SHOULD collect
+                // Create InitExpressionCompiler for on-demand compilation
+                var compiler = new InitExpressionCompiler(heapManager, bundle, layoutResolver);
+
+                // Execute the first init expression with on-demand compilation and GC verification
+                var result = executor.ExecuteInitExpressionOnDemand(firstExpr, compiler);
+
+                // Report results
+                Console.WriteLine();
+                if (result.Status == InitStatus.Success)
+                {
+                    Console.WriteLine($"✅ SUCCESS: First init expression executed successfully!");
+                    Console.WriteLine($"  Expression: {firstExpr.Source}");
+                    Console.WriteLine($"  Elapsed: {result.ElapsedMilliseconds}ms");
+                    if (result.ReturnValueOop.HasValue)
+                    {
+                        Console.WriteLine($"  Return value: {result.ReturnValueOop.Value}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"❌ FAILED: Init expression failed");
+                    Console.WriteLine($"  Expression: {firstExpr.Source}");
+                    Console.WriteLine($"  Status: {result.Status}");
+                    if (result.Diagnostic != null)
+                    {
+                        Console.WriteLine($"  Error: {result.Diagnostic.Message}");
+                        if (result.Diagnostic.StackTrace != null)
+                        {
+                            Console.WriteLine($"\n  Stack Trace:");
+                            Console.WriteLine($"  {result.Diagnostic.StackTrace}");
+                        }
+                    }
+                }
+
+                // Stop here - we're only testing the first expression for now
+                Console.WriteLine();
+                Console.WriteLine("=== On-Demand Compilation Test Complete ===");
+                Console.WriteLine("  Next: Validate GC behavior and extend to all init expressions");
+                return;
             }
 
             Console.WriteLine("\n✓ All systems ready!");
