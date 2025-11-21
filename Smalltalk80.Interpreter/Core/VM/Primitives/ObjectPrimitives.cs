@@ -257,12 +257,20 @@ public static class SimpleObjectPrimitives
         private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
         {
             if (context.RuntimeHeapAccess == null)
+            {
+                Console.WriteLine($"[Primitive 63 DEBUG] RuntimeHeapAccess is null");
                 return context.HeapManager.GetNil();
+            }
 
             // Get Character class from SystemDictionary
             var characterClassOOP = context.RuntimeHeapAccess.GetClass("Character");
             if (characterClassOOP == context.HeapManager.GetNil())
+            {
+                Console.WriteLine($"[Primitive 63 DEBUG] Character class not found");
                 return context.HeapManager.GetNil();
+            }
+
+            Console.WriteLine($"[Primitive 63 DEBUG] Found Character class: {characterClassOOP}");
 
             // Get classPool from Character class (instance variable index 7)
             // Class instance variables: [0-3] Behavior (superclass, methodDict, format, subclasses)
@@ -271,10 +279,17 @@ public static class SimpleObjectPrimitives
             // Note: Class variables are stored in the Class's classPool, NOT in the Metaclass
             var classPoolOOP = context.HeapManager.GetInstanceVariable(characterClassOOP, 7);
             if (classPoolOOP == context.HeapManager.GetNil())
+            {
+                Console.WriteLine($"[Primitive 63 DEBUG] classPool at index 7 is nil");
                 return context.HeapManager.GetNil();
+            }
+
+            Console.WriteLine($"[Primitive 63 DEBUG] Found classPool: {classPoolOOP}");
 
             // Search for CharacterTable in class pool
             int dictSize = context.HeapManager.GetIndexedSize(classPoolOOP);
+            Console.WriteLine($"[Primitive 63 DEBUG] classPool dictionary size: {dictSize}");
+
             for (int i = 0; i < dictSize; i++)
             {
                 var entryOOP = context.HeapManager.GetIndexedOOP(classPoolOOP, i);
@@ -289,13 +304,19 @@ public static class SimpleObjectPrimitives
                 for (int j = 0; j < symbolSize; j++)
                     bytes[j] = context.HeapManager.GetIndexedByte(keyOOP, j);
 
-                if (System.Text.Encoding.ASCII.GetString(bytes) == "CharacterTable")
+                string symbolName = System.Text.Encoding.ASCII.GetString(bytes);
+                if (symbolName == "CharacterTable")
                 {
+                    Console.WriteLine($"[Primitive 63 DEBUG] Found CharacterTable at index {i}");
                     var characterTableOOP = context.HeapManager.GetInstanceVariable(entryOOP, 1);
-                    return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+                    Console.WriteLine($"[Primitive 63 DEBUG] CharacterTable OOP: {characterTableOOP}");
+                    var resultOOP = context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+                    Console.WriteLine($"[Primitive 63 DEBUG] Character for ASCII {asciiValue}: {resultOOP}");
+                    return resultOOP;
                 }
             }
 
+            Console.WriteLine($"[Primitive 63 DEBUG] CharacterTable not found in classPool");
             return context.HeapManager.GetNil();
         }
     }
