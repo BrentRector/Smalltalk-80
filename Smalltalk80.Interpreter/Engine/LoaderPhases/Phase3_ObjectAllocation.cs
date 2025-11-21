@@ -204,13 +204,13 @@ public class Phase3_ObjectAllocation : IPhase
         GlobalRegistry.Register("ProcessorScheduler", processorSchedulerOOP);
 
         // Initialize ProcessorScheduler fields that should NOT be nil
-        InitializeProcessorSchedulerFields(processorSchedulerOOP, nilOOP);
+        InitializeProcessorSchedulerFields(processorSchedulerOOP, initialNilOOP);
 
         // Create Undeclared Dictionary (v1.0.7)
         // The Undeclared dictionary holds Association objects for variables that were referenced
         // but not yet defined during compilation. SystemDictionary>>at:put: will migrate these
         // Associations when the variables become defined.
-        CreateUndeclaredDictionary(nilOOP);
+        CreateUndeclaredDictionary(initialNilOOP);
     }
 
     /// <summary>

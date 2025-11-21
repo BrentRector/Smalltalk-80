@@ -1,10 +1,9 @@
 using System.Diagnostics;
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 
@@ -39,7 +38,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
         {
             var probe = context.Allocator.GetIndexedOOP(dictionaryOOP, location);
 
-            if (probe == nilOOP || probe == SmalltalkOOP.Null)
+            if (probe == nilOOP || probe == default(SmalltalkOOP))
             {
                 // Found empty slot - install association
                 context.Allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
