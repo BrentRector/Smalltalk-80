@@ -285,131 +285,23 @@ public class InitExpressionExecutor
 
             if (compiledMethodAlive || methodContextAlive)
             {
-                Console.WriteLine($" ❌ FAILED (objects not collected)");
-                Console.WriteLine($"    CompiledMethod {compiledMethodOOP}: {(compiledMethodAlive ? "ALIVE" : "collected")}");
-                Console.WriteLine($"    MethodContext {methodContextOOP}: {(methodContextAlive ? "ALIVE" : "collected")}");
+                // Check if contexts are kept alive by forked processes (expected behavior)
+                bool keptAliveByForkedProcess = IsKeptAliveByForkedProcess(methodContextOOP, schedulerOOP);
 
-                // Check GC roots - see if our objects are directly in roots
-                var gcRoots = _heapManager.GC.GetGCRoots();
-                Console.WriteLine($"    GC has {gcRoots.Length} roots:");
-                for (int i = 0; i < gcRoots.Length; i++)
+                if (keptAliveByForkedProcess)
                 {
-                    var rootClass = _heapManager.GetClassOOP(gcRoots[i]);
-                    var rootClassName = _heapManager.GetClassName(rootClass);
-                    Console.WriteLine($"      Root #{i}: {gcRoots[i]} (class={rootClassName})");
+                    // This is EXPECTED - init expression forked a persistent process
+                    Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, contexts kept alive by forked process)");
+                    return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
                 }
-
-                // Check the active Process object thoroughly
-                SmalltalkOOP activeProcessOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
-                Console.WriteLine($"    Active Process: {activeProcessOOP}");
-
-                var nextLink = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_NEXTLINK_INDEX);
-                var suspendedCtx = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-                var priority = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_PRIORITY_INDEX);
-                var myList = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_MYLIST_INDEX);
-
-                Console.WriteLine($"      nextLink: {nextLink}");
-                Console.WriteLine($"      suspendedContext: {suspendedCtx}");
-                Console.WriteLine($"      priority: {priority}");
-                Console.WriteLine($"      myList: {myList}");
-
-                // Check if any of these reference our context
-                if (nextLink == methodContextOOP) Console.WriteLine($"      ^^^ nextLink IS our MethodContext!");
-                if (suspendedCtx == methodContextOOP) Console.WriteLine($"      ^^^ suspendedContext IS our MethodContext!");
-                if (myList == methodContextOOP) Console.WriteLine($"      ^^^ myList IS our MethodContext!");
-
-                // Check ALL processes in the scheduler's process lists
-                Console.WriteLine($"    Checking ProcessorScheduler's process lists...");
-                SmalltalkOOP processListsArrayOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
-                int numPriorities = _heapManager.GetIndexedSize(processListsArrayOOP);
-                Console.WriteLine($"      Found {numPriorities} priority levels");
-
-                for (int priorityIndex = 0; priorityIndex < numPriorities; priorityIndex++)
+                else
                 {
-                    SmalltalkOOP processListOOP = _heapManager.GetIndexedOOP(processListsArrayOOP, priorityIndex);
-                    if (processListOOP == _metadata.KnownObjects.Nil)
-                        continue;
-
-                    // ProcessList has firstLink and lastLink
-                    SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(processListOOP, 0); // firstLink
-                    if (firstLinkOOP == _metadata.KnownObjects.Nil)
-                        continue;
-
-                    Console.WriteLine($"      Priority {priorityIndex}: has processes");
-
-                    // Walk the linked list of processes
-                    SmalltalkOOP currentProcessOOP = firstLinkOOP;
-                    int processCount = 0;
-                    while (currentProcessOOP != _metadata.KnownObjects.Nil && processCount < 100) // safety limit
-                    {
-                        processCount++;
-                        var procSuspendedCtx = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-                        Console.WriteLine($"        Process {currentProcessOOP}: suspendedContext={procSuspendedCtx}");
-
-                        // Check if this process's suspendedContext is our MethodContext
-                        if (procSuspendedCtx == methodContextOOP)
-                        {
-                            Console.WriteLine($"        ^^^ FOUND IT! This process's suspendedContext IS our MethodContext!");
-                        }
-
-                        // Also check if it's a BlockContext whose home is our MethodContext
-                        if (procSuspendedCtx != _metadata.KnownObjects.Nil && !procSuspendedCtx.IsSmallInteger)
-                        {
-                            var ctxClass = _heapManager.GetClassOOP(procSuspendedCtx);
-                            var ctxClassName = _heapManager.GetClassName(ctxClass);
-                            Console.WriteLine($"          Context class: {ctxClassName}");
-
-                            // Check if it's a BlockContext (GetClassName returns "BlockContext class")
-                            if (ctxClassName.Contains("BlockContext"))
-                            {
-                                var homeCtx = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                                Console.WriteLine($"          BlockContext home: {homeCtx}");
-                                if (homeCtx == methodContextOOP)
-                                {
-                                    Console.WriteLine($"          ^^^ FOUND IT! This BlockContext's home IS our MethodContext!");
-                                }
-
-                                // Check if home's sender chain reaches our MethodContext
-                                if (homeCtx != _metadata.KnownObjects.Nil && !homeCtx.IsSmallInteger)
-                                {
-                                    SmalltalkOOP homeSender = _heapManager.GetInstanceVariable(homeCtx, VMConstants.CONTEXT_SENDER_INDEX);
-                                    Console.WriteLine($"          BlockContext home's sender: {homeSender}");
-                                    if (homeSender == methodContextOOP)
-                                    {
-                                        Console.WriteLine($"          ^^^ FOUND IT! BlockContext->home->sender IS our MethodContext!");
-                                    }
-
-                                    // Walk the full sender chain from home
-                                    SmalltalkOOP currentSender = homeSender;
-                                    int depth = 0;
-                                    while (currentSender != _metadata.KnownObjects.Nil && !currentSender.IsSmallInteger && depth < 10)
-                                    {
-                                        if (currentSender == methodContextOOP)
-                                        {
-                                            Console.WriteLine($"          ^^^ FOUND IT at depth {depth}! Sender chain reaches our MethodContext!");
-                                            break;
-                                        }
-                                        currentSender = _heapManager.GetInstanceVariable(currentSender, VMConstants.CONTEXT_SENDER_INDEX);
-                                        depth++;
-                                    }
-                                }
-
-                                // Also check BlockContext's own sender chain
-                                SmalltalkOOP senderOOP = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.CONTEXT_SENDER_INDEX);
-                                Console.WriteLine($"          BlockContext sender: {senderOOP}");
-                                if (senderOOP == methodContextOOP)
-                                {
-                                    Console.WriteLine($"          ^^^ FOUND IT! This BlockContext's sender IS our MethodContext!");
-                                }
-                            }
-                        }
-
-                        // Move to next process in list
-                        currentProcessOOP = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_NEXTLINK_INDEX);
-                    }
+                    // This is UNEXPECTED - contexts alive but NOT due to forked processes
+                    Console.WriteLine($" ❌ FAILED (objects not collected, not kept alive by forked process)");
+                    Console.WriteLine($"    CompiledMethod {compiledMethodOOP}: {(compiledMethodAlive ? "ALIVE" : "collected")}");
+                    Console.WriteLine($"    MethodContext {methodContextOOP}: {(methodContextAlive ? "ALIVE" : "collected")}");
+                    return InitResult.FatalError(expr.LocalId, $"CompiledMethod or MethodContext still alive after execution (not due to forked process)");
                 }
-
-                return InitResult.FatalError(expr.LocalId, $"CompiledMethod or MethodContext still alive after execution");
             }
 
             // Show simple GC summary (listener shows details)
@@ -443,6 +335,108 @@ public class InitExpressionExecutor
         {
             return false; // Object no longer exists
         }
+    }
+
+    /// <summary>
+    /// Checks if a MethodContext is kept alive by a forked process in the ProcessorScheduler.
+    /// This is expected behavior when init expressions fork background processes.
+    /// </summary>
+    private bool IsKeptAliveByForkedProcess(SmalltalkOOP methodContextOOP, SmalltalkOOP schedulerOOP)
+    {
+        try
+        {
+            // Get process lists array from scheduler
+            SmalltalkOOP processListsArrayOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+            int numPriorities = _heapManager.GetIndexedSize(processListsArrayOOP);
+
+            // Check each priority level
+            for (int priorityIndex = 0; priorityIndex < numPriorities; priorityIndex++)
+            {
+                SmalltalkOOP processListOOP = _heapManager.GetIndexedOOP(processListsArrayOOP, priorityIndex);
+                if (processListOOP == _metadata.KnownObjects.Nil)
+                    continue;
+
+                // Get first process in list
+                SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(processListOOP, 0);
+                if (firstLinkOOP == _metadata.KnownObjects.Nil)
+                    continue;
+
+                // Walk linked list of processes
+                SmalltalkOOP currentProcessOOP = firstLinkOOP;
+                int processCount = 0;
+                while (currentProcessOOP != _metadata.KnownObjects.Nil && processCount < 100)
+                {
+                    processCount++;
+                    var procSuspendedCtx = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+
+                    // Check if suspended context is our MethodContext
+                    if (procSuspendedCtx == methodContextOOP)
+                        return true;
+
+                    // Check if it's a BlockContext whose home or sender chain reaches our MethodContext
+                    if (procSuspendedCtx != _metadata.KnownObjects.Nil && !procSuspendedCtx.IsSmallInteger)
+                    {
+                        var ctxClass = _heapManager.GetClassOOP(procSuspendedCtx);
+                        var ctxClassName = _heapManager.GetClassName(ctxClass);
+
+                        if (ctxClassName.Contains("BlockContext"))
+                        {
+                            // Check home pointer
+                            var homeCtx = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                            if (homeCtx == methodContextOOP)
+                                return true;
+
+                            // Check home's sender chain
+                            if (homeCtx != _metadata.KnownObjects.Nil && !homeCtx.IsSmallInteger)
+                            {
+                                if (IsSenderChainReaches(homeCtx, methodContextOOP))
+                                    return true;
+                            }
+
+                            // Check BlockContext's own sender chain
+                            if (IsSenderChainReaches(procSuspendedCtx, methodContextOOP))
+                                return true;
+                        }
+                        else if (ctxClassName.Contains("MethodContext"))
+                        {
+                            // Check MethodContext's sender chain
+                            if (IsSenderChainReaches(procSuspendedCtx, methodContextOOP))
+                                return true;
+                        }
+                    }
+
+                    // Move to next process
+                    currentProcessOOP = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_NEXTLINK_INDEX);
+                }
+            }
+
+            return false;
+        }
+        catch
+        {
+            // If any error occurs during checking, assume not kept alive by forked process
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Checks if a context's sender chain reaches the target context.
+    /// </summary>
+    private bool IsSenderChainReaches(SmalltalkOOP contextOOP, SmalltalkOOP targetOOP)
+    {
+        SmalltalkOOP currentSender = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_SENDER_INDEX);
+        int depth = 0;
+
+        while (currentSender != _metadata.KnownObjects.Nil && !currentSender.IsSmallInteger && depth < 20)
+        {
+            if (currentSender == targetOOP)
+                return true;
+
+            currentSender = _heapManager.GetInstanceVariable(currentSender, VMConstants.CONTEXT_SENDER_INDEX);
+            depth++;
+        }
+
+        return false;
     }
 
     /// <summary>
