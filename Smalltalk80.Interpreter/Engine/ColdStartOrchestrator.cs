@@ -182,13 +182,6 @@ public class ColdStartOrchestrator : IColdStartLoader
             InitExpressionMethods = phase4.InitExpressionMethods;
         });
 
-        // DEBUG: Trace ProcessorScheduler class after Phase 4
-        if (GlobalRegistry.TryGet("ProcessorScheduler", out var processorOOP))
-        {
-            var classOOP = _allocator.GetClassOOP(processorOOP);
-            Console.WriteLine($"[After Phase 4] ProcessorScheduler class = {classOOP}");
-        }
-
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches
         var phase5 = new Phase5Orchestrator(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics);

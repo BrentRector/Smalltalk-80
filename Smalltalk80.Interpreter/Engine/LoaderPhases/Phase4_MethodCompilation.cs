@@ -693,12 +693,6 @@ public class Phase4_MethodCompilation : IPhase
         // They will be compiled on-demand during execution when they're reachable
         // via Processor.activeProcess. This avoids GC collection issues.
 
-        if (_bundle.InitExpressions.Length > 0)
-        {
-            Console.WriteLine($"  NOTE: Skipping init expression compilation (will compile on-demand)");
-            Console.WriteLine($"  Total init expressions in bundle: {_bundle.InitExpressions.Length}");
-        }
-
         // Set to nil - no pre-compiled init expressions
         _initExpressionMethods = _heapManager.GetNil();
     }

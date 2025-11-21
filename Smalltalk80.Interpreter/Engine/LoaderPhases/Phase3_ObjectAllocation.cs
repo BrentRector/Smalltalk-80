@@ -183,10 +183,8 @@ public class Phase3_ObjectAllocation : IPhase
         // - initialNilOOP now contains the real UndefinedObject data
         // - realNilOOP now contains the placeholder data (which we don't care about)
         // - All objects allocated in Phase1/2 that reference initialNilOOP now see the real nil
-        Console.WriteLine($"  [Phase 3] Before become: initialNilOOP={initialNilOOP}, realNilOOP={realNilOOP}");
         var heap = (ISmalltalkHeap)_heapManager;
         heap.Become.BecomeTwoWay(initialNilOOP, realNilOOP);
-        Console.WriteLine($"  [Phase 3] After become: placeholder nil OOP={realNilOOP} (should be collected by Phase 6 GC)");
 
         // Register the initial nil OOP (which now points to real UndefinedObject after Become)
         GlobalRegistry.Register("nil", initialNilOOP);
@@ -292,9 +290,6 @@ public class Phase3_ObjectAllocation : IPhase
         // Set activeProcess
         _allocator.SetInstanceVariable(processorSchedulerOOP, activeProcessIndex, processOOP);
         _initializedFields.Add((processorSchedulerOOP, activeProcessIndex));
-
-        Console.WriteLine($"  [Phase 3] Created initial Process {processOOP} with priority=4, suspendedContext=nil");
-        Console.WriteLine($"  [Phase 3] Set Processor.activeProcess = {processOOP}");
     }
 
     /// <summary>
@@ -336,22 +331,7 @@ public class Phase3_ObjectAllocation : IPhase
         // Register in GlobalRegistry (Association will be created in Phase 3.5)
         GlobalRegistry.Register("Undeclared", undeclaredOOP);
 
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = $"Created Undeclared dictionary (OOP={undeclaredOOP}, capacity={initialCapacity}, undeclared count={undeclaredCount})",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = "Registered in GlobalRegistry - Association will be created in Phase 3.5",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
+        // Diagnostic messages removed for cleaner output
     }
 
     /// <summary>
@@ -692,14 +672,6 @@ public class Phase3_ObjectAllocation : IPhase
             }
         }
 
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = $"Fixed {associationsFixed} Association + {dictionariesFixed} Dictionary class references",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
     }
 
     private string GetClassNameFromLocalId(string localId)
@@ -1021,15 +993,6 @@ public class Phase3_ObjectAllocation : IPhase
             return;
         }
 
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = "Pre-creating canonical Associations for undeclared variables...",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-
         var nilOOP = _heapManager.GetNil();
         int createdCount = 0;
         int classNameCount = 0;
@@ -1079,39 +1042,6 @@ public class Phase3_ObjectAllocation : IPhase
             createdCount++;
         }
 
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = $"Pre-created {createdCount} canonical Associations",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = $"Includes {classNameCount} class names (Phase 5 will set their values)",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = $"Used pre-created values from GlobalRegistry for {withPreCreatedValues} globals",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = $"AssociationRegistry now contains {AssociationRegistry.Count} canonical Associations",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-
         // CRITICAL: Install all Associations in Undeclared dictionary
         // This matches runtime semantics: undefined variables start in Undeclared,
         // then migrate to SystemDictionary when defined (e.g., class installation, init expressions)
@@ -1128,22 +1058,6 @@ public class Phase3_ObjectAllocation : IPhase
             installedInUndeclared++;
         }
 
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = $"Installed {installedInUndeclared} Associations in Undeclared dictionary",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase3",
-            Message = "Phase 5 will migrate defined globals to SystemDictionary",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
     }
 
     #endregion

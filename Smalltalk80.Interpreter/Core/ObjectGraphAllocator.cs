@@ -132,25 +132,7 @@ public class ObjectGraphAllocator
 
         // Just allocate - no cross-references set
         var oop = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringLength);
-
-        // Enhanced tracking: capture actual string content if this is a tracked OOP
-        if (TrackedOOPs.Contains(oop))
-        {
-            // Read the bytes to show the actual symbol text
-            var bytes = new byte[stringLength];
-            for (int i = 0; i < stringLength; i++)
-            {
-                bytes[i] = _heapManager.GetIndexedByte(oop, i);
-            }
-            string symbolText = System.Text.Encoding.UTF8.GetString(bytes);
-
-            var stackTrace = new System.Diagnostics.StackTrace(2, true);
-            var frame = stackTrace.GetFrame(0);
-            Console.WriteLine($"[OOP TRACKER] Allocated {oop} in AllocateString({className}, {stringLength})");
-            Console.WriteLine($"  Symbol text: \"{symbolText}\"");
-            Console.WriteLine($"  Caller: {frame?.GetMethod()?.DeclaringType?.Name}.{frame?.GetMethod()?.Name}");
-        }
-
+        TrackOOP(oop, $"AllocateString({className}, {stringLength})");
         return oop;
     }
 

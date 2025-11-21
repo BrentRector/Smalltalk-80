@@ -200,14 +200,6 @@ public class SystemDictionaryInstaller(
             dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, poolName);
         }
 
-        context.Diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase5",
-            Message = $"Created pool dictionary {poolName} (capacity {capacity}, used by {declaringClasses.Count} class{(declaringClasses.Count == 1 ? "" : "es")})",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
     }
 
     private SmalltalkOOP AllocateEmptyDictionary(int capacity)
@@ -235,38 +227,8 @@ public class SystemDictionaryInstaller(
 
     private void InstallProcessorGlobal(SmalltalkOOP processorSchedulerOOP)
     {
-        // DEBUG: Verify we're installing the ProcessorScheduler instance, not an Association
-        var classOOP = context.Allocator.GetClassOOP(processorSchedulerOOP);
-        // GetClassName expects an INSTANCE - it looks up the class of what you pass
-        var processorSchedulerClass = context.Allocator.GetClassName(processorSchedulerOOP);
-        Console.WriteLine($"[InstallProcessorGlobal] DEBUG:");
-        Console.WriteLine($"  processorSchedulerOOP = {processorSchedulerOOP}");
-        Console.WriteLine($"  processorSchedulerOOP class OOP = {classOOP}");
-        Console.WriteLine($"  processorSchedulerOOP class name = {processorSchedulerClass}");
-
-        if (processorSchedulerClass == "Association")
-        {
-            Console.WriteLine($"  ERROR: processorSchedulerOOP is an Association, not a ProcessorScheduler!");
-            // Get the Association's key and value to help debug
-            var assocKey = context.Allocator.GetInstanceVariable(processorSchedulerOOP, 0);
-            var assocValue = context.Allocator.GetInstanceVariable(processorSchedulerOOP, 1);
-            Console.WriteLine($"  Association key OOP = {assocKey}");
-            Console.WriteLine($"  Association value OOP = {assocValue}");
-        }
-
         var associationOOP = associationManager.GetOrCreateCanonical("Processor");
-        Console.WriteLine($"  Processor Association OOP = {associationOOP}");
-
-        // Check value before setting
-        var valueBefore = context.Allocator.GetInstanceVariable(associationOOP, 1);
-        Console.WriteLine($"  Value before = {valueBefore}");
-
         context.Allocator.SetInstanceVariable(associationOOP, 1, processorSchedulerOOP);
-
-        // Verify value after setting
-        var valueAfter = context.Allocator.GetInstanceVariable(associationOOP, 1);
-        Console.WriteLine($"  Value after = {valueAfter}");
-
         InstallInSystemDictionary(associationOOP, "Processor");
     }
 
