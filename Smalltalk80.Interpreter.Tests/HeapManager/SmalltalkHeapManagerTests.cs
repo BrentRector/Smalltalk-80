@@ -742,8 +742,10 @@ public class SmalltalkHeapManagerTests : IDisposable
         var roots = new[] { root1, root2 };
 
         // Act
-        _heapManager.SetGCRoots(roots);
-        var retrieved = _heapManager.GetGCRoots();
+        _heapManager.GC.ClearGCRoots();
+        foreach (var root in roots)
+            _heapManager.GC.AddGCRoot(root);
+        var retrieved = _heapManager.GC.GetGCRoots();
 
         // Assert
         Assert.Equal(2, retrieved.Length);
@@ -759,11 +761,13 @@ public class SmalltalkHeapManagerTests : IDisposable
         var root2 = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         var root3 = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
 
-        _heapManager.SetGCRoots(new[] { root1 });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root1);
 
         // Act
-        _heapManager.AddGCRoots(new[] { root2, root3 });
-        var retrieved = _heapManager.GetGCRoots();
+        _heapManager.GC.AddGCRoot(root2);
+        _heapManager.GC.AddGCRoot(root3);
+        var retrieved = _heapManager.GC.GetGCRoots();
 
         // Assert
         Assert.Equal(3, retrieved.Length);
@@ -777,11 +781,12 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var root = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
 
         // Act
-        var retrieved1 = _heapManager.GetGCRoots();
-        var retrieved2 = _heapManager.GetGCRoots();
+        var retrieved1 = _heapManager.GC.GetGCRoots();
+        var retrieved2 = _heapManager.GC.GetGCRoots();
 
         // Assert
         Assert.NotSame(retrieved1, retrieved2);
@@ -797,7 +802,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Arrange
         var root = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         var unreachable = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
 
         // Act
         var stats = _heapManager.GC.GarbageCollect();
@@ -813,7 +819,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         var root = _heapManager.AllocateObject(ObjectFormat.Pointer, 1, 0);
         var child = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         _heapManager.SetInstanceVariable(root, 0, child);
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
 
         // Act
         _heapManager.GC.GarbageCollect();
@@ -828,7 +835,8 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange
         var root = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
 
         // Act
         var stats = _heapManager.GC.GarbageCollect();
@@ -846,7 +854,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         var root = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         var unreachable1 = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         var unreachable2 = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, 10);
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
 
         // Act
         var unreachable = _heapManager.GC.GetUnreachableObjects();
@@ -869,7 +878,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetInstanceVariable(root, 0, a);
         _heapManager.SetInstanceVariable(a, 0, b);
         _heapManager.SetInstanceVariable(b, 0, c);
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
 
         // Act
         _heapManager.GC.GarbageCollect();
@@ -891,7 +901,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetInstanceVariable(a, 0, b);
         _heapManager.SetInstanceVariable(b, 0, c);
         _heapManager.SetInstanceVariable(c, 0, a);
-        _heapManager.SetGCRoots(new[] { a });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(a);
 
         // Act
         _heapManager.GC.GarbageCollect();
@@ -912,7 +923,8 @@ public class SmalltalkHeapManagerTests : IDisposable
 
         _heapManager.SetInstanceVariable(x, 0, y);
         _heapManager.SetInstanceVariable(y, 0, x);
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
 
         // Act
         var unreachable = _heapManager.GC.GetUnreachableObjects();
@@ -927,7 +939,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange - Create object but don't mark it or add to roots
         var unmarkedObj = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
-        _heapManager.SetGCRoots(Array.Empty<SmalltalkOOP>());
+        _heapManager.GC.ClearGCRoots();
 
         // Act
         var unreachable = _heapManager.GC.GetUnreachableObjects();
@@ -941,7 +953,8 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         // Arrange - Create object and add to GC roots
         var markedObj = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
-        _heapManager.SetGCRoots(new[] { markedObj });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(markedObj);
 
         // Act
         var unreachable = _heapManager.GC.GetUnreachableObjects();
@@ -957,7 +970,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         var root = _heapManager.AllocateObject(ObjectFormat.Pointer, 1, 0);
         var child = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         _heapManager.SetInstanceVariable(root, 0, child);
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
 
         // Act
         var unreachable = _heapManager.GC.GetUnreachableObjects();
@@ -998,7 +1012,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         var obj3 = _heapManager.AllocateObject(ObjectFormat.WordIndexed, 0, 50);
 
         // Act
-        var stats = _heapManager.GetGCStatistics();
+        var stats = _heapManager.GC.GetStatistics();
 
         // Assert
         Assert.True(stats.TotalObjects >= 3); // At least our 3 objects plus nil/true/false
@@ -1014,11 +1028,11 @@ public class SmalltalkHeapManagerTests : IDisposable
     public void GetGCStatistics_AfterAllocation_ReflectsNewObjects()
     {
         // Arrange
-        var statsBefore = _heapManager.GetGCStatistics();
+        var statsBefore = _heapManager.GC.GetStatistics();
 
         // Act
         _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
-        var statsAfter = _heapManager.GetGCStatistics();
+        var statsAfter = _heapManager.GC.GetStatistics();
 
         // Assert
         Assert.Equal(statsBefore.TotalObjects + 1, statsAfter.TotalObjects);
@@ -1042,7 +1056,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         }
 
         int beforeCount = _heapManager.GetActiveObjectCount();
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
 
         // Act
         var stats = _heapManager.GC.GarbageCollect();
@@ -1064,7 +1079,8 @@ public class SmalltalkHeapManagerTests : IDisposable
             _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         }
 
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
         _heapManager.GC.GarbageCollect();
 
         // Act - Allocate more objects after GC
@@ -1109,7 +1125,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         var root = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         var unreachable = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
 
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
         _heapManager.GC.GarbageCollect();
 
         // Act
@@ -1957,7 +1974,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         }
 
         int tableSizeBeforeGC = _heapManager.GetObjectTableSize();
-        _heapManager.SetGCRoots(new[] { root });
+        _heapManager.GC.ClearGCRoots();
+        _heapManager.GC.AddGCRoot(root);
 
         // Act
         _heapManager.GC.GarbageCollect();

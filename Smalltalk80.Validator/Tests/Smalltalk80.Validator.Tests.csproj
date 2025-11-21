@@ -14,4 +14,7 @@
     <ProjectReference Include="..\Core\Smalltalk80.Validator.Core.csproj" />
     <ProjectReference Include="..\Engine\Smalltalk80.Validator.Engine.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -18,13 +18,15 @@ public class SystemPrimitivesTests : PrimitiveTestBase
     {
         var primitive = new SystemOperations.CoreLeft();
         var mockHeap = CreateMockHeapManager();
+        var mockGC = new Mock<IGarbageCollector>();
 
-        mockHeap.Setup(h => h.GetGCStatistics()).Returns(new GCStatistics
+        mockGC.Setup(gc => gc.GetStatistics()).Returns(new GCStatistics
         {
             TotalObjects = 1000,
             CollectedObjects = 0,
             FreeObjectTableEntries = 0
         });
+        mockHeap.Setup(h => h.GC).Returns(mockGC.Object);
         mockHeap.Setup(h => h.GetObjectTableSize()).Returns(10000);
 
         var context = CreateContext(ObjectOOP(100), [], mockHeap.Object);
