@@ -23,23 +23,25 @@ public static class VMConstants
     //
     // Blue Book source (Smalltalk-80.st):
     //   ContextPart variableSubclass: #MethodContext
-    //   instanceVariableNames: 'method receiver'
+    //   instanceVariableNames: 'method lexicalParent receiver'
     //
     // Complete layout:
     //   Instance variable 0: sender (from InstructionStream) - caller context
     //   Instance variable 1: pc (from InstructionStream) - program counter
     //   Instance variable 2: stackp (from ContextPart) - stack pointer
     //   Instance variable 3: method (MethodContext field) - CompiledMethod being executed
-    //   Instance variable 4: receiver (MethodContext field) - self
-    //   Instance variable 5+: indexed temps/stack (variable part)
+    //   Instance variable 4: lexicalParent (MethodContext field) - context where method/block was defined
+    //   Instance variable 5: receiver (MethodContext field) - self
+    //   Instance variable 6+: indexed temps/stack (variable part)
 
     // Common context fields (shared by all contexts)
     public const int CONTEXT_SENDER_INDEX = 0;           // InstructionStream field (dynamic call chain)
     public const int CONTEXT_PC_INDEX = 1;               // InstructionStream field
     public const int CONTEXT_STACKP_INDEX = 2;           // ContextPart field
     public const int CONTEXT_METHOD_INDEX = 3;           // MethodContext field - CompiledMethod
-    public const int CONTEXT_RECEIVER_INDEX = 4;         // MethodContext field - self
-    public const int CONTEXT_TEMP_FRAME_START = 5;       // Start of indexed slots
+    public const int CONTEXT_LEXICALPARENT_INDEX = 4;    // MethodContext field - lexical parent context
+    public const int CONTEXT_RECEIVER_INDEX = 5;         // MethodContext field - self
+    public const int CONTEXT_TEMP_FRAME_START = 6;       // Start of indexed slots
 
     // ========================================================================
     // Blue Book: BlockContext field indices (Primitives 80-82)
@@ -67,6 +69,9 @@ public static class VMConstants
     //   Instance variable 5: home (BlockContext field) - lexical parent (always the MethodContext in unified frame)
     //   Instance variable 6: argStartIndex (VM EXTENSION) - starting index in MethodContext temp frame for block args
     //   Instance variable 7+: indexed slots - expression stack ONLY
+    //
+    // NOTE: BlockContext shares the first 3 fields with MethodContext (sender, pc, stackp) but these
+    // constants are defined separately for clarity in primitive implementations.
     //
     // IMPORTANT: BlockContext indexed slots (7+) are used ONLY for the expression stack.
     // Block arguments are stored in the home MethodContext's unified temp frame at indices
@@ -114,7 +119,16 @@ public static class VMConstants
     // ========================================================================
     // Metaclass field indices
     // ========================================================================
-    // Metaclass instanceVariableNames: 'thisClass' (plus inherited from Class/ClassDescription/Behavior)
+    // Metaclass inherits from: Behavior → ClassDescription → Class
+    // Metaclass adds: 'thisClass'
+    // Complete layout:
+    //   Instance variable 0: superclass (from Behavior)
+    //   Instance variable 1: methodDict (from Behavior)
+    //   Instance variable 2: format (from Behavior)
+    //   Instance variable 3: subclasses (from Behavior)
+    //   Instance variable 4: instanceVariables (from ClassDescription)
+    //   Instance variable 5: organization (from ClassDescription)
+    //   Instance variable 6: thisClass (Metaclass field) - points to the regular class
     // This field is critical for resolving class variables in metaclass methods
 
     public const int METACLASS_THISCLASS_INDEX = 6;  // Instance variable 6: thisClass (points to the regular class)
@@ -124,10 +138,17 @@ public static class VMConstants
     // ========================================================================
     // These are fixed by the Smalltalk-80 class definitions and won't change at runtime.
 
-    // Process instanceVariableNames: 'suspendedContext priority myList'
-    public const int PROCESS_SUSPENDEDCONTEXT_INDEX = 0;
-    public const int PROCESS_PRIORITY_INDEX = 1;
-    public const int PROCESS_MYLIST_INDEX = 2;
+    // Process inherits from Link (which has instance variable 'nextLink')
+    // Process adds: 'suspendedContext priority myList'
+    // Complete layout:
+    //   Instance variable 0: nextLink (from Link) - next process in linked list
+    //   Instance variable 1: suspendedContext (Process field) - saved context when suspended
+    //   Instance variable 2: priority (Process field) - process priority
+    //   Instance variable 3: myList (Process field) - process list this process belongs to
+    public const int PROCESS_NEXTLINK_INDEX = 0;
+    public const int PROCESS_SUSPENDEDCONTEXT_INDEX = 1;
+    public const int PROCESS_PRIORITY_INDEX = 2;
+    public const int PROCESS_MYLIST_INDEX = 3;
 
     // ProcessorScheduler instanceVariableNames: 'quiescentProcessLists activeProcess'
     public const int PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX = 0;
