@@ -40,9 +40,9 @@ public class GCDetailListener : IDiagnosticListener
                         .OrderByDescending(kvp => kvp.Value)
                         .ToList();
 
-                    foreach (var (className, count) in sortedClasses)
+                    foreach (var (cls, count) in sortedClasses)
                     {
-                        Console.WriteLine($"      {className}: {count}");
+                        Console.WriteLine($"      {cls}: {count}");
                     }
 
                     // Verify accounting
