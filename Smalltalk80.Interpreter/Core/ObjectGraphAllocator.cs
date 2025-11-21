@@ -185,22 +185,6 @@ public class ObjectGraphAllocator
     }
 
     /// <summary>
-    /// Gets raw slot access to the underlying heap manager.
-    /// </summary>
-    public SmalltalkOOP GetSlot(SmalltalkOOP objectOOP, int slotIndex)
-    {
-        return _heapManager.GetSlot(objectOOP, slotIndex);
-    }
-
-    /// <summary>
-    /// Sets raw slot access to the underlying heap manager.
-    /// </summary>
-    public void SetSlot(SmalltalkOOP objectOOP, int slotIndex, SmalltalkOOP value)
-    {
-        _heapManager.SetSlot(objectOOP, slotIndex, value);
-    }
-
-    /// <summary>
     /// Gets indexed byte from ByteIndexed objects.
     /// </summary>
     public byte GetIndexedByte(SmalltalkOOP objectOOP, int index)
