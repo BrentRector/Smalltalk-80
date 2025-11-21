@@ -62,7 +62,7 @@ Smalltalk80.Interpreter/
 
 ---
 
-### Smalltalk80.Interpreter.HeapManager Assembly (11 files)
+### Smalltalk80.Interpreter.HeapManager Assembly (10 files)
 
 **SEPARATE ASSEMBLY** - Memory management and object allocation with zero dependencies on VM semantics.
 
@@ -101,7 +101,6 @@ The heap manager is split into three focused interfaces:
 | File | Purpose |
 |------|---------|
 | ISmalltalkHeap.cs | Core heap interface (250 lines) |
-| ISmalltalkHeapManager.cs | Facade interface (backwards compatibility) |
 | SmalltalkHeapManager.cs | Heap implementation (825+ lines) |
 | IGarbageCollector.cs | GC interface (72 lines) |
 | GarbageCollector.cs | Mark-sweep GC implementation |
