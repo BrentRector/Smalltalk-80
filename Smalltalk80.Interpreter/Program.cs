@@ -361,9 +361,9 @@ public static class Program
                         Console.WriteLine("******************************************");
                         Console.WriteLine($"[{index}] {expr.Source}");
                         Console.WriteLine("******************************************");
-                        var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+                        var testResult = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
 
-                        if (result.Status == InitStatus.Success)
+                        if (testResult.Status == InitStatus.Success)
                         {
                             Console.WriteLine($"  ✓ Test completed successfully");
                             succeeded++;
@@ -372,16 +372,16 @@ public static class Program
                         {
                             failed++;
                             Console.WriteLine($"\n❌ TEST FAILED: {expr.Source}");
-                            Console.WriteLine($"   Status: {result.Status}");
-                            if (result.Diagnostic?.Message != null)
+                            Console.WriteLine($"   Status: {testResult.Status}");
+                            if (testResult.Diagnostic?.Message != null)
                             {
-                                Console.WriteLine($"   Error: {result.Diagnostic.Message}");
+                                Console.WriteLine($"   Error: {testResult.Diagnostic.Message}");
                             }
                             // Stack trace suppressed for cleaner output
-                            // if (result.Diagnostic?.StackTrace != null)
+                            // if (testResult.Diagnostic?.StackTrace != null)
                             // {
                             //     Console.WriteLine($"\n   Stack Trace:");
-                            //     Console.WriteLine($"   {result.Diagnostic.StackTrace}");
+                            //     Console.WriteLine($"   {testResult.Diagnostic.StackTrace}");
                             // }
                         }
                     }
