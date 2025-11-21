@@ -452,7 +452,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 _contextManager.DecrementContextDepth();
 
                 // Check if target was the initial context
-                if (senderOOP == _initialContextOOP || senderOOP == _knownObjects.Nil)
+                if (senderOOP == _initialContextOOP || senderOOP == _metadata.KnownObjects.Nil)
                 {
                     _returnValue = nlrValue;
                     _contextManager.SetActiveContext(_initialContextOOP);
@@ -481,7 +481,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             _contextManager.DecrementContextDepth();
 
             // Check if we ran out of contexts (error case)
-            if (senderOOP == _knownObjects.Nil)
+            if (senderOOP == _metadata.KnownObjects.Nil)
             {
                 throw new InvalidOperationException(
                     $"Non-local return target context {_nlrHandler.TargetContext} not found in sender chain. " +
@@ -533,7 +533,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _contextManager.DecrementContextDepth();
 
         // Check if we're returning to the initial context
-        if (senderOOP == _initialContextOOP || senderOOP == _knownObjects.Nil)
+        if (senderOOP == _initialContextOOP || senderOOP == _metadata.KnownObjects.Nil)
         {
             // Execution complete - return to caller
             _returnValue = returnValue;
@@ -596,7 +596,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         //
         //     // Debug: show what literal[0] actually is
         //     string literalInfo = "";
-        //     if (selectorOOP == _knownObjects.Nil)
+        //     if (selectorOOP == _metadata.KnownObjects.Nil)
         //     {
         //         literalInfo = " [literal[0]=nil]";
         //     }
@@ -792,7 +792,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _contextSwitchedByPrimitive = true;
 
         // Return nil as sentinel (actual result will be pushed by HandleReturn)
-        return _knownObjects.Nil;
+        return _metadata.KnownObjects.Nil;
     }
 
 
@@ -1002,7 +1002,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         int depth = 0;
         const int MAX_DEPTH = 5000;
 
-        while (currentOOP != _knownObjects.Nil && depth < MAX_DEPTH)
+        while (currentOOP != _metadata.KnownObjects.Nil && depth < MAX_DEPTH)
         {
             if (currentOOP == targetOOP)
                 return true;
@@ -1035,7 +1035,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         try
         {
             var thisClassOOP = _heapManager.GetInstanceVariable(classOOP, _metadata.MetaclassThisClassFieldIndex);
-            if (thisClassOOP != _knownObjects.Nil && thisClassOOP != _heapManager.GetNil())
+            if (thisClassOOP != _metadata.KnownObjects.Nil && thisClassOOP != _heapManager.GetNil())
             {
                 // This is a metaclass - get the name from its thisClass field
                 var nameSymbolOOP = _heapManager.GetInstanceVariable(thisClassOOP, _metadata.ClassNameFieldIndex);
@@ -1108,13 +1108,13 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // Context switch - signal and return nil
             // The InterpreterLoop will handle the context switch
             _contextSwitchPending = true;
-            return _knownObjects.Nil;
+            return _metadata.KnownObjects.Nil;
         }
         else
         {
             // Other outcomes (VMException, NonLocalReturn) - return nil
             // In legacy perform primitives, these were also handled
-            return _knownObjects.Nil;
+            return _metadata.KnownObjects.Nil;
         }
     }
 
@@ -1170,7 +1170,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Look up class OOP from heap - className might already have "class:" prefix
         string classNameClean = className.StartsWith("class:") ? className.Substring(6) : className;
         var classOOP = _runtimeHeapAccess.GetClass(classNameClean);
-        if (classOOP == _knownObjects.Nil)
+        if (classOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException($"Class {classNameClean} not found in heap");
         }
@@ -1285,8 +1285,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         int homeIndex = VMConstants.BLOCKCONTEXT_HOME_INDEX;
 
         // Initialize BlockContext fields (all 6 fixed fields)
-        _heapManager.SetInstanceVariable(blockContextOOP, senderIndex, _knownObjects.Nil); // sender initially nil
-        _heapManager.SetInstanceVariable(blockContextOOP, pcIndex, _knownObjects.Nil); // pc initially nil
+        _heapManager.SetInstanceVariable(blockContextOOP, senderIndex, _metadata.KnownObjects.Nil); // sender initially nil
+        _heapManager.SetInstanceVariable(blockContextOOP, pcIndex, _metadata.KnownObjects.Nil); // pc initially nil
         _heapManager.SetInstanceVariable(blockContextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(0)); // Stack starts empty
         _heapManager.SetInstanceVariable(blockContextOOP, nargsIndex, SmalltalkOOP.FromSmallInteger(argCount));
         _heapManager.SetInstanceVariable(blockContextOOP, startpcIndex, SmalltalkOOP.FromSmallInteger(startPC));
@@ -1295,7 +1295,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Initialize indexed fields to nil
         for (int i = 0; i < stackSize; i++)
         {
-            _heapManager.SetIndexedOOP(blockContextOOP, i, _knownObjects.Nil);
+            _heapManager.SetIndexedOOP(blockContextOOP, i, _metadata.KnownObjects.Nil);
         }
 
         return blockContextOOP;
@@ -1328,7 +1328,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 var fieldOOP = _heapManager.GetInstanceVariable(blockContextOOP, i);
                 Console.WriteLine($"  Slot {i}: {fieldOOP} (IsSmallInt={fieldOOP.IsSmallInteger})");
             }
-            return _knownObjects.Nil;
+            return _metadata.KnownObjects.Nil;
         }
 
         if (!nargsOOP.IsSmallInteger)
@@ -1341,7 +1341,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 var fieldOOP = _heapManager.GetInstanceVariable(blockContextOOP, i);
                 Console.WriteLine($"  Slot {i}: {fieldOOP} (IsSmallInt={fieldOOP.IsSmallInteger})");
             }
-            return _knownObjects.Nil;
+            return _metadata.KnownObjects.Nil;
         }
 
         int startPC = startPcOOP.AsSmallInteger();
@@ -1353,7 +1353,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         if (providedArgCount != expectedArgCount)
         {
             // Argument count mismatch - this will cause primitive to fail
-            return _knownObjects.Nil;
+            return _metadata.KnownObjects.Nil;
         }
 
         // Copy arguments into the BlockContext's OWN indexed slots (Blue Book architecture)
@@ -1405,7 +1405,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var classOfClassOOP = _heapManager.GetClassOOP(classOOP);
         
         var metaclassOOP = _runtimeHeapAccess.GetClass("Metaclass");
-        if (metaclassOOP != _knownObjects.Nil)
+        if (metaclassOOP != _metadata.KnownObjects.Nil)
         {
             if (classOfClassOOP == metaclassOOP)
             {
@@ -1441,7 +1441,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
         
         // Check if classPool is nil (shouldn't happen - Phase4 should have created it)
-        var nilOOP = _knownObjects.Nil;
+        var nilOOP = _metadata.KnownObjects.Nil;
         if (classPoolOOP == nilOOP)
         {
             return;
@@ -1513,7 +1513,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         const int initialSize = 8;
 
         var dictClassOOP = _runtimeHeapAccess.GetClass("Dictionary");
-        if (dictClassOOP == _knownObjects.Nil)
+        if (dictClassOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("Dictionary class not found - needed for classPool lazy initialization");
         }
@@ -1532,7 +1532,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Set tally to 0 (Dictionary inherits tally from Set at index 0)
         _heapManager.SetInstanceVariable(dictOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(0));
         
-        var nilOOP = _knownObjects.Nil;
+        var nilOOP = _metadata.KnownObjects.Nil;
         for (int i = 0; i < initialSize; i++)
         {
             _heapManager.SetIndexedOOP(dictOOP, i, nilOOP);
@@ -1567,7 +1567,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         for (int i = 0; i < size; i++)
         {
             var existingAssocOOP = _heapManager.GetIndexedOOP(dictionaryOOP, i);
-            if (existingAssocOOP == _knownObjects.Nil)
+            if (existingAssocOOP == _metadata.KnownObjects.Nil)
                 continue;
 
             var existingKeyOOP = _heapManager.GetInstanceVariable(existingAssocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
@@ -1582,7 +1582,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         for (int i = 0; i < size; i++)
         {
             var slotOOP = _heapManager.GetIndexedOOP(dictionaryOOP, i);
-            if (slotOOP == _knownObjects.Nil)
+            if (slotOOP == _metadata.KnownObjects.Nil)
             {
                 // Found empty slot - insert here
                 _heapManager.SetIndexedOOP(dictionaryOOP, i, associationOOP);
@@ -1605,7 +1605,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // 3. Which calls fullCheck that detects fullness
         // 4. Which calls grow to create a larger dictionary
         // 5. Which uses become: to swap the old and new dictionaries
-        return _knownObjects.Nil;
+        return _metadata.KnownObjects.Nil;
     }
 
     /// <summary>
@@ -1680,17 +1680,17 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Get USTable (Universal Symbol Table) from GlobalRegistry
         // Get USTable from heap (via the Smalltalk global dictionary)
-        var smalltalkDictOOP = _knownObjects.Smalltalk;
+        var smalltalkDictOOP = _metadata.KnownObjects.Smalltalk;
         var ustableOOP = _runtimeHeapAccess.LookupGlobalByName(smalltalkDictOOP, "USTable");
-        if (ustableOOP == _knownObjects.Nil)
+        if (ustableOOP == _metadata.KnownObjects.Nil)
         {
             // USTable not yet created (shouldn't happen after cold start)
-            return _knownObjects.Nil;
+            return _metadata.KnownObjects.Nil;
         }
 
         // USTable is an Array of Symbol OOPs (with nils for empty slots)
         int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
-        var nilOOP = _knownObjects.Nil;
+        var nilOOP = _metadata.KnownObjects.Nil;
 
         // Convert input string to bytes for comparison (Latin-1 encoding)
         byte[] searchBytes = System.Text.Encoding.Latin1.GetBytes(symbolName);
@@ -1731,7 +1731,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Symbol not found - return Nil to signal primitive failure
         // The Smalltalk fallback code will create a new Symbol if needed
-        return _knownObjects.Nil;
+        return _metadata.KnownObjects.Nil;
     }
 
     SmalltalkOOP IPrimitiveContext.GetGlobalObjectByName(string globalName)
@@ -1740,11 +1740,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // NOT from GlobalRegistry (which is a cold start snapshot that becomes stale)
 
         // Get Smalltalk SystemDictionary from KnownObjects
-        var smalltalkOOP = _knownObjects.Smalltalk;
-        if (smalltalkOOP == _knownObjects.Nil)
+        var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
+        if (smalltalkOOP == _metadata.KnownObjects.Nil)
         {
             // SystemDictionary not yet created (shouldn't happen after cold start)
-            return _knownObjects.Nil;
+            return _metadata.KnownObjects.Nil;
         }
 
         // Determine what we're looking for based on the prefix
@@ -1767,10 +1767,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // First, intern the key as a Symbol (required for dictionary lookup)
         var keySymbolOOP = ((IPrimitiveContext)this).InternSymbol(lookupKey);
-        if (keySymbolOOP == _knownObjects.Nil)
+        if (keySymbolOOP == _metadata.KnownObjects.Nil)
         {
             // Symbol not found - global doesn't exist
-            return _knownObjects.Nil;
+            return _metadata.KnownObjects.Nil;
         }
 
         // SystemDictionary is a Dictionary (PointerIndexed subclass of Set)
@@ -1783,7 +1783,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Search through SystemDictionary's indexed slots
         int dictionarySize = _heapManager.GetIndexedSize(smalltalkOOP);
-        var nilOOP = _knownObjects.Nil;
+        var nilOOP = _metadata.KnownObjects.Nil;
 
         for (int i = 0; i < dictionarySize; i++)
         {
@@ -1806,7 +1806,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         // Global not found
-        return _knownObjects.Nil;
+        return _metadata.KnownObjects.Nil;
     }
 
     string? IPrimitiveContext.GetClassNameForObject(SmalltalkOOP objectOOP)
@@ -1818,7 +1818,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Get the class OOP from slot 0 of the object
         var classOOP = _heapManager.GetSlot(objectOOP, 0);
-        if (classOOP == _knownObjects.Nil || classOOP == _heapManager.GetNil())
+        if (classOOP == _metadata.KnownObjects.Nil || classOOP == _heapManager.GetNil())
         {
             return null;
         }
@@ -1846,10 +1846,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private SmalltalkOOP ResolveAndPatchPoolVariable(SmalltalkOOP poolLiteralOOP, SmalltalkOOP methodOOP, int literalIndex, SmalltalkOOP poolNameSymbol, SmalltalkOOP keySymbol)
     {
         // 1. Resolve pool dictionary name to actual dictionary object
-        var smalltalkDict = _knownObjects.Smalltalk;
+        var smalltalkDict = _metadata.KnownObjects.Smalltalk;
         var poolDictOOP = LookupInDictionary(smalltalkDict, poolNameSymbol);
         
-        if (poolDictOOP == _knownObjects.Nil)
+        if (poolDictOOP == _metadata.KnownObjects.Nil)
         {
             // Pool dictionary not found - fall back to Undeclared
             // This handles cases where the pool dictionary is created by an initialize method
@@ -1857,12 +1857,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             Console.WriteLine($"[POOL VAR FALLBACK] Pool dictionary '{poolNameString}' not found, checking Undeclared");
 
             // Look up in Undeclared dictionary
-            var systemDictOOP = _knownObjects.Smalltalk;
+            var systemDictOOP = _metadata.KnownObjects.Smalltalk;
             var undeclaredOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, "Undeclared");
-            if (undeclaredOOP != _knownObjects.Nil)
+            if (undeclaredOOP != _metadata.KnownObjects.Nil)
             {
                 var undeclaredValueOOP = LookupInDictionary(undeclaredOOP, keySymbol);
-                if (undeclaredValueOOP != _knownObjects.Nil)
+                if (undeclaredValueOOP != _metadata.KnownObjects.Nil)
                 {
                     Console.WriteLine($"[POOL VAR FALLBACK] Found '{GetSymbolString(keySymbol)}' in Undeclared");
                     // Return the Association from Undeclared (don't patch, as pool dict may be created later)
@@ -1877,7 +1877,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // This allows us to distinguish "not found" from "value is nil"
         var resolvedAssocOOP = LookupAssociationInDictionary(poolDictOOP, keySymbol);
 
-        if (resolvedAssocOOP == _knownObjects.Nil)
+        if (resolvedAssocOOP == _metadata.KnownObjects.Nil)
         {
             // Key not found in pool dictionary
             var poolNameString = GetSymbolString(poolNameSymbol);
@@ -1905,7 +1905,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         //   Instance variable [0]: tally (inherited from Set)
         //   Indexed slots [0..N]: Association array
         int arraySize = _heapManager.GetIndexedSize(dictionaryOOP);
-        if (arraySize == 0) return _knownObjects.Nil;
+        if (arraySize == 0) return _metadata.KnownObjects.Nil;
 
         // Compute hash using identity hash (Primitive 75 semantics: OOP >> 1)
         int hash = keySymbol.IsSmallInteger
@@ -1921,10 +1921,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         {
             var elementOOP = _heapManager.GetIndexedOOP(dictionaryOOP, index);
 
-            if (elementOOP == _knownObjects.Nil)
+            if (elementOOP == _metadata.KnownObjects.Nil)
             {
                 // Empty slot - key not in dictionary
-                return _knownObjects.Nil;
+                return _metadata.KnownObjects.Nil;
             }
 
             // Element should be an Association
@@ -1941,7 +1941,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         } while (index != startIndex);
 
         // Wrapped around completely - not found
-        return _knownObjects.Nil;
+        return _metadata.KnownObjects.Nil;
     }
 
     /// <summary>
@@ -1952,9 +1952,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private SmalltalkOOP LookupInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbol)
     {
         var assocOOP = LookupAssociationInDictionary(dictionaryOOP, keySymbol);
-        if (assocOOP == _knownObjects.Nil)
+        if (assocOOP == _metadata.KnownObjects.Nil)
         {
-            return _knownObjects.Nil;
+            return _metadata.KnownObjects.Nil;
         }
         return _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
     }

@@ -241,7 +241,7 @@ public sealed class ObjectTable
 
             foreach (var rootOOP in roots)
             {
-                if (rootOOP != heapManager.GetNil() && rootOOP.IsObjectPointer)
+                if (rootOOP rootOOP.IsObjectPointer)
                 {
                     workList.Enqueue(rootOOP);
                 }
@@ -276,7 +276,7 @@ public sealed class ObjectTable
 
                         // Count non-nil InstanceVariables[4]
                         var instVarNamesRef = data.InstanceVariables[4];
-                        if (instVarNamesRef != heapManager.GetNil() && instVarNamesRef.IsObjectPointer)
+                        if (instVarNamesRef instVarNamesRef.IsObjectPointer)
                         {
                             class9withInstVars++;
                         }
@@ -287,7 +287,7 @@ public sealed class ObjectTable
 
                         // Count non-nil InstanceVariables[4]
                         var instVarNamesRef = data.InstanceVariables[4];
-                        if (instVarNamesRef != heapManager.GetNil() && instVarNamesRef.IsObjectPointer)
+                        if (instVarNamesRef instVarNamesRef.IsObjectPointer)
                         {
                             class7withInstVars++;
                         }
@@ -312,7 +312,7 @@ public sealed class ObjectTable
         bool enableDetailedLogging = false; // TODO: Re-enable when RuntimeOptions is added
 
         // Trace class reference
-        if (data.ClassRef != heapManager.GetNil() && data.ClassRef.IsObjectPointer)
+        if (data.ClassRef data.ClassRef.IsObjectPointer)
         {
             workList.Enqueue(data.ClassRef);
         }
@@ -329,7 +329,7 @@ public sealed class ObjectTable
 
             foreach (var varRef in data.InstanceVariables)
             {
-                if (varRef != heapManager.GetNil() && varRef.IsObjectPointer)
+                if (varRef varRef.IsObjectPointer)
                 {
                     workList.Enqueue(varRef);
                 }
@@ -343,7 +343,7 @@ public sealed class ObjectTable
             {
                 foreach (var indexedRef in indexedRefs)
                 {
-                    if (indexedRef != heapManager.GetNil() && indexedRef.IsObjectPointer)
+                    if (indexedRef indexedRef.IsObjectPointer)
                     {
                         workList.Enqueue(indexedRef);
                     }

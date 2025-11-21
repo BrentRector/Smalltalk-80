@@ -9,22 +9,30 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// Bytecode execution handlers for the Smalltalk-80 VM.
 /// Extracted from VirtualMachine.Bytecodes.cs for cleaner architecture.
 /// </summary>
-/// <param name="heapManager">The heap manager for memory operations.</param>
-/// <param name="context">The bytecode context for accessing execution state.</param>
-/// <param name="runtimeHeapAccess">Runtime heap access for class lookups.</param>
-/// <param name="metadata">VM metadata containing class OOPs.</param>
-internal class BytecodeInterpreter(
-    ISmalltalkHeapManager heapManager,
-    
-    IBytecodeContext context,
-    RuntimeHeapAccessor runtimeHeapAccess,
-    VMMetadata metadata) : IBytecodeInterpreter
+internal class BytecodeInterpreter : IBytecodeInterpreter
 {
+    private readonly ISmalltalkHeapManager heapManager;
+    private readonly IBytecodeContext context;
+    private readonly RuntimeHeapAccessor runtimeHeapAccess;
+    private readonly VMMetadata metadata;
+
     // Cached selector OOPs for arithmetic bytecodes (0xB0-0xBF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _arithmeticSelectorOOPs;
 
     // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _specialSelectorOOPs;
+
+    public BytecodeInterpreter(
+        ISmalltalkHeapManager heapManager,
+        IBytecodeContext context,
+        RuntimeHeapAccessor runtimeHeapAccess,
+        VMMetadata metadata)
+    {
+        this.heapManager = heapManager;
+        this.context = context;
+        this.runtimeHeapAccess = runtimeHeapAccess;
+        this.metadata = metadata;
+    }
 
     /// <inheritdoc />
     public bool VerboseDebug { get; set; }
