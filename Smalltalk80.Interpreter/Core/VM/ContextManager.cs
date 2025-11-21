@@ -285,6 +285,8 @@ internal class ContextManager(
     /// </summary>
     private void DisplayPoolStatistics()
     {
+        Console.WriteLine($"DEBUG: DisplayPoolStatistics called");
+
         // Calculate total contexts in all pools
         int totalPooled = 0;
         foreach (var (size, pool) in _contextPools)
@@ -292,9 +294,14 @@ internal class ContextManager(
             totalPooled += pool.Count;
         }
 
+        Console.WriteLine($"DEBUG: totalPooled={totalPooled}, hits={_poolHits}, misses={_poolMisses}, evictions={_poolEvictions}");
+
         // Only display if there are pooled contexts
         if (totalPooled == 0)
+        {
+            Console.WriteLine($"DEBUG: Early return - no contexts pooled");
             return;
+        }
 
         // Display statistics based on whether there have been requests
         long totalRequests = _poolHits + _poolMisses;
