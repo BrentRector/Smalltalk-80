@@ -264,8 +264,14 @@ public static class SimpleObjectPrimitives
             if (characterClassOOP == context.HeapManager.GetNil())
                 return context.HeapManager.GetNil();
 
-            // Get classPool from Character class (instance variable index 7)
-            var classPoolOOP = context.HeapManager.GetInstanceVariable(characterClassOOP, 7);
+            // Get the Character metaclass (class of Character class)
+            // Class variables are stored in the metaclass, not the class itself
+            var characterMetaclassOOP = context.HeapManager.GetClassOOP(characterClassOOP);
+            if (characterMetaclassOOP == context.HeapManager.GetNil())
+                return context.HeapManager.GetNil();
+
+            // Get classPool from Character metaclass (instance variable index 7)
+            var classPoolOOP = context.HeapManager.GetInstanceVariable(characterMetaclassOOP, 7);
             if (classPoolOOP == context.HeapManager.GetNil())
                 return context.HeapManager.GetNil();
 
