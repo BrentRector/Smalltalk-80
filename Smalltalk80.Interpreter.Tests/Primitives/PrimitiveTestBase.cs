@@ -14,9 +14,9 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Creates a mock heap manager with common default behaviors.
     /// </summary>
-    protected static Mock<ISmalltalkHeapManager> CreateMockHeapManager()
+    protected static Mock<ISmalltalkHeap> CreateMockHeapManager()
     {
-        var mock = new Mock<ISmalltalkHeapManager>(MockBehavior.Loose);
+        var mock = new Mock<ISmalltalkHeap>(MockBehavior.Loose);
 
         // Default behavior for class name lookup
         mock.Setup(h => h.GetClassName(It.IsAny<SmalltalkOOP>()))
@@ -95,7 +95,7 @@ public abstract class PrimitiveTestBase
     protected static PrimitiveExecutionContext CreateContext(
         SmalltalkOOP receiver,
         SmalltalkOOP[] arguments,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         RuntimeHeapAccessor? runtimeHeapAccess = null,
         IContextManager? contextManager = null,
         ICacheManager? cacheManager = null,
@@ -184,7 +184,7 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Sets up a mock heap manager to return a specific class OOP for an object.
     /// </summary>
-    protected static void SetupClassOOP(Mock<ISmalltalkHeapManager> mock, SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
+    protected static void SetupClassOOP(Mock<ISmalltalkHeap> mock, SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
     {
         mock.Setup(h => h.GetClassOOP(objectOOP)).Returns(classOOP);
     }
@@ -192,7 +192,7 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Sets up a mock heap manager to return a specific class name for an object.
     /// </summary>
-    protected static void SetupClassName(Mock<ISmalltalkHeapManager> mock, SmalltalkOOP objectOOP, string className)
+    protected static void SetupClassName(Mock<ISmalltalkHeap> mock, SmalltalkOOP objectOOP, string className)
     {
         mock.Setup(h => h.GetClassName(objectOOP)).Returns(className);
     }
@@ -200,7 +200,7 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Sets up a mock heap manager to return a specific indexed size for an object.
     /// </summary>
-    protected static void SetupIndexedSize(Mock<ISmalltalkHeapManager> mock, SmalltalkOOP objectOOP, int size)
+    protected static void SetupIndexedSize(Mock<ISmalltalkHeap> mock, SmalltalkOOP objectOOP, int size)
     {
         mock.Setup(h => h.GetIndexedSize(objectOOP)).Returns(size);
     }
@@ -208,7 +208,7 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Sets up a mock heap manager to return a specific object format.
     /// </summary>
-    protected static void SetupObjectFormat(Mock<ISmalltalkHeapManager> mock, SmalltalkOOP objectOOP, ObjectFormat format)
+    protected static void SetupObjectFormat(Mock<ISmalltalkHeap> mock, SmalltalkOOP objectOOP, ObjectFormat format)
     {
         mock.Setup(h => h.GetObjectFormat(objectOOP)).Returns(format);
     }
@@ -216,7 +216,7 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Sets up a mock heap manager to return specific instance variable values.
     /// </summary>
-    protected static void SetupInstanceVariable(Mock<ISmalltalkHeapManager> mock, SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
+    protected static void SetupInstanceVariable(Mock<ISmalltalkHeap> mock, SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
     {
         mock.Setup(h => h.GetInstanceVariable(objectOOP, index)).Returns(value);
     }
@@ -224,7 +224,7 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Sets up a mock heap manager to return specific indexed OOP values.
     /// </summary>
-    protected static void SetupIndexedOOP(Mock<ISmalltalkHeapManager> mock, SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
+    protected static void SetupIndexedOOP(Mock<ISmalltalkHeap> mock, SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
     {
         mock.Setup(h => h.GetIndexedOOP(objectOOP, index)).Returns(value);
     }
@@ -232,7 +232,7 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Sets up a mock heap manager to return specific indexed byte values.
     /// </summary>
-    protected static void SetupIndexedByte(Mock<ISmalltalkHeapManager> mock, SmalltalkOOP objectOOP, int index, byte value)
+    protected static void SetupIndexedByte(Mock<ISmalltalkHeap> mock, SmalltalkOOP objectOOP, int index, byte value)
     {
         mock.Setup(h => h.GetIndexedByte(objectOOP, index)).Returns(value);
     }
@@ -241,7 +241,7 @@ public abstract class PrimitiveTestBase
     /// Creates a basic mock RuntimeHeapAccessor that returns -1 for all field lookups.
     /// Tests can set up specific field indices as needed.
     /// </summary>
-    protected static Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccessor(Mock<ISmalltalkHeapManager> mockHeap)
+    protected static Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccessor(Mock<ISmalltalkHeap> mockHeap)
     {
         var mock = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
 

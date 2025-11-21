@@ -24,16 +24,16 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// - IBytecodeInterpreter → BytecodeInterpreter.cs: Bytecode dispatch and execution
 /// - IVMDebugger → VMDebugger.cs: Debugging and diagnostic output
 ///
-/// Uses ISmalltalkHeapManager for object storage and LayoutResolver for dynamic field access.
+/// Uses ISmalltalkHeap for object storage and LayoutResolver for dynamic field access.
 /// Consistently uses SmalltalkOOP for ALL object references to avoid OOP↔int conversions.
 ///
-/// RUNTIME ONLY: This class must ONLY access the Smalltalk heap via ISmalltalkHeapManager.
+/// RUNTIME ONLY: This class must ONLY access the Smalltalk heap via ISmalltalkHeap.
 /// NO access to cold start proxy data (_symbols[], ColdStartBundle, unfrozen registries).
 /// </summary>
 [RuntimeOnly(Reason = "Executes Smalltalk bytecode at runtime, must use heap-only access")]
 public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICacheManager, IPrimitiveMessageSender
 {
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     
     private readonly RuntimeHeapAccessor _runtimeHeapAccess;
     private readonly LayoutResolver _layoutResolver;
@@ -85,7 +85,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         set => _tracer.SelectorTraceEnabled = value;
     }
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
+    public VirtualMachine(ISmalltalkHeap heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
     {
         _heapManager = heapManager;
 
@@ -1075,7 +1075,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     }
 
     // IPrimitiveContext implementation - using new heap manager API with SmalltalkOOP types
-    ISmalltalkHeapManager IPrimitiveContext.HeapManager => _heapManager;
+    ISmalltalkHeap IPrimitiveContext.HeapManager => _heapManager;
     void IPrimitiveContext.InvalidateAllRuntimeCaches()
     {
         _runtimeHeapAccess.InvalidateAllCaches();
@@ -1641,8 +1641,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // This requires:
         // 1. Swapping the object table entries
         // 2. Updating ALL references in the heap to point to the swapped objects
-        
-        _heapManager.BecomeTwoWay(oop1, oop2);
+
+        _heapManager.Become.BecomeTwoWay(oop1, oop2);
     }
 
 

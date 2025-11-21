@@ -10,10 +10,10 @@ namespace Smalltalk80.Interpreter.HeapManager;
 internal class GarbageCollector : IGarbageCollector
 {
     private readonly IObjectTableManager _tableManager;
-    private readonly ISmalltalkHeapManager _heap;
+    private readonly ISmalltalkHeap _heap;
     private SmalltalkOOP[] _gcRoots = Array.Empty<SmalltalkOOP>();
 
-    public GarbageCollector(IObjectTableManager tableManager, ISmalltalkHeapManager heap)
+    public GarbageCollector(IObjectTableManager tableManager, ISmalltalkHeap heap)
     {
         _tableManager = tableManager;
         _heap = heap;

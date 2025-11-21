@@ -11,7 +11,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 public static class FloatArithmetic
 {
     /// <summary>Helper: Converts a Float object to C# double.</summary>
-    private static double ToDouble(ISmalltalkHeapManager heap, SmalltalkOOP floatOop)
+    private static double ToDouble(ISmalltalkHeap heap, SmalltalkOOP floatOop)
     {
         byte[] bytes = new byte[8];
         for (int i = 0; i < 4; i++)
@@ -38,7 +38,7 @@ public static class FloatArithmetic
     }
 
     /// <summary>Helper: Checks if an object is a Float.</summary>
-    private static bool IsFloat(ISmalltalkHeapManager heap, SmalltalkOOP oop)
+    private static bool IsFloat(ISmalltalkHeap heap, SmalltalkOOP oop)
     {
         if (oop.IsSmallInteger) return false;
         var format = heap.GetObjectFormat(oop);
@@ -47,7 +47,7 @@ public static class FloatArithmetic
     }
 
     /// <summary>Helper: Gets numeric value (SmallInteger or Float) as double.</summary>
-    private static bool TryGetDouble(ISmalltalkHeapManager heap, SmalltalkOOP oop, out double value)
+    private static bool TryGetDouble(ISmalltalkHeap heap, SmalltalkOOP oop, out double value)
     {
         if (oop.IsSmallInteger)
         {

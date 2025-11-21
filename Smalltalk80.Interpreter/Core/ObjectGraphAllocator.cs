@@ -18,10 +18,10 @@ namespace Smalltalk80.Interpreter.Core;
 [ColdStartOnly(Reason = "Uses ColdStartBundle which is stale after cold start")]
 public class ObjectGraphAllocator
 {
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly ColdStartBundle _bundle;
 
-    public ObjectGraphAllocator(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    public ObjectGraphAllocator(ISmalltalkHeap heapManager, ColdStartBundle bundle)
     {
         _heapManager = heapManager;
         _bundle = bundle;

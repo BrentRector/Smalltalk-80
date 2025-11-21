@@ -59,7 +59,7 @@ public static class ControlPrimitives
         /// <param name="currentPC">Current instruction pointer</param>
         /// <returns>PrimitiveResult with newly created BlockContext OOP</returns>
         public static PrimitiveResult CreateBlockContext(
-            ISmalltalkHeapManager heapManager,
+            ISmalltalkHeap heapManager,
             SmalltalkOOP activeContext,
             SmalltalkOOP blockContextClassOOP,
             SmalltalkOOP blockArgumentCount,

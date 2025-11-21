@@ -185,7 +185,7 @@ public static class SystemOperations
 
             try
             {
-                context.HeapManager.BecomeTwoWay(context.Receiver, context.Arguments[0]);
+                context.HeapManager.Become.BecomeTwoWay(context.Receiver, context.Arguments[0]);
                 return PrimitiveResult.Ok(context.Arguments[0]);
             }
             catch

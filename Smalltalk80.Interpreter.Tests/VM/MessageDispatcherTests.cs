@@ -14,12 +14,12 @@ namespace Smalltalk80.Interpreter.Tests.VM;
 [Trait("Category", "VM")]
 public class MessageDispatcherTests
 {
-    private readonly Mock<ISmalltalkHeapManager> _mockHeapManager;
+    private readonly Mock<ISmalltalkHeap> _mockHeapManager;
     private readonly Mock<IObjectMetadataAccessor> _mockHelpers;
 
     public MessageDispatcherTests()
     {
-        _mockHeapManager = new Mock<ISmalltalkHeapManager>(MockBehavior.Loose);
+        _mockHeapManager = new Mock<ISmalltalkHeap>(MockBehavior.Loose);
         _mockHelpers = new Mock<IObjectMetadataAccessor>(MockBehavior.Loose);
         SetupDefaultMocks();
     }

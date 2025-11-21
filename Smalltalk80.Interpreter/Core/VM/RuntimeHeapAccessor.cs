@@ -12,13 +12,13 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// </summary>
 public class RuntimeHeapAccessor : IRuntimeHeapAccessor
 {
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly VMMetadata metadata;
 
     // Caching layer (invalidated by primitive 89)
     private readonly RuntimeClassCache _classCache;
 
-    public RuntimeHeapAccessor(ISmalltalkHeapManager heapManager, VMMetadata metadata)
+    public RuntimeHeapAccessor(ISmalltalkHeap heapManager, VMMetadata metadata)
     {
         _heapManager = heapManager;
         this.metadata = metadata;

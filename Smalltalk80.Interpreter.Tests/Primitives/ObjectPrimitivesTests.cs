@@ -425,7 +425,7 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var result = primitive.Execute(context);
 
         AssertSuccessWithOOP(result, obj1);
-        mockHeap.Verify(h => h.BecomeTwoWay(obj1, obj2), Times.Once);
+        mockHeap.Verify(h => h.Become.BecomeTwoWay(obj1, obj2), Times.Once);
     }
 
     [Fact]

@@ -162,7 +162,7 @@ public static class Program
 
             // Run GC immediately after cold start to verify heap integrity
             Console.WriteLine("\n=== Running GC after cold start ===");
-            var gcStatsBefore = heapManager.GarbageCollect();
+            var gcStatsBefore = heapManager.GC.GarbageCollect();
             Console.WriteLine($"  {gcStatsBefore.GetSummary()}");
 
             // Execute init expressions - Run normal init expressions to check for regressions
@@ -487,7 +487,7 @@ public static class Program
 
                 // Run GC after all init expressions to collect temporary objects
                 Console.WriteLine($"\n=== Running GC after init expressions ===");
-                var gcStatsAfter = heapManager.GarbageCollect();
+                var gcStatsAfter = heapManager.GC.GarbageCollect();
                 Console.WriteLine($"  {gcStatsAfter.GetSummary()}");
                 if (gcStatsAfter.CollectedObjects > 0)
                 {
@@ -784,7 +784,7 @@ public static class Program
     /// <summary>
     /// Formats a return value OOP for display.
     /// </summary>
-    private static string FormatReturnValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, SmalltalkOOP returnOOP)
+    private static string FormatReturnValue(ISmalltalkHeap heapManager, ColdStartBundle bundle, SmalltalkOOP returnOOP)
     {
         if (returnOOP.IsSmallInteger)
             return $"SmallInteger({returnOOP.AsSmallInteger()})";
@@ -830,7 +830,7 @@ public static class Program
         byte[] bytecodes,
         SmalltalkOOP[] literalOOPs,
         InitResult result,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         ColdStartBundle bundle)
     {
         Console.WriteLine("\n=== VERBOSE DEBUG OUTPUT ===");

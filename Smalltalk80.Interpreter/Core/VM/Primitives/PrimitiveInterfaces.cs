@@ -50,7 +50,7 @@ public readonly struct PrimitiveExecutionContext
     public SmalltalkOOP[] Arguments { get; }
 
     /// <summary>Gets the heap manager for memory operations.</summary>
-    public ISmalltalkHeapManager HeapManager { get; }
+    public ISmalltalkHeap HeapManager { get; }
 
     /// <summary>Gets the stack manager for stack operations (optional for simple primitives).</summary>
     public IStackManager? StackManager { get; }
@@ -85,7 +85,7 @@ public readonly struct PrimitiveExecutionContext
     public PrimitiveExecutionContext(
         SmalltalkOOP receiver,
         SmalltalkOOP[] arguments,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         IStackManager? stackManager = null,
         IContextManager? contextManager = null,
         LayoutResolver? layoutResolver = null,

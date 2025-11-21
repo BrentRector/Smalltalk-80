@@ -19,7 +19,7 @@ namespace Smalltalk80.Interpreter.Core
     /// </summary>
     public class SnapshotWriter
     {
-        private readonly ISmalltalkHeapManager _heapManager;
+        private readonly ISmalltalkHeap _heapManager;
         private readonly ColdStartBundle _bundle;
         private readonly IReadOnlyDictionary<string, SmalltalkOOP> _localIdToObjectId;
 
@@ -27,7 +27,7 @@ namespace Smalltalk80.Interpreter.Core
         /// Initialize a new SnapshotWriter with heap access
         /// </summary>
         public SnapshotWriter(
-            ISmalltalkHeapManager heapManager,
+            ISmalltalkHeap heapManager,
             ColdStartBundle bundle,
             IReadOnlyDictionary<string, SmalltalkOOP> localIdToObjectId)
         {

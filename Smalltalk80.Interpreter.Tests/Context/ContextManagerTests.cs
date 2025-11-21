@@ -16,7 +16,7 @@ public class ContextManagerTests
 {
     #region Test Infrastructure
 
-    private readonly Mock<ISmalltalkHeapManager> _mockHeap;
+    private readonly Mock<ISmalltalkHeap> _mockHeap;
     private readonly Mock<IObjectMetadataAccessor> _mockHelpers;
     private readonly VMMetadata _metadata;
     private readonly LayoutResolver _layoutResolver;
@@ -30,7 +30,7 @@ public class ContextManagerTests
 
     public ContextManagerTests()
     {
-        _mockHeap = new Mock<ISmalltalkHeapManager>(MockBehavior.Loose);
+        _mockHeap = new Mock<ISmalltalkHeap>(MockBehavior.Loose);
         _mockHelpers = new Mock<IObjectMetadataAccessor>(MockBehavior.Loose);
 
         // Initialize SpecialObjectsArray for tests

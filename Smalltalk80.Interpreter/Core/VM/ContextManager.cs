@@ -11,7 +11,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// <param name="metadata">VM metadata containing class OOPs.</param>
 /// <param name="helpers">VM helper methods.</param>
 internal class ContextManager(
-    ISmalltalkHeapManager heapManager,
+    ISmalltalkHeap heapManager,
     VMMetadata metadata,
     IObjectMetadataAccessor helpers) : IContextManager
 {

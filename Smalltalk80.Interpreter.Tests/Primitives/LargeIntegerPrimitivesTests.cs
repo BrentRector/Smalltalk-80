@@ -22,7 +22,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     /// <summary>
     /// Sets up a mock heap manager for a LargePositiveInteger object.
     /// </summary>
-    private static SmalltalkOOP SetupLargePositiveInteger(Mock<ISmalltalkHeapManager> mock, int rawValue, BigInteger value)
+    private static SmalltalkOOP SetupLargePositiveInteger(Mock<ISmalltalkHeap> mock, int rawValue, BigInteger value)
     {
         var largeIntOOP = ObjectOOP(rawValue);
         var largeIntClassOOP = ObjectOOP(1000);
@@ -40,7 +40,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
         return largeIntOOP;
     }
 
-    private Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccess(Mock<ISmalltalkHeapManager> mockHeap)
+    private Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccess(Mock<ISmalltalkHeap> mockHeap)
     {
         var mock = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
         mock.Setup(r => r.GetClass("LargePositiveInteger")).Returns(ObjectOOP(1000));

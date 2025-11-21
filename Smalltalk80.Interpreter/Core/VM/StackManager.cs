@@ -15,7 +15,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// <param name="getPushTraceCounter">Function to get the current push trace counter.</param>
 /// <param name="incrementPushTraceCounter">Action to increment the push trace counter.</param>
 internal class StackManager(
-    ISmalltalkHeapManager heapManager,
+    ISmalltalkHeap heapManager,
     VMMetadata metadata,
     IObjectMetadataAccessor helpers,
     Func<SmalltalkOOP> getActiveContext,

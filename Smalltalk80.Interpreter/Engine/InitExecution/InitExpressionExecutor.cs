@@ -22,14 +22,14 @@ namespace Smalltalk80.Interpreter.Engine.InitExecution;
 /// </summary>
 public class InitExpressionExecutor
 {
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly VirtualMachine _vm;
     private readonly VMMetadata _metadata;
     private readonly InitPolicy _policy;
     private readonly int _defaultTimeoutMs;
 
     public InitExpressionExecutor(
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         VirtualMachine vm,
         VMMetadata metadata,
         InitPolicy policy = InitPolicy.AbortOnFirstError,
@@ -85,8 +85,8 @@ public class InitExpressionExecutor
 
             // Run GC after each init expression to validate collection of temporary objects
             // (Process and MethodContext are abandoned after each expression completes)
-            var gcStats = _heapManager.GarbageCollect();
-            Console.WriteLine($"[GC after {initId}] Collected {gcStats.CollectedObjects} objects, {gcStats.TotalObjects} total, {gcStats.ReachableObjects} reachable");
+            var gcStats = _heapManager.GC.GarbageCollect();
+            Console.WriteLine($"[GC after {initId}] Collected {gcStats.CollectedObjects} objects, {gcStats.TotalObjects} total, {gcStats.LiveObjects} live");
 
             if (result.Status != InitStatus.Success && _policy == InitPolicy.AbortOnFirstError)
             {

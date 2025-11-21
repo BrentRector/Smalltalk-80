@@ -14,7 +14,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Diagnoses Float class variables by comparing expected vs actual values.
     /// </summary>
-    public static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
+    public static void DiagnoseFloatClassVariables(ISmalltalkHeap heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -71,7 +71,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Gets the value of a Float class variable from the classPool.
     /// </summary>
-    public static string GetClassVariableValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, string varName, VMMetadata metadata)
+    public static string GetClassVariableValue(ISmalltalkHeap heapManager, ColdStartBundle bundle, string varName, VMMetadata metadata)
     {
         try
         {
@@ -139,7 +139,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Gets the string representation of a Symbol OOP.
     /// </summary>
-    public static string GetSymbolName(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, SmalltalkOOP symbolOOP)
+    public static string GetSymbolName(ISmalltalkHeap heapManager, ColdStartBundle bundle, SmalltalkOOP symbolOOP)
     {
         if (symbolOOP.IsSmallInteger)
             return $"SmallInteger({symbolOOP.AsSmallInteger()})";
@@ -164,7 +164,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Formats an OOP value for display, handling Floats, Arrays, and other types.
     /// </summary>
-    public static string FormatValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, SmalltalkOOP valueOOP, VMMetadata metadata)
+    public static string FormatValue(ISmalltalkHeap heapManager, ColdStartBundle bundle, SmalltalkOOP valueOOP, VMMetadata metadata)
     {
         if (valueOOP.IsSmallInteger)
             return $"{valueOOP.AsSmallInteger()}";
@@ -215,7 +215,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Diagnoses Cursor class variables.
     /// </summary>
-    public static void DiagnoseCursorClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
+    public static void DiagnoseCursorClassVariables(ISmalltalkHeap heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -310,7 +310,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Inspects ClassDescription.instanceVariables for several classes.
     /// </summary>
-    public static void InspectClassDescriptionInstanceVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
+    public static void InspectClassDescriptionInstanceVariables(ISmalltalkHeap heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -399,7 +399,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Formats an OOP value for display in diagnostics.
     /// </summary>
-    public static string FormatOOPValue(ISmalltalkHeapManager heapManager, SmalltalkOOP oop, SmalltalkOOP nilOOP)
+    public static string FormatOOPValue(ISmalltalkHeap heapManager, SmalltalkOOP oop, SmalltalkOOP nilOOP)
     {
         if (oop == nilOOP)
             return "nil";
@@ -458,7 +458,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Tests RuntimeHeapAccessor.BuildFieldMap() to verify it can read instance variable names.
     /// </summary>
-    public static void TestBuildFieldMap(ISmalltalkHeapManager heapManager, VMMetadata metadata)
+    public static void TestBuildFieldMap(ISmalltalkHeap heapManager, VMMetadata metadata)
     {
         try
         {
@@ -511,7 +511,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Inspects the File class>>initialize method's literal frame.
     /// </summary>
-    public static void InspectFileInitializeLiterals(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
+    public static void InspectFileInitializeLiterals(ISmalltalkHeap heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {

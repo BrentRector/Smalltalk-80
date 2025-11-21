@@ -25,7 +25,7 @@ public class Phase3_ObjectAllocation : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly LayoutResolver _layoutResolver;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
@@ -50,7 +50,7 @@ public class Phase3_ObjectAllocation : IPhase
     public Phase3_ObjectAllocation(
         ColdStartBundle bundle,
         ObjectGraphAllocator allocator,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,

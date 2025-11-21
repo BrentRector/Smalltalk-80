@@ -28,7 +28,7 @@ public class Phase6_ValidationAndGC : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly LayoutResolver _layoutResolver;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly string[] _symbols;
@@ -49,7 +49,7 @@ public class Phase6_ValidationAndGC : IPhase
     public Phase6_ValidationAndGC(
         ColdStartBundle bundle,
         ObjectGraphAllocator allocator,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         ColdstartReport report,
@@ -785,8 +785,11 @@ public class Phase6_ValidationAndGC : IPhase
         }
 
         // Set as GC roots (bulk operation - replaces any previous roots)
-        var gcRoots = gcRootsList.Select(r => r.oop).ToArray();
-        _heapManager.SetGCRoots(gcRoots);
+        _heapManager.GC.ClearGCRoots();
+        foreach (var (name, oop) in gcRootsList)
+        {
+            _heapManager.GC.AddGCRoot(oop);
+        }
 
         // Display GC roots
 // Console.WriteLine($"  GC Roots ({gcRootsList.Count} objects):");
@@ -803,7 +806,7 @@ public class Phase6_ValidationAndGC : IPhase
 
     private void RunGCVerification()
     {
-        var gcStats = _heapManager.GarbageCollect();
+        var gcStats = _heapManager.GC.GarbageCollect();
 
         // Update report metrics
         _report.Metrics.TotalObjectsAllocated = gcStats.TotalObjects;

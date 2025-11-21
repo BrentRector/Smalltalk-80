@@ -16,14 +16,14 @@ namespace Smalltalk80.Interpreter.Core.VM.Views;
 public readonly struct CompiledMethodView
 {
     private readonly SmalltalkOOP _oop;
-    private readonly ISmalltalkHeapManager _heap;
+    private readonly ISmalltalkHeap _heap;
 
     /// <summary>
     /// Creates a view of a CompiledMethod.
     /// </summary>
     /// <param name="oop">The CompiledMethod OOP.</param>
     /// <param name="heap">The heap manager for accessing fields.</param>
-    public CompiledMethodView(SmalltalkOOP oop, ISmalltalkHeapManager heap)
+    public CompiledMethodView(SmalltalkOOP oop, ISmalltalkHeap heap)
     {
         _oop = oop;
         _heap = heap;

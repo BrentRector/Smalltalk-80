@@ -535,7 +535,7 @@ public static class SimpleObjectPrimitives
             if (context.Receiver.IsSmallInteger || context.Arguments[0].IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            context.HeapManager.BecomeTwoWay(context.Receiver, context.Arguments[0]);
+            context.HeapManager.Become.BecomeTwoWay(context.Receiver, context.Arguments[0]);
             return PrimitiveResult.Ok(context.Receiver);
         }
     }
@@ -625,7 +625,7 @@ public static class CompiledMethodHelpers
     /// + Separate ByteArray for actual bytecodes
     /// </summary>
     public static SmalltalkOOP AllocateCompiledMethodInternal(
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         SmalltalkOOP compiledMethodClassOOP,
         SmalltalkOOP byteArrayClassOOP,
         SmalltalkOOP homeClassOOP,

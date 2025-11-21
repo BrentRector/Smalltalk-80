@@ -43,11 +43,11 @@ public static class TestHelpers
     #region Mock Factory Helpers
 
     /// <summary>
-    /// Creates a mock ISmalltalkHeapManager with common default setups.
+    /// Creates a mock ISmalltalkHeap with common default setups.
     /// </summary>
-    public static Mock<ISmalltalkHeapManager> CreateMockHeapManager()
+    public static Mock<ISmalltalkHeap> CreateMockHeapManager()
     {
-        var mock = new Mock<ISmalltalkHeapManager>();
+        var mock = new Mock<ISmalltalkHeap>();
 
         // Default: allocations return sequential OOPs
         var nextOopIndex = 100;

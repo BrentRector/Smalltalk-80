@@ -9,7 +9,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Caching;
 /// </summary>
 public class SelectorCache
 {
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly VMMetadata _metadata;
 
     /// <summary>Cached selector OOPs for arithmetic bytecodes (0xB0-0xBF).</summary>
@@ -24,7 +24,7 @@ public class SelectorCache
     /// <summary>
     /// Creates a new SelectorCache.
     /// </summary>
-    public SelectorCache(ISmalltalkHeapManager heapManager, VMMetadata metadata)
+    public SelectorCache(ISmalltalkHeap heapManager, VMMetadata metadata)
     {
         _heapManager = heapManager;
         _metadata = metadata;

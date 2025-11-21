@@ -21,7 +21,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
     /// <summary>
     /// Sets up a mock heap manager to return Float object data from a double value.
     /// </summary>
-    private static void SetupFloatObject(Mock<ISmalltalkHeapManager> mock, SmalltalkOOP floatOOP, double value)
+    private static void SetupFloatObject(Mock<ISmalltalkHeap> mock, SmalltalkOOP floatOOP, double value)
     {
         byte[] bytes = BitConverter.GetBytes(value);
 

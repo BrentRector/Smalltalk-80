@@ -17,7 +17,7 @@ public class Phase2_ClassInfrastructure : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
     private readonly ColdstartReport _report;
@@ -41,7 +41,7 @@ public class Phase2_ClassInfrastructure : IPhase
     public Phase2_ClassInfrastructure(
         ColdStartBundle bundle,
         ObjectGraphAllocator allocator,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
         ColdstartReport report,

@@ -24,7 +24,7 @@ namespace Smalltalk80.Interpreter.Engine;
 public class ColdStartOrchestrator : IColdStartLoader
 {
     private readonly ColdStartBundle _bundle;
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly ObjectGraphAllocator _allocator;
     private readonly ColdstartReport _report;
     private readonly string _bundlePath;
@@ -88,7 +88,7 @@ public class ColdStartOrchestrator : IColdStartLoader
     /// <param name="heapManager">The heap manager for allocating objects.</param>
     /// <param name="bundlePath">Optional path to the bundle file for diagnostics.</param>
     /// <param name="diagnostics">Optional diagnostic hub for event emission.</param>
-    public ColdStartOrchestrator(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, string? bundlePath = null, IDiagnosticHub? diagnostics = null)
+    public ColdStartOrchestrator(ColdStartBundle bundle, ISmalltalkHeap heapManager, string? bundlePath = null, IDiagnosticHub? diagnostics = null)
     {
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
         _heapManager = heapManager ?? throw new ArgumentNullException(nameof(heapManager));
@@ -440,8 +440,12 @@ public class ColdStartOrchestrator : IColdStartLoader
         }
 
         // Set GC roots and get unreachable objects (READ-ONLY - does not collect)
-        _heapManager.SetGCRoots(gcRootsList.ToArray());
-        var unreachableOOPs = _heapManager.GetUnreachableObjects();
+        _heapManager.GC.ClearGCRoots();
+        foreach (var root in gcRootsList)
+        {
+            _heapManager.GC.AddGCRoot(root);
+        }
+        var unreachableOOPs = _heapManager.GC.GetUnreachableObjects();
 
         // Report results
         if (unreachableOOPs.Length == 0)

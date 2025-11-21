@@ -11,7 +11,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// </summary>
 internal class BytecodeInterpreter : IBytecodeInterpreter
 {
-    private readonly ISmalltalkHeapManager heapManager;
+    private readonly ISmalltalkHeap heapManager;
     private readonly IBytecodeContext context;
     private readonly RuntimeHeapAccessor runtimeHeapAccess;
     private readonly VMMetadata metadata;
@@ -23,7 +23,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     private SmalltalkOOP[]? _specialSelectorOOPs;
 
     public BytecodeInterpreter(
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         IBytecodeContext context,
         RuntimeHeapAccessor runtimeHeapAccess,
         VMMetadata metadata)

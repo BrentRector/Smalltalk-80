@@ -29,7 +29,7 @@ public class Phase5Orchestrator : IPhase
     public Phase5Orchestrator(
         ColdStartBundle bundle,
         ObjectGraphAllocator allocator,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,

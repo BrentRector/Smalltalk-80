@@ -9,9 +9,9 @@ namespace Smalltalk80.Interpreter.Engine;
 /// </summary>
 public class ColdStartPrimitives : IColdStartPrimitives
 {
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
 
-    public ColdStartPrimitives(ISmalltalkHeapManager heapManager)
+    public ColdStartPrimitives(ISmalltalkHeap heapManager)
     {
         _heapManager = heapManager;
     }

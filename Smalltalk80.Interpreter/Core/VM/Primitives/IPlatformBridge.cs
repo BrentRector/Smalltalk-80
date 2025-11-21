@@ -12,7 +12,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// - All methods accept/return only SmalltalkOOPs and primitive scalars (int, byte, etc.)
 /// - Never return CLR proxy objects to primitives
 /// - Request-object pattern: Multi-field operations use heap-resident request objects
-/// - All OOPs passed in/out reference heap allocations created via ISmalltalkHeapManager
+/// - All OOPs passed in/out reference heap allocations created via ISmalltalkHeap
 /// </summary>
 public interface IPlatformBridge
 {

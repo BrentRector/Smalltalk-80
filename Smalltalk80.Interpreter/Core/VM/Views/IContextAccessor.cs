@@ -66,10 +66,10 @@ public interface IContextAccessor
 /// </summary>
 public class ContextAccessor : IContextAccessor
 {
-    private readonly ISmalltalkHeapManager _heap;
+    private readonly ISmalltalkHeap _heap;
     private readonly SmalltalkOOP _blockContextClassOOP;
 
-    public ContextAccessor(ISmalltalkHeapManager heap, SmalltalkOOP blockContextClassOOP)
+    public ContextAccessor(ISmalltalkHeap heap, SmalltalkOOP blockContextClassOOP)
     {
         _heap = heap;
         _blockContextClassOOP = blockContextClassOOP;
