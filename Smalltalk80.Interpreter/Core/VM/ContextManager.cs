@@ -242,14 +242,8 @@ internal class ContextManager(
     {
         if (_diagnostics != null)
         {
-            Console.WriteLine("DEBUG: ContextManager registering for GCStart events");
             // Register to receive ONLY GCStart events
             _diagnostics.Register(this, DiagnosticEventTypes.GCStart);
-            Console.WriteLine($"DEBUG: ContextManager registered successfully, hub has listeners");
-        }
-        else
-        {
-            Console.WriteLine("DEBUG: ContextManager has NO diagnostics hub!");
         }
     }
 
@@ -266,8 +260,6 @@ internal class ContextManager(
     /// <inheritdoc />
     public void OnEvent(DiagnosticEvent evt)
     {
-        Console.WriteLine("DEBUG: ContextManager received GCStart event!");
-
         // Hub only dispatches GCStart events (our registered type)
         // Safe to cast without checking
         var gcStart = (GCStartEvent)evt;
@@ -285,8 +277,6 @@ internal class ContextManager(
     /// </summary>
     private void DisplayPoolStatistics()
     {
-        Console.WriteLine($"DEBUG: DisplayPoolStatistics called");
-
         // Calculate total contexts in all pools
         int totalPooled = 0;
         foreach (var (size, pool) in _contextPools)
@@ -294,14 +284,9 @@ internal class ContextManager(
             totalPooled += pool.Count;
         }
 
-        Console.WriteLine($"DEBUG: totalPooled={totalPooled}, hits={_poolHits}, misses={_poolMisses}, evictions={_poolEvictions}");
-
         // Only display if there are pooled contexts
         if (totalPooled == 0)
-        {
-            Console.WriteLine($"DEBUG: Early return - no contexts pooled");
             return;
-        }
 
         // Display statistics based on whether there have been requests
         long totalRequests = _poolHits + _poolMisses;

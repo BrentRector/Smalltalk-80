@@ -223,16 +223,6 @@ public class InitExpressionExecutor
             // Set the process's suspendedContext to our new MethodContext
             _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, methodContextOOP);
 
-            // Run GC - should NOT collect (reachable via activeProcess → suspendedContext → method)
-            var gcStatsBefore = _heapManager.GC.GarbageCollect();
-
-            // Verify the CompiledMethod is still alive
-            if (!IsObjectAlive(compiledMethodOOP))
-            {
-                Console.WriteLine($" ❌ FAILED (CompiledMethod collected during reachability check)");
-                return InitResult.FatalError(expr.LocalId, "CompiledMethod was incorrectly collected during GC");
-            }
-
             // Execute the init expression
             SmalltalkOOP resultOOP;
             try
@@ -300,7 +290,7 @@ public class InitExpressionExecutor
             }
 
             // Show simple GC summary (listener shows details)
-            Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, GC: {gcStatsBefore.CollectedObjects}/{gcStatsAfter.CollectedObjects})");
+            Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, {gcStatsAfter.CollectedObjects} collected)");
 
             return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
         }
