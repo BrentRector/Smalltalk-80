@@ -214,7 +214,7 @@ public class InitExpressionExecutor
         // Find MethodContext class by querying Smalltalk dictionary
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
         var methodContextClassOOP = LookupGlobal(smalltalkOOP, "MethodContext");
-        if (methodContextClassOOP == default(SmalltalkOOP))
+        if (methodContextClassOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("MethodContext class not found in Smalltalk dictionary");
         }
@@ -263,9 +263,9 @@ public class InitExpressionExecutor
 
         // Find the symbol OOP for the global name by searching USTable
         var symbolOOP = FindSymbol(globalName);
-        if (symbolOOP == default(SmalltalkOOP))
+        if (symbolOOP == _metadata.KnownObjects.Nil)
         {
-            return default(SmalltalkOOP);
+            return _metadata.KnownObjects.Nil;
         }
 
         for (int i = 0; i < size; i++)
@@ -283,7 +283,7 @@ public class InitExpressionExecutor
             }
         }
 
-        return default(SmalltalkOOP);
+        return _metadata.KnownObjects.Nil;
     }
 
     /// <summary>
@@ -304,7 +304,7 @@ public class InitExpressionExecutor
             }
         }
 
-        return default(SmalltalkOOP);
+        return _metadata.KnownObjects.Nil;
     }
 
     /// <summary>
@@ -329,7 +329,7 @@ public class InitExpressionExecutor
         // Get Process class OOP - lookup from live heap
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
         var processClassOOP = LookupGlobal(smalltalkOOP, "Process");
-        if (processClassOOP == default(SmalltalkOOP))
+        if (processClassOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("Process class not found in Smalltalk dictionary");
         }
