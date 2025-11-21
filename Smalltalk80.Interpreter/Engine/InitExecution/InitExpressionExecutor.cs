@@ -369,7 +369,32 @@ public class InitExpressionExecutor
                                     Console.WriteLine($"          ^^^ FOUND IT! This BlockContext's home IS our MethodContext!");
                                 }
 
-                                // Also check sender chain
+                                // Check if home's sender chain reaches our MethodContext
+                                if (homeCtx != _metadata.KnownObjects.Nil && !homeCtx.IsSmallInteger)
+                                {
+                                    SmalltalkOOP homeSender = _heapManager.GetInstanceVariable(homeCtx, VMConstants.CONTEXT_SENDER_INDEX);
+                                    Console.WriteLine($"          BlockContext home's sender: {homeSender}");
+                                    if (homeSender == methodContextOOP)
+                                    {
+                                        Console.WriteLine($"          ^^^ FOUND IT! BlockContext->home->sender IS our MethodContext!");
+                                    }
+
+                                    // Walk the full sender chain from home
+                                    SmalltalkOOP currentSender = homeSender;
+                                    int depth = 0;
+                                    while (currentSender != _metadata.KnownObjects.Nil && !currentSender.IsSmallInteger && depth < 10)
+                                    {
+                                        if (currentSender == methodContextOOP)
+                                        {
+                                            Console.WriteLine($"          ^^^ FOUND IT at depth {depth}! Sender chain reaches our MethodContext!");
+                                            break;
+                                        }
+                                        currentSender = _heapManager.GetInstanceVariable(currentSender, VMConstants.CONTEXT_SENDER_INDEX);
+                                        depth++;
+                                    }
+                                }
+
+                                // Also check BlockContext's own sender chain
                                 SmalltalkOOP senderOOP = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.CONTEXT_SENDER_INDEX);
                                 Console.WriteLine($"          BlockContext sender: {senderOOP}");
                                 if (senderOOP == methodContextOOP)
