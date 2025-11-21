@@ -22,7 +22,13 @@ public class ObjectGraphAllocator
     private readonly ColdStartBundle _bundle;
 
     // OOP tracking for debugging orphaned objects
-    private static readonly HashSet<int> TrackedOOPs = new() { 6750, 30272, 30273, 30274 };
+    private static readonly HashSet<SmalltalkOOP> TrackedOOPs = new()
+    {
+        new SmalltalkOOP(6750),
+        new SmalltalkOOP(30272),
+        new SmalltalkOOP(30273),
+        new SmalltalkOOP(30274)
+    };
 
     public ObjectGraphAllocator(ISmalltalkHeap heapManager, ColdStartBundle bundle)
     {
@@ -33,7 +39,7 @@ public class ObjectGraphAllocator
     private void TrackOOP(SmalltalkOOP oop, string context)
     {
         if (oop.IsSmallInteger) return;
-        if (TrackedOOPs.Contains(oop.Value))
+        if (TrackedOOPs.Contains(oop))
         {
             var stackTrace = new System.Diagnostics.StackTrace(2, true);
             var frame = stackTrace.GetFrame(0);
