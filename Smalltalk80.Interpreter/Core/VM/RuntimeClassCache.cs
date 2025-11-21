@@ -11,11 +11,11 @@ namespace Smalltalk80.Interpreter.Core.VM;
 public class RuntimeClassCache
 {
     private readonly RuntimeHeapAccessor _heapAccess;
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private Dictionary<string, SmalltalkOOP> _classCache = new();
     private bool _cacheValid = true;
 
-    public RuntimeClassCache(RuntimeHeapAccessor heapAccess, ISmalltalkHeapManager heapManager)
+    public RuntimeClassCache(RuntimeHeapAccessor heapAccess, ISmalltalkHeap heapManager)
     {
         _heapAccess = heapAccess;
         _heapManager = heapManager;

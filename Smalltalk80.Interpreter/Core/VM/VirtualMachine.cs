@@ -24,16 +24,16 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// - IBytecodeInterpreter → BytecodeInterpreter.cs: Bytecode dispatch and execution
 /// - IVMDebugger → VMDebugger.cs: Debugging and diagnostic output
 ///
-/// Uses ISmalltalkHeapManager for object storage and LayoutResolver for dynamic field access.
+/// Uses ISmalltalkHeap for object storage and LayoutResolver for dynamic field access.
 /// Consistently uses SmalltalkOOP for ALL object references to avoid OOP↔int conversions.
 ///
-/// RUNTIME ONLY: This class must ONLY access the Smalltalk heap via ISmalltalkHeapManager.
+/// RUNTIME ONLY: This class must ONLY access the Smalltalk heap via ISmalltalkHeap.
 /// NO access to cold start proxy data (_symbols[], ColdStartBundle, unfrozen registries).
 /// </summary>
 [RuntimeOnly(Reason = "Executes Smalltalk bytecode at runtime, must use heap-only access")]
 public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICacheManager, IPrimitiveMessageSender
 {
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     
     private readonly RuntimeHeapAccessor _runtimeHeapAccess;
     private readonly LayoutResolver _layoutResolver;
@@ -85,7 +85,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         set => _tracer.SelectorTraceEnabled = value;
     }
 
-    public VirtualMachine(ISmalltalkHeapManager heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
+    public VirtualMachine(ISmalltalkHeap heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
     {
         _heapManager = heapManager;
 
@@ -101,7 +101,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _contextManager = new ContextManager(
             heapManager,
             metadata,
-            _layoutResolver,
             this // IObjectMetadataAccessor
         );
 
@@ -1026,7 +1025,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             return _metadata.SmallIntegerClassOOP;
 
         // For heap objects, class is in slot 0
-        var classOOP = _heapManager.GetSlot(objectOOP, 0);
+        var classOOP = _heapManager.GetClassOOP(objectOOP);
         return classOOP;
     }
 
@@ -1076,7 +1075,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     }
 
     // IPrimitiveContext implementation - using new heap manager API with SmalltalkOOP types
-    ISmalltalkHeapManager IPrimitiveContext.HeapManager => _heapManager;
+    ISmalltalkHeap IPrimitiveContext.HeapManager => _heapManager;
     void IPrimitiveContext.InvalidateAllRuntimeCaches()
     {
         _runtimeHeapAccess.InvalidateAllCaches();
@@ -1211,7 +1210,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var objectOOP = _heapManager.AllocateObject(format, fixedSize, indexedSize);
 
         // Set the class reference
-        _heapManager.SetSlot(objectOOP, 0, classOOP);
+        _heapManager.SetClassOOP(objectOOP, classOOP);
 
         return objectOOP;
     }
@@ -1276,7 +1275,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Allocate BlockContext with indexed fields for stack
         // BlockContext has 6 fixed fields (sender, pc, stackp, nargs, startpc, home) plus indexed stack slots
         var blockContextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 6, stackSize);
-        _heapManager.SetSlot(blockContextOOP, 0, blockContextClassOOP); // Set class reference
+        _heapManager.SetClassOOP(blockContextOOP, blockContextClassOOP); // Set class reference
 
         // Get field indices using LayoutResolver
         int senderIndex = VMConstants.BLOCKCONTEXT_CALLER_INDEX;
@@ -1529,7 +1528,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             initialSize
         );
 
-        _heapManager.SetSlot(dictOOP, 0, dictClassOOP);
+        _heapManager.SetClassOOP(dictOOP, dictClassOOP);
 
         // Set tally to 0 (Dictionary inherits tally from Set at index 0)
         _heapManager.SetInstanceVariable(dictOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(0));
@@ -1639,11 +1638,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     void IPrimitiveContext.BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2)
     {
         // Implement two-way become: swap the identities of oop1 and oop2
-        // This requires:
-        // 1. Swapping the object table entries
-        // 2. Updating ALL references in the heap to point to the swapped objects
-        
-        _heapManager.BecomeTwoWay(oop1, oop2);
+        // Swaps the ObjectTable entries - all existing OOP references are implicitly updated
+        // since OOPs are just indices into the ObjectTable
+
+        _heapManager.Become.BecomeTwoWay(oop1, oop2);
     }
 
 
@@ -1819,7 +1817,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         // Get the class OOP from slot 0 of the object
-        var classOOP = _heapManager.GetSlot(objectOOP, 0);
+        var classOOP = _heapManager.GetClassOOP(objectOOP);
         if (classOOP == _metadata.KnownObjects.Nil || classOOP == _heapManager.GetNil())
         {
             return null;

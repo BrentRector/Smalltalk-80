@@ -13,20 +13,20 @@ public static class PointPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var xOop = context.Receiver;
             var yOop = context.Arguments[0];
 
             // Both coordinates must be SmallIntegers
             if (!xOop.IsSmallInteger || !yOop.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             // Allocate Point with 2 instance variables
             var pointOOP = context.AllocateObject("Point", 0);
 
             // Get field indices from layout resolver
-            if (context.LayoutResolver == null) return PrimitiveResult.Fail();
+            if (context.LayoutResolver == null) return PrimitiveResult.Fail(context.Metadata!);
             int xIndex = context.LayoutResolver.GetFieldIndex("class:Point", "x");
             int yIndex = context.LayoutResolver.GetFieldIndex("class:Point", "y");
 

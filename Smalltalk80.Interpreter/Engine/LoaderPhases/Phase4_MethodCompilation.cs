@@ -3,7 +3,6 @@ using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
@@ -29,7 +28,7 @@ public class Phase4_MethodCompilation : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly IReadOnlyList<string> _symbols;
     private readonly ColdstartReport _report;
@@ -73,7 +72,7 @@ public class Phase4_MethodCompilation : IPhase
     public Phase4_MethodCompilation(
         ColdStartBundle bundle,
         ObjectGraphAllocator allocator,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
@@ -211,7 +210,7 @@ public class Phase4_MethodCompilation : IPhase
         foreach (var method in _bundle.Methods)
         {
             var bytecodes = ClassHierarchyTraversal.DecodeBytecodes(method.Bytecodes);
-            var nilOOP = GlobalRegistry.Get("nil");
+            var nilOOP = _heapManager.GetNil();
             var placeholderLiterals = new SmalltalkOOP[method.Literals.Length];
             for (int i = 0; i < placeholderLiterals.Length; i++)
             {
@@ -301,7 +300,7 @@ public class Phase4_MethodCompilation : IPhase
         // Fallback: Search literals for an Association
         foreach (var literalOOP in literalOOPs)
         {
-            var literalClassOOP = _heapManager.GetSlot(literalOOP, 0);
+            var literalClassOOP = _heapManager.GetClassOOP(literalOOP);
             var literalClassName = _allocator.GetClassName(literalClassOOP);
 
             if (literalClassName == "Association")
@@ -483,7 +482,7 @@ public class Phase4_MethodCompilation : IPhase
 
                 // VALUE MIGRATION VALIDATION: Check if Association has non-nil value
                 var valueOOP = _allocator.GetInstanceVariable(assocOOP, 1);
-                if (valueOOP != GlobalRegistry.Get("nil"))
+                if (valueOOP != _heapManager.GetNil())
                 {
                     nonNilValueCount++;
                 }
@@ -567,7 +566,7 @@ public class Phase4_MethodCompilation : IPhase
             for (int i = 0; i < sysDictSize; i++)
             {
                 var assocOOP = _allocator.GetIndexedOOP(sysDictOOP, i);
-                if (assocOOP != GlobalRegistry.Get("nil"))
+                if (assocOOP != _heapManager.GetNil())
                 {
                     reachableAssociations.Add(assocOOP);
                 }
@@ -587,14 +586,14 @@ public class Phase4_MethodCompilation : IPhase
                 int classPoolIndex = 7; // Standard classPool index
                 var classPoolOOP = _allocator.GetInstanceVariable(classOOP, classPoolIndex);
 
-                if (classPoolOOP == GlobalRegistry.Get("nil"))
+                if (classPoolOOP == _heapManager.GetNil())
                     continue;
 
                 int poolSize = _allocator.GetIndexedSize(classPoolOOP);
                 for (int i = 0; i < poolSize; i++)
                 {
                     var assocOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
-                    if (assocOOP != GlobalRegistry.Get("nil"))
+                    if (assocOOP != _heapManager.GetNil())
                     {
                         reachableAssociations.Add(assocOOP);
                     }

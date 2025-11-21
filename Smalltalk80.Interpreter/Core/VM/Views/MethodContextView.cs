@@ -14,14 +14,14 @@ namespace Smalltalk80.Interpreter.Core.VM.Views;
 public readonly struct MethodContextView
 {
     private readonly SmalltalkOOP _oop;
-    private readonly ISmalltalkHeapManager _heap;
+    private readonly ISmalltalkHeap _heap;
 
     /// <summary>
     /// Creates a view of a MethodContext.
     /// </summary>
     /// <param name="oop">The MethodContext OOP.</param>
     /// <param name="heap">The heap manager for accessing fields.</param>
-    public MethodContextView(SmalltalkOOP oop, ISmalltalkHeapManager heap)
+    public MethodContextView(SmalltalkOOP oop, ISmalltalkHeap heap)
     {
         _oop = oop;
         _heap = heap;

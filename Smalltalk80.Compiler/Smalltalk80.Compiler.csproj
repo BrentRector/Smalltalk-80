@@ -75,14 +75,22 @@
     <RemoveDir Directories="$(MSBuildProjectDirectory)\Generated" ContinueOnError="true" />
   </Target>
 
-  <!-- Auto-generation removed - use build scripts instead:
-       - build-standard.ps1: Generates standard coldstart.json
-       - build-with-tests.ps1: Generates coldstart_with_tests.json
-  -->
-  <!--
-  <Target Name="GenerateColdStart" AfterTargets="Build">
-    ... (removed - see build scripts)
+  <!-- Post-build: Generate coldstart.json from Smalltalk-80.st source -->
+  <Target Name="GenerateColdStart" AfterTargets="Build" Condition="'$(BuildingProject)' == 'true'">
+    <PropertyGroup>
+      <SourceFile>$(MSBuildProjectDirectory)\..\Smalltalk-80 Source\Smalltalk-80.st</SourceFile>
+      <CompilerExe>$(TargetPath)</CompilerExe>
+    </PropertyGroup>
+
+    <!-- Check if source file exists -->
+    <Error Condition="!Exists('$(SourceFile)')"
+           Text="Smalltalk-80 source file not found: $(SourceFile)" />
+
+    <!-- Run compiler to generate coldstart.json (defaults to $(TargetDir)coldstart.json) -->
+    <Message Text="Generating coldstart.json from Smalltalk-80.st..." Importance="high" />
+    <Exec Command="dotnet &quot;$(CompilerExe)&quot; &quot;$(SourceFile)&quot;" />
+
+    <Message Text="✓ Generated: $(TargetDir)coldstart.json" Importance="high" />
   </Target>
-  -->
 
 </Project>

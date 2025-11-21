@@ -13,10 +13,10 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Query garbage collector for memory statistics
-            var stats = context.HeapManager.GetGCStatistics();
+            var stats = context.HeapManager.GC.GetStatistics();
             int totalSlots = context.HeapManager.GetObjectTableSize();
             int usedSlots = stats.TotalObjects;
             int freeSlots = totalSlots - usedSlots;
@@ -35,7 +35,7 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             if (context.Platform != null)
             {
@@ -55,7 +55,7 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             if (System.Diagnostics.Debugger.IsAttached)
             {
@@ -64,7 +64,7 @@ public static class SystemOperations
             }
             else
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
@@ -74,7 +74,7 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             int totalSlots = context.HeapManager.GetObjectTableSize();
             int activeObjects = context.HeapManager.GetActiveObjectCount();
@@ -92,19 +92,19 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver must be Semaphore object (or nil to disable)
             if (!context.Receiver.IsSmallInteger && context.Receiver != context.HeapManager.GetNil())
             {
                 if (!context.Arguments[0].IsSmallInteger || !context.Arguments[1].IsSmallInteger)
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
 
                 int oopsThreshold = context.Arguments[0].AsSmallInteger();
                 int wordsThreshold = context.Arguments[1].AsSmallInteger();
 
                 if (oopsThreshold < 0 || wordsThreshold < 0)
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
 
                 // Stub implementation - accept parameters but don't implement monitoring
             }
@@ -118,14 +118,14 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver is a class (Behavior) - get its format field
             // Behavior instance variable layout: [0]=superclass, [1]=methodDict, [2]=format
             var formatOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 2);
             if (!formatOOP.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             // Use FormatWord to decode the instance variable count (bits 0-7)
             var formatWord = new FormatWord(formatOOP.AsSmallInteger());
@@ -140,14 +140,14 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Find first instance of receiver class
             var instance = context.HeapManager.FindInstanceOf(context.Receiver);
 
             if (instance == context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             return PrimitiveResult.Ok(instance);
         }
@@ -158,8 +158,8 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get receiver's class
             SmalltalkOOP receiverClassOOP = context.HeapManager.GetClassOOP(context.Receiver);
@@ -168,7 +168,7 @@ public static class SystemOperations
             var nextInstance = context.HeapManager.FindNextInstanceOf(receiverClassOOP, context.Receiver);
 
             if (nextInstance == context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             return PrimitiveResult.Ok(nextInstance);
         }
@@ -179,18 +179,18 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger || context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
-                context.HeapManager.BecomeTwoWay(context.Receiver, context.Arguments[0]);
+                context.HeapManager.Become.BecomeTwoWay(context.Receiver, context.Arguments[0]);
                 return PrimitiveResult.Ok(context.Arguments[0]);
             }
             catch
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
@@ -200,8 +200,8 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int count = 0;
 
@@ -228,7 +228,7 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -242,8 +242,8 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Find next object in heap enumeration
             int receiverIndex = context.Receiver.ToObjectTableIndex();

@@ -12,7 +12,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// <param name="helpers">Helper methods for symbol/class name resolution.</param>
 /// <param name="metadata">VM metadata for known objects.</param>
 internal sealed class VMDebugger(
-    ISmalltalkHeapManager heapManager,
+    ISmalltalkHeap heapManager,
     IContextManager contextManager,
     IBytecodeContext helpers,
     VMMetadata metadata) : IVMDebugger

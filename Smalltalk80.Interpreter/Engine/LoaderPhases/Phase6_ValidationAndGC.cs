@@ -28,7 +28,7 @@ public class Phase6_ValidationAndGC : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly LayoutResolver _layoutResolver;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly string[] _symbols;
@@ -49,7 +49,7 @@ public class Phase6_ValidationAndGC : IPhase
     public Phase6_ValidationAndGC(
         ColdStartBundle bundle,
         ObjectGraphAllocator allocator,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         ColdstartReport report,
@@ -134,7 +134,10 @@ public class Phase6_ValidationAndGC : IPhase
         // 8. Validate Association canonicalization
         ValidateAssociationCanonicalization(results);
 
-        // 9. Block ownership validation removed - BlockOwnerMap tracked in Phase4
+        // 9. Validate VMConstants against actual class layouts
+        ValidateVMConstants(results);
+
+        // 10. Block ownership validation removed - BlockOwnerMap tracked in Phase4
 
         // Report results
         ReportValidationResults(results);
@@ -303,7 +306,7 @@ public class Phase6_ValidationAndGC : IPhase
 // Console.WriteLine("  Validating special objects...");
 
         // Validate nil
-        ValidateSpecialObject("nil", GlobalRegistry.Get("nil"), results);
+        ValidateSpecialObject("nil", _heapManager.GetNil(), results);
 
         // Validate true/false
         ValidateSpecialObject("true", GlobalRegistry.Get("true"), results);
@@ -447,7 +450,7 @@ public class Phase6_ValidationAndGC : IPhase
         int validatedSlots = 0;
 
         // Validate nil singleton
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _heapManager.GetNil();
         if (nilOOP.IsSmallInteger)
         {
             results.AddError("Nil is SmallInteger");
@@ -546,7 +549,7 @@ public class Phase6_ValidationAndGC : IPhase
             // Get the class's method dictionary (instance variable 1 in Behavior)
             var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1);
 
-            if (methodDictOOP == GlobalRegistry.Get("nil"))
+            if (methodDictOOP == _heapManager.GetNil())
             {
                 continue;
             }
@@ -589,7 +592,7 @@ public class Phase6_ValidationAndGC : IPhase
                 for (int i = 0; i < capacity; i++)
                 {
                     var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
-                    if (keyOOP == GlobalRegistry.Get("nil"))
+                    if (keyOOP == _heapManager.GetNil())
                         continue;
 
                     var keySymbolName = _allocator.GetSymbolName(keyOOP);
@@ -674,34 +677,85 @@ public class Phase6_ValidationAndGC : IPhase
 
     private void ReportValidationResults(ValidationResults results)
     {
-        if (results.Errors.Count == 0)
+        // Count VMConstants-specific errors
+        var vmConstantErrors = results.Errors.Where(e => e.Contains("VMConstants")).ToList();
+        var otherErrors = results.Errors.Except(vmConstantErrors).ToList();
+
+        // Report VMConstants validation status
+        if (vmConstantErrors.Count == 0)
         {
-// Console.WriteLine("  ✓ Validation Summary:");
-// Console.WriteLine($"    Classes: {results.ClassesValidated} validated");
-// Console.WriteLine($"    Methods: {results.MethodsValidated} validated");
-// Console.WriteLine($"    Special objects: {results.SpecialObjectsValidated} validated");
-// Console.WriteLine($"    Init expressions: {results.InitExpressionsValidated} validated");
-// Console.WriteLine($"    Cross-references: {results.CrossReferencesValidated} objects checked");
-// Console.WriteLine($"    ✓ All heap objects match JSON definitions");
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Info,
+                Category = "Phase6",
+                Message = "✓ VMConstants validation: All 27 constants match class layouts",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
         }
         else
         {
-// Console.WriteLine("  ✗ VALIDATION FAILED");
-// Console.WriteLine($"    Validation errors found: {results.Errors.Count}");
-// Console.WriteLine($"    Classes: {results.ClassesValidated} validated");
-// Console.WriteLine($"    Methods: {results.MethodsValidated} validated");
-// Console.WriteLine($"    Invalid references: {results.InvalidReferences}");
-
-// Console.WriteLine($"    Showing first 20 errors:");
-            foreach (var error in results.Errors.Take(20))
+            _diagnostics?.Emit(new DiagnosticMessageEvent
             {
-// Console.WriteLine($"      {error}");
-            }
-            if (results.Errors.Count > 20)
-            {
-// Console.WriteLine($"      ... and {results.Errors.Count - 20} more errors");
-            }
+                Severity = MessageSeverity.Error,
+                Category = "Phase6",
+                Message = $"✗ VMConstants validation FAILED: {vmConstantErrors.Count} mismatches found",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
 
+            foreach (var error in vmConstantErrors)
+            {
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Error,
+                    Category = "Phase6",
+                    Message = $"  {error}",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
+            }
+        }
+
+        // Report other validation errors if any
+        if (otherErrors.Count > 0)
+        {
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Error,
+                Category = "Phase6",
+                Message = $"✗ VALIDATION FAILED: {otherErrors.Count} errors found",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+
+            foreach (var error in otherErrors.Take(20))
+            {
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Error,
+                    Category = "Phase6",
+                    Message = $"  {error}",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
+            }
+            if (otherErrors.Count > 20)
+            {
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Error,
+                    Category = "Phase6",
+                    Message = $"  ... and {otherErrors.Count - 20} more errors",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
+            }
+        }
+
+        // Throw if any errors found
+        if (results.Errors.Count > 0)
+        {
             throw new InvalidOperationException($"Heap validation failed with {results.Errors.Count} errors");
         }
     }
@@ -718,21 +772,24 @@ public class Phase6_ValidationAndGC : IPhase
         // use: ((ISmalltalkHeap)_heapManager).GC.AddGCRoot(oop)
         var gcRootsList = new List<(string name, SmalltalkOOP oop)>
         {
-            ("nil", GlobalRegistry.Get("nil")),
+            ("nil", _heapManager.GetNil()),
             ("false", GlobalRegistry.Get("false")),
             ("true", GlobalRegistry.Get("true")),
             ("Smalltalk", GlobalRegistry.SystemDictionaryOOP)
         };
 
         // Add init expression methods if allocated
-        if (_initExpressionMethods != GlobalRegistry.Get("nil"))
+        if (_initExpressionMethods != _heapManager.GetNil())
         {
             gcRootsList.Add(("InitExpressionMethods", _initExpressionMethods));
         }
 
         // Set as GC roots (bulk operation - replaces any previous roots)
-        var gcRoots = gcRootsList.Select(r => r.oop).ToArray();
-        _heapManager.SetGCRoots(gcRoots);
+        _heapManager.GC.ClearGCRoots();
+        foreach (var (name, oop) in gcRootsList)
+        {
+            _heapManager.GC.AddGCRoot(oop);
+        }
 
         // Display GC roots
 // Console.WriteLine($"  GC Roots ({gcRootsList.Count} objects):");
@@ -749,41 +806,22 @@ public class Phase6_ValidationAndGC : IPhase
 
     private void RunGCVerification()
     {
-        // Log object counts before GC
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase6",
-            Message = $"Objects before GC: Total objects: {_heapManager.GetActiveObjectCount()}",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-
-        var gcStats = _heapManager.GarbageCollect();
-
-        // Print GC statistics
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase6",
-            Message = $"GC Results: Live objects: {gcStats.LiveObjects}, Collected: {gcStats.CollectedObjects}",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
+        var gcStats = _heapManager.GC.GarbageCollect();
 
         // Update report metrics
         _report.Metrics.TotalObjectsAllocated = gcStats.TotalObjects;
         _report.Metrics.TotalObjectsReachable = gcStats.LiveObjects;
-        _report.Metrics.GCPassed = (gcStats.CollectedObjects == 0);
+        _report.Metrics.GCPassed = (gcStats.CollectedObjects == 1);
 
-        // Cold start fails if ANY objects were collected
-        if (gcStats.CollectedObjects > 0)
+        // Cold start expects exactly 1 collected object (the placeholder nil from heap manager initialization)
+        // After become: swaps the placeholder with the real UndefinedObject, the placeholder becomes unreachable
+        if (gcStats.CollectedObjects != 1)
         {
             _diagnostics?.Emit(new DiagnosticMessageEvent
             {
                 Severity = MessageSeverity.Error,
                 Category = "Phase6",
-                Message = $"COLD START FAILED: GC collected {gcStats.CollectedObjects} objects! All objects must be reachable from GC roots for cold start to pass.",
+                Message = $"COLD START FAILED: GC collected {gcStats.CollectedObjects} objects! Expected exactly 1 object (placeholder nil after become:).",
                 Timestamp = Stopwatch.GetTimestamp(),
                 InstructionCount = 0
             });
@@ -825,9 +863,9 @@ public class Phase6_ValidationAndGC : IPhase
                         if (obj.format == ObjectFormat.PointerIndexed)
                         {
                             var arrayOOP = new SmalltalkOOP(obj.oop);
-                            
+
                             // Check slot 0 (class pointer) to see what class this REALLY is
-                            var classOOP = _heapManager.GetSlot(arrayOOP, 0);
+                            var classOOP = _heapManager.GetClassOOP(arrayOOP);
                             string actualClassName = "?";
                             string homeClassInfo = "";
                             try
@@ -838,14 +876,14 @@ public class Phase6_ValidationAndGC : IPhase
                                 if (actualClassName == "CompiledMethod")
                                 {
                                     var homeClassOOP = _heapManager.GetInstanceVariable(arrayOOP, 0);
-                                    if (homeClassOOP == GlobalRegistry.Get("nil"))
+                                    if (homeClassOOP == _heapManager.GetNil())
                                     {
                                         homeClassInfo = " [homeClass=NIL!]";
                                     }
                                     else
                                     {
                                         var homeClassName = _heapManager.GetClassName(homeClassOOP);
-                                        var homeClassClass = _heapManager.GetSlot(homeClassOOP, 0);
+                                        var homeClassClass = _heapManager.GetClassOOP(homeClassOOP);
                                         var homeClassClassClass = _heapManager.GetClassName(homeClassClass);
                                         homeClassInfo = $" [homeClass={homeClassOOP}:{homeClassName}, homeClass.class={homeClassClass}:{homeClassClassClass}]";
                                     }
@@ -866,7 +904,7 @@ public class Phase6_ValidationAndGC : IPhase
                                     string elemStr;
                                     if (elem.IsSmallInteger)
                                         elemStr = elem.AsSmallInteger().ToString();
-                                    else if (elem == GlobalRegistry.Get("nil"))
+                                    else if (elem == _heapManager.GetNil())
                                         elemStr = "nil";
                                     else if (TryGetSymbolName(elem, out var name))
                                         elemStr = $"#{name}";
@@ -914,10 +952,87 @@ public class Phase6_ValidationAndGC : IPhase
 
             throw new InvalidOperationException(
                 $"COLD START BUG: GC collected {gcStats.CollectedObjects} objects. " +
-                $"All objects should be reachable from GC roots.");
+                $"Expected exactly 1 object (placeholder nil after become:).");
         }
 
-// Console.WriteLine($"  ✓ GC Verification passed: All {gcStats.LiveObjects} objects are reachable");
+// Console.WriteLine($"  ✓ GC Verification passed: {gcStats.LiveObjects} objects reachable, 1 placeholder nil collected as expected");
+    }
+
+    // ========================================================================================
+    // VMConstants Validation (catches Smalltalk source changes requiring VMConstants updates)
+    // ========================================================================================
+
+    /// <summary>
+    /// Validates that all VMConstants match the actual class layouts from LayoutResolver.
+    /// This catches changes in Smalltalk source code that require VMConstants to be updated.
+    /// </summary>
+    private void ValidateVMConstants(ValidationResults results)
+    {
+        // MethodContext field validation
+        ValidateConstant(results, "class:MethodContext", "sender", VMConstants.CONTEXT_SENDER_INDEX);
+        ValidateConstant(results, "class:MethodContext", "pc", VMConstants.CONTEXT_PC_INDEX);
+        ValidateConstant(results, "class:MethodContext", "stackp", VMConstants.CONTEXT_STACKP_INDEX);
+        ValidateConstant(results, "class:MethodContext", "method", VMConstants.CONTEXT_METHOD_INDEX);
+        ValidateConstant(results, "class:MethodContext", "lexicalParent", VMConstants.CONTEXT_LEXICALPARENT_INDEX);
+        ValidateConstant(results, "class:MethodContext", "receiver", VMConstants.CONTEXT_RECEIVER_INDEX);
+
+        // BlockContext field validation
+        ValidateConstant(results, "class:BlockContext", "sender", VMConstants.BLOCKCONTEXT_CALLER_INDEX);
+        ValidateConstant(results, "class:BlockContext", "pc", VMConstants.BLOCKCONTEXT_PC_INDEX);
+        ValidateConstant(results, "class:BlockContext", "stackp", VMConstants.BLOCKCONTEXT_STACKP_INDEX);
+        ValidateConstant(results, "class:BlockContext", "nargs", VMConstants.BLOCKCONTEXT_NARGS_INDEX);
+        ValidateConstant(results, "class:BlockContext", "startpc", VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+        ValidateConstant(results, "class:BlockContext", "home", VMConstants.BLOCKCONTEXT_HOME_INDEX);
+        ValidateConstant(results, "class:BlockContext", "argStartIndex", VMConstants.BLOCKCONTEXT_ARG_START_INDEX);
+
+        // Process field validation
+        ValidateConstant(results, "class:Process", "nextLink", VMConstants.PROCESS_NEXTLINK_INDEX);
+        ValidateConstant(results, "class:Process", "suspendedContext", VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+        ValidateConstant(results, "class:Process", "priority", VMConstants.PROCESS_PRIORITY_INDEX);
+        ValidateConstant(results, "class:Process", "myList", VMConstants.PROCESS_MYLIST_INDEX);
+
+        // ProcessorScheduler field validation
+        ValidateConstant(results, "class:ProcessorScheduler", "quiescentProcessLists", VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        ValidateConstant(results, "class:ProcessorScheduler", "activeProcess", VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+
+        // Association field validation
+        ValidateConstant(results, "class:Association", "key", VMConstants.ASSOCIATION_KEY_INDEX);
+        ValidateConstant(results, "class:Association", "value", VMConstants.ASSOCIATION_VALUE_INDEX);
+
+        // Set/Dictionary field validation
+        ValidateConstant(results, "class:Set", "tally", VMConstants.SET_TALLY_INDEX);
+        ValidateConstant(results, "class:Dictionary", "tally", VMConstants.DICTIONARY_TALLY_INDEX);
+
+        // Metaclass field validation
+        ValidateConstant(results, "class:Metaclass", "thisClass", VMConstants.METACLASS_THISCLASS_INDEX);
+
+        // Behavior field validation (superclass, methodDict, format)
+        ValidateConstant(results, "class:Behavior", "superclass", VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
+        ValidateConstant(results, "class:Behavior", "methodDict", VMConstants.BEHAVIOR_METHODDICT_INDEX);
+        ValidateConstant(results, "class:Behavior", "format", VMConstants.BEHAVIOR_FORMAT_INDEX);
+    }
+
+    /// <summary>
+    /// Validates a single VMConstant against LayoutResolver.
+    /// </summary>
+    private void ValidateConstant(ValidationResults results, string classLocalId, string fieldName, int expectedIndex)
+    {
+        try
+        {
+            int actualIndex = _layoutResolver.GetFieldIndex(classLocalId, fieldName);
+            if (actualIndex != expectedIndex)
+            {
+                results.AddError(
+                    $"VMConstants mismatch: {classLocalId}.{fieldName} expected index {expectedIndex} " +
+                    $"but LayoutResolver reports {actualIndex}. " +
+                    $"VMConstants.cs must be updated to match Smalltalk source changes.");
+            }
+        }
+        catch (Exception ex)
+        {
+            results.AddError(
+                $"VMConstants validation failed for {classLocalId}.{fieldName}: {ex.Message}");
+        }
     }
 
     // ========================================================================================

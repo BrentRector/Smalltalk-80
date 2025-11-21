@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Smalltalk80.Interpreter.Shared.Types;
 
 /// <summary>
@@ -38,6 +40,7 @@ public readonly struct KnownObjects
     /// <summary>
     /// Creates a KnownObjects instance with all required objects.
     /// </summary>
+    [SetsRequiredMembers]
     public KnownObjects(SmalltalkOOP nil, SmalltalkOOP @true, SmalltalkOOP @false, SmalltalkOOP smalltalk)
     {
         Nil = nil;

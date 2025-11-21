@@ -14,14 +14,14 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Prefer hardware-accelerated BitBlt if available
             if (context.Platform != null)
             {
                 bool success = context.Platform.PerformBitBlt(context.Receiver);
-                if (!success) return PrimitiveResult.Fail();
+                if (!success) return PrimitiveResult.Fail(context.Metadata!);
                 return PrimitiveResult.Ok(context.Receiver);
             }
 
@@ -50,7 +50,7 @@ public static class GraphicsOperations
                 !sourceYOOP.IsSmallInteger || !clipXOOP.IsSmallInteger || !clipYOOP.IsSmallInteger ||
                 !clipWidthOOP.IsSmallInteger || !clipHeightOOP.IsSmallInteger)
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
 
             // Extract numeric parameters
@@ -140,12 +140,12 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            if (context.Platform == null) return PrimitiveResult.Fail();
+            if (context.Platform == null) return PrimitiveResult.Fail(context.Metadata!);
 
             bool success = context.Platform.PerformSnapshot(context.Receiver);
-            if (!success) return PrimitiveResult.Fail();
+            if (!success) return PrimitiveResult.Fail(context.Metadata!);
 
             return PrimitiveResult.Ok(context.Receiver);
         }
@@ -156,7 +156,7 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Return estimate of available OOP slots
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(100000));
@@ -168,7 +168,7 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Query .NET GC for available memory estimate
             long availableMemory = GC.GetTotalMemory(false);
@@ -184,7 +184,7 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             int seconds;
             if (context.Platform != null)
@@ -205,8 +205,8 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Invalidate display if platform bridge available
             if (context.Platform != null)
@@ -232,8 +232,8 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Stub implementation
             return PrimitiveResult.Ok(context.Receiver);
@@ -245,7 +245,7 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             if (context.Platform != null)
             {
@@ -265,7 +265,7 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Platform == null) return PrimitiveResult.Fail();
+            if (context.Platform == null) return PrimitiveResult.Fail(context.Metadata!);
 
             if (context.Arguments.Length == 0)
             {
@@ -278,15 +278,15 @@ public static class GraphicsOperations
                 // Write clipboard
                 SmalltalkOOP stringOOP = context.Arguments[0];
                 if (stringOOP.IsSmallInteger || stringOOP == context.HeapManager.GetNil())
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
 
                 bool success = context.Platform.WriteClipboardFromStringOOP(stringOOP);
-                if (!success) return PrimitiveResult.Fail();
+                if (!success) return PrimitiveResult.Fail(context.Metadata!);
 
                 return PrimitiveResult.Ok(context.Receiver);
             }
 
-            return PrimitiveResult.Fail();
+            return PrimitiveResult.Fail(context.Metadata!);
         }
     }
 }

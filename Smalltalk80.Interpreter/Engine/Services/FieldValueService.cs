@@ -1,8 +1,8 @@
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Core.Schema;
 
 namespace Smalltalk80.Interpreter.Engine.Services;
 
@@ -37,19 +37,20 @@ public class FieldValueService
     /// </summary>
     /// <param name="value">The field value to resolve.</param>
     /// <param name="localIdToObjectId">The mapping from local IDs to allocated OOPs.</param>
+    /// <param name="nilOOP">The nil OOP from heap manager.</param>
     /// <returns>The resolved OOP, or null if the type requires allocation.</returns>
-    public SmalltalkOOP? ResolveSimpleValue(FieldValue value, Dictionary<string, SmalltalkOOP> localIdToObjectId)
+    public SmalltalkOOP? ResolveSimpleValue(FieldValue value, Dictionary<string, SmalltalkOOP> localIdToObjectId, SmalltalkOOP nilOOP)
     {
         return value.Type switch
         {
-            "nil" => GlobalRegistry.Get("nil"),
+            "nil" => nilOOP,
             "true" => GlobalRegistry.Get("true"),
             "false" => GlobalRegistry.Get("false"),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(value.Value!)),
             "symbolRef" => _symbolService.GetSymbolOOPByIndex(value.Index!.Value),
             "objectRef" => localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP)
                 ? objOOP
-                : GlobalRegistry.Get("nil"),
+                : nilOOP,
             _ => null // Requires allocation - return null to signal caller should handle
         };
     }

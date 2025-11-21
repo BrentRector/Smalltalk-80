@@ -2,7 +2,6 @@ using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Engine.Services;
 
@@ -26,7 +25,7 @@ public class FieldValueResolver : IFieldValueResolver
     public SmalltalkOOP Resolve(FieldValue? value)
     {
         if (value == null)
-            return GlobalRegistry.Get("nil");
+            return _context.HeapManager.GetNil();
 
         if (value.Type == "objectRef")
         {
@@ -35,7 +34,7 @@ public class FieldValueResolver : IFieldValueResolver
 
         return value.Type switch
         {
-            "nil" => GlobalRegistry.Get("nil"),
+            "nil" => _context.HeapManager.GetNil(),
             "true" => GlobalRegistry.Get("true"),
             "false" => GlobalRegistry.Get("false"),
             "smallInt" => SmalltalkOOP.FromSmallInteger((int)value.Value!),

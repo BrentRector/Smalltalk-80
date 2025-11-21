@@ -1,9 +1,8 @@
 using Moq;
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Tests.TestUtilities;
 
@@ -44,11 +43,11 @@ public static class TestHelpers
     #region Mock Factory Helpers
 
     /// <summary>
-    /// Creates a mock ISmalltalkHeapManager with common default setups.
+    /// Creates a mock ISmalltalkHeap with common default setups.
     /// </summary>
-    public static Mock<ISmalltalkHeapManager> CreateMockHeapManager()
+    public static Mock<ISmalltalkHeap> CreateMockHeapManager()
     {
-        var mock = new Mock<ISmalltalkHeapManager>();
+        var mock = new Mock<ISmalltalkHeap>();
 
         // Default: allocations return sequential OOPs
         var nextOopIndex = 100;
@@ -67,29 +66,21 @@ public static class TestHelpers
     }
 
     /// <summary>
-    /// Creates a real SmalltalkHeapManager with SpecialObjectsArray initialized.
+    /// Creates a real SmalltalkHeapManager with test objects allocated.
+    /// Note: SpecialObjectsArray was replaced with VMMetadata.KnownObjects
     /// </summary>
     public static (SmalltalkHeapManager heap, SmalltalkOOP nil, SmalltalkOOP trueOop, SmalltalkOOP falseOop)
         CreateInitializedHeap()
     {
         var heap = new SmalltalkHeapManager();
 
-        // Allocate special objects
+        // Allocate special objects for testing
         var nilOOP = heap.AllocateObject(ObjectFormat.Pointer, 0, 0);
         var falseOOP = heap.AllocateObject(ObjectFormat.Pointer, 0, 0);
         var trueOOP = heap.AllocateObject(ObjectFormat.Pointer, 0, 0);
 
-        // Initialize SpecialObjectsArray if not already done
-        try
-        {
-            var soa = new SpecialObjectsArray(nilOOP, falseOOP, trueOOP,
-                SmalltalkOOP.Null, SmalltalkOOP.Null);
-            SpecialObjectsArray.Initialize(soa);
-        }
-        catch
-        {
-            // Already initialized, ignore
-        }
+        // Note: For full VM operation, these would be stored in VMMetadata.KnownObjects
+        // For unit tests, we just return the allocated OOPs
 
         return (heap, nilOOP, trueOOP, falseOOP);
     }

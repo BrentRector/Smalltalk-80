@@ -5,7 +5,6 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Attributes;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using System.Diagnostics;
@@ -25,7 +24,7 @@ namespace Smalltalk80.Interpreter.Engine;
 public class ColdStartOrchestrator : IColdStartLoader
 {
     private readonly ColdStartBundle _bundle;
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly ObjectGraphAllocator _allocator;
     private readonly ColdstartReport _report;
     private readonly string _bundlePath;
@@ -89,7 +88,7 @@ public class ColdStartOrchestrator : IColdStartLoader
     /// <param name="heapManager">The heap manager for allocating objects.</param>
     /// <param name="bundlePath">Optional path to the bundle file for diagnostics.</param>
     /// <param name="diagnostics">Optional diagnostic hub for event emission.</param>
-    public ColdStartOrchestrator(ColdStartBundle bundle, ISmalltalkHeapManager heapManager, string? bundlePath = null, IDiagnosticHub? diagnostics = null)
+    public ColdStartOrchestrator(ColdStartBundle bundle, ISmalltalkHeap heapManager, string? bundlePath = null, IDiagnosticHub? diagnostics = null)
     {
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
         _heapManager = heapManager ?? throw new ArgumentNullException(nameof(heapManager));
@@ -253,7 +252,7 @@ public class ColdStartOrchestrator : IColdStartLoader
         int thisClassIdx = LayoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
 
         // Get special objects from GlobalRegistry (allocated during cold start phases)
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _heapManager.GetNil();
         var trueOOP = GlobalRegistry.Get("true");
         var falseOOP = GlobalRegistry.Get("false");
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
@@ -423,8 +422,8 @@ public class ColdStartOrchestrator : IColdStartLoader
         var gcRootsList = new List<SmalltalkOOP>();
 
         // Add fundamental sentinels if they exist
-        if (GlobalRegistry.Get("nil") != default)
-            gcRootsList.Add(GlobalRegistry.Get("nil"));
+        if (_heapManager.GetNil() != default)
+            gcRootsList.Add(_heapManager.GetNil());
         if (GlobalRegistry.Get("true") != default)
             gcRootsList.Add(GlobalRegistry.Get("true"));
         if (GlobalRegistry.Get("false") != default)
@@ -441,8 +440,12 @@ public class ColdStartOrchestrator : IColdStartLoader
         }
 
         // Set GC roots and get unreachable objects (READ-ONLY - does not collect)
-        _heapManager.SetGCRoots(gcRootsList.ToArray());
-        var unreachableOOPs = _heapManager.GetUnreachableObjects();
+        _heapManager.GC.ClearGCRoots();
+        foreach (var root in gcRootsList)
+        {
+            _heapManager.GC.AddGCRoot(root);
+        }
+        var unreachableOOPs = _heapManager.GC.GetUnreachableObjects();
 
         // Report results
         if (unreachableOOPs.Length == 0)

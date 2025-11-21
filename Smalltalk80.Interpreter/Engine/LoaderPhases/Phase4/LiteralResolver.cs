@@ -3,7 +3,6 @@ using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Engine.Services;
 
@@ -56,7 +55,7 @@ internal class LiteralResolver(
             "string" => InternString(_strings[literal.Index!.Value]),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
             "float" => AllocateFloat(GetFloatValue(literal.Value!)),
-            "nil" => GlobalRegistry.Get("nil"),
+            "nil" => _allocator.GetNil(),
             "true" => GlobalRegistry.Get("true"),
             "false" => GlobalRegistry.Get("false"),
             "objectRef" => _localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1) ? objOOP1 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
@@ -116,7 +115,7 @@ internal class LiteralResolver(
         // VALUE MIGRATION POLICY: Validate that incoming Association has nil value
         var incomingValueOOP = assoc.ValueRef?.LocalId != null
             ? _localIdToObjectId[assoc.ValueRef.LocalId]
-            : GlobalRegistry.Get("nil");
+            : _allocator.GetNil();
 
         // Warn if incoming value is non-nil (policy violation - silent)
         // Policy: Association literals should have nil values at compile time
@@ -126,7 +125,7 @@ internal class LiteralResolver(
         {
             // Create new Association: key=Symbol, value=nil
             // Always use nil value per VALUE MIGRATION POLICY
-            var assocOOP = AllocateAssociation(keySymbol, GlobalRegistry.Get("nil"));
+            var assocOOP = AllocateAssociation(keySymbol, _allocator.GetNil());
 
             return assocOOP;
         });
@@ -179,7 +178,7 @@ internal class LiteralResolver(
         var stringOOP = _allocator.AllocateString(value);
         // Set String class reference (coldstart phases can use GlobalRegistry)
         var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
-        _allocator.SetObjectClass(stringOOP, stringClassOOP);
+        _allocator.SetClassOOP(stringOOP, stringClassOOP);
         return stringOOP;
     }
 
@@ -196,7 +195,7 @@ internal class LiteralResolver(
 
         // Set Float class reference
         var floatClassOOP = GlobalRegistry.LookupClassOOP("Float");
-        _allocator.SetObjectClass(floatOOP, floatClassOOP);
+        _allocator.SetClassOOP(floatOOP, floatClassOOP);
 
         return floatOOP;
     }
@@ -219,7 +218,7 @@ internal class LiteralResolver(
         var characterOOP = _allocator.AllocateFixedObject("Character");
         // Set Character class reference
         var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
-        _allocator.SetObjectClass(characterOOP, characterClassOOP);
+        _allocator.SetClassOOP(characterOOP, characterClassOOP);
 
         // Store the code point in the Character object
         var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
@@ -255,7 +254,7 @@ internal class LiteralResolver(
         var byteArrayOOP = _allocator.AllocateByteArray("ByteArray", bytes);
         // Set ByteArray class reference
         var byteArrayClassOOP = GlobalRegistry.LookupClassOOP("ByteArray");
-        _allocator.SetObjectClass(byteArrayOOP, byteArrayClassOOP);
+        _allocator.SetClassOOP(byteArrayOOP, byteArrayClassOOP);
 
         // Bytes already stored during allocation
 

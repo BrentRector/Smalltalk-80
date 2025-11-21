@@ -1,9 +1,8 @@
 using Moq;
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Tests.Primitives;
 
@@ -426,7 +425,7 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var result = primitive.Execute(context);
 
         AssertSuccessWithOOP(result, obj1);
-        mockHeap.Verify(h => h.BecomeTwoWay(obj1, obj2), Times.Once);
+        mockHeap.Verify(h => h.Become.BecomeTwoWay(obj1, obj2), Times.Once);
     }
 
     [Fact]
@@ -468,8 +467,8 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
         // Format with 3 fixed fields
-        mockHeap.Setup(h => h.GetSlot(classOOP, 3)).Returns(SmallInt(3));
-        mockHeap.Setup(h => h.GetSlot(objectOOP, 2)).Returns(valueOOP);
+        mockHeap.Setup(h => h.GetInstanceVariable(classOOP, 2)).Returns(SmallInt(3));
+        mockHeap.Setup(h => h.GetInstanceVariable(objectOOP, 1)).Returns(valueOOP);
 
         var context = CreateContext(objectOOP, [SmallInt(2)], mockHeap.Object);
 
@@ -487,7 +486,7 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var classOOP = ObjectOOP(50);
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
-        mockHeap.Setup(h => h.GetSlot(classOOP, 3)).Returns(SmallInt(3));
+        mockHeap.Setup(h => h.GetInstanceVariable(classOOP, 2)).Returns(SmallInt(3));
 
         var context = CreateContext(objectOOP, [SmallInt(0)], mockHeap.Object);
 
@@ -505,7 +504,7 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var classOOP = ObjectOOP(50);
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
-        mockHeap.Setup(h => h.GetSlot(classOOP, 3)).Returns(SmallInt(3));
+        mockHeap.Setup(h => h.GetInstanceVariable(classOOP, 2)).Returns(SmallInt(3));
 
         var context = CreateContext(objectOOP, [SmallInt(4)], mockHeap.Object);
 
@@ -528,14 +527,14 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var valueOOP = ObjectOOP(200);
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
-        mockHeap.Setup(h => h.GetSlot(classOOP, 3)).Returns(SmallInt(3));
+        mockHeap.Setup(h => h.GetInstanceVariable(classOOP, 2)).Returns(SmallInt(3));
 
         var context = CreateContext(objectOOP, [SmallInt(2), valueOOP], mockHeap.Object);
 
         var result = primitive.Execute(context);
 
         AssertSuccessWithOOP(result, valueOOP);
-        mockHeap.Verify(h => h.SetSlot(objectOOP, 2, valueOOP), Times.Once);
+        mockHeap.Verify(h => h.SetInstanceVariable(objectOOP, 1, valueOOP), Times.Once);
     }
 
     #endregion
@@ -610,8 +609,9 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var primitive = new SimpleObjectPrimitives.SomeInstance();
         var mockHeap = CreateMockHeapManager();
         var classOOP = ObjectOOP(100);
+        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
 
-        mockHeap.Setup(h => h.FindInstanceOf(classOOP)).Returns(Nil);
+        mockHeap.Setup(h => h.FindInstanceOf(classOOP)).Returns(nilOOP);
 
         var context = CreateContext(classOOP, [], mockHeap.Object);
 
@@ -650,9 +650,10 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var mockHeap = CreateMockHeapManager();
         var objectOOP = ObjectOOP(100);
         var classOOP = ObjectOOP(50);
+        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
-        mockHeap.Setup(h => h.FindNextInstanceOf(classOOP, objectOOP)).Returns(Nil);
+        mockHeap.Setup(h => h.FindNextInstanceOf(classOOP, objectOOP)).Returns(nilOOP);
 
         var context = CreateContext(objectOOP, [], mockHeap.Object);
 

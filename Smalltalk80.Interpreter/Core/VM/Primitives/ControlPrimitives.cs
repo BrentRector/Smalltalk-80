@@ -15,13 +15,13 @@ public static class ControlPrimitives
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             // VM EXTENSION: Accept two arguments (nargs, argStartIndex)
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
 
             // args[0]: Block argument count (SmallInteger)
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // args[1]: argStartIndex in unified temp frame (SmallInteger)
-            if (!context.Arguments[1].IsSmallInteger) return PrimitiveResult.Fail();
+            if (!context.Arguments[1].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP blockArgumentCount = context.Arguments[0];
             int argCount = blockArgumentCount.AsSmallInteger();
@@ -30,7 +30,7 @@ public static class ControlPrimitives
             int argStartIndex = argStartIndexOOP.AsSmallInteger();
 
             // Argument count must be non-negative
-            if (argCount < 0 || argStartIndex < 0) return PrimitiveResult.Fail();
+            if (argCount < 0 || argStartIndex < 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get active context (receiver of blockCopy: bytecode)
             SmalltalkOOP activeContext = context.Receiver;
@@ -59,7 +59,7 @@ public static class ControlPrimitives
         /// <param name="currentPC">Current instruction pointer</param>
         /// <returns>PrimitiveResult with newly created BlockContext OOP</returns>
         public static PrimitiveResult CreateBlockContext(
-            ISmalltalkHeapManager heapManager,
+            ISmalltalkHeap heapManager,
             SmalltalkOOP activeContext,
             SmalltalkOOP blockContextClassOOP,
             SmalltalkOOP blockArgumentCount,
@@ -111,23 +111,23 @@ public static class ControlPrimitives
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             // Handles value, value:, value:value:, value:value:value:
-            if (context.Arguments.Length > 3) return PrimitiveResult.Fail();
+            if (context.Arguments.Length > 3) return PrimitiveResult.Fail(context.Metadata!);
 
             int argumentCount = context.Arguments.Length;
 
             // Receiver should be a BlockContext
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP blockContext = context.Receiver;
 
             // Get block's expected argument count
             SmalltalkOOP blockArgumentCountOOP = context.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-            if (!blockArgumentCountOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!blockArgumentCountOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int blockArgumentCount = blockArgumentCountOOP.AsSmallInteger();
 
             // Verify argument count matches
-            if (argumentCount != blockArgumentCount) return PrimitiveResult.Fail();
+            if (argumentCount != blockArgumentCount) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get argStartIndex from BlockContext extension field
             SmalltalkOOP argStartIndexOOP = context.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_ARG_START_INDEX);
@@ -168,30 +168,30 @@ public static class ControlPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver should be a BlockContext
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP arrayArg = context.Arguments[0];
 
             // Argument must be an Array (not SmallInteger)
-            if (arrayArg.IsSmallInteger) return PrimitiveResult.Fail();
+            if (arrayArg.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Validate it's actually an Array class
             string className = context.HeapManager.GetClassName(arrayArg);
-            if (className != "Array") return PrimitiveResult.Fail();
+            if (className != "Array") return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP blockContext = context.Receiver;
 
             // Get block's expected argument count
             SmalltalkOOP blockArgumentCountOOP = context.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-            if (!blockArgumentCountOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!blockArgumentCountOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
             int blockArgumentCount = blockArgumentCountOOP.AsSmallInteger();
 
             // Verify array size matches block's argument count
             int arraySize = context.HeapManager.GetIndexedSize(arrayArg);
-            if (arraySize != blockArgumentCount) return PrimitiveResult.Fail();
+            if (arraySize != blockArgumentCount) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get argStartIndex from BlockContext extension field
             SmalltalkOOP argStartIndexOOP = context.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_ARG_START_INDEX);
@@ -233,12 +233,12 @@ public static class ControlPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             // args[0] should be a Symbol
-            if (context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            if (context.MessageSender == null) return PrimitiveResult.Fail();
+            if (context.MessageSender == null) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP selectorOop = context.Arguments[0];
 
@@ -255,12 +255,12 @@ public static class ControlPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
 
             // args[0] = selector (Symbol), args[1] = argument
-            if (context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            if (context.MessageSender == null) return PrimitiveResult.Fail();
+            if (context.MessageSender == null) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP selectorOop = context.Arguments[0];
 
@@ -277,13 +277,13 @@ public static class ControlPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver must be a Semaphore
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? className = context.GetClassNameForObject(context.Receiver);
-            if (className == null) return PrimitiveResult.Fail();
+            if (className == null) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get Semaphore fields
             SmalltalkOOP firstLinkOop = context.GetFieldValue(context.Receiver, className, "firstLink");
@@ -292,7 +292,7 @@ public static class ControlPrimitives
             if (firstLinkOop == context.HeapManager.GetNil())
             {
                 // No processes waiting - increment excessSignals
-                if (!excessSignalsOop.IsSmallInteger) return PrimitiveResult.Fail();
+                if (!excessSignalsOop.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
                 int excessCount = excessSignalsOop.AsSmallInteger();
                 context.SetFieldValue(context.Receiver, className, "excessSignals", SmalltalkOOP.FromSmallInteger(excessCount + 1));
@@ -303,10 +303,10 @@ public static class ControlPrimitives
                 SmalltalkOOP processOop = RemoveFirstLink(context, context.Receiver, className);
 
                 if (processOop == context.HeapManager.GetNil())
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
 
                 if (!ResumeProcess(context, processOop))
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
             }
 
             return PrimitiveResult.Ok(context.Receiver);
@@ -318,18 +318,18 @@ public static class ControlPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver must be a Semaphore
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? className = context.GetClassNameForObject(context.Receiver);
-            if (className == null) return PrimitiveResult.Fail();
+            if (className == null) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get excessSignals field
             SmalltalkOOP excessSignalsOop = context.GetFieldValue(context.Receiver, className, "excessSignals");
 
-            if (!excessSignalsOop.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!excessSignalsOop.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int excessCount = excessSignalsOop.AsSmallInteger();
 
@@ -345,13 +345,13 @@ public static class ControlPrimitives
                 SmalltalkOOP activeProcessOop = GetActiveProcess(context);
 
                 if (activeProcessOop == context.HeapManager.GetNil())
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
 
                 // Add active process to semaphore's waiting list
                 AddLastLink(context, context.Receiver, className, activeProcessOop);
 
                 // Actual suspension requires context switch - fail to let Smalltalk handle it
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
@@ -361,24 +361,24 @@ public static class ControlPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver must be a Process
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? className = context.GetClassNameForObject(context.Receiver);
-            if (className == null) return PrimitiveResult.Fail();
+            if (className == null) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get Process fields: myList must be nil (not already scheduled)
             SmalltalkOOP myListOop = context.GetFieldValue(context.Receiver, className, "myList");
 
             // Fail if already on a list
             if (myListOop != context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             // Resume the process
             if (!ResumeProcess(context, context.Receiver))
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             return PrimitiveResult.Ok(context.Receiver);
         }
@@ -389,20 +389,20 @@ public static class ControlPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver must be a Process
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? className = context.GetClassNameForObject(context.Receiver);
-            if (className == null) return PrimitiveResult.Fail();
+            if (className == null) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP activeProcessOop = GetActiveProcess(context);
 
             if (context.Receiver == activeProcessOop)
             {
                 // Suspending active process requires context switch - fail
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
             else
             {
@@ -411,11 +411,11 @@ public static class ControlPrimitives
 
                 // Process must be on a list to suspend
                 if (myListOop == context.HeapManager.GetNil())
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
 
                 // Remove process from its list
                 if (!RemoveProcessFromList(context, context.Receiver, myListOop))
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
 
                 // Clear myList reference
                 context.SetFieldValue(context.Receiver, className, "myList", context.HeapManager.GetNil());
@@ -430,9 +430,9 @@ public static class ControlPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            if (context.CacheManager == null) return PrimitiveResult.Fail();
+            if (context.CacheManager == null) return PrimitiveResult.Fail(context.Metadata!);
 
             // Clear all caches
             context.CacheManager.ClearMethodCache();

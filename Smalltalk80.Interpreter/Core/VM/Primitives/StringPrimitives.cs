@@ -13,10 +13,10 @@ public static class StringPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 4) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 4) return PrimitiveResult.Fail(context.Metadata!);
 
             if (!context.Arguments[0].IsSmallInteger || !context.Arguments[1].IsSmallInteger || !context.Arguments[3].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int startIndex = context.Arguments[0].AsSmallInteger() - 1;
             int stopIndex = context.Arguments[1].AsSmallInteger() - 1;
@@ -24,17 +24,17 @@ public static class StringPrimitives
             int sourceStart = context.Arguments[3].AsSmallInteger() - 1;
 
             if (startIndex < 0 || stopIndex < startIndex || sourceStart < 0)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             if (context.Receiver.IsSmallInteger || sourceOop.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int copyCount = stopIndex - startIndex + 1;
             int receiverSize = context.HeapManager.GetIndexedSize(context.Receiver);
             int sourceSize = context.HeapManager.GetIndexedSize(sourceOop);
 
             if (stopIndex >= receiverSize || sourceStart + copyCount > sourceSize)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             // Handle overlapping regions
             if (context.Receiver == sourceOop && startIndex > sourceStart && startIndex < sourceStart + copyCount)
@@ -63,12 +63,12 @@ public static class StringPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get string bytes
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-            if (size == 0) return PrimitiveResult.Fail();
+            if (size == 0) return PrimitiveResult.Fail(context.Metadata!);
 
             byte[] bytes = new byte[size];
             for (int i = 0; i < size; i++)
@@ -79,11 +79,11 @@ public static class StringPrimitives
             string stringValue = System.Text.Encoding.Latin1.GetString(bytes);
 
             // Look up in USTable
-            if (context.RuntimeHeapAccess == null) return PrimitiveResult.Fail();
+            if (context.RuntimeHeapAccess == null) return PrimitiveResult.Fail(context.Metadata!);
             var symbolOOP = context.RuntimeHeapAccess.InternSymbol(stringValue);
 
             if (symbolOOP == context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             return PrimitiveResult.Ok(symbolOOP);
         }

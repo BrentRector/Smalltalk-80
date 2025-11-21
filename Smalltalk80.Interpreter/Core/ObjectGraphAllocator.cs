@@ -18,14 +18,20 @@ namespace Smalltalk80.Interpreter.Core;
 [ColdStartOnly(Reason = "Uses ColdStartBundle which is stale after cold start")]
 public class ObjectGraphAllocator
 {
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly ColdStartBundle _bundle;
 
-    public ObjectGraphAllocator(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    public ObjectGraphAllocator(ISmalltalkHeap heapManager, ColdStartBundle bundle)
     {
         _heapManager = heapManager;
         _bundle = bundle;
     }
+
+    /// <summary>
+    /// Gets the placeholder nil OOP (allocated during heap manager construction).
+    /// This OOP remains valid throughout cold start and becomes the real UndefinedObject via become:.
+    /// </summary>
+    public SmalltalkOOP GetNil() => _heapManager.GetNil();
 
     /// <summary>
     /// Allocates a basic object with only fixed instance variables (Pointer format).
@@ -75,7 +81,7 @@ public class ObjectGraphAllocator
         var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringBytes.Length);
 
         // Set class reference
-        _heapManager.SetSlot(stringOOP, 0, classOOP);
+        _heapManager.SetClassOOP(stringOOP, classOOP);
 
         // Store the string bytes
         for (int i = 0; i < stringBytes.Length; i++)
@@ -112,7 +118,7 @@ public class ObjectGraphAllocator
         var arrayOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, elementCount);
         
         // ALWAYS set class reference immediately - no way to forget this step
-        _heapManager.SetSlot(arrayOOP, 0, classOOP);
+        _heapManager.SetClassOOP(arrayOOP, classOOP);
         
         return arrayOOP;
     }
@@ -179,25 +185,9 @@ public class ObjectGraphAllocator
     /// <summary>
     /// Sets the class OOP in slot 0 (used to fix placeholder references).
     /// </summary>
-    public void SetObjectClass(SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
+    public void SetClassOOP(SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
     {
-        _heapManager.SetSlot(objectOOP, 0, classOOP);
-    }
-
-    /// <summary>
-    /// Gets raw slot access to the underlying heap manager.
-    /// </summary>
-    public SmalltalkOOP GetSlot(SmalltalkOOP objectOOP, int slotIndex)
-    {
-        return _heapManager.GetSlot(objectOOP, slotIndex);
-    }
-
-    /// <summary>
-    /// Sets raw slot access to the underlying heap manager.
-    /// </summary>
-    public void SetSlot(SmalltalkOOP objectOOP, int slotIndex, SmalltalkOOP value)
-    {
-        _heapManager.SetSlot(objectOOP, slotIndex, value);
+        _heapManager.SetClassOOP(objectOOP, classOOP);
     }
 
     /// <summary>
@@ -559,7 +549,7 @@ public class ObjectGraphAllocator
             return "SmallInteger";
         }
 
-        var classOOP = _heapManager.GetSlot(objectOOP, 0);
+        var classOOP = _heapManager.GetClassOOP(objectOOP);
         if (classOOP == _heapManager.GetNil())
         {
             return "NULL_CLASS";

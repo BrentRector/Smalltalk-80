@@ -2,7 +2,6 @@ using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
@@ -23,7 +22,7 @@ public class AssociationManager(Phase5Context context) : IAssociationManager
 
         return AssociationRegistry.GetOrCreate(keyName, () =>
         {
-            return Allocate(keySymbolOOP, GlobalRegistry.Get("nil"));
+            return Allocate(keySymbolOOP, context.HeapManager.GetNil());
         });
     }
 
@@ -36,7 +35,7 @@ public class AssociationManager(Phase5Context context) : IAssociationManager
 
         // Set Association class reference
         var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        context.Allocator.SetObjectClass(associationOOP, associationClassOOP);
+        context.Allocator.SetClassOOP(associationOOP, associationClassOOP);
 
         // Set instance variables: [0] = key, [1] = value
         context.Allocator.SetInstanceVariable(associationOOP, 0, keyOOP);

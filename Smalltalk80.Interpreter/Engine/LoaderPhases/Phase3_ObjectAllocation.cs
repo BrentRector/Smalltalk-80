@@ -25,7 +25,7 @@ public class Phase3_ObjectAllocation : IPhase
 {
     private readonly ColdStartBundle _bundle;
     private readonly ObjectGraphAllocator _allocator;
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly LayoutResolver _layoutResolver;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId;
     private readonly HashSet<(SmalltalkOOP oop, int slot)> _initializedFields;
@@ -50,7 +50,7 @@ public class Phase3_ObjectAllocation : IPhase
     public Phase3_ObjectAllocation(
         ColdStartBundle bundle,
         ObjectGraphAllocator allocator,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         LayoutResolver layoutResolver,
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
@@ -199,18 +199,18 @@ public class Phase3_ObjectAllocation : IPhase
 
         // CRITICAL: Set the class reference - AllocateFixedObject doesn't set it!
         var processorSchedulerClassOOP = GlobalRegistry.LookupClassOOP("ProcessorScheduler");
-        _allocator.SetObjectClass(processorSchedulerOOP, processorSchedulerClassOOP);
+        _allocator.SetClassOOP(processorSchedulerOOP, processorSchedulerClassOOP);
 
         GlobalRegistry.Register("ProcessorScheduler", processorSchedulerOOP);
 
         // Initialize ProcessorScheduler fields that should NOT be nil
-        InitializeProcessorSchedulerFields(processorSchedulerOOP, nilOOP);
+        InitializeProcessorSchedulerFields(processorSchedulerOOP, _heapManager.GetNil());
 
         // Create Undeclared Dictionary (v1.0.7)
         // The Undeclared dictionary holds Association objects for variables that were referenced
         // but not yet defined during compilation. SystemDictionary>>at:put: will migrate these
         // Associations when the variables become defined.
-        CreateUndeclaredDictionary(nilOOP);
+        CreateUndeclaredDictionary(_heapManager.GetNil());
     }
 
     /// <summary>
@@ -249,7 +249,7 @@ public class Phase3_ObjectAllocation : IPhase
         for (int i = 0; i < 8; i++)
         {
             var linkedListOOP = _allocator.AllocateFixedObject("LinkedList");
-            _allocator.SetObjectClass(linkedListOOP, linkedListClassOOP);
+            _allocator.SetClassOOP(linkedListOOP, linkedListClassOOP);
             // Initialize all instance variables to nil
             for (int j = 0; j < linkedListInstVarCount; j++)
             {
@@ -266,7 +266,7 @@ public class Phase3_ObjectAllocation : IPhase
         // Use ClassHierarchyTraversal to get correct indices from bundle data
         var processClassOOP = GlobalRegistry.LookupClassOOP("Process");
         var processOOP = _allocator.AllocateFixedObject("Process");
-        _allocator.SetObjectClass(processOOP, processClassOOP);
+        _allocator.SetClassOOP(processOOP, processClassOOP);
 
         // Get instance variable indices from bundle (includes inherited variables)
         int suspendedContextIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Process", "suspendedContext", _bundle);
@@ -540,7 +540,7 @@ public class Phase3_ObjectAllocation : IPhase
             {
                 // Metaclass objects point to the Metaclass class
                 var metaclassClassOOP = GlobalRegistry.LookupClassOOP("Metaclass");
-                _allocator.SetSlot(classOOP, 0, metaclassClassOOP);
+                _allocator.SetClassOOP(classOOP, metaclassClassOOP);
             }
             else
             {
@@ -550,7 +550,7 @@ public class Phase3_ObjectAllocation : IPhase
 
                 if (_localIdToObjectId.TryGetValue(metaclassLocalId, out SmalltalkOOP metaclassOOP))
                 {
-                    _allocator.SetSlot(classOOP, 0, metaclassOOP);
+                    _allocator.SetClassOOP(classOOP, metaclassOOP);
                 }
             }
 
@@ -571,7 +571,7 @@ public class Phase3_ObjectAllocation : IPhase
 
             string className = _bundle.Symbols[obj.ClassNameIndex];
             var classOOP = GlobalRegistry.LookupClassOOP(className);
-            _allocator.SetSlot(objectOOP, 0, classOOP);
+            _allocator.SetClassOOP(objectOOP, classOOP);
 
             classReferencesSet++;
         }
@@ -587,7 +587,7 @@ public class Phase3_ObjectAllocation : IPhase
             SmalltalkOOP classObjectId = GlobalRegistry.LookupClassOOP(className);
             var objectOOP = objectId;
             var classOOP = classObjectId;
-            _allocator.SetSlot(objectOOP, 0, classOOP);
+            _allocator.SetClassOOP(objectOOP, classOOP);
         }
     }
 
@@ -599,7 +599,7 @@ public class Phase3_ObjectAllocation : IPhase
 
         foreach (var (index, symbolOOP) in allSymbols)
         {
-            _allocator.SetSlot(symbolOOP, 0, symbolClassOOP);
+            _allocator.SetClassOOP(symbolOOP, symbolClassOOP);
         }
 
         // Set class reference for SystemDictionary
@@ -608,7 +608,7 @@ public class Phase3_ObjectAllocation : IPhase
             SmalltalkOOP systemDictClassId = GlobalRegistry.LookupClassOOP("SystemDictionary");
             var systemDictOOP = systemDictId;
             var systemDictClassOOP = systemDictClassId;
-            _allocator.SetSlot(systemDictOOP, 0, systemDictClassOOP);
+            _allocator.SetClassOOP(systemDictOOP, systemDictClassOOP);
         }
 
         // Set class reference for USTable (Array)
@@ -617,7 +617,7 @@ public class Phase3_ObjectAllocation : IPhase
             SmalltalkOOP arrayClassId = GlobalRegistry.LookupClassOOP("Array");
             var ustableOOP = ustableId;
             var arrayClassOOP = arrayClassId;
-            _allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
+            _allocator.SetClassOOP(ustableOOP, arrayClassOOP);
         }
 
         // CRITICAL FIX: Set class references for Associations created in Phase 3
@@ -651,11 +651,11 @@ public class Phase3_ObjectAllocation : IPhase
                 if (objectOOP.IsSmallInteger)
                     continue;
 
-                // Check if class pointer is unset (OOP(0) or nil)
-                var currentClassOOP = _allocator.GetSlot(objectOOP, 0);
+                // Check if class pointer is unset (nil)
+                var currentClassOOP = _allocator.GetClassOOP(objectOOP);
 
-                // Skip if class pointer already set to a non-zero/non-nil value
-                if (currentClassOOP != default(SmalltalkOOP) && currentClassOOP != GlobalRegistry.Get("nil"))
+                // Skip if class pointer already set (not nil)
+                if (currentClassOOP != _heapManager.GetNil())
                     continue;
 
                 // Check object format to determine class
@@ -666,13 +666,13 @@ public class Phase3_ObjectAllocation : IPhase
                 // Association: 2 instance vars, Pointer format, no indexed data
                 if (format == ObjectFormat.Pointer && instVarCount == 2 && indexedSize == 0)
                 {
-                    _allocator.SetSlot(objectOOP, 0, associationClassOOP);
+                    _allocator.SetClassOOP(objectOOP, associationClassOOP);
                     associationsFixed++;
                 }
                 // Dictionary: 1 instance var (tally), PointerIndexed format, indexed data
                 else if (format == ObjectFormat.PointerIndexed && instVarCount == 1 && indexedSize > 0)
                 {
-                    _allocator.SetSlot(objectOOP, 0, dictionaryClassOOP);
+                    _allocator.SetClassOOP(objectOOP, dictionaryClassOOP);
                     dictionariesFixed++;
                 }
             }
@@ -711,7 +711,7 @@ public class Phase3_ObjectAllocation : IPhase
     private void InitializeUnsetInstanceVariables()
     {
         int instanceVariablesInitialized = 0;
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _heapManager.GetNil();
 
         // Step 1: Initialize class object instance variables
         foreach (var cls in _bundle.Classes)
@@ -866,7 +866,7 @@ public class Phase3_ObjectAllocation : IPhase
     #region Behavior.subclasses Field Population
 
     /// <summary>
-    /// Populates Behavior.subclasses field (slot 3) with Set containing class OOP references
+    /// Populates Behavior.subclasses field (instance variable 3) with Set containing class OOP references
     /// for all direct subclasses of each class. This enables runtime reflection and supports
     /// class hierarchy queries.
     ///
@@ -892,7 +892,7 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // Get nil singleton (created in Section 1: AllocateSentinelObjects)
-        SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
+        SmalltalkOOP nilOOP = _heapManager.GetNil();
 
         // Build subclass map: className -> list of direct subclass OOPs
         var subclassMap = new Dictionary<string, List<SmalltalkOOP>>();
@@ -928,7 +928,7 @@ public class Phase3_ObjectAllocation : IPhase
             totalSubclassRefs++;
         }
 
-        // Now populate slot 3 for each class with its Set of subclasses
+        // Now populate instance variable 3 for each class with its Set of subclasses
         foreach (var cls in _bundle.Classes)
         {
             string className = _symbols[cls.NameIndex];
@@ -949,7 +949,7 @@ public class Phase3_ObjectAllocation : IPhase
                 // For simplicity during cold-start, we'll use a direct Array-based representation
                 // Real Set uses open-addressing hash table, but we'll use a simple Array for now
                 var setOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 1, subclasses.Count);
-                _heapManager.SetSlot(setOOP, 0, setClassOOP);  // Set class reference
+                _heapManager.SetClassOOP(setOOP, setClassOOP);  // Set class reference
 
                 // Set tally (instance variable 0) to SmallInteger with subclass count
                 var tallyOOP = SmalltalkOOP.FromSmallInteger(subclasses.Count);
@@ -961,7 +961,7 @@ public class Phase3_ObjectAllocation : IPhase
                     _heapManager.SetIndexedOOP(setOOP, i, subclasses[i]);
                 }
 
-                // Set Behavior.subclasses field (slot 3)
+                // Set Behavior.subclasses field (instance variable 3)
                 SetAndTrackInstanceVariable(classOOP, 3, setOOP);
                 setCount++;
             }
@@ -1021,7 +1021,7 @@ public class Phase3_ObjectAllocation : IPhase
             InstructionCount = 0
         });
 
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _heapManager.GetNil();
         int createdCount = 0;
         int classNameCount = 0;
         int withPreCreatedValues = 0;

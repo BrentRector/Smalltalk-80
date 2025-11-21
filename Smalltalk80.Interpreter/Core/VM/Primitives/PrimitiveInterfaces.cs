@@ -25,8 +25,11 @@ public readonly struct PrimitiveResult
     /// <summary>Creates a successful result with the given value.</summary>
     public static PrimitiveResult Ok(SmalltalkOOP value) => new(true, value);
 
-    /// <summary>Creates a failed result (value will be default/nil).</summary>
-    public static PrimitiveResult Fail() => new(false, default(SmalltalkOOP));
+    /// <summary>
+    /// Creates a failed result with nil value.
+    /// Always use this method - VMMetadata is required.
+    /// </summary>
+    public static PrimitiveResult Fail(VMMetadata metadata) => new(false, metadata.KnownObjects.Nil);
 
     /// <summary>Creates a result from a boolean condition.</summary>
     public static PrimitiveResult FromBool(bool condition, SmalltalkOOP trueValue, SmalltalkOOP falseValue) =>
@@ -47,7 +50,7 @@ public readonly struct PrimitiveExecutionContext
     public SmalltalkOOP[] Arguments { get; }
 
     /// <summary>Gets the heap manager for memory operations.</summary>
-    public ISmalltalkHeapManager HeapManager { get; }
+    public ISmalltalkHeap HeapManager { get; }
 
     /// <summary>Gets the stack manager for stack operations (optional for simple primitives).</summary>
     public IStackManager? StackManager { get; }
@@ -82,7 +85,7 @@ public readonly struct PrimitiveExecutionContext
     public PrimitiveExecutionContext(
         SmalltalkOOP receiver,
         SmalltalkOOP[] arguments,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         IStackManager? stackManager = null,
         IContextManager? contextManager = null,
         LayoutResolver? layoutResolver = null,

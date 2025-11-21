@@ -1,10 +1,6 @@
-extern alias CompilerLib;
-
-using FormatWord = CompilerLib::Smalltalk80.Core.FormatWord;
+using System.IO;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
-using System.IO;
 using Xunit;
 
 namespace Smalltalk80.Interpreter.Tests.HeapManager;
@@ -34,15 +30,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         _falseOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         _trueOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
 
-        // Initialize SpecialObjectsArray with our test objects
-        var soa = new SpecialObjectsArray(
-            _nilOOP,
-            _falseOOP,
-            _trueOOP,
-            SmalltalkOOP.Null,
-            SmalltalkOOP.Null
-        );
-        SpecialObjectsArray.Initialize(soa);
+        // Note: SpecialObjectsArray was replaced with KnownObjects in VMMetadata
+        // For unit tests, we just use the allocated test objects directly
     }
 
     /// <summary>
@@ -50,8 +39,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     /// </summary>
     public void Dispose()
     {
-        // Reset SpecialObjectsArray to avoid test interference
-        SpecialObjectsArray.Initialize();
+        // Cleanup heap manager resources
     }
 
     /// <summary>
@@ -277,7 +265,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         var instanceOOP = _heapManager.AllocateInstanceOf(classOOP, 0);
 
         // Assert
-        Assert.Equal(classOOP, _heapManager.GetSlot(instanceOOP, 0));
+        Assert.Equal(classOOP, _heapManager.GetClassOOP(instanceOOP));
         Assert.Equal(classOOP, _heapManager.GetClassOOP(instanceOOP));
     }
 
@@ -293,8 +281,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         var valueOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
 
         // Act
-        _heapManager.SetSlot(oop, 1, valueOOP);
-        var retrieved = _heapManager.GetSlot(oop, 1);
+        _heapManager.SetInstanceVariable(oop, 0, valueOOP);
+        var retrieved = _heapManager.GetInstanceVariable(oop, 0);
 
         // Assert
         Assert.Equal(valueOOP, retrieved);
@@ -310,7 +298,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         var instanceOOP = _heapManager.AllocateInstanceOf(classOOP, 0);
 
         // Act
-        var retrievedClass = _heapManager.GetSlot(instanceOOP, 0);
+        var retrievedClass = _heapManager.GetClassOOP(instanceOOP);
 
         // Assert
         Assert.Equal(classOOP, retrievedClass);
@@ -324,7 +312,7 @@ public class SmalltalkHeapManagerTests : IDisposable
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() =>
-            _heapManager.GetSlot(smallInt, 0));
+            _heapManager.GetClassOOP(smallInt));
     }
 
     [Fact]
@@ -335,18 +323,18 @@ public class SmalltalkHeapManagerTests : IDisposable
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() =>
-            _heapManager.SetSlot(smallInt, 0, _nilOOP));
+            _heapManager.SetClassOOP(smallInt, _nilOOP));
     }
 
     [Fact]
-    public void SetSlot_OutOfRange_ThrowsArgumentOutOfRangeException()
+    public void SetInstanceVariable_OutOfRange_ThrowsArgumentOutOfRangeException()
     {
         // Arrange
         var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 2, 0);
 
         // Act & Assert
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            _heapManager.SetSlot(oop, 100, _nilOOP));
+            _heapManager.SetInstanceVariable(oop, 99, _nilOOP));
     }
 
     #endregion
@@ -643,7 +631,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Arrange
         var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 2, 0);
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
-        _heapManager.SetSlot(oop, 0, classOOP);
+        _heapManager.SetClassOOP(oop, classOOP);
 
         // Act
         var retrieved = _heapManager.GetClassOOP(oop);
@@ -661,7 +649,7 @@ public class SmalltalkHeapManagerTests : IDisposable
 
         // Act
         _heapManager.SetClassOOP(oop, classOOP);
-        var retrieved = _heapManager.GetSlot(oop, 0);
+        var retrieved = _heapManager.GetClassOOP(oop);
 
         // Assert
         Assert.Equal(classOOP, retrieved);
@@ -812,7 +800,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { root });
 
         // Act
-        var stats = _heapManager.GarbageCollect();
+        var stats = _heapManager.GC.GarbageCollect();
 
         // Assert
         Assert.True(stats.CollectedObjects > 0);
@@ -828,7 +816,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { root });
 
         // Act
-        _heapManager.GarbageCollect();
+        _heapManager.GC.GarbageCollect();
 
         // Assert - child should still be accessible
         var retrieved = _heapManager.GetInstanceVariable(root, 0);
@@ -843,7 +831,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { root });
 
         // Act
-        var stats = _heapManager.GarbageCollect();
+        var stats = _heapManager.GC.GarbageCollect();
 
         // Assert
         Assert.True(stats.TotalObjects >= 0);
@@ -861,7 +849,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { root });
 
         // Act
-        var unreachable = _heapManager.GetUnreachableObjects();
+        var unreachable = _heapManager.GC.GetUnreachableObjects();
 
         // Assert
         Assert.Contains(unreachable1, unreachable);
@@ -884,7 +872,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { root });
 
         // Act
-        _heapManager.GarbageCollect();
+        _heapManager.GC.GarbageCollect();
 
         // Assert - All should be accessible
         Assert.Equal(a, _heapManager.GetInstanceVariable(root, 0));
@@ -906,7 +894,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { a });
 
         // Act
-        _heapManager.GarbageCollect();
+        _heapManager.GC.GarbageCollect();
 
         // Assert - All should survive
         Assert.Equal(b, _heapManager.GetInstanceVariable(a, 0));
@@ -927,7 +915,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { root });
 
         // Act
-        var unreachable = _heapManager.GetUnreachableObjects();
+        var unreachable = _heapManager.GC.GetUnreachableObjects();
 
         // Assert - Both x and y should be unreachable
         Assert.Contains(x, unreachable);
@@ -942,7 +930,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(Array.Empty<SmalltalkOOP>());
 
         // Act
-        var unreachable = _heapManager.GetUnreachableObjects();
+        var unreachable = _heapManager.GC.GetUnreachableObjects();
 
         // Assert - Unmarked object should be in unreachable list
         Assert.Contains(unmarkedObj, unreachable);
@@ -956,7 +944,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { markedObj });
 
         // Act
-        var unreachable = _heapManager.GetUnreachableObjects();
+        var unreachable = _heapManager.GC.GetUnreachableObjects();
 
         // Assert - Object reachable from roots should NOT be in unreachable list
         Assert.DoesNotContain(markedObj, unreachable);
@@ -972,32 +960,34 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { root });
 
         // Act
-        var unreachable = _heapManager.GetUnreachableObjects();
+        var unreachable = _heapManager.GC.GetUnreachableObjects();
 
         // Assert - Child reachable from root should NOT be in unreachable list
         Assert.DoesNotContain(child, unreachable);
         Assert.DoesNotContain(root, unreachable);
     }
 
-    [Fact]
-    public void MarkObject_SmallInteger_DoesNotThrow()
-    {
-        // Arrange
-        var smallInt = SmalltalkOOP.FromSmallInteger(42);
-
-        // Act & Assert - SmallIntegers should be safely ignored
-        _heapManager.MarkObject(smallInt);
-    }
-
-    [Fact]
-    public void MarkObject_InvalidOOP_DoesNotThrow()
-    {
-        // Arrange
-        var invalidOOP = SmalltalkOOP.FromObjectTableIndex(99999);
-
-        // Act & Assert - Invalid OOPs should be safely ignored
-        _heapManager.MarkObject(invalidOOP);
-    }
+    // NOTE: MarkObject is now internal to GC implementation and not part of public API
+    // These tests are commented out as the method is no longer exposed
+    //[Fact]
+    //public void MarkObject_SmallInteger_DoesNotThrow()
+    //{
+    //    // Arrange
+    //    var smallInt = SmalltalkOOP.FromSmallInteger(42);
+    //
+    //    // Act & Assert - SmallIntegers should be safely ignored
+    //    _heapManager.MarkObject(smallInt);
+    //}
+    //
+    //[Fact]
+    //public void MarkObject_InvalidOOP_DoesNotThrow()
+    //{
+    //    // Arrange
+    //    var invalidOOP = SmalltalkOOP.FromObjectTableIndex(99999);
+    //
+    //    // Act & Assert - Invalid OOPs should be safely ignored
+    //    _heapManager.MarkObject(invalidOOP);
+    //}
 
     [Fact]
     public void GetGCStatistics_ReturnsCurrentHeapStatistics()
@@ -1055,7 +1045,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { root });
 
         // Act
-        var stats = _heapManager.GarbageCollect();
+        var stats = _heapManager.GC.GarbageCollect();
         int afterCount = _heapManager.GetActiveObjectCount();
 
         // Assert
@@ -1075,7 +1065,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         }
 
         _heapManager.SetGCRoots(new[] { root });
-        _heapManager.GarbageCollect();
+        _heapManager.GC.GarbageCollect();
 
         // Act - Allocate more objects after GC
         var newObjects = new List<SmalltalkOOP>();
@@ -1120,7 +1110,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         var unreachable = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
 
         _heapManager.SetGCRoots(new[] { root });
-        _heapManager.GarbageCollect();
+        _heapManager.GC.GarbageCollect();
 
         // Act
         var objects = _heapManager.EnumerateObjectTable().ToList();
@@ -1250,7 +1240,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetInstanceVariable(obj2, 0, value2);
 
         // Act
-        _heapManager.BecomeTwoWay(obj1, obj2);
+        _heapManager.Become.BecomeTwoWay(obj1, obj2);
 
         // Assert - Values should be swapped
         Assert.Equal(value2, _heapManager.GetInstanceVariable(obj1, 0));
@@ -1269,7 +1259,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetInstanceVariable(c, 0, a);
 
         // Act
-        _heapManager.BecomeTwoWay(a, b);
+        _heapManager.Become.BecomeTwoWay(a, b);
 
         // Assert - c now references b (because a became b)
         var cRef = _heapManager.GetInstanceVariable(c, 0);
@@ -1288,7 +1278,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         var indexedFormat = _heapManager.GetObjectFormat(indexed);
 
         // Act
-        _heapManager.BecomeTwoWay(pointer, indexed);
+        _heapManager.Become.BecomeTwoWay(pointer, indexed);
 
         // Assert - Formats should be swapped
         Assert.Equal(indexedFormat, _heapManager.GetObjectFormat(pointer));
@@ -1646,8 +1636,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Act - Implicit conversion with zero
         SmalltalkOOP oop = zero;
 
-        // Assert - Zero creates null OOP
-        Assert.Equal(SmalltalkOOP.Null, oop);
+        // Assert - Zero creates default OOP
+        Assert.Equal(default(SmalltalkOOP), oop);
         Assert.Equal(0, oop.RawValue);
     }
 
@@ -1865,7 +1855,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Arrange
         var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 2, 0);
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        _heapManager.SetSlot(oop, 0, classOOP);
+        _heapManager.SetClassOOP(oop, classOOP);
 
         // Act
         var className = _heapManager.GetClassName(oop);
@@ -1880,7 +1870,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Arrange
         var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 1, 0);
         var invalidClass = SmalltalkOOP.FromSmallInteger(42);
-        _heapManager.SetSlot(oop, 0, invalidClass);
+        _heapManager.SetClassOOP(oop, invalidClass);
 
         // Act
         var className = _heapManager.GetClassName(oop);
@@ -1925,7 +1915,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         var localIdToObjectId = new Dictionary<string, int>();
         var obj = _heapManager.AllocateObject(ObjectFormat.Pointer, 1, 0);
         var invalidClass = SmalltalkOOP.FromSmallInteger(999);
-        _heapManager.SetSlot(obj, 0, invalidClass);
+        _heapManager.SetClassOOP(obj, invalidClass);
 
         localIdToObjectId["obj1"] = obj.ToObjectTableIndex();
 
@@ -1970,7 +1960,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         _heapManager.SetGCRoots(new[] { root });
 
         // Act
-        _heapManager.GarbageCollect();
+        _heapManager.GC.GarbageCollect();
 
         // Allocate new objects - they should reuse freed entries
         var newObjects = new List<SmalltalkOOP>();

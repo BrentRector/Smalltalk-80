@@ -62,66 +62,87 @@ Smalltalk80.Interpreter/
 
 ---
 
-### Smalltalk80.Interpreter.HeapManager Assembly (11 files)
+### Smalltalk80.Interpreter.HeapManager Assembly (10 files)
 
 **SEPARATE ASSEMBLY** - Memory management and object allocation with zero dependencies on VM semantics.
+
+**Dependencies**: Only `Smalltalk80.Interpreter.Shared.Types` (SmalltalkOOP, ObjectFormat, FormatWord)
+
+**Location**: `/Smalltalk80.Interpreter.HeapManager/`
 
 #### Three-Interface Architecture
 
 The heap manager is split into three focused interfaces:
 
-1. **ISmalltalkHeap** - Core heap operations
-   - Object allocation (AllocateObject, AllocateInstanceOf)
-   - Instance variable access with write barriers
-   - Indexed access (OOP, byte, word)
-   - Class pointer access (GetClassOOP, SetClassOOP)
-   - Object metadata (format, size, counts)
+1. **ISmalltalkHeap** - Core heap operations (250 lines)
+   - Nil singleton: `GetNil()` - Returns placeholder/real nil OOP
+   - Object allocation: `AllocateObject()`, `AllocateInstanceOf()` (reads format from heap)
+   - Instance variable access with write barriers: `SetInstanceVariableWithBarrier()`, `SetInstanceVariableNoBarrier()`
+   - Indexed access (OOP, byte, word): `GetIndexedOOP()`, `SetIndexedOOP()`, `GetIndexedByte()`, `SetIndexedByte()`, `GetIndexedWord()`, `SetIndexedWord()`
+   - Class pointer access: `GetClassOOP()`, `SetClassOOP()`
+   - Object metadata: `GetObjectFormat()`, `GetObjectSizeInWords()`, `GetInstanceVariableCount()`, `GetIndexedSize()`
+   - Validation: `IsValidObjectOOP()`, `IsValidOOP()`, `EnumerateObjectTable()`
+   - Instance finding (primitives 77-78): `FindInstanceOf()`, `FindNextInstanceOf()`
+   - Diagnostics: `GetClassName()`, `ValidateAllObjectClasses()`, `VerboseDebugMode`
    - Subsystem access via `GC` and `Become` properties
-   - **Note**: GetSlot/SetSlot removed from public API (internal use only)
 
-2. **IGarbageCollector** - Generic GC with zero semantic knowledge
-   - Root management: AddGCRoot, RemoveGCRoot, GetGCRoots, ClearGCRoots
-   - Collection: GarbageCollect() (4 steps: clear marks → mark → find → collect)
-   - Statistics: GetStatistics()
-   - Debug: GetUnreachableObjects() (mark phase only, no collection)
+2. **IGarbageCollector** - Generic GC with zero semantic knowledge (72 lines)
+   - Root management: `AddGCRoot()`, `RemoveGCRoot()`, `GetGCRoots()`, `ClearGCRoots()`
+   - Collection: `GarbageCollect()` (4 phases: clear marks → mark reachable → find unreachable → collect)
+   - Statistics: `GetStatistics()` - Current GC statistics without collection
+   - Debug/Testing: `GetUnreachableObjects()` - Marking only, no actual collection
 
-3. **IBecomeHandler** - Object identity swapping
-   - BecomeTwoWay(oop1, oop2) - Primitive 72 support
-   - Separated due to infrequent use (bootstrap-only)
+3. **IBecomeHandler** - Object identity swapping (20 lines)
+   - `BecomeTwoWay(oop1, oop2)` - Primitive 72 support (swaps identities of two objects)
+   - Used for placeholder nil swap during cold start Phase 3
 
 #### Files
 
 | File | Purpose |
 |------|---------|
-| ISmalltalkHeap.cs | Core heap interface (NEW) |
-| ISmalltalkHeapManager.cs | Legacy compatibility interface |
-| SmalltalkHeapManager.cs | Heap implementation (~860 lines) |
-| IGarbageCollector.cs | Generic GC interface (refactored) |
-| GarbageCollector.cs | Mark-sweep GC (refactored) |
-| IBecomeHandler.cs | Identity swap interface |
-| BecomeHandler.cs | Become operations |
-| IObjectTableManager.cs | Table management interface |
-| ObjectTableManager.cs | Table block allocation |
-| ObjectTableEntry.cs | Table entry structure |
-| ObjectTableBlock.cs | Block-based table storage |
+| ISmalltalkHeap.cs | Core heap interface (250 lines) |
+| SmalltalkHeapManager.cs | Heap implementation (825+ lines) |
+| IGarbageCollector.cs | GC interface (72 lines) |
+| GarbageCollector.cs | Mark-sweep GC implementation |
+| IBecomeHandler.cs | Identity swap interface (20 lines) |
+| BecomeHandler.cs | Become operations implementation |
+| IObjectTableManager.cs | Table management interface + ObjectTableBlock |
+| ObjectTableManager.cs | Object table block allocation and index management |
+| ObjectTableEntry.cs | Object metadata structure (200 lines) |
+| HeapStatistics.cs | GC statistics structure |
+
+**Key Architectural Principle - Placeholder Nil Pattern**:
+1. Heap initialization creates placeholder nil at index 1 (OOP 0x0002)
+2. Cold start uses `heapManager.GetNil()` throughout Phases 1-5
+3. Phase 3 creates real UndefinedObject and calls `heapManager.Become.BecomeTwoWay(placeholderNil, realNil)`
+4. Phase 6 GC collects exactly 1 object (unreachable placeholder nil)
 
 **Usage**:
-- New code: `heap.GC.AddGCRoot(oop)`, `heap.Become.BecomeTwoWay(oop1, oop2)`
-- Legacy: `heap.AddGCRoots(array)`, `heap.BecomeTwoWay(oop1, oop2)` (compatibility)
+```csharp
+// Nil access (runtime and cold start)
+var nil = heap.GetNil();
+
+// GC operations
+heap.GC.AddGCRoot(oop);
+heap.GC.GarbageCollect();
+
+// Become operations (cold start only)
+heap.Become.BecomeTwoWay(placeholderNil, realNil);
+```
+
+**See**: [HEAP-MANAGER-ARCHITECTURE.md](HEAP-MANAGER-ARCHITECTURE.md) for complete heap manager design details
 
 ---
 
-### Core/Memory (5 files)
+### Core/Memory (1 file)
 
-Low-level object data structures.
+Special objects management (well-known OOPs).
 
 | File | Purpose |
 |------|---------|
-| ObjectData.cs | Object storage structure |
-| ObjectFormat.cs | Storage format enum |
-| ObjectTable.cs | Object table implementation |
-| ObjectTableStatistics.cs | Table metrics |
-| SpecialObjectsArray.cs | Well-known objects cache |
+| SpecialObjectsArray.cs | Well-known objects cache (ProcessorScheduler, Nil, True, False, etc.) |
+
+**Note**: Object storage structures (ObjectData, ObjectTable, ObjectFormat) are now in the `Smalltalk80.Interpreter.HeapManager` assembly and `Smalltalk80.Interpreter.Shared.Types` assembly.
 
 ---
 
@@ -613,4 +634,6 @@ dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
 ## Related Documents
 
 - [IMPLEMENTATION-ARCHITECTURE.md](IMPLEMENTATION-ARCHITECTURE.md) - How bytecode execution, contexts, and primitives work
+- [HEAP-MANAGER-ARCHITECTURE.md](HEAP-MANAGER-ARCHITECTURE.md) - Heap manager design and three-interface architecture
+- [DEVELOPMENT-GUIDE.md](DEVELOPMENT-GUIDE.md) - How to extend the interpreter with new primitives, phases, and components
 - [../Block-Context-And-Variable-Access-COMPREHENSIVE.md](../Block-Context-And-Variable-Access-COMPREHENSIVE.md) - BlockContext design details

@@ -24,7 +24,7 @@ public record PatchApplicationResult(
 public record Phase5Context(
     ColdStartBundle Bundle,
     ObjectGraphAllocator Allocator,
-    ISmalltalkHeapManager HeapManager,
+    ISmalltalkHeap HeapManager,
     LayoutResolver LayoutResolver,
     Dictionary<string, SmalltalkOOP> LocalIdToObjectId,
     HashSet<(SmalltalkOOP oop, int slot)> InitializedFields,

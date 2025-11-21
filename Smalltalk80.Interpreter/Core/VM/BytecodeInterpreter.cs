@@ -11,7 +11,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// </summary>
 internal class BytecodeInterpreter : IBytecodeInterpreter
 {
-    private readonly ISmalltalkHeapManager heapManager;
+    private readonly ISmalltalkHeap heapManager;
     private readonly IBytecodeContext context;
     private readonly RuntimeHeapAccessor runtimeHeapAccess;
     private readonly VMMetadata metadata;
@@ -23,7 +23,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     private SmalltalkOOP[]? _specialSelectorOOPs;
 
     public BytecodeInterpreter(
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         IBytecodeContext context,
         RuntimeHeapAccessor runtimeHeapAccess,
         VMMetadata metadata)
@@ -56,7 +56,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
         if (isBlockContext)
         {
-            // BlockContext: receiver from home MethodContext (slot 5 in BlockContext is HOME, not receiver!)
+            // BlockContext: receiver from home MethodContext (instance variable 5 in BlockContext is HOME, not receiver!)
             var methodContextOOP = context.FindMethodContext(context.ActiveContext);
             receiverOOP = heapManager.GetInstanceVariable(methodContextOOP, receiverIndex);
         }
@@ -204,7 +204,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             }
 
             // Association has a fixed layout per Smalltalk-80 specification:
-            // slot 0 = key, slot 1 = value
+            // instance variable 0 = key, instance variable 1 = value
             var keyOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
             var valueOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
 
@@ -566,13 +566,13 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
         if (isBlockContext)
         {
-            // BlockContext: receiver from home MethodContext (slot 5 in BlockContext is HOME, not receiver!)
+            // BlockContext: receiver from home MethodContext (instance variable 5 in BlockContext is HOME, not receiver!)
             var homeOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
             receiverOOP = heapManager.GetInstanceVariable(homeOOP, receiverIndex);
         }
         else
         {
-            // MethodContext: receiver is at slot 4
+            // MethodContext: receiver is at instance variable 4
             receiverOOP = heapManager.GetInstanceVariable(context.ActiveContext, receiverIndex);
         }
 
@@ -764,7 +764,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                             $"Method: {methodLocalId}, PC: {ip - 2}");
                     }
 
-                    var literalClass = heapManager.GetSlot(associationOOP, 0);
+                    var literalClass = heapManager.GetClassOOP(associationOOP);
                     string? literalClassName = context.GetClassName(literalClass);
 
                     // Allow "Association" or "class:Association" as valid class names

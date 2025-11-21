@@ -1,12 +1,11 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Core.Schema;
-using Smalltalk80.Interpreter.Core;
 
 namespace Smalltalk80.Interpreter.Engine.InitExecution;
 
@@ -23,14 +22,14 @@ namespace Smalltalk80.Interpreter.Engine.InitExecution;
 /// </summary>
 public class InitExpressionExecutor
 {
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly VirtualMachine _vm;
     private readonly VMMetadata _metadata;
     private readonly InitPolicy _policy;
     private readonly int _defaultTimeoutMs;
 
     public InitExpressionExecutor(
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         VirtualMachine vm,
         VMMetadata metadata,
         InitPolicy policy = InitPolicy.AbortOnFirstError,
@@ -48,8 +47,8 @@ public class InitExpressionExecutor
     /// </summary>
     private SmalltalkOOP ResumeProcess(SmalltalkOOP processOOP)
     {
-        // Get the suspended context from the Process (instance variable 0)
-        var contextOOP = _heapManager.GetSlot(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX + 1);
+        // Get the suspended context from the Process (instance variable 1: suspendedContext)
+        var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
         return _vm.ExecuteExistingContext(contextOOP);
     }
 
@@ -83,6 +82,11 @@ public class InitExpressionExecutor
             string initId = $"init:{i}";
             var result = ExecuteInitExpression(initId, methodOOP);
             results.Add(result);
+
+            // Run GC after each init expression to validate collection of temporary objects
+            // (Process and MethodContext are abandoned after each expression completes)
+            var gcStats = _heapManager.GC.GarbageCollect();
+            Console.WriteLine($"[GC after {initId}] Collected {gcStats.CollectedObjects} objects, {gcStats.TotalObjects} total, {gcStats.LiveObjects} live");
 
             if (result.Status != InitStatus.Success && _policy == InitPolicy.AbortOnFirstError)
             {
@@ -184,10 +188,10 @@ public class InitExpressionExecutor
     {
         error = null;
 
-        // Basic validation - check it's not null
-        if (methodOOP == SmalltalkOOP.Null)
+        // Basic validation - check it's not nil
+        if (methodOOP == _metadata.KnownObjects.Nil)
         {
-            error = "Method OOP is null (0)";
+            error = "Method OOP is nil";
             return false;
         }
 
@@ -215,40 +219,41 @@ public class InitExpressionExecutor
         // Find MethodContext class by querying Smalltalk dictionary
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
         var methodContextClassOOP = LookupGlobal(smalltalkOOP, "MethodContext");
-        if (methodContextClassOOP == SmalltalkOOP.Null)
+        if (methodContextClassOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("MethodContext class not found in Smalltalk dictionary");
         }
 
         // MethodContext has a fixed layout per Smalltalk-80 specification:
-        // 6 instance variables (sender, pc, stackp, method, receiverMap, receiver)
-        // Starting at METHODCONTEXT_TEMP_FRAME_START=6 for indexed slots
+        // MethodContext inherits: InstructionStream (sender, pc) → ContextPart (stackp)
+        // MethodContext adds: method, lexicalParent, receiver
+        // Total: 6 instance variables (sender, pc, stackp, method, lexicalParent, receiver)
+        // Starting at index 6 for indexed slots (temp frame)
         const int METHODCONTEXT_INSTANCE_VAR_COUNT = 6;
 
         // Allocate MethodContext with indexed slots for stack (use 12 for small frame)
         var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, indexedSize: 12);
-        _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
+        _heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
 
-        // Set instance variables using LayoutResolver indices
+        // Set instance variables using VMConstants indices
         int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
         int pcIndex = VMConstants.CONTEXT_PC_INDEX;
         int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
         int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
-        // TODO: receiverMapIndex removed - part of obsolete dual-context architecture
+        int lexicalParentIndex = VMConstants.CONTEXT_LEXICALPARENT_INDEX;
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
-        _heapManager.SetSlot(contextOOP, senderIndex + 1, GlobalRegistry.Get("nil"));
-        _heapManager.SetSlot(contextOOP, pcIndex + 1, SmalltalkOOP.FromSmallInteger(0));
-        _heapManager.SetSlot(contextOOP, stackpIndex + 1, SmalltalkOOP.FromSmallInteger(0));
-        _heapManager.SetSlot(contextOOP, methodIndex + 1, methodOOP);
-        // receiverMapIndex initialization removed - obsolete field
-        _heapManager.SetSlot(contextOOP, receiverIndex + 1, receiverOOP);
+        _heapManager.SetInstanceVariable(contextOOP, senderIndex, _heapManager.GetNil());
+        _heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
+        _heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(0));
+        _heapManager.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
+        _heapManager.SetInstanceVariable(contextOOP, lexicalParentIndex, _heapManager.GetNil());
+        _heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
 
         // Initialize indexed portion (stack) with nil
-        int indexedBase = METHODCONTEXT_INSTANCE_VAR_COUNT + 1; // +1 for class slot
         for (int i = 0; i < 12; i++)
         {
-            _heapManager.SetSlot(contextOOP, indexedBase + i, GlobalRegistry.Get("nil"));
+            _heapManager.SetIndexedOOP(contextOOP, i, _heapManager.GetNil());
         }
 
         return contextOOP;
@@ -264,27 +269,27 @@ public class InitExpressionExecutor
 
         // Find the symbol OOP for the global name by searching USTable
         var symbolOOP = FindSymbol(globalName);
-        if (symbolOOP == SmalltalkOOP.Null)
+        if (symbolOOP == _metadata.KnownObjects.Nil)
         {
-            return SmalltalkOOP.Null;
+            return _metadata.KnownObjects.Nil;
         }
 
         for (int i = 0; i < size; i++)
         {
             var assocOOP = _heapManager.GetIndexedOOP(systemDictOOP, i);
-            if (assocOOP == GlobalRegistry.Get("nil"))
+            if (assocOOP == _heapManager.GetNil())
                 continue;
 
-            // Association has key at slot 0 (after class slot)
-            var keyOOP = _heapManager.GetSlot(assocOOP, 1);
+            // Association has key at instance variable 0
+            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
             if (keyOOP == symbolOOP)
             {
-                // Return value at slot 1 (after class slot)
-                return _heapManager.GetSlot(assocOOP, 2);
+                // Return value at instance variable 1
+                return _heapManager.GetInstanceVariable(assocOOP, 1);
             }
         }
 
-        return SmalltalkOOP.Null;
+        return _metadata.KnownObjects.Nil;
     }
 
     /// <summary>
@@ -305,7 +310,7 @@ public class InitExpressionExecutor
             }
         }
 
-        return SmalltalkOOP.Null;
+        return _metadata.KnownObjects.Nil;
     }
 
     /// <summary>
@@ -330,23 +335,25 @@ public class InitExpressionExecutor
         // Get Process class OOP - lookup from live heap
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
         var processClassOOP = LookupGlobal(smalltalkOOP, "Process");
-        if (processClassOOP == SmalltalkOOP.Null)
+        if (processClassOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("Process class not found in Smalltalk dictionary");
         }
 
         // Process has a fixed layout per Smalltalk-80 specification:
-        // 3 instance variables (suspendedContext, priority, myList)
-        const int PROCESS_INSTANCE_VAR_COUNT = 3;
+        // Process inherits from Link (1 instance variable: nextLink)
+        // Process adds 3 instance variables: suspendedContext, priority, myList
+        // Total: 4 instance variables (nextLink, suspendedContext, priority, myList)
+        const int PROCESS_INSTANCE_VAR_COUNT = 4;
 
-        // Allocate Process object
-        var processOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
-        _heapManager.SetSlot(processOOP, 0, processClassOOP);
+        // Allocate Process object (fixed size, not indexed)
+        var processOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
+        _heapManager.SetClassOOP(processOOP, processClassOOP);
 
         // Set instance variables using fixed indices from VMConstants
-        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX + 1, suspendedContextOOP);
-        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_PRIORITY_INDEX + 1, SmalltalkOOP.FromSmallInteger(priority));
-        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_MYLIST_INDEX + 1, GlobalRegistry.Get("nil"));
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, suspendedContextOOP);
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX, SmalltalkOOP.FromSmallInteger(priority));
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _heapManager.GetNil());
 
         return processOOP;
     }

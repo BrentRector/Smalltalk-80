@@ -14,7 +14,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Diagnoses Float class variables by comparing expected vs actual values.
     /// </summary>
-    public static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
+    public static void DiagnoseFloatClassVariables(ISmalltalkHeap heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -71,7 +71,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Gets the value of a Float class variable from the classPool.
     /// </summary>
-    public static string GetClassVariableValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, string varName, VMMetadata metadata)
+    public static string GetClassVariableValue(ISmalltalkHeap heapManager, ColdStartBundle bundle, string varName, VMMetadata metadata)
     {
         try
         {
@@ -117,13 +117,13 @@ public static class DiagnosticInspector
                 if (assocOOP == metadata.KnownObjects.Nil)
                     continue;
 
-                // Association has key at slot 1, value at slot 2
-                var keyOOP = heapManager.GetSlot(assocOOP, 1);
+                // Association has key at instance variable 0, value at instance variable 1
+                var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
                 var keyName = GetSymbolName(heapManager, bundle, keyOOP);
 
                 if (keyName == varName)
                 {
-                    var valueOOP = heapManager.GetSlot(assocOOP, 2);
+                    var valueOOP = heapManager.GetInstanceVariable(assocOOP, 1);
                     return FormatValue(heapManager, bundle, valueOOP, metadata);
                 }
             }
@@ -139,7 +139,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Gets the string representation of a Symbol OOP.
     /// </summary>
-    public static string GetSymbolName(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, SmalltalkOOP symbolOOP)
+    public static string GetSymbolName(ISmalltalkHeap heapManager, ColdStartBundle bundle, SmalltalkOOP symbolOOP)
     {
         if (symbolOOP.IsSmallInteger)
             return $"SmallInteger({symbolOOP.AsSmallInteger()})";
@@ -164,7 +164,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Formats an OOP value for display, handling Floats, Arrays, and other types.
     /// </summary>
-    public static string FormatValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, SmalltalkOOP valueOOP, VMMetadata metadata)
+    public static string FormatValue(ISmalltalkHeap heapManager, ColdStartBundle bundle, SmalltalkOOP valueOOP, VMMetadata metadata)
     {
         if (valueOOP.IsSmallInteger)
             return $"{valueOOP.AsSmallInteger()}";
@@ -196,7 +196,7 @@ public static class DiagnosticInspector
                     for (int i = 0; i < size && i < 10; i++)  // Limit to 10 elements
                     {
                         var elemOOP = heapManager.GetIndexedOOP(valueOOP, i);
-                        elements.Add(FormatValue(heapManager, bundle, elemOOP));
+                        elements.Add(FormatValue(heapManager, bundle, elemOOP, metadata));
                     }
                     if (size > 10)
                         elements.Add("...");
@@ -215,7 +215,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Diagnoses Cursor class variables.
     /// </summary>
-    public static void DiagnoseCursorClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
+    public static void DiagnoseCursorClassVariables(ISmalltalkHeap heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -278,11 +278,11 @@ public static class DiagnosticInspector
                 if (assocOOP == metadata.KnownObjects.Nil)
                     continue;
 
-                // Association has key at slot 1, value at slot 2
-                var keyOOP = heapManager.GetSlot(assocOOP, 1);
+                // Association has key at instance variable 0, value at instance variable 1
+                var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
                 var keyName = GetSymbolName(heapManager, bundle, keyOOP);
-                var valueOOP = heapManager.GetSlot(assocOOP, 2);
-                var value = FormatValue(heapManager, bundle, valueOOP);
+                var valueOOP = heapManager.GetInstanceVariable(assocOOP, 1);
+                var value = FormatValue(heapManager, bundle, valueOOP, metadata);
 
                 foundVariables.Add(keyName);
                 Console.WriteLine($"{keyName}:");
@@ -310,7 +310,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Inspects ClassDescription.instanceVariables for several classes.
     /// </summary>
-    public static void InspectClassDescriptionInstanceVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
+    public static void InspectClassDescriptionInstanceVariables(ISmalltalkHeap heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -329,7 +329,7 @@ public static class DiagnosticInspector
                     continue;
                 }
 
-                // Check both slot 3 and slot 4 to be sure
+                // Check both instance variable 2 and instance variable 3 to be sure
                 for (int slotIndex = 3; slotIndex <= 4; slotIndex++)
                 {
                     var fieldValueOOP = heapManager.GetInstanceVariable(classOOP, slotIndex);
@@ -399,7 +399,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Formats an OOP value for display in diagnostics.
     /// </summary>
-    public static string FormatOOPValue(ISmalltalkHeapManager heapManager, SmalltalkOOP oop, SmalltalkOOP nilOOP)
+    public static string FormatOOPValue(ISmalltalkHeap heapManager, SmalltalkOOP oop, SmalltalkOOP nilOOP)
     {
         if (oop == nilOOP)
             return "nil";
@@ -409,7 +409,7 @@ public static class DiagnosticInspector
         // Try to get object class for better display
         try
         {
-            var classOOP = heapManager.GetSlot(oop, 0);
+            var classOOP = heapManager.GetClassOOP(oop);
             if (classOOP != nilOOP && !classOOP.IsSmallInteger)
             {
                 // STRATEGY 1: Check if THIS object is a Class object itself
@@ -458,7 +458,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Tests RuntimeHeapAccessor.BuildFieldMap() to verify it can read instance variable names.
     /// </summary>
-    public static void TestBuildFieldMap(ISmalltalkHeapManager heapManager, VMMetadata metadata)
+    public static void TestBuildFieldMap(ISmalltalkHeap heapManager, VMMetadata metadata)
     {
         try
         {
@@ -511,7 +511,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Inspects the File class>>initialize method's literal frame.
     /// </summary>
-    public static void InspectFileInitializeLiterals(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
+    public static void InspectFileInitializeLiterals(ISmalltalkHeap heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -594,7 +594,7 @@ public static class DiagnosticInspector
                     Console.WriteLine($"        Format: {format}");
 
                     // Get class OOP
-                    var classOOP = heapManager.GetSlot(literalOOP, 0);
+                    var classOOP = heapManager.GetClassOOP(literalOOP);
                     Console.WriteLine($"        Class OOP: {classOOP}");
 
                     if (format == ObjectFormat.Pointer)

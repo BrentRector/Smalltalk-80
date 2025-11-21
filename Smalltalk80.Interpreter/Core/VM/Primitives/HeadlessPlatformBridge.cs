@@ -12,7 +12,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// </summary>
 public class HeadlessPlatformBridge : IPlatformBridge
 {
-    private readonly ISmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly VMMetadata metadata;
     private readonly Func<string, SmalltalkOOP> _getClassOOP;
     private readonly Func<SmalltalkOOP, string, string, SmalltalkOOP> _getFieldValue;
@@ -23,7 +23,7 @@ public class HeadlessPlatformBridge : IPlatformBridge
     private readonly Queue<int> _inputEvents = new();
 
     public HeadlessPlatformBridge(
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         VMMetadata metadata,
         Func<string, SmalltalkOOP> getClassOOP,
         Func<SmalltalkOOP, string, string, SmalltalkOOP> getFieldValue,

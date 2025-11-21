@@ -1,9 +1,8 @@
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Engine.Services;
 
@@ -53,7 +52,7 @@ public class DictionaryService
 
         // Set Association class reference
         var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        _allocator.SetObjectClass(associationOOP, associationClassOOP);
+        _allocator.SetClassOOP(associationOOP, associationClassOOP);
 
         // Set instance variables: [0] = key, [1] = value (assuming standard Association layout)
         _allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
@@ -88,7 +87,7 @@ public class DictionaryService
             try
             {
                 // Check if this is an Association object
-                var classOOP = _allocator.GetSlot(objectOOP, 0);
+                var classOOP = _allocator.GetClassOOP(objectOOP);
                 if (classOOP == associationClassOOP)
                 {
                     // Get the key (instance variable 0)
@@ -123,9 +122,9 @@ public class DictionaryService
     {
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
-        SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
+        SmalltalkOOP nilOOP = _allocator.GetNil();
 
-        // Get the key symbol from the Association (slot 0)
+        // Get the key symbol from the Association (instance variable 0)
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup (same algorithm as Dictionary>>findKeyOrNil:)
@@ -179,9 +178,9 @@ public class DictionaryService
     public void InstallInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string name)
     {
         int dictSize = _allocator.GetIndexedSize(dictionaryOOP);
-        SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
+        SmalltalkOOP nilOOP = _allocator.GetNil();
 
-        // Get the key symbol from the Association (slot 0)
+        // Get the key symbol from the Association (instance variable 0)
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup

@@ -11,7 +11,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// <param name="helpers">VM helper methods.</param>
 /// <param name="metadata">VM metadata for known objects.</param>
 internal class MessageDispatcher(
-    ISmalltalkHeapManager heapManager,
+    ISmalltalkHeap heapManager,
     IObjectMetadataAccessor helpers,
     VMMetadata metadata) : IMessageDispatcher
 {

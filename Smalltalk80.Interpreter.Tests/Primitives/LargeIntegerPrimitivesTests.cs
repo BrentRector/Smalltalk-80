@@ -1,10 +1,9 @@
+using System.Numerics;
 using Moq;
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
-using System.Numerics;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Tests.Primitives;
 
@@ -14,10 +13,16 @@ namespace Smalltalk80.Interpreter.Tests.Primitives;
 [Trait("Category", "Primitives")]
 public class LargeIntegerPrimitivesTests : PrimitiveTestBase
 {
+    // Shared heap and metadata for comparison tests
+    private static readonly SmalltalkHeapManager _testHeap = new();
+    private static readonly VMMetadata _testMetadata = CreateTestMetadata(_testHeap);
+    private static readonly SmalltalkOOP _trueOOP = _testMetadata.KnownObjects.True;
+    private static readonly SmalltalkOOP _falseOOP = _testMetadata.KnownObjects.False;
+
     /// <summary>
     /// Sets up a mock heap manager for a LargePositiveInteger object.
     /// </summary>
-    private static SmalltalkOOP SetupLargePositiveInteger(Mock<ISmalltalkHeapManager> mock, int rawValue, BigInteger value)
+    private static SmalltalkOOP SetupLargePositiveInteger(Mock<ISmalltalkHeap> mock, int rawValue, BigInteger value)
     {
         var largeIntOOP = ObjectOOP(rawValue);
         var largeIntClassOOP = ObjectOOP(1000);
@@ -35,7 +40,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
         return largeIntOOP;
     }
 
-    private Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccess(Mock<ISmalltalkHeapManager> mockHeap)
+    private Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccess(Mock<ISmalltalkHeap> mockHeap)
     {
         var mock = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
         mock.Setup(r => r.GetClass("LargePositiveInteger")).Returns(ObjectOOP(1000));
@@ -119,11 +124,11 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(2000000000));
 
         var primitive = new LargeIntegerArithmetic.LessThan();
-        var context = CreateContext(int1, [int2], mockHeap.Object, mockRuntime.Object);
+        var context = CreateContext(int1, [int2], mockHeap.Object, mockRuntime.Object, metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, true);
+        AssertSuccessWithBool(result, true, _trueOOP, _falseOOP);
     }
 
     [Fact]
@@ -136,11 +141,11 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(1000000000));
 
         var primitive = new LargeIntegerArithmetic.GreaterThan();
-        var context = CreateContext(int1, [int2], mockHeap.Object, mockRuntime.Object);
+        var context = CreateContext(int1, [int2], mockHeap.Object, mockRuntime.Object, metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, true);
+        AssertSuccessWithBool(result, true, _trueOOP, _falseOOP);
     }
 
     [Fact]
@@ -153,11 +158,11 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(1000000000));
 
         var primitive = new LargeIntegerArithmetic.Equal();
-        var context = CreateContext(int1, [int2], mockHeap.Object, mockRuntime.Object);
+        var context = CreateContext(int1, [int2], mockHeap.Object, mockRuntime.Object, metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, true);
+        AssertSuccessWithBool(result, true, _trueOOP, _falseOOP);
     }
 
     [Fact]
@@ -170,11 +175,11 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(2000000000));
 
         var primitive = new LargeIntegerArithmetic.NotEqual();
-        var context = CreateContext(int1, [int2], mockHeap.Object, mockRuntime.Object);
+        var context = CreateContext(int1, [int2], mockHeap.Object, mockRuntime.Object, metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, true);
+        AssertSuccessWithBool(result, true, _trueOOP, _falseOOP);
     }
 
     #endregion

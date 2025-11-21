@@ -1,8 +1,7 @@
 using Moq;
+using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Core.VM.Primitives;
 
 namespace Smalltalk80.Interpreter.Tests.Primitives;
 
@@ -189,8 +188,9 @@ public class SystemPrimitivesTests : PrimitiveTestBase
         var primitive = new SystemOperations.SomeInstance();
         var mockHeap = CreateMockHeapManager();
         var classOOP = ObjectOOP(100);
+        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
 
-        mockHeap.Setup(h => h.FindInstanceOf(classOOP)).Returns(Nil);
+        mockHeap.Setup(h => h.FindInstanceOf(classOOP)).Returns(nilOOP);
 
         var context = CreateContext(classOOP, [], mockHeap.Object);
 
@@ -229,9 +229,10 @@ public class SystemPrimitivesTests : PrimitiveTestBase
         var mockHeap = CreateMockHeapManager();
         var objectOOP = ObjectOOP(100);
         var classOOP = ObjectOOP(50);
+        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
-        mockHeap.Setup(h => h.FindNextInstanceOf(classOOP, objectOOP)).Returns(Nil);
+        mockHeap.Setup(h => h.FindNextInstanceOf(classOOP, objectOOP)).Returns(nilOOP);
 
         var context = CreateContext(objectOOP, [], mockHeap.Object);
 
@@ -257,7 +258,7 @@ public class SystemPrimitivesTests : PrimitiveTestBase
         var result = primitive.Execute(context);
 
         AssertSuccessWithOOP(result, obj2);
-        mockHeap.Verify(h => h.BecomeTwoWay(obj1, obj2), Times.Once);
+        mockHeap.Verify(h => h.Become.BecomeTwoWay(obj1, obj2), Times.Once);
     }
 
     [Fact]
@@ -402,6 +403,10 @@ public class SystemPrimitivesTests : PrimitiveTestBase
     public void NextObject_NoMoreObjects_ReturnsNil()
     {
         var primitive = new SystemOperations.NextObject();
+        var heap = new SmalltalkHeapManager();
+        var metadata = CreateTestMetadata(heap);
+        var nilOOP = metadata.KnownObjects.Nil;
+
         var mockHeap = CreateMockHeapManager();
         var receiverOOP = SmalltalkOOP.FromObjectTableIndex(98);
 
@@ -409,11 +414,11 @@ public class SystemPrimitivesTests : PrimitiveTestBase
         // Mark remaining slots as invalid
         mockHeap.Setup(h => h.IsValidObjectOOP(It.IsAny<SmalltalkOOP>())).Returns(false);
 
-        var context = CreateContext(receiverOOP, [], mockHeap.Object);
+        var context = CreateContext(receiverOOP, [], mockHeap.Object, metadata: metadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithOOP(result, Nil);
+        AssertSuccessWithOOP(result, nilOOP);
     }
 
     [Fact]
@@ -467,16 +472,21 @@ public class SystemPrimitivesTests : PrimitiveTestBase
     public void SignalAtOopsLeftWordsLeft_NilReceiver_Succeeds()
     {
         var primitive = new SystemOperations.SignalAtOopsLeftWordsLeft();
+        var heap = new SmalltalkHeapManager();
+        var metadata = CreateTestMetadata(heap);
+        var nilOOP = metadata.KnownObjects.Nil;
+
         var mockHeap = CreateMockHeapManager();
 
         var context = CreateContext(
-            Nil,
+            nilOOP,
             [SmallInt(1000), SmallInt(2000)],
-            mockHeap.Object);
+            mockHeap.Object,
+            metadata: metadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithOOP(result, Nil);
+        AssertSuccessWithOOP(result, nilOOP);
     }
 
     [Fact]

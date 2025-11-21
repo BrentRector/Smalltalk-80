@@ -1,16 +1,15 @@
-using Smalltalk80.Interpreter.Engine;
-using Smalltalk80.Interpreter.Engine.InitExecution;
-using Smalltalk80.Interpreter.Core.Schema;
-using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
+using System.Windows.Forms;
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
+using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Engine;
+using Smalltalk80.Interpreter.Engine.InitExecution;
+using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Platform.Windows;
+using Smalltalk80.Interpreter.Shared.Types;
 using ClassHierarchyTraversal = Smalltalk80.Interpreter.Core.ClassHierarchyTraversal;
-using System.Windows.Forms;
 
 namespace Smalltalk80.Interpreter;
 
@@ -163,7 +162,7 @@ public static class Program
 
             // Run GC immediately after cold start to verify heap integrity
             Console.WriteLine("\n=== Running GC after cold start ===");
-            var gcStatsBefore = heapManager.GarbageCollect();
+            var gcStatsBefore = heapManager.GC.GarbageCollect();
             Console.WriteLine($"  {gcStatsBefore.GetSummary()}");
 
             // Execute init expressions - Run normal init expressions to check for regressions
@@ -349,7 +348,7 @@ public static class Program
                     foreach (int index in testIndices)
                     {
                         var expr = bundle.InitExpressions[index];
-                        var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
+                        var initMethodOOP = heapManager.GetIndexedOOP(vmMetadata.InitExpressionMethods, index);
 
                         Console.WriteLine();
                         Console.WriteLine("******************************************");
@@ -404,7 +403,7 @@ public static class Program
                 foreach (int index in reorderedIndices)
                 {
                     var expr = bundle.InitExpressions[index];
-                    var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
+                    var initMethodOOP = heapManager.GetIndexedOOP(vmMetadata.InitExpressionMethods, index);
 
                     // Show what we're executing
                     Console.Write($"  [{index}] {expr.Source}... ");
@@ -488,7 +487,7 @@ public static class Program
 
                 // Run GC after all init expressions to collect temporary objects
                 Console.WriteLine($"\n=== Running GC after init expressions ===");
-                var gcStatsAfter = heapManager.GarbageCollect();
+                var gcStatsAfter = heapManager.GC.GarbageCollect();
                 Console.WriteLine($"  {gcStatsAfter.GetSummary()}");
                 if (gcStatsAfter.CollectedObjects > 0)
                 {
@@ -551,7 +550,7 @@ public static class Program
                     );
 
                     var expr = bundle.InitExpressions[exprIndex];
-                    var methodOOP = heapManager.GetIndexedOOP(initArrayOOP, exprIndex);
+                    var methodOOP = heapManager.GetIndexedOOP(vmMetadata.InitExpressionMethods, exprIndex);
 
                     Console.WriteLine($"  Found expression at index {exprIndex}: {expr.Source}");
                     Console.WriteLine();
@@ -642,7 +641,7 @@ public static class Program
         {
             return loader.Allocator.GetIndexedOOP(methodOOP, literalIndex + 1); // +1 to skip header
         }
-        return GlobalRegistry.Get("nil");
+        return loader.Allocator.GetNil();
     }
 
     /// <summary>
@@ -660,7 +659,7 @@ public static class Program
             "string" => allocator.AllocateString(bundle.Strings[literal.Index!.Value]),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
             "float" => allocator.AllocateFloat(GetFloatValue(literal.Value!)),
-            "nil" => GlobalRegistry.Get("nil"),
+            "nil" => allocator.GetNil(),
             "true" => GlobalRegistry.Get("true"),
             "false" => GlobalRegistry.Get("false"),
             "objectRef" => localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1)
@@ -726,7 +725,7 @@ public static class Program
                 for (int i = 0; i < sysDictSize; i++)
                 {
                     var assocOOP = allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP == GlobalRegistry.Get("nil")) continue;
+                    if (assocOOP == allocator.GetNil()) continue;
 
                     var assocKeyOOP = allocator.GetInstanceVariable(assocOOP, 0);
                     if (assocKeyOOP == keyOOP)
@@ -739,7 +738,7 @@ public static class Program
 
         var valueOOP = assoc.ValueRef?.LocalId != null
             ? localIdToObjectId[assoc.ValueRef.LocalId]
-            : GlobalRegistry.Get("nil");
+            : allocator.GetNil();
 
         var associationOOP = allocator.AllocateFixedObject("Association");
         allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
@@ -785,12 +784,12 @@ public static class Program
     /// <summary>
     /// Formats a return value OOP for display.
     /// </summary>
-    private static string FormatReturnValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, SmalltalkOOP returnOOP)
+    private static string FormatReturnValue(ISmalltalkHeap heapManager, ColdStartBundle bundle, SmalltalkOOP returnOOP)
     {
         if (returnOOP.IsSmallInteger)
             return $"SmallInteger({returnOOP.AsSmallInteger()})";
 
-        if (returnOOP == GlobalRegistry.Get("nil"))
+        if (returnOOP == heapManager.GetNil())
             return "nil";
 
         if (returnOOP == GlobalRegistry.Get("true"))
@@ -831,7 +830,7 @@ public static class Program
         byte[] bytecodes,
         SmalltalkOOP[] literalOOPs,
         InitResult result,
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         ColdStartBundle bundle)
     {
         Console.WriteLine("\n=== VERBOSE DEBUG OUTPUT ===");
@@ -881,7 +880,7 @@ public static class Program
         int thisClassIdx = layoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
 
         // Get special objects from GlobalRegistry (allocated during cold start phases)
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = loader.Allocator.GetNil();
         var trueOOP = GlobalRegistry.Get("true");
         var falseOOP = GlobalRegistry.Get("false");
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");

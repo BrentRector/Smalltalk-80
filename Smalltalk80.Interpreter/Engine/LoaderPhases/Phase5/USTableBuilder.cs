@@ -1,7 +1,6 @@
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
@@ -61,15 +60,15 @@ public class USTableBuilder(Phase5Context context) : IUSTableBuilder
         var ustableOOP = context.Allocator.AllocateArray("Array", size);
 
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        context.Allocator.SetSlot(ustableOOP, 0, arrayClassOOP);
+        context.Allocator.SetClassOOP(ustableOOP, arrayClassOOP);
 
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
 
         for (int i = 0; i < size; i++)
         {
             // Allocate bucket (even empty buckets must be Arrays, not nil)
             var bucketOOP = context.Allocator.AllocateArray("Array", bucketCounts[i]);
-            context.Allocator.SetSlot(bucketOOP, 0, arrayClassOOP);
+            context.Allocator.SetClassOOP(bucketOOP, arrayClassOOP);
 
             // Initialize indexed slots to nil
             for (int j = 0; j < bucketCounts[i]; j++)

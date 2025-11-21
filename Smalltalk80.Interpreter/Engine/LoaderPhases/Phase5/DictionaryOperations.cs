@@ -1,10 +1,9 @@
 using System.Diagnostics;
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 
@@ -21,9 +20,9 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
     public void InstallAssociation(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string keyName)
     {
         int dictSize = context.Allocator.GetIndexedSize(dictionaryOOP);
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
 
-        // Get the key symbol from the Association (slot 0)
+        // Get the key symbol from the Association (instance variable 0)
         var keySymbolOOP = context.Allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup (Dictionary>>findKeyOrNil:)
@@ -39,7 +38,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
         {
             var probe = context.Allocator.GetIndexedOOP(dictionaryOOP, location);
 
-            if (probe == nilOOP || probe == SmalltalkOOP.Null)
+            if (probe == nilOOP)
             {
                 // Found empty slot - install association
                 context.Allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
@@ -113,7 +112,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
     /// </summary>
     public void RemoveAssociation(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbolOOP, string keyName)
     {
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
         int dictSize = context.Allocator.GetIndexedSize(dictionaryOOP);
 
         int hash = GetSymbolHash(keySymbolOOP);
@@ -178,7 +177,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
     /// </summary>
     public void FixCollisionsFrom(SmalltalkOOP dictionaryOOP, int startIndex)
     {
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
         int dictSize = context.Allocator.GetIndexedSize(dictionaryOOP);
         int oldIndex = startIndex;
 

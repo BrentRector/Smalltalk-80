@@ -14,8 +14,8 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(size));
@@ -27,7 +27,7 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Blue Book: hash returns half the object pointer
             // SmallIntegers hash to their value
@@ -49,7 +49,7 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             bool identical = context.Receiver == context.Arguments[0];
             return PrimitiveResult.FromBool(identical, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
@@ -61,7 +61,7 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP classOOP;
             if (context.Receiver.IsSmallInteger)
@@ -84,15 +84,15 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
 
             // Smalltalk indices are 1-based
-            if (index < 1 || index > size) return PrimitiveResult.Fail();
+            if (index < 1 || index > size) return PrimitiveResult.Fail(context.Metadata!);
 
             var format = context.HeapManager.GetObjectFormat(context.Receiver);
             SmalltalkOOP value;
@@ -121,31 +121,31 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
             var value = context.Arguments[1];
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
 
             // Smalltalk indices are 1-based
-            if (index < 1 || index > size) return PrimitiveResult.Fail();
+            if (index < 1 || index > size) return PrimitiveResult.Fail(context.Metadata!);
 
             var format = context.HeapManager.GetObjectFormat(context.Receiver);
 
             if (format == ObjectFormat.ByteIndexed)
             {
-                if (!value.IsSmallInteger) return PrimitiveResult.Fail();
+                if (!value.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
                 int byteValue = value.AsSmallInteger();
-                if (byteValue < 0 || byteValue > 255) return PrimitiveResult.Fail();
+                if (byteValue < 0 || byteValue > 255) return PrimitiveResult.Fail(context.Metadata!);
                 context.HeapManager.SetIndexedByte(context.Receiver, index - 1, (byte)byteValue);
             }
             else if (format == ObjectFormat.WordIndexed)
             {
-                if (!value.IsSmallInteger) return PrimitiveResult.Fail();
+                if (!value.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
                 int wordValue = value.AsSmallInteger();
-                if (wordValue < 0 || wordValue > 65535) return PrimitiveResult.Fail();
+                if (wordValue < 0 || wordValue > 65535) return PrimitiveResult.Fail(context.Metadata!);
                 context.HeapManager.SetIndexedWord(context.Receiver, index - 1, (ushort)wordValue);
             }
             else
@@ -162,32 +162,32 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
 
             // Always read count from class format - this is the authoritative source
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
             if (classOOP.IsSmallInteger || classOOP == context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
-            // Read format from class using GetSlot to bypass bounds check
+            // Read format from class using GetInstanceVariable
             // Class slot layout: [0]=class, [1]=superclass, [2]=methodDict, [3]=format
-            var formatOOP = context.HeapManager.GetSlot(classOOP, 3);
+            var formatOOP = context.HeapManager.GetInstanceVariable(classOOP, 2);
             if (!formatOOP.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             var formatWord = new FormatWord(formatOOP.AsSmallInteger());
             int count = formatWord.FixedFields;
 
             // Smalltalk indices are 1-based
-            if (index < 1 || index > count) return PrimitiveResult.Fail();
+            if (index < 1 || index > count) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Use GetSlot directly to bypass cached bounds check
+            // Use GetInstanceVariable to access instance variables
             // Object slot layout: [0]=class, [1..count]=instance variables
-            var value = context.HeapManager.GetSlot(context.Receiver, index);
+            var value = context.HeapManager.GetInstanceVariable(context.Receiver, index - 1);
             return PrimitiveResult.Ok(value);
         }
     }
@@ -197,9 +197,9 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
             var value = context.Arguments[1];
@@ -207,23 +207,23 @@ public static class SimpleObjectPrimitives
             // Always read count from class format - this is the authoritative source
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
             if (classOOP.IsSmallInteger || classOOP == context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
-            // Read format from class using GetSlot to bypass bounds check
+            // Read format from class using GetInstanceVariable
             // Class slot layout: [0]=class, [1]=superclass, [2]=methodDict, [3]=format
-            var formatOOP = context.HeapManager.GetSlot(classOOP, 3);
+            var formatOOP = context.HeapManager.GetInstanceVariable(classOOP, 2);
             if (!formatOOP.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             var formatWord = new FormatWord(formatOOP.AsSmallInteger());
             int count = formatWord.FixedFields;
 
             // Smalltalk indices are 1-based
-            if (index < 1 || index > count) return PrimitiveResult.Fail();
+            if (index < 1 || index > count) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Use SetSlot directly to bypass cached bounds check
+            // Use SetInstanceVariable to modify instance variables
             // Object slot layout: [0]=class, [1..count]=instance variables
-            context.HeapManager.SetSlot(context.Receiver, index, value);
+            context.HeapManager.SetInstanceVariable(context.Receiver, index - 1, value);
             return PrimitiveResult.Ok(value);
         }
     }
@@ -233,22 +233,22 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
-            if (index < 1) return PrimitiveResult.Fail();
+            if (index < 1) return PrimitiveResult.Fail(context.Metadata!);
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-            if (index > size) return PrimitiveResult.Fail();
+            if (index > size) return PrimitiveResult.Fail(context.Metadata!);
 
             byte byteValue = context.HeapManager.GetIndexedByte(context.Receiver, index - 1);
 
             // Get Character from CharacterTable (Character class pool variable)
             var characterOOP = GetCharacterForAscii(context, byteValue);
             if (characterOOP == context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             return PrimitiveResult.Ok(characterOOP);
         }
@@ -301,12 +301,12 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
-            if (index < 1) return PrimitiveResult.Fail();
+            if (index < 1) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP characterOOP = context.Arguments[1];
             int charValue;
@@ -315,19 +315,19 @@ public static class SimpleObjectPrimitives
             if (characterOOP.IsSmallInteger)
             {
                 charValue = characterOOP.AsSmallInteger();
-                if (charValue < 0 || charValue > 255) return PrimitiveResult.Fail();
+                if (charValue < 0 || charValue > 255) return PrimitiveResult.Fail(context.Metadata!);
             }
             else
             {
                 // Character object - extract value from instance variable 0
                 var asciiOOP = context.HeapManager.GetInstanceVariable(characterOOP, 0);
-                if (!asciiOOP.IsSmallInteger) return PrimitiveResult.Fail();
+                if (!asciiOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
                 charValue = asciiOOP.AsSmallInteger();
-                if (charValue < 0 || charValue > 255) return PrimitiveResult.Fail();
+                if (charValue < 0 || charValue > 255) return PrimitiveResult.Fail(context.Metadata!);
             }
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-            if (index > size) return PrimitiveResult.Fail();
+            if (index > size) return PrimitiveResult.Fail(context.Metadata!);
 
             context.HeapManager.SetIndexedByte(context.Receiver, index - 1, (byte)charValue);
             return PrimitiveResult.Ok(characterOOP);
@@ -339,8 +339,8 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Stream instance variables: collection (0), position (1), readLimit (2)
             SmalltalkOOP collectionOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 0);
@@ -348,16 +348,16 @@ public static class SimpleObjectPrimitives
             SmalltalkOOP readLimitOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 2);
 
             if (!positionOOP.IsSmallInteger || !readLimitOOP.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int position = positionOOP.AsSmallInteger();
             int readLimit = readLimitOOP.AsSmallInteger();
 
-            if (position > readLimit) return PrimitiveResult.Fail();
-            if (collectionOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (position > readLimit) return PrimitiveResult.Fail(context.Metadata!);
+            if (collectionOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int collectionSize = context.HeapManager.GetIndexedSize(collectionOOP);
-            if (position < 1 || position > collectionSize) return PrimitiveResult.Fail();
+            if (position < 1 || position > collectionSize) return PrimitiveResult.Fail(context.Metadata!);
 
             // Read element from collection
             SmalltalkOOP element;
@@ -384,8 +384,8 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP value = context.Arguments[0];
 
@@ -395,24 +395,24 @@ public static class SimpleObjectPrimitives
             SmalltalkOOP writeLimitOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 3);
 
             if (!positionOOP.IsSmallInteger || !writeLimitOOP.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int position = positionOOP.AsSmallInteger();
             int writeLimit = writeLimitOOP.AsSmallInteger();
 
-            if (position > writeLimit) return PrimitiveResult.Fail();
-            if (collectionOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (position > writeLimit) return PrimitiveResult.Fail(context.Metadata!);
+            if (collectionOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int collectionSize = context.HeapManager.GetIndexedSize(collectionOOP);
-            if (position < 1 || position > collectionSize) return PrimitiveResult.Fail();
+            if (position < 1 || position > collectionSize) return PrimitiveResult.Fail(context.Metadata!);
 
             // Write element to collection
             var format = context.HeapManager.GetObjectFormat(collectionOOP);
             if (format == ObjectFormat.ByteIndexed)
             {
-                if (!value.IsSmallInteger) return PrimitiveResult.Fail();
+                if (!value.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
                 int byteValue = value.AsSmallInteger();
-                if (byteValue < 0 || byteValue > 255) return PrimitiveResult.Fail();
+                if (byteValue < 0 || byteValue > 255) return PrimitiveResult.Fail(context.Metadata!);
                 context.HeapManager.SetIndexedByte(collectionOOP, position - 1, (byte)byteValue);
             }
             else
@@ -432,15 +432,15 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Stream instance variables: collection (0), position (1), readLimit (2)
             SmalltalkOOP positionOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 1);
             SmalltalkOOP readLimitOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 2);
 
             if (!positionOOP.IsSmallInteger || !readLimitOOP.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int position = positionOOP.AsSmallInteger();
             int readLimit = readLimitOOP.AsSmallInteger();
@@ -454,15 +454,15 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
-            if (index < 1) return PrimitiveResult.Fail();
+            if (index < 1) return PrimitiveResult.Fail(context.Metadata!);
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-            if (index > size) return PrimitiveResult.Fail();
+            if (index > size) return PrimitiveResult.Fail(context.Metadata!);
 
             return PrimitiveResult.Ok(context.HeapManager.GetIndexedOOP(context.Receiver, index - 1));
         }
@@ -473,15 +473,15 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
-            if (index < 1) return PrimitiveResult.Fail();
+            if (index < 1) return PrimitiveResult.Fail(context.Metadata!);
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-            if (index > size) return PrimitiveResult.Fail();
+            if (index > size) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP value = context.Arguments[1];
             context.HeapManager.SetIndexedOOP(context.Receiver, index - 1, value);
@@ -494,8 +494,8 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -504,7 +504,7 @@ public static class SimpleObjectPrimitives
             }
             catch
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
@@ -514,12 +514,12 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int size = context.Arguments[0].AsSmallInteger();
-            if (size < 0) return PrimitiveResult.Fail();
+            if (size < 0) return PrimitiveResult.Fail(context.Metadata!);
 
             var result = context.HeapManager.AllocateInstanceOf(context.Receiver, size);
             return PrimitiveResult.Ok(result);
@@ -531,11 +531,11 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger || context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
-            context.HeapManager.BecomeTwoWay(context.Receiver, context.Arguments[0]);
+            context.HeapManager.Become.BecomeTwoWay(context.Receiver, context.Arguments[0]);
             return PrimitiveResult.Ok(context.Receiver);
         }
     }
@@ -545,12 +545,12 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             var instance = context.HeapManager.FindInstanceOf(context.Receiver);
             if (instance == context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             return PrimitiveResult.Ok(instance);
         }
@@ -561,14 +561,14 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
             var nextInstance = context.HeapManager.FindNextInstanceOf(classOOP, context.Receiver);
 
             if (nextInstance == context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             return PrimitiveResult.Ok(nextInstance);
         }
@@ -579,21 +579,21 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Arguments[0].IsSmallInteger || !context.Arguments[1].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int numberOfBytes = context.Arguments[0].AsSmallInteger();
             int headerWord = context.Arguments[1].AsSmallInteger();
 
-            if (numberOfBytes < 0) return PrimitiveResult.Fail();
+            if (numberOfBytes < 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get class OOPs
             var compiledMethodClassOOP = context.RuntimeHeapAccess?.GetClass("CompiledMethod");
             var byteArrayClassOOP = context.RuntimeHeapAccess?.GetClass("ByteArray");
 
             if (compiledMethodClassOOP == null || byteArrayClassOOP == null)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             // Create bytecode array
             byte[] bytecodes = new byte[numberOfBytes];
@@ -625,7 +625,7 @@ public static class CompiledMethodHelpers
     /// + Separate ByteArray for actual bytecodes
     /// </summary>
     public static SmalltalkOOP AllocateCompiledMethodInternal(
-        ISmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         SmalltalkOOP compiledMethodClassOOP,
         SmalltalkOOP byteArrayClassOOP,
         SmalltalkOOP homeClassOOP,
@@ -641,7 +641,7 @@ public static class CompiledMethodHelpers
 
         // Step 1: Create separate ByteArray for bytecodes
         var bytecodeArrayOOP = heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, bytecodes.Length);
-        heapManager.SetSlot(bytecodeArrayOOP, 0, byteArrayClassOOP);
+        heapManager.SetClassOOP(bytecodeArrayOOP, byteArrayClassOOP);
         for (int i = 0; i < bytecodes.Length; i++)
         {
             heapManager.SetIndexedByte(bytecodeArrayOOP, i, bytecodes[i]);
@@ -649,7 +649,7 @@ public static class CompiledMethodHelpers
 
         // Step 2: Allocate PointerIndexed CompiledMethod
         var methodOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, indexedSlots);
-        heapManager.SetSlot(methodOOP, 0, compiledMethodClassOOP);
+        heapManager.SetClassOOP(methodOOP, compiledMethodClassOOP);
 
         // Step 3: Set fixed slot 0 (homeClass) - needed for super sends
         heapManager.SetInstanceVariable(methodOOP, 0, homeClassOOP);

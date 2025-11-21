@@ -91,7 +91,7 @@ public class PatchApplier(Phase5Context context, IFieldValueResolver fieldValueR
 
         // Check if the literal is an Association
         var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
-        var literalClassOOP = context.HeapManager.GetSlot(literalOOP, 0);
+        var literalClassOOP = context.HeapManager.GetClassOOP(literalOOP);
 
         if (literalClassOOP == associationClassOOP)
         {
@@ -110,8 +110,8 @@ public class PatchApplier(Phase5Context context, IFieldValueResolver fieldValueR
                     var elem0 = context.HeapManager.GetIndexedOOP(literalOOP, 0);
                     var elem1 = context.HeapManager.GetIndexedOOP(literalOOP, 1);
                     var symbolClassOOP = GlobalRegistry.LookupClassOOP("Symbol");
-                    var elem0ClassOOP = context.HeapManager.GetSlot(elem0, 0);
-                    var elem1ClassOOP = context.HeapManager.GetSlot(elem1, 0);
+                    var elem0ClassOOP = context.HeapManager.GetClassOOP(elem0);
+                    var elem1ClassOOP = context.HeapManager.GetClassOOP(elem1);
 
                     if (elem0ClassOOP == symbolClassOOP && elem1ClassOOP == symbolClassOOP)
                     {

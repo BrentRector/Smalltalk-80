@@ -1,9 +1,8 @@
 using Moq;
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Tests.Primitives;
 
@@ -13,10 +12,16 @@ namespace Smalltalk80.Interpreter.Tests.Primitives;
 [Trait("Category", "Primitives")]
 public class FloatPrimitivesTests : PrimitiveTestBase
 {
+    // Shared heap and metadata for comparison tests
+    private static readonly SmalltalkHeapManager _testHeap = new();
+    private static readonly VMMetadata _testMetadata = CreateTestMetadata(_testHeap);
+    private static readonly SmalltalkOOP _trueOOP = _testMetadata.KnownObjects.True;
+    private static readonly SmalltalkOOP _falseOOP = _testMetadata.KnownObjects.False;
+
     /// <summary>
     /// Sets up a mock heap manager to return Float object data from a double value.
     /// </summary>
-    private static void SetupFloatObject(Mock<ISmalltalkHeapManager> mock, SmalltalkOOP floatOOP, double value)
+    private static void SetupFloatObject(Mock<ISmalltalkHeap> mock, SmalltalkOOP floatOOP, double value)
     {
         byte[] bytes = BitConverter.GetBytes(value);
 
@@ -205,11 +210,12 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var context = CreateContext(
             float1,
             [float2],
-            mockHeap.Object);
+            mockHeap.Object,
+            metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, true);
+        AssertSuccessWithBool(result, true, _trueOOP, _falseOOP);
     }
 
     [Fact]
@@ -226,11 +232,12 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var context = CreateContext(
             float1,
             [float2],
-            mockHeap.Object);
+            mockHeap.Object,
+            metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, false);
+        AssertSuccessWithBool(result, false, _trueOOP, _falseOOP);
     }
 
     [Fact]
@@ -247,11 +254,12 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var context = CreateContext(
             float1,
             [float2],
-            mockHeap.Object);
+            mockHeap.Object,
+            metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, true);
+        AssertSuccessWithBool(result, true, _trueOOP, _falseOOP);
     }
 
     [Fact]
@@ -268,11 +276,12 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var context = CreateContext(
             float1,
             [float2],
-            mockHeap.Object);
+            mockHeap.Object,
+            metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, true);
+        AssertSuccessWithBool(result, true, _trueOOP, _falseOOP);
     }
 
     [Fact]
@@ -289,11 +298,12 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var context = CreateContext(
             float1,
             [float2],
-            mockHeap.Object);
+            mockHeap.Object,
+            metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, true);
+        AssertSuccessWithBool(result, true, _trueOOP, _falseOOP);
     }
 
     [Fact]
@@ -310,11 +320,12 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var context = CreateContext(
             float1,
             [float2],
-            mockHeap.Object);
+            mockHeap.Object,
+            metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, true);
+        AssertSuccessWithBool(result, true, _trueOOP, _falseOOP);
     }
 
     [Fact]
@@ -331,11 +342,12 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var context = CreateContext(
             float1,
             [float2],
-            mockHeap.Object);
+            mockHeap.Object,
+            metadata: _testMetadata);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithBool(result, true);
+        AssertSuccessWithBool(result, true, _trueOOP, _falseOOP);
     }
 
     #endregion

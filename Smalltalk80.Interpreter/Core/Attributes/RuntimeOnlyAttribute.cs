@@ -6,7 +6,7 @@ namespace Smalltalk80.Interpreter.Core.Attributes;
 ///
 /// Components marked with this attribute typically:
 /// - Execute Smalltalk bytecode
-/// - Access only the Smalltalk heap (ISmalltalkHeapManager)
+/// - Access only the Smalltalk heap (ISmalltalkHeap)
 /// - Use LayoutResolver for dynamic field lookups
 /// - Never touch ColdStartBundle or stale proxy data
 ///

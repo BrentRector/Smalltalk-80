@@ -34,7 +34,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         }
 
         // Primitive not found
-        return PrimitiveResult.Fail();
+        return PrimitiveResult.Fail(context.Metadata!);
     }
 
     /// <inheritdoc/>
@@ -98,9 +98,11 @@ public class PrimitiveRegistry : IPrimitiveRegistry
             return result.Value;
         }
 
-        // Primitive not found
+        // Primitive not found - return nil
         ctx.PrimitiveSuccess = false;
-        return default(SmalltalkOOP);
+        if (metadata == null)
+            throw new InvalidOperationException("VMMetadata required but not provided to ExecuteLegacyExtended");
+        return metadata.KnownObjects.Nil;
     }
 
     /// <summary>

@@ -24,9 +24,9 @@ public static class FontPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (context.LayoutResolver == null) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.LayoutResolver == null) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get character value
             var charArg = context.Arguments[0];
@@ -40,7 +40,7 @@ public static class FontPrimitives
             {
                 // Character object - get its value
                 var className = context.HeapManager.GetClassName(charArg);
-                if (className != "Character") return PrimitiveResult.Fail();
+                if (className != "Character") return PrimitiveResult.Fail(context.Metadata!);
 
                 // Character stores its value in first inst var
                 charValue = context.HeapManager.GetInstanceVariable(charArg, 0).AsSmallInteger();
@@ -56,7 +56,7 @@ public static class FontPrimitives
             var xTableOOP = context.HeapManager.GetInstanceVariable(context.Receiver, xTableIdx);
 
             if (!minAsciiOOP.IsSmallInteger || !maxAsciiOOP.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int minAscii = minAsciiOOP.AsSmallInteger();
             int maxAscii = maxAsciiOOP.AsSmallInteger();
@@ -72,7 +72,7 @@ public static class FontPrimitives
             var rightEdge = context.HeapManager.GetIndexedOOP(xTableOOP, index + 1);
 
             if (!leftEdge.IsSmallInteger || !rightEdge.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int width = rightEdge.AsSmallInteger() - leftEdge.AsSmallInteger();
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(width));
@@ -88,12 +88,12 @@ public static class FontPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (context.LayoutResolver == null) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.LayoutResolver == null) return PrimitiveResult.Fail(context.Metadata!);
 
             var stringArg = context.Arguments[0];
-            if (stringArg.IsSmallInteger) return PrimitiveResult.Fail();
+            if (stringArg.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get string characters
             int stringSize = context.HeapManager.GetIndexedSize(stringArg);
@@ -108,7 +108,7 @@ public static class FontPrimitives
             var xTableOOP = context.HeapManager.GetInstanceVariable(context.Receiver, xTableIdx);
 
             if (!minAsciiOOP.IsSmallInteger || !maxAsciiOOP.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int minAscii = minAsciiOOP.AsSmallInteger();
             int maxAscii = maxAsciiOOP.AsSmallInteger();
@@ -129,7 +129,7 @@ public static class FontPrimitives
                 var rightEdge = context.HeapManager.GetIndexedOOP(xTableOOP, index + 1);
 
                 if (!leftEdge.IsSmallInteger || !rightEdge.IsSmallInteger)
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
 
                 totalWidth += rightEdge.AsSmallInteger() - leftEdge.AsSmallInteger();
             }
@@ -147,9 +147,9 @@ public static class FontPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (context.LayoutResolver == null) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.LayoutResolver == null) return PrimitiveResult.Fail(context.Metadata!);
 
             int ascentIdx = context.LayoutResolver.GetFieldIndex("StrikeFont", "ascent");
             var ascentOOP = context.HeapManager.GetInstanceVariable(context.Receiver, ascentIdx);
@@ -167,9 +167,9 @@ public static class FontPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
-            if (context.LayoutResolver == null) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.LayoutResolver == null) return PrimitiveResult.Fail(context.Metadata!);
 
             int descentIdx = context.LayoutResolver.GetFieldIndex("StrikeFont", "descent");
             var descentOOP = context.HeapManager.GetInstanceVariable(context.Receiver, descentIdx);

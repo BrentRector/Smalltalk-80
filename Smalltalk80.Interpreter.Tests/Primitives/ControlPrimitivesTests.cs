@@ -1,9 +1,8 @@
 using Moq;
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Tests.Primitives;
 
@@ -250,6 +249,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
     public void BlockCopy_InitializesCallerToNil()
     {
         var primitive = new ControlPrimitives.BlockCopy();
+        var heap = new SmalltalkHeapManager();
+        var metadata = CreateTestMetadata(heap);
+        var nilOOP = metadata.KnownObjects.Nil;
+
         var mockHeap = CreateMockHeapManager();
         var methodContextOOP = ObjectOOP(100);
         var blockContextClassOOP = ObjectOOP(50);
@@ -266,12 +269,13 @@ public class ControlPrimitivesTests : PrimitiveTestBase
             [SmallInt(0), SmallInt(5)],
             mockHeap.Object,
             mockRuntimeAccess.Object,
-            instructionPointer: 100);
+            instructionPointer: 100,
+            metadata: metadata);
 
         var result = primitive.Execute(context);
 
         AssertSuccess(result);
-        mockHeap.Verify(h => h.SetInstanceVariable(newBlockContextOOP, VMConstants.BLOCKCONTEXT_CALLER_INDEX, Nil), Times.Once);
+        mockHeap.Verify(h => h.SetInstanceVariable(newBlockContextOOP, VMConstants.BLOCKCONTEXT_CALLER_INDEX, nilOOP), Times.Once);
     }
 
     [Fact]
@@ -1095,8 +1099,9 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         mockRuntime.Setup(r => r.GetFieldIndex(semaphoreClassOOP, "excessSignals")).Returns(1);
 
         // firstLink is nil (no processes waiting)
+        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
         mockHeap.Setup(h => h.GetInstanceVariable(semaphoreOOP, 0))
-            .Returns(SpecialObjectsArray.Instance.Nil);
+            .Returns(nilOOP);
 
         // excessSignals is not a SmallInteger (should cause failure)
         mockHeap.Setup(h => h.GetInstanceVariable(semaphoreOOP, 1))

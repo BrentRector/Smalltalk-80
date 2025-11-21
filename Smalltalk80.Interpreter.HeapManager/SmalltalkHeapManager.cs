@@ -8,7 +8,7 @@ namespace Smalltalk80.Interpreter.HeapManager;
 /// Uses tagged OOPs for SmallIntegers and ObjectTable indirection for heap objects.
 /// Delegates to specialized components for GC, table management, and become operations.
 /// </summary>
-public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
+public class SmalltalkHeapManager : ISmalltalkHeap
 {
     private readonly IObjectTableManager _tableManager;
     private readonly IGarbageCollector _garbageCollector;
@@ -38,7 +38,8 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         );
 
         // Set class pointer to self-reference (fixed later by become)
-        SetSlot(_nilOOP, 0, _nilOOP);
+        var nilEntry = _tableManager.GetObjectTableEntry(_nilOOP);
+        WriteSlot(nilEntry, 0, _nilOOP);
     }
 
     /// <summary>
@@ -176,26 +177,12 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         SmalltalkOOP newInstanceOOP = AllocateObject(format, instanceVariableCount, indexedSize);
 
         // Set the new instance's class reference (slot 0) to the class
-        SetSlot(newInstanceOOP, 0, classOOP);
+        SetClassOOP(newInstanceOOP, classOOP);
 
-        // Initialize all instance variables to nil
-        // (Note: AllocateObject already initializes slots, but we do it again for clarity)
         // Track runtime allocations for debugging
         System.Threading.Interlocked.Increment(ref _runtimeAllocationCount);
 
-        for (int i = 1; i <= instanceVariableCount; i++)
-        {
-            SetSlot(newInstanceOOP, i, _nilOOP);
-        }
-
-        // Initialize indexed slots to nil for PointerIndexed objects
-        if (format == ObjectFormat.PointerIndexed && indexedSize > 0)
-        {
-            for (int i = 0; i < indexedSize; i++)
-            {
-                SetIndexedOOP(newInstanceOOP, i, _nilOOP);
-            }
-        }
+        // Note: AllocateObject already initializes all instance variables and indexed slots to nil
 
         return newInstanceOOP;
     }
@@ -215,12 +202,13 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
 
     #endregion
 
-    #region Slot Access
+    #region Slot Access (Internal Use Only)
 
     /// <summary>
-    /// Raw slot access - gets OOP from any slot (semantic-agnostic).
+    /// INTERNAL: Raw slot access - gets OOP from any slot (semantic-agnostic).
+    /// External code should use GetClassOOP/GetInstanceVariable/GetIndexedOOP instead.
     /// </summary>
-    public SmalltalkOOP GetSlot(SmalltalkOOP objectOOP, int slotIndex)
+    private SmalltalkOOP GetSlot(SmalltalkOOP objectOOP, int slotIndex)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot get slot from SmallInteger");
@@ -230,9 +218,10 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
     }
 
     /// <summary>
-    /// Raw slot access - sets OOP in any slot (semantic-agnostic).
+    /// INTERNAL: Raw slot access - sets OOP in any slot (semantic-agnostic).
+    /// External code should use SetClassOOP/SetInstanceVariable/SetIndexedOOP instead.
     /// </summary>
-    public void SetSlot(SmalltalkOOP objectOOP, int slotIndex, SmalltalkOOP value)
+    private void SetSlot(SmalltalkOOP objectOOP, int slotIndex, SmalltalkOOP value)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot set slot in SmallInteger");
@@ -250,8 +239,11 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         int instanceVarCount = entry.InstanceVariableCountExplicit;
 
         if (index < 0 || index >= instanceVarCount)
+        {
+            string className = GetClassName(objectOOP) ?? "UnknownClass";
             throw new ArgumentOutOfRangeException(nameof(index),
-                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
+                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
+        }
 
         return ReadSlot(entry, 1 + index);
     }
@@ -270,8 +262,11 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         int instanceVarCount = entry.InstanceVariableCountExplicit;
 
         if (index < 0 || index >= instanceVarCount)
+        {
+            string className = GetClassName(objectOOP) ?? "UnknownClass";
             throw new ArgumentOutOfRangeException(nameof(index),
-                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
+                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
+        }
 
         WriteSlot(entry, 1 + index, value);
         // Write barrier: Future implementation for incremental/concurrent GC
@@ -286,8 +281,11 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         int instanceVarCount = entry.InstanceVariableCountExplicit;
 
         if (index < 0 || index >= instanceVarCount)
+        {
+            string className = GetClassName(objectOOP) ?? "UnknownClass";
             throw new ArgumentOutOfRangeException(nameof(index),
-                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
+                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
+        }
 
         WriteSlot(entry, 1 + index, value);
     }
@@ -305,7 +303,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
 
         if (entry.FormatExplicit != ObjectFormat.PointerIndexed)
         {
-            var classOOP = GetSlot(objectOOP, 0);
+            var classOOP = GetClassOOP(objectOOP);
             throw new InvalidOperationException(
                 $"GetIndexedOOP called on non-PointerIndexed object!\n" +
                 $"  objectOOP: {objectOOP}, format: {entry.FormatExplicit}, class={classOOP}, index: {index}");
@@ -323,7 +321,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
 
         if (entry.FormatExplicit != ObjectFormat.PointerIndexed)
         {
-            var classOOP = GetSlot(objectOOP, 0);
+            var classOOP = GetClassOOP(objectOOP);
             throw new InvalidOperationException(
                 $"SetIndexedOOP called on non-PointerIndexed object!\n" +
                 $"  objectOOP: {objectOOP}, format: {entry.FormatExplicit}, class={classOOP}, index: {index}");
@@ -577,7 +575,11 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
 
     public void SetClassOOP(SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
     {
-        SetSlot(objectOOP, 0, classOOP);
+        if (objectOOP.IsSmallInteger)
+            throw new ArgumentException("Cannot set class of SmallInteger");
+
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+        WriteSlot(entry, 0, classOOP);
     }
 
     public ObjectFormat GetObjectFormat(SmalltalkOOP objectOOP)
@@ -636,36 +638,6 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
 
     #endregion
 
-    #region GC Delegation (ISmalltalkHeapManager compatibility)
-
-    // Legacy methods for ISmalltalkHeapManager compatibility
-    // New code should use heap.GC.* instead
-    public void SetGCRoots(SmalltalkOOP[] rootObjects)
-    {
-        _garbageCollector.ClearGCRoots();
-        if (rootObjects != null)
-        {
-            foreach (var oop in rootObjects)
-                _garbageCollector.AddGCRoot(oop);
-        }
-    }
-
-    public void AddGCRoots(SmalltalkOOP[] additionalRoots)
-    {
-        if (additionalRoots != null)
-        {
-            foreach (var oop in additionalRoots)
-                _garbageCollector.AddGCRoot(oop);
-        }
-    }
-
-    public SmalltalkOOP[] GetGCRoots() => _garbageCollector.GetGCRoots();
-    public SmalltalkOOP[] GetUnreachableObjects() => _garbageCollector.GetUnreachableObjects();
-    public GCStatistics GarbageCollect() => _garbageCollector.GarbageCollect();
-    public GCStatistics GetGCStatistics() => _garbageCollector.GetStatistics();
-
-    #endregion
-
     #region Table Management Delegation
 
     public int GetObjectTableSize() => _tableManager.GetObjectTableSize();
@@ -673,12 +645,6 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
     public bool IsValidObjectOOP(SmalltalkOOP objectOOP) => _tableManager.IsValidObjectOOP(objectOOP);
     public bool IsValidOOP(SmalltalkOOP oop) => _tableManager.IsValidOOP(oop);
     public IEnumerable<SmalltalkOOP> EnumerateObjectTable() => _tableManager.EnumerateObjectTable();
-
-    #endregion
-
-    #region Become Delegation
-
-    public void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2) => _becomeHandler.BecomeTwoWay(oop1, oop2);
 
     #endregion
 
@@ -737,7 +703,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
             if (!IsValidObjectOOP(objectOOP))
                 return "Invalid";
 
-            var classOOP = GetSlot(objectOOP, 0);
+            var classOOP = GetClassOOP(objectOOP);
             if (classOOP.IsSmallInteger)
                 return "InvalidClass(SmallInt)";
 
@@ -842,7 +808,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
             {
                 var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
                 var entry = _tableManager.GetObjectTableEntry(objectOOP);
-                var classOOP = GetSlot(objectOOP, 0);
+                var classOOP = GetClassOOP(objectOOP);
 
                 string localId = localIdToObjectId.FirstOrDefault(kvp => kvp.Value == objectId).Key ?? "unknown";
 

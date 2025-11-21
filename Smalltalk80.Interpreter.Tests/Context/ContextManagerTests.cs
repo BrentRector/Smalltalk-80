@@ -16,7 +16,7 @@ public class ContextManagerTests
 {
     #region Test Infrastructure
 
-    private readonly Mock<ISmalltalkHeapManager> _mockHeap;
+    private readonly Mock<ISmalltalkHeap> _mockHeap;
     private readonly Mock<IObjectMetadataAccessor> _mockHelpers;
     private readonly VMMetadata _metadata;
     private readonly LayoutResolver _layoutResolver;
@@ -30,7 +30,7 @@ public class ContextManagerTests
 
     public ContextManagerTests()
     {
-        _mockHeap = new Mock<ISmalltalkHeapManager>(MockBehavior.Loose);
+        _mockHeap = new Mock<ISmalltalkHeap>(MockBehavior.Loose);
         _mockHelpers = new Mock<IObjectMetadataAccessor>(MockBehavior.Loose);
 
         // Initialize SpecialObjectsArray for tests
@@ -74,7 +74,7 @@ public class ContextManagerTests
 
     private ContextManager CreateContextManager()
     {
-        return new ContextManager(_mockHeap.Object, _metadata, _layoutResolver, _mockHelpers.Object);
+        return new ContextManager(_mockHeap.Object, _metadata, _mockHelpers.Object);
     }
 
     private static SmalltalkOOP SmallInt(int value) => SmalltalkOOP.FromSmallInteger(value);
@@ -313,7 +313,7 @@ public class ContextManagerTests
         manager.CreateMethodContext(methodOOP, receiverOOP, [SmallInt(1), SmallInt(2)]);
 
         // Should allocate 2 args + 0 temps + 16 stack = 18
-        _mockHeap.Verify(h => h.AllocateObject(ObjectFormat.PointerIndexed, 5, 18), Times.Once);
+        _mockHeap.Verify(h => h.AllocateObject(ObjectFormat.PointerIndexed, 6, 18), Times.Once);
     }
 
     #endregion
@@ -550,7 +550,7 @@ public class ContextManagerTests
 
         manager.CreateMethodContext(methodOOP, receiverOOP, []);
 
-        _mockHeap.Verify(h => h.AllocateObject(ObjectFormat.PointerIndexed, 5, 48), Times.Once);
+        _mockHeap.Verify(h => h.AllocateObject(ObjectFormat.PointerIndexed, 6, 48), Times.Once);
     }
 
     [Fact]
@@ -566,7 +566,7 @@ public class ContextManagerTests
 
         manager.CreateMethodContext(methodOOP, receiverOOP, [SmallInt(1), SmallInt(2), SmallInt(3)]);
 
-        _mockHeap.Verify(h => h.AllocateObject(ObjectFormat.PointerIndexed, 5, 56), Times.Once);
+        _mockHeap.Verify(h => h.AllocateObject(ObjectFormat.PointerIndexed, 6, 56), Times.Once);
     }
 
     #endregion

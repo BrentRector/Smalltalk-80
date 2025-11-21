@@ -21,14 +21,14 @@ namespace Smalltalk80.Interpreter.Core.VM.Views;
 public readonly struct ClassView
 {
     private readonly SmalltalkOOP _oop;
-    private readonly ISmalltalkHeapManager _heap;
+    private readonly ISmalltalkHeap _heap;
 
     /// <summary>
     /// Creates a view of a Class.
     /// </summary>
     /// <param name="oop">The Class OOP.</param>
     /// <param name="heap">The heap manager for accessing fields.</param>
-    public ClassView(SmalltalkOOP oop, ISmalltalkHeapManager heap)
+    public ClassView(SmalltalkOOP oop, ISmalltalkHeap heap)
     {
         _oop = oop;
         _heap = heap;

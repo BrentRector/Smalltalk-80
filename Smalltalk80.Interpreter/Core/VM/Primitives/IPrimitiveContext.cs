@@ -12,7 +12,7 @@ public interface IPrimitiveContext
     /// <summary>
     /// Gets the heap manager instance.
     /// </summary>
-    ISmalltalkHeapManager HeapManager { get; }
+    ISmalltalkHeap HeapManager { get; }
 
 
     /// <summary>

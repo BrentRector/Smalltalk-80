@@ -10,10 +10,10 @@ namespace Smalltalk80.Interpreter.HeapManager;
 internal class GarbageCollector : IGarbageCollector
 {
     private readonly IObjectTableManager _tableManager;
-    private readonly ISmalltalkHeapManager _heap;
+    private readonly ISmalltalkHeap _heap;
     private SmalltalkOOP[] _gcRoots = Array.Empty<SmalltalkOOP>();
 
-    public GarbageCollector(IObjectTableManager tableManager, ISmalltalkHeapManager heap)
+    public GarbageCollector(IObjectTableManager tableManager, ISmalltalkHeap heap)
     {
         _tableManager = tableManager;
         _heap = heap;
@@ -139,7 +139,10 @@ internal class GarbageCollector : IGarbageCollector
             entry.ManagedStorage = null;
             entry.InstanceVariableStorage = null;
 
-            // Free the object
+            // Remove entry from ObjectTable (prevents double-free on next GC)
+            _tableManager.SetObjectTableEntry(objectId, null!);
+
+            // Free the object table index for reuse
             _tableManager.FreeObjectTableIndex(objectId);
         }
 
