@@ -285,14 +285,15 @@ public class InitExpressionExecutor
                 Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, GC: {gcStatsBefore.CollectedObjects}/{gcStatsAfter.CollectedObjects})");
                 Console.WriteLine($"    WARNING: Collected {gcStatsAfter.CollectedObjects} objects (expected ~3)");
 
-                // Group collected objects by class
+                // Group collected objects by class - show ALL classes, not just top 10
                 var classCounts = gcStatsAfter.CollectedObjectDetails
                     .GroupBy(obj => obj.className ?? "unknown")
                     .Select(g => new { ClassName = g.Key, Count = g.Count() })
                     .OrderByDescending(x => x.Count)
-                    .Take(10);
+                    .ToList();
 
-                Console.WriteLine($"    Top collected classes:");
+                int accountedFor = classCounts.Sum(x => x.Count);
+                Console.WriteLine($"    All collected classes ({accountedFor}/{gcStatsAfter.CollectedObjects} accounted):");
                 foreach (var item in classCounts)
                 {
                     Console.WriteLine($"      {item.ClassName}: {item.Count}");
