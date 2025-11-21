@@ -126,7 +126,20 @@ internal class GarbageCollector : IGarbageCollector
                 string? className = null;
                 try
                 {
+                    // DEBUG: Track when GetClassName is called for oop=6750
+                    if (objectId == 3375) // 6750 >> 1 = 3375
+                    {
+                        var classOOP = _heap.GetClassOOP(oop);
+                        Console.WriteLine($"[GC SWEEP] Getting className for oop={oop} (index={objectId})");
+                        Console.WriteLine($"  classOOP={classOOP}");
+                    }
+
                     className = _heap.GetClassName(oop);
+
+                    if (objectId == 3375)
+                    {
+                        Console.WriteLine($"  Result: className=\"{className}\"");
+                    }
                 }
                 catch
                 {

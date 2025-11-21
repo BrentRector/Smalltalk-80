@@ -236,6 +236,36 @@ public class InitExpressionExecutor
                 var classOOP = _heapManager.GetClassOOP(trackedOOP);
                 var className = _heapManager.GetClassName(trackedOOP);
                 Console.WriteLine($"  [BEFORE GC] oop=6750 class={classOOP}, className=\"{className}\"");
+
+                // Check Symbol class (oop=11352) name field
+                var symbolClassOOP = new SmalltalkOOP(11352);
+                if (_heapManager.IsValidObjectOOP(symbolClassOOP))
+                {
+                    // Class name is at instance variable index 6
+                    var symbolClassNameSymbolOOP = _heapManager.GetInstanceVariable(symbolClassOOP, 6);
+                    Console.WriteLine($"  [BEFORE GC] Symbol class (oop=11352) name field = {symbolClassNameSymbolOOP}");
+
+                    // Read the actual symbol text
+                    if (!symbolClassNameSymbolOOP.IsSmallInteger && _heapManager.IsValidObjectOOP(symbolClassNameSymbolOOP))
+                    {
+                        int symbolSize = _heapManager.GetIndexedSize(symbolClassNameSymbolOOP);
+                        byte[] symbolBytes = new byte[symbolSize];
+                        for (int i = 0; i < symbolSize; i++)
+                        {
+                            symbolBytes[i] = _heapManager.GetIndexedByte(symbolClassNameSymbolOOP, i);
+                        }
+                        string symbolText = System.Text.Encoding.UTF8.GetString(symbolBytes);
+                        Console.WriteLine($"  [BEFORE GC] Symbol class name symbol text = \"{symbolText}\"");
+                    }
+                }
+
+                // Also check what class has "ByteArray" as its name
+                var byteArrayClassOOP = new SmalltalkOOP(11348); // Common OOP for ByteArray class
+                if (_heapManager.IsValidObjectOOP(byteArrayClassOOP))
+                {
+                    var byteArrayClassName = _heapManager.GetClassName(byteArrayClassOOP);
+                    Console.WriteLine($"  [BEFORE GC] oop=11348 className=\"{byteArrayClassName}\"");
+                }
             }
 
             var gcStatsBefore = _heapManager.GC.GarbageCollect();
