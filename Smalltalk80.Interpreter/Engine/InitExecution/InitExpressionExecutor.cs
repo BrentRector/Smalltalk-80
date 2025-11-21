@@ -359,13 +359,22 @@ public class InitExpressionExecutor
                             var ctxClassName = _heapManager.GetClassName(ctxClass);
                             Console.WriteLine($"          Context class: {ctxClassName}");
 
-                            if (ctxClassName == "BlockContext")
+                            // Check if it's a BlockContext (GetClassName returns "BlockContext class")
+                            if (ctxClassName.Contains("BlockContext"))
                             {
                                 var homeCtx = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
                                 Console.WriteLine($"          BlockContext home: {homeCtx}");
                                 if (homeCtx == methodContextOOP)
                                 {
                                     Console.WriteLine($"          ^^^ FOUND IT! This BlockContext's home IS our MethodContext!");
+                                }
+
+                                // Also check sender chain
+                                SmalltalkOOP senderOOP = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.CONTEXT_SENDER_INDEX);
+                                Console.WriteLine($"          BlockContext sender: {senderOOP}");
+                                if (senderOOP == methodContextOOP)
+                                {
+                                    Console.WriteLine($"          ^^^ FOUND IT! This BlockContext's sender IS our MethodContext!");
                                 }
                             }
                         }
