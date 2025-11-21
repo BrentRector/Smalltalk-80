@@ -1095,7 +1095,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
 
         // firstLink is nil (no processes waiting)
         mockHeap.Setup(h => h.GetInstanceVariable(semaphoreOOP, 0))
-            .Returns(SpecialObjectsArray.Instance.Nil);
+            .Returns(Nil);
 
         // excessSignals is not a SmallInteger (should cause failure)
         mockHeap.Setup(h => h.GetInstanceVariable(semaphoreOOP, 1))

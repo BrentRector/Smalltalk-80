@@ -30,6 +30,20 @@ public abstract class PrimitiveTestBase
     }
 
     /// <summary>
+    /// Test metadata with known objects for primitive testing.
+    /// </summary>
+    protected static readonly VMMetadata TestMetadata = new VMMetadata
+    {
+        KnownObjects = new KnownObjects(
+            nil: SmalltalkOOP.FromObjectTableIndex(0),      // Nil
+            @true: SmalltalkOOP.FromObjectTableIndex(1),     // True
+            @false: SmalltalkOOP.FromObjectTableIndex(2),    // False
+            smalltalk: SmalltalkOOP.FromObjectTableIndex(3)  // Smalltalk dictionary
+        ),
+        ProcessorScheduler = SmalltalkOOP.FromObjectTableIndex(4)
+    };
+
+    /// <summary>
     /// Creates a PrimitiveExecutionContext with the specified receiver and arguments.
     /// </summary>
     protected static PrimitiveExecutionContext CreateContext(
@@ -40,7 +54,8 @@ public abstract class PrimitiveTestBase
         IContextManager? contextManager = null,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
-        int instructionPointer = 0)
+        int instructionPointer = 0,
+        VMMetadata? metadata = null)
     {
         return new PrimitiveExecutionContext(
             receiver,
@@ -53,7 +68,8 @@ public abstract class PrimitiveTestBase
             runtimeHeapAccess: runtimeHeapAccess,
             instructionPointer: instructionPointer,
             cacheManager: cacheManager,
-            messageSender: messageSender);
+            messageSender: messageSender,
+            metadata: metadata ?? TestMetadata);
     }
 
     /// <summary>
@@ -67,19 +83,19 @@ public abstract class PrimitiveTestBase
     protected static SmalltalkOOP ObjectOOP(int rawValue) => new SmalltalkOOP(rawValue << 1);
 
     /// <summary>
-    /// Gets the Nil OOP from SpecialObjectsArray.
+    /// Gets the Nil OOP for testing (uses test metadata).
     /// </summary>
-    protected static SmalltalkOOP Nil => SpecialObjectsArray.Instance.Nil;
+    protected static SmalltalkOOP Nil => TestMetadata.KnownObjects.Nil;
 
     /// <summary>
-    /// Gets the True OOP from SpecialObjectsArray.
+    /// Gets the True OOP for testing (uses test metadata).
     /// </summary>
-    protected static SmalltalkOOP True => SpecialObjectsArray.Instance.True;
+    protected static SmalltalkOOP True => TestMetadata.KnownObjects.True;
 
     /// <summary>
-    /// Gets the False OOP from SpecialObjectsArray.
+    /// Gets the False OOP for testing (uses test metadata).
     /// </summary>
-    protected static SmalltalkOOP False => SpecialObjectsArray.Instance.False;
+    protected static SmalltalkOOP False => TestMetadata.KnownObjects.False;
 
     /// <summary>
     /// Asserts that a PrimitiveResult is successful.

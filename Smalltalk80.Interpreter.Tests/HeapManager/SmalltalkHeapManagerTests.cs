@@ -30,15 +30,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         _falseOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         _trueOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
 
-        // Initialize SpecialObjectsArray with our test objects
-        var soa = new SpecialObjectsArray(
-            _nilOOP,
-            _falseOOP,
-            _trueOOP,
-            SmalltalkOOP.Null,
-            SmalltalkOOP.Null
-        );
-        SpecialObjectsArray.Initialize(soa);
+        // Note: SpecialObjectsArray was replaced with KnownObjects in VMMetadata
+        // For unit tests, we just use the allocated test objects directly
     }
 
     /// <summary>
@@ -46,8 +39,7 @@ public class SmalltalkHeapManagerTests : IDisposable
     /// </summary>
     public void Dispose()
     {
-        // Reset SpecialObjectsArray to avoid test interference
-        SpecialObjectsArray.Initialize();
+        // Cleanup heap manager resources
     }
 
     /// <summary>
@@ -975,25 +967,27 @@ public class SmalltalkHeapManagerTests : IDisposable
         Assert.DoesNotContain(root, unreachable);
     }
 
-    [Fact]
-    public void MarkObject_SmallInteger_DoesNotThrow()
-    {
-        // Arrange
-        var smallInt = SmalltalkOOP.FromSmallInteger(42);
-
-        // Act & Assert - SmallIntegers should be safely ignored
-        _heapManager.MarkObject(smallInt);
-    }
-
-    [Fact]
-    public void MarkObject_InvalidOOP_DoesNotThrow()
-    {
-        // Arrange
-        var invalidOOP = SmalltalkOOP.FromObjectTableIndex(99999);
-
-        // Act & Assert - Invalid OOPs should be safely ignored
-        _heapManager.MarkObject(invalidOOP);
-    }
+    // NOTE: MarkObject is now internal to GC implementation and not part of public API
+    // These tests are commented out as the method is no longer exposed
+    //[Fact]
+    //public void MarkObject_SmallInteger_DoesNotThrow()
+    //{
+    //    // Arrange
+    //    var smallInt = SmalltalkOOP.FromSmallInteger(42);
+    //
+    //    // Act & Assert - SmallIntegers should be safely ignored
+    //    _heapManager.MarkObject(smallInt);
+    //}
+    //
+    //[Fact]
+    //public void MarkObject_InvalidOOP_DoesNotThrow()
+    //{
+    //    // Arrange
+    //    var invalidOOP = SmalltalkOOP.FromObjectTableIndex(99999);
+    //
+    //    // Act & Assert - Invalid OOPs should be safely ignored
+    //    _heapManager.MarkObject(invalidOOP);
+    //}
 
     [Fact]
     public void GetGCStatistics_ReturnsCurrentHeapStatistics()
@@ -1642,8 +1636,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Act - Implicit conversion with zero
         SmalltalkOOP oop = zero;
 
-        // Assert - Zero creates null OOP
-        Assert.Equal(SmalltalkOOP.Null, oop);
+        // Assert - Zero creates default OOP
+        Assert.Equal(default(SmalltalkOOP), oop);
         Assert.Equal(0, oop.RawValue);
     }
 
