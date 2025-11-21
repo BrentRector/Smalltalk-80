@@ -101,7 +101,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _contextManager = new ContextManager(
             heapManager,
             metadata,
-            _layoutResolver,
             this // IObjectMetadataAccessor
         );
 

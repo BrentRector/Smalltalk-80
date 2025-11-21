@@ -677,34 +677,85 @@ public class Phase6_ValidationAndGC : IPhase
 
     private void ReportValidationResults(ValidationResults results)
     {
-        if (results.Errors.Count == 0)
+        // Count VMConstants-specific errors
+        var vmConstantErrors = results.Errors.Where(e => e.Contains("VMConstants")).ToList();
+        var otherErrors = results.Errors.Except(vmConstantErrors).ToList();
+
+        // Report VMConstants validation status
+        if (vmConstantErrors.Count == 0)
         {
-// Console.WriteLine("  ✓ Validation Summary:");
-// Console.WriteLine($"    Classes: {results.ClassesValidated} validated");
-// Console.WriteLine($"    Methods: {results.MethodsValidated} validated");
-// Console.WriteLine($"    Special objects: {results.SpecialObjectsValidated} validated");
-// Console.WriteLine($"    Init expressions: {results.InitExpressionsValidated} validated");
-// Console.WriteLine($"    Cross-references: {results.CrossReferencesValidated} objects checked");
-// Console.WriteLine($"    ✓ All heap objects match JSON definitions");
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Info,
+                Category = "Phase6",
+                Message = "✓ VMConstants validation: All 27 constants match class layouts",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
         }
         else
         {
-// Console.WriteLine("  ✗ VALIDATION FAILED");
-// Console.WriteLine($"    Validation errors found: {results.Errors.Count}");
-// Console.WriteLine($"    Classes: {results.ClassesValidated} validated");
-// Console.WriteLine($"    Methods: {results.MethodsValidated} validated");
-// Console.WriteLine($"    Invalid references: {results.InvalidReferences}");
-
-// Console.WriteLine($"    Showing first 20 errors:");
-            foreach (var error in results.Errors.Take(20))
+            _diagnostics?.Emit(new DiagnosticMessageEvent
             {
-// Console.WriteLine($"      {error}");
-            }
-            if (results.Errors.Count > 20)
-            {
-// Console.WriteLine($"      ... and {results.Errors.Count - 20} more errors");
-            }
+                Severity = MessageSeverity.Error,
+                Category = "Phase6",
+                Message = $"✗ VMConstants validation FAILED: {vmConstantErrors.Count} mismatches found",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
 
+            foreach (var error in vmConstantErrors)
+            {
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Error,
+                    Category = "Phase6",
+                    Message = $"  {error}",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
+            }
+        }
+
+        // Report other validation errors if any
+        if (otherErrors.Count > 0)
+        {
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Error,
+                Category = "Phase6",
+                Message = $"✗ VALIDATION FAILED: {otherErrors.Count} errors found",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+
+            foreach (var error in otherErrors.Take(20))
+            {
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Error,
+                    Category = "Phase6",
+                    Message = $"  {error}",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
+            }
+            if (otherErrors.Count > 20)
+            {
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Error,
+                    Category = "Phase6",
+                    Message = $"  ... and {otherErrors.Count - 20} more errors",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
+            }
+        }
+
+        // Throw if any errors found
+        if (results.Errors.Count > 0)
+        {
             throw new InvalidOperationException($"Heap validation failed with {results.Errors.Count} errors");
         }
     }
@@ -752,27 +803,7 @@ public class Phase6_ValidationAndGC : IPhase
 
     private void RunGCVerification()
     {
-        // Log object counts before GC
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase6",
-            Message = $"Objects before GC: Total objects: {_heapManager.GetActiveObjectCount()}",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
-
         var gcStats = _heapManager.GarbageCollect();
-
-        // Print GC statistics
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase6",
-            Message = $"GC Results: Live objects: {gcStats.LiveObjects}, Collected: {gcStats.CollectedObjects}",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
 
         // Update report metrics
         _report.Metrics.TotalObjectsAllocated = gcStats.TotalObjects;

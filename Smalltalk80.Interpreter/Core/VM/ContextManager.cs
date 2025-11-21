@@ -9,12 +9,10 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// </summary>
 /// <param name="heapManager">The heap manager for memory operations.</param>
 /// <param name="metadata">VM metadata containing class OOPs.</param>
-/// <param name="layoutResolver">Resolver for class layout information.</param>
 /// <param name="helpers">VM helper methods.</param>
 internal class ContextManager(
     ISmalltalkHeapManager heapManager,
     VMMetadata metadata,
-    LayoutResolver layoutResolver,
     IObjectMetadataAccessor helpers) : IContextManager
 {
     // Active context (current MethodContext being executed)
@@ -65,7 +63,9 @@ internal class ContextManager(
 
         // Step 4: Try to reuse a pooled context with matching size, otherwise allocate new
         SmalltalkOOP contextOOP;
-        int instanceVarCount = layoutResolver.GetInstanceVariableCount("class:MethodContext");
+        // MethodContext has 6 instance variables: sender, pc, stackp, method, lexicalParent, receiver
+        // See VMConstants.CONTEXT_* for field indices
+        const int METHODCONTEXT_INSTANCE_VAR_COUNT = 6;
 
         // Check size-specific pool for matching context
         if (_contextPools.TryGetValue(stackSize, out var pool) && pool.Count > 0)
@@ -76,13 +76,13 @@ internal class ContextManager(
             if (contextOOP == _activeContextOOP || IsInSenderChain(contextOOP, _activeContextOOP))
             {
                 pool.Push(contextOOP);
-                contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
+                contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
                 heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
             }
         }
         else
         {
-            contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
+            contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
             heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
         }
 
@@ -96,11 +96,12 @@ internal class ContextManager(
                 $"This typically indicates infinite recursion or primitive failure causing excessive message sends.");
         }
 
-        // Step 5: Get field indices
+        // Step 5: Get field indices from VMConstants
         int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
         int pcIndex = VMConstants.CONTEXT_PC_INDEX;
         int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
         int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
+        int lexicalParentIndex = VMConstants.CONTEXT_LEXICALPARENT_INDEX;
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         // Step 6: Initialize MethodContext fixed fields
@@ -109,6 +110,7 @@ internal class ContextManager(
         heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
         heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(header.NumArgs + header.NumTemps));
         heapManager.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
+        heapManager.SetInstanceVariable(contextOOP, lexicalParentIndex, metadata.KnownObjects.Nil);
         heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
 
         // Step 7: Initialize indexed fields (args + temps + stack)
