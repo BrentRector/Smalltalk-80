@@ -638,36 +638,6 @@ public class SmalltalkHeapManager : ISmalltalkHeap
 
     #endregion
 
-    #region GC Delegation (ISmalltalkHeap compatibility)
-
-    // Legacy methods for ISmalltalkHeap compatibility
-    // New code should use heap.GC.* instead
-    public void SetGCRoots(SmalltalkOOP[] rootObjects)
-    {
-        _garbageCollector.ClearGCRoots();
-        if (rootObjects != null)
-        {
-            foreach (var oop in rootObjects)
-                _garbageCollector.AddGCRoot(oop);
-        }
-    }
-
-    public void AddGCRoots(SmalltalkOOP[] additionalRoots)
-    {
-        if (additionalRoots != null)
-        {
-            foreach (var oop in additionalRoots)
-                _garbageCollector.AddGCRoot(oop);
-        }
-    }
-
-    public SmalltalkOOP[] GetGCRoots() => _garbageCollector.GetGCRoots();
-    public SmalltalkOOP[] GetUnreachableObjects() => _garbageCollector.GetUnreachableObjects();
-    public GCStatistics GarbageCollect() => _garbageCollector.GarbageCollect();
-    public GCStatistics GetGCStatistics() => _garbageCollector.GetStatistics();
-
-    #endregion
-
     #region Table Management Delegation
 
     public int GetObjectTableSize() => _tableManager.GetObjectTableSize();
@@ -675,12 +645,6 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     public bool IsValidObjectOOP(SmalltalkOOP objectOOP) => _tableManager.IsValidObjectOOP(objectOOP);
     public bool IsValidOOP(SmalltalkOOP oop) => _tableManager.IsValidOOP(oop);
     public IEnumerable<SmalltalkOOP> EnumerateObjectTable() => _tableManager.EnumerateObjectTable();
-
-    #endregion
-
-    #region Become Delegation
-
-    public void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2) => _becomeHandler.BecomeTwoWay(oop1, oop2);
 
     #endregion
 
