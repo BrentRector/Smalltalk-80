@@ -21,10 +21,25 @@ public class ObjectGraphAllocator
     private readonly ISmalltalkHeap _heapManager;
     private readonly ColdStartBundle _bundle;
 
+    // OOP tracking for debugging orphaned objects
+    private static readonly HashSet<int> TrackedOOPs = new() { 6750, 30272, 30273, 30274 };
+
     public ObjectGraphAllocator(ISmalltalkHeap heapManager, ColdStartBundle bundle)
     {
         _heapManager = heapManager;
         _bundle = bundle;
+    }
+
+    private void TrackOOP(SmalltalkOOP oop, string context)
+    {
+        if (oop.IsSmallInteger) return;
+        if (TrackedOOPs.Contains(oop.Value))
+        {
+            var stackTrace = new System.Diagnostics.StackTrace(2, true);
+            var frame = stackTrace.GetFrame(0);
+            Console.WriteLine($"[OOP TRACKER] Allocated {oop} in {context}");
+            Console.WriteLine($"  Caller: {frame?.GetMethod()?.DeclaringType?.Name}.{frame?.GetMethod()?.Name}");
+        }
     }
 
     /// <summary>
@@ -41,9 +56,11 @@ public class ObjectGraphAllocator
     public SmalltalkOOP AllocateFixedObject(string className)
     {
         int fixedSlots = CalculateInstanceVariableCount(className);
-        
+
         // Just allocate - no cross-references set
-        return _heapManager.AllocateObject(ObjectFormat.Pointer, fixedSlots, 0);
+        var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, fixedSlots, 0);
+        TrackOOP(oop, $"AllocateFixedObject({className})");
+        return oop;
     }
 
     /// <summary>
@@ -55,16 +72,17 @@ public class ObjectGraphAllocator
     {
         int fixedSlots = CalculateInstanceVariableCount("String");
         byte[] stringBytes = System.Text.Encoding.UTF8.GetBytes(value);
-        
+
         // Allocate ByteIndexed object
         var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringBytes.Length);
-        
+        TrackOOP(stringOOP, $"AllocateString(\"{value.Substring(0, Math.Min(20, value.Length))}\")");
+
         // Store the string bytes
         for (int i = 0; i < stringBytes.Length; i++)
         {
             _heapManager.SetIndexedByte(stringOOP, i, stringBytes[i]);
         }
-        
+
         return stringOOP;
     }
 
@@ -79,6 +97,7 @@ public class ObjectGraphAllocator
 
         // Allocate ByteIndexed object
         var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringBytes.Length);
+        TrackOOP(stringOOP, $"AllocateString(classOOP={classOOP}, \"{value.Substring(0, Math.Min(20, value.Length))}\")");
 
         // Set class reference
         _heapManager.SetClassOOP(stringOOP, classOOP);
@@ -101,7 +120,9 @@ public class ObjectGraphAllocator
         int fixedSlots = CalculateInstanceVariableCount(className);
 
         // Just allocate - no cross-references set
-        return _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringLength);
+        var oop = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringLength);
+        TrackOOP(oop, $"AllocateString({className}, {stringLength})");
+        return oop;
     }
 
     /// <summary>
@@ -113,13 +134,14 @@ public class ObjectGraphAllocator
     public SmalltalkOOP AllocateArray(SmalltalkOOP classOOP, int elementCount)
     {
         int fixedSlots = CalculateInstanceVariableCountFromClass(classOOP);
-        
+
         // Allocate the object
         var arrayOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, elementCount);
-        
+        TrackOOP(arrayOOP, $"AllocateArray(classOOP={classOOP}, elementCount={elementCount})");
+
         // ALWAYS set class reference immediately - no way to forget this step
         _heapManager.SetClassOOP(arrayOOP, classOOP);
-        
+
         return arrayOOP;
     }
 
@@ -132,9 +154,11 @@ public class ObjectGraphAllocator
     public SmalltalkOOP AllocateArray(string className, int elementCount)
     {
         int fixedSlots = CalculateInstanceVariableCount(className);
-        
+
         // Just allocate - no cross-references set (bootstrap phase)
-        return _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, elementCount);
+        var oop = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, elementCount);
+        TrackOOP(oop, $"AllocateArray({className}, elementCount={elementCount})");
+        return oop;
     }
 
     /// <summary>
@@ -145,16 +169,17 @@ public class ObjectGraphAllocator
     public SmalltalkOOP AllocateByteArray(string className, byte[] bytes)
     {
         int fixedSlots = CalculateInstanceVariableCount(className);
-        
+
         // Allocate ByteIndexed object
         var byteArrayOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, bytes.Length);
-        
+        TrackOOP(byteArrayOOP, $"AllocateByteArray({className}, bytes.Length={bytes.Length})");
+
         // Store the bytes
         for (int i = 0; i < bytes.Length; i++)
         {
             _heapManager.SetIndexedByte(byteArrayOOP, i, bytes[i]);
         }
-        
+
         return byteArrayOOP;
     }
 
@@ -165,9 +190,11 @@ public class ObjectGraphAllocator
     public SmalltalkOOP AllocateByteArray(string className, int byteCount)
     {
         int fixedSlots = CalculateInstanceVariableCount(className);
-        
+
         // Just allocate - no cross-references set
-        return _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, byteCount);
+        var oop = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, byteCount);
+        TrackOOP(oop, $"AllocateByteArray({className}, byteCount={byteCount})");
+        return oop;
     }
 
     /// <summary>
@@ -177,9 +204,11 @@ public class ObjectGraphAllocator
     public SmalltalkOOP AllocateObject(string className, ObjectFormat format, int indexedSize)
     {
         int fixedSlots = CalculateInstanceVariableCount(className);
-        
+
         // Just allocate - no cross-references set
-        return _heapManager.AllocateObject(format, fixedSlots, indexedSize);
+        var oop = _heapManager.AllocateObject(format, fixedSlots, indexedSize);
+        TrackOOP(oop, $"AllocateObject({className}, format={format}, indexedSize={indexedSize})");
+        return oop;
     }
 
     /// <summary>
@@ -494,6 +523,7 @@ public class ObjectGraphAllocator
         // Blue Book: Float is "variableWordSubclass" → WordIndexed format
         // IMPORTANT: Store as 4x 16-bit words (not 2x 32-bit) to avoid byte-swapping issues
         var floatOOP = _heapManager.AllocateObject(ObjectFormat.WordIndexed, fixedSlots, 4);
+        TrackOOP(floatOOP, $"AllocateFloat({value})");
 
         // Convert double to IEEE 754 binary representation in little-endian byte order
         byte[] bytes = BitConverter.GetBytes(value);
