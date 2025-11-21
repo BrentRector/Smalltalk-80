@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Smalltalk80.Interpreter.Shared.Types\Smalltalk80.Interpreter.Shared.Types.csproj" />
+    <ProjectReference Include="..\Smalltalk80.Interpreter\Smalltalk80.Interpreter.csproj" />
   </ItemGroup>
 
 </Project>
