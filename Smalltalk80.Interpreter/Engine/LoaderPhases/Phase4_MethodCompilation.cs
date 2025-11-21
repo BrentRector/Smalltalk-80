@@ -482,7 +482,7 @@ public class Phase4_MethodCompilation : IPhase
 
                 // VALUE MIGRATION VALIDATION: Check if Association has non-nil value
                 var valueOOP = _allocator.GetInstanceVariable(assocOOP, 1);
-                if (valueOOP != GlobalRegistry.Get("nil"))
+                if (valueOOP != _heapManager.GetNil())
                 {
                     nonNilValueCount++;
                 }
@@ -566,7 +566,7 @@ public class Phase4_MethodCompilation : IPhase
             for (int i = 0; i < sysDictSize; i++)
             {
                 var assocOOP = _allocator.GetIndexedOOP(sysDictOOP, i);
-                if (assocOOP != GlobalRegistry.Get("nil"))
+                if (assocOOP != _heapManager.GetNil())
                 {
                     reachableAssociations.Add(assocOOP);
                 }
@@ -586,14 +586,14 @@ public class Phase4_MethodCompilation : IPhase
                 int classPoolIndex = 7; // Standard classPool index
                 var classPoolOOP = _allocator.GetInstanceVariable(classOOP, classPoolIndex);
 
-                if (classPoolOOP == GlobalRegistry.Get("nil"))
+                if (classPoolOOP == _heapManager.GetNil())
                     continue;
 
                 int poolSize = _allocator.GetIndexedSize(classPoolOOP);
                 for (int i = 0; i < poolSize; i++)
                 {
                     var assocOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
-                    if (assocOOP != GlobalRegistry.Get("nil"))
+                    if (assocOOP != _heapManager.GetNil())
                     {
                         reachableAssociations.Add(assocOOP);
                     }

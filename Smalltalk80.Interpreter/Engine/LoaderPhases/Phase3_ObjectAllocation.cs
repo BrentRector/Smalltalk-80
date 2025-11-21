@@ -655,7 +655,7 @@ public class Phase3_ObjectAllocation : IPhase
                 var currentClassOOP = _allocator.GetClassOOP(objectOOP);
 
                 // Skip if class pointer already set (not nil)
-                if (currentClassOOP != GlobalRegistry.Get("nil"))
+                if (currentClassOOP != _heapManager.GetNil())
                     continue;
 
                 // Check object format to determine class

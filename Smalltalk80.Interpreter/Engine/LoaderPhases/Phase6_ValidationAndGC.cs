@@ -838,7 +838,7 @@ public class Phase6_ValidationAndGC : IPhase
                                 if (actualClassName == "CompiledMethod")
                                 {
                                     var homeClassOOP = _heapManager.GetInstanceVariable(arrayOOP, 0);
-                                    if (homeClassOOP == GlobalRegistry.Get("nil"))
+                                    if (homeClassOOP == _heapManager.GetNil())
                                     {
                                         homeClassInfo = " [homeClass=NIL!]";
                                     }
