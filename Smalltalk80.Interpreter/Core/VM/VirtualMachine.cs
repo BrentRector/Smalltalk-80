@@ -432,6 +432,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Declare common variables once for all code paths
         int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
         SmalltalkOOP senderOOP;
+        SmalltalkOOP returningContext;
 
         // Handle non-local returns (NLR)
         if (_nlrHandler.IsPending)
@@ -452,7 +453,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
 
                 // Save context to pool AFTER switching (must not be active)
-                SmalltalkOOP returningContext = _contextManager.ActiveContext;
+                returningContext = _contextManager.ActiveContext;
 
                 // Decrement context depth
                 _contextManager.DecrementContextDepth();
@@ -483,7 +484,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             //     Console.WriteLine($"[HandleReturn NLR] Unwinding through {_contextManager.ActiveContext}, next sender={senderOOP}");
 
             // Save context to pool AFTER switching (must not be active)
-            SmalltalkOOP returningContext = _contextManager.ActiveContext;
+            returningContext = _contextManager.ActiveContext;
 
             // Decrement context depth
             _contextManager.DecrementContextDepth();
@@ -536,7 +537,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         // Save context to pool AFTER switching (must not be active)
-        SmalltalkOOP returningContext = _contextManager.ActiveContext;
+        returningContext = _contextManager.ActiveContext;
 
         // Decrement context depth
         _contextManager.DecrementContextDepth();
