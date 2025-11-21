@@ -139,7 +139,10 @@ internal class GarbageCollector : IGarbageCollector
             entry.ManagedStorage = null;
             entry.InstanceVariableStorage = null;
 
-            // Free the object
+            // Remove entry from ObjectTable (prevents double-free on next GC)
+            _tableManager.SetObjectTableEntry(objectId, null!);
+
+            // Free the object table index for reuse
             _tableManager.FreeObjectTableIndex(objectId);
         }
 
