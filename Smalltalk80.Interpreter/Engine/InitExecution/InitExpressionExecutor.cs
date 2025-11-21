@@ -220,27 +220,29 @@ public class InitExpressionExecutor
         }
 
         // MethodContext has a fixed layout per Smalltalk-80 specification:
-        // 6 instance variables (sender, pc, stackp, method, receiverMap, receiver)
-        // Starting at METHODCONTEXT_TEMP_FRAME_START=6 for indexed slots
+        // MethodContext inherits: InstructionStream (sender, pc) → ContextPart (stackp)
+        // MethodContext adds: method, lexicalParent, receiver
+        // Total: 6 instance variables (sender, pc, stackp, method, lexicalParent, receiver)
+        // Starting at index 6 for indexed slots (temp frame)
         const int METHODCONTEXT_INSTANCE_VAR_COUNT = 6;
 
         // Allocate MethodContext with indexed slots for stack (use 12 for small frame)
         var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, indexedSize: 12);
         _heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
 
-        // Set instance variables using LayoutResolver indices
+        // Set instance variables using VMConstants indices
         int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
         int pcIndex = VMConstants.CONTEXT_PC_INDEX;
         int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
         int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
-        // TODO: receiverMapIndex removed - part of obsolete dual-context architecture
+        int lexicalParentIndex = VMConstants.CONTEXT_LEXICALPARENT_INDEX;
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
         _heapManager.SetInstanceVariable(contextOOP, senderIndex, _heapManager.GetNil());
         _heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
         _heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(0));
         _heapManager.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
-        // receiverMapIndex initialization removed - obsolete field
+        _heapManager.SetInstanceVariable(contextOOP, lexicalParentIndex, _heapManager.GetNil());
         _heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
 
         // Initialize indexed portion (stack) with nil
@@ -334,8 +336,10 @@ public class InitExpressionExecutor
         }
 
         // Process has a fixed layout per Smalltalk-80 specification:
-        // 3 instance variables (suspendedContext, priority, myList)
-        const int PROCESS_INSTANCE_VAR_COUNT = 3;
+        // Process inherits from Link (1 instance variable: nextLink)
+        // Process adds 3 instance variables: suspendedContext, priority, myList
+        // Total: 4 instance variables (nextLink, suspendedContext, priority, myList)
+        const int PROCESS_INSTANCE_VAR_COUNT = 4;
 
         // Allocate Process object
         var processOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
