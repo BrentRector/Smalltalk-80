@@ -320,6 +320,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
             // Check if symbol already exists (deduplication)
             if (_symbolTable.TryGetValue(name, out var existingOOP))
             {
+                Console.WriteLine($"[PHASE1 DEDUP] Symbol \"{name}\" already exists as {existingOOP}, returning existing OOP");
                 return existingOOP;
             }
 
@@ -333,6 +334,13 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
             for (int i = 0; i < symbolBytes.Length; i++)
             {
                 _allocator.SetIndexedByte(symbolOOP, i, symbolBytes[i]);
+            }
+
+            // Enhanced tracking for specific OOPs
+            var trackedOOPs = new[] { new SmalltalkOOP(6750), new SmalltalkOOP(30272), new SmalltalkOOP(30273), new SmalltalkOOP(30274) };
+            if (trackedOOPs.Contains(symbolOOP))
+            {
+                Console.WriteLine($"[PHASE1 SYMBOL] Created tracked symbol {symbolOOP}: \"{name}\" (length={symbolBytes.Length})");
             }
 
             // Cache in symbol table for deduplication
