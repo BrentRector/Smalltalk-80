@@ -28,6 +28,12 @@ public class ObjectGraphAllocator
     }
 
     /// <summary>
+    /// Gets the placeholder nil OOP (allocated during heap manager construction).
+    /// This OOP remains valid throughout cold start and becomes the real UndefinedObject via become:.
+    /// </summary>
+    public SmalltalkOOP GetNil() => _heapManager.GetNil();
+
+    /// <summary>
     /// Allocates a basic object with only fixed instance variables (Pointer format).
     /// Common for: Association, Character, True/False/UndefinedObject, etc.
     /// Does NOT set class reference - must be done in separate pass.

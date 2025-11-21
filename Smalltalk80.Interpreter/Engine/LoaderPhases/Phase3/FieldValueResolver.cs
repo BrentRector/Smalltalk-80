@@ -33,7 +33,7 @@ internal class FieldValueResolver(
     {
         return value.Type switch
         {
-            "nil" => GlobalRegistry.Get("nil"),
+            "nil" => allocator.GetNil(),
             "true" => GlobalRegistry.Get("true"),
             "false" => GlobalRegistry.Get("false"),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(value.Value!)),
@@ -42,7 +42,7 @@ internal class FieldValueResolver(
             "float" => AllocateFloat(GetFloatValue(value.Value!)),
             "symbolRef" => InternSymbol(_symbols[value.Index!.Value]),
             "stringRef" => InternString(bundle.Strings[value.Index!.Value]),
-            "objectRef" => localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : GlobalRegistry.Get("nil"),
+            "objectRef" => localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP) ? objOOP : allocator.GetNil(),
             "character" => AllocateCharacter(value.CodePoint!.Value),
             "bytes" => AllocateByteArray(value.Encoding!, value.Data!),
             _ => throw new InvalidOperationException($"Unknown field type: {value.Type}")

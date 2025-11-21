@@ -204,13 +204,13 @@ public class Phase3_ObjectAllocation : IPhase
         GlobalRegistry.Register("ProcessorScheduler", processorSchedulerOOP);
 
         // Initialize ProcessorScheduler fields that should NOT be nil
-        InitializeProcessorSchedulerFields(processorSchedulerOOP, initialNilOOP);
+        InitializeProcessorSchedulerFields(processorSchedulerOOP, _heapManager.GetNil());
 
         // Create Undeclared Dictionary (v1.0.7)
         // The Undeclared dictionary holds Association objects for variables that were referenced
         // but not yet defined during compilation. SystemDictionary>>at:put: will migrate these
         // Associations when the variables become defined.
-        CreateUndeclaredDictionary(initialNilOOP);
+        CreateUndeclaredDictionary(_heapManager.GetNil());
     }
 
     /// <summary>
@@ -711,7 +711,7 @@ public class Phase3_ObjectAllocation : IPhase
     private void InitializeUnsetInstanceVariables()
     {
         int instanceVariablesInitialized = 0;
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _heapManager.GetNil();
 
         // Step 1: Initialize class object instance variables
         foreach (var cls in _bundle.Classes)
@@ -892,7 +892,7 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // Get nil singleton (created in Section 1: AllocateSentinelObjects)
-        SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
+        SmalltalkOOP nilOOP = _heapManager.GetNil();
 
         // Build subclass map: className -> list of direct subclass OOPs
         var subclassMap = new Dictionary<string, List<SmalltalkOOP>>();
@@ -1021,7 +1021,7 @@ public class Phase3_ObjectAllocation : IPhase
             InstructionCount = 0
         });
 
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _heapManager.GetNil();
         int createdCount = 0;
         int classNameCount = 0;
         int withPreCreatedValues = 0;

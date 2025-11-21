@@ -27,7 +27,7 @@ public class FontObjectBuilder
     /// <returns>OOP of the created StrikeFont.</returns>
     public SmalltalkOOP CreateStrikeFont(StrikeFontData fontData)
     {
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _context.HeapManager.GetNil();
 
         // Allocate StrikeFont object
         var strikeFontOOP = _context.Allocator.AllocateFixedObject("StrikeFont");
@@ -84,7 +84,7 @@ public class FontObjectBuilder
     /// <returns>OOP of the created TextStyle.</returns>
     public SmalltalkOOP CreateTextStyle(SmalltalkOOP[] fonts, int lineGrid, int baseline)
     {
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _context.HeapManager.GetNil();
 
         // Allocate TextStyle object
         var textStyleOOP = _context.Allocator.AllocateFixedObject("TextStyle");
@@ -219,7 +219,7 @@ public class FontObjectBuilder
     /// </summary>
     private SmalltalkOOP CreateStopConditionsArray()
     {
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _context.HeapManager.GetNil();
         var arrayOOP = _context.Allocator.AllocateArray("Array", 258);
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         _context.Allocator.SetClassOOP(arrayOOP, arrayClassOOP);

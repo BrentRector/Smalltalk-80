@@ -20,7 +20,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
     public void InstallAssociation(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string keyName)
     {
         int dictSize = context.Allocator.GetIndexedSize(dictionaryOOP);
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
 
         // Get the key symbol from the Association (instance variable 0)
         var keySymbolOOP = context.Allocator.GetInstanceVariable(associationOOP, 0);
@@ -112,7 +112,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
     /// </summary>
     public void RemoveAssociation(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbolOOP, string keyName)
     {
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
         int dictSize = context.Allocator.GetIndexedSize(dictionaryOOP);
 
         int hash = GetSymbolHash(keySymbolOOP);
@@ -177,7 +177,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
     /// </summary>
     public void FixCollisionsFrom(SmalltalkOOP dictionaryOOP, int startIndex)
     {
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
         int dictSize = context.Allocator.GetIndexedSize(dictionaryOOP);
         int oldIndex = startIndex;
 

@@ -303,7 +303,7 @@ public class Phase6_ValidationAndGC : IPhase
 // Console.WriteLine("  Validating special objects...");
 
         // Validate nil
-        ValidateSpecialObject("nil", GlobalRegistry.Get("nil"), results);
+        ValidateSpecialObject("nil", _heapManager.GetNil(), results);
 
         // Validate true/false
         ValidateSpecialObject("true", GlobalRegistry.Get("true"), results);
@@ -447,7 +447,7 @@ public class Phase6_ValidationAndGC : IPhase
         int validatedSlots = 0;
 
         // Validate nil singleton
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _heapManager.GetNil();
         if (nilOOP.IsSmallInteger)
         {
             results.AddError("Nil is SmallInteger");
@@ -546,7 +546,7 @@ public class Phase6_ValidationAndGC : IPhase
             // Get the class's method dictionary (instance variable 1 in Behavior)
             var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1);
 
-            if (methodDictOOP == GlobalRegistry.Get("nil"))
+            if (methodDictOOP == _heapManager.GetNil())
             {
                 continue;
             }
@@ -589,7 +589,7 @@ public class Phase6_ValidationAndGC : IPhase
                 for (int i = 0; i < capacity; i++)
                 {
                     var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
-                    if (keyOOP == GlobalRegistry.Get("nil"))
+                    if (keyOOP == _heapManager.GetNil())
                         continue;
 
                     var keySymbolName = _allocator.GetSymbolName(keyOOP);
@@ -718,14 +718,14 @@ public class Phase6_ValidationAndGC : IPhase
         // use: ((ISmalltalkHeap)_heapManager).GC.AddGCRoot(oop)
         var gcRootsList = new List<(string name, SmalltalkOOP oop)>
         {
-            ("nil", GlobalRegistry.Get("nil")),
+            ("nil", _heapManager.GetNil()),
             ("false", GlobalRegistry.Get("false")),
             ("true", GlobalRegistry.Get("true")),
             ("Smalltalk", GlobalRegistry.SystemDictionaryOOP)
         };
 
         // Add init expression methods if allocated
-        if (_initExpressionMethods != GlobalRegistry.Get("nil"))
+        if (_initExpressionMethods != _heapManager.GetNil())
         {
             gcRootsList.Add(("InitExpressionMethods", _initExpressionMethods));
         }
@@ -866,7 +866,7 @@ public class Phase6_ValidationAndGC : IPhase
                                     string elemStr;
                                     if (elem.IsSmallInteger)
                                         elemStr = elem.AsSmallInteger().ToString();
-                                    else if (elem == GlobalRegistry.Get("nil"))
+                                    else if (elem == _heapManager.GetNil())
                                         elemStr = "nil";
                                     else if (TryGetSymbolName(elem, out var name))
                                         elemStr = $"#{name}";

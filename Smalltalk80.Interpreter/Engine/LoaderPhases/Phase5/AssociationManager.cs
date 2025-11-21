@@ -22,7 +22,7 @@ public class AssociationManager(Phase5Context context) : IAssociationManager
 
         return AssociationRegistry.GetOrCreate(keyName, () =>
         {
-            return Allocate(keySymbolOOP, GlobalRegistry.Get("nil"));
+            return Allocate(keySymbolOOP, context.HeapManager.GetNil());
         });
     }
 

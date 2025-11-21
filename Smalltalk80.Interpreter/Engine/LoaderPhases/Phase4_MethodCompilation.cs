@@ -210,7 +210,7 @@ public class Phase4_MethodCompilation : IPhase
         foreach (var method in _bundle.Methods)
         {
             var bytecodes = ClassHierarchyTraversal.DecodeBytecodes(method.Bytecodes);
-            var nilOOP = GlobalRegistry.Get("nil");
+            var nilOOP = _heapManager.GetNil();
             var placeholderLiterals = new SmalltalkOOP[method.Literals.Length];
             for (int i = 0; i < placeholderLiterals.Length; i++)
             {

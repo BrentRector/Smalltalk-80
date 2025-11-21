@@ -100,7 +100,7 @@ internal class MethodDictionaryInstaller(
         _allocator.SetInstanceVariable(methodDictOOP, 1, tallyOOP);
 
         // Initialize all indexed fields (keys) to nil
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _allocator.GetNil();
         for (int i = 0; i < capacity; i++)
         {
             _allocator.SetIndexedOOP(methodDictOOP, i, nilOOP);
@@ -161,7 +161,7 @@ internal class MethodDictionaryInstaller(
             // Behavior instance variables: [0]=superclass, [1]=methodDict, [2]=format, [3]=subclasses
             var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1); // methodDict is at instance var index 1
 
-            if (methodDictOOP == GlobalRegistry.Get("nil"))
+            if (methodDictOOP == _allocator.GetNil())
             {
                 _diagnostics?.Emit(new DiagnosticMessageEvent
                 {
@@ -210,7 +210,7 @@ internal class MethodDictionaryInstaller(
         var valuesArrayOOP = _allocator.GetInstanceVariable(methodDictOOP, 0);
         var tallyOOP = _allocator.GetInstanceVariable(methodDictOOP, 1);
 
-        if (valuesArrayOOP == GlobalRegistry.Get("nil"))
+        if (valuesArrayOOP == _allocator.GetNil())
         {
             throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has nil valueArray");
         }
@@ -229,7 +229,7 @@ internal class MethodDictionaryInstaller(
         {
             var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
 
-            if (keyOOP == GlobalRegistry.Get("nil"))
+            if (keyOOP == _allocator.GetNil())
             {
                 // Empty slot found
                 targetIndex = i;
@@ -250,7 +250,7 @@ internal class MethodDictionaryInstaller(
 
         // Check if this is a new entry (for tally update)
         var existingKeyOOP = _allocator.GetIndexedOOP(methodDictOOP, targetIndex);
-        bool isNewEntry = existingKeyOOP == GlobalRegistry.Get("nil");
+        bool isNewEntry = existingKeyOOP == _allocator.GetNil();
 
         // Install the method
         _allocator.SetIndexedOOP(methodDictOOP, targetIndex, selectorSymbolOOP);

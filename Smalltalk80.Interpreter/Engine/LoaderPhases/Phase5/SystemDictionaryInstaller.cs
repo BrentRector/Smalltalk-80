@@ -66,13 +66,13 @@ public class SystemDictionaryInstaller(
     {
         // USTable is a CLASS VARIABLE of Symbol, not a global
         var symbolClassOOP = GlobalRegistry.LookupClassOOP("Symbol");
-        if (symbolClassOOP == GlobalRegistry.Get("nil"))
+        if (symbolClassOOP == context.HeapManager.GetNil())
         {
             throw new InvalidOperationException("Symbol class not found during USTable installation");
         }
 
         var classPoolOOP = context.Allocator.GetInstanceVariable(symbolClassOOP, 7);
-        if (classPoolOOP == GlobalRegistry.Get("nil"))
+        if (classPoolOOP == context.HeapManager.GetNil())
         {
             throw new InvalidOperationException("Symbol classPool is nil during USTable installation");
         }
@@ -86,13 +86,13 @@ public class SystemDictionaryInstaller(
     private void InitializeSingleCharSymbols()
     {
         var symbolClassOOP = GlobalRegistry.LookupClassOOP("Symbol");
-        if (symbolClassOOP == GlobalRegistry.Get("nil"))
+        if (symbolClassOOP == context.HeapManager.GetNil())
         {
             throw new InvalidOperationException("Symbol class not found during SingleCharSymbols installation");
         }
 
         var classPoolOOP = context.Allocator.GetInstanceVariable(symbolClassOOP, 7);
-        if (classPoolOOP == GlobalRegistry.Get("nil"))
+        if (classPoolOOP == context.HeapManager.GetNil())
         {
             throw new InvalidOperationException("Symbol classPool is nil during SingleCharSymbols installation");
         }
@@ -101,7 +101,7 @@ public class SystemDictionaryInstaller(
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         var arrayOOP = context.Allocator.AllocateArray(arrayClassOOP, 128);
 
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
         for (int i = 0; i < 128; i++)
         {
             context.Allocator.SetIndexedOOP(arrayOOP, i, nilOOP);
@@ -181,7 +181,7 @@ public class SystemDictionaryInstaller(
 
         // Populate with all referenced pool variables (initialized to nil)
         // This is required so that pool variable references can be resolved at runtime
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
         foreach (var varName in variableNames)
         {
             // Create canonical Association for this pool variable (registered in AssociationRegistry)
@@ -219,7 +219,7 @@ public class SystemDictionaryInstaller(
         // Dictionary inherits from Set which has indexed slots directly
         // (not a separate array instance variable)
         var dictionaryClassOOP = GlobalRegistry.LookupClassOOP("Dictionary");
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
 
         // Allocate Dictionary with indexed slots for hash table entries
         var dictOOP = context.Allocator.AllocateArray("Dictionary", capacity);
@@ -307,7 +307,7 @@ public class SystemDictionaryInstaller(
     private void InstallInClassPool(SmalltalkOOP classPoolOOP, SmalltalkOOP associationOOP, string keyName)
     {
         int classPoolSize = context.Allocator.GetIndexedSize(classPoolOOP);
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = context.HeapManager.GetNil();
         int emptySlotIndex = -1;
 
         // Get key from association
