@@ -54,10 +54,9 @@ public class ProcessSchedulerInitializer
     }
 
     /// <summary>
-    /// Creates an initial Process with a dummy suspended context.
-    /// The context is a minimal MethodContext that serves as a placeholder.
+    /// Creates an initial Process with suspendedContext set to nil.
     /// When init expressions or other code runs, they will create their own contexts
-    /// that become the actual suspended context of this process.
+    /// and set them as the suspended context of this process.
     /// </summary>
     private SmalltalkOOP CreateInitialProcess(int priority)
     {
@@ -73,56 +72,14 @@ public class ProcessSchedulerInitializer
         var processOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
         _heapManager.SetClassOOP(processOOP, processClassOOP);
 
-        // Create a dummy suspended context (minimal MethodContext)
-        // This context is just a placeholder - when code runs, it will be replaced
-        SmalltalkOOP dummyContextOOP = CreateDummyContext();
-        Console.WriteLine($"  [DEBUG] Created dummy MethodContext: {dummyContextOOP} (will be orphaned when replaced)");
-
         // Set Process instance variables
+        // NOTE: suspendedContext starts as nil - will be set when code executes
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_NEXTLINK_INDEX, _heapManager.GetNil());
-        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, dummyContextOOP);
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, _heapManager.GetNil());
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX, SmalltalkOOP.FromSmallInteger(priority));
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _heapManager.GetNil());
 
         return processOOP;
-    }
-
-    /// <summary>
-    /// Creates a minimal dummy MethodContext to serve as the initial suspended context.
-    /// This context is never actually executed - it's replaced when real code runs.
-    /// </summary>
-    private SmalltalkOOP CreateDummyContext()
-    {
-        // Get MethodContext class
-        var methodContextClassOOP = LookupGlobal("MethodContext");
-        if (methodContextClassOOP == _heapManager.GetNil())
-        {
-            throw new InvalidOperationException("MethodContext class not found in Smalltalk dictionary");
-        }
-
-        // MethodContext has 6 instance variables: sender, pc, stackp, method, lexicalParent, receiver
-        const int METHODCONTEXT_INSTANCE_VAR_COUNT = 6;
-
-        // Create MethodContext with minimal stack space
-        var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, indexedSize: 4);
-        _heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
-
-        // Initialize all fields to nil (this is a placeholder context)
-        var nilOOP = _heapManager.GetNil();
-        _heapManager.SetInstanceVariable(contextOOP, VMConstants.CONTEXT_SENDER_INDEX, nilOOP);
-        _heapManager.SetInstanceVariable(contextOOP, VMConstants.CONTEXT_PC_INDEX, SmalltalkOOP.FromSmallInteger(0));
-        _heapManager.SetInstanceVariable(contextOOP, VMConstants.CONTEXT_STACKP_INDEX, SmalltalkOOP.FromSmallInteger(0));
-        _heapManager.SetInstanceVariable(contextOOP, VMConstants.CONTEXT_METHOD_INDEX, nilOOP);
-        _heapManager.SetInstanceVariable(contextOOP, VMConstants.CONTEXT_LEXICALPARENT_INDEX, nilOOP);
-        _heapManager.SetInstanceVariable(contextOOP, VMConstants.CONTEXT_RECEIVER_INDEX, nilOOP);
-
-        // Initialize indexed slots (stack) with nil
-        for (int i = 0; i < 4; i++)
-        {
-            _heapManager.SetIndexedOOP(contextOOP, i, nilOOP);
-        }
-
-        return contextOOP;
     }
 
     /// <summary>
