@@ -196,7 +196,7 @@ public static class DiagnosticInspector
                     for (int i = 0; i < size && i < 10; i++)  // Limit to 10 elements
                     {
                         var elemOOP = heapManager.GetIndexedOOP(valueOOP, i);
-                        elements.Add(FormatValue(heapManager, bundle, elemOOP));
+                        elements.Add(FormatValue(heapManager, bundle, elemOOP, metadata));
                     }
                     if (size > 10)
                         elements.Add("...");
@@ -282,7 +282,7 @@ public static class DiagnosticInspector
                 var keyOOP = heapManager.GetSlot(assocOOP, 1);
                 var keyName = GetSymbolName(heapManager, bundle, keyOOP);
                 var valueOOP = heapManager.GetSlot(assocOOP, 2);
-                var value = FormatValue(heapManager, bundle, valueOOP);
+                var value = FormatValue(heapManager, bundle, valueOOP, metadata);
 
                 foundVariables.Add(keyName);
                 Console.WriteLine($"{keyName}:");
