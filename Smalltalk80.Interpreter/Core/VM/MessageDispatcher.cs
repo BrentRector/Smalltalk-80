@@ -9,9 +9,11 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// </summary>
 /// <param name="heapManager">The heap manager for memory operations.</param>
 /// <param name="helpers">VM helper methods.</param>
+/// <param name="metadata">VM metadata for known objects.</param>
 internal class MessageDispatcher(
     ISmalltalkHeapManager heapManager,
-    IObjectMetadataAccessor helpers) : IMessageDispatcher
+    IObjectMetadataAccessor helpers,
+    VMMetadata metadata) : IMessageDispatcher
 {
     /// <inheritdoc />
     public MethodLookupResult? LookupMethod(SmalltalkOOP classOOP, string selectorName)

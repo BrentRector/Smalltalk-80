@@ -25,12 +25,12 @@ public readonly struct PrimitiveResult
     /// <summary>Creates a successful result with the given value.</summary>
     public static PrimitiveResult Ok(SmalltalkOOP value) => new(true, value);
 
-    /// <summary>Creates a failed result (value will be nil).</summary>
-    public static PrimitiveResult Fail() => new(false, heapManager.GetNil());
+    /// <summary>Creates a failed result (value will be default/nil).</summary>
+    public static PrimitiveResult Fail() => new(false, default(SmalltalkOOP));
 
     /// <summary>Creates a result from a boolean condition.</summary>
-    public static PrimitiveResult FromBool(bool condition) =>
-        condition ? Ok(heapManager.GetNil()) : Ok(heapManager.GetNil());
+    public static PrimitiveResult FromBool(bool condition, SmalltalkOOP trueValue, SmalltalkOOP falseValue) =>
+        condition ? Ok(trueValue) : Ok(falseValue);
 }
 
 /// <summary>

@@ -100,7 +100,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
 
         // Primitive not found
         ctx.PrimitiveSuccess = false;
-        return heapManager.GetNil();
+        return default(SmalltalkOOP);
     }
 
     /// <summary>

@@ -1183,7 +1183,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     /// <param name="selector">The arithmetic selector name.</param>
     /// <param name="argOOP">The argument SmallInteger OOP.</param>
     /// <returns>The result OOP, or nil if the operation failed.</returns>
-    private static SmalltalkOOP ExecuteIntegerArithmetic(SmalltalkOOP receiverOOP, string selector, SmalltalkOOP argOOP)
+    private SmalltalkOOP ExecuteIntegerArithmetic(SmalltalkOOP receiverOOP, string selector, SmalltalkOOP argOOP)
     {
         if (!receiverOOP.IsSmallInteger || !argOOP.IsSmallInteger)
         {

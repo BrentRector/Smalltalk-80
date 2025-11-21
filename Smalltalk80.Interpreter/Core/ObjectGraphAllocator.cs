@@ -560,7 +560,7 @@ public class ObjectGraphAllocator
         }
 
         var classOOP = _heapManager.GetSlot(objectOOP, 0);
-        if (classOOP == heapManager.GetNil())
+        if (classOOP == _heapManager.GetNil())
         {
             return "NULL_CLASS";
         }
@@ -575,7 +575,7 @@ public class ObjectGraphAllocator
     /// </summary>
     public string GetSymbolName(SmalltalkOOP symbolOOP)
     {
-        if (symbolOOP == heapManager.GetNil() || symbolOOP.IsSmallInteger)
+        if (symbolOOP == _heapManager.GetNil() || symbolOOP.IsSmallInteger)
         {
             return "<invalid symbol>";
         }

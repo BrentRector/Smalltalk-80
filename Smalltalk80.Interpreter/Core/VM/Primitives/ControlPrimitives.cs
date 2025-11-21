@@ -159,7 +159,7 @@ public static class ControlPrimitives
             // Switch to the BlockContext
             context.SetActiveContext(blockContext);
 
-            return PrimitiveResult.Ok(heapManager.GetNil());
+            return PrimitiveResult.Ok(context.HeapManager.GetNil());
         }
     }
 
@@ -224,7 +224,7 @@ public static class ControlPrimitives
             // Switch to the BlockContext
             context.SetActiveContext(blockContext);
 
-            return PrimitiveResult.Ok(heapManager.GetNil());
+            return PrimitiveResult.Ok(context.HeapManager.GetNil());
         }
     }
 

@@ -10,10 +10,12 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// <param name="heapManager">Heap manager for object access.</param>
 /// <param name="contextManager">Context manager for active context access.</param>
 /// <param name="helpers">Helper methods for symbol/class name resolution.</param>
+/// <param name="metadata">VM metadata for known objects.</param>
 internal sealed class VMDebugger(
     ISmalltalkHeapManager heapManager,
     IContextManager contextManager,
-    IBytecodeContext helpers) : IVMDebugger
+    IBytecodeContext helpers,
+    VMMetadata metadata) : IVMDebugger
 {
     /// <inheritdoc/>
     public void DumpSenderChain(SmalltalkOOP contextOOP, int maxDepth)

@@ -10,6 +10,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Caching;
 public class SelectorCache
 {
     private readonly ISmalltalkHeapManager _heapManager;
+    private readonly VMMetadata _metadata;
 
     /// <summary>Cached selector OOPs for arithmetic bytecodes (0xB0-0xBF).</summary>
     public SmalltalkOOP[]? ArithmeticSelectors { get; private set; }
@@ -23,9 +24,10 @@ public class SelectorCache
     /// <summary>
     /// Creates a new SelectorCache.
     /// </summary>
-    public SelectorCache(ISmalltalkHeapManager heapManager)
+    public SelectorCache(ISmalltalkHeapManager heapManager, VMMetadata metadata)
     {
         _heapManager = heapManager;
+        _metadata = metadata;
     }
 
     /// <summary>
@@ -79,7 +81,7 @@ public class SelectorCache
 
         // USTable is an Array in the Smalltalk heap containing Symbol OOPs
         int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
-        var nilOOP = metadata.KnownObjects.Nil;
+        var nilOOP = _metadata.KnownObjects.Nil;
 
         // Convert search string to bytes (Latin-1 encoding)
         byte[] searchBytes = System.Text.Encoding.Latin1.GetBytes(symbolName);
