@@ -279,7 +279,29 @@ public class InitExpressionExecutor
                 return InitResult.FatalError(expr.LocalId, $"CompiledMethod or MethodContext still alive after execution");
             }
 
-            Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, GC: {gcStatsBefore.CollectedObjects}/{gcStatsAfter.CollectedObjects})");
+            // Show what was collected if suspicious (expected: 3 objects minimum)
+            if (gcStatsAfter.CollectedObjects > 10)
+            {
+                Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, GC: {gcStatsBefore.CollectedObjects}/{gcStatsAfter.CollectedObjects})");
+                Console.WriteLine($"    WARNING: Collected {gcStatsAfter.CollectedObjects} objects (expected ~3)");
+
+                // Group collected objects by class
+                var classCounts = gcStatsAfter.CollectedObjectDetails
+                    .GroupBy(obj => obj.className ?? "unknown")
+                    .Select(g => new { ClassName = g.Key, Count = g.Count() })
+                    .OrderByDescending(x => x.Count)
+                    .Take(10);
+
+                Console.WriteLine($"    Top collected classes:");
+                foreach (var item in classCounts)
+                {
+                    Console.WriteLine($"      {item.ClassName}: {item.Count}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, GC: {gcStatsBefore.CollectedObjects}/{gcStatsAfter.CollectedObjects})");
+            }
 
             return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
         }
