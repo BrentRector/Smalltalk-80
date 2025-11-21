@@ -467,8 +467,8 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
         // Format with 3 fixed fields
-        mockHeap.Setup(h => h.GetSlot(classOOP, 3)).Returns(SmallInt(3));
-        mockHeap.Setup(h => h.GetSlot(objectOOP, 2)).Returns(valueOOP);
+        mockHeap.Setup(h => h.GetInstanceVariable(classOOP, 2)).Returns(SmallInt(3));
+        mockHeap.Setup(h => h.GetInstanceVariable(objectOOP, 1)).Returns(valueOOP);
 
         var context = CreateContext(objectOOP, [SmallInt(2)], mockHeap.Object);
 
@@ -486,7 +486,7 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var classOOP = ObjectOOP(50);
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
-        mockHeap.Setup(h => h.GetSlot(classOOP, 3)).Returns(SmallInt(3));
+        mockHeap.Setup(h => h.GetInstanceVariable(classOOP, 2)).Returns(SmallInt(3));
 
         var context = CreateContext(objectOOP, [SmallInt(0)], mockHeap.Object);
 
@@ -504,7 +504,7 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var classOOP = ObjectOOP(50);
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
-        mockHeap.Setup(h => h.GetSlot(classOOP, 3)).Returns(SmallInt(3));
+        mockHeap.Setup(h => h.GetInstanceVariable(classOOP, 2)).Returns(SmallInt(3));
 
         var context = CreateContext(objectOOP, [SmallInt(4)], mockHeap.Object);
 
@@ -527,14 +527,14 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var valueOOP = ObjectOOP(200);
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
-        mockHeap.Setup(h => h.GetSlot(classOOP, 3)).Returns(SmallInt(3));
+        mockHeap.Setup(h => h.GetInstanceVariable(classOOP, 2)).Returns(SmallInt(3));
 
         var context = CreateContext(objectOOP, [SmallInt(2), valueOOP], mockHeap.Object);
 
         var result = primitive.Execute(context);
 
         AssertSuccessWithOOP(result, valueOOP);
-        mockHeap.Verify(h => h.SetSlot(objectOOP, 2, valueOOP), Times.Once);
+        mockHeap.Verify(h => h.SetInstanceVariable(objectOOP, 1, valueOOP), Times.Once);
     }
 
     #endregion

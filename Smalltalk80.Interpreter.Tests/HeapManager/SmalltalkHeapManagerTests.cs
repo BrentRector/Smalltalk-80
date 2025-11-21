@@ -265,7 +265,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         var instanceOOP = _heapManager.AllocateInstanceOf(classOOP, 0);
 
         // Assert
-        Assert.Equal(classOOP, _heapManager.GetSlot(instanceOOP, 0));
+        Assert.Equal(classOOP, _heapManager.GetClassOOP(instanceOOP));
         Assert.Equal(classOOP, _heapManager.GetClassOOP(instanceOOP));
     }
 
@@ -281,8 +281,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         var valueOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
 
         // Act
-        _heapManager.SetSlot(oop, 1, valueOOP);
-        var retrieved = _heapManager.GetSlot(oop, 1);
+        _heapManager.SetInstanceVariable(oop, 0, valueOOP);
+        var retrieved = _heapManager.GetInstanceVariable(oop, 0);
 
         // Assert
         Assert.Equal(valueOOP, retrieved);
@@ -298,7 +298,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         var instanceOOP = _heapManager.AllocateInstanceOf(classOOP, 0);
 
         // Act
-        var retrievedClass = _heapManager.GetSlot(instanceOOP, 0);
+        var retrievedClass = _heapManager.GetClassOOP(instanceOOP);
 
         // Assert
         Assert.Equal(classOOP, retrievedClass);
@@ -312,7 +312,7 @@ public class SmalltalkHeapManagerTests : IDisposable
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() =>
-            _heapManager.GetSlot(smallInt, 0));
+            _heapManager.GetClassOOP(smallInt));
     }
 
     [Fact]
@@ -323,18 +323,18 @@ public class SmalltalkHeapManagerTests : IDisposable
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() =>
-            _heapManager.SetSlot(smallInt, 0, _nilOOP));
+            _heapManager.SetClassOOP(smallInt, _nilOOP));
     }
 
     [Fact]
-    public void SetSlot_OutOfRange_ThrowsArgumentOutOfRangeException()
+    public void SetInstanceVariable_OutOfRange_ThrowsArgumentOutOfRangeException()
     {
         // Arrange
         var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 2, 0);
 
         // Act & Assert
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            _heapManager.SetSlot(oop, 100, _nilOOP));
+            _heapManager.SetInstanceVariable(oop, 99, _nilOOP));
     }
 
     #endregion
@@ -631,7 +631,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Arrange
         var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 2, 0);
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
-        _heapManager.SetSlot(oop, 0, classOOP);
+        _heapManager.SetClassOOP(oop, classOOP);
 
         // Act
         var retrieved = _heapManager.GetClassOOP(oop);
@@ -649,7 +649,7 @@ public class SmalltalkHeapManagerTests : IDisposable
 
         // Act
         _heapManager.SetClassOOP(oop, classOOP);
-        var retrieved = _heapManager.GetSlot(oop, 0);
+        var retrieved = _heapManager.GetClassOOP(oop);
 
         // Assert
         Assert.Equal(classOOP, retrieved);
@@ -1855,7 +1855,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Arrange
         var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 2, 0);
         var classOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 3, 0);
-        _heapManager.SetSlot(oop, 0, classOOP);
+        _heapManager.SetClassOOP(oop, classOOP);
 
         // Act
         var className = _heapManager.GetClassName(oop);
@@ -1870,7 +1870,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Arrange
         var oop = _heapManager.AllocateObject(ObjectFormat.Pointer, 1, 0);
         var invalidClass = SmalltalkOOP.FromSmallInteger(42);
-        _heapManager.SetSlot(oop, 0, invalidClass);
+        _heapManager.SetClassOOP(oop, invalidClass);
 
         // Act
         var className = _heapManager.GetClassName(oop);
@@ -1915,7 +1915,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         var localIdToObjectId = new Dictionary<string, int>();
         var obj = _heapManager.AllocateObject(ObjectFormat.Pointer, 1, 0);
         var invalidClass = SmalltalkOOP.FromSmallInteger(999);
-        _heapManager.SetSlot(obj, 0, invalidClass);
+        _heapManager.SetClassOOP(obj, invalidClass);
 
         localIdToObjectId["obj1"] = obj.ToObjectTableIndex();
 
