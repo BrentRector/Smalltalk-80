@@ -239,8 +239,11 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         int instanceVarCount = entry.InstanceVariableCountExplicit;
 
         if (index < 0 || index >= instanceVarCount)
+        {
+            string className = GetClassName(objectOOP) ?? "UnknownClass";
             throw new ArgumentOutOfRangeException(nameof(index),
-                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
+                $"Instance variable index {index} (index) out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
+        }
 
         return ReadSlot(entry, 1 + index);
     }
@@ -259,8 +262,11 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         int instanceVarCount = entry.InstanceVariableCountExplicit;
 
         if (index < 0 || index >= instanceVarCount)
+        {
+            string className = GetClassName(objectOOP) ?? "UnknownClass";
             throw new ArgumentOutOfRangeException(nameof(index),
-                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
+                $"Instance variable index {index} (index) out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
+        }
 
         WriteSlot(entry, 1 + index, value);
         // Write barrier: Future implementation for incremental/concurrent GC
@@ -275,8 +281,11 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         int instanceVarCount = entry.InstanceVariableCountExplicit;
 
         if (index < 0 || index >= instanceVarCount)
+        {
+            string className = GetClassName(objectOOP) ?? "UnknownClass";
             throw new ArgumentOutOfRangeException(nameof(index),
-                $"Instance variable index {index} out of range [0, {instanceVarCount - 1}] for object {objectOOP}");
+                $"Instance variable index {index} (index) out of range [0, {instanceVarCount - 1}] for object {objectOOP} ({className})");
+        }
 
         WriteSlot(entry, 1 + index, value);
     }
