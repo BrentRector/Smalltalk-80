@@ -289,10 +289,28 @@ public class InitExpressionExecutor
                 Console.WriteLine($"    CompiledMethod {compiledMethodOOP}: {(compiledMethodAlive ? "ALIVE" : "collected")}");
                 Console.WriteLine($"    MethodContext {methodContextOOP}: {(methodContextAlive ? "ALIVE" : "collected")}");
 
-                // Check if methodContext is referenced by active process (reuse schedulerOOP from line 220)
-                SmalltalkOOP activeProcessOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
-                SmalltalkOOP suspendedContextOOP = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-                Console.WriteLine($"    Active process suspendedContext: {suspendedContextOOP} (should be nil={_heapManager.GetNil()})");
+                // Check GC roots - see if our objects are directly in roots
+                var gcRoots = _heapManager.GC.GetGCRoots();
+                Console.WriteLine($"    GC has {gcRoots.Length} roots");
+                bool foundMethod = false;
+                bool foundContext = false;
+                for (int i = 0; i < gcRoots.Length; i++)
+                {
+                    if (gcRoots[i] == compiledMethodOOP)
+                    {
+                        Console.WriteLine($"    FOUND: CompiledMethod is GC root #{i}!");
+                        foundMethod = true;
+                    }
+                    if (gcRoots[i] == methodContextOOP)
+                    {
+                        Console.WriteLine($"    FOUND: MethodContext is GC root #{i}!");
+                        foundContext = true;
+                    }
+                }
+                if (!foundMethod && compiledMethodAlive)
+                    Console.WriteLine($"    CompiledMethod not in GC roots (reachable indirectly)");
+                if (!foundContext && methodContextAlive)
+                    Console.WriteLine($"    MethodContext not in GC roots (reachable indirectly)");
 
                 return InitResult.FatalError(expr.LocalId, $"CompiledMethod or MethodContext still alive after execution");
             }
