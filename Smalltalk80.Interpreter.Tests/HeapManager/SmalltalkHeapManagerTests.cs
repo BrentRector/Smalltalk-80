@@ -1,10 +1,6 @@
-extern alias CompilerLib;
-
-using FormatWord = CompilerLib::Smalltalk80.Core.FormatWord;
+using System.IO;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
-using Smalltalk80.Interpreter.Shared.Types;
-using System.IO;
 using Xunit;
 
 namespace Smalltalk80.Interpreter.Tests.HeapManager;
