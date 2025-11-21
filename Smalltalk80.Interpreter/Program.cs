@@ -184,7 +184,7 @@ public static class Program
 
                 var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
-                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
+                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, platformBridge: null, diagnostics);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;
@@ -486,7 +486,7 @@ public static class Program
 
                     var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
-                    var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
+                    var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, platformBridge: null, diagnostics);
                     vm.VerboseDebug = verboseDebug;
                     vm.InitializeSelectorCaches();
 

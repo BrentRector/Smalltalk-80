@@ -1,20 +1,27 @@
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
 /// Manages execution contexts for the Smalltalk-80 VM.
 /// Handles context creation, pooling, switching, and chain traversal.
+/// Listens for GC events to clear context pools before garbage collection.
 /// </summary>
 /// <param name="heapManager">The heap manager for memory operations.</param>
 /// <param name="metadata">VM metadata containing class OOPs.</param>
 /// <param name="helpers">VM helper methods.</param>
+/// <param name="diagnostics">Optional diagnostic hub for GC event notifications.</param>
 internal class ContextManager(
     ISmalltalkHeap heapManager,
     VMMetadata metadata,
-    IObjectMetadataAccessor helpers) : IContextManager
+    IObjectMetadataAccessor helpers,
+    IDiagnosticHub? diagnostics = null) : IContextManager, IDiagnosticListener
 {
+    // Diagnostic hub for GC event notifications
+    private readonly IDiagnosticHub? _diagnostics = diagnostics;
+
     // Active context (current MethodContext being executed)
     private SmalltalkOOP _activeContextOOP;
 
@@ -209,6 +216,52 @@ internal class ContextManager(
         if (poolForSize.Count < MaxPooledContextsPerSize)
         {
             poolForSize.Push(contextOOP);
+        }
+    }
+
+    /// <summary>
+    /// Initializes the ContextManager and registers for GC events.
+    /// Must be called after construction to enable pool clearing before GC.
+    /// </summary>
+    public void Initialize()
+    {
+        if (_diagnostics != null)
+        {
+            // Register to receive ONLY GCStart events
+            _diagnostics.Register(this, DiagnosticEventTypes.GCStart);
+        }
+    }
+
+    // ============================================================
+    // IDiagnosticListener Implementation
+    // ============================================================
+
+    /// <inheritdoc />
+    public string Name => "ContextPoolManager";
+
+    /// <inheritdoc />
+    public IDiagnosticFilter? Filter => null;
+
+    /// <inheritdoc />
+    public void OnEvent(DiagnosticEvent evt)
+    {
+        // Hub only dispatches GCStart events (our registered type)
+        // Safe to cast without checking
+        var gcStart = (GCStartEvent)evt;
+        ClearAllPools();
+    }
+
+    /// <summary>
+    /// Clears all context pools before GC runs.
+    /// This prevents use-after-free bugs where GC collects pooled contexts
+    /// and heap reallocates the OOP to a different object type.
+    /// Pools naturally rebuild as methods return after GC.
+    /// </summary>
+    private void ClearAllPools()
+    {
+        foreach (var (size, pool) in _contextPools)
+        {
+            pool.Clear();
         }
     }
 }

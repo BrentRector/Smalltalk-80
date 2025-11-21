@@ -6,6 +6,7 @@ using Smalltalk80.Interpreter.Core.VM.Caching;
 using Smalltalk80.Interpreter.Core.VM.Diagnostics;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.Attributes;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -85,7 +86,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         set => _tracer.SelectorTraceEnabled = value;
     }
 
-    public VirtualMachine(ISmalltalkHeap heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
+    public VirtualMachine(ISmalltalkHeap heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, IDiagnosticHub? diagnostics = null)
     {
         _heapManager = heapManager;
 
@@ -101,8 +102,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _contextManager = new ContextManager(
             heapManager,
             metadata,
-            this // IObjectMetadataAccessor
+            this, // IObjectMetadataAccessor
+            diagnostics // For GC event notifications
         );
+
+        // Initialize context manager to register for GC events
+        _contextManager.Initialize();
 
         _stackManager = new StackManager(
             heapManager,
