@@ -417,7 +417,7 @@ public static class Program
                 Console.WriteLine();
 
                 // Create InitExpressionCompiler for on-demand compilation (runtime-safe)
-                var compiler = new InitExpressionCompiler(heapManager, bundle);
+                var compiler = new InitExpressionCompiler(heapManager, bundle, vmMetadata);
 
                 // Execute the first init expression with on-demand compilation and GC verification
                 var result = executor.ExecuteInitExpressionOnDemand(firstExpr, compiler);

@@ -17,13 +17,16 @@ public class InitExpressionCompiler
 {
     private readonly ISmalltalkHeap _heapManager;
     private readonly ColdStartBundle _bundle;
+    private readonly VMMetadata _metadata;
 
     public InitExpressionCompiler(
         ISmalltalkHeap heapManager,
-        ColdStartBundle bundle)
+        ColdStartBundle bundle,
+        VMMetadata metadata)
     {
         _heapManager = heapManager ?? throw new ArgumentNullException(nameof(heapManager));
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
+        _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
     }
 
     /// <summary>
@@ -38,17 +41,17 @@ public class InitExpressionCompiler
         // Determine homeClass from the resolved literals
         string homeClassLocalId = ExtractHomeClassFromInitExpression(expr, literalOOPs);
 
-        // Get required class OOPs
-        var compiledMethodClassOOP = GlobalRegistry.LookupClassOOP("CompiledMethod");
-        var byteArrayClassOOP = GlobalRegistry.LookupClassOOP("ByteArray");
+        // Get required class OOPs (runtime-safe lookups)
+        var compiledMethodClassOOP = LookupGlobal("CompiledMethod");
+        var byteArrayClassOOP = LookupGlobal("ByteArray");
 
         if (compiledMethodClassOOP == _heapManager.GetNil())
             throw new InvalidOperationException("CompiledMethod class not found");
         if (byteArrayClassOOP == _heapManager.GetNil())
             throw new InvalidOperationException("ByteArray class not found");
 
-        // Get homeClass OOP
-        var homeClassOOP = GlobalRegistry.LookupClassOOP(homeClassLocalId.Replace("meta:", ""));
+        // Get homeClass OOP (runtime-safe lookup)
+        var homeClassOOP = LookupGlobal(homeClassLocalId.Replace("meta:", ""));
         if (homeClassOOP == _heapManager.GetNil())
             throw new InvalidOperationException($"Home class not found: {homeClassLocalId}");
 
@@ -233,7 +236,7 @@ public class InitExpressionCompiler
                 if (literalValue.Association != null)
                 {
                     string keySymbolText = _bundle.Symbols[literalValue.Association.KeyIndex];
-                    var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
+                    var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
                     var keySymbolOOP = FindSymbol(keySymbolText);
                     return FindAssociation(smalltalkOOP, keySymbolOOP);
                 }
@@ -243,10 +246,10 @@ public class InitExpressionCompiler
                 return _heapManager.GetNil();
 
             case "true":
-                return GlobalRegistry.Get("true");
+                return _metadata.KnownObjects.True;
 
             case "false":
-                return GlobalRegistry.Get("false");
+                return _metadata.KnownObjects.False;
 
             case "compiledMethod":
                 // For block literals - they reference a method by localId
@@ -314,6 +317,38 @@ public class InitExpressionCompiler
             if (keyOOP == keySymbolOOP)
             {
                 return assocOOP;
+            }
+        }
+
+        return _heapManager.GetNil();
+    }
+
+    /// <summary>
+    /// Looks up a global variable in the SystemDictionary (runtime-safe).
+    /// </summary>
+    private SmalltalkOOP LookupGlobal(string globalName)
+    {
+        var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
+        int size = _heapManager.GetIndexedSize(smalltalkOOP);
+
+        // Find the symbol OOP for the global name
+        var symbolOOP = FindSymbol(globalName);
+        if (symbolOOP == _heapManager.GetNil())
+        {
+            return _heapManager.GetNil();
+        }
+
+        // Search SystemDictionary for Association with this key
+        for (int i = 0; i < size; i++)
+        {
+            var assocOOP = _heapManager.GetIndexedOOP(smalltalkOOP, i);
+            if (assocOOP == _heapManager.GetNil())
+                continue;
+
+            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            if (keyOOP == symbolOOP)
+            {
+                return _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
             }
         }
 
