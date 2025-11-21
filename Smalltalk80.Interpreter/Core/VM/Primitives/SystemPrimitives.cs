@@ -16,7 +16,7 @@ public static class SystemOperations
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Query garbage collector for memory statistics
-            var stats = context.HeapManager.GetGCStatistics();
+            var stats = context.HeapManager.GC.GetStatistics();
             int totalSlots = context.HeapManager.GetObjectTableSize();
             int usedSlots = stats.TotalObjects;
             int freeSlots = totalSlots - usedSlots;
