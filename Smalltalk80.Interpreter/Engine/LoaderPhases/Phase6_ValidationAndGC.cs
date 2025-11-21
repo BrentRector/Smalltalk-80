@@ -134,7 +134,10 @@ public class Phase6_ValidationAndGC : IPhase
         // 8. Validate Association canonicalization
         ValidateAssociationCanonicalization(results);
 
-        // 9. Block ownership validation removed - BlockOwnerMap tracked in Phase4
+        // 9. Validate VMConstants against actual class layouts
+        ValidateVMConstants(results);
+
+        // 10. Block ownership validation removed - BlockOwnerMap tracked in Phase4
 
         // Report results
         ReportValidationResults(results);
@@ -919,6 +922,83 @@ public class Phase6_ValidationAndGC : IPhase
         }
 
 // Console.WriteLine($"  ✓ GC Verification passed: {gcStats.LiveObjects} objects reachable, 1 placeholder nil collected as expected");
+    }
+
+    // ========================================================================================
+    // VMConstants Validation (catches Smalltalk source changes requiring VMConstants updates)
+    // ========================================================================================
+
+    /// <summary>
+    /// Validates that all VMConstants match the actual class layouts from LayoutResolver.
+    /// This catches changes in Smalltalk source code that require VMConstants to be updated.
+    /// </summary>
+    private void ValidateVMConstants(ValidationResults results)
+    {
+        // MethodContext field validation
+        ValidateConstant(results, "class:MethodContext", "sender", VMConstants.CONTEXT_SENDER_INDEX);
+        ValidateConstant(results, "class:MethodContext", "pc", VMConstants.CONTEXT_PC_INDEX);
+        ValidateConstant(results, "class:MethodContext", "stackp", VMConstants.CONTEXT_STACKP_INDEX);
+        ValidateConstant(results, "class:MethodContext", "method", VMConstants.CONTEXT_METHOD_INDEX);
+        ValidateConstant(results, "class:MethodContext", "lexicalParent", VMConstants.CONTEXT_LEXICALPARENT_INDEX);
+        ValidateConstant(results, "class:MethodContext", "receiver", VMConstants.CONTEXT_RECEIVER_INDEX);
+
+        // BlockContext field validation
+        ValidateConstant(results, "class:BlockContext", "sender", VMConstants.BLOCKCONTEXT_CALLER_INDEX);
+        ValidateConstant(results, "class:BlockContext", "pc", VMConstants.BLOCKCONTEXT_PC_INDEX);
+        ValidateConstant(results, "class:BlockContext", "stackp", VMConstants.BLOCKCONTEXT_STACKP_INDEX);
+        ValidateConstant(results, "class:BlockContext", "nargs", VMConstants.BLOCKCONTEXT_NARGS_INDEX);
+        ValidateConstant(results, "class:BlockContext", "startpc", VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+        ValidateConstant(results, "class:BlockContext", "home", VMConstants.BLOCKCONTEXT_HOME_INDEX);
+        ValidateConstant(results, "class:BlockContext", "argStartIndex", VMConstants.BLOCKCONTEXT_ARG_START_INDEX);
+
+        // Process field validation
+        ValidateConstant(results, "class:Process", "nextLink", VMConstants.PROCESS_NEXTLINK_INDEX);
+        ValidateConstant(results, "class:Process", "suspendedContext", VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+        ValidateConstant(results, "class:Process", "priority", VMConstants.PROCESS_PRIORITY_INDEX);
+        ValidateConstant(results, "class:Process", "myList", VMConstants.PROCESS_MYLIST_INDEX);
+
+        // ProcessorScheduler field validation
+        ValidateConstant(results, "class:ProcessorScheduler", "quiescentProcessLists", VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        ValidateConstant(results, "class:ProcessorScheduler", "activeProcess", VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+
+        // Association field validation
+        ValidateConstant(results, "class:Association", "key", VMConstants.ASSOCIATION_KEY_INDEX);
+        ValidateConstant(results, "class:Association", "value", VMConstants.ASSOCIATION_VALUE_INDEX);
+
+        // Set/Dictionary field validation
+        ValidateConstant(results, "class:Set", "tally", VMConstants.SET_TALLY_INDEX);
+        ValidateConstant(results, "class:Dictionary", "tally", VMConstants.DICTIONARY_TALLY_INDEX);
+
+        // Metaclass field validation
+        ValidateConstant(results, "class:Metaclass", "thisClass", VMConstants.METACLASS_THISCLASS_INDEX);
+
+        // Behavior field validation (superclass, methodDict, format)
+        ValidateConstant(results, "class:Behavior", "superclass", VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
+        ValidateConstant(results, "class:Behavior", "methodDict", VMConstants.BEHAVIOR_METHODDICT_INDEX);
+        ValidateConstant(results, "class:Behavior", "format", VMConstants.BEHAVIOR_FORMAT_INDEX);
+    }
+
+    /// <summary>
+    /// Validates a single VMConstant against LayoutResolver.
+    /// </summary>
+    private void ValidateConstant(ValidationResults results, string classLocalId, string fieldName, int expectedIndex)
+    {
+        try
+        {
+            int actualIndex = _layoutResolver.GetFieldIndex(classLocalId, fieldName);
+            if (actualIndex != expectedIndex)
+            {
+                results.AddError(
+                    $"VMConstants mismatch: {classLocalId}.{fieldName} expected index {expectedIndex} " +
+                    $"but LayoutResolver reports {actualIndex}. " +
+                    $"VMConstants.cs must be updated to match Smalltalk source changes.");
+            }
+        }
+        catch (Exception ex)
+        {
+            results.AddError(
+                $"VMConstants validation failed for {classLocalId}.{fieldName}: {ex.Message}");
+        }
     }
 
     // ========================================================================================
