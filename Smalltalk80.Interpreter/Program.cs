@@ -393,33 +393,48 @@ public static class Program
                     return;
                 }
 
-                // Execute initialize! expressions in dependency order
-                Console.WriteLine($"\n=== Executing Initialize Expressions (Dependency Order) ===");
+                // Execute ONLY THE FIRST initialize! expression with on-demand compilation and GC verification
+                Console.WriteLine($"\n=== Testing On-Demand Init Expression Compilation ===");
                 Console.WriteLine($"  Total initialize! expressions: {phase1Indices.Count}");
-                Console.WriteLine($"  Execution order determined by class dependencies");
+                Console.WriteLine($"  NOTE: Testing ONLY the first expression to validate approach");
                 Console.WriteLine();
-
-                // Use dependency-ordered phase1 indices
-                var reorderedIndices = new List<int>();
-                reorderedIndices.AddRange(phase1Indices);
 
                 succeeded = 0;
                 failed = 0;
 
-                // Execute with per-expression status output
-                foreach (int index in reorderedIndices)
+                // Get the first init expression index
+                if (phase1Indices.Count == 0)
                 {
-                    var expr = bundle.InitExpressions[index];
-                    var initMethodOOP = heapManager.GetIndexedOOP(vmMetadata.InitExpressionMethods, index);
+                    Console.WriteLine("  No initialize! expressions found");
+                    return;
+                }
 
-                    // Show what we're executing
-                    Console.Write($"  [{index}] {expr.Source}... ");
+                int firstIndex = phase1Indices[0];
+                var expr = bundle.InitExpressions[firstIndex];
 
-                    // Reset instruction count before each expression
-                    vm.ResetInstructionCount();
+                Console.WriteLine($"=== STEP 1: Compile Init Expression On-Demand ===");
+                Console.WriteLine($"  Expression: {expr.Source}");
 
-                    var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
-                    long instructionCount = vm.InstructionCount;
+                // TODO: Compile the init expression here on-demand
+                // For now, skip execution since compilation logic needs to be implemented
+                Console.WriteLine($"  ⚠️  On-demand compilation not yet implemented");
+                Console.WriteLine($"  Skipping init expression execution for now");
+                Console.WriteLine();
+                Console.WriteLine($"=== Init Expression Testing Skipped ===");
+                Console.WriteLine($"  Next step: Implement on-demand compilation in InitExpressionExecutor");
+                return;
+
+                // PLACEHOLDER for future implementation:
+                // var initMethodOOP = CompileInitExpressionOnDemand(expr);
+                // WireToProcess(initMethodOOP);
+                // RunGC(); // Should NOT collect
+                // var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+                // UnwireFromProcess();
+                // RunGC(); // SHOULD collect
+
+                // Dummy variables to avoid compilation errors
+                InitResult result = default;
+                long instructionCount = 0;
 
                     if (result.Status == InitStatus.Success)
                     {
