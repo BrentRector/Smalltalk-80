@@ -165,8 +165,8 @@ public class InitExpressionCompiler
         int literalCount = expr.Header.LiteralCount;
 
         // Create ByteArray for bytecodes
-        int bytecodeWordCount = (bytecodes.Length + 1) / 2; // Round up to word boundary
-        var bytecodeArrayOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots: 0, indexedSize: bytecodeWordCount);
+        // For ByteIndexed format, indexedSize represents the number of BYTES
+        var bytecodeArrayOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots: 0, indexedSize: bytecodes.Length);
         _heapManager.SetClassOOP(bytecodeArrayOOP, byteArrayClassOOP);
 
         for (int i = 0; i < bytecodes.Length; i++)
