@@ -316,7 +316,8 @@ public interface IPrimitiveRegistry
         IContextManager? contextManager = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
-        IPrimitiveMessageSender? messageSender = null);
+        IPrimitiveMessageSender? messageSender = null,
+        VMMetadata? metadata = null);
 
     /// <summary>
     /// Checks if a primitive is registered.
