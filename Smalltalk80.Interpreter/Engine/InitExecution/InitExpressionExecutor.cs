@@ -47,8 +47,14 @@ public class InitExpressionExecutor
     /// </summary>
     private SmalltalkOOP ResumeProcess(SmalltalkOOP processOOP)
     {
-        // Get the suspended context from the Process (instance variable 0)
+        // Get the suspended context from the Process (instance variable 1: suspendedContext)
         var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+
+        // DEBUG: Verify we extracted a context, not the process itself
+        Console.WriteLine($"[ResumeProcess] processOOP={processOOP}, contextOOP={contextOOP}");
+        Console.WriteLine($"[ResumeProcess] process class={_heapManager.GetClassName(processOOP)}");
+        Console.WriteLine($"[ResumeProcess] context class={_heapManager.GetClassName(contextOOP)}");
+
         return _vm.ExecuteExistingContext(contextOOP);
     }
 
@@ -349,6 +355,11 @@ public class InitExpressionExecutor
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, suspendedContextOOP);
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX, SmalltalkOOP.FromSmallInteger(priority));
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _heapManager.GetNil());
+
+        // DEBUG: Verify what we stored
+        Console.WriteLine($"[CreateProcess] Created processOOP={processOOP}");
+        Console.WriteLine($"[CreateProcess] Stored suspendedContextOOP={suspendedContextOOP}");
+        Console.WriteLine($"[CreateProcess] suspendedContext class={_heapManager.GetClassName(suspendedContextOOP)}");
 
         return processOOP;
     }
