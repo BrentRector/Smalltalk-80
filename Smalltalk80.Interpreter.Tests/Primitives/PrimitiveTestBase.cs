@@ -34,13 +34,38 @@ public abstract class PrimitiveTestBase
     /// </summary>
     protected static readonly VMMetadata TestMetadata = new VMMetadata
     {
+        // Known objects for Nil, True, False, Smalltalk
         KnownObjects = new KnownObjects(
             nil: SmalltalkOOP.FromObjectTableIndex(0),      // Nil
             @true: SmalltalkOOP.FromObjectTableIndex(1),     // True
             @false: SmalltalkOOP.FromObjectTableIndex(2),    // False
             smalltalk: SmalltalkOOP.FromObjectTableIndex(3)  // Smalltalk dictionary
         ),
-        ProcessorScheduler = SmalltalkOOP.FromObjectTableIndex(4)
+        ProcessorScheduler = SmalltalkOOP.FromObjectTableIndex(4),
+
+        // Class field indices (standard Blue Book layout)
+        ClassNameFieldIndex = 6,
+        ClassSuperclassFieldIndex = 0,
+        ClassMethodDictFieldIndex = 1,
+        ClassFormatFieldIndex = 2,
+
+        // Metaclass field index
+        MetaclassThisClassFieldIndex = 5,
+
+        // MethodDictionary field indices
+        MethodDictTallyFieldIndex = 0,
+        MethodDictKeysFieldIndex = 1,
+        MethodDictValuesFieldIndex = 2,
+
+        // Well-known class OOPs (test dummy values)
+        ClassClassOOP = SmalltalkOOP.FromObjectTableIndex(10),
+        MetaclassClassOOP = SmalltalkOOP.FromObjectTableIndex(11),
+        SymbolClassOOP = SmalltalkOOP.FromObjectTableIndex(12),
+        StringClassOOP = SmalltalkOOP.FromObjectTableIndex(13),
+        ArrayClassOOP = SmalltalkOOP.FromObjectTableIndex(14),
+        CompiledMethodClassOOP = SmalltalkOOP.FromObjectTableIndex(15),
+        SmallIntegerClassOOP = SmalltalkOOP.FromObjectTableIndex(16),
+        BlockContextClassOOP = SmalltalkOOP.FromObjectTableIndex(17)
     };
 
     /// <summary>
