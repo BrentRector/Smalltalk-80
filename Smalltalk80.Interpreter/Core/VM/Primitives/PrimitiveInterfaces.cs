@@ -27,17 +27,9 @@ public readonly struct PrimitiveResult
 
     /// <summary>
     /// Creates a failed result with nil value.
-    /// Prefer this overload when VMMetadata is available via PrimitiveExecutionContext.
+    /// Always use this method - VMMetadata is required.
     /// </summary>
     public static PrimitiveResult Fail(VMMetadata metadata) => new(false, metadata.KnownObjects.Nil);
-
-    /// <summary>
-    /// Creates a failed result with default OOP value.
-    /// DEPRECATED: Use Fail(metadata) instead to properly set value to nil.
-    /// This overload exists for compatibility but should be avoided.
-    /// </summary>
-    [Obsolete("Use Fail(context.Metadata) to properly return nil on failure")]
-    public static PrimitiveResult Fail() => new(false, default(SmalltalkOOP));
 
     /// <summary>Creates a result from a boolean condition.</summary>
     public static PrimitiveResult FromBool(bool condition, SmalltalkOOP trueValue, SmalltalkOOP falseValue) =>

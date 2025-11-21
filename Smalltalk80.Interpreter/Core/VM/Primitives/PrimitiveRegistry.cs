@@ -100,7 +100,9 @@ public class PrimitiveRegistry : IPrimitiveRegistry
 
         // Primitive not found - return nil
         ctx.PrimitiveSuccess = false;
-        return metadata?.KnownObjects.Nil ?? default(SmalltalkOOP);
+        if (metadata == null)
+            throw new InvalidOperationException("VMMetadata required but not provided to ExecuteLegacyExtended");
+        return metadata.KnownObjects.Nil;
     }
 
     /// <summary>
