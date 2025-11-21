@@ -39,6 +39,9 @@ public class ObjectGraphAllocator
 
     private void TrackOOP(SmalltalkOOP oop, string context)
     {
+        // OOP tracking disabled - issue resolved
+        // Enable during debugging by uncommenting the code below
+        /*
         if (oop.IsSmallInteger) return;
         if (TrackedOOPs.Contains(oop))
         {
@@ -47,6 +50,7 @@ public class ObjectGraphAllocator
             Console.WriteLine($"[OOP TRACKER] Allocated {oop} in {context}");
             Console.WriteLine($"  Caller: {frame?.GetMethod()?.DeclaringType?.Name}.{frame?.GetMethod()?.Name}");
         }
+        */
     }
 
     /// <summary>

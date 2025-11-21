@@ -606,20 +606,9 @@ public class Phase3_ObjectAllocation : IPhase
         var allSymbols = SymbolRegistry.AllSymbols();
         var symbolClassOOP = GlobalRegistry.LookupClassOOP("Symbol");
 
-        var trackedOOPs = new[] { new SmalltalkOOP(6750), new SmalltalkOOP(30272), new SmalltalkOOP(30273), new SmalltalkOOP(30274) };
-
         foreach (var (index, symbolOOP) in allSymbols)
         {
             _allocator.SetClassOOP(symbolOOP, symbolClassOOP);
-
-            if (trackedOOPs.Contains(symbolOOP))
-            {
-                // Verify the class reference was set correctly
-                var verifyClassOOP = _heapManager.GetClassOOP(symbolOOP);
-                var verifyClassName = _heapManager.GetClassName(symbolOOP);
-                Console.WriteLine($"[PHASE3 CLASS FIX] Set class reference for tracked symbol {symbolOOP} (index={index})");
-                Console.WriteLine($"  symbolClassOOP={symbolClassOOP}, verified class={verifyClassOOP}, className=\"{verifyClassName}\"");
-            }
         }
 
         // Set class reference for SystemDictionary

@@ -336,13 +336,6 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
                 _allocator.SetIndexedByte(symbolOOP, i, symbolBytes[i]);
             }
 
-            // Enhanced tracking for specific OOPs
-            var trackedOOPs = new[] { new SmalltalkOOP(6750), new SmalltalkOOP(30272), new SmalltalkOOP(30273), new SmalltalkOOP(30274) };
-            if (trackedOOPs.Contains(symbolOOP))
-            {
-                Console.WriteLine($"[PHASE1 SYMBOL] Created tracked symbol {symbolOOP}: \"{name}\" (length={symbolBytes.Length})");
-            }
-
             // Cache in symbol table for deduplication
             _symbolTable[name] = symbolOOP;
 

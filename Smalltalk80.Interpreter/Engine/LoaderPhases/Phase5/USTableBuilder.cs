@@ -32,7 +32,6 @@ public class USTableBuilder(Phase5Context context) : IUSTableBuilder
 
         // Pass 2: Insert symbols into buckets
         var bucketPositions = new int[ustableSize];
-        var trackedOOPs = new[] { new SmalltalkOOP(6750), new SmalltalkOOP(30272), new SmalltalkOOP(30273), new SmalltalkOOP(30274) };
 
         foreach (var (index, symbolOOP) in symbolObjects)
         {
@@ -44,11 +43,6 @@ public class USTableBuilder(Phase5Context context) : IUSTableBuilder
             int position = bucketPositions[bucketIndex]++;
 
             context.Allocator.SetIndexedOOP(bucketOOP, position, symbolOOP);
-
-            if (trackedOOPs.Contains(symbolOOP))
-            {
-                Console.WriteLine($"[PHASE5 USTABLE] Installed tracked symbol {symbolOOP} (\"{symbolName}\") in USTable bucket {bucketIndex}, position {position}");
-            }
         }
 
         GlobalRegistry.Register("USTable", ustableOOP);

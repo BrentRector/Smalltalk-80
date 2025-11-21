@@ -133,17 +133,6 @@ public static class Program
             Console.WriteLine("Initializing heap manager...");
             var heapManager = new SmalltalkHeapManager();
 
-            // Track specific orphaned OOPs during cold start
-            var trackedOOPs = new[]
-            {
-                new SmalltalkOOP(6750),
-                new SmalltalkOOP(13500),  // Track object table index reuse after placeholder nil collection
-                new SmalltalkOOP(30272),
-                new SmalltalkOOP(30273),
-                new SmalltalkOOP(30274)
-            };
-            Console.WriteLine($"[OOP TRACKER] Monitoring allocations for orphaned OOPs: {string.Join(", ", trackedOOPs.Select(oop => oop.ToString()))}");
-
             // Create and run the loader
             Console.WriteLine("Starting cold start loader (6-phase)...");
 

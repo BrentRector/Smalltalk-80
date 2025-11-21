@@ -229,57 +229,8 @@ public class InitExpressionExecutor
             // STEP 4: Run GC - should NOT collect (reachable via activeProcess → suspendedContext → method)
             Console.WriteLine($"\n[STEP 4] Running GC (should NOT collect init expression)...");
 
-            // Check oop=6750's class reference BEFORE GC
-            var trackedOOP = new SmalltalkOOP(6750);
-            if (_heapManager.IsValidObjectOOP(trackedOOP))
-            {
-                var classOOP = _heapManager.GetClassOOP(trackedOOP);
-                var className = _heapManager.GetClassName(trackedOOP);
-                Console.WriteLine($"  [BEFORE GC] oop=6750 class={classOOP}, className=\"{className}\"");
-
-                // Check Symbol class (oop=11352) name field
-                var symbolClassOOP = new SmalltalkOOP(11352);
-                if (_heapManager.IsValidObjectOOP(symbolClassOOP))
-                {
-                    // Class name is at instance variable index 6
-                    var symbolClassNameSymbolOOP = _heapManager.GetInstanceVariable(symbolClassOOP, 6);
-                    Console.WriteLine($"  [BEFORE GC] Symbol class (oop=11352) name field = {symbolClassNameSymbolOOP}");
-
-                    // Read the actual symbol text
-                    if (!symbolClassNameSymbolOOP.IsSmallInteger && _heapManager.IsValidObjectOOP(symbolClassNameSymbolOOP))
-                    {
-                        int symbolSize = _heapManager.GetIndexedSize(symbolClassNameSymbolOOP);
-                        byte[] symbolBytes = new byte[symbolSize];
-                        for (int i = 0; i < symbolSize; i++)
-                        {
-                            symbolBytes[i] = _heapManager.GetIndexedByte(symbolClassNameSymbolOOP, i);
-                        }
-                        string symbolText = System.Text.Encoding.UTF8.GetString(symbolBytes);
-                        Console.WriteLine($"  [BEFORE GC] Symbol class name symbol text = \"{symbolText}\"");
-                    }
-                }
-
-                // Also check what class has "ByteArray" as its name
-                var byteArrayClassOOP = new SmalltalkOOP(11348); // Common OOP for ByteArray class
-                if (_heapManager.IsValidObjectOOP(byteArrayClassOOP))
-                {
-                    var byteArrayClassName = _heapManager.GetClassName(byteArrayClassOOP);
-                    Console.WriteLine($"  [BEFORE GC] oop=11348 className=\"{byteArrayClassName}\"");
-                }
-            }
-
             var gcStatsBefore = _heapManager.GC.GarbageCollect();
             Console.WriteLine($"  GC collected {gcStatsBefore.CollectedObjects} objects (expected 0 - everything reachable)");
-
-            // Show what was collected
-            if (gcStatsBefore.CollectedObjects > 0)
-            {
-                Console.WriteLine($"  [DEBUG] Collected objects:");
-                foreach (var obj in gcStatsBefore.CollectedObjectDetails.Take(10))
-                {
-                    Console.WriteLine($"    {obj.oop} (class: {obj.className ?? "unknown"})");
-                }
-            }
 
             // Verify the CompiledMethod is still alive
             if (!IsObjectAlive(compiledMethodOOP))
@@ -332,19 +283,8 @@ public class InitExpressionExecutor
 
             // STEP 7: Run GC - SHOULD collect (MethodContext, CompiledMethod, ByteArray no longer reachable)
             Console.WriteLine($"\n[STEP 7] Running GC (SHOULD collect init expression)...");
-            Console.WriteLine($"  [DEBUG] Expected to collect: CompiledMethod {compiledMethodOOP}, MethodContext {methodContextOOP}");
             var gcStatsAfter = _heapManager.GC.GarbageCollect();
             Console.WriteLine($"  GC collected {gcStatsAfter.CollectedObjects} objects (expected 3 - MethodContext, CompiledMethod, ByteArray)");
-
-            // Show what was collected
-            if (gcStatsAfter.CollectedObjects > 0)
-            {
-                Console.WriteLine($"  [DEBUG] Actually collected:");
-                foreach (var obj in gcStatsAfter.CollectedObjectDetails.Take(10))
-                {
-                    Console.WriteLine($"    {obj.oop} (class: {obj.className ?? "unknown"})");
-                }
-            }
 
             // Verify the CompiledMethod was collected
             bool compiledMethodAlive = IsObjectAlive(compiledMethodOOP);

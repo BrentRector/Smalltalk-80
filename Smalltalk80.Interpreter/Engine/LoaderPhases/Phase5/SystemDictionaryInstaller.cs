@@ -20,22 +20,18 @@ public class SystemDictionaryInstaller(
     {
         // Install Smalltalk -> SystemDictionary (self-reference)
         InstallSmalltalkGlobal();
-        TraceProcessorSchedulerClass("After InstallSmalltalkGlobal");
 
         // Install USTable in Symbol's classPool
         if (GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableOOP))
         {
             InstallUSTableGlobal(ustableOOP);
         }
-        TraceProcessorSchedulerClass("After InstallUSTableGlobal");
 
         // Initialize SingleCharSymbols class variable
         InitializeSingleCharSymbols();
-        TraceProcessorSchedulerClass("After InitializeSingleCharSymbols");
 
         // Log pool dictionaries that will be created by init expressions
         InitializeAllPoolDictionaries();
-        TraceProcessorSchedulerClass("After InitializeAllPoolDictionaries");
 
         // Install Processor -> ProcessorScheduler singleton
         if (GlobalRegistry.TryGet("ProcessorScheduler", out SmalltalkOOP processorSchedulerOOP))
@@ -272,15 +268,6 @@ public class SystemDictionaryInstaller(
         Console.WriteLine($"  Value after = {valueAfter}");
 
         InstallInSystemDictionary(associationOOP, "Processor");
-    }
-
-    private void TraceProcessorSchedulerClass(string checkpoint)
-    {
-        if (GlobalRegistry.TryGet("ProcessorScheduler", out var processorOOP))
-        {
-            var classOOP = context.Allocator.GetClassOOP(processorOOP);
-            Console.WriteLine($"[InstallGlobals TRACE] {checkpoint}: ProcessorScheduler class = {classOOP}");
-        }
     }
 
     private void InstallClassGlobal(string className, SmalltalkOOP classOOP)
