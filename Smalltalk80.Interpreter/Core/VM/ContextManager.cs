@@ -86,13 +86,21 @@ internal class ContextManager(
         {
             contextOOP = pool.Pop();
 
-            // Check if we accidentally picked the active context
+            // Verify pooled context is safe to reuse
             if (contextOOP == _activeContextOOP || IsInSenderChain(contextOOP, _activeContextOOP))
             {
+                // Active or in sender chain - put it back and allocate new
                 pool.Push(contextOOP);
                 contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
                 heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
                 _poolMisses++;  // Safety check failed, count as miss
+            }
+            else if (heapManager.GetClassOOP(contextOOP) != methodContextClassOOP)
+            {
+                // Class mismatch - pool corruption detected, discard and allocate new
+                contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
+                heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
+                _poolMisses++;  // Pool corruption, count as miss
             }
             else
             {
