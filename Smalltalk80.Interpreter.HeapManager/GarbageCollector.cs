@@ -126,26 +126,14 @@ internal class GarbageCollector : IGarbageCollector
                 string? className = null;
                 try
                 {
-                    // DEBUG: Track when GetClassName is called for oop=6750
-                    if (objectId == 3375) // 6750 >> 1 = 3375
-                    {
-                        var classOOP = _heap.GetClassOOP(oop);
-                        Console.WriteLine($"[GC SWEEP] Getting className for oop={oop} (index={objectId})");
-                        Console.WriteLine($"  classOOP={classOOP}");
-                    }
-
                     className = _heap.GetClassName(oop);
-
-                    if (objectId == 3375)
-                    {
-                        Console.WriteLine($"  Result: className=\"{className}\"");
-                    }
                 }
                 catch
                 {
                     className = "<unknown>";
                 }
-                collectedObjectDetails.Add((objectId, entry.FormatExplicit, entry.SizeInWordsExplicit, className));
+                // IMPORTANT: Report OOP raw value (external API), not internal object table index
+                collectedObjectDetails.Add((oop.RawValue, entry.FormatExplicit, entry.SizeInWordsExplicit, className));
             }
 
             // Clear managed storage (allows .NET GC to reclaim memory)
