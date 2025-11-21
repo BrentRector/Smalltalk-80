@@ -326,13 +326,13 @@ public class InitExpressionExecutor
 
                 for (int priorityIndex = 0; priorityIndex < numPriorities; priorityIndex++)
                 {
-                    SmalltalkOOP processListOOP = _heapManager.GetIndexedSlot(processListsArrayOOP, priorityIndex);
-                    if (processListOOP == _metadata.NilOOP)
+                    SmalltalkOOP processListOOP = _heapManager.GetIndexedOOP(processListsArrayOOP, priorityIndex);
+                    if (processListOOP == _metadata.KnownObjects.Nil)
                         continue;
 
                     // ProcessList has firstLink and lastLink
                     SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(processListOOP, 0); // firstLink
-                    if (firstLinkOOP == _metadata.NilOOP)
+                    if (firstLinkOOP == _metadata.KnownObjects.Nil)
                         continue;
 
                     Console.WriteLine($"      Priority {priorityIndex}: has processes");
@@ -340,7 +340,7 @@ public class InitExpressionExecutor
                     // Walk the linked list of processes
                     SmalltalkOOP currentProcessOOP = firstLinkOOP;
                     int processCount = 0;
-                    while (currentProcessOOP != _metadata.NilOOP && processCount < 100) // safety limit
+                    while (currentProcessOOP != _metadata.KnownObjects.Nil && processCount < 100) // safety limit
                     {
                         processCount++;
                         var procSuspendedCtx = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
@@ -353,7 +353,7 @@ public class InitExpressionExecutor
                         }
 
                         // Also check if it's a BlockContext whose home is our MethodContext
-                        if (procSuspendedCtx != _metadata.NilOOP && !procSuspendedCtx.IsSmallInteger)
+                        if (procSuspendedCtx != _metadata.KnownObjects.Nil && !procSuspendedCtx.IsSmallInteger)
                         {
                             var ctxClass = _heapManager.GetClassOOP(procSuspendedCtx);
                             var ctxClassName = _heapManager.GetClassName(ctxClass);
