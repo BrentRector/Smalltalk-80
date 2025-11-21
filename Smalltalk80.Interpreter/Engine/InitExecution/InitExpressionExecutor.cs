@@ -286,6 +286,15 @@ public class InitExpressionExecutor
             if (compiledMethodAlive || methodContextAlive)
             {
                 Console.WriteLine($" ❌ FAILED (objects not collected)");
+                Console.WriteLine($"    CompiledMethod {compiledMethodOOP}: {(compiledMethodAlive ? "ALIVE" : "collected")}");
+                Console.WriteLine($"    MethodContext {methodContextOOP}: {(methodContextAlive ? "ALIVE" : "collected")}");
+
+                // Check if methodContext is referenced by active process
+                var schedulerOOP = _metadata.ProcessorScheduler;
+                SmalltalkOOP activeProcessOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+                SmalltalkOOP suspendedContextOOP = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+                Console.WriteLine($"    Active process suspendedContext: {suspendedContextOOP} (should be nil={_heapManager.GetNil()})");
+
                 return InitResult.FatalError(expr.LocalId, $"CompiledMethod or MethodContext still alive after execution");
             }
 
