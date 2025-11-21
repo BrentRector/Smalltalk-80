@@ -1,4 +1,5 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Core.VM.Interpreter;
 
@@ -17,6 +18,7 @@ internal class NonLocalReturnHandler
     private bool _isPending;
     private SmalltalkOOP _value;
     private SmalltalkOOP _targetContext;
+    private readonly SmalltalkOOP _nilOOP;
 
     /// <summary>Gets whether a non-local return is currently in progress.</summary>
     public bool IsPending => _isPending;
@@ -30,11 +32,12 @@ internal class NonLocalReturnHandler
     /// <summary>
     /// Creates a new NonLocalReturnHandler with no NLR in progress.
     /// </summary>
-    public NonLocalReturnHandler()
+    public NonLocalReturnHandler(SmalltalkOOP nilOOP)
     {
+        _nilOOP = nilOOP;
         _isPending = false;
-        _value = SmalltalkOOP.Null;
-        _targetContext = SmalltalkOOP.Null;
+        _value = _nilOOP;
+        _targetContext = _nilOOP;
     }
 
     /// <summary>
@@ -83,8 +86,8 @@ internal class NonLocalReturnHandler
     {
         var value = _value;
         _isPending = false;
-        _value = SmalltalkOOP.Null;
-        _targetContext = SmalltalkOOP.Null;
+        _value = _nilOOP;
+        _targetContext = _nilOOP;
         return value;
     }
 

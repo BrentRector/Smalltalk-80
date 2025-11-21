@@ -2,9 +2,10 @@ using Smalltalk80.Interpreter.Engine;
 using Smalltalk80.Interpreter.Engine.InitExecution;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 using Smalltalk80.Interpreter.Platform.Windows;
@@ -181,7 +182,7 @@ public static class Program
                     return;
                 }
 
-                var vmMetadata = BuildVMMetadata(layoutResolver);
+                var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
                 var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
 
@@ -194,19 +195,19 @@ public static class Program
                 var executor = new InitExpressionExecutor(
                     heapManager,
                     vm,
+                    vmMetadata,
                     InitPolicy.ContinueAndCollect,  // Continue to run all init expressions including tests
                     defaultTimeoutMs: 5000
                 );
 
-                // Note: Init expressions are pre-allocated during coldstart Phase 8b
-                // and stored in SpecialObjectsArray.InitExpressionMethods.
+                // Note: Init expressions are pre-allocated during coldstart Phase 4
+                // and stored in VMMetadata.InitExpressionMethods.
 
                 // Phase-based execution strategy:
                 // Phase 1: Execute all initialize! expressions (infrastructure setup)
                 // Phase 2: Execute all comment: expressions (documentation)
                 // Fast-fail: Stop on first error with full diagnostics
 
-                var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
                 int totalExpressions = bundle.InitExpressions.Length;
 
                 // Essential init expressions that MUST run for basic VM functionality
@@ -535,7 +536,7 @@ public static class Program
                         return;
                     }
 
-                    var vmMetadata = BuildVMMetadata(layoutResolver);
+                    var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
                     var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
                     vm.VerboseDebug = verboseDebug;
@@ -544,12 +545,12 @@ public static class Program
                     var executor = new InitExpressionExecutor(
                         heapManager,
                         vm,
+                        vmMetadata,
                         InitPolicy.AbortOnFirstError,
                         defaultTimeoutMs: 10000
                     );
 
                     var expr = bundle.InitExpressions[exprIndex];
-                    var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
                     var methodOOP = heapManager.GetIndexedOOP(initArrayOOP, exprIndex);
 
                     Console.WriteLine($"  Found expression at index {exprIndex}: {expr.Source}");
@@ -641,7 +642,7 @@ public static class Program
         {
             return loader.Allocator.GetIndexedOOP(methodOOP, literalIndex + 1); // +1 to skip header
         }
-        return SpecialObjectsArray.Instance.Nil;
+        return GlobalRegistry.Get("nil");
     }
 
     /// <summary>
@@ -659,9 +660,9 @@ public static class Program
             "string" => allocator.AllocateString(bundle.Strings[literal.Index!.Value]),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
             "float" => allocator.AllocateFloat(GetFloatValue(literal.Value!)),
-            "nil" => SpecialObjectsArray.Instance.Nil,
-            "true" => SpecialObjectsArray.Instance.True,
-            "false" => SpecialObjectsArray.Instance.False,
+            "nil" => GlobalRegistry.Get("nil"),
+            "true" => GlobalRegistry.Get("true"),
+            "false" => GlobalRegistry.Get("false"),
             "objectRef" => localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1)
                 ? objOOP1
                 : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
@@ -725,7 +726,7 @@ public static class Program
                 for (int i = 0; i < sysDictSize; i++)
                 {
                     var assocOOP = allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP == SpecialObjectsArray.Instance.Nil) continue;
+                    if (assocOOP == GlobalRegistry.Get("nil")) continue;
 
                     var assocKeyOOP = allocator.GetInstanceVariable(assocOOP, 0);
                     if (assocKeyOOP == keyOOP)
@@ -738,7 +739,7 @@ public static class Program
 
         var valueOOP = assoc.ValueRef?.LocalId != null
             ? localIdToObjectId[assoc.ValueRef.LocalId]
-            : SpecialObjectsArray.Instance.Nil;
+            : GlobalRegistry.Get("nil");
 
         var associationOOP = allocator.AllocateFixedObject("Association");
         allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
@@ -789,13 +790,13 @@ public static class Program
         if (returnOOP.IsSmallInteger)
             return $"SmallInteger({returnOOP.AsSmallInteger()})";
 
-        if (returnOOP == SpecialObjectsArray.Instance.Nil)
+        if (returnOOP == GlobalRegistry.Get("nil"))
             return "nil";
 
-        if (returnOOP == SpecialObjectsArray.Instance.True)
+        if (returnOOP == GlobalRegistry.Get("true"))
             return "true";
 
-        if (returnOOP == SpecialObjectsArray.Instance.False)
+        if (returnOOP == GlobalRegistry.Get("false"))
             return "false";
 
         try
@@ -875,9 +876,23 @@ public static class Program
         Console.WriteLine("\n=== END DEBUG OUTPUT ===");
     }
 
-    private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver)
+    private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver, ColdStartOrchestrator loader)
     {
         int thisClassIdx = layoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
+
+        // Get special objects from GlobalRegistry (allocated during cold start phases)
+        var nilOOP = GlobalRegistry.Get("nil");
+        var trueOOP = GlobalRegistry.Get("true");
+        var falseOOP = GlobalRegistry.Get("false");
+        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
+        var processorSchedulerOOP = GlobalRegistry.Get("ProcessorScheduler");
+
+        var knownObjects = new KnownObjects(
+            nil: nilOOP,
+            @true: trueOOP,
+            @false: falseOOP,
+            smalltalk: smalltalkOOP
+        );
 
         return new VMMetadata
         {
@@ -896,7 +911,10 @@ public static class Program
             ArrayClassOOP = GlobalRegistry.Get("class:Array"),
             CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
-            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext")
+            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
+            KnownObjects = knownObjects,
+            ProcessorScheduler = processorSchedulerOOP,
+            InitExpressionMethods = loader.InitExpressionMethods
         };
     }
 

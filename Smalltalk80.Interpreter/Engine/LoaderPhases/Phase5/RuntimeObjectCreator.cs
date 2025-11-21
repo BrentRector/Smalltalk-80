@@ -1,8 +1,9 @@
 using System.Diagnostics;
 using Smalltalk80.Interpreter.Core.Schema;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.VM.Graphics;
@@ -158,7 +159,7 @@ public class RuntimeObjectCreator(
     /// </summary>
     private SmalltalkOOP CreateStubTextStyle(FontObjectBuilder fontBuilder)
     {
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
 
         // Create minimal stub StrikeFont
         var strikeFontOOP = context.Allocator.AllocateFixedObject("StrikeFont");
@@ -197,7 +198,7 @@ public class RuntimeObjectCreator(
     /// </summary>
     public void CreateDisplay()
     {
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
 
         // Step 1: Create offset Point (0@0)
         var pointOOP = context.Allocator.AllocateFixedObject("Point");

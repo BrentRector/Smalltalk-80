@@ -1,8 +1,9 @@
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Schema;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM.Graphics;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
@@ -27,7 +28,7 @@ public class FontObjectBuilder
     /// <returns>OOP of the created StrikeFont.</returns>
     public SmalltalkOOP CreateStrikeFont(StrikeFontData fontData)
     {
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
 
         // Allocate StrikeFont object
         var strikeFontOOP = _context.Allocator.AllocateFixedObject("StrikeFont");
@@ -84,7 +85,7 @@ public class FontObjectBuilder
     /// <returns>OOP of the created TextStyle.</returns>
     public SmalltalkOOP CreateTextStyle(SmalltalkOOP[] fonts, int lineGrid, int baseline)
     {
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
 
         // Allocate TextStyle object
         var textStyleOOP = _context.Allocator.AllocateFixedObject("TextStyle");
@@ -219,7 +220,7 @@ public class FontObjectBuilder
     /// </summary>
     private SmalltalkOOP CreateStopConditionsArray()
     {
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
         var arrayOOP = _context.Allocator.AllocateArray("Array", 258);
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         _context.Allocator.SetObjectClass(arrayOOP, arrayClassOOP);

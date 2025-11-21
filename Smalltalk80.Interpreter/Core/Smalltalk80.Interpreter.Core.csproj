@@ -5,15 +5,24 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <!-- Allow test project to access internal types -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Smalltalk80.Interpreter.Tests" />
+  </ItemGroup>
   
   <!-- Shared definitions -->
   <ItemGroup>
     <Compile Include="..\..\Shared\Core\Bytecodes\BytecodeDefinitions.cs"
              Link="Core\Bytecodes\BytecodeDefinitions.cs" />
-    <Compile Include="..\..\Shared\Core\FormatWord.cs"
-             Link="Core\FormatWord.cs" />
   </ItemGroup>
-  
+
+  <!-- Project references to new HeapManager assemblies -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Smalltalk80.Interpreter.Shared.Types\Smalltalk80.Interpreter.Shared.Types.csproj" />
+    <ProjectReference Include="..\..\Smalltalk80.Interpreter.HeapManager\Smalltalk80.Interpreter.HeapManager.csproj" />
+  </ItemGroup>
+
   <!-- Temporarily exclude files that still reference old heap manager -->
   <ItemGroup>
     <Compile Remove="VM\ClassPrettyPrinter.cs" />

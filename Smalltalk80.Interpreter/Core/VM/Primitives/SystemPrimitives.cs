@@ -1,6 +1,5 @@
-using Smalltalk80.Core;
-using Smalltalk80.Interpreter.Core.Memory;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -96,7 +95,7 @@ public static class SystemOperations
             if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
 
             // Receiver must be Semaphore object (or nil to disable)
-            if (!context.Receiver.IsSmallInteger && context.Receiver != SpecialObjectsArray.Instance.Nil)
+            if (!context.Receiver.IsSmallInteger && context.Receiver != context.HeapManager.GetNil())
             {
                 if (!context.Arguments[0].IsSmallInteger || !context.Arguments[1].IsSmallInteger)
                     return PrimitiveResult.Fail();
@@ -147,7 +146,7 @@ public static class SystemOperations
             // Find first instance of receiver class
             var instance = context.HeapManager.FindInstanceOf(context.Receiver);
 
-            if (instance == SpecialObjectsArray.Instance.Nil)
+            if (instance == context.HeapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(instance);
@@ -168,7 +167,7 @@ public static class SystemOperations
             // Find next instance after receiver
             var nextInstance = context.HeapManager.FindNextInstanceOf(receiverClassOOP, context.Receiver);
 
-            if (nextInstance == SpecialObjectsArray.Instance.Nil)
+            if (nextInstance == context.HeapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(nextInstance);
@@ -260,7 +259,7 @@ public static class SystemOperations
             }
 
             // No more objects
-            return PrimitiveResult.Ok(SpecialObjectsArray.Instance.Nil);
+            return PrimitiveResult.Ok(context.HeapManager.GetNil());
         }
     }
 }

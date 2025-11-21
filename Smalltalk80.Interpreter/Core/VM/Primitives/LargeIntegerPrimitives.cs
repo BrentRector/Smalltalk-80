@@ -1,6 +1,6 @@
 using System.Numerics;
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -83,11 +83,11 @@ public static class LargeIntegerArithmetic
 
         // Check against both LargeInteger classes
         var posClass = context.RuntimeHeapAccess?.GetClass("LargePositiveInteger");
-        if (posClass != null && posClass != SpecialObjectsArray.Instance.Nil && classOOP == posClass)
+        if (posClass != null && posClass != context.HeapManager.GetNil() && classOOP == posClass)
             return true;
 
         var negClass = context.RuntimeHeapAccess?.GetClass("LargeNegativeInteger");
-        if (negClass != null && negClass != SpecialObjectsArray.Instance.Nil && classOOP == negClass)
+        if (negClass != null && negClass != context.HeapManager.GetNil() && classOOP == negClass)
             return true;
 
         return false;
@@ -104,7 +104,7 @@ public static class LargeIntegerArithmetic
 
         var classOOP = context.RuntimeHeapAccess?.GetClass(className);
 
-        if (classOOP != null && classOOP != SpecialObjectsArray.Instance.Nil)
+        if (classOOP != null && classOOP != context.HeapManager.GetNil())
             return classOOP.Value;
 
         throw new InvalidOperationException(
@@ -156,7 +156,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left < right);
+            return PrimitiveResult.FromBool(left < right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -171,7 +171,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left > right);
+            return PrimitiveResult.FromBool(left > right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -186,7 +186,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left <= right);
+            return PrimitiveResult.FromBool(left <= right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -201,7 +201,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left >= right);
+            return PrimitiveResult.FromBool(left >= right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -216,7 +216,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left == right);
+            return PrimitiveResult.FromBool(left == right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -231,7 +231,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left != right);
+            return PrimitiveResult.FromBool(left != right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 

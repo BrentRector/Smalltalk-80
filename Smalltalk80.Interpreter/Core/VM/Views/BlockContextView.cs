@@ -1,5 +1,5 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Core.VM.Views;
 
@@ -110,5 +110,5 @@ public readonly struct BlockContextView
     public MethodContextView GetHomeView() => new(Home, _heap);
 
     /// <summary>Checks if this is a valid context (not nil).</summary>
-    public bool IsValid => _oop != SpecialObjectsArray.Instance.Nil && !_oop.IsSmallInteger;
+    public bool IsValid => _oop != _heap.GetNil() && !_oop.IsSmallInteger;
 }

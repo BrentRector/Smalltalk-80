@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <LangVersion>13.0</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="Moq" Version="4.20.70" />
+    <PackageReference Include="xunit" Version="2.6.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Smalltalk80.Interpreter\Smalltalk80.Interpreter.csproj">
+      <Aliases>InterpreterCore</Aliases>
+    </ProjectReference>
+    <ProjectReference Include="..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj">
+      <Aliases>CompilerLib</Aliases>
+    </ProjectReference>
+    <ProjectReference Include="..\Smalltalk80.Interpreter.Shared.Types\Smalltalk80.Interpreter.Shared.Types.csproj" />
+    <ProjectReference Include="..\Smalltalk80.Interpreter.HeapManager\Smalltalk80.Interpreter.HeapManager.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Disable non-primitive tests for Phase 1 - focus on primitives only -->
+    <!-- HeapManager tests re-enabled after architectural review -->
+    <Compile Remove="Compiler\**\*.cs" />
+    <Compile Remove="Context\**\*.cs" />
+    <!-- <Compile Remove="HeapManager\**\*.cs" /> -->
+    <Compile Remove="VM\**\*.cs" />
+  </ItemGroup>
+
+</Project>

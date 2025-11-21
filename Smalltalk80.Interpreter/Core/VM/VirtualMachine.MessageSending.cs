@@ -1,6 +1,6 @@
 using Smalltalk80.Core.Bytecodes;
-using Smalltalk80.Interpreter.Core.Memory;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core.VM.Interpreter;
 
@@ -118,7 +118,7 @@ public partial class VirtualMachine
 
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
-                _contextManager, currentPC, this, this);
+                _contextManager, currentPC, this, this, _metadata);
 
             if (_primitiveSuccess)
             {
@@ -204,7 +204,7 @@ public partial class VirtualMachine
         }
 
         // Debug: check for classId 0 on "comment:" send
-        if (classOOP == SmalltalkOOP.Null)
+        if (classOOP == _heapManager.GetNil())
         {
             throw new InvalidOperationException(
                 $"Method not found: {selectorName ?? "unknown"} in class 0 (receiver OOP={receiverOOP}, receiverId has classId 0!)");
@@ -280,7 +280,7 @@ public partial class VirtualMachine
             // Try to execute the primitive
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
-                _contextManager, currentPC, this, this);
+                _contextManager, currentPC, this, this, _metadata);
 
             if (_primitiveSuccess)
             {
@@ -453,7 +453,7 @@ public partial class VirtualMachine
         Console.WriteLine();
 
         // Display temps (if in active context)
-        if (_contextManager.ActiveContext != SmalltalkOOP.Null)
+        if (_contextManager.ActiveContext != _heapManager.GetNil())
         {
             Console.WriteLine($"TEMPORARIES ({tempCount}):");
             for (int i = 0; i < tempCount; i++)
@@ -465,7 +465,7 @@ public partial class VirtualMachine
         }
 
         // Display stack
-        if (_contextManager.ActiveContext != SmalltalkOOP.Null)
+        if (_contextManager.ActiveContext != _heapManager.GetNil())
         {
             int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
             var stackpOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, stackpIndex);

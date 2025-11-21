@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Smalltalk80.Interpreter.Shared.Types</RootNamespace>
+    <AssemblyName>Smalltalk80.Interpreter.Shared.Types</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Description>Shared foundation types for Smalltalk-80 Interpreter (SmalltalkOOP, ObjectTableEntry, GCStatistics)</Description>
+    <Authors>Smalltalk-80 Project</Authors>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+</Project>

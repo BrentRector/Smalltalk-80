@@ -1,4 +1,5 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Core.VM.Interpreter;
 
@@ -12,13 +13,13 @@ internal record ExecutionState
     /// The starting context for this execution.
     /// Execution returns when we get back to this context.
     /// </summary>
-    public SmalltalkOOP InitialContext { get; init; } = SmalltalkOOP.Null;
+    public SmalltalkOOP InitialContext { get; init; } = default(SmalltalkOOP);
 
     /// <summary>
     /// The return value from execution.
     /// Set when execution completes normally or via NLR.
     /// </summary>
-    public SmalltalkOOP ReturnValue { get; init; } = SmalltalkOOP.Null;
+    public SmalltalkOOP ReturnValue { get; init; } = default(SmalltalkOOP);
 
     /// <summary>
     /// Signal that a context switch occurred and the trampoline should continue.
@@ -53,13 +54,13 @@ internal record NonLocalReturnState
     /// <summary>
     /// The value being returned via NLR.
     /// </summary>
-    public SmalltalkOOP Value { get; init; } = SmalltalkOOP.Null;
+    public SmalltalkOOP Value { get; init; } = default(SmalltalkOOP);
 
     /// <summary>
     /// The target context to unwind to.
     /// This is the home MethodContext of the block performing the return.
     /// </summary>
-    public SmalltalkOOP TargetContext { get; init; } = SmalltalkOOP.Null;
+    public SmalltalkOOP TargetContext { get; init; } = default(SmalltalkOOP);
 
     /// <summary>
     /// Default state: no NLR in progress.
@@ -120,7 +121,7 @@ internal readonly struct CallOutcome
 
     /// <summary>Normal completion with a return value.</summary>
     public static CallOutcome Normal(SmalltalkOOP value)
-        => new(CallOutcomeKind.Normal, value, SmalltalkOOP.Null, null);
+        => new(CallOutcomeKind.Normal, value, default(SmalltalkOOP), null);
 
     /// <summary>Non-local return to a target context.</summary>
     public static CallOutcome NonLocalReturn(SmalltalkOOP target, SmalltalkOOP value)
@@ -128,11 +129,11 @@ internal readonly struct CallOutcome
 
     /// <summary>VM exception during execution.</summary>
     public static CallOutcome VMError(Exception ex)
-        => new(CallOutcomeKind.VMException, SmalltalkOOP.Null, SmalltalkOOP.Null, ex);
+        => new(CallOutcomeKind.VMException, default(SmalltalkOOP), default(SmalltalkOOP), ex);
 
     /// <summary>Context switch occurred (e.g., block invocation).</summary>
     public static CallOutcome ContextSwitch()
-        => new(CallOutcomeKind.ContextSwitch, SmalltalkOOP.Null, SmalltalkOOP.Null, null);
+        => new(CallOutcomeKind.ContextSwitch, default(SmalltalkOOP), default(SmalltalkOOP), null);
 }
 
 /// <summary>

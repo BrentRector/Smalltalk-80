@@ -1,5 +1,5 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -38,7 +38,7 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Registers a well-known global object OOP.
-    /// Also updates SpecialObjectsArray.Instance for singleton values.
+    /// Used during cold start to track special objects (nil, true, false, etc).
     /// THROWS after Freeze() - only for cold start use.
     /// </summary>
     public static void Register(string name, SmalltalkOOP oop)
@@ -52,28 +52,21 @@ public static class GlobalRegistry
 
         _globals[name] = oop;
 
-        // Update well-known properties AND SpecialObjectsArray
+        // Update well-known properties
         switch (name)
         {
             case "nil":
                 NilOOP = oop;
-                SpecialObjectsArray.SetNil(oop);
                 break;
             case "true":
                 TrueOOP = oop;
-                SpecialObjectsArray.SetTrue(oop);
                 break;
             case "false":
                 FalseOOP = oop;
-                SpecialObjectsArray.SetFalse(oop);
                 break;
             case "SystemDictionary":
             case "Smalltalk":
                 SystemDictionaryOOP = oop;
-                SpecialObjectsArray.SetSmalltalk(oop);
-                break;
-            case "ProcessorScheduler":
-                SpecialObjectsArray.SetProcessorScheduler(oop);
                 break;
         }
     }
@@ -178,9 +171,10 @@ public static class GlobalRegistry
     {
         _globals.Clear();
         _objects.Clear();
-        NilOOP = SmalltalkOOP.Null;
-        TrueOOP = SmalltalkOOP.Null;
-        FalseOOP = SmalltalkOOP.Null;
-        SystemDictionaryOOP = SmalltalkOOP.Null;
+        NilOOP = default;
+        TrueOOP = default;
+        FalseOOP = default;
+        SystemDictionaryOOP = default;
+        _isFrozen = false;
     }
 }

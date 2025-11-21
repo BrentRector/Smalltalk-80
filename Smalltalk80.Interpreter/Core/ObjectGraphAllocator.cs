@@ -1,5 +1,5 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -560,7 +560,7 @@ public class ObjectGraphAllocator
         }
 
         var classOOP = _heapManager.GetSlot(objectOOP, 0);
-        if (classOOP == SmalltalkOOP.Null)
+        if (classOOP == _heapManager.GetNil())
         {
             return "NULL_CLASS";
         }
@@ -575,7 +575,7 @@ public class ObjectGraphAllocator
     /// </summary>
     public string GetSymbolName(SmalltalkOOP symbolOOP)
     {
-        if (symbolOOP == SmalltalkOOP.Null || symbolOOP.IsSmallInteger)
+        if (symbolOOP == _heapManager.GetNil() || symbolOOP.IsSmallInteger)
         {
             return "<invalid symbol>";
         }

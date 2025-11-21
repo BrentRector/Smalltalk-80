@@ -7,7 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Smalltalk80.Compiler;
 using Smalltalk80.Compiler.AST;
-using Smalltalk80.Core;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Compiler.CodeGen;
 

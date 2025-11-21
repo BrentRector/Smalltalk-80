@@ -1,6 +1,5 @@
-using Smalltalk80.Core;
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Core.VM.Views;
 
@@ -81,7 +80,7 @@ public readonly struct ClassView
     public string GetClassName()
     {
         var nameOOP = Name;
-        if (nameOOP == SpecialObjectsArray.Instance.Nil || nameOOP.IsSmallInteger)
+        if (nameOOP == _heap.GetNil() || nameOOP.IsSmallInteger)
             return "<anonymous>";
 
         int length = _heap.GetIndexedSize(nameOOP);
@@ -121,5 +120,5 @@ public readonly struct ClassView
     public ClassView GetSuperclassView() => new(Superclass, _heap);
 
     /// <summary>Checks if this is a valid class (not nil).</summary>
-    public bool IsValid => _oop != SpecialObjectsArray.Instance.Nil && !_oop.IsSmallInteger;
+    public bool IsValid => _oop != _heap.GetNil() && !_oop.IsSmallInteger;
 }

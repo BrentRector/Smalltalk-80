@@ -1,5 +1,5 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -70,7 +70,7 @@ public static class SmallIntegerArithmetic
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
-            return PrimitiveResult.FromBool(a < b);
+            return PrimitiveResult.FromBool(a < b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -85,7 +85,7 @@ public static class SmallIntegerArithmetic
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
-            return PrimitiveResult.FromBool(a > b);
+            return PrimitiveResult.FromBool(a > b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -100,7 +100,7 @@ public static class SmallIntegerArithmetic
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
-            return PrimitiveResult.FromBool(a <= b);
+            return PrimitiveResult.FromBool(a <= b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -115,7 +115,7 @@ public static class SmallIntegerArithmetic
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
-            return PrimitiveResult.FromBool(a >= b);
+            return PrimitiveResult.FromBool(a >= b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -130,7 +130,7 @@ public static class SmallIntegerArithmetic
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
-            return PrimitiveResult.FromBool(a == b);
+            return PrimitiveResult.FromBool(a == b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -145,7 +145,7 @@ public static class SmallIntegerArithmetic
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
-            return PrimitiveResult.FromBool(a != b);
+            return PrimitiveResult.FromBool(a != b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 

@@ -1,6 +1,6 @@
 using Smalltalk80.Core.Bytecodes;
-using Smalltalk80.Interpreter.Core.Memory;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 
 namespace Smalltalk80.Interpreter.Core.VM;
@@ -9,21 +9,30 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// Bytecode execution handlers for the Smalltalk-80 VM.
 /// Extracted from VirtualMachine.Bytecodes.cs for cleaner architecture.
 /// </summary>
-/// <param name="heapManager">The heap manager for memory operations.</param>
-/// <param name="context">The bytecode context for accessing execution state.</param>
-/// <param name="runtimeHeapAccess">Runtime heap access for class lookups.</param>
-/// <param name="metadata">VM metadata containing class OOPs.</param>
-internal class BytecodeInterpreter(
-    ISmalltalkHeapManager heapManager,
-    IBytecodeContext context,
-    RuntimeHeapAccessor runtimeHeapAccess,
-    VMMetadata metadata) : IBytecodeInterpreter
+internal class BytecodeInterpreter : IBytecodeInterpreter
 {
+    private readonly ISmalltalkHeapManager heapManager;
+    private readonly IBytecodeContext context;
+    private readonly RuntimeHeapAccessor runtimeHeapAccess;
+    private readonly VMMetadata metadata;
+
     // Cached selector OOPs for arithmetic bytecodes (0xB0-0xBF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _arithmeticSelectorOOPs;
 
     // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _specialSelectorOOPs;
+
+    public BytecodeInterpreter(
+        ISmalltalkHeapManager heapManager,
+        IBytecodeContext context,
+        RuntimeHeapAccessor runtimeHeapAccess,
+        VMMetadata metadata)
+    {
+        this.heapManager = heapManager;
+        this.context = context;
+        this.runtimeHeapAccess = runtimeHeapAccess;
+        this.metadata = metadata;
+    }
 
     /// <inheritdoc />
     public bool VerboseDebug { get; set; }
@@ -83,7 +92,7 @@ internal class BytecodeInterpreter(
             if (VerboseDebug)
             {
                 string valueDesc = valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" :
-                                   valueOOP == SpecialObjectsArray.Instance.Nil ? "nil" :
+                                   valueOOP == metadata.KnownObjects.Nil ? "nil" :
                                    $"{heapManager.GetClassName(valueOOP)} OOP({valueOOP})";
                 Console.WriteLine($"[PUSH_TEMP] Retrieved value: {valueDesc}");
                 context.DumpStack("After PUSH_TEMP");
@@ -125,9 +134,9 @@ internal class BytecodeInterpreter(
             int index = BytecodeUtil.PushLiteralVarIndex(bytecode);
             var literalOOP = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
-            if (literalOOP == SpecialObjectsArray.Instance.Nil)
+            if (literalOOP == metadata.KnownObjects.Nil)
             {
-                context.Push(SpecialObjectsArray.Instance.Nil);
+                context.Push(metadata.KnownObjects.Nil);
                 return true;
             }
 
@@ -265,15 +274,15 @@ internal class BytecodeInterpreter(
                 return true;
 
             case Bytecode.PUSH_TRUE:
-                context.Push(SpecialObjectsArray.Instance.True);
+                context.Push(metadata.KnownObjects.True);
                 return true;
 
             case Bytecode.PUSH_FALSE:
-                context.Push(SpecialObjectsArray.Instance.False);
+                context.Push(metadata.KnownObjects.False);
                 return true;
 
             case Bytecode.PUSH_NIL:
-                context.Push(SpecialObjectsArray.Instance.Nil);
+                context.Push(metadata.KnownObjects.Nil);
                 return true;
 
             case Bytecode.PUSH_MINUS_ONE:
@@ -297,15 +306,15 @@ internal class BytecodeInterpreter(
                 return false; // Return from method
 
             case Bytecode.RETURN_TRUE:
-                context.Push(SpecialObjectsArray.Instance.True);
+                context.Push(metadata.KnownObjects.True);
                 return false;
 
             case Bytecode.RETURN_FALSE:
-                context.Push(SpecialObjectsArray.Instance.False);
+                context.Push(metadata.KnownObjects.False);
                 return false;
 
             case Bytecode.RETURN_NIL:
-                context.Push(SpecialObjectsArray.Instance.Nil);
+                context.Push(metadata.KnownObjects.Nil);
                 return false;
 
             case Bytecode.RETURN_TOP:
@@ -687,10 +696,10 @@ internal class BytecodeInterpreter(
 
                             // Look up pool dictionary in Smalltalk SystemDictionary
                             // NOTE: LookupGlobalByName returns the VALUE, not the Association
-                            var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+                            var systemDictOOP = metadata.KnownObjects.Smalltalk;
                             var poolDictOOP = runtimeHeapAccess.LookupGlobalByName(systemDictOOP, poolDictName);
 
-                            if (poolDictOOP == SpecialObjectsArray.Instance.Nil)
+                            if (poolDictOOP == metadata.KnownObjects.Nil)
                             {
                                 throw new InvalidOperationException($"Pool dictionary not found: {poolDictName}");
                             }
@@ -707,7 +716,7 @@ internal class BytecodeInterpreter(
                             // NOTE: LookupGlobalByName returns the VALUE, not the Association
                             var valueOOP = runtimeHeapAccess.LookupGlobalByName(poolDictOOP, varName);
 
-                            if (valueOOP == SpecialObjectsArray.Instance.Nil)
+                            if (valueOOP == metadata.KnownObjects.Nil)
                             {
                                 throw new InvalidOperationException($"Variable not found in pool dictionary {poolDictName}: {varName}");
                             }
@@ -904,7 +913,7 @@ internal class BytecodeInterpreter(
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = context.Pop();
 
-                    if (valueOOP == SpecialObjectsArray.Instance.True)
+                    if (valueOOP == metadata.KnownObjects.True)
                     {
                         heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
@@ -921,7 +930,7 @@ internal class BytecodeInterpreter(
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = context.Pop();
 
-                    if (valueOOP == SpecialObjectsArray.Instance.False)
+                    if (valueOOP == metadata.KnownObjects.False)
                     {
                         heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
@@ -948,7 +957,7 @@ internal class BytecodeInterpreter(
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = context.Pop();
 
-                    if (valueOOP == SpecialObjectsArray.Instance.True)
+                    if (valueOOP == metadata.KnownObjects.True)
                     {
                         heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
@@ -965,7 +974,7 @@ internal class BytecodeInterpreter(
                     int offset = (offsetHigh << 8) | offsetLow;
                     var valueOOP = context.Pop();
 
-                    if (valueOOP == SpecialObjectsArray.Instance.False)
+                    if (valueOOP == metadata.KnownObjects.False)
                     {
                         heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
                     }
@@ -1041,7 +1050,7 @@ internal class BytecodeInterpreter(
             };
 
             var resultOOP = ExecuteIntegerArithmetic(receiverOOP, selector, argOOP);
-            if (resultOOP != SpecialObjectsArray.Instance.Nil ||
+            if (resultOOP != metadata.KnownObjects.Nil ||
                 selector is "=" or "~=" or "<" or ">" or "<=" or ">=")
             {
                 context.Push(resultOOP);
@@ -1140,7 +1149,7 @@ internal class BytecodeInterpreter(
         if (selectorIndex == 6) // ==
         {
             bool isIdentical = receiverOOP == args[0];
-            context.Push(isIdentical ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False);
+            context.Push(isIdentical ? metadata.KnownObjects.True : metadata.KnownObjects.False);
             return true;
         }
 
@@ -1174,11 +1183,11 @@ internal class BytecodeInterpreter(
     /// <param name="selector">The arithmetic selector name.</param>
     /// <param name="argOOP">The argument SmallInteger OOP.</param>
     /// <returns>The result OOP, or nil if the operation failed.</returns>
-    private static SmalltalkOOP ExecuteIntegerArithmetic(SmalltalkOOP receiverOOP, string selector, SmalltalkOOP argOOP)
+    private SmalltalkOOP ExecuteIntegerArithmetic(SmalltalkOOP receiverOOP, string selector, SmalltalkOOP argOOP)
     {
         if (!receiverOOP.IsSmallInteger || !argOOP.IsSmallInteger)
         {
-            return SpecialObjectsArray.Instance.Nil;
+            return metadata.KnownObjects.Nil;
         }
 
         int a = receiverOOP.AsSmallInteger();
@@ -1191,24 +1200,24 @@ internal class BytecodeInterpreter(
                 "+" => SmalltalkOOP.FromSmallInteger(a + b),
                 "-" => SmalltalkOOP.FromSmallInteger(a - b),
                 "*" => SmalltalkOOP.FromSmallInteger(a * b),
-                "/" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : SpecialObjectsArray.Instance.Nil,
-                "\\" => b != 0 ? SmalltalkOOP.FromSmallInteger(a % b) : SpecialObjectsArray.Instance.Nil,
-                "//" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : SpecialObjectsArray.Instance.Nil,
-                "<" => a < b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
-                ">" => a > b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
-                "<=" => a <= b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
-                ">=" => a >= b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
-                "=" => a == b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
-                "~=" => a != b ? SpecialObjectsArray.Instance.True : SpecialObjectsArray.Instance.False,
+                "/" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : metadata.KnownObjects.Nil,
+                "\\" => b != 0 ? SmalltalkOOP.FromSmallInteger(a % b) : metadata.KnownObjects.Nil,
+                "//" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : metadata.KnownObjects.Nil,
+                "<" => a < b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
+                ">" => a > b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
+                "<=" => a <= b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
+                ">=" => a >= b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
+                "=" => a == b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
+                "~=" => a != b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
                 "bitAnd:" => SmalltalkOOP.FromSmallInteger(a & b),
                 "bitOr:" => SmalltalkOOP.FromSmallInteger(a | b),
                 "bitShift:" => b >= 0 ? SmalltalkOOP.FromSmallInteger(a << b) : SmalltalkOOP.FromSmallInteger(a >> (-b)),
-                _ => SpecialObjectsArray.Instance.Nil
+                _ => metadata.KnownObjects.Nil
             };
         }
         catch
         {
-            return SpecialObjectsArray.Instance.Nil;
+            return metadata.KnownObjects.Nil;
         }
     }
 }

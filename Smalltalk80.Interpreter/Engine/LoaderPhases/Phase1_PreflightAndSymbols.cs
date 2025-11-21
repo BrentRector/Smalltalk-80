@@ -9,7 +9,8 @@ using System.Linq;
 using System.Text;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 
@@ -90,8 +91,8 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
             ValidateMetaclassCircle();
             _report.AddValidation("Phase 1", "Metaclass circle valid", true);
 
-            ValidateSpecialObjectsArrayDefinition();
-            _report.AddValidation("Phase 1", "SpecialObjectsArray definition valid", true);
+            ValidateWellKnownObjectsDefinition();
+            _report.AddValidation("Phase 1", "Well-known objects definition valid", true);
 
             ValidatePatches();
             _report.AddValidation("Phase 1", "Patch definitions valid", true);
@@ -216,7 +217,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
             }
         }
 
-        private void ValidateSpecialObjectsArrayDefinition()
+        private void ValidateWellKnownObjectsDefinition()
         {
             var requiredClasses = new[] { "class:UndefinedObject", "class:True", "class:False" };
             var classLocalIds = _bundle.Classes.Select(c => c.LocalId).ToHashSet();
@@ -224,7 +225,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
             foreach (var required in requiredClasses)
             {
                 if (!classLocalIds.Contains(required))
-                    throw new InvalidOperationException($"Required class {required} for SpecialObjectsArray not found");
+                    throw new InvalidOperationException($"Required class {required} for well-known objects not found");
             }
         }
 

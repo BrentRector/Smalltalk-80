@@ -1,6 +1,7 @@
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Schema;
 
 namespace Smalltalk80.Interpreter.Engine.Services;
@@ -41,14 +42,14 @@ public class FieldValueService
     {
         return value.Type switch
         {
-            "nil" => SpecialObjectsArray.Instance.Nil,
-            "true" => SpecialObjectsArray.Instance.True,
-            "false" => SpecialObjectsArray.Instance.False,
+            "nil" => GlobalRegistry.Get("nil"),
+            "true" => GlobalRegistry.Get("true"),
+            "false" => GlobalRegistry.Get("false"),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(value.Value!)),
             "symbolRef" => _symbolService.GetSymbolOOPByIndex(value.Index!.Value),
             "objectRef" => localIdToObjectId.TryGetValue(value.LocalId!, out SmalltalkOOP objOOP)
                 ? objOOP
-                : SpecialObjectsArray.Instance.Nil,
+                : GlobalRegistry.Get("nil"),
             _ => null // Requires allocation - return null to signal caller should handle
         };
     }

@@ -1,5 +1,5 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM.Graphics;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -13,6 +13,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 public class HeadlessPlatformBridge : IPlatformBridge
 {
     private readonly ISmalltalkHeapManager _heapManager;
+    private readonly VMMetadata metadata;
     private readonly Func<string, SmalltalkOOP> _getClassOOP;
     private readonly Func<SmalltalkOOP, string, string, SmalltalkOOP> _getFieldValue;
     private readonly Func<SmalltalkOOP, Memory<byte>> _getByteArray;
@@ -23,11 +24,13 @@ public class HeadlessPlatformBridge : IPlatformBridge
 
     public HeadlessPlatformBridge(
         ISmalltalkHeapManager heapManager,
+        VMMetadata metadata,
         Func<string, SmalltalkOOP> getClassOOP,
         Func<SmalltalkOOP, string, string, SmalltalkOOP> getFieldValue,
         Func<SmalltalkOOP, Memory<byte>> getByteArray)
     {
         _heapManager = heapManager;
+        this.metadata = metadata;
         _getClassOOP = getClassOOP;
         _getFieldValue = getFieldValue;
         _getByteArray = getByteArray;
@@ -40,7 +43,7 @@ public class HeadlessPlatformBridge : IPlatformBridge
     public bool PerformBitBlt(SmalltalkOOP bitBltOOP)
     {
         // Validate input
-        if (bitBltOOP.IsSmallInteger || bitBltOOP == SpecialObjectsArray.Instance.Nil)
+        if (bitBltOOP.IsSmallInteger || bitBltOOP == metadata.KnownObjects.Nil)
             return false;
 
         // Extract BitBlt instance variables (Blue Book page 346):
@@ -110,7 +113,7 @@ public class HeadlessPlatformBridge : IPlatformBridge
     private (Memory<byte> bits, int width, int height) ExtractFormData(SmalltalkOOP formOOP)
     {
         // Check for nil or SmallInteger (invalid Form)
-        if (formOOP == SpecialObjectsArray.Instance.Nil || formOOP.IsSmallInteger)
+        if (formOOP == metadata.KnownObjects.Nil || formOOP.IsSmallInteger)
             return (Memory<byte>.Empty, 0, 0);
 
         // Get Form instance variables
@@ -190,12 +193,12 @@ public class HeadlessPlatformBridge : IPlatformBridge
     {
         // Return nil if clipboard is empty
         if (string.IsNullOrEmpty(_clipboardText))
-            return SpecialObjectsArray.Instance.Nil;
+            return metadata.KnownObjects.Nil;
 
         // Get String class OOP from heap
         SmalltalkOOP stringClassOOP = _getClassOOP("class:String");
-        if (stringClassOOP == SpecialObjectsArray.Instance.Nil)
-            return SpecialObjectsArray.Instance.Nil;
+        if (stringClassOOP == metadata.KnownObjects.Nil)
+            return metadata.KnownObjects.Nil;
 
         // Allocate String object with proper class
         byte[] bytes = System.Text.Encoding.Latin1.GetBytes(_clipboardText);
@@ -213,7 +216,7 @@ public class HeadlessPlatformBridge : IPlatformBridge
     public bool WriteClipboardFromStringOOP(SmalltalkOOP stringOOP)
     {
         // Read String from heap and store in simulated clipboard
-        if (stringOOP.IsSmallInteger || stringOOP == SpecialObjectsArray.Instance.Nil)
+        if (stringOOP.IsSmallInteger || stringOOP == metadata.KnownObjects.Nil)
             return false;
 
         // Read string bytes from heap

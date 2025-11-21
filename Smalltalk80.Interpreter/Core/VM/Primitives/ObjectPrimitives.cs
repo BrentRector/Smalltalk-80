@@ -1,6 +1,5 @@
-using Smalltalk80.Core;
-using Smalltalk80.Interpreter.Core.Memory;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -53,7 +52,7 @@ public static class SimpleObjectPrimitives
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
 
             bool identical = context.Receiver == context.Arguments[0];
-            return PrimitiveResult.FromBool(identical);
+            return PrimitiveResult.FromBool(identical, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -69,7 +68,7 @@ public static class SimpleObjectPrimitives
             {
                 // SmallInteger class - need to look it up
                 classOOP = context.RuntimeHeapAccess?.GetClass("SmallInteger")
-                    ?? SpecialObjectsArray.Instance.Nil;
+                    ?? context.HeapManager.GetNil();
             }
             else
             {
@@ -171,7 +170,7 @@ public static class SimpleObjectPrimitives
 
             // Always read count from class format - this is the authoritative source
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
-            if (classOOP.IsSmallInteger || classOOP == SpecialObjectsArray.Instance.Nil)
+            if (classOOP.IsSmallInteger || classOOP == context.HeapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             // Read format from class using GetSlot to bypass bounds check
@@ -207,7 +206,7 @@ public static class SimpleObjectPrimitives
 
             // Always read count from class format - this is the authoritative source
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
-            if (classOOP.IsSmallInteger || classOOP == SpecialObjectsArray.Instance.Nil)
+            if (classOOP.IsSmallInteger || classOOP == context.HeapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             // Read format from class using GetSlot to bypass bounds check
@@ -248,7 +247,7 @@ public static class SimpleObjectPrimitives
 
             // Get Character from CharacterTable (Character class pool variable)
             var characterOOP = GetCharacterForAscii(context, byteValue);
-            if (characterOOP == SpecialObjectsArray.Instance.Nil)
+            if (characterOOP == context.HeapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(characterOOP);
@@ -258,24 +257,24 @@ public static class SimpleObjectPrimitives
         private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
         {
             if (context.RuntimeHeapAccess == null)
-                return SpecialObjectsArray.Instance.Nil;
+                return context.HeapManager.GetNil();
 
             // Get Character class from SystemDictionary
             var characterClassOOP = context.RuntimeHeapAccess.GetClass("Character");
-            if (characterClassOOP == SpecialObjectsArray.Instance.Nil)
-                return SpecialObjectsArray.Instance.Nil;
+            if (characterClassOOP == context.HeapManager.GetNil())
+                return context.HeapManager.GetNil();
 
             // Get classPool from Character class (instance variable index 7)
             var classPoolOOP = context.HeapManager.GetInstanceVariable(characterClassOOP, 7);
-            if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
-                return SpecialObjectsArray.Instance.Nil;
+            if (classPoolOOP == context.HeapManager.GetNil())
+                return context.HeapManager.GetNil();
 
             // Search for CharacterTable in class pool
             int dictSize = context.HeapManager.GetIndexedSize(classPoolOOP);
             for (int i = 0; i < dictSize; i++)
             {
                 var entryOOP = context.HeapManager.GetIndexedOOP(classPoolOOP, i);
-                if (entryOOP == SpecialObjectsArray.Instance.Nil)
+                if (entryOOP == context.HeapManager.GetNil())
                     continue;
 
                 var keyOOP = context.HeapManager.GetInstanceVariable(entryOOP, 0);
@@ -293,7 +292,7 @@ public static class SimpleObjectPrimitives
                 }
             }
 
-            return SpecialObjectsArray.Instance.Nil;
+            return context.HeapManager.GetNil();
         }
     }
 
@@ -446,7 +445,7 @@ public static class SimpleObjectPrimitives
             int position = positionOOP.AsSmallInteger();
             int readLimit = readLimitOOP.AsSmallInteger();
 
-            return PrimitiveResult.FromBool(position > readLimit);
+            return PrimitiveResult.FromBool(position > readLimit, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -550,7 +549,7 @@ public static class SimpleObjectPrimitives
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
 
             var instance = context.HeapManager.FindInstanceOf(context.Receiver);
-            if (instance == SpecialObjectsArray.Instance.Nil)
+            if (instance == context.HeapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(instance);
@@ -568,7 +567,7 @@ public static class SimpleObjectPrimitives
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
             var nextInstance = context.HeapManager.FindNextInstanceOf(classOOP, context.Receiver);
 
-            if (nextInstance == SpecialObjectsArray.Instance.Nil)
+            if (nextInstance == context.HeapManager.GetNil())
                 return PrimitiveResult.Fail();
 
             return PrimitiveResult.Ok(nextInstance);
@@ -604,7 +603,7 @@ public static class SimpleObjectPrimitives
                 context.HeapManager,
                 compiledMethodClassOOP.Value,
                 byteArrayClassOOP.Value,
-                SpecialObjectsArray.Instance.Nil,
+                context.HeapManager.GetNil(),
                 headerWord,
                 Array.Empty<SmalltalkOOP>(),
                 bytecodes);

@@ -1,5 +1,5 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 
@@ -14,7 +14,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Diagnoses Float class variables by comparing expected vs actual values.
     /// </summary>
-    public static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    public static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -53,7 +53,7 @@ public static class DiagnosticInspector
             // Get class variables from SystemDictionary associations
             foreach (var varName in expectedValues.Keys)
             {
-                var actual = GetClassVariableValue(heapManager, bundle, varName);
+                var actual = GetClassVariableValue(heapManager, bundle, varName, metadata);
                 var expected = expectedValues[varName];
 
                 Console.WriteLine($"{varName}:");
@@ -71,7 +71,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Gets the value of a Float class variable from the classPool.
     /// </summary>
-    public static string GetClassVariableValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, string varName)
+    public static string GetClassVariableValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, string varName, VMMetadata metadata)
     {
         try
         {
@@ -91,7 +91,7 @@ public static class DiagnosticInspector
             // Get the classPool instance variable (Dictionary containing class variables)
             var classPoolOOP = heapManager.GetInstanceVariable(floatClassOOP, 7);
 
-            if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+            if (classPoolOOP == metadata.KnownObjects.Nil)
             {
                 return "classPool is nil";
             }
@@ -114,7 +114,7 @@ public static class DiagnosticInspector
             for (int i = 0; i < size; i++)
             {
                 var assocOOP = heapManager.GetIndexedOOP(classPoolOOP, i);
-                if (assocOOP == SpecialObjectsArray.Instance.Nil)
+                if (assocOOP == metadata.KnownObjects.Nil)
                     continue;
 
                 // Association has key at slot 1, value at slot 2
@@ -124,7 +124,7 @@ public static class DiagnosticInspector
                 if (keyName == varName)
                 {
                     var valueOOP = heapManager.GetSlot(assocOOP, 2);
-                    return FormatValue(heapManager, bundle, valueOOP);
+                    return FormatValue(heapManager, bundle, valueOOP, metadata);
                 }
             }
 
@@ -164,7 +164,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Formats an OOP value for display, handling Floats, Arrays, and other types.
     /// </summary>
-    public static string FormatValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, SmalltalkOOP valueOOP)
+    public static string FormatValue(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, SmalltalkOOP valueOOP, VMMetadata metadata)
     {
         if (valueOOP.IsSmallInteger)
             return $"{valueOOP.AsSmallInteger()}";
@@ -215,7 +215,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Diagnoses Cursor class variables.
     /// </summary>
-    public static void DiagnoseCursorClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    public static void DiagnoseCursorClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -244,7 +244,7 @@ public static class DiagnosticInspector
             // Get classPool instance variable (Dictionary containing class variables)
             var classPoolOOP = heapManager.GetInstanceVariable(cursorClassOOP, 7);
 
-            if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+            if (classPoolOOP == metadata.KnownObjects.Nil)
             {
                 Console.WriteLine("  classPool is nil - no class variables created yet");
                 return;
@@ -275,7 +275,7 @@ public static class DiagnosticInspector
             for (int i = 0; i < size; i++)
             {
                 var assocOOP = heapManager.GetIndexedOOP(classPoolOOP, i);
-                if (assocOOP == SpecialObjectsArray.Instance.Nil)
+                if (assocOOP == metadata.KnownObjects.Nil)
                     continue;
 
                 // Association has key at slot 1, value at slot 2
@@ -310,13 +310,13 @@ public static class DiagnosticInspector
     /// <summary>
     /// Inspects ClassDescription.instanceVariables for several classes.
     /// </summary>
-    public static void InspectClassDescriptionInstanceVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    public static void InspectClassDescriptionInstanceVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
             // Test classes: Array, Point, Process (various inheritance depths)
             string[] testClasses = { "Array", "Point", "Process", "Dictionary" };
-            var nilOOP = SpecialObjectsArray.Instance.Nil;
+            var nilOOP = metadata.KnownObjects.Nil;
 
             foreach (var className in testClasses)
             {
@@ -458,11 +458,11 @@ public static class DiagnosticInspector
     /// <summary>
     /// Tests RuntimeHeapAccessor.BuildFieldMap() to verify it can read instance variable names.
     /// </summary>
-    public static void TestBuildFieldMap(ISmalltalkHeapManager heapManager)
+    public static void TestBuildFieldMap(ISmalltalkHeapManager heapManager, VMMetadata metadata)
     {
         try
         {
-            var runtimeHeapAccess = new RuntimeHeapAccessor(heapManager);
+            var runtimeHeapAccess = new RuntimeHeapAccessor(heapManager, metadata);
             Console.WriteLine("Building field map from heap...");
 
             var startTime = System.Diagnostics.Stopwatch.StartNew();
@@ -511,7 +511,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Inspects the File class>>initialize method's literal frame.
     /// </summary>
-    public static void InspectFileInitializeLiterals(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    public static void InspectFileInitializeLiterals(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -537,8 +537,8 @@ public static class DiagnosticInspector
             Console.WriteLine($"  Found at index {fileInitIndex}");
 
             // Get the CompiledMethod OOP from the InitExpressionMethods array
-            var initArrayOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
-            if (initArrayOOP == SpecialObjectsArray.Instance.Nil)
+            var initArrayOOP = metadata.InitExpressionMethods;
+            if (initArrayOOP == metadata.KnownObjects.Nil)
             {
                 Console.WriteLine("  InitExpressionMethods array is nil");
                 return;
@@ -573,17 +573,17 @@ public static class DiagnosticInspector
                     }
 
                     // Check special values
-                    if (literalOOP == SpecialObjectsArray.Instance.Nil)
+                    if (literalOOP == metadata.KnownObjects.Nil)
                     {
                         Console.WriteLine($"        nil");
                         continue;
                     }
-                    if (literalOOP == SpecialObjectsArray.Instance.True)
+                    if (literalOOP == metadata.KnownObjects.True)
                     {
                         Console.WriteLine($"        true");
                         continue;
                     }
-                    if (literalOOP == SpecialObjectsArray.Instance.False)
+                    if (literalOOP == metadata.KnownObjects.False)
                     {
                         Console.WriteLine($"        false");
                         continue;
@@ -610,7 +610,7 @@ public static class DiagnosticInspector
                             Console.WriteLine($"          Field[1] (value?): {valueOOP}");
 
                             // Try to read key as Symbol
-                            if (!keyOOP.IsSmallInteger && keyOOP != SpecialObjectsArray.Instance.Nil)
+                            if (!keyOOP.IsSmallInteger && keyOOP != metadata.KnownObjects.Nil)
                             {
                                 try
                                 {
@@ -638,7 +638,7 @@ public static class DiagnosticInspector
                             {
                                 Console.WriteLine($"          Value is SmallInteger: {valueOOP.AsSmallInteger()}");
                             }
-                            else if (valueOOP == SpecialObjectsArray.Instance.Nil)
+                            else if (valueOOP == metadata.KnownObjects.Nil)
                             {
                                 Console.WriteLine($"          Value is nil");
                             }

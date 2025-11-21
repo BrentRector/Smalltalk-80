@@ -1,5 +1,5 @@
-using Smalltalk80.Interpreter.Core.Memory;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.HeapManager;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -183,7 +183,7 @@ public partial class VirtualMachine
                     VMConstants.BLOCKCONTEXT_HOME_INDEX
                 );
 
-                if (contextOOP == SpecialObjectsArray.Instance.Nil)
+                if (contextOOP == _metadata.KnownObjects.Nil)
                 {
                     throw new InvalidOperationException("Home chain broken - no MethodContext found");
                 }

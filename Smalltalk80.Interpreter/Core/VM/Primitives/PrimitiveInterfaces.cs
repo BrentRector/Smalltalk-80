@@ -1,5 +1,5 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -25,12 +25,12 @@ public readonly struct PrimitiveResult
     /// <summary>Creates a successful result with the given value.</summary>
     public static PrimitiveResult Ok(SmalltalkOOP value) => new(true, value);
 
-    /// <summary>Creates a failed result (value will be nil).</summary>
-    public static PrimitiveResult Fail() => new(false, SpecialObjectsArray.Instance.Nil);
+    /// <summary>Creates a failed result (value will be default/nil).</summary>
+    public static PrimitiveResult Fail() => new(false, default(SmalltalkOOP));
 
     /// <summary>Creates a result from a boolean condition.</summary>
-    public static PrimitiveResult FromBool(bool condition) =>
-        condition ? Ok(SpecialObjectsArray.Instance.True) : Ok(SpecialObjectsArray.Instance.False);
+    public static PrimitiveResult FromBool(bool condition, SmalltalkOOP trueValue, SmalltalkOOP falseValue) =>
+        condition ? Ok(trueValue) : Ok(falseValue);
 }
 
 /// <summary>
@@ -73,6 +73,9 @@ public readonly struct PrimitiveExecutionContext
     /// <summary>Gets the message sender for perform primitives.</summary>
     public IPrimitiveMessageSender? MessageSender { get; }
 
+    /// <summary>Gets the VM metadata for accessing special objects and field indices.</summary>
+    public VMMetadata? Metadata { get; }
+
     /// <summary>
     /// Creates a new primitive execution context.
     /// </summary>
@@ -87,7 +90,8 @@ public readonly struct PrimitiveExecutionContext
         RuntimeHeapAccessor? runtimeHeapAccess = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
-        IPrimitiveMessageSender? messageSender = null)
+        IPrimitiveMessageSender? messageSender = null,
+        VMMetadata? metadata = null)
     {
         Receiver = receiver;
         Arguments = arguments;
@@ -100,29 +104,46 @@ public readonly struct PrimitiveExecutionContext
         InstructionPointer = instructionPointer;
         CacheManager = cacheManager;
         MessageSender = messageSender;
+        Metadata = metadata;
     }
 
     /// <summary>
-    /// Gets a field value from an object using the layout resolver.
+    /// Gets a field value from an object by querying the runtime heap for field layout.
+    /// The Smalltalk heap is the authoritative source of class structure at runtime.
     /// </summary>
     public SmalltalkOOP GetFieldValue(SmalltalkOOP oop, string className, string fieldName)
     {
-        if (LayoutResolver == null)
-            throw new InvalidOperationException("LayoutResolver not available");
+        if (RuntimeHeapAccess == null)
+            throw new InvalidOperationException("RuntimeHeapAccess not available");
 
-        int fieldIndex = LayoutResolver.GetFieldIndex(className, fieldName);
+        // Get the class OOP from the heap
+        var classOOP = HeapManager.GetClassOOP(oop);
+
+        // Query the heap for the field index
+        int fieldIndex = RuntimeHeapAccess.GetFieldIndex(classOOP, fieldName);
+        if (fieldIndex < 0)
+            throw new InvalidOperationException($"Field '{fieldName}' not found in class '{className}'");
+
         return HeapManager.GetInstanceVariable(oop, fieldIndex);
     }
 
     /// <summary>
-    /// Sets a field value in an object using the layout resolver.
+    /// Sets a field value in an object by querying the runtime heap for field layout.
+    /// The Smalltalk heap is the authoritative source of class structure at runtime.
     /// </summary>
     public void SetFieldValue(SmalltalkOOP oop, string className, string fieldName, SmalltalkOOP value)
     {
-        if (LayoutResolver == null)
-            throw new InvalidOperationException("LayoutResolver not available");
+        if (RuntimeHeapAccess == null)
+            throw new InvalidOperationException("RuntimeHeapAccess not available");
 
-        int fieldIndex = LayoutResolver.GetFieldIndex(className, fieldName);
+        // Get the class OOP from the heap
+        var classOOP = HeapManager.GetClassOOP(oop);
+
+        // Query the heap for the field index
+        int fieldIndex = RuntimeHeapAccess.GetFieldIndex(classOOP, fieldName);
+        if (fieldIndex < 0)
+            throw new InvalidOperationException($"Field '{fieldName}' not found in class '{className}'");
+
         HeapManager.SetInstanceVariable(oop, fieldIndex, value);
     }
 
@@ -175,7 +196,12 @@ public readonly struct PrimitiveExecutionContext
     {
         if (objectOOP.IsSmallInteger)
             return "class:SmallInteger";
-        return "class:" + HeapManager.GetClassName(objectOOP);
+
+        var className = HeapManager.GetClassName(objectOOP);
+        if (className == null)
+            return null;
+
+        return "class:" + className;
     }
 
     /// <summary>
@@ -198,7 +224,7 @@ public readonly struct PrimitiveExecutionContext
             return RuntimeHeapAccess.GetClass(name);
 
         // For globals, look up in SystemDictionary
-        var systemDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var systemDictOOP = Metadata!.KnownObjects.Smalltalk;
         return RuntimeHeapAccess.LookupGlobalByName(systemDictOOP, name);
     }
 }
@@ -290,7 +316,8 @@ public interface IPrimitiveRegistry
         IContextManager? contextManager = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
-        IPrimitiveMessageSender? messageSender = null);
+        IPrimitiveMessageSender? messageSender = null,
+        VMMetadata? metadata = null);
 
     /// <summary>
     /// Checks if a primitive is registered.

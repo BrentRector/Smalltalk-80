@@ -1,6 +1,7 @@
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 
@@ -122,7 +123,7 @@ public class DictionaryService
     {
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
-        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+        SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
 
         // Get the key symbol from the Association (slot 0)
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
@@ -178,7 +179,7 @@ public class DictionaryService
     public void InstallInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string name)
     {
         int dictSize = _allocator.GetIndexedSize(dictionaryOOP);
-        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+        SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
 
         // Get the key symbol from the Association (slot 0)
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);

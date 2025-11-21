@@ -1,7 +1,7 @@
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
@@ -168,17 +168,31 @@ public class Phase3_ObjectAllocation : IPhase
     /// </summary>
     private void AllocateSentinelObjects()
     {
+        // Get the initial nil OOP that was allocated during heap manager construction
+        var initialNilOOP = _heapManager.GetNil();
+
         // Create minimal dependency singletons: nil, true, false
-        var nilOOP = _allocator.AllocateFixedObject("UndefinedObject");
+        // Allocate the REAL UndefinedObject instance with proper class reference
+        var realNilOOP = _allocator.AllocateFixedObject("UndefinedObject");
         var trueOOP = _allocator.AllocateFixedObject("True");
         var falseOOP = _allocator.AllocateFixedObject("False");
 
-        GlobalRegistry.Register("nil", nilOOP);
+        // CRITICAL: Swap initial nil with real UndefinedObject using Become operation
+        // This ensures all existing references to initial nil now point to the real UndefinedObject
+        // After this operation:
+        // - initialNilOOP now contains the real UndefinedObject data
+        // - realNilOOP now contains the placeholder data (which we don't care about)
+        // - All objects allocated in Phase1/2 that reference initialNilOOP now see the real nil
+        var heap = (ISmalltalkHeap)_heapManager;
+        heap.Become.BecomeTwoWay(initialNilOOP, realNilOOP);
+
+        // Register the initial nil OOP (which now points to real UndefinedObject after Become)
+        GlobalRegistry.Register("nil", initialNilOOP);
         GlobalRegistry.Register("true", trueOOP);
         GlobalRegistry.Register("false", falseOOP);
 
         // Initialize SystemDictionary slots with nil (created in Phase 2 but couldn't be initialized until now)
-        InitializeSystemDictionaryWithNil(nilOOP);
+        InitializeSystemDictionaryWithNil(initialNilOOP);
 
         // Create ProcessorScheduler singleton
         var processorSchedulerOOP = _allocator.AllocateFixedObject("ProcessorScheduler");
@@ -641,7 +655,7 @@ public class Phase3_ObjectAllocation : IPhase
                 var currentClassOOP = _allocator.GetSlot(objectOOP, 0);
 
                 // Skip if class pointer already set to a non-zero/non-nil value
-                if (currentClassOOP != default(SmalltalkOOP) && currentClassOOP != SpecialObjectsArray.Instance.Nil)
+                if (currentClassOOP != default(SmalltalkOOP) && currentClassOOP != GlobalRegistry.Get("nil"))
                     continue;
 
                 // Check object format to determine class
@@ -697,7 +711,7 @@ public class Phase3_ObjectAllocation : IPhase
     private void InitializeUnsetInstanceVariables()
     {
         int instanceVariablesInitialized = 0;
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
 
         // Step 1: Initialize class object instance variables
         foreach (var cls in _bundle.Classes)
@@ -830,7 +844,7 @@ public class Phase3_ObjectAllocation : IPhase
 
             // Get the classPool Dictionary OOP
             var classPoolOOP = _allocator.GetInstanceVariable(classOOP, classPoolIndex);
-            if (classPoolOOP == SmalltalkOOP.Null)
+            if (classPoolOOP == _heapManager.GetNil())
                 continue;
 
             // Check if this object is a Dictionary by checking its class OOP
@@ -878,7 +892,7 @@ public class Phase3_ObjectAllocation : IPhase
         }
 
         // Get nil singleton (created in Section 1: AllocateSentinelObjects)
-        SmalltalkOOP nilOOP = SpecialObjectsArray.Instance.Nil;
+        SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
 
         // Build subclass map: className -> list of direct subclass OOPs
         var subclassMap = new Dictionary<string, List<SmalltalkOOP>>();
@@ -1007,7 +1021,7 @@ public class Phase3_ObjectAllocation : IPhase
             InstructionCount = 0
         });
 
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = GlobalRegistry.Get("nil");
         int createdCount = 0;
         int classNameCount = 0;
         int withPreCreatedValues = 0;

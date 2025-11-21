@@ -1,5 +1,5 @@
-using Smalltalk80.Interpreter.Core.Memory;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.VM.Graphics;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -86,7 +86,7 @@ public static class GraphicsOperations
         private static (Memory<byte> bits, int width, int height) ExtractFormData(
             PrimitiveExecutionContext context, SmalltalkOOP formOOP)
         {
-            if (formOOP == SpecialObjectsArray.Instance.Nil || formOOP.IsSmallInteger)
+            if (formOOP == context.HeapManager.GetNil() || formOOP.IsSmallInteger)
                 return (Memory<byte>.Empty, 0, 0);
 
             // Get Form instance variables: bits (0), width (1), height (2)
@@ -101,7 +101,7 @@ public static class GraphicsOperations
             int height = heightOOP.AsSmallInteger();
 
             // Get bitmap data
-            if (bitsOOP == SpecialObjectsArray.Instance.Nil || bitsOOP.IsSmallInteger)
+            if (bitsOOP == context.HeapManager.GetNil() || bitsOOP.IsSmallInteger)
                 return (Memory<byte>.Empty, 0, 0);
 
             // Check object format to determine how to extract bits
@@ -277,7 +277,7 @@ public static class GraphicsOperations
             {
                 // Write clipboard
                 SmalltalkOOP stringOOP = context.Arguments[0];
-                if (stringOOP.IsSmallInteger || stringOOP == SpecialObjectsArray.Instance.Nil)
+                if (stringOOP.IsSmallInteger || stringOOP == context.HeapManager.GetNil())
                     return PrimitiveResult.Fail();
 
                 bool success = context.Platform.WriteClipboardFromStringOOP(stringOOP);

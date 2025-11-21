@@ -2,9 +2,10 @@ using Smalltalk80.Interpreter.Engine.LoaderPhases;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Core.HeapManager;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Attributes;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using System.Diagnostics;
@@ -75,7 +76,11 @@ public class ColdStartOrchestrator : IColdStartLoader
     /// </summary>
     public IReadOnlyList<IPhase>? Phases => _phases;
 
-    // InitExpressionsArrayOOP removed - accessible via SpecialObjectsArray.Instance.InitExpressionMethods
+    /// <summary>
+    /// Gets the InitExpressionMethods array OOP (available after Phase 4 completes).
+    /// Returns default(SmalltalkOOP) if no init expressions exist.
+    /// </summary>
+    public SmalltalkOOP InitExpressionMethods { get; private set; }
 
     /// <summary>
     /// Initializes a new instance of the ColdStartOrchestrator class.
@@ -91,9 +96,6 @@ public class ColdStartOrchestrator : IColdStartLoader
         _allocator = new ObjectGraphAllocator(heapManager, bundle);
         _bundlePath = bundlePath ?? "coldstart.json";
         _diagnostics = diagnostics;
-
-        // Initialize SpecialObjectsArray (will be populated during Phase 3)
-        SpecialObjectsArray.Initialize();
 
         // Initialize the report with bundle metadata
         _report = new ColdstartReport
@@ -177,7 +179,8 @@ public class ColdStartOrchestrator : IColdStartLoader
         RunPhase(phase4.Name, () =>
         {
             phase4.Run();
-            // Init expressions array is set in SpecialObjectsArray by Phase4
+            // Store InitExpressionMethods for later use in BuildVMMetadata
+            InitExpressionMethods = phase4.InitExpressionMethods;
         });
 
         // DEBUG: Trace ProcessorScheduler class after Phase 4
@@ -198,7 +201,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 6: Validation + GC Verification
         // Comprehensive validation and GC verification to ensure cold start correctness
-        var phase6 = new Phase6_ValidationAndGC(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _report, _diagnostics);
+        var phase6 = new Phase6_ValidationAndGC(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _report, InitExpressionMethods, _diagnostics);
         _phases.Add(phase6);
         RunPhase(phase6.Name, () =>
         {
@@ -249,6 +252,20 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         int thisClassIdx = LayoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
 
+        // Get special objects from GlobalRegistry (allocated during cold start phases)
+        var nilOOP = GlobalRegistry.Get("nil");
+        var trueOOP = GlobalRegistry.Get("true");
+        var falseOOP = GlobalRegistry.Get("false");
+        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
+        var processorSchedulerOOP = GlobalRegistry.Get("ProcessorScheduler");
+
+        var knownObjects = new KnownObjects(
+            nil: nilOOP,
+            @true: trueOOP,
+            @false: falseOOP,
+            smalltalk: smalltalkOOP
+        );
+
         var metadata = new VMMetadata
         {
             ClassNameFieldIndex = LayoutResolver.GetFieldIndex("class:Class", "name"),
@@ -266,7 +283,10 @@ public class ColdStartOrchestrator : IColdStartLoader
             ArrayClassOOP = GlobalRegistry.Get("class:Array"),
             CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
-            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext")
+            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
+            KnownObjects = knownObjects,
+            ProcessorScheduler = processorSchedulerOOP,
+            InitExpressionMethods = InitExpressionMethods
         };
 
         return metadata;
@@ -403,22 +423,21 @@ public class ColdStartOrchestrator : IColdStartLoader
         var gcRootsList = new List<SmalltalkOOP>();
 
         // Add fundamental sentinels if they exist
-        if (SpecialObjectsArray.Instance.Nil != default)
-            gcRootsList.Add(SpecialObjectsArray.Instance.Nil);
-        if (SpecialObjectsArray.Instance.True != default)
-            gcRootsList.Add(SpecialObjectsArray.Instance.True);
-        if (SpecialObjectsArray.Instance.False != default)
-            gcRootsList.Add(SpecialObjectsArray.Instance.False);
+        if (GlobalRegistry.Get("nil") != default)
+            gcRootsList.Add(GlobalRegistry.Get("nil"));
+        if (GlobalRegistry.Get("true") != default)
+            gcRootsList.Add(GlobalRegistry.Get("true"));
+        if (GlobalRegistry.Get("false") != default)
+            gcRootsList.Add(GlobalRegistry.Get("false"));
 
         // Add Smalltalk SystemDictionary if it exists
         if (GlobalRegistry.SystemDictionaryOOP != default)
             gcRootsList.Add(GlobalRegistry.SystemDictionaryOOP);
 
         // Add init expression methods if they exist
-        if (SpecialObjectsArray.Instance.InitExpressionMethods != default)
+        if (InitExpressionMethods != default)
         {
-            var initMethodsOOP = SpecialObjectsArray.Instance.InitExpressionMethods;
-            gcRootsList.Add(initMethodsOOP);
+            gcRootsList.Add(InitExpressionMethods);
         }
 
         // Set GC roots and get unreachable objects (READ-ONLY - does not collect)

@@ -1,5 +1,5 @@
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 using System.Text;
 
 namespace Smalltalk80.Interpreter.Core.VM;
@@ -13,20 +13,22 @@ namespace Smalltalk80.Interpreter.Core.VM;
 public class RuntimeHeapAccessor : IRuntimeHeapAccessor
 {
     private readonly ISmalltalkHeapManager _heapManager;
+    private readonly VMMetadata metadata;
 
     // Caching layer (invalidated by primitive 89)
     private readonly RuntimeClassCache _classCache;
 
-    public RuntimeHeapAccessor(ISmalltalkHeapManager heapManager)
+    public RuntimeHeapAccessor(ISmalltalkHeapManager heapManager, VMMetadata metadata)
     {
         _heapManager = heapManager;
+        this.metadata = metadata;
         _classCache = new RuntimeClassCache(this, heapManager);
     }
 
     /// <summary>
     /// Invalidates all runtime caches. Called by primitive 89 (flushCache).
     /// </summary>
-    public void InvalidateAllCaches()
+    public virtual void InvalidateAllCaches()
     {
         _classCache.InvalidateCache();
         RuntimeSpecialObjects.Instance.InvalidateCache();
@@ -35,7 +37,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// <summary>
     /// Gets a class OOP by name, using cache if valid.
     /// </summary>
-    public SmalltalkOOP GetClass(string className)
+    public virtual SmalltalkOOP GetClass(string className)
     {
         return _classCache.GetClass(className);
     }
@@ -46,8 +48,8 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// </summary>
     internal SmalltalkOOP LookupClassInHeap(string className)
     {
-        // Step 1: Get Smalltalk dictionary from SpecialObjectsArray
-        var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+        // Step 1: Get Smalltalk dictionary from KnownObjects
+        var smalltalkDictOOP = metadata.KnownObjects.Smalltalk;
 
         // Step 2: Intern the class name as a Symbol
         var symbolOOP = InternSymbol(className);
@@ -60,7 +62,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// Interns a string as a Symbol in the Smalltalk heap.
     /// Searches USTable for existing symbol or returns nil if not found.
     /// </summary>
-    public SmalltalkOOP InternSymbol(string symbolName)
+    public virtual SmalltalkOOP InternSymbol(string symbolName)
     {
         // CRITICAL: USTable is a CLASS VARIABLE of Symbol, not a global!
         // Symbol class definition: classVariableNames: 'SingleCharSymbols USTable'
@@ -68,30 +70,30 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
 
         // CRITICAL: To avoid infinite recursion (InternSymbol → GetClass("Symbol") → InternSymbol),
         // we must look up Symbol class using direct byte comparison, not through InternSymbol
-        var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+        var smalltalkDictOOP = metadata.KnownObjects.Smalltalk;
         var symbolClassOOP = LookupGlobalByName(smalltalkDictOOP, "Symbol");
-        if (symbolClassOOP == SpecialObjectsArray.Instance.Nil)
+        if (symbolClassOOP == metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("Symbol class not found during InternSymbol");
         }
 
         // Get Symbol's classPool (instance variable index 7 for Class)
         var classPoolOOP = _heapManager.GetInstanceVariable(symbolClassOOP, 7);
-        if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+        if (classPoolOOP == metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("Symbol classPool is nil during InternSymbol");
         }
 
         // Search classPool for USTable association
         var ustableOOP = LookupGlobalByName(classPoolOOP, "USTable");
-        if (ustableOOP == SpecialObjectsArray.Instance.Nil)
+        if (ustableOOP == metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("USTable not found in Symbol classPool");
         }
 
         // USTable is an Array in the Smalltalk heap containing Symbol OOPs
         int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = metadata.KnownObjects.Nil;
 
         // Convert search string to bytes (Latin-1 encoding)
         byte[] searchBytes = Encoding.Latin1.GetBytes(symbolName);
@@ -144,7 +146,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// Used to break the circular dependency when looking up USTable.
     /// CRITICAL: Cannot use hash-based lookup because Symbol>>hash depends on OOP, not string content!
     /// </summary>
-    public SmalltalkOOP LookupGlobalByName(SmalltalkOOP dictOOP, string globalName)
+    public virtual SmalltalkOOP LookupGlobalByName(SmalltalkOOP dictOOP, string globalName)
     {
         byte[] searchBytes = Encoding.Latin1.GetBytes(globalName);
         int size = _heapManager.GetIndexedSize(dictOOP);
@@ -155,12 +157,12 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
             var associationOOP = _heapManager.GetIndexedOOP(dictOOP, i);
 
             // Skip nil slots
-            if (associationOOP == SpecialObjectsArray.Instance.Nil || associationOOP.IsSmallInteger)
+            if (associationOOP == metadata.KnownObjects.Nil || associationOOP.IsSmallInteger)
                 continue;
 
             // Get the key from the Association (slot 0)
             var keyOOP = _heapManager.GetInstanceVariable(associationOOP, 0);
-            if (keyOOP == SpecialObjectsArray.Instance.Nil || keyOOP.IsSmallInteger)
+            if (keyOOP == metadata.KnownObjects.Nil || keyOOP.IsSmallInteger)
                 continue;
 
             // Compare Symbol bytes directly
@@ -188,7 +190,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
             }
         }
 
-        return SpecialObjectsArray.Instance.Nil;  // Not found
+        return metadata.KnownObjects.Nil;  // Not found
     }
 
     /// <summary>
@@ -204,7 +206,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
 
         // Search through Dictionary's indexed slots for matching key
         int size = _heapManager.GetIndexedSize(dictOOP);
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = metadata.KnownObjects.Nil;
 
         for (int i = 0; i < size; i++)
         {
@@ -224,7 +226,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
             }
         }
 
-        return SpecialObjectsArray.Instance.Nil;  // Not found
+        return metadata.KnownObjects.Nil;  // Not found
     }
 
     /// <summary>
@@ -235,7 +237,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     {
         var result = new List<string>();
 
-        if (instVarsOOP == SpecialObjectsArray.Instance.Nil)
+        if (instVarsOOP == metadata.KnownObjects.Nil)
             return result;
 
         // Read the String bytes from the heap
@@ -265,16 +267,16 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// This enables full runtime reflection and supports runtime class modification.
     /// Equivalent to Smalltalk's allInstVarNames method.
     /// </summary>
-    public Dictionary<string, List<string>> BuildFieldMap()
+    public virtual Dictionary<string, List<string>> BuildFieldMap()
     {
         var fieldMap = new Dictionary<string, List<string>>();
 
-        // Get Smalltalk dictionary from SpecialObjectsArray
-        var smalltalkDictOOP = SpecialObjectsArray.Instance.Smalltalk;
+        // Get Smalltalk dictionary from KnownObjects
+        var smalltalkDictOOP = metadata.KnownObjects.Smalltalk;
 
         // Iterate through all global bindings (Associations in SystemDictionary)
         int dictSize = _heapManager.GetIndexedSize(smalltalkDictOOP);
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = metadata.KnownObjects.Nil;
 
         for (int i = 0; i < dictSize; i++)
         {
@@ -322,7 +324,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     private List<string> AccumulateInstanceVariableNames(SmalltalkOOP classOOP)
     {
         var fields = new List<string>();
-        var nilOOP = SpecialObjectsArray.Instance.Nil;
+        var nilOOP = metadata.KnownObjects.Nil;
 
         // Walk superclass chain from current class to root (Object), pushing onto stack
         var superclassChain = new Stack<SmalltalkOOP>();
@@ -390,5 +392,21 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
             bytes[i] = _heapManager.GetIndexedByte(stringOOP, i);
         }
         return Encoding.Latin1.GetString(bytes);
+    }
+
+    /// <summary>
+    /// Gets the field index for a named field in a class by walking the heap.
+    /// This is used by primitives at runtime - the heap is the source of truth.
+    /// </summary>
+    /// <param name="classOOP">The class OOP to query</param>
+    /// <param name="fieldName">The field name to find</param>
+    /// <returns>The zero-based field index, or -1 if not found</returns>
+    public virtual int GetFieldIndex(SmalltalkOOP classOOP, string fieldName)
+    {
+        // Build the field list for this class by walking the heap
+        var fields = AccumulateInstanceVariableNames(classOOP);
+
+        // Find the index of the requested field
+        return fields.IndexOf(fieldName);
     }
 }

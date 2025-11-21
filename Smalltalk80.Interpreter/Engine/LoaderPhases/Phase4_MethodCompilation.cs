@@ -1,8 +1,9 @@
 using System.Diagnostics;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.Core.HeapManager;
-using Smalltalk80.Interpreter.Core.Memory;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
@@ -39,10 +40,19 @@ public class Phase4_MethodCompilation : IPhase
     private readonly MethodDictionaryInstaller _dictionaryInstaller;
     private readonly SymbolService _symbolService;
 
+    // Init expression methods array (allocated during Run())
+    private SmalltalkOOP _initExpressionMethods;
+
     /// <summary>
     /// Gets the phase name for diagnostics and logging.
     /// </summary>
     public string Name => "Phase 4: Method Compilation";
+
+    /// <summary>
+    /// Gets the InitExpressionMethods array OOP (available after Run() completes).
+    /// Returns default(SmalltalkOOP) if no init expressions exist.
+    /// </summary>
+    public SmalltalkOOP InitExpressionMethods => _initExpressionMethods;
 
     /// <summary>
     /// Gets the phase number (1-6).
@@ -201,7 +211,7 @@ public class Phase4_MethodCompilation : IPhase
         foreach (var method in _bundle.Methods)
         {
             var bytecodes = ClassHierarchyTraversal.DecodeBytecodes(method.Bytecodes);
-            var nilOOP = SpecialObjectsArray.Instance.Nil;
+            var nilOOP = GlobalRegistry.Get("nil");
             var placeholderLiterals = new SmalltalkOOP[method.Literals.Length];
             for (int i = 0; i < placeholderLiterals.Length; i++)
             {
@@ -473,7 +483,7 @@ public class Phase4_MethodCompilation : IPhase
 
                 // VALUE MIGRATION VALIDATION: Check if Association has non-nil value
                 var valueOOP = _allocator.GetInstanceVariable(assocOOP, 1);
-                if (valueOOP != SpecialObjectsArray.Instance.Nil)
+                if (valueOOP != GlobalRegistry.Get("nil"))
                 {
                     nonNilValueCount++;
                 }
@@ -557,7 +567,7 @@ public class Phase4_MethodCompilation : IPhase
             for (int i = 0; i < sysDictSize; i++)
             {
                 var assocOOP = _allocator.GetIndexedOOP(sysDictOOP, i);
-                if (assocOOP != SpecialObjectsArray.Instance.Nil)
+                if (assocOOP != GlobalRegistry.Get("nil"))
                 {
                     reachableAssociations.Add(assocOOP);
                 }
@@ -577,14 +587,14 @@ public class Phase4_MethodCompilation : IPhase
                 int classPoolIndex = 7; // Standard classPool index
                 var classPoolOOP = _allocator.GetInstanceVariable(classOOP, classPoolIndex);
 
-                if (classPoolOOP == SpecialObjectsArray.Instance.Nil)
+                if (classPoolOOP == GlobalRegistry.Get("nil"))
                     continue;
 
                 int poolSize = _allocator.GetIndexedSize(classPoolOOP);
                 for (int i = 0; i < poolSize; i++)
                 {
                     var assocOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
-                    if (assocOOP != SpecialObjectsArray.Instance.Nil)
+                    if (assocOOP != GlobalRegistry.Get("nil"))
                     {
                         reachableAssociations.Add(assocOOP);
                     }
@@ -682,8 +692,8 @@ public class Phase4_MethodCompilation : IPhase
     {
         if (_bundle.InitExpressions.Length == 0)
         {
-            // No init expressions - store nil
-            SpecialObjectsArray.SetInitExpressionMethods(SpecialObjectsArray.Instance.Nil);
+            // No init expressions - leave as default
+            _initExpressionMethods = default;
             return;
         }
 
@@ -744,7 +754,7 @@ public class Phase4_MethodCompilation : IPhase
             _allocator.SetIndexedOOP(initArrayOOP, i, initExprMethods[i]);
         }
 
-        // Store in SpecialObjectsArray for runtime access
-        SpecialObjectsArray.SetInitExpressionMethods(initArrayOOP);
+        // Store for ColdStartOrchestrator to pass to BuildVMMetadata
+        _initExpressionMethods = initArrayOOP;
     }
 }
