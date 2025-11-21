@@ -809,8 +809,8 @@ public class Phase6_ValidationAndGC : IPhase
         var placeholderNilOOP = GlobalRegistry.Get("_placeholderNil");
         Console.WriteLine($"  [Phase 6 GC] Placeholder nil OOP: {placeholderNilOOP}");
 
-        var gcRoots = _heapManager.GC.GetRoots();
-        bool placeholderInRoots = gcRoots.Any(r => r.oop == placeholderNilOOP);
+        var gcRoots = _heapManager.GC.GetGCRoots();
+        bool placeholderInRoots = gcRoots.Contains(placeholderNilOOP);
         Console.WriteLine($"  [Phase 6 GC] Placeholder nil in GC roots: {placeholderInRoots}");
 
         Console.WriteLine($"  [Phase 6 GC] Running garbage collection...");
