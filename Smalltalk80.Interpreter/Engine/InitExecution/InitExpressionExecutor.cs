@@ -231,6 +231,16 @@ public class InitExpressionExecutor
             var gcStatsBefore = _heapManager.GC.GarbageCollect();
             Console.WriteLine($"  GC collected {gcStatsBefore.CollectedObjects} objects (expected 0 - everything reachable)");
 
+            // Show what was collected
+            if (gcStatsBefore.CollectedObjects > 0)
+            {
+                Console.WriteLine($"  [DEBUG] Collected objects:");
+                foreach (var obj in gcStatsBefore.CollectedObjectDetails.Take(10))
+                {
+                    Console.WriteLine($"    {obj.oop} (class: {obj.className ?? "unknown"})");
+                }
+            }
+
             // Verify the CompiledMethod is still alive
             if (!IsObjectAlive(compiledMethodOOP))
             {
@@ -284,6 +294,16 @@ public class InitExpressionExecutor
             Console.WriteLine($"\n[STEP 7] Running GC (SHOULD collect init expression)...");
             var gcStatsAfter = _heapManager.GC.GarbageCollect();
             Console.WriteLine($"  GC collected {gcStatsAfter.CollectedObjects} objects (expected 3 - MethodContext, CompiledMethod, ByteArray)");
+
+            // Show what was collected
+            if (gcStatsAfter.CollectedObjects > 0)
+            {
+                Console.WriteLine($"  [DEBUG] Collected objects:");
+                foreach (var obj in gcStatsAfter.CollectedObjectDetails.Take(10))
+                {
+                    Console.WriteLine($"    {obj.oop} (class: {obj.className ?? "unknown"})");
+                }
+            }
 
             // Verify the CompiledMethod was collected
             if (IsObjectAlive(compiledMethodOOP))

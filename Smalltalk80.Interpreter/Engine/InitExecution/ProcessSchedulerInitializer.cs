@@ -76,6 +76,7 @@ public class ProcessSchedulerInitializer
         // Create a dummy suspended context (minimal MethodContext)
         // This context is just a placeholder - when code runs, it will be replaced
         SmalltalkOOP dummyContextOOP = CreateDummyContext();
+        Console.WriteLine($"  [DEBUG] Created dummy MethodContext: {dummyContextOOP} (will be orphaned when replaced)");
 
         // Set Process instance variables
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_NEXTLINK_INDEX, _heapManager.GetNil());
