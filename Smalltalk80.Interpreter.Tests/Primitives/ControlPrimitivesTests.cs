@@ -249,6 +249,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
     public void BlockCopy_InitializesCallerToNil()
     {
         var primitive = new ControlPrimitives.BlockCopy();
+        var heap = new SmalltalkHeapManager();
+        var metadata = CreateTestMetadata(heap);
+        var nilOOP = metadata.KnownObjects.Nil;
+
         var mockHeap = CreateMockHeapManager();
         var methodContextOOP = ObjectOOP(100);
         var blockContextClassOOP = ObjectOOP(50);
@@ -265,12 +269,13 @@ public class ControlPrimitivesTests : PrimitiveTestBase
             [SmallInt(0), SmallInt(5)],
             mockHeap.Object,
             mockRuntimeAccess.Object,
-            instructionPointer: 100);
+            instructionPointer: 100,
+            metadata: metadata);
 
         var result = primitive.Execute(context);
 
         AssertSuccess(result);
-        mockHeap.Verify(h => h.SetInstanceVariable(newBlockContextOOP, VMConstants.BLOCKCONTEXT_CALLER_INDEX, Nil), Times.Once);
+        mockHeap.Verify(h => h.SetInstanceVariable(newBlockContextOOP, VMConstants.BLOCKCONTEXT_CALLER_INDEX, nilOOP), Times.Once);
     }
 
     [Fact]

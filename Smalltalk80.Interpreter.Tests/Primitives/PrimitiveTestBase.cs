@@ -161,14 +161,15 @@ public abstract class PrimitiveTestBase
 
     /// <summary>
     /// Asserts that a PrimitiveResult is successful and returns the expected boolean value.
+    /// Callers must provide the true/false OOPs from their test metadata or heap.
     /// </summary>
-    protected static void AssertSuccessWithBool(PrimitiveResult result, bool expectedValue)
+    protected static void AssertSuccessWithBool(PrimitiveResult result, bool expectedValue, SmalltalkOOP trueOOP, SmalltalkOOP falseOOP)
     {
         AssertSuccess(result);
         if (expectedValue)
-            Assert.Equal(True, result.Value);
+            Assert.Equal(trueOOP, result.Value);
         else
-            Assert.Equal(False, result.Value);
+            Assert.Equal(falseOOP, result.Value);
     }
 
     /// <summary>
