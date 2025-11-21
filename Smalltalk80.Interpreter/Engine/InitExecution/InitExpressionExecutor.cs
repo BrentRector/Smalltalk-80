@@ -289,8 +289,7 @@ public class InitExpressionExecutor
                 Console.WriteLine($"    CompiledMethod {compiledMethodOOP}: {(compiledMethodAlive ? "ALIVE" : "collected")}");
                 Console.WriteLine($"    MethodContext {methodContextOOP}: {(methodContextAlive ? "ALIVE" : "collected")}");
 
-                // Check if methodContext is referenced by active process
-                var schedulerOOP = _metadata.ProcessorScheduler;
+                // Check if methodContext is referenced by active process (reuse schedulerOOP from line 220)
                 SmalltalkOOP activeProcessOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
                 SmalltalkOOP suspendedContextOOP = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
                 Console.WriteLine($"    Active process suspendedContext: {suspendedContextOOP} (should be nil={_heapManager.GetNil()})");
