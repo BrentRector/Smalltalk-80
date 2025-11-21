@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;

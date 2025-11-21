@@ -1,4 +1,4 @@
-namespace Smalltalk80.Interpreter.Core.Diagnostics;
+namespace Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 /// <summary>
 /// Flags indicating which diagnostic events are enabled.

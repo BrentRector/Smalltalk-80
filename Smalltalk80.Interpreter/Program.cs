@@ -2,6 +2,7 @@ using System.Windows.Forms;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Engine;

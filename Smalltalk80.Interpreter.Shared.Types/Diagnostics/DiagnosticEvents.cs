@@ -1,7 +1,4 @@
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
-
-namespace Smalltalk80.Interpreter.Core.Diagnostics;
+namespace Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 /// <summary>
 /// Base class for all diagnostic events.

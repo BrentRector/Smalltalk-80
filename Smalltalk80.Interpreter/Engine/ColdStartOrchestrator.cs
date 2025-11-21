@@ -7,6 +7,7 @@ using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Attributes;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using System.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Engine;

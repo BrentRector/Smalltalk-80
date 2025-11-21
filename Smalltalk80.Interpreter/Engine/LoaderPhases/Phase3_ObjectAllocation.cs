@@ -4,6 +4,7 @@ using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
 using Smalltalk80.Interpreter.Engine.Services;
 using System.Diagnostics;

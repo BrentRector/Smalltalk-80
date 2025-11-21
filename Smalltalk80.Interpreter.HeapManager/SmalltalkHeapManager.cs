@@ -1,6 +1,6 @@
 using System.Diagnostics;
-using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 namespace Smalltalk80.Interpreter.HeapManager;
 
