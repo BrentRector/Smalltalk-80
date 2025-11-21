@@ -241,7 +241,7 @@ public sealed class ObjectTable
 
             foreach (var rootOOP in roots)
             {
-                if (rootOOP rootOOP.IsObjectPointer)
+                if (rootOOP.IsObjectPointer)
                 {
                     workList.Enqueue(rootOOP);
                 }
@@ -276,7 +276,7 @@ public sealed class ObjectTable
 
                         // Count non-nil InstanceVariables[4]
                         var instVarNamesRef = data.InstanceVariables[4];
-                        if (instVarNamesRef instVarNamesRef.IsObjectPointer)
+                        if (instVarNamesRef.IsObjectPointer)
                         {
                             class9withInstVars++;
                         }
@@ -287,7 +287,7 @@ public sealed class ObjectTable
 
                         // Count non-nil InstanceVariables[4]
                         var instVarNamesRef = data.InstanceVariables[4];
-                        if (instVarNamesRef instVarNamesRef.IsObjectPointer)
+                        if (instVarNamesRef.IsObjectPointer)
                         {
                             class7withInstVars++;
                         }
@@ -312,7 +312,7 @@ public sealed class ObjectTable
         bool enableDetailedLogging = false; // TODO: Re-enable when RuntimeOptions is added
 
         // Trace class reference
-        if (data.ClassRef data.ClassRef.IsObjectPointer)
+        if (data.ClassRef.IsObjectPointer)
         {
             workList.Enqueue(data.ClassRef);
         }
@@ -329,7 +329,7 @@ public sealed class ObjectTable
 
             foreach (var varRef in data.InstanceVariables)
             {
-                if (varRef varRef.IsObjectPointer)
+                if (varRef.IsObjectPointer)
                 {
                     workList.Enqueue(varRef);
                 }
@@ -343,7 +343,7 @@ public sealed class ObjectTable
             {
                 foreach (var indexedRef in indexedRefs)
                 {
-                    if (indexedRef indexedRef.IsObjectPointer)
+                    if (indexedRef.IsObjectPointer)
                     {
                         workList.Enqueue(indexedRef);
                     }
