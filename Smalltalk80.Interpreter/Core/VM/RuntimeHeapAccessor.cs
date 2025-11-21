@@ -160,7 +160,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
             if (associationOOP == metadata.KnownObjects.Nil || associationOOP.IsSmallInteger)
                 continue;
 
-            // Get the key from the Association (slot 0)
+            // Get the key from the Association (instance variable 0)
             var keyOOP = _heapManager.GetInstanceVariable(associationOOP, 0);
             if (keyOOP == metadata.KnownObjects.Nil || keyOOP.IsSmallInteger)
                 continue;
@@ -182,7 +182,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
 
                 if (match)
                 {
-                    // Return the value from the Association (slot 1)
+                    // Return the value from the Association (instance variable 1)
                     var valueOOP = _heapManager.GetInstanceVariable(associationOOP, 1);
 
                     return valueOOP;
@@ -261,7 +261,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
 
     /// <summary>
     /// Builds complete field layout map for all classes by walking the Smalltalk heap.
-    /// Reads ClassDescription.instanceVariables (slot 4) Array-of-Strings for each class,
+    /// Reads ClassDescription.instanceVariables (instance variable 4) Array-of-Strings for each class,
     /// walks superclass chain to accumulate inherited fields, and returns complete layouts.
     ///
     /// This enables full runtime reflection and supports runtime class modification.
@@ -284,20 +284,20 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
             if (associationOOP == nilOOP || associationOOP.IsSmallInteger)
                 continue;
 
-            // Get the value from Association (slot 1)
+            // Get the value from Association (instance variable 1)
             var valueOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
             if (valueOOP == nilOOP || valueOOP.IsSmallInteger)
                 continue;
 
             // Check if it's a class object (has ClassDescription as ancestor)
-            // Classes have methodDict field (slot 1), which is typically a Dictionary
+            // Classes have methodDict field (instance variable 1), which is typically a Dictionary
             try
             {
                 var methodDictOOP = _heapManager.GetInstanceVariable(valueOOP, 1);
                 if (methodDictOOP == nilOOP || methodDictOOP.IsSmallInteger)
                     continue;  // Not a class
 
-                // Get class name from Association key (slot 0 - a Symbol)
+                // Get class name from Association key (instance variable 0 - a Symbol)
                 var keySymbolOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
                 string className = ReadSymbolName(keySymbolOOP);
 
@@ -319,7 +319,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
 
     /// <summary>
     /// Accumulates instance variable names by walking the superclass chain from root to leaf.
-    /// Reads ClassDescription.instanceVariables (slot 4) for each class in the hierarchy.
+    /// Reads ClassDescription.instanceVariables (instance variable 4) for each class in the hierarchy.
     /// </summary>
     private List<string> AccumulateInstanceVariableNames(SmalltalkOOP classOOP)
     {
@@ -333,7 +333,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
         while (currentOOP != nilOOP && !currentOOP.IsSmallInteger)
         {
             superclassChain.Push(currentOOP);
-            // Read superclass field (slot 0 from Behavior)
+            // Read superclass field (instance variable 0 from Behavior)
             currentOOP = _heapManager.GetInstanceVariable(currentOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
         }
 
@@ -342,7 +342,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
         {
             var oop = superclassChain.Pop();
 
-            // Read ClassDescription.instanceVariables field (slot 4)
+            // Read ClassDescription.instanceVariables field (instance variable 4)
             // This is an Array of String objects containing the class's own instance variables
             var instVarsArrayOOP = _heapManager.GetInstanceVariable(oop, 4);
 

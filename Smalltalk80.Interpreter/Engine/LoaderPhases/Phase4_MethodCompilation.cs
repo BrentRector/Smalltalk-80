@@ -300,7 +300,7 @@ public class Phase4_MethodCompilation : IPhase
         // Fallback: Search literals for an Association
         foreach (var literalOOP in literalOOPs)
         {
-            var literalClassOOP = _heapManager.GetSlot(literalOOP, 0);
+            var literalClassOOP = _heapManager.GetClassOOP(literalOOP);
             var literalClassName = _allocator.GetClassName(literalClassOOP);
 
             if (literalClassName == "Association")

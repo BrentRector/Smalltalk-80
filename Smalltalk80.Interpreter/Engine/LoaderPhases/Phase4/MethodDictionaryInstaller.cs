@@ -157,8 +157,7 @@ internal class MethodDictionaryInstaller(
                 continue;
             }
 
-            // Get the class's method dictionary (instance variable index 1, slot 2 in Behavior)
-            // Instance variable indexing: index N = slot N+1 (slot 0 is class pointer)
+            // Get the class's method dictionary (instance variable 1 in Behavior)
             // Behavior instance variables: [0]=superclass, [1]=methodDict, [2]=format, [3]=subclasses
             var methodDictOOP = _allocator.GetInstanceVariable(classOOP, 1); // methodDict is at instance var index 1
 

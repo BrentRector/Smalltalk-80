@@ -22,7 +22,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
         int dictSize = context.Allocator.GetIndexedSize(dictionaryOOP);
         var nilOOP = GlobalRegistry.Get("nil");
 
-        // Get the key symbol from the Association (slot 0)
+        // Get the key symbol from the Association (instance variable 0)
         var keySymbolOOP = context.Allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup (Dictionary>>findKeyOrNil:)

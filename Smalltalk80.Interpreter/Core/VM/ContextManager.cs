@@ -77,13 +77,13 @@ internal class ContextManager(
             {
                 pool.Push(contextOOP);
                 contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
-                heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
+                heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
             }
         }
         else
         {
             contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, instanceVarCount, stackSize);
-            heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
+            heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
         }
 
         // Increment context depth and check limit

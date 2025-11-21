@@ -38,7 +38,8 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         );
 
         // Set class pointer to self-reference (fixed later by become)
-        SetSlot(_nilOOP, 0, _nilOOP);
+        var nilEntry = _tableManager.GetObjectTableEntry(_nilOOP);
+        WriteSlot(nilEntry, 0, _nilOOP);
     }
 
     /// <summary>
@@ -176,26 +177,12 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
         SmalltalkOOP newInstanceOOP = AllocateObject(format, instanceVariableCount, indexedSize);
 
         // Set the new instance's class reference (slot 0) to the class
-        SetSlot(newInstanceOOP, 0, classOOP);
+        SetClassOOP(newInstanceOOP, classOOP);
 
-        // Initialize all instance variables to nil
-        // (Note: AllocateObject already initializes slots, but we do it again for clarity)
         // Track runtime allocations for debugging
         System.Threading.Interlocked.Increment(ref _runtimeAllocationCount);
 
-        for (int i = 1; i <= instanceVariableCount; i++)
-        {
-            SetSlot(newInstanceOOP, i, _nilOOP);
-        }
-
-        // Initialize indexed slots to nil for PointerIndexed objects
-        if (format == ObjectFormat.PointerIndexed && indexedSize > 0)
-        {
-            for (int i = 0; i < indexedSize; i++)
-            {
-                SetIndexedOOP(newInstanceOOP, i, _nilOOP);
-            }
-        }
+        // Note: AllocateObject already initializes all instance variables and indexed slots to nil
 
         return newInstanceOOP;
     }
@@ -215,12 +202,13 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
 
     #endregion
 
-    #region Slot Access
+    #region Slot Access (Internal Use Only)
 
     /// <summary>
-    /// Raw slot access - gets OOP from any slot (semantic-agnostic).
+    /// INTERNAL: Raw slot access - gets OOP from any slot (semantic-agnostic).
+    /// External code should use GetClassOOP/GetInstanceVariable/GetIndexedOOP instead.
     /// </summary>
-    public SmalltalkOOP GetSlot(SmalltalkOOP objectOOP, int slotIndex)
+    private SmalltalkOOP GetSlot(SmalltalkOOP objectOOP, int slotIndex)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot get slot from SmallInteger");
@@ -230,9 +218,10 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
     }
 
     /// <summary>
-    /// Raw slot access - sets OOP in any slot (semantic-agnostic).
+    /// INTERNAL: Raw slot access - sets OOP in any slot (semantic-agnostic).
+    /// External code should use SetClassOOP/SetInstanceVariable/SetIndexedOOP instead.
     /// </summary>
-    public void SetSlot(SmalltalkOOP objectOOP, int slotIndex, SmalltalkOOP value)
+    private void SetSlot(SmalltalkOOP objectOOP, int slotIndex, SmalltalkOOP value)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot set slot in SmallInteger");
@@ -305,7 +294,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
 
         if (entry.FormatExplicit != ObjectFormat.PointerIndexed)
         {
-            var classOOP = GetSlot(objectOOP, 0);
+            var classOOP = GetClassOOP(objectOOP);
             throw new InvalidOperationException(
                 $"GetIndexedOOP called on non-PointerIndexed object!\n" +
                 $"  objectOOP: {objectOOP}, format: {entry.FormatExplicit}, class={classOOP}, index: {index}");
@@ -323,7 +312,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
 
         if (entry.FormatExplicit != ObjectFormat.PointerIndexed)
         {
-            var classOOP = GetSlot(objectOOP, 0);
+            var classOOP = GetClassOOP(objectOOP);
             throw new InvalidOperationException(
                 $"SetIndexedOOP called on non-PointerIndexed object!\n" +
                 $"  objectOOP: {objectOOP}, format: {entry.FormatExplicit}, class={classOOP}, index: {index}");
@@ -577,7 +566,11 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
 
     public void SetClassOOP(SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
     {
-        SetSlot(objectOOP, 0, classOOP);
+        if (objectOOP.IsSmallInteger)
+            throw new ArgumentException("Cannot set class of SmallInteger");
+
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+        WriteSlot(entry, 0, classOOP);
     }
 
     public ObjectFormat GetObjectFormat(SmalltalkOOP objectOOP)
@@ -737,7 +730,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
             if (!IsValidObjectOOP(objectOOP))
                 return "Invalid";
 
-            var classOOP = GetSlot(objectOOP, 0);
+            var classOOP = GetClassOOP(objectOOP);
             if (classOOP.IsSmallInteger)
                 return "InvalidClass(SmallInt)";
 
@@ -842,7 +835,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeapManager
             {
                 var objectOOP = SmalltalkOOP.FromObjectTableIndex(objectId);
                 var entry = _tableManager.GetObjectTableEntry(objectOOP);
-                var classOOP = GetSlot(objectOOP, 0);
+                var classOOP = GetClassOOP(objectOOP);
 
                 string localId = localIdToObjectId.FirstOrDefault(kvp => kvp.Value == objectId).Key ?? "unknown";
 

@@ -75,7 +75,7 @@ public class ObjectGraphAllocator
         var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringBytes.Length);
 
         // Set class reference
-        _heapManager.SetSlot(stringOOP, 0, classOOP);
+        _heapManager.SetClassOOP(stringOOP, classOOP);
 
         // Store the string bytes
         for (int i = 0; i < stringBytes.Length; i++)
@@ -112,7 +112,7 @@ public class ObjectGraphAllocator
         var arrayOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, fixedSlots, elementCount);
         
         // ALWAYS set class reference immediately - no way to forget this step
-        _heapManager.SetSlot(arrayOOP, 0, classOOP);
+        _heapManager.SetClassOOP(arrayOOP, classOOP);
         
         return arrayOOP;
     }
@@ -181,7 +181,7 @@ public class ObjectGraphAllocator
     /// </summary>
     public void SetObjectClass(SmalltalkOOP objectOOP, SmalltalkOOP classOOP)
     {
-        _heapManager.SetSlot(objectOOP, 0, classOOP);
+        _heapManager.SetClassOOP(objectOOP, classOOP);
     }
 
     /// <summary>
@@ -559,7 +559,7 @@ public class ObjectGraphAllocator
             return "SmallInteger";
         }
 
-        var classOOP = _heapManager.GetSlot(objectOOP, 0);
+        var classOOP = _heapManager.GetClassOOP(objectOOP);
         if (classOOP == _heapManager.GetNil())
         {
             return "NULL_CLASS";

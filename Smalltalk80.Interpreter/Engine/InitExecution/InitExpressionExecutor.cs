@@ -48,7 +48,7 @@ public class InitExpressionExecutor
     private SmalltalkOOP ResumeProcess(SmalltalkOOP processOOP)
     {
         // Get the suspended context from the Process (instance variable 0)
-        var contextOOP = _heapManager.GetSlot(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX + 1);
+        var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
         return _vm.ExecuteExistingContext(contextOOP);
     }
 
@@ -226,7 +226,7 @@ public class InitExpressionExecutor
 
         // Allocate MethodContext with indexed slots for stack (use 12 for small frame)
         var contextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, indexedSize: 12);
-        _heapManager.SetSlot(contextOOP, 0, methodContextClassOOP);
+        _heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
 
         // Set instance variables using LayoutResolver indices
         int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
@@ -236,18 +236,17 @@ public class InitExpressionExecutor
         // TODO: receiverMapIndex removed - part of obsolete dual-context architecture
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
-        _heapManager.SetSlot(contextOOP, senderIndex + 1, GlobalRegistry.Get("nil"));
-        _heapManager.SetSlot(contextOOP, pcIndex + 1, SmalltalkOOP.FromSmallInteger(0));
-        _heapManager.SetSlot(contextOOP, stackpIndex + 1, SmalltalkOOP.FromSmallInteger(0));
-        _heapManager.SetSlot(contextOOP, methodIndex + 1, methodOOP);
+        _heapManager.SetInstanceVariable(contextOOP, senderIndex, GlobalRegistry.Get("nil"));
+        _heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
+        _heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(0));
+        _heapManager.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
         // receiverMapIndex initialization removed - obsolete field
-        _heapManager.SetSlot(contextOOP, receiverIndex + 1, receiverOOP);
+        _heapManager.SetInstanceVariable(contextOOP, receiverIndex, receiverOOP);
 
         // Initialize indexed portion (stack) with nil
-        int indexedBase = METHODCONTEXT_INSTANCE_VAR_COUNT + 1; // +1 for class slot
         for (int i = 0; i < 12; i++)
         {
-            _heapManager.SetSlot(contextOOP, indexedBase + i, GlobalRegistry.Get("nil"));
+            _heapManager.SetIndexedOOP(contextOOP, i, GlobalRegistry.Get("nil"));
         }
 
         return contextOOP;
@@ -274,12 +273,12 @@ public class InitExpressionExecutor
             if (assocOOP == GlobalRegistry.Get("nil"))
                 continue;
 
-            // Association has key at slot 0 (after class slot)
-            var keyOOP = _heapManager.GetSlot(assocOOP, 1);
+            // Association has key at instance variable 0
+            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
             if (keyOOP == symbolOOP)
             {
-                // Return value at slot 1 (after class slot)
-                return _heapManager.GetSlot(assocOOP, 2);
+                // Return value at instance variable 1
+                return _heapManager.GetInstanceVariable(assocOOP, 1);
             }
         }
 
@@ -340,12 +339,12 @@ public class InitExpressionExecutor
 
         // Allocate Process object
         var processOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
-        _heapManager.SetSlot(processOOP, 0, processClassOOP);
+        _heapManager.SetClassOOP(processOOP, processClassOOP);
 
         // Set instance variables using fixed indices from VMConstants
-        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX + 1, suspendedContextOOP);
-        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_PRIORITY_INDEX + 1, SmalltalkOOP.FromSmallInteger(priority));
-        _heapManager.SetSlot(processOOP, VMConstants.PROCESS_MYLIST_INDEX + 1, GlobalRegistry.Get("nil"));
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, suspendedContextOOP);
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX, SmalltalkOOP.FromSmallInteger(priority));
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, GlobalRegistry.Get("nil"));
 
         return processOOP;
     }

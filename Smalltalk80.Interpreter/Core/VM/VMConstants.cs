@@ -26,12 +26,12 @@ public static class VMConstants
     //   instanceVariableNames: 'method receiver'
     //
     // Complete layout:
-    //   Slot 0: sender (from InstructionStream) - caller context
-    //   Slot 1: pc (from InstructionStream) - program counter
-    //   Slot 2: stackp (from ContextPart) - stack pointer
-    //   Slot 3: method (MethodContext field) - CompiledMethod being executed
-    //   Slot 4: receiver (MethodContext field) - self
-    //   Slot 5+: indexed temps/stack (variable part)
+    //   Instance variable 0: sender (from InstructionStream) - caller context
+    //   Instance variable 1: pc (from InstructionStream) - program counter
+    //   Instance variable 2: stackp (from ContextPart) - stack pointer
+    //   Instance variable 3: method (MethodContext field) - CompiledMethod being executed
+    //   Instance variable 4: receiver (MethodContext field) - self
+    //   Instance variable 5+: indexed temps/stack (variable part)
 
     // Common context fields (shared by all contexts)
     public const int CONTEXT_SENDER_INDEX = 0;           // InstructionStream field (dynamic call chain)
@@ -59,14 +59,14 @@ public static class VMConstants
     // non-overlapping blocks.
     //
     // Complete layout (Blue Book + VM Extension):
-    //   Slot 0: sender (from InstructionStream) - caller field, set by primitiveValue
-    //   Slot 1: pc (from InstructionStream) - instruction pointer
-    //   Slot 2: stackp (from ContextPart) - stack pointer
-    //   Slot 3: nargs (BlockContext field) - block argument count
-    //   Slot 4: startpc (BlockContext field) - saved PC (called initialIP in Blue Book)
-    //   Slot 5: home (BlockContext field) - lexical parent (always the MethodContext in unified frame)
-    //   Slot 6: argStartIndex (VM EXTENSION) - starting index in MethodContext temp frame for block args
-    //   Slot 7+: indexed slots - expression stack ONLY
+    //   Instance variable 0: sender (from InstructionStream) - caller field, set by primitiveValue
+    //   Instance variable 1: pc (from InstructionStream) - instruction pointer
+    //   Instance variable 2: stackp (from ContextPart) - stack pointer
+    //   Instance variable 3: nargs (BlockContext field) - block argument count
+    //   Instance variable 4: startpc (BlockContext field) - saved PC (called initialIP in Blue Book)
+    //   Instance variable 5: home (BlockContext field) - lexical parent (always the MethodContext in unified frame)
+    //   Instance variable 6: argStartIndex (VM EXTENSION) - starting index in MethodContext temp frame for block args
+    //   Instance variable 7+: indexed slots - expression stack ONLY
     //
     // IMPORTANT: BlockContext indexed slots (7+) are used ONLY for the expression stack.
     // Block arguments are stored in the home MethodContext's unified temp frame at indices
@@ -117,7 +117,7 @@ public static class VMConstants
     // Metaclass instanceVariableNames: 'thisClass' (plus inherited from Class/ClassDescription/Behavior)
     // This field is critical for resolving class variables in metaclass methods
 
-    public const int METACLASS_THISCLASS_INDEX = 6;  // Slot 6: thisClass (points to the regular class)
+    public const int METACLASS_THISCLASS_INDEX = 6;  // Instance variable 6: thisClass (points to the regular class)
 
     // ========================================================================
     // Process and ProcessorScheduler field indices

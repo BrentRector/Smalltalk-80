@@ -34,23 +34,6 @@ public interface ISmalltalkHeapManager
     /// <returns>Tagged OOP referencing new instance</returns>
     SmalltalkOOP AllocateInstanceOf(SmalltalkOOP classOOP, int indexedSize);
 
-
-    /// <summary>
-    /// Raw slot access - gets OOP from any slot (semantic-agnostic).
-    /// </summary>
-    /// <param name="objectOOP">Object to access</param>
-    /// <param name="slotIndex">Zero-based slot index</param>
-    /// <returns>OOP stored at slot</returns>
-    SmalltalkOOP GetSlot(SmalltalkOOP objectOOP, int slotIndex);
-
-    /// <summary>
-    /// Raw slot access - sets OOP in any slot (semantic-agnostic).
-    /// </summary>
-    /// <param name="objectOOP">Object to modify</param>
-    /// <param name="slotIndex">Zero-based slot index</param>
-    /// <param name="value">OOP to store at slot</param>
-    void SetSlot(SmalltalkOOP objectOOP, int slotIndex, SmalltalkOOP value);
-
     // Instance Variable Access (always OOPs)
     
     /// <summary>

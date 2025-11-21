@@ -117,13 +117,13 @@ public static class DiagnosticInspector
                 if (assocOOP == metadata.KnownObjects.Nil)
                     continue;
 
-                // Association has key at slot 1, value at slot 2
-                var keyOOP = heapManager.GetSlot(assocOOP, 1);
+                // Association has key at instance variable 0, value at instance variable 1
+                var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
                 var keyName = GetSymbolName(heapManager, bundle, keyOOP);
 
                 if (keyName == varName)
                 {
-                    var valueOOP = heapManager.GetSlot(assocOOP, 2);
+                    var valueOOP = heapManager.GetInstanceVariable(assocOOP, 1);
                     return FormatValue(heapManager, bundle, valueOOP, metadata);
                 }
             }
@@ -278,10 +278,10 @@ public static class DiagnosticInspector
                 if (assocOOP == metadata.KnownObjects.Nil)
                     continue;
 
-                // Association has key at slot 1, value at slot 2
-                var keyOOP = heapManager.GetSlot(assocOOP, 1);
+                // Association has key at instance variable 0, value at instance variable 1
+                var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
                 var keyName = GetSymbolName(heapManager, bundle, keyOOP);
-                var valueOOP = heapManager.GetSlot(assocOOP, 2);
+                var valueOOP = heapManager.GetInstanceVariable(assocOOP, 1);
                 var value = FormatValue(heapManager, bundle, valueOOP, metadata);
 
                 foundVariables.Add(keyName);
@@ -329,7 +329,7 @@ public static class DiagnosticInspector
                     continue;
                 }
 
-                // Check both slot 3 and slot 4 to be sure
+                // Check both instance variable 2 and instance variable 3 to be sure
                 for (int slotIndex = 3; slotIndex <= 4; slotIndex++)
                 {
                     var fieldValueOOP = heapManager.GetInstanceVariable(classOOP, slotIndex);
@@ -409,7 +409,7 @@ public static class DiagnosticInspector
         // Try to get object class for better display
         try
         {
-            var classOOP = heapManager.GetSlot(oop, 0);
+            var classOOP = heapManager.GetClassOOP(oop);
             if (classOOP != nilOOP && !classOOP.IsSmallInteger)
             {
                 // STRATEGY 1: Check if THIS object is a Class object itself
@@ -594,7 +594,7 @@ public static class DiagnosticInspector
                     Console.WriteLine($"        Format: {format}");
 
                     // Get class OOP
-                    var classOOP = heapManager.GetSlot(literalOOP, 0);
+                    var classOOP = heapManager.GetClassOOP(literalOOP);
                     Console.WriteLine($"        Class OOP: {classOOP}");
 
                     if (format == ObjectFormat.Pointer)

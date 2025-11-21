@@ -534,7 +534,7 @@ public class Phase2_ClassInfrastructure : IPhase
         );
 
         // Set class reference (will be done by PhaseX, but we can set it now since Dictionary class exists)
-        _heapManager.SetSlot(dictOOP, 0, dictClassOOP);
+        _heapManager.SetClassOOP(dictOOP, dictClassOOP);
 
         // Initialize tally to SmallInteger 0
         // Find 'tally' instance variable index in Dictionary hierarchy
@@ -651,7 +651,7 @@ public class Phase2_ClassInfrastructure : IPhase
     }
 
     /// <summary>
-    /// Populates ClassDescription.instanceVariables field (slot 4) with Array-of-Strings
+    /// Populates ClassDescription.instanceVariables field (instance variable 4) with Array-of-Strings
     /// containing the class's own instance variable names (not inherited ones).
     /// This enables runtime reflection via RuntimeHeapAccessor.BuildFieldMap().
     ///
@@ -689,7 +689,7 @@ public class Phase2_ClassInfrastructure : IPhase
             {
                 // Set instanceVariables to empty Array (not nil)
                 var emptyArrayOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 0, 0);
-                _heapManager.SetSlot(emptyArrayOOP, 0, arrayClassOOP);
+                _heapManager.SetClassOOP(emptyArrayOOP, arrayClassOOP);
                 SetAndTrackInstanceVariable(classOOP, 4, emptyArrayOOP);
                 continue;
             }
@@ -705,7 +705,7 @@ public class Phase2_ClassInfrastructure : IPhase
 
                 // Allocate ByteIndexed String object
                 var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, varNameBytes.Length);
-                _heapManager.SetSlot(stringOOP, 0, stringClassOOP);  // Set class reference
+                _heapManager.SetClassOOP(stringOOP, stringClassOOP);  // Set class reference
 
                 // Copy bytes into String object
                 for (int b = 0; b < varNameBytes.Length; b++)
@@ -719,7 +719,7 @@ public class Phase2_ClassInfrastructure : IPhase
 
             // Allocate Array object to hold the String objects
             var instVarsArrayOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 0, cls.InstVarNames.Length);
-            _heapManager.SetSlot(instVarsArrayOOP, 0, arrayClassOOP);  // Set class reference
+            _heapManager.SetClassOOP(instVarsArrayOOP, arrayClassOOP);  // Set class reference
 
             // Populate Array with String OOPs
             for (int i = 0; i < instVarStringOOPs.Length; i++)
@@ -729,7 +729,7 @@ public class Phase2_ClassInfrastructure : IPhase
 
             arrayCount++;
 
-            // Set ClassDescription.instanceVariables field (slot 4)
+            // Set ClassDescription.instanceVariables field (instance variable 4)
             SetAndTrackInstanceVariable(classOOP, 4, instVarsArrayOOP);
             classCount++;
         }

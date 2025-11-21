@@ -825,9 +825,9 @@ public class Phase6_ValidationAndGC : IPhase
                         if (obj.format == ObjectFormat.PointerIndexed)
                         {
                             var arrayOOP = new SmalltalkOOP(obj.oop);
-                            
+
                             // Check slot 0 (class pointer) to see what class this REALLY is
-                            var classOOP = _heapManager.GetSlot(arrayOOP, 0);
+                            var classOOP = _heapManager.GetClassOOP(arrayOOP);
                             string actualClassName = "?";
                             string homeClassInfo = "";
                             try
@@ -845,7 +845,7 @@ public class Phase6_ValidationAndGC : IPhase
                                     else
                                     {
                                         var homeClassName = _heapManager.GetClassName(homeClassOOP);
-                                        var homeClassClass = _heapManager.GetSlot(homeClassOOP, 0);
+                                        var homeClassClass = _heapManager.GetClassOOP(homeClassOOP);
                                         var homeClassClassClass = _heapManager.GetClassName(homeClassClass);
                                         homeClassInfo = $" [homeClass={homeClassOOP}:{homeClassName}, homeClass.class={homeClassClass}:{homeClassClassClass}]";
                                     }

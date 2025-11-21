@@ -56,7 +56,7 @@ public partial class VirtualMachine
         // When executing in a method, _contextManager.ActiveContext is already a MethodContext.
 
         // Check if we're in a BlockContext or MethodContext
-        var contextClass = GetClassName(_heapManager.GetSlot(_contextManager.ActiveContext, 0));
+        var contextClass = GetClassName(_heapManager.GetClassOOP(_contextManager.ActiveContext));
         SmalltalkOOP methodContextOOP;
 
         if (contextClass == "BlockContext")
@@ -77,7 +77,7 @@ public partial class VirtualMachine
                 $"Super send requires MethodContext or BlockContext, but _contextManager.ActiveContext is {contextClass}.");
         }
 
-        // Now read the method from the MethodContext (slot 3)
+        // Now read the method from the MethodContext (instance variable 3)
         int methodIndex = VMConstants.CONTEXT_METHOD_INDEX;
         var currentMethodOOP = _heapManager.GetInstanceVariable(methodContextOOP, methodIndex);
 

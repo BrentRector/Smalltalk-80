@@ -87,7 +87,7 @@ public class DictionaryService
             try
             {
                 // Check if this is an Association object
-                var classOOP = _allocator.GetSlot(objectOOP, 0);
+                var classOOP = _allocator.GetClassOOP(objectOOP);
                 if (classOOP == associationClassOOP)
                 {
                     // Get the key (instance variable 0)
@@ -124,7 +124,7 @@ public class DictionaryService
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
         SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
 
-        // Get the key symbol from the Association (slot 0)
+        // Get the key symbol from the Association (instance variable 0)
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup (same algorithm as Dictionary>>findKeyOrNil:)
@@ -180,7 +180,7 @@ public class DictionaryService
         int dictSize = _allocator.GetIndexedSize(dictionaryOOP);
         SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
 
-        // Get the key symbol from the Association (slot 0)
+        // Get the key symbol from the Association (instance variable 0)
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup
