@@ -49,12 +49,6 @@ public class InitExpressionExecutor
     {
         // Get the suspended context from the Process (instance variable 1: suspendedContext)
         var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-
-        // DEBUG: Verify we extracted a context, not the process itself
-        Console.WriteLine($"[ResumeProcess] processOOP={processOOP}, contextOOP={contextOOP}");
-        Console.WriteLine($"[ResumeProcess] process class={_heapManager.GetClassName(processOOP)}");
-        Console.WriteLine($"[ResumeProcess] context class={_heapManager.GetClassName(contextOOP)}");
-
         return _vm.ExecuteExistingContext(contextOOP);
     }
 
@@ -136,7 +130,6 @@ public class InitExpressionExecutor
 
             // Step 3: Create MethodContext for init expression
             SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
-            Console.WriteLine($"[ExecuteInitExpression] methodContextOOP returned={methodContextOOP}");
 
             // Step 4: Create Process with this context
             SmalltalkOOP processOOP = CreateProcess(methodContextOOP, priority: 4);
@@ -258,10 +251,6 @@ public class InitExpressionExecutor
             _heapManager.SetIndexedOOP(contextOOP, i, _heapManager.GetNil());
         }
 
-        // DEBUG: Verify what we're returning
-        Console.WriteLine($"[CreateMethodContext] Created contextOOP={contextOOP}");
-        Console.WriteLine($"[CreateMethodContext] context class={_heapManager.GetClassName(contextOOP)}");
-
         return contextOOP;
     }
 
@@ -360,11 +349,6 @@ public class InitExpressionExecutor
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, suspendedContextOOP);
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX, SmalltalkOOP.FromSmallInteger(priority));
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _heapManager.GetNil());
-
-        // DEBUG: Verify what we stored
-        Console.WriteLine($"[CreateProcess] Created processOOP={processOOP}");
-        Console.WriteLine($"[CreateProcess] Stored suspendedContextOOP={suspendedContextOOP}");
-        Console.WriteLine($"[CreateProcess] suspendedContext class={_heapManager.GetClassName(suspendedContextOOP)}");
 
         return processOOP;
     }

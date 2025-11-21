@@ -20,16 +20,9 @@ internal class ObjectTableManager : IObjectTableManager
 
     public int AllocateObjectTableIndex()
     {
-        // DEBUG: Show allocation state
-        Console.WriteLine($"[AllocateObjectTableIndex] _nextObjectTableIndex={_nextObjectTableIndex}, freeList.Count={_freeObjectTableIndices.Count}");
-
         // Reuse free index if available
         if (_freeObjectTableIndices.Count > 0)
-        {
-            int reusedIndex = _freeObjectTableIndices.Pop();
-            Console.WriteLine($"[AllocateObjectTableIndex] Reusing free index: {reusedIndex}");
-            return reusedIndex;
-        }
+            return _freeObjectTableIndices.Pop();
 
         // Canonical mapping: index >= 1, so (index - 1) gives 0-based block/entry
         int blockIndex = (_nextObjectTableIndex - 1) / ObjectTableBlock.BlockSize;
@@ -38,9 +31,7 @@ internal class ObjectTableManager : IObjectTableManager
             _objectTableBlocks.Add(new ObjectTableBlock());
         }
 
-        int allocated = _nextObjectTableIndex++;
-        Console.WriteLine($"[AllocateObjectTableIndex] Allocated new index: {allocated}");
-        return allocated;
+        return _nextObjectTableIndex++;
     }
 
     public ObjectTableEntry GetObjectTableEntry(SmalltalkOOP objectOOP)
