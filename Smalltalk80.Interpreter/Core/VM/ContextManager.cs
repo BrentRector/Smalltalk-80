@@ -280,7 +280,8 @@ internal class ContextManager(
 
     /// <summary>
     /// Displays pool statistics if any contexts were pooled since last GC.
-    /// Shows hit rate, miss rate, and eviction count.
+    /// Shows pool size, hit rate (if there were requests), and eviction count.
+    /// Only displays if there are contexts in the pool.
     /// </summary>
     private void DisplayPoolStatistics()
     {
@@ -293,19 +294,21 @@ internal class ContextManager(
 
         // Only display if there are pooled contexts
         if (totalPooled == 0)
-        {
             return;
-        }
 
+        // Display statistics based on whether there have been requests
         long totalRequests = _poolHits + _poolMisses;
-        if (totalRequests == 0)
+        if (totalRequests > 0)
         {
-            return;
+            // Have requests - show hit rate
+            double hitRate = (_poolHits * 100.0) / totalRequests;
+            Console.WriteLine($"    Context Pool: {totalPooled} contexts, {_poolHits}/{totalRequests} hits ({hitRate:F1}%), {_poolEvictions} evicted");
         }
-
-        double hitRate = (_poolHits * 100.0) / totalRequests;
-
-        Console.WriteLine($"    Context Pool: {totalPooled} contexts, {_poolHits}/{totalRequests} hits ({hitRate:F1}%), {_poolEvictions} evicted");
+        else
+        {
+            // No requests yet - just show pool size and evictions
+            Console.WriteLine($"    Context Pool: {totalPooled} contexts (no requests yet), {_poolEvictions} evicted");
+        }
     }
 
     /// <summary>
