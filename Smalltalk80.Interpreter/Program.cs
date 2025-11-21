@@ -392,17 +392,15 @@ public static class Program
                     return;
                 }
 
-                // Execute ONLY THE FIRST initialize! expression with on-demand compilation and GC verification
+                // Execute all initialize! expressions with on-demand compilation and GC verification
                 Console.WriteLine($"\n=== Init Expression Execution ===");
                 Console.WriteLine($"  Total initialize! expressions: {phase1Indices.Count}");
-                Console.WriteLine($"  Executing first 4 expressions (shakedown test)");
+                Console.WriteLine($"  Executing all expressions (2 skipped)");
                 Console.WriteLine();
 
                 succeeded = 0;
                 failed = 0;
 
-                // Get the first 4 init expression indices (or fewer if not available)
-                int expressionLimit = Math.Min(4, phase1Indices.Count);
                 if (phase1Indices.Count == 0)
                 {
                     Console.WriteLine("  No initialize! expressions found");
@@ -412,8 +410,8 @@ public static class Program
                 // Create InitExpressionCompiler for on-demand compilation (runtime-safe)
                 var compiler = new InitExpressionCompiler(heapManager, bundle, vmMetadata);
 
-                // Execute the first 4 init expressions
-                for (int i = 0; i < expressionLimit; i++)
+                // Execute all init expressions
+                for (int i = 0; i < phase1Indices.Count; i++)
                 {
                     int exprIndex = phase1Indices[i];
                     var expr = bundle.InitExpressions[exprIndex];
