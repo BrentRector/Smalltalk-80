@@ -205,7 +205,7 @@ public class InitExpressionExecutor
         var effectiveTimeout = timeoutMs ?? _defaultTimeoutMs;
         var stopwatch = Stopwatch.StartNew();
 
-        Console.Write($"  {expr.Source}...");
+        Console.WriteLine($"  {expr.Source}...");
 
         try
         {
