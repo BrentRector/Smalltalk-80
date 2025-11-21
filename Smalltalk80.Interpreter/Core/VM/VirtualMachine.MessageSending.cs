@@ -204,7 +204,7 @@ public partial class VirtualMachine
         }
 
         // Debug: check for classId 0 on "comment:" send
-        if (classOOP == heapManager.GetNil())
+        if (classOOP == _heapManager.GetNil())
         {
             throw new InvalidOperationException(
                 $"Method not found: {selectorName ?? "unknown"} in class 0 (receiver OOP={receiverOOP}, receiverId has classId 0!)");
@@ -453,7 +453,7 @@ public partial class VirtualMachine
         Console.WriteLine();
 
         // Display temps (if in active context)
-        if (_contextManager.ActiveContext != heapManager.GetNil())
+        if (_contextManager.ActiveContext != _heapManager.GetNil())
         {
             Console.WriteLine($"TEMPORARIES ({tempCount}):");
             for (int i = 0; i < tempCount; i++)
@@ -465,7 +465,7 @@ public partial class VirtualMachine
         }
 
         // Display stack
-        if (_contextManager.ActiveContext != heapManager.GetNil())
+        if (_contextManager.ActiveContext != _heapManager.GetNil())
         {
             int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
             var stackpOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, stackpIndex);

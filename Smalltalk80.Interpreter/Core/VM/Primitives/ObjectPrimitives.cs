@@ -52,7 +52,7 @@ public static class SimpleObjectPrimitives
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
 
             bool identical = context.Receiver == context.Arguments[0];
-            return PrimitiveResult.FromBool(identical);
+            return PrimitiveResult.FromBool(identical, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -445,7 +445,7 @@ public static class SimpleObjectPrimitives
             int position = positionOOP.AsSmallInteger();
             int readLimit = readLimitOOP.AsSmallInteger();
 
-            return PrimitiveResult.FromBool(position > readLimit);
+            return PrimitiveResult.FromBool(position > readLimit, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 

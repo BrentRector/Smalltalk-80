@@ -108,7 +108,7 @@ public static class FloatArithmetic
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail();
-            return PrimitiveResult.FromBool(a < b);
+            return PrimitiveResult.FromBool(a < b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -120,7 +120,7 @@ public static class FloatArithmetic
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail();
-            return PrimitiveResult.FromBool(a > b);
+            return PrimitiveResult.FromBool(a > b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -132,7 +132,7 @@ public static class FloatArithmetic
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail();
-            return PrimitiveResult.FromBool(a <= b);
+            return PrimitiveResult.FromBool(a <= b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -144,7 +144,7 @@ public static class FloatArithmetic
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail();
-            return PrimitiveResult.FromBool(a >= b);
+            return PrimitiveResult.FromBool(a >= b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -156,7 +156,7 @@ public static class FloatArithmetic
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail();
-            return PrimitiveResult.FromBool(a == b);
+            return PrimitiveResult.FromBool(a == b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -168,7 +168,7 @@ public static class FloatArithmetic
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail();
             if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail();
-            return PrimitiveResult.FromBool(a != b);
+            return PrimitiveResult.FromBool(a != b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 

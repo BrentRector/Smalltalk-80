@@ -156,7 +156,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left < right);
+            return PrimitiveResult.FromBool(left < right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -171,7 +171,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left > right);
+            return PrimitiveResult.FromBool(left > right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -186,7 +186,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left <= right);
+            return PrimitiveResult.FromBool(left <= right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -201,7 +201,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left >= right);
+            return PrimitiveResult.FromBool(left >= right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -216,7 +216,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left == right);
+            return PrimitiveResult.FromBool(left == right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -231,7 +231,7 @@ public static class LargeIntegerArithmetic
 
             BigInteger left = ToBigInteger(context, context.Receiver);
             BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left != right);
+            return PrimitiveResult.FromBool(left != right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 

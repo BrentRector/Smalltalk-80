@@ -14,7 +14,7 @@ public static class DiagnosticInspector
     /// <summary>
     /// Diagnoses Float class variables by comparing expected vs actual values.
     /// </summary>
-    public static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle)
+    public static void DiagnoseFloatClassVariables(ISmalltalkHeapManager heapManager, ColdStartBundle bundle, VMMetadata metadata)
     {
         try
         {
@@ -53,7 +53,7 @@ public static class DiagnosticInspector
             // Get class variables from SystemDictionary associations
             foreach (var varName in expectedValues.Keys)
             {
-                var actual = GetClassVariableValue(heapManager, bundle, varName);
+                var actual = GetClassVariableValue(heapManager, bundle, varName, metadata);
                 var expected = expectedValues[varName];
 
                 Console.WriteLine($"{varName}:");
@@ -124,7 +124,7 @@ public static class DiagnosticInspector
                 if (keyName == varName)
                 {
                     var valueOOP = heapManager.GetSlot(assocOOP, 2);
-                    return FormatValue(heapManager, bundle, valueOOP);
+                    return FormatValue(heapManager, bundle, valueOOP, metadata);
                 }
             }
 
@@ -458,11 +458,11 @@ public static class DiagnosticInspector
     /// <summary>
     /// Tests RuntimeHeapAccessor.BuildFieldMap() to verify it can read instance variable names.
     /// </summary>
-    public static void TestBuildFieldMap(ISmalltalkHeapManager heapManager)
+    public static void TestBuildFieldMap(ISmalltalkHeapManager heapManager, VMMetadata metadata)
     {
         try
         {
-            var runtimeHeapAccess = new RuntimeHeapAccessor(heapManager);
+            var runtimeHeapAccess = new RuntimeHeapAccessor(heapManager, metadata);
             Console.WriteLine("Building field map from heap...");
 
             var startTime = System.Diagnostics.Stopwatch.StartNew();

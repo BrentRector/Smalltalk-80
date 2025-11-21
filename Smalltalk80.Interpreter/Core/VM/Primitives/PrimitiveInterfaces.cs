@@ -224,7 +224,7 @@ public readonly struct PrimitiveExecutionContext
             return RuntimeHeapAccess.GetClass(name);
 
         // For globals, look up in SystemDictionary
-        var systemDictOOP = metadata.KnownObjects.Smalltalk;
+        var systemDictOOP = Metadata!.KnownObjects.Smalltalk;
         return RuntimeHeapAccess.LookupGlobalByName(systemDictOOP, name);
     }
 }

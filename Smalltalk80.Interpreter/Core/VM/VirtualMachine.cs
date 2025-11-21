@@ -88,9 +88,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     public VirtualMachine(ISmalltalkHeapManager heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
     {
         _heapManager = heapManager;
-        
+
         _layoutResolver = layoutResolver;
-        _runtimeHeapAccess = new RuntimeHeapAccessor(heapManager);
+        _runtimeHeapAccess = new RuntimeHeapAccessor(heapManager, metadata);
         RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
         _metadata = metadata;
         _platformBridge = platformBridge;
@@ -117,7 +117,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         _messageDispatcher = new MessageDispatcher(
             heapManager,
-            this // IObjectMetadataAccessor
+            this, // IObjectMetadataAccessor
+            metadata
         );
 
         _bytecodeInterpreter = new BytecodeInterpreter(
@@ -130,7 +131,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _debugger = new VMDebugger(
             heapManager,
             _contextManager,
-            this // IBytecodeContext
+            this, // IBytecodeContext
+            metadata
         );
 
         // Initialize primitive registry with new IPrimitive implementations
@@ -138,10 +140,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _primitiveRegistry = Primitives.PrimitiveRegistry.CreateWithNewPrimitives();
 
         // Initialize selector cache (populated later via InitializeSelectorCaches)
-        _selectorCache = new SelectorCache(heapManager);
+        _selectorCache = new SelectorCache(heapManager, metadata);
 
         // Initialize NLR handler
-        _nlrHandler = new NonLocalReturnHandler();
+        _nlrHandler = new NonLocalReturnHandler(metadata.KnownObjects.Nil);
     }
 
     /// <summary>
