@@ -11,23 +11,19 @@ namespace Smalltalk80.Interpreter.Engine.InitExecution;
 /// Compiles init expressions on-demand from ColdStartBundle.
 /// This allows init expressions to be compiled only when needed, ensuring they're
 /// reachable via Processor.activeProcess during execution (avoiding GC collection).
+/// RUNTIME SAFE: Uses only runtime-available infrastructure, not cold-start classes.
 /// </summary>
 public class InitExpressionCompiler
 {
     private readonly ISmalltalkHeap _heapManager;
     private readonly ColdStartBundle _bundle;
-    private readonly LayoutResolver _layoutResolver;
-    private readonly LiteralResolver _literalResolver;
 
     public InitExpressionCompiler(
         ISmalltalkHeap heapManager,
-        ColdStartBundle bundle,
-        LayoutResolver layoutResolver)
+        ColdStartBundle bundle)
     {
         _heapManager = heapManager ?? throw new ArgumentNullException(nameof(heapManager));
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
-        _layoutResolver = layoutResolver ?? throw new ArgumentNullException(nameof(layoutResolver));
-        _literalResolver = new LiteralResolver(heapManager, bundle);
     }
 
     /// <summary>
@@ -36,8 +32,8 @@ public class InitExpressionCompiler
     /// </summary>
     public SmalltalkOOP CompileInitExpression(InitExpression expr)
     {
-        // Resolve literals using the SAME canonicalization mechanism as regular methods
-        var literalOOPs = expr.Literals.Select(_literalResolver.ResolveLiteralValueAsOOP).ToArray();
+        // Resolve literals at runtime from the heap
+        var literalOOPs = expr.Literals.Select(ResolveLiteralValueAtRuntime).ToArray();
 
         // Determine homeClass from the resolved literals
         string homeClassLocalId = ExtractHomeClassFromInitExpression(expr, literalOOPs);
@@ -205,5 +201,96 @@ public class InitExpressionCompiler
         // Note: This may need adjustment based on actual VM layout
 
         return methodOOP;
+    }
+
+    /// <summary>
+    /// Resolves a literal value from the bundle to a heap OOP at runtime.
+    /// RUNTIME SAFE: Only uses runtime-available infrastructure.
+    /// </summary>
+    private SmalltalkOOP ResolveLiteralValueAtRuntime(LiteralValue literalValue)
+    {
+        switch (literalValue.Type)
+        {
+            case LiteralType.SmallInteger:
+                return SmalltalkOOP.FromSmallInteger(literalValue.IntValue ?? 0);
+
+            case LiteralType.Symbol:
+                // Symbols should already exist in the heap from cold start
+                return FindSymbol(literalValue.StringValue ?? "");
+
+            case LiteralType.Association:
+                // Look up association by key in SystemDictionary
+                var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
+                var keySymbolOOP = FindSymbol(literalValue.StringValue ?? "");
+                return FindAssociation(smalltalkOOP, keySymbolOOP);
+
+            case LiteralType.Nil:
+                return _heapManager.GetNil();
+
+            case LiteralType.True:
+                return GlobalRegistry.Get("true");
+
+            case LiteralType.False:
+                return GlobalRegistry.Get("false");
+
+            default:
+                throw new InvalidOperationException($"Unsupported literal type at runtime: {literalValue.Type}");
+        }
+    }
+
+    /// <summary>
+    /// Finds a symbol OOP by name from the existing heap.
+    /// </summary>
+    private SmalltalkOOP FindSymbol(string symbolText)
+    {
+        foreach (var (index, symbolOOP) in SymbolRegistry.AllSymbols())
+        {
+            var symbolString = ReadSymbolString(symbolOOP);
+            if (symbolString == symbolText)
+            {
+                return symbolOOP;
+            }
+        }
+
+        return _heapManager.GetNil();
+    }
+
+    /// <summary>
+    /// Reads a Symbol object's string value from the heap.
+    /// </summary>
+    private string ReadSymbolString(SmalltalkOOP symbolOOP)
+    {
+        int size = _heapManager.GetIndexedSize(symbolOOP);
+        var bytes = new byte[size];
+
+        for (int i = 0; i < size; i++)
+        {
+            bytes[i] = _heapManager.GetIndexedByte(symbolOOP, i);
+        }
+
+        return System.Text.Encoding.UTF8.GetString(bytes);
+    }
+
+    /// <summary>
+    /// Finds an Association in the SystemDictionary by key symbol.
+    /// </summary>
+    private SmalltalkOOP FindAssociation(SmalltalkOOP systemDictOOP, SmalltalkOOP keySymbolOOP)
+    {
+        int size = _heapManager.GetIndexedSize(systemDictOOP);
+
+        for (int i = 0; i < size; i++)
+        {
+            var assocOOP = _heapManager.GetIndexedOOP(systemDictOOP, i);
+            if (assocOOP == _heapManager.GetNil())
+                continue;
+
+            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            if (keyOOP == keySymbolOOP)
+            {
+                return assocOOP;
+            }
+        }
+
+        return _heapManager.GetNil();
     }
 }

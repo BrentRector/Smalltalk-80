@@ -416,8 +416,8 @@ public static class Program
                 Console.WriteLine($"  First expression: [{firstIndex}] {firstExpr.Source}");
                 Console.WriteLine();
 
-                // Create InitExpressionCompiler for on-demand compilation
-                var compiler = new InitExpressionCompiler(heapManager, bundle, layoutResolver);
+                // Create InitExpressionCompiler for on-demand compilation (runtime-safe)
+                var compiler = new InitExpressionCompiler(heapManager, bundle);
 
                 // Execute the first init expression with on-demand compilation and GC verification
                 var result = executor.ExecuteInitExpressionOnDemand(firstExpr, compiler);
