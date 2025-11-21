@@ -13,7 +13,7 @@ public static class InputOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Default to origin (0,0) for headless mode
             int x = 0, y = 0;
@@ -27,7 +27,7 @@ public static class InputOperations
             // Get Point class OOP
             var pointClassOOP = context.RuntimeHeapAccess?.GetClass("Point");
             if (pointClassOOP == null || pointClassOOP == context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             // Allocate Point instance with 2 instance variables (x, y)
             SmalltalkOOP pointOOP = context.HeapManager.AllocateInstanceOf(pointClassOOP.Value, 0);
@@ -45,17 +45,17 @@ public static class InputOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var point = context.Arguments[0];
-            if (point.IsSmallInteger) return PrimitiveResult.Fail();
+            if (point.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Extract x and y coordinates from Point instance variables
             SmalltalkOOP xOOP = context.HeapManager.GetInstanceVariable(point, 0);
             SmalltalkOOP yOOP = context.HeapManager.GetInstanceVariable(point, 1);
 
             if (!xOOP.IsSmallInteger || !yOOP.IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int x = xOOP.AsSmallInteger();
             int y = yOOP.AsSmallInteger();
@@ -75,10 +75,10 @@ public static class InputOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var cursorOOP = context.Arguments[0];
-            if (cursorOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (cursorOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Stub implementation - accept cursor and succeed
             return PrimitiveResult.Ok(context.Receiver);
@@ -90,13 +90,13 @@ public static class InputOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var semaphoreOOP = context.Arguments[0];
 
             // SmallIntegers not allowed (except nil)
             if (semaphoreOOP.IsSmallInteger && semaphoreOOP != context.HeapManager.GetNil())
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             // Register semaphore with platform event system
             if (context.Platform != null)
@@ -113,10 +113,10 @@ public static class InputOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var intervalOOP = context.Arguments[0];
-            if (!intervalOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!intervalOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int intervalMs = intervalOOP.AsSmallInteger();
 
@@ -135,7 +135,7 @@ public static class InputOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Default to 0 (no events) for headless mode
             int inputWord = 0;

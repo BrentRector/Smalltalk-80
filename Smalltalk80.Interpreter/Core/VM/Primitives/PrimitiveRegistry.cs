@@ -34,7 +34,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         }
 
         // Primitive not found
-        return PrimitiveResult.Fail();
+        return PrimitiveResult.Fail(context.Metadata!);
     }
 
     /// <inheritdoc/>

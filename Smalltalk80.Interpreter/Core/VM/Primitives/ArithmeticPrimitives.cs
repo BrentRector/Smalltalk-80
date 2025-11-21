@@ -18,9 +18,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -29,10 +29,10 @@ public static class SmallIntegerArithmetic
             {
                 int result = checked(a + b);
                 if (result < SmallIntegerMin || result > SmallIntegerMax)
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(result));
             }
-            catch (OverflowException) { return PrimitiveResult.Fail(); }
+            catch (OverflowException) { return PrimitiveResult.Fail(context.Metadata!); }
         }
     }
 
@@ -41,9 +41,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -52,10 +52,10 @@ public static class SmallIntegerArithmetic
             {
                 int result = checked(a - b);
                 if (result < SmallIntegerMin || result > SmallIntegerMax)
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(result));
             }
-            catch (OverflowException) { return PrimitiveResult.Fail(); }
+            catch (OverflowException) { return PrimitiveResult.Fail(context.Metadata!); }
         }
     }
 
@@ -64,9 +64,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -79,9 +79,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -94,9 +94,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -109,9 +109,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -124,9 +124,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -139,9 +139,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -154,9 +154,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -165,10 +165,10 @@ public static class SmallIntegerArithmetic
             {
                 long result = (long)a * b;
                 if (result < SmallIntegerMin || result > SmallIntegerMax)
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)result));
             }
-            catch (OverflowException) { return PrimitiveResult.Fail(); }
+            catch (OverflowException) { return PrimitiveResult.Fail(context.Metadata!); }
         }
     }
 
@@ -177,19 +177,19 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
 
-            if (b == 0) return PrimitiveResult.Fail();
-            if (a % b != 0) return PrimitiveResult.Fail(); // Must be exact division
+            if (b == 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (a % b != 0) return PrimitiveResult.Fail(context.Metadata!); // Must be exact division
 
             int result = a / b;
             if (result < SmallIntegerMin || result > SmallIntegerMax)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(result));
         }
     }
@@ -199,14 +199,14 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
 
-            if (b == 0) return PrimitiveResult.Fail();
+            if (b == 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Smalltalk \\ uses floored division (result has same sign as divisor)
             int result = a - b * (int)Math.Floor((double)a / b);
@@ -219,14 +219,14 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
 
-            if (b == 0) return PrimitiveResult.Fail();
+            if (b == 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Smalltalk // uses floored division (rounds toward negative infinity)
             int result = (int)Math.Floor((double)a / b);
@@ -239,14 +239,14 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
 
-            if (b == 0) return PrimitiveResult.Fail();
+            if (b == 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // C# / already truncates toward zero
             int result = a / b;
@@ -259,9 +259,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -274,9 +274,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -289,9 +289,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
@@ -304,9 +304,9 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
 
             int a = context.Receiver.AsSmallInteger();
             int shift = context.Arguments[0].AsSmallInteger();
@@ -315,10 +315,10 @@ public static class SmallIntegerArithmetic
             if (shift >= 0)
             {
                 // Left shift - check for overflow
-                if (shift >= 31) return PrimitiveResult.Fail();
+                if (shift >= 31) return PrimitiveResult.Fail(context.Metadata!);
                 long shiftedValue = (long)a << shift;
                 if (shiftedValue < SmallIntegerMin || shiftedValue > SmallIntegerMax)
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
                 result = (int)shiftedValue;
             }
             else
@@ -356,10 +356,10 @@ public static class MiscArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             // Blue Book: primitive takes no arguments
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Must be a SmallInteger to convert to object pointer
-            if (!context.Receiver.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Extract integer value from tagged OOP
             int value = context.Receiver.AsSmallInteger();
@@ -369,10 +369,10 @@ public static class MiscArithmetic
             var oop = new SmalltalkOOP(objectPointer);
 
             // Verify the resulting OOP references a valid object in the heap
-            if (oop.IsSmallInteger) return PrimitiveResult.Fail();
+            if (oop.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Check if OOP is in valid range
-            if (objectPointer < 0) return PrimitiveResult.Fail();
+            if (objectPointer < 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // The heap manager will handle validation when the object is accessed
             return PrimitiveResult.Ok(oop);

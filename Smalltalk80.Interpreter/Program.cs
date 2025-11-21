@@ -1,16 +1,15 @@
-using Smalltalk80.Interpreter.Engine;
-using Smalltalk80.Interpreter.Engine.InitExecution;
-using Smalltalk80.Interpreter.Core.Schema;
-using Smalltalk80.Interpreter.Core.VM;
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
+using System.Windows.Forms;
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
+using Smalltalk80.Interpreter.Core.Schema;
+using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Engine;
+using Smalltalk80.Interpreter.Engine.InitExecution;
+using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Platform.Windows;
+using Smalltalk80.Interpreter.Shared.Types;
 using ClassHierarchyTraversal = Smalltalk80.Interpreter.Core.ClassHierarchyTraversal;
-using System.Windows.Forms;
 
 namespace Smalltalk80.Interpreter;
 
@@ -349,7 +348,7 @@ public static class Program
                     foreach (int index in testIndices)
                     {
                         var expr = bundle.InitExpressions[index];
-                        var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
+                        var initMethodOOP = heapManager.GetIndexedOOP(vmMetadata.InitExpressionMethods, index);
 
                         Console.WriteLine();
                         Console.WriteLine("******************************************");
@@ -404,7 +403,7 @@ public static class Program
                 foreach (int index in reorderedIndices)
                 {
                     var expr = bundle.InitExpressions[index];
-                    var initMethodOOP = heapManager.GetIndexedOOP(initArrayOOP, index);
+                    var initMethodOOP = heapManager.GetIndexedOOP(vmMetadata.InitExpressionMethods, index);
 
                     // Show what we're executing
                     Console.Write($"  [{index}] {expr.Source}... ");
@@ -551,7 +550,7 @@ public static class Program
                     );
 
                     var expr = bundle.InitExpressions[exprIndex];
-                    var methodOOP = heapManager.GetIndexedOOP(initArrayOOP, exprIndex);
+                    var methodOOP = heapManager.GetIndexedOOP(vmMetadata.InitExpressionMethods, exprIndex);
 
                     Console.WriteLine($"  Found expression at index {exprIndex}: {expr.Source}");
                     Console.WriteLine();

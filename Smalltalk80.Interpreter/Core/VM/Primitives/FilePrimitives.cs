@@ -119,13 +119,13 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? path = ExtractString(context, pathOOP);
-            if (path == null) return PrimitiveResult.Fail();
+            if (path == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -151,7 +151,7 @@ public static class FileOperations
             }
             catch
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
@@ -166,20 +166,20 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 4) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 4) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
             var accessOOP = context.Arguments[1];
             var shareOOP = context.Arguments[2];
             var createOOP = context.Arguments[3];
 
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!accessOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!shareOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!createOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!accessOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!shareOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!createOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? path = ExtractString(context, pathOOP);
-            if (path == null) return PrimitiveResult.Fail();
+            if (path == null) return PrimitiveResult.Fail(context.Metadata!);
 
             int accessMode = accessOOP.AsSmallInteger();
             int shareMode = shareOOP.AsSmallInteger();
@@ -200,10 +200,10 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var handleOOP = context.Arguments[0];
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int handle = handleOOP.AsSmallInteger();
             bool success = FileHandleManager.CloseFile(handle);
@@ -224,21 +224,21 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 3) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 3) return PrimitiveResult.Fail(context.Metadata!);
 
             var handleOOP = context.Arguments[0];
             var bufferOOP = context.Arguments[1];
             var countOOP = context.Arguments[2];
 
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (bufferOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!countOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (bufferOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!countOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int handle = handleOOP.AsSmallInteger();
             int count = countOOP.AsSmallInteger();
 
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail();
+            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -260,7 +260,7 @@ public static class FileOperations
             }
             catch
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
@@ -275,21 +275,21 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 3) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 3) return PrimitiveResult.Fail(context.Metadata!);
 
             var handleOOP = context.Arguments[0];
             var bufferOOP = context.Arguments[1];
             var countOOP = context.Arguments[2];
 
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (bufferOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!countOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (bufferOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!countOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int handle = handleOOP.AsSmallInteger();
             int count = countOOP.AsSmallInteger();
 
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail();
+            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -311,7 +311,7 @@ public static class FileOperations
             }
             catch
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
@@ -326,22 +326,22 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 3) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 3) return PrimitiveResult.Fail(context.Metadata!);
 
             var handleOOP = context.Arguments[0];
             var offsetOOP = context.Arguments[1];
             var originOOP = context.Arguments[2];
 
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!offsetOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (!originOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!offsetOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!originOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int handle = handleOOP.AsSmallInteger();
             int offset = offsetOOP.AsSmallInteger();
             int origin = originOOP.AsSmallInteger();
 
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail();
+            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -377,13 +377,13 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? path = ExtractString(context, pathOOP);
-            if (path == null) return PrimitiveResult.Fail();
+            if (path == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -407,18 +407,18 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
 
             var oldPathOOP = context.Arguments[0];
             var newPathOOP = context.Arguments[1];
 
-            if (oldPathOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (newPathOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (oldPathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (newPathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? oldPath = ExtractString(context, oldPathOOP);
             string? newPath = ExtractString(context, newPathOOP);
 
-            if (oldPath == null || newPath == null) return PrimitiveResult.Fail();
+            if (oldPath == null || newPath == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -442,13 +442,13 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? path = ExtractString(context, pathOOP);
-            if (path == null) return PrimitiveResult.Fail();
+            if (path == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -473,13 +473,13 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? path = ExtractString(context, pathOOP);
-            if (path == null) return PrimitiveResult.Fail();
+            if (path == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -504,13 +504,13 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? path = ExtractString(context, pathOOP);
-            if (path == null) return PrimitiveResult.Fail();
+            if (path == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -559,7 +559,7 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -650,13 +650,13 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var patternOOP = context.Arguments[0];
-            if (patternOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (patternOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? pattern = ExtractString(context, patternOOP);
-            if (pattern == null) return PrimitiveResult.Fail();
+            if (pattern == null) return PrimitiveResult.Fail(context.Metadata!);
 
             int handle = DirectoryEnumerator.FindFirst(pattern);
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(handle));
@@ -674,10 +674,10 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var handleOOP = context.Arguments[0];
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int handle = handleOOP.AsSmallInteger();
             string? fileName = DirectoryEnumerator.FindNext(handle);
@@ -702,10 +702,10 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var handleOOP = context.Arguments[0];
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int handle = handleOOP.AsSmallInteger();
             bool success = DirectoryEnumerator.FindClose(handle);
@@ -725,7 +725,7 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -734,7 +734,7 @@ public static class FileOperations
             }
             catch
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
@@ -749,13 +749,13 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? path = ExtractString(context, pathOOP);
-            if (path == null) return PrimitiveResult.Fail();
+            if (path == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -780,13 +780,13 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? path = ExtractString(context, pathOOP);
-            if (path == null) return PrimitiveResult.Fail();
+            if (path == null) return PrimitiveResult.Fail(context.Metadata!);
 
             bool exists = File.Exists(path) || Directory.Exists(path);
             return exists
@@ -805,7 +805,7 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var arg = context.Arguments[0];
 
@@ -816,24 +816,24 @@ public static class FileOperations
                 // Handle is an integer - get size from stream
                 int handle = arg.AsSmallInteger();
                 var stream = FileHandleManager.GetStream(handle);
-                if (stream == null) return PrimitiveResult.Fail();
+                if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
                 size = stream.Length;
             }
             else
             {
                 // Path is a string
                 string? path = ExtractString(context, arg);
-                if (path == null) return PrimitiveResult.Fail();
+                if (path == null) return PrimitiveResult.Fail(context.Metadata!);
 
                 try
                 {
                     var info = new FileInfo(path);
-                    if (!info.Exists) return PrimitiveResult.Fail();
+                    if (!info.Exists) return PrimitiveResult.Fail(context.Metadata!);
                     size = info.Length;
                 }
                 catch
                 {
-                    return PrimitiveResult.Fail();
+                    return PrimitiveResult.Fail(context.Metadata!);
                 }
             }
 
@@ -854,14 +854,14 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var handleOOP = context.Arguments[0];
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int handle = handleOOP.AsSmallInteger();
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail();
+            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
 
             long position = stream.Position;
             if (position > 0x3FFFFFFF) position = 0x3FFFFFFF;
@@ -880,18 +880,18 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
 
             var dirPathOOP = context.Arguments[0];
             var patternOOP = context.Arguments[1];
 
-            if (dirPathOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (patternOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (dirPathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (patternOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? dirPath = ExtractString(context, dirPathOOP);
             string? pattern = ExtractString(context, patternOOP);
 
-            if (dirPath == null || pattern == null) return PrimitiveResult.Fail();
+            if (dirPath == null || pattern == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -934,14 +934,14 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var handleOOP = context.Arguments[0];
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int handle = handleOOP.AsSmallInteger();
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail();
+            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -950,7 +950,7 @@ public static class FileOperations
             }
             catch
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
@@ -965,13 +965,13 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? path = ExtractString(context, pathOOP);
-            if (path == null) return PrimitiveResult.Fail();
+            if (path == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -980,7 +980,7 @@ public static class FileOperations
             }
             catch
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
@@ -995,18 +995,18 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail();
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
             var contentOOP = context.Arguments[1];
 
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail();
-            if (contentOOP.IsSmallInteger) return PrimitiveResult.Fail();
+            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (contentOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             string? path = ExtractString(context, pathOOP);
             string? content = ExtractString(context, contentOOP);
 
-            if (path == null || content == null) return PrimitiveResult.Fail();
+            if (path == null || content == null) return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
@@ -1015,7 +1015,7 @@ public static class FileOperations
             }
             catch
             {
-                return PrimitiveResult.Fail();
+                return PrimitiveResult.Fail(context.Metadata!);
             }
         }
     }
