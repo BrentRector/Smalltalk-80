@@ -1,6 +1,6 @@
 # Implementation Architecture
 
-**Last Updated**: 2025-11-18
+**Last Updated**: 2025-11-21
 
 This document describes how the Smalltalk-80 interpreter executes bytecodes, manages contexts, dispatches messages, and handles primitives.
 
@@ -310,6 +310,32 @@ The GC uses mark-sweep with root tracing:
 - Special objects array
 - Smalltalk global dictionary
 - Symbol table (USTable)
+- **ProcessorScheduler and forked processes**
+
+### Process Lifecycle and GC
+
+Forked processes (created via `BlockContext>>forkAt:`) remain in the ProcessorScheduler's quiescentProcessLists and keep their entire call stack alive as GC roots.
+
+**Example: Delay initialize**
+
+```smalltalk
+Delay class>>initializeTimingProcess
+    [[true] whileTrue: [...]] forkAt: Processor timingPriority
+```
+
+**Reference chain keeping contexts alive:**
+```
+SystemDictionary (root)
+  → Processor (ProcessorScheduler)
+    → quiescentProcessLists[priority]
+      → Process (forked background process)
+        → suspendedContext (BlockContext)
+          → home (MethodContext for initializeTimingProcess)
+            → sender chain
+              → MethodContext (Delay initialize) ← Kept alive
+```
+
+**This is expected behavior** - forked processes legitimately keep their call stacks alive. Init expression tests verify this and pass when contexts are reachable through forked processes.
 
 ### When GC Runs
 
