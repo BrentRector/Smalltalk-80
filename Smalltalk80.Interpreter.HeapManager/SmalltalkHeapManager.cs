@@ -8,7 +8,7 @@ namespace Smalltalk80.Interpreter.HeapManager;
 /// Uses tagged OOPs for SmallIntegers and ObjectTable indirection for heap objects.
 /// Delegates to specialized components for GC, table management, and become operations.
 /// </summary>
-public class SmalltalkHeapManager : ISmalltalkHeap, ISmalltalkHeap
+public class SmalltalkHeapManager : ISmalltalkHeap
 {
     private readonly IObjectTableManager _tableManager;
     private readonly IGarbageCollector _garbageCollector;

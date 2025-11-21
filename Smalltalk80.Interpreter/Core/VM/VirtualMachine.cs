@@ -1638,9 +1638,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     void IPrimitiveContext.BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2)
     {
         // Implement two-way become: swap the identities of oop1 and oop2
-        // This requires:
-        // 1. Swapping the object table entries
-        // 2. Updating ALL references in the heap to point to the swapped objects
+        // Swaps the ObjectTable entries - all existing OOP references are implicitly updated
+        // since OOPs are just indices into the ObjectTable
 
         _heapManager.Become.BecomeTwoWay(oop1, oop2);
     }
