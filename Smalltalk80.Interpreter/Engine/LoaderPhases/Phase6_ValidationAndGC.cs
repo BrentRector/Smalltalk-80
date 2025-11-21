@@ -778,11 +778,10 @@ public class Phase6_ValidationAndGC : IPhase
             ("Smalltalk", GlobalRegistry.SystemDictionaryOOP)
         };
 
-        // Add init expression methods if allocated
-        if (_initExpressionMethods != _heapManager.GetNil())
-        {
-            gcRootsList.Add(("InitExpressionMethods", _initExpressionMethods));
-        }
+        // NOTE: We no longer add InitExpressionMethods as a GC root!
+        // With full ProcessorScheduler integration, init expressions run in a Process context.
+        // The GC can trace: Processor (global) → activeProcess → suspendedContext → method
+        // This makes init expression methods naturally reachable during execution.
 
         // Set as GC roots (bulk operation - replaces any previous roots)
         _heapManager.GC.ClearGCRoots();

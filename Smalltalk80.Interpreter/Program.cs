@@ -191,6 +191,13 @@ public static class Program
                 // Initialize selector caches after cold start completes
                 vm.InitializeSelectorCaches();
 
+                // Initialize ProcessorScheduler for runtime execution
+                // Creates an initial Process and sets it as Processor.activeProcess
+                // This ensures all code (including init expressions) runs within a Process context
+                Console.WriteLine("\n=== Initializing ProcessorScheduler for Runtime ===");
+                var schedulerInitializer = new ProcessSchedulerInitializer(heapManager, vmMetadata);
+                var initialProcessOOP = schedulerInitializer.InitializeForRuntime();
+
                 var executor = new InitExpressionExecutor(
                     heapManager,
                     vm,
@@ -540,6 +547,11 @@ public static class Program
                     var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
                     vm.VerboseDebug = verboseDebug;
                     vm.InitializeSelectorCaches();
+
+                    // Initialize ProcessorScheduler for runtime execution
+                    Console.WriteLine("\n=== Initializing ProcessorScheduler for Runtime ===");
+                    var schedulerInitializer = new ProcessSchedulerInitializer(heapManager, vmMetadata);
+                    var initialProcessOOP = schedulerInitializer.InitializeForRuntime();
 
                     var executor = new InitExpressionExecutor(
                         heapManager,
