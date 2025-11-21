@@ -175,8 +175,8 @@ public class InitExpressionCompiler
         }
 
         // Create CompiledMethod object
-        // Format: PointerIndexed with literals + 1 slot for header
-        int methodLiteralCount = literalCount + 1; // +1 for header
+        // Format: PointerIndexed with header + literals + bytecode array OOP
+        int methodLiteralCount = literalCount + 2; // +1 for header, +1 for bytecode array OOP
         var methodOOP = _heapManager.AllocateObject(
             ObjectFormat.PointerIndexed,
             fixedSlots: 0,
@@ -199,9 +199,9 @@ public class InitExpressionCompiler
             _heapManager.SetIndexedOOP(methodOOP, i + 1, _heapManager.GetNil());
         }
 
-        // Store homeClass pointer (Blue Book specifies this is stored separately)
-        // In our implementation, we use a special indexed slot
-        // Note: This may need adjustment based on actual VM layout
+        // Store bytecode array OOP as last indexed slot
+        // Blue Book: CompiledMethod format is [header, literals..., bytecodeArrayOOP]
+        _heapManager.SetIndexedOOP(methodOOP, methodLiteralCount - 1, bytecodeArrayOOP);
 
         return methodOOP;
     }

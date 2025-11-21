@@ -25,6 +25,7 @@ public class ObjectGraphAllocator
     private static readonly HashSet<SmalltalkOOP> TrackedOOPs = new()
     {
         new SmalltalkOOP(6750),
+        new SmalltalkOOP(13500),  // Track reused object table index after placeholder nil collection
         new SmalltalkOOP(30272),
         new SmalltalkOOP(30273),
         new SmalltalkOOP(30274)

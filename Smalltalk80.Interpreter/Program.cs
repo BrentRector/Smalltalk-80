@@ -137,6 +137,7 @@ public static class Program
             var trackedOOPs = new[]
             {
                 new SmalltalkOOP(6750),
+                new SmalltalkOOP(13500),  // Track object table index reuse after placeholder nil collection
                 new SmalltalkOOP(30272),
                 new SmalltalkOOP(30273),
                 new SmalltalkOOP(30274)
