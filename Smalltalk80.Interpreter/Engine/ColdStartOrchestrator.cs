@@ -252,7 +252,7 @@ public class ColdStartOrchestrator : IColdStartLoader
         int thisClassIdx = LayoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
 
         // Get special objects from GlobalRegistry (allocated during cold start phases)
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = _heapManager.GetNil();
         var trueOOP = GlobalRegistry.Get("true");
         var falseOOP = GlobalRegistry.Get("false");
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
@@ -422,8 +422,8 @@ public class ColdStartOrchestrator : IColdStartLoader
         var gcRootsList = new List<SmalltalkOOP>();
 
         // Add fundamental sentinels if they exist
-        if (GlobalRegistry.Get("nil") != default)
-            gcRootsList.Add(GlobalRegistry.Get("nil"));
+        if (_heapManager.GetNil() != default)
+            gcRootsList.Add(_heapManager.GetNil());
         if (GlobalRegistry.Get("true") != default)
             gcRootsList.Add(GlobalRegistry.Get("true"));
         if (GlobalRegistry.Get("false") != default)

@@ -122,7 +122,7 @@ public class DictionaryService
     {
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
         int systemDictSize = _allocator.GetIndexedSize(systemDictOOP);
-        SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
+        SmalltalkOOP nilOOP = _allocator.GetNil();
 
         // Get the key symbol from the Association (instance variable 0)
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
@@ -178,7 +178,7 @@ public class DictionaryService
     public void InstallInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string name)
     {
         int dictSize = _allocator.GetIndexedSize(dictionaryOOP);
-        SmalltalkOOP nilOOP = GlobalRegistry.Get("nil");
+        SmalltalkOOP nilOOP = _allocator.GetNil();
 
         // Get the key symbol from the Association (instance variable 0)
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);

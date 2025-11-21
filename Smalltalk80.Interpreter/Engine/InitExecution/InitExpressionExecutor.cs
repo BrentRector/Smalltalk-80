@@ -236,7 +236,7 @@ public class InitExpressionExecutor
         // TODO: receiverMapIndex removed - part of obsolete dual-context architecture
         int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
 
-        _heapManager.SetInstanceVariable(contextOOP, senderIndex, GlobalRegistry.Get("nil"));
+        _heapManager.SetInstanceVariable(contextOOP, senderIndex, _heapManager.GetNil());
         _heapManager.SetInstanceVariable(contextOOP, pcIndex, SmalltalkOOP.FromSmallInteger(0));
         _heapManager.SetInstanceVariable(contextOOP, stackpIndex, SmalltalkOOP.FromSmallInteger(0));
         _heapManager.SetInstanceVariable(contextOOP, methodIndex, methodOOP);
@@ -246,7 +246,7 @@ public class InitExpressionExecutor
         // Initialize indexed portion (stack) with nil
         for (int i = 0; i < 12; i++)
         {
-            _heapManager.SetIndexedOOP(contextOOP, i, GlobalRegistry.Get("nil"));
+            _heapManager.SetIndexedOOP(contextOOP, i, _heapManager.GetNil());
         }
 
         return contextOOP;
@@ -270,7 +270,7 @@ public class InitExpressionExecutor
         for (int i = 0; i < size; i++)
         {
             var assocOOP = _heapManager.GetIndexedOOP(systemDictOOP, i);
-            if (assocOOP == GlobalRegistry.Get("nil"))
+            if (assocOOP == _heapManager.GetNil())
                 continue;
 
             // Association has key at instance variable 0
@@ -344,7 +344,7 @@ public class InitExpressionExecutor
         // Set instance variables using fixed indices from VMConstants
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, suspendedContextOOP);
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX, SmalltalkOOP.FromSmallInteger(priority));
-        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, GlobalRegistry.Get("nil"));
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _heapManager.GetNil());
 
         return processOOP;
     }

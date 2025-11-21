@@ -641,7 +641,7 @@ public static class Program
         {
             return loader.Allocator.GetIndexedOOP(methodOOP, literalIndex + 1); // +1 to skip header
         }
-        return GlobalRegistry.Get("nil");
+        return loader.Allocator.GetNil();
     }
 
     /// <summary>
@@ -659,7 +659,7 @@ public static class Program
             "string" => allocator.AllocateString(bundle.Strings[literal.Index!.Value]),
             "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
             "float" => allocator.AllocateFloat(GetFloatValue(literal.Value!)),
-            "nil" => GlobalRegistry.Get("nil"),
+            "nil" => allocator.GetNil(),
             "true" => GlobalRegistry.Get("true"),
             "false" => GlobalRegistry.Get("false"),
             "objectRef" => localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1)
@@ -725,7 +725,7 @@ public static class Program
                 for (int i = 0; i < sysDictSize; i++)
                 {
                     var assocOOP = allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP == GlobalRegistry.Get("nil")) continue;
+                    if (assocOOP == allocator.GetNil()) continue;
 
                     var assocKeyOOP = allocator.GetInstanceVariable(assocOOP, 0);
                     if (assocKeyOOP == keyOOP)
@@ -738,7 +738,7 @@ public static class Program
 
         var valueOOP = assoc.ValueRef?.LocalId != null
             ? localIdToObjectId[assoc.ValueRef.LocalId]
-            : GlobalRegistry.Get("nil");
+            : allocator.GetNil();
 
         var associationOOP = allocator.AllocateFixedObject("Association");
         allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
@@ -789,7 +789,7 @@ public static class Program
         if (returnOOP.IsSmallInteger)
             return $"SmallInteger({returnOOP.AsSmallInteger()})";
 
-        if (returnOOP == GlobalRegistry.Get("nil"))
+        if (returnOOP == heapManager.GetNil())
             return "nil";
 
         if (returnOOP == GlobalRegistry.Get("true"))
@@ -880,7 +880,7 @@ public static class Program
         int thisClassIdx = layoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
 
         // Get special objects from GlobalRegistry (allocated during cold start phases)
-        var nilOOP = GlobalRegistry.Get("nil");
+        var nilOOP = loader.Allocator.GetNil();
         var trueOOP = GlobalRegistry.Get("true");
         var falseOOP = GlobalRegistry.Get("false");
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
