@@ -299,25 +299,79 @@ public class InitExpressionExecutor
                     Console.WriteLine($"      Root #{i}: {gcRoots[i]} (class={rootClassName})");
                 }
 
-                // Check if methodContext is in the sender chain of any GC root context
-                foreach (var root in gcRoots)
+                // Check the active Process object thoroughly
+                SmalltalkOOP activeProcessOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+                Console.WriteLine($"    Active Process: {activeProcessOOP}");
+
+                var nextLink = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_NEXTLINK_INDEX);
+                var suspendedCtx = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+                var priority = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_PRIORITY_INDEX);
+                var myList = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_MYLIST_INDEX);
+
+                Console.WriteLine($"      nextLink: {nextLink}");
+                Console.WriteLine($"      suspendedContext: {suspendedCtx}");
+                Console.WriteLine($"      priority: {priority}");
+                Console.WriteLine($"      myList: {myList}");
+
+                // Check if any of these reference our context
+                if (nextLink == methodContextOOP) Console.WriteLine($"      ^^^ nextLink IS our MethodContext!");
+                if (suspendedCtx == methodContextOOP) Console.WriteLine($"      ^^^ suspendedContext IS our MethodContext!");
+                if (myList == methodContextOOP) Console.WriteLine($"      ^^^ myList IS our MethodContext!");
+
+                // Check ALL processes in the scheduler's process lists
+                Console.WriteLine($"    Checking ProcessorScheduler's process lists...");
+                SmalltalkOOP processListsArrayOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+                int numPriorities = _heapManager.GetIndexedSize(processListsArrayOOP);
+                Console.WriteLine($"      Found {numPriorities} priority levels");
+
+                for (int priorityIndex = 0; priorityIndex < numPriorities; priorityIndex++)
                 {
-                    var rootClass = _heapManager.GetClassOOP(root);
-                    var rootClassName = _heapManager.GetClassName(rootClass);
-                    if (rootClassName == "MethodContext" || rootClassName == "BlockContext")
+                    SmalltalkOOP processListOOP = _heapManager.GetIndexedSlot(processListsArrayOOP, priorityIndex);
+                    if (processListOOP == _metadata.NilOOP)
+                        continue;
+
+                    // ProcessList has firstLink and lastLink
+                    SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(processListOOP, 0); // firstLink
+                    if (firstLinkOOP == _metadata.NilOOP)
+                        continue;
+
+                    Console.WriteLine($"      Priority {priorityIndex}: has processes");
+
+                    // Walk the linked list of processes
+                    SmalltalkOOP currentProcessOOP = firstLinkOOP;
+                    int processCount = 0;
+                    while (currentProcessOOP != _metadata.NilOOP && processCount < 100) // safety limit
                     {
-                        // Walk sender chain from this root
-                        var current = root;
-                        var nilOOP = _heapManager.GetNil();
-                        for (int depth = 0; depth < 50 && current != nilOOP; depth++)
+                        processCount++;
+                        var procSuspendedCtx = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+                        Console.WriteLine($"        Process {currentProcessOOP}: suspendedContext={procSuspendedCtx}");
+
+                        // Check if this process's suspendedContext is our MethodContext
+                        if (procSuspendedCtx == methodContextOOP)
                         {
-                            if (current == methodContextOOP)
-                            {
-                                Console.WriteLine($"    FOUND: MethodContext is in sender chain of root {root} at depth {depth}!");
-                                break;
-                            }
-                            current = _heapManager.GetInstanceVariable(current, VMConstants.CONTEXT_SENDER_INDEX);
+                            Console.WriteLine($"        ^^^ FOUND IT! This process's suspendedContext IS our MethodContext!");
                         }
+
+                        // Also check if it's a BlockContext whose home is our MethodContext
+                        if (procSuspendedCtx != _metadata.NilOOP && !procSuspendedCtx.IsSmallInteger)
+                        {
+                            var ctxClass = _heapManager.GetClassOOP(procSuspendedCtx);
+                            var ctxClassName = _heapManager.GetClassName(ctxClass);
+                            Console.WriteLine($"          Context class: {ctxClassName}");
+
+                            if (ctxClassName == "BlockContext")
+                            {
+                                var homeCtx = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                                Console.WriteLine($"          BlockContext home: {homeCtx}");
+                                if (homeCtx == methodContextOOP)
+                                {
+                                    Console.WriteLine($"          ^^^ FOUND IT! This BlockContext's home IS our MethodContext!");
+                                }
+                            }
+                        }
+
+                        // Move to next process in list
+                        currentProcessOOP = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_NEXTLINK_INDEX);
                     }
                 }
 
