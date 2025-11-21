@@ -300,15 +300,7 @@ public class InitExpressionExecutor
             }
 
             // Show simple GC summary (listener shows details)
-            if (gcStatsAfter.CollectedObjects > 10)
-            {
-                Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, GC: {gcStatsBefore.CollectedObjects}/{gcStatsAfter.CollectedObjects})");
-                Console.WriteLine($"    WARNING: Collected {gcStatsAfter.CollectedObjects} objects (expected ~3)");
-            }
-            else
-            {
-                Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, GC: {gcStatsBefore.CollectedObjects}/{gcStatsAfter.CollectedObjects})");
-            }
+            Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, GC: {gcStatsBefore.CollectedObjects}/{gcStatsAfter.CollectedObjects})");
 
             return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
         }

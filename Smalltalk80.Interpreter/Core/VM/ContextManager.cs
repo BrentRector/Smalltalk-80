@@ -242,8 +242,14 @@ internal class ContextManager(
     {
         if (_diagnostics != null)
         {
+            Console.WriteLine("DEBUG: ContextManager registering for GCStart events");
             // Register to receive ONLY GCStart events
             _diagnostics.Register(this, DiagnosticEventTypes.GCStart);
+            Console.WriteLine($"DEBUG: ContextManager registered successfully, hub has listeners");
+        }
+        else
+        {
+            Console.WriteLine("DEBUG: ContextManager has NO diagnostics hub!");
         }
     }
 
@@ -260,6 +266,8 @@ internal class ContextManager(
     /// <inheritdoc />
     public void OnEvent(DiagnosticEvent evt)
     {
+        Console.WriteLine("DEBUG: ContextManager received GCStart event!");
+
         // Hub only dispatches GCStart events (our registered type)
         // Safe to cast without checking
         var gcStart = (GCStartEvent)evt;
