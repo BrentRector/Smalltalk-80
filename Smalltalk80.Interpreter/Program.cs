@@ -312,12 +312,13 @@ public static class Program
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
                     // Move font/GUI-dependent expressions to run last (tests DefaultTextStyle)
-                    // Order: Form → TextList → BitEditor (each tests more font functionality)
+                    // Order: Form → TextList → BitEditor → Object (each tests more font functionality)
                     var runLastExpressions = new List<string>
                     {
                         "Form initialize",           // Tests Form creation with glyphs
                         "TextList initialize",       // Tests DefaultTextStyle copy
-                        "BitEditor initialize"       // Tests PopUpMenu labels: with font support
+                        "BitEditor initialize",      // Tests PopUpMenu labels: with font support
+                        "Object initialize"          // MUST run last: requires Sensor global and displays interactive dialog
                     };
 
                     var lastIndices = new List<int>();
