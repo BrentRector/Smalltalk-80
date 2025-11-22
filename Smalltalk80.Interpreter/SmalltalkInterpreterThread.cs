@@ -261,12 +261,13 @@ public class SmalltalkInterpreterThread
                 _vm!.MessageDispatcher,
                 _vm!.ContextManager);
 
-            // Step 1: Create Smalltalk String from user expression
-            var sourceString = StringHelper.CreateString(_context.HeapManager, _context.Config.ExecuteExpression);
+            // Step 1: Look up required classes at runtime
+            var stringClassOOP = LookupGlobal("String");
+            var compilerClassOOP = LookupGlobal("Compiler");
+            var undefinedObjectClassOOP = LookupGlobal("UndefinedObject");
 
-            // Step 2: Get Compiler class and UndefinedObject class
-            var compilerClassOOP = GlobalRegistry.Get("class:Compiler");
-            var undefinedObjectClassOOP = GlobalRegistry.Get("class:UndefinedObject");
+            // Step 2: Create Smalltalk String from user expression
+            var sourceString = StringHelper.CreateString(_context.HeapManager, stringClassOOP, _context.Config.ExecuteExpression);
 
             // Step 3: Send compile:in: to Compiler
             // Compiler compile: sourceString in: UndefinedObject
@@ -314,11 +315,11 @@ public class SmalltalkInterpreterThread
         {
             Console.WriteLine("nil");
         }
-        else if (resultOOP == GlobalRegistry.Get("true"))
+        else if (resultOOP == LookupGlobal("true"))
         {
             Console.WriteLine("true");
         }
-        else if (resultOOP == GlobalRegistry.Get("false"))
+        else if (resultOOP == LookupGlobal("false"))
         {
             Console.WriteLine("false");
         }
@@ -336,27 +337,90 @@ public class SmalltalkInterpreterThread
         }
     }
 
+    /// <summary>
+    /// Looks up a global variable in the Smalltalk dictionary at runtime.
+    /// This is the runtime-safe way to access globals (not using GlobalRegistry).
+    /// </summary>
+    private SmalltalkOOP LookupGlobal(string globalName)
+    {
+        // Get Smalltalk global dictionary from VMMetadata
+        var smalltalkOOP = _context.VMMetadata.SmalltalkDictionary;
+
+        // Search for the global by name
+        int size = _context.HeapManager.GetIndexedSize(smalltalkOOP);
+
+        // Find the symbol OOP for the global name
+        var symbolOOP = FindSymbol(globalName);
+        if (symbolOOP == _context.HeapManager.GetNil())
+        {
+            throw new InvalidOperationException($"Global '{globalName}' not found - symbol does not exist");
+        }
+
+        // Search dictionary for association with this key
+        for (int i = 0; i < size; i++)
+        {
+            var assocOOP = _context.HeapManager.GetIndexedOOP(smalltalkOOP, i);
+            if (assocOOP == _context.HeapManager.GetNil())
+                continue;
+
+            // Association has key at instance variable 0
+            var keyOOP = _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            if (keyOOP == symbolOOP)
+            {
+                // Return value at instance variable 1
+                return _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+            }
+        }
+
+        throw new InvalidOperationException($"Global '{globalName}' not found in Smalltalk dictionary");
+    }
+
+    /// <summary>
+    /// Finds a symbol OOP by text at runtime by searching the USTable.
+    /// </summary>
+    private SmalltalkOOP FindSymbol(string symbolText)
+    {
+        // Get USTable (User Symbol Table) from VMMetadata
+        var usTableOOP = _context.VMMetadata.USTable;
+        int tableSize = _context.HeapManager.GetIndexedSize(usTableOOP);
+
+        // Search through all symbols
+        for (int i = 0; i < tableSize; i++)
+        {
+            var symbolOOP = _context.HeapManager.GetIndexedOOP(usTableOOP, i);
+            if (symbolOOP == _context.HeapManager.GetNil())
+                continue;
+
+            // Read symbol string
+            var symbolString = ExtractSymbolString(symbolOOP);
+            if (symbolString == symbolText)
+            {
+                return symbolOOP;
+            }
+        }
+
+        return _context.HeapManager.GetNil();
+    }
+
+    /// <summary>
+    /// Extracts the string value from a Symbol OOP.
+    /// </summary>
+    private string ExtractSymbolString(SmalltalkOOP symbolOOP)
+    {
+        int size = _context.HeapManager.GetIndexedSize(symbolOOP);
+        var bytes = new byte[size];
+
+        for (int i = 0; i < size; i++)
+        {
+            bytes[i] = _context.HeapManager.GetIndexedByte(symbolOOP, i);
+        }
+
+        return System.Text.Encoding.UTF8.GetString(bytes);
+    }
+
     private string GetClassName(SmalltalkOOP classOOP)
     {
-        try
-        {
-            var nameOOP = _context.HeapManager.GetInstanceVariable(classOOP, VMConstants.BEHAVIOR_NAME_INDEX);
-            if (nameOOP == _context.HeapManager.GetNil())
-                return "<unnamed>";
-
-            int length = _context.HeapManager.GetIndexedSize(nameOOP);
-            var bytes = new byte[length];
-            for (int i = 0; i < length; i++)
-            {
-                bytes[i] = _context.HeapManager.GetIndexedByte(nameOOP, i);
-            }
-
-            return System.Text.Encoding.ASCII.GetString(bytes);
-        }
-        catch
-        {
-            return "<unknown>";
-        }
+        return _context.HeapManager.GetClassName(classOOP);
     }
 
     // Future: Start Smalltalk controller loop
