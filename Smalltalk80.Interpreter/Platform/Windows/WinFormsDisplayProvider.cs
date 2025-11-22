@@ -1,20 +1,26 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
+using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Core;
 
 namespace Smalltalk80.Interpreter.Platform.Windows;
 
 /// <summary>
-/// Windows Forms implementation of IDisplayProvider.
-/// Provides a 640x480 monochrome bitmap display with mouse and keyboard input.
-/// Thread-safe: All display updates must occur on the UI thread.
+/// Windows Forms implementation of display provider and platform bridge.
+/// Provides a monochrome bitmap display with mouse and keyboard input.
+/// Thread-safe: Display updates can occur from Smalltalk thread, rendering occurs on UI thread.
 /// </summary>
-public class WinFormsDisplayProvider : Form, IDisposable
+public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 {
     private readonly byte[] _displayBuffer;
     private readonly Bitmap _backBuffer;
     private readonly object _bufferLock = new();
-    private readonly Queue<int> _inputQueue = new();
+    private readonly SmalltalkEventQueue _eventQueue;
+    private readonly ISmalltalkHeap _heap;
+    private readonly SmalltalkOOP _displayOOP;
     private bool _disposed = false;
 
     public new int Width { get; }
@@ -28,10 +34,20 @@ public class WinFormsDisplayProvider : Form, IDisposable
     /// </summary>
     public Memory<byte> DisplayBuffer => new Memory<byte>(_displayBuffer);
 
-    public WinFormsDisplayProvider(int width = 640, int height = 480, string title = "Smalltalk-80")
+    public WinFormsDisplayProvider(SmalltalkEventQueue eventQueue, ISmalltalkHeap heap, string title = "Smalltalk-80")
     {
+        _eventQueue = eventQueue;
+        _heap = heap;
+
+        // Read Display dimensions from heap
+        _displayOOP = GlobalRegistry.Get("Display");
+        int width = _heap.GetInstanceVariable(_displayOOP, 1).AsSmallInteger();   // Form.width at index 1
+        int height = _heap.GetInstanceVariable(_displayOOP, 2).AsSmallInteger();  // Form.height at index 2
+
         Width = width;
         Height = height;
+
+        Console.WriteLine($"[WinForms] Creating window: {width}x{height} (read from Display object)");
 
         // Calculate buffer size: each row needs (width + 7) / 8 bytes
         int rowStride = (width + 7) / 8;
@@ -57,6 +73,9 @@ public class WinFormsDisplayProvider : Form, IDisposable
         MouseMove += OnMouseMove;
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
+
+        // Initial sync from heap
+        CopyEntireDisplayFromHeap();
     }
 
     /// <summary>
@@ -148,56 +167,33 @@ public class WinFormsDisplayProvider : Form, IDisposable
     // Mouse Input
     // ============================================================================
 
-    private int _mouseButtons = 0;
-    private int _mouseX = 0;
-    private int _mouseY = 0;
-
     private void OnMouseDown(object? sender, MouseEventArgs e)
     {
-        UpdateMouseState(e);
-        EnqueueMouseEvent();
+        EnqueueMouseEvent(e);
     }
 
     private void OnMouseUp(object? sender, MouseEventArgs e)
     {
-        UpdateMouseState(e);
-        EnqueueMouseEvent();
+        EnqueueMouseEvent(e);
     }
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
-        UpdateMouseState(e);
+        EnqueueMouseEvent(e);
     }
 
-    private void UpdateMouseState(MouseEventArgs e)
+    private void EnqueueMouseEvent(MouseEventArgs e)
     {
-        _mouseX = e.X;
-        _mouseY = e.Y;
-
-        // Map Windows buttons to Smalltalk convention
-        // Smalltalk: bit 0 = red (left), bit 1 = yellow (middle), bit 2 = blue (right)
-        _mouseButtons = 0;
-        if (e.Button.HasFlag(MouseButtons.Left))   _mouseButtons |= 0x1; // Red button
-        if (e.Button.HasFlag(MouseButtons.Middle)) _mouseButtons |= 0x2; // Yellow button
-        if (e.Button.HasFlag(MouseButtons.Right))  _mouseButtons |= 0x4; // Blue button
-    }
-
-    private void EnqueueMouseEvent()
-    {
-        // Smalltalk input word format (simplified):
-        // Bits 0-7: 0 (no character for mouse events)
-        // Bits 8-10: Mouse button state
-        int eventWord = (_mouseButtons << 8);
-
-        lock (_inputQueue)
+        _eventQueue.Enqueue(new SmalltalkEvent
         {
-            _inputQueue.Enqueue(eventWord);
-        }
-    }
-
-    public (int X, int Y) GetMousePosition()
-    {
-        return (_mouseX, _mouseY);
+            Type = SmalltalkEventType.Mouse,
+            X = e.X,
+            Y = e.Y,
+            RedButton = e.Button.HasFlag(MouseButtons.Left),
+            YellowButton = e.Button.HasFlag(MouseButtons.Middle),
+            BlueButton = e.Button.HasFlag(MouseButtons.Right),
+            Milliseconds = Environment.TickCount64
+        });
     }
 
     // ============================================================================
@@ -206,7 +202,13 @@ public class WinFormsDisplayProvider : Form, IDisposable
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        EnqueueKeyEvent((char)e.KeyValue, true);
+        _eventQueue.Enqueue(new SmalltalkEvent
+        {
+            Type = SmalltalkEventType.Keyboard,
+            Character = (char)e.KeyValue,
+            KeyCode = e.KeyValue,
+            Milliseconds = Environment.TickCount64
+        });
     }
 
     private void OnKeyUp(object? sender, KeyEventArgs e)
@@ -214,30 +216,191 @@ public class WinFormsDisplayProvider : Form, IDisposable
         // Smalltalk typically only needs key down events
     }
 
-    private void EnqueueKeyEvent(char ch, bool isKeyDown)
+    // ============================================================================
+    // IPlatformBridge Implementation
+    // ============================================================================
+
+    public bool PerformBitBlt(SmalltalkOOP bitBltOOP)
     {
-        if (!isKeyDown) return;
+        // BitBlt is handled by the VM primitives
+        // This method is called AFTER the VM performs the BitBlt
+        // We just need to detect if it affected Display and invalidate
+        return true;
+    }
 
-        // Smalltalk input word format:
-        // Bits 0-7: Character code
-        // Bits 8-10: Mouse button state (preserved)
-        int eventWord = (ch & 0xFF) | (_mouseButtons << 8);
+    public bool PerformSnapshot(SmalltalkOOP snapshotRequestOOP)
+    {
+        // Snapshot not yet implemented
+        return false;
+    }
 
-        lock (_inputQueue)
+    public void InvalidateDisplayRegion(int x, int y, int w, int h)
+    {
+        // Copy changed region from heap to local buffer
+        lock (_bufferLock)
         {
-            _inputQueue.Enqueue(eventWord);
+            CopyDisplayRegionFromHeap(x, y, w, h);
+        }
+
+        // Signal WinForms thread to repaint
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() => Invalidate(new Rectangle(x, y, w, h))));
+        }
+        else
+        {
+            Invalidate(new Rectangle(x, y, w, h));
+        }
+    }
+
+    public (int x, int y) GetMousePosition()
+    {
+        return _eventQueue.GetMousePosition();
+    }
+
+    public void SetCursorPosition(int x, int y)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() => Cursor.Position = PointToScreen(new Point(x, y))));
+        }
+        else
+        {
+            Cursor.Position = PointToScreen(new Point(x, y));
         }
     }
 
     public int GetInputWord()
     {
-        lock (_inputQueue)
+        // Dequeue event from queue and pack into Smalltalk input word format
+        if (_eventQueue.TryDequeue(out var evt))
         {
-            if (_inputQueue.Count > 0)
+            if (evt == null)
+                return 0;
+
+            // Smalltalk input word format:
+            // Bits 0-7: Character code (or 0 for mouse events)
+            // Bits 8-10: Mouse button state (red=bit 0, yellow=bit 1, blue=bit 2)
+            // Bits 11-31: Reserved
+
+            int buttonBits = 0;
+            if (evt.RedButton) buttonBits |= 0x1;
+            if (evt.YellowButton) buttonBits |= 0x2;
+            if (evt.BlueButton) buttonBits |= 0x4;
+
+            if (evt.Type == SmalltalkEventType.Keyboard)
             {
-                return _inputQueue.Dequeue();
+                return (evt.Character & 0xFF) | (buttonBits << 8);
             }
-            return 0;
+            else
+            {
+                // Mouse event - no character
+                return buttonBits << 8;
+            }
+        }
+
+        return 0;
+    }
+
+    public void SetSampleInterval(int intervalMs)
+    {
+        // Not implemented yet - would configure event polling rate
+    }
+
+    public void SetInputSemaphore(SmalltalkOOP semaphoreOOP)
+    {
+        // Not implemented yet - would signal semaphore when events available
+    }
+
+    public SmalltalkOOP ReadClipboardToStringOOP()
+    {
+        // Not implemented yet
+        return _heap.GetNil();
+    }
+
+    public bool WriteClipboardFromStringOOP(SmalltalkOOP stringOOP)
+    {
+        // Not implemented yet
+        return false;
+    }
+
+    public void Beep()
+    {
+        System.Media.SystemSounds.Beep.Play();
+    }
+
+    public void Quit(int exitCode)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() => {
+                Close();
+                Environment.Exit(exitCode);
+            }));
+        }
+        else
+        {
+            Close();
+            Environment.Exit(exitCode);
+        }
+    }
+
+    public int GetTimeWords()
+    {
+        // Return seconds since Unix epoch, masked to 31 bits
+        long secondsSinceEpoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return (int)(secondsSinceEpoch & 0x7FFFFFFF);
+    }
+
+    // ============================================================================
+    // Display Buffer Synchronization
+    // ============================================================================
+
+    /// <summary>
+    /// Copies the entire Display bitmap from heap to local buffer.
+    /// Called during initialization.
+    /// </summary>
+    private void CopyEntireDisplayFromHeap()
+    {
+        var bitsOOP = _heap.GetInstanceVariable(_displayOOP, 0); // Form.bits at index 0
+        int rowStride = (Width + 7) / 8;
+        int totalBytes = rowStride * Height;
+
+        for (int i = 0; i < totalBytes; i++)
+        {
+            _displayBuffer[i] = _heap.GetIndexedByte(bitsOOP, i);
+        }
+    }
+
+    /// <summary>
+    /// Copies a rectangular region of the Display bitmap from heap to local buffer.
+    /// Called from Smalltalk thread when display is updated.
+    /// </summary>
+    private void CopyDisplayRegionFromHeap(int x, int y, int w, int h)
+    {
+        var bitsOOP = _heap.GetInstanceVariable(_displayOOP, 0); // Form.bits at index 0
+        int rowStride = (Width + 7) / 8;
+
+        // Clip to display bounds
+        if (x < 0) { w += x; x = 0; }
+        if (y < 0) { h += y; y = 0; }
+        if (x + w > Width) w = Width - x;
+        if (y + h > Height) h = Height - y;
+
+        if (w <= 0 || h <= 0) return;
+
+        // Copy affected bytes
+        int startByteX = x / 8;
+        int endByteX = (x + w + 7) / 8;
+        int byteWidth = endByteX - startByteX;
+
+        for (int row = y; row < y + h; row++)
+        {
+            int heapOffset = row * rowStride + startByteX;
+            for (int i = 0; i < byteWidth; i++)
+            {
+                _displayBuffer[heapOffset + i] = _heap.GetIndexedByte(bitsOOP, heapOffset + i);
+            }
         }
     }
 
