@@ -246,7 +246,7 @@ named: aFileName mode: modeString
 !WindowsFile methodsFor: 'file operations'!
 
 openNamed: aFileName mode: modeString
-    <primitive: 98>
+    <primitive: 121>
     fileHandle _ self primOpen: aFileName mode: modeString.
     fileName _ aFileName.
     position _ 0.
@@ -256,14 +256,14 @@ openNamed: aFileName mode: modeString
     ^self!
 
 close
-    <primitive: 99>
+    <primitive: 122>
     fileHandle ifNotNil: [
         self primClose: fileHandle.
         fileHandle _ nil].
     ^self!
 
 delete
-    <primitive: 100>
+    <primitive: 125>
     self close.
     self primDelete: fileName.
     ^self! !
@@ -271,15 +271,15 @@ delete
 !WindowsFile methodsFor: 'accessing'!
 
 size
-    <primitive: 92>
+    <primitive: 144>
     ^self primSize: fileHandle!
 
 position
-    <primitive: 93>
+    <primitive: 145>
     ^position!
 
 position: anInteger
-    <primitive: 94>
+    <primitive: 124>
     self primSetPosition: fileHandle to: anInteger.
     position _ anInteger.
     ^self!
@@ -390,15 +390,15 @@ setToEnd
 !WindowsFile methodsFor: 'private-primitives'!
 
 primOpen: aFileName mode: modeString
-    <primitive: 98>
+    <primitive: 121>
     self primitiveFailed!
 
 primClose: handle
-    <primitive: 99>
+    <primitive: 122>
     self primitiveFailed!
 
 primDelete: aFileName
-    <primitive: 100>
+    <primitive: 125>
     self primitiveFailed!
 
 primAt: handle position: pos
@@ -410,15 +410,15 @@ primAt: handle position: pos put: byte
     self primitiveFailed!
 
 primSize: handle
-    <primitive: 92>
+    <primitive: 144>
     self primitiveFailed!
 
 primPosition: handle
-    <primitive: 93>
+    <primitive: 145>
     self primitiveFailed!
 
 primSetPosition: handle to: pos
-    <primitive: 94>
+    <primitive: 124>
     self primitiveFailed! !
 
 
