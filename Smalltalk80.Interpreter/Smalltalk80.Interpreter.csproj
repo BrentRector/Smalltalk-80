@@ -5,6 +5,7 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <UseWindowsForms>true</UseWindowsForms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -12,6 +13,14 @@
   <!-- Reference to Engine (which references Core) -->
   <ItemGroup>
     <ProjectReference Include="Engine\Smalltalk80.Interpreter.Engine.csproj" />
+  </ItemGroup>
+
+  <!-- CLI and GUI files -->
+  <ItemGroup>
+    <!-- Include all .cs files in root directory only (not subdirectories) -->
+    <Compile Include="*.cs" />
+    <!-- Include all .cs files in Platform folder and its subdirectories -->
+    <Compile Include="Platform\**\*.cs" />
   </ItemGroup>
 
   <!-- Windows Forms and Graphics packages -->
