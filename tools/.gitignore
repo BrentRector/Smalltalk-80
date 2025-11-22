@@ -1,18 +1,5 @@
 # Generated files
-arrow_output/
-bmp_output/
-gacha_output/
-gacha_bmp/
-gacha12_output/
-gacha12_bmp/
-hippo10_output/
-hippo10_bmp/
-logo24_output/
-logo24_bmp/
-math10_output/
-math10_bmp/
 *.AL
-*.form
-*.bmp
 test_arrows.bin
-output/
+__pycache__/
+arrows_visual.txt

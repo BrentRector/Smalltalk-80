@@ -9,6 +9,7 @@ bitmap, outputting them in the Smalltalk-80 Form file format.
 import sys
 import os
 import struct
+import argparse
 
 def read_word(data, offset):
     """Read big-endian 16-bit word."""
@@ -24,8 +25,8 @@ def signed_int16(value):
         return value - 65536
     return value
 
-def extract_bitmaps(input_file, output_dir):
-    """Extract bitmaps from ARROWS10.AL file."""
+def extract_bitmaps(input_file, output_dir, prefix="arrow"):
+    """Extract bitmaps from Alto .AL file."""
     # Read the entire file
     with open(input_file, 'rb') as f:
         data = f.read()
@@ -102,7 +103,7 @@ def extract_bitmaps(input_file, output_dir):
     print("\nGenerating Form files...")
 
     for bitmap in bitmaps:
-        form_file = os.path.join(output_dir, f"arrow{bitmap['number']}.form")
+        form_file = os.path.join(output_dir, f"{prefix}_{bitmap['number']}.form")
 
         try:
             with open(form_file, 'wb') as f:
@@ -164,17 +165,15 @@ def extract_bitmaps(input_file, output_dir):
     print(f"\nDone! Extracted {len(bitmaps)} bitmaps.")
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print("Usage: extract_arrow_bitmaps.py <input_file> <output_dir>")
-        print("  input_file  - Path to ARROWS10.AL file")
-        print("  output_dir  - Directory where Form files will be written")
+    parser = argparse.ArgumentParser(description='Extract bitmaps from Alto .AL file')
+    parser.add_argument('input_file', help='Path to .AL file')
+    parser.add_argument('output_dir', help='Directory where Form files will be written')
+    parser.add_argument('--prefix', default='arrow', help='Prefix for output filenames (default: arrow)')
+
+    args = parser.parse_args()
+
+    if not os.path.exists(args.input_file):
+        print(f"Error: Input file not found: {args.input_file}")
         sys.exit(1)
 
-    input_file = sys.argv[1]
-    output_dir = sys.argv[2]
-
-    if not os.path.exists(input_file):
-        print(f"Error: Input file not found: {input_file}")
-        sys.exit(1)
-
-    extract_bitmaps(input_file, output_dir)
+    extract_bitmaps(args.input_file, args.output_dir, args.prefix)
