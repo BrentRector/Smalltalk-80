@@ -1,6 +1,8 @@
 # Generated files
 arrow_output/
 bmp_output/
+gacha_output/
+gacha_bmp/
 *.AL
 *.form
 *.bmp
