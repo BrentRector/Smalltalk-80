@@ -228,6 +228,7 @@ public static class Program
                 // Skip list for init expressions requiring runtime features not available during bootstrap
                 var skipList = new HashSet<string>
                 {
+                    "Object initialize",                     // ❌ Requires interactive GUI: displays confirmation dialog via Sensor cursorPoint
                     "FormMenuView initialize",               // ❌ Requires file I/O primitives (98, 92, 99, 146) - not yet implemented
                 };
 
@@ -306,13 +307,12 @@ public static class Program
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
                     // Move font/GUI-dependent expressions to run last (tests DefaultTextStyle)
-                    // Order: Form → TextList → BitEditor → Object (each tests more functionality, Object runs last)
+                    // Order: Form → TextList → BitEditor (each tests more font functionality)
                     var runLastExpressions = new List<string>
                     {
                         "Form initialize",           // Tests Form creation with glyphs
                         "TextList initialize",       // Tests DefaultTextStyle copy
-                        "BitEditor initialize",      // Tests PopUpMenu labels: with font support
-                        "Object initialize"          // Runs last after all dependencies are initialized
+                        "BitEditor initialize"       // Tests PopUpMenu labels: with font support
                     };
 
                     var lastIndices = new List<int>();
