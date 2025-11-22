@@ -601,14 +601,8 @@ public class Phase3_ObjectAllocation : IPhase
             _allocator.SetClassOOP(systemDictOOP, systemDictClassOOP);
         }
 
-        // Set class reference for USTable (Array)
-        if (GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableId))
-        {
-            SmalltalkOOP arrayClassId = GlobalRegistry.LookupClassOOP("Array");
-            var ustableOOP = ustableId;
-            var arrayClassOOP = arrayClassId;
-            _allocator.SetClassOOP(ustableOOP, arrayClassOOP);
-        }
+        // NOTE: USTable is created in Phase 5, not Phase 3, so it doesn't exist yet
+        // Its class reference is set in USTableBuilder.CreateUSTableWithBuckets()
 
         // CRITICAL FIX: Set class references for Associations created in Phase 3
         // These include:

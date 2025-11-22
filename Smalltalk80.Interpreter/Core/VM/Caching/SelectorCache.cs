@@ -65,18 +65,101 @@ public class SelectorCache
     }
 
     /// <summary>
+    /// Looks up a class variable from a class's classPool dictionary.
+    /// </summary>
+    private SmalltalkOOP LookupClassVariable(string className, string varName)
+    {
+        // Get the class OOP from Smalltalk dictionary
+        var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
+        var classOOP = _metadata.KnownObjects.Nil;
+
+        // Find the class by searching Smalltalk dictionary
+        int dictSize = _heapManager.GetIndexedSize(smalltalkOOP);
+        for (int i = 0; i < dictSize; i++)
+        {
+            var assocOOP = _heapManager.GetIndexedOOP(smalltalkOOP, i);
+            if (assocOOP == _metadata.KnownObjects.Nil)
+                continue;
+
+            // Get the key (class name symbol)
+            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+
+            // Check if this is the class we're looking for
+            int keySize = _heapManager.GetIndexedSize(keyOOP);
+            if (keySize != className.Length)
+                continue;
+
+            bool match = true;
+            for (int j = 0; j < keySize; j++)
+            {
+                if (_heapManager.GetIndexedByte(keyOOP, j) != (byte)className[j])
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match)
+            {
+                classOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                break;
+            }
+        }
+
+        if (classOOP == _metadata.KnownObjects.Nil)
+            return _metadata.KnownObjects.Nil;
+
+        // Get classPool (instance variable 7 of Class)
+        var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, 7);
+        if (classPoolOOP == _metadata.KnownObjects.Nil)
+            return _metadata.KnownObjects.Nil;
+
+        // Find the class variable by searching classPool dictionary
+        int poolSize = _heapManager.GetIndexedSize(classPoolOOP);
+        for (int i = 0; i < poolSize; i++)
+        {
+            var assocOOP = _heapManager.GetIndexedOOP(classPoolOOP, i);
+            if (assocOOP == _metadata.KnownObjects.Nil)
+                continue;
+
+            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+
+            // Check if this is the variable we're looking for
+            int keySize = _heapManager.GetIndexedSize(keyOOP);
+            if (keySize != varName.Length)
+                continue;
+
+            bool match = true;
+            for (int j = 0; j < keySize; j++)
+            {
+                if (_heapManager.GetIndexedByte(keyOOP, j) != (byte)varName[j])
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match)
+            {
+                // Return the value from the association
+                return _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+            }
+        }
+
+        return _metadata.KnownObjects.Nil;
+    }
+
+    /// <summary>
     /// Looks up a symbol in the Smalltalk heap by searching USTable.
     /// CRITICAL: Uses heap-only access, no C# proxy data.
     /// </summary>
     private SmalltalkOOP LookupSymbolInHeap(string symbolName)
     {
-        // Get USTable OOP
-        // NOTE: During VM initialization (cold start), GlobalRegistry is valid and contains USTable
-        // This is acceptable because VM initialization happens during cold start, not runtime
-        if (!GlobalRegistry.TryGet("USTable", out var ustableOOP))
+        // Get USTable from Symbol's classPool (it's a class variable, not a global)
+        var ustableOOP = LookupClassVariable("Symbol", "USTable");
+        if (ustableOOP == _metadata.KnownObjects.Nil)
         {
-            throw new InvalidOperationException("USTable not found - cannot initialize selector caches. " +
-                "This method should only be called during cold start initialization.");
+            throw new InvalidOperationException("USTable not found in Symbol's classPool - cannot initialize selector caches.");
         }
 
         // USTable is an Array in the Smalltalk heap containing Symbol OOPs

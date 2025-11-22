@@ -409,4 +409,45 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
         // Find the index of the requested field
         return fields.IndexOf(fieldName);
     }
+
+    /// <summary>
+    /// Looks up a class variable from a class's classPool dictionary.
+    /// Runtime-safe: uses only heap access, no cold start structures.
+    /// </summary>
+    /// <param name="className">Name of the class that owns the class variable</param>
+    /// <param name="varName">Name of the class variable</param>
+    /// <returns>The value OOP of the class variable, or Nil if not found</returns>
+    public virtual SmalltalkOOP LookupClassVariable(string className, string varName)
+    {
+        // Get the class OOP
+        var classOOP = GetClass(className);
+        if (classOOP == metadata.KnownObjects.Nil)
+            return metadata.KnownObjects.Nil;
+
+        // Get classPool (instance variable 7 of Class)
+        var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, 7);
+        if (classPoolOOP == metadata.KnownObjects.Nil)
+            return metadata.KnownObjects.Nil;
+
+        // Search classPool dictionary for association with matching key
+        int size = _heapManager.GetIndexedSize(classPoolOOP);
+        for (int i = 0; i < size; i++)
+        {
+            var assocOOP = _heapManager.GetIndexedOOP(classPoolOOP, i);
+            if (assocOOP == metadata.KnownObjects.Nil)
+                continue;
+
+            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+
+            // Check if this symbol matches the variable name
+            var keyString = ReadSymbolName(keyOOP);
+            if (keyString == varName)
+            {
+                // Return the value from the association
+                return _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+            }
+        }
+
+        return metadata.KnownObjects.Nil;
+    }
 }
