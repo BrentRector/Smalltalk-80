@@ -422,10 +422,31 @@ public static class Program
                         Console.WriteLine("\n=== DEBUG: FilePool Dictionary Contents ===");
                         try
                         {
-                            var filePoolOOP = GlobalRegistry.Get("FilePool");
+                            // Look up FilePool in Smalltalk dictionary at runtime
+                            var smalltalkOOP = vmMetadata.KnownObjects.Smalltalk;
+                            var filePoolSymbol = SymbolRegistry.GetSymbolOOP("FilePool");
+
+                            // Search Smalltalk dictionary for FilePool
+                            int smalltalkSize = heapManager.GetIndexedSize(smalltalkOOP);
+                            SmalltalkOOP filePoolOOP = heapManager.GetNil();
+
+                            for (int idx = 0; idx < smalltalkSize; idx++)
+                            {
+                                var assocOOP = heapManager.GetIndexedOOP(smalltalkOOP, idx);
+                                if (assocOOP != heapManager.GetNil())
+                                {
+                                    var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
+                                    if (keyOOP == filePoolSymbol)
+                                    {
+                                        filePoolOOP = heapManager.GetInstanceVariable(assocOOP, 1);
+                                        break;
+                                    }
+                                }
+                            }
+
                             if (filePoolOOP == heapManager.GetNil())
                             {
-                                Console.WriteLine("  FilePool is nil!");
+                                Console.WriteLine("  FilePool not found in Smalltalk dictionary!");
                             }
                             else
                             {
