@@ -5,6 +5,8 @@ gacha_output/
 gacha_bmp/
 gacha12_output/
 gacha12_bmp/
+hippo10_output/
+hippo10_bmp/
 *.AL
 *.form
 *.bmp
