@@ -56,15 +56,8 @@ public class SmalltalkInterpreterThread
             // _fiberScheduler.Initialize();
 
             // STEP 4: Execute init expressions
-            if (!_context.Config.SkipInitExpressions || HasEssentialInitExpressions())
-            {
-                Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
-                ExecuteInitExpressions();
-            }
-            else
-            {
-                Console.WriteLine("[Smalltalk Thread] Skipping all init expressions (--skip-init-expressions)");
-            }
+            Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
+            ExecuteInitExpressions();
 
             // STEP 5: Execute user expression if requested
             if (_context.Config.ExecuteExpression != null)
@@ -89,23 +82,6 @@ public class SmalltalkInterpreterThread
             Console.Error.WriteLine($"Stack trace:\n{ex.StackTrace}");
             Environment.Exit(1);
         }
-    }
-
-    private bool HasEssentialInitExpressions()
-    {
-        var essentialList = new HashSet<string>
-        {
-            "Character initialize",
-            "SmallInteger initialize",
-            "Float initialize",
-            "InputSensor initialize",
-            "InputSensor install",
-            "InputSensor initSensor",
-            "BlockContextTest validate",
-        };
-
-        return _context.Bundle.InitExpressions.Any(expr =>
-            expr.Source != null && essentialList.Contains(expr.Source));
     }
 
     // Future: Convert thread to fiber for Smalltalk process scheduling
@@ -188,13 +164,6 @@ public class SmalltalkInterpreterThread
             if (!isEssential && skipList.Contains(expr.Source))
             {
                 skippedIndices.Add((i, "Requires features not yet available"));
-                continue;
-            }
-
-            // Skip non-essential if --skip-init-expressions flag set
-            if (_context.Config.SkipInitExpressions && !isEssential)
-            {
-                skippedIndices.Add((i, "Skipped by --skip-init-expressions"));
                 continue;
             }
 

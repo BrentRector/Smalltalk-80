@@ -63,16 +63,6 @@ dotnet run -- --diagnostics method
 dotnet run -- --diagnostics detail,method,gc
 ```
 
-### Skip Init Expressions
-
-```bash
-# Uses default coldstart.bin in executable directory
-dotnet run -- --skip-init-expressions
-
-# Or specify a different coldstart file
-dotnet run -- --coldstart path/to/coldstart.bin --skip-init-expressions
-```
-
 ### Execute User Expressions (--execute)
 
 **NEW**: Runtime expression evaluation using the built-in Smalltalk Compiler.

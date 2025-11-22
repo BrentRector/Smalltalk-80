@@ -10,7 +10,6 @@ public record CommandLineConfig
     public bool VerboseDebug { get; init; }
     public string? TestFilter { get; init; }
     public string? ReportOutput { get; init; }
-    public bool SkipInitExpressions { get; init; }
     public string? ExecuteExpression { get; init; }
     public string? DiagnosticCategories { get; init; }
 }
@@ -32,7 +31,6 @@ public static class CommandLineParser
         bool verboseDebug = false;
         string? testFilter = null;
         string? reportOutput = null;
-        bool skipInitExpressions = false;
         string? executeExpression = null;
         string? diagnosticCategories = null;
 
@@ -52,10 +50,6 @@ public static class CommandLineParser
             {
                 testFilter = args[i + 1];
                 i++;
-            }
-            else if (args[i] == "--skip-init-expressions")
-            {
-                skipInitExpressions = true;
             }
             else if (args[i] == "--execute" && i + 1 < args.Length)
             {
@@ -100,7 +94,6 @@ public static class CommandLineParser
             VerboseDebug = verboseDebug,
             TestFilter = testFilter,
             ReportOutput = reportOutput,
-            SkipInitExpressions = skipInitExpressions,
             ExecuteExpression = executeExpression,
             DiagnosticCategories = diagnosticCategories
         };
@@ -119,7 +112,6 @@ public static class CommandLineParser
         Console.Error.WriteLine("                         after cold start completes");
         Console.Error.WriteLine("  --test-filter <pattern> Run only init expressions matching pattern");
         Console.Error.WriteLine("                         (e.g., 'BlockValidator' or 'Test')");
-        Console.Error.WriteLine("  --skip-init-expressions Skip all init expression execution");
         Console.Error.WriteLine("  --execute <expression>  Execute specific Smalltalk expression after cold start");
         Console.Error.WriteLine("                         (e.g., 'BlockContextTest testAllCombinations')");
         Console.Error.WriteLine("  --verbose, -v          Enable verbose debugging (logs all method calls)");
