@@ -350,7 +350,7 @@ public class Phase6_ValidationAndGC : IPhase
     /// </summary>
     private SmalltalkOOP LookupClassVariable(string className, string varName)
     {
-        // Get the class OOP
+        // Get the class OOP (using GlobalRegistry is acceptable during cold start Phase 6)
         var classOOP = GlobalRegistry.LookupClassOOP(className);
         if (classOOP == _allocator.GetNil())
             return _allocator.GetNil();

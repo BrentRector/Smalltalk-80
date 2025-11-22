@@ -419,10 +419,19 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// <returns>The value OOP of the class variable, or Nil if not found</returns>
     public virtual SmalltalkOOP LookupClassVariable(string className, string varName)
     {
-        // Get the class OOP
-        var classOOP = GetClass(className);
-        if (classOOP == metadata.KnownObjects.Nil)
-            return metadata.KnownObjects.Nil;
+        // Optimize for well-known classes using VMMetadata
+        SmalltalkOOP classOOP;
+        if (className == "Symbol")
+        {
+            classOOP = metadata.SymbolClassOOP;
+        }
+        else
+        {
+            // For other classes, look up in Smalltalk dictionary
+            classOOP = GetClass(className);
+            if (classOOP == metadata.KnownObjects.Nil)
+                return metadata.KnownObjects.Nil;
+        }
 
         // Get classPool (instance variable 7 of Class)
         var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, 7);

@@ -69,45 +69,18 @@ public class SelectorCache
     /// </summary>
     private SmalltalkOOP LookupClassVariable(string className, string varName)
     {
-        // Get the class OOP from Smalltalk dictionary
-        var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
-        var classOOP = _metadata.KnownObjects.Nil;
-
-        // Find the class by searching Smalltalk dictionary
-        int dictSize = _heapManager.GetIndexedSize(smalltalkOOP);
-        for (int i = 0; i < dictSize; i++)
+        // For Symbol class, use the well-known OOP from VMMetadata
+        SmalltalkOOP classOOP;
+        if (className == "Symbol")
         {
-            var assocOOP = _heapManager.GetIndexedOOP(smalltalkOOP, i);
-            if (assocOOP == _metadata.KnownObjects.Nil)
-                continue;
-
-            // Get the key (class name symbol)
-            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-
-            // Check if this is the class we're looking for
-            int keySize = _heapManager.GetIndexedSize(keyOOP);
-            if (keySize != className.Length)
-                continue;
-
-            bool match = true;
-            for (int j = 0; j < keySize; j++)
-            {
-                if (_heapManager.GetIndexedByte(keyOOP, j) != (byte)className[j])
-                {
-                    match = false;
-                    break;
-                }
-            }
-
-            if (match)
-            {
-                classOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-                break;
-            }
+            classOOP = _metadata.SymbolClassOOP;
         }
-
-        if (classOOP == _metadata.KnownObjects.Nil)
+        else
+        {
+            // For other classes, would need to look up in Smalltalk dictionary
+            // (Currently only Symbol is supported)
             return _metadata.KnownObjects.Nil;
+        }
 
         // Get classPool (instance variable 7 of Class)
         var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, 7);
