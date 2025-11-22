@@ -259,46 +259,18 @@ public static class SimpleObjectPrimitives
             if (context.RuntimeHeapAccess == null)
                 return context.HeapManager.GetNil();
 
-            // Get Character class from SystemDictionary
-            var characterClassOOP = context.RuntimeHeapAccess.GetClass("Character");
-            if (characterClassOOP == context.HeapManager.GetNil())
+            // Use RuntimeHeapAccessor to look up CharacterTable class variable
+            var characterTableOOP = context.RuntimeHeapAccess.LookupClassVariable("Character", "CharacterTable");
+            if (characterTableOOP == context.HeapManager.GetNil())
                 return context.HeapManager.GetNil();
 
-            // Get classPool from Character class (instance variable index 7)
-            // Class instance variables: [0-3] Behavior (superclass, methodDict, format, subclasses)
-            //                          [4-5] ClassDescription (instanceVariables, organization)
-            //                          [6-8] Class (name, classPool, sharedPools)
-            // Note: Class variables are stored in the Class's classPool, NOT in the Metaclass
-            var classPoolOOP = context.HeapManager.GetInstanceVariable(characterClassOOP, 7);
-            if (classPoolOOP == context.HeapManager.GetNil())
+            // CharacterTable is an Array of 256 Character objects
+            // Return the Character at the given ASCII value index
+            int tableSize = context.HeapManager.GetIndexedSize(characterTableOOP);
+            if (asciiValue >= tableSize)
                 return context.HeapManager.GetNil();
 
-            // Search for CharacterTable in class pool
-            int dictSize = context.HeapManager.GetIndexedSize(classPoolOOP);
-
-            for (int i = 0; i < dictSize; i++)
-            {
-                var entryOOP = context.HeapManager.GetIndexedOOP(classPoolOOP, i);
-                if (entryOOP == context.HeapManager.GetNil())
-                    continue;
-
-                var keyOOP = context.HeapManager.GetInstanceVariable(entryOOP, 0);
-                int symbolSize = context.HeapManager.GetIndexedSize(keyOOP);
-                if (symbolSize != 14) continue; // "CharacterTable" has 14 chars
-
-                byte[] bytes = new byte[symbolSize];
-                for (int j = 0; j < symbolSize; j++)
-                    bytes[j] = context.HeapManager.GetIndexedByte(keyOOP, j);
-
-                string symbolName = System.Text.Encoding.ASCII.GetString(bytes);
-                if (symbolName == "CharacterTable")
-                {
-                    var characterTableOOP = context.HeapManager.GetInstanceVariable(entryOOP, 1);
-                    return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
-                }
-            }
-
-            return context.HeapManager.GetNil();
+            return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
         }
     }
 
