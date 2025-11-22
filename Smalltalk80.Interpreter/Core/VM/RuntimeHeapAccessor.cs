@@ -419,48 +419,45 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// <returns>The value OOP of the class variable, or Nil if not found</returns>
     public virtual SmalltalkOOP LookupClassVariable(string className, string varName)
     {
-        Console.WriteLine($"[LookupClassVariable DEBUG] Looking up {className}>>{varName}");
-
         // Optimize for well-known classes using VMMetadata
         SmalltalkOOP classOOP;
         if (className == "Symbol")
         {
             classOOP = metadata.SymbolClassOOP;
-            Console.WriteLine($"[LookupClassVariable DEBUG] Using cached Symbol class: {classOOP}");
         }
         else
         {
             // For other classes, look up in Smalltalk dictionary
             classOOP = GetClass(className);
-            Console.WriteLine($"[LookupClassVariable DEBUG] GetClass({className}) returned: {classOOP}");
             if (classOOP == metadata.KnownObjects.Nil)
             {
-                Console.WriteLine($"[LookupClassVariable DEBUG] Class {className} not found!");
+                Console.WriteLine($"[LookupClassVariable] ERROR: Class {className} not found!");
                 return metadata.KnownObjects.Nil;
             }
         }
 
         // Get classPool (instance variable 7 of Class)
         var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, 7);
-        Console.WriteLine($"[LookupClassVariable DEBUG] classPool for {className}: {classPoolOOP}");
         if (classPoolOOP == metadata.KnownObjects.Nil)
         {
-            Console.WriteLine($"[LookupClassVariable DEBUG] classPool is nil!");
+            Console.WriteLine($"[LookupClassVariable] ERROR: classPool is nil for {className}!");
             return metadata.KnownObjects.Nil;
         }
 
         // Find the symbol OOP for the variable name
         var varSymbolOOP = InternSymbol(varName);
-        Console.WriteLine($"[LookupClassVariable DEBUG] InternSymbol({varName}) returned: {varSymbolOOP}");
         if (varSymbolOOP == metadata.KnownObjects.Nil)
         {
-            Console.WriteLine($"[LookupClassVariable DEBUG] Symbol {varName} not found!");
+            Console.WriteLine($"[LookupClassVariable] ERROR: Symbol '{varName}' not found!");
             return metadata.KnownObjects.Nil;
         }
 
         // Look up the symbol in the classPool dictionary
         var result = DictionaryLookup(classPoolOOP, varSymbolOOP);
-        Console.WriteLine($"[LookupClassVariable DEBUG] DictionaryLookup returned: {result}");
+        if (result == metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine($"[LookupClassVariable] ERROR: {className}>>{varName} not found in classPool!");
+        }
         return result;
     }
 }

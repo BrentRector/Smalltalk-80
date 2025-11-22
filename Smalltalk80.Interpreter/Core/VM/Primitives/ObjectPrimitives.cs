@@ -233,22 +233,45 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Arguments.Length != 1)
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: Wrong number of arguments ({context.Arguments.Length})");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (context.Receiver.IsSmallInteger)
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: Receiver is SmallInteger ({context.Receiver})");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (!context.Arguments[0].IsSmallInteger)
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: Index is not SmallInteger ({context.Arguments[0]})");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             int index = context.Arguments[0].AsSmallInteger();
-            if (index < 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (index < 1)
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: Index < 1 ({index})");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-            if (index > size) return PrimitiveResult.Fail(context.Metadata!);
+            if (index > size)
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: Index {index} > size {size}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             byte byteValue = context.HeapManager.GetIndexedByte(context.Receiver, index - 1);
 
             // Get Character from CharacterTable (Character class pool variable)
             var characterOOP = GetCharacterForAscii(context, byteValue);
             if (characterOOP == context.HeapManager.GetNil())
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: GetCharacterForAscii returned nil for ASCII {byteValue}");
                 return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             return PrimitiveResult.Ok(characterOOP);
         }
@@ -258,35 +281,29 @@ public static class SimpleObjectPrimitives
         {
             if (context.RuntimeHeapAccess == null)
             {
-                Console.WriteLine($"[Primitive 63 DEBUG] RuntimeHeapAccess is null!");
+                Console.WriteLine($"[Primitive 63] ERROR: RuntimeHeapAccess is null!");
                 return context.HeapManager.GetNil();
             }
 
             // Use RuntimeHeapAccessor to look up CharacterTable class variable
-            Console.WriteLine($"[Primitive 63 DEBUG] Looking up CharacterTable for ASCII {asciiValue}...");
             var characterTableOOP = context.RuntimeHeapAccess.LookupClassVariable("Character", "CharacterTable");
             if (characterTableOOP == context.HeapManager.GetNil())
             {
-                Console.WriteLine($"[Primitive 63 DEBUG] CharacterTable lookup returned nil!");
+                Console.WriteLine($"[Primitive 63] ERROR: CharacterTable lookup returned nil!");
                 return context.HeapManager.GetNil();
             }
-
-            Console.WriteLine($"[Primitive 63 DEBUG] Found CharacterTable: {characterTableOOP}");
 
             // CharacterTable is an Array of 256 Character objects
             // Return the Character at the given ASCII value index
             int tableSize = context.HeapManager.GetIndexedSize(characterTableOOP);
-            Console.WriteLine($"[Primitive 63 DEBUG] CharacterTable size: {tableSize}");
 
             if (asciiValue >= tableSize)
             {
-                Console.WriteLine($"[Primitive 63 DEBUG] ASCII value {asciiValue} >= table size {tableSize}");
+                Console.WriteLine($"[Primitive 63] ERROR: ASCII {asciiValue} >= table size {tableSize}");
                 return context.HeapManager.GetNil();
             }
 
-            var characterOOP = context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
-            Console.WriteLine($"[Primitive 63 DEBUG] Returning Character OOP: {characterOOP}");
-            return characterOOP;
+            return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
         }
     }
 
