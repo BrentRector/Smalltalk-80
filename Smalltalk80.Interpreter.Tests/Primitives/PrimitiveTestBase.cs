@@ -91,6 +91,7 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Creates a PrimitiveExecutionContext with the specified receiver and arguments.
     /// For tests that need metadata, call CreateTestMetadata() first and pass it in.
+    /// If no metadata is provided, a default test metadata is created automatically.
     /// </summary>
     protected static PrimitiveExecutionContext CreateContext(
         SmalltalkOOP receiver,
@@ -103,6 +104,9 @@ public abstract class PrimitiveTestBase
         int instructionPointer = 0,
         VMMetadata? metadata = null)
     {
+        // Ensure metadata is always provided (create default if not specified)
+        var actualMetadata = metadata ?? CreateDefaultTestMetadata();
+
         return new PrimitiveExecutionContext(
             receiver,
             arguments,
@@ -115,7 +119,7 @@ public abstract class PrimitiveTestBase
             instructionPointer: instructionPointer,
             cacheManager: cacheManager,
             messageSender: messageSender,
-            metadata: metadata);
+            metadata: actualMetadata);
     }
 
     /// <summary>
@@ -241,13 +245,49 @@ public abstract class PrimitiveTestBase
     /// Creates a basic mock RuntimeHeapAccessor that returns -1 for all field lookups.
     /// Tests can set up specific field indices as needed.
     /// </summary>
-    protected static Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccessor(Mock<ISmalltalkHeap> mockHeap)
+    protected static Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccessor(Mock<ISmalltalkHeap> mockHeap, VMMetadata? metadata = null)
     {
-        var mock = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        // Use provided metadata or create a default one
+        var testMetadata = metadata ?? CreateDefaultTestMetadata();
+
+        var mock = new Mock<RuntimeHeapAccessor>(mockHeap.Object, testMetadata);
 
         // Default: return -1 (field not found) for any field lookup
         mock.Setup(r => r.GetFieldIndex(It.IsAny<SmalltalkOOP>(), It.IsAny<string>())).Returns(-1);
 
         return mock;
+    }
+
+    /// <summary>
+    /// Creates a minimal VMMetadata for tests that don't need specific metadata values.
+    /// </summary>
+    protected static VMMetadata CreateDefaultTestMetadata()
+    {
+        return new VMMetadata
+        {
+            KnownObjects = new KnownObjects(
+                nil: ObjectOOP(0),
+                @true: ObjectOOP(1),
+                @false: ObjectOOP(2),
+                smalltalk: ObjectOOP(3)
+            ),
+            ProcessorScheduler = ObjectOOP(4),
+            ClassNameFieldIndex = 6,
+            ClassSuperclassFieldIndex = 0,
+            ClassMethodDictFieldIndex = 1,
+            ClassFormatFieldIndex = 2,
+            MetaclassThisClassFieldIndex = 5,
+            MethodDictTallyFieldIndex = 0,
+            MethodDictKeysFieldIndex = 1,
+            MethodDictValuesFieldIndex = 2,
+            ClassClassOOP = ObjectOOP(10),
+            MetaclassClassOOP = ObjectOOP(11),
+            SymbolClassOOP = ObjectOOP(12),
+            StringClassOOP = ObjectOOP(13),
+            ArrayClassOOP = ObjectOOP(14),
+            CompiledMethodClassOOP = ObjectOOP(15),
+            SmallIntegerClassOOP = ObjectOOP(16),
+            BlockContextClassOOP = ObjectOOP(17)
+        };
     }
 }

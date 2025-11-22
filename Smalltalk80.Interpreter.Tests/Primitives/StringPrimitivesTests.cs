@@ -230,7 +230,7 @@ public class StringPrimitivesTests : PrimitiveTestBase
             SetupIndexedByte(mockHeap, stringOOP, i, helloBytes[i]);
         }
 
-        var mockRuntime = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntime.Setup(r => r.InternSymbol("hello")).Returns(symbolOOP);
 
         var context = CreateContext(
@@ -294,7 +294,7 @@ public class StringPrimitivesTests : PrimitiveTestBase
             SetupIndexedByte(mockHeap, stringOOP, i, bytes[i]);
         }
 
-        var mockRuntime = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntime.Setup(r => r.InternSymbol("unknown")).Returns(nilOOP);
 
         var context = CreateContext(

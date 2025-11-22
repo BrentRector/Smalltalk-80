@@ -29,7 +29,12 @@ public readonly struct PrimitiveResult
     /// Creates a failed result with nil value.
     /// Always use this method - VMMetadata is required.
     /// </summary>
-    public static PrimitiveResult Fail(VMMetadata metadata) => new(false, metadata.KnownObjects.Nil);
+    public static PrimitiveResult Fail(VMMetadata? metadata)
+    {
+        if (metadata == null)
+            throw new ArgumentNullException(nameof(metadata), "VMMetadata is required for primitive failures");
+        return new(false, metadata.KnownObjects.Nil);
+    }
 
     /// <summary>Creates a result from a boolean condition.</summary>
     public static PrimitiveResult FromBool(bool condition, SmalltalkOOP trueValue, SmalltalkOOP falseValue) =>
