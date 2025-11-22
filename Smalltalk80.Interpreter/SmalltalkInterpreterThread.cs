@@ -343,8 +343,8 @@ public class SmalltalkInterpreterThread
     /// </summary>
     private SmalltalkOOP LookupGlobal(string globalName)
     {
-        // Get Smalltalk global dictionary from VMMetadata
-        var smalltalkOOP = _context.VMMetadata.SmalltalkDictionary;
+        // Get Smalltalk global dictionary from VMMetadata (runtime-safe)
+        var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
 
         // Search for the global by name
         int size = _context.HeapManager.GetIndexedSize(smalltalkOOP);
@@ -377,25 +377,95 @@ public class SmalltalkInterpreterThread
 
     /// <summary>
     /// Finds a symbol OOP by text at runtime by searching the USTable.
+    /// Uses hash-based lookup for efficiency (same algorithm as Smalltalk-80).
     /// </summary>
     private SmalltalkOOP FindSymbol(string symbolText)
     {
-        // Get USTable (User Symbol Table) from VMMetadata
-        var usTableOOP = _context.VMMetadata.USTable;
+        // Get USTable from Smalltalk dictionary (runtime-safe)
+        var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
+        var usTableSymbolOOP = FindSymbolLinear("USTable");
+        if (usTableSymbolOOP == _context.HeapManager.GetNil())
+        {
+            throw new InvalidOperationException("USTable symbol not found - cannot perform symbol lookup");
+        }
+
+        // Look up USTable global
+        var usTableOOP = _context.HeapManager.GetNil();
+        int dictSize = _context.HeapManager.GetIndexedSize(smalltalkOOP);
+        for (int i = 0; i < dictSize; i++)
+        {
+            var assocOOP = _context.HeapManager.GetIndexedOOP(smalltalkOOP, i);
+            if (assocOOP == _context.HeapManager.GetNil())
+                continue;
+
+            var keyOOP = _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            if (keyOOP == usTableSymbolOOP)
+            {
+                usTableOOP = _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                break;
+            }
+        }
+
+        if (usTableOOP == _context.HeapManager.GetNil())
+        {
+            throw new InvalidOperationException("USTable global not found in Smalltalk dictionary");
+        }
+
+        // USTable is an Array of Arrays (hash buckets)
         int tableSize = _context.HeapManager.GetIndexedSize(usTableOOP);
 
-        // Search through all symbols
-        for (int i = 0; i < tableSize; i++)
+        // Compute hash and get bucket index
+        int bucketIndex = SymbolHasher.ComputeUSTableIndexZeroBased(symbolText, tableSize);
+        var bucketOOP = _context.HeapManager.GetIndexedOOP(usTableOOP, bucketIndex);
+
+        if (bucketOOP == _context.HeapManager.GetNil())
         {
-            var symbolOOP = _context.HeapManager.GetIndexedOOP(usTableOOP, i);
+            return _context.HeapManager.GetNil();
+        }
+
+        // Search bucket for matching symbol
+        int bucketSize = _context.HeapManager.GetIndexedSize(bucketOOP);
+        for (int i = 0; i < bucketSize; i++)
+        {
+            var symbolOOP = _context.HeapManager.GetIndexedOOP(bucketOOP, i);
             if (symbolOOP == _context.HeapManager.GetNil())
                 continue;
 
-            // Read symbol string
             var symbolString = ExtractSymbolString(symbolOOP);
             if (symbolString == symbolText)
             {
                 return symbolOOP;
+            }
+        }
+
+        return _context.HeapManager.GetNil();
+    }
+
+    /// <summary>
+    /// Finds a symbol by linear search (used only for bootstrapping USTable lookup).
+    /// </summary>
+    private SmalltalkOOP FindSymbolLinear(string symbolText)
+    {
+        var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
+        int size = _context.HeapManager.GetIndexedSize(smalltalkOOP);
+
+        // Linear search through all associations
+        for (int i = 0; i < size; i++)
+        {
+            var assocOOP = _context.HeapManager.GetIndexedOOP(smalltalkOOP, i);
+            if (assocOOP == _context.HeapManager.GetNil())
+                continue;
+
+            // Get key (Symbol)
+            var keyOOP = _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            if (keyOOP == _context.HeapManager.GetNil())
+                continue;
+
+            // Check if this is a Symbol with matching text
+            var keyString = ExtractSymbolString(keyOOP);
+            if (keyString == symbolText)
+            {
+                return keyOOP;
             }
         }
 

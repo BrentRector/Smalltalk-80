@@ -56,7 +56,6 @@ public static class Program
             var verboseDebug = config.VerboseDebug;
             var testFilter = config.TestFilter;
             var reportOutput = config.ReportOutput;
-            var skipInitExpressions = config.SkipInitExpressions;
             var executeExpression = config.ExecuteExpression;
             var diagnosticCategories = config.DiagnosticCategories;
 
