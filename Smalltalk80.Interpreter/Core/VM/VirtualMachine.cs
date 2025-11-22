@@ -86,6 +86,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         set => _tracer.SelectorTraceEnabled = value;
     }
 
+    /// <summary>Gets the message dispatcher for runtime message sending.</summary>
+    public IMessageDispatcher MessageDispatcher => _messageDispatcher;
+
+    /// <summary>Gets the context manager for runtime context management.</summary>
+    public IContextManager ContextManager => _contextManager;
+
     public VirtualMachine(ISmalltalkHeap heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, IDiagnosticHub? diagnostics = null)
     {
         _heapManager = heapManager;

@@ -3,6 +3,7 @@ using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Core.Utilities;
 using Smalltalk80.Interpreter.Engine;
 using Smalltalk80.Interpreter.Engine.InitExecution;
 using Smalltalk80.Interpreter.HeapManager;
@@ -281,11 +282,112 @@ public class SmalltalkInterpreterThread
         Console.WriteLine($"\n=== Executing User Expression ===");
         Console.WriteLine($"Expression: {_context.Config.ExecuteExpression}");
 
-        // TODO: Implement user expression compilation and execution
-        // This requires a full Smalltalk source compiler (not just bytecode from bundle)
-        // For now, user can execute init expressions from the bundle via --execute flag
-        Console.WriteLine("NOTE: User expression execution not yet implemented in two-thread architecture");
-        Console.WriteLine("      Use init expressions in the coldstart bundle for now");
+        try
+        {
+            // Create MessageSender for runtime message sending
+            var messageSender = new MessageSender(
+                _context.HeapManager,
+                _vm!,
+                _context.VMMetadata,
+                _vm!.MessageDispatcher,
+                _vm!.ContextManager);
+
+            // Step 1: Create Smalltalk String from user expression
+            var sourceString = StringHelper.CreateString(_context.HeapManager, _context.Config.ExecuteExpression);
+
+            // Step 2: Get Compiler class and UndefinedObject class
+            var compilerClassOOP = GlobalRegistry.Get("class:Compiler");
+            var undefinedObjectClassOOP = GlobalRegistry.Get("class:UndefinedObject");
+
+            // Step 3: Send compile:in: to Compiler
+            // Compiler compile: sourceString in: UndefinedObject
+            Console.WriteLine("  Compiling expression using Smalltalk Compiler...");
+            var compiledMethodOOP = messageSender.SendKeyword(
+                compilerClassOOP,
+                "compile:in:",
+                sourceString,
+                undefinedObjectClassOOP);
+
+            Console.WriteLine($"  Compiled method: {compiledMethodOOP}");
+
+            // Step 4: Execute the compiled method
+            // We need to execute it with nil as receiver (DoIt semantics)
+            var nilOOP = _context.HeapManager.GetNil();
+
+            // Create a MethodContext and execute
+            var contextOOP = _vm!.ContextManager.CreateMethodContext(
+                compiledMethodOOP,
+                nilOOP,
+                Array.Empty<SmalltalkOOP>(),
+                callerContextOOP: _context.HeapManager.GetNil());
+
+            Console.WriteLine("  Executing compiled method...");
+            var resultOOP = _vm!.ExecuteExistingContext(contextOOP);
+
+            // Step 5: Display the result
+            Console.WriteLine($"\n=== Result ===");
+            DisplayResult(resultOOP);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"\n❌ Error executing user expression: {ex.Message}");
+            Console.Error.WriteLine($"Stack trace:\n{ex.StackTrace}");
+        }
+    }
+
+    private void DisplayResult(SmalltalkOOP resultOOP)
+    {
+        if (resultOOP.IsSmallInteger)
+        {
+            Console.WriteLine($"SmallInteger: {resultOOP.AsSmallInteger()}");
+        }
+        else if (resultOOP == _context.HeapManager.GetNil())
+        {
+            Console.WriteLine("nil");
+        }
+        else if (resultOOP == GlobalRegistry.Get("true"))
+        {
+            Console.WriteLine("true");
+        }
+        else if (resultOOP == GlobalRegistry.Get("false"))
+        {
+            Console.WriteLine("false");
+        }
+        else if (StringHelper.IsString(_context.HeapManager, resultOOP))
+        {
+            var str = StringHelper.ExtractString(_context.HeapManager, resultOOP);
+            Console.WriteLine($"String: \"{str}\"");
+        }
+        else
+        {
+            // Generic object - show class and OOP
+            var classOOP = _context.HeapManager.GetClassOOP(resultOOP);
+            var className = GetClassName(classOOP);
+            Console.WriteLine($"{className} instance (OOP: {resultOOP})");
+        }
+    }
+
+    private string GetClassName(SmalltalkOOP classOOP)
+    {
+        try
+        {
+            var nameOOP = _context.HeapManager.GetInstanceVariable(classOOP, VMConstants.BEHAVIOR_NAME_INDEX);
+            if (nameOOP == _context.HeapManager.GetNil())
+                return "<unnamed>";
+
+            int length = _context.HeapManager.GetIndexedSize(nameOOP);
+            var bytes = new byte[length];
+            for (int i = 0; i < length; i++)
+            {
+                bytes[i] = _context.HeapManager.GetIndexedByte(nameOOP, i);
+            }
+
+            return System.Text.Encoding.ASCII.GetString(bytes);
+        }
+        catch
+        {
+            return "<unknown>";
+        }
     }
 
     // Future: Start Smalltalk controller loop
