@@ -87,7 +87,7 @@ public static class Program
 
             var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, diagnostics);
             loader.Run();
-            var layoutResolver = loader.LayoutResolver;
+            var layoutResolver = loader.LayoutResolver ?? throw new InvalidOperationException("LayoutResolver is null after cold start");
 
             // Write report if requested
             if (reportOutput != null)
@@ -107,13 +107,18 @@ public static class Program
             // Build VM metadata (needed by Smalltalk thread)
             var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
+            // Read Display dimensions from heap (before creating UI)
+            var displayOOP = GlobalRegistry.Get("Display");
+            int displayWidth = heapManager.GetInstanceVariable(displayOOP, 1).AsSmallInteger();   // Form.width at index 1
+            int displayHeight = heapManager.GetInstanceVariable(displayOOP, 2).AsSmallInteger();  // Form.height at index 2
+
             // Create event queue (shared between threads)
             Console.WriteLine("\n=== Creating Event Queue ===");
             var eventQueue = new SmalltalkEventQueue();
 
-            // Create display window (reads Display dimensions from heap)
+            // Create display window (UI thread object - does NOT access heap)
             Console.WriteLine("\n=== Creating Display Window ===");
-            var displayProvider = new WinFormsDisplayProvider(eventQueue, heapManager, "Smalltalk-80");
+            var displayProvider = new WinFormsDisplayProvider(displayWidth, displayHeight, eventQueue, "Smalltalk-80");
             Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity
@@ -129,7 +134,7 @@ public static class Program
                 VMMetadata = vmMetadata,
                 Bundle = bundle,
                 EventQueue = eventQueue,
-                DisplayProvider = displayProvider,
+                PlatformBridge = displayProvider,  // Smalltalk thread calls methods on UI object
                 Diagnostics = diagnostics,
                 Config = config
             };
@@ -158,7 +163,7 @@ public static class Program
 
             // When window closes, signal Smalltalk thread to shutdown
             Console.WriteLine("\n=== Shutting Down ===");
-            interpreterThread.RequestShutdown();
+            // interpreterThread.RequestShutdown();  // Future: for fiber event loop
 
             // Wait for Smalltalk thread to finish (with timeout)
             if (!smalltalkThread.Join(TimeSpan.FromSeconds(5)))

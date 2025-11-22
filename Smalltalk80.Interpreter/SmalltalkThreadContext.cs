@@ -1,11 +1,11 @@
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Engine;
 using Smalltalk80.Interpreter.Engine.LoaderPhases;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Platform;
-using Smalltalk80.Interpreter.Platform.Windows;
 
 namespace Smalltalk80.Interpreter;
 
@@ -41,9 +41,10 @@ public class SmalltalkThreadContext
     public required SmalltalkEventQueue EventQueue { get; init; }
 
     /// <summary>
-    /// The WinForms display provider (implements IPlatformBridge).
+    /// Platform bridge for Smalltalk -> UI communication.
+    /// Smalltalk thread calls methods on this object (thread-safe).
     /// </summary>
-    public required WinFormsDisplayProvider DisplayProvider { get; init; }
+    public required IPlatformBridge PlatformBridge { get; init; }
 
     /// <summary>
     /// Diagnostic hub for logging and events.

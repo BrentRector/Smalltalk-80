@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Engine;
@@ -18,7 +19,7 @@ public class SmalltalkInterpreterThread
     private readonly SmalltalkThreadContext _context;
     //private FiberScheduler? _fiberScheduler;  // Future: for process scheduling
     private VirtualMachine? _vm;
-    private bool _shutdownRequested;
+    // private bool _shutdownRequested;  // Future: for fiber event loop
 
     public SmalltalkInterpreterThread(SmalltalkThreadContext context)
     {
@@ -123,7 +124,7 @@ public class SmalltalkInterpreterThread
             _context.HeapManager,
             _context.LayoutResolver,
             _context.VMMetadata,
-            platformBridge: _context.DisplayProvider, // DisplayProvider implements IPlatformBridge
+            platformBridge: _context.PlatformBridge,
             _context.Diagnostics
         );
 
@@ -231,9 +232,9 @@ public class SmalltalkInterpreterThread
                 failed++;
                 Console.WriteLine($"    ❌ Failed: {expr.Source}");
                 Console.WriteLine($"       Status: {result.Status}");
-                if (result.ErrorMessage != null)
+                if (result.Diagnostic?.Message != null)
                 {
-                    Console.WriteLine($"       Error: {result.ErrorMessage}");
+                    Console.WriteLine($"       Error: {result.Diagnostic.Message}");
                 }
             }
         }
@@ -303,25 +304,29 @@ public class SmalltalkInterpreterThread
             var result = executor.ExecuteInitExpressionOnDemand(userExpression, compiler);
 
             Console.WriteLine($"\nUser expression result: {result.Status}");
-            if (result.ResultOOP.IsSmallInteger())
+            if (result.ReturnValueOop.HasValue)
             {
-                Console.WriteLine($"Result: {result.ResultOOP.AsSmallInteger()}");
-            }
-            else if (result.ResultOOP == _context.HeapManager.GetNil())
-            {
-                Console.WriteLine($"Result: nil");
-            }
-            else if (result.ResultOOP == _context.HeapManager.GetTrue())
-            {
-                Console.WriteLine($"Result: true");
-            }
-            else if (result.ResultOOP == _context.HeapManager.GetFalse())
-            {
-                Console.WriteLine($"Result: false");
-            }
-            else
-            {
-                Console.WriteLine($"Result OOP: {result.ResultOOP}");
+                var returnOOP = result.ReturnValueOop.Value;
+                if (returnOOP.IsSmallInteger())
+                {
+                    Console.WriteLine($"Result: {returnOOP.AsSmallInteger()}");
+                }
+                else if (returnOOP == _context.HeapManager.GetNil())
+                {
+                    Console.WriteLine($"Result: nil");
+                }
+                else if (returnOOP == GlobalRegistry.Get("true"))
+                {
+                    Console.WriteLine($"Result: true");
+                }
+                else if (returnOOP == GlobalRegistry.Get("false"))
+                {
+                    Console.WriteLine($"Result: false");
+                }
+                else
+                {
+                    Console.WriteLine($"Result OOP: {returnOOP}");
+                }
             }
         }
         catch (Exception ex)
@@ -353,8 +358,9 @@ public class SmalltalkInterpreterThread
     //     }
     // }
 
-    public void RequestShutdown()
-    {
-        _shutdownRequested = true;
-    }
+    // Future: Request shutdown for fiber event loop
+    // public void RequestShutdown()
+    // {
+    //     _shutdownRequested = true;
+    // }
 }

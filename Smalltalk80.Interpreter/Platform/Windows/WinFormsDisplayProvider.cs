@@ -20,8 +20,6 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     private readonly Bitmap _backBuffer;
     private readonly object _bufferLock = new();
     private readonly SmalltalkEventQueue _eventQueue;
-    private readonly ISmalltalkHeap _heap;
-    private readonly SmalltalkOOP _displayOOP;
     private bool _disposed = false;
 
     public new int Width { get; }
@@ -35,20 +33,13 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     /// </summary>
     public Memory<byte> DisplayBuffer => new Memory<byte>(_displayBuffer);
 
-    public WinFormsDisplayProvider(SmalltalkEventQueue eventQueue, ISmalltalkHeap heap, string title = "Smalltalk-80")
+    public WinFormsDisplayProvider(int width, int height, SmalltalkEventQueue eventQueue, string title = "Smalltalk-80")
     {
-        _eventQueue = eventQueue;
-        _heap = heap;
-
-        // Read Display dimensions from heap
-        _displayOOP = GlobalRegistry.Get("Display");
-        int width = _heap.GetInstanceVariable(_displayOOP, 1).AsSmallInteger();   // Form.width at index 1
-        int height = _heap.GetInstanceVariable(_displayOOP, 2).AsSmallInteger();  // Form.height at index 2
-
         Width = width;
         Height = height;
+        _eventQueue = eventQueue;
 
-        Console.WriteLine($"[WinForms] Creating window: {width}x{height} (read from Display object)");
+        Console.WriteLine($"[WinForms] Creating window: {width}x{height}");
 
         // Calculate buffer size: each row needs (width + 7) / 8 bytes
         int rowStride = (width + 7) / 8;
@@ -74,9 +65,6 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         MouseMove += OnMouseMove;
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
-
-        // Initial sync from heap
-        CopyEntireDisplayFromHeap();
     }
 
     /// <summary>
@@ -237,13 +225,8 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public void InvalidateDisplayRegion(int x, int y, int w, int h)
     {
-        // Copy changed region from heap to local buffer
-        lock (_bufferLock)
-        {
-            CopyDisplayRegionFromHeap(x, y, w, h);
-        }
-
         // Signal WinForms thread to repaint
+        // Note: Display buffer is updated by Smalltalk thread via direct memory access
         if (InvokeRequired)
         {
             BeginInvoke(new Action(() => Invalidate(new Rectangle(x, y, w, h))));
@@ -315,8 +298,8 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public SmalltalkOOP ReadClipboardToStringOOP()
     {
-        // Not implemented yet
-        return _heap.GetNil();
+        // Not implemented yet - return value should be provided by Smalltalk thread
+        return default(SmalltalkOOP);
     }
 
     public bool WriteClipboardFromStringOOP(SmalltalkOOP stringOOP)
@@ -351,58 +334,6 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         // Return seconds since Unix epoch, masked to 31 bits
         long secondsSinceEpoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         return (int)(secondsSinceEpoch & 0x7FFFFFFF);
-    }
-
-    // ============================================================================
-    // Display Buffer Synchronization
-    // ============================================================================
-
-    /// <summary>
-    /// Copies the entire Display bitmap from heap to local buffer.
-    /// Called during initialization.
-    /// </summary>
-    private void CopyEntireDisplayFromHeap()
-    {
-        var bitsOOP = _heap.GetInstanceVariable(_displayOOP, 0); // Form.bits at index 0
-        int rowStride = (Width + 7) / 8;
-        int totalBytes = rowStride * Height;
-
-        for (int i = 0; i < totalBytes; i++)
-        {
-            _displayBuffer[i] = _heap.GetIndexedByte(bitsOOP, i);
-        }
-    }
-
-    /// <summary>
-    /// Copies a rectangular region of the Display bitmap from heap to local buffer.
-    /// Called from Smalltalk thread when display is updated.
-    /// </summary>
-    private void CopyDisplayRegionFromHeap(int x, int y, int w, int h)
-    {
-        var bitsOOP = _heap.GetInstanceVariable(_displayOOP, 0); // Form.bits at index 0
-        int rowStride = (Width + 7) / 8;
-
-        // Clip to display bounds
-        if (x < 0) { w += x; x = 0; }
-        if (y < 0) { h += y; y = 0; }
-        if (x + w > Width) w = Width - x;
-        if (y + h > Height) h = Height - y;
-
-        if (w <= 0 || h <= 0) return;
-
-        // Copy affected bytes
-        int startByteX = x / 8;
-        int endByteX = (x + w + 7) / 8;
-        int byteWidth = endByteX - startByteX;
-
-        for (int row = y; row < y + h; row++)
-        {
-            int heapOffset = row * rowStride + startByteX;
-            for (int i = 0; i < byteWidth; i++)
-            {
-                _displayBuffer[heapOffset + i] = _heap.GetIndexedByte(bitsOOP, heapOffset + i);
-            }
-        }
     }
 
     // ============================================================================
