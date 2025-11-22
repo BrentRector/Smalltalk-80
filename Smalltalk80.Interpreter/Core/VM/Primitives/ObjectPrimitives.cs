@@ -257,20 +257,36 @@ public static class SimpleObjectPrimitives
         private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
         {
             if (context.RuntimeHeapAccess == null)
+            {
+                Console.WriteLine($"[Primitive 63 DEBUG] RuntimeHeapAccess is null!");
                 return context.HeapManager.GetNil();
+            }
 
             // Use RuntimeHeapAccessor to look up CharacterTable class variable
+            Console.WriteLine($"[Primitive 63 DEBUG] Looking up CharacterTable for ASCII {asciiValue}...");
             var characterTableOOP = context.RuntimeHeapAccess.LookupClassVariable("Character", "CharacterTable");
             if (characterTableOOP == context.HeapManager.GetNil())
+            {
+                Console.WriteLine($"[Primitive 63 DEBUG] CharacterTable lookup returned nil!");
                 return context.HeapManager.GetNil();
+            }
+
+            Console.WriteLine($"[Primitive 63 DEBUG] Found CharacterTable: {characterTableOOP}");
 
             // CharacterTable is an Array of 256 Character objects
             // Return the Character at the given ASCII value index
             int tableSize = context.HeapManager.GetIndexedSize(characterTableOOP);
-            if (asciiValue >= tableSize)
-                return context.HeapManager.GetNil();
+            Console.WriteLine($"[Primitive 63 DEBUG] CharacterTable size: {tableSize}");
 
-            return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+            if (asciiValue >= tableSize)
+            {
+                Console.WriteLine($"[Primitive 63 DEBUG] ASCII value {asciiValue} >= table size {tableSize}");
+                return context.HeapManager.GetNil();
+            }
+
+            var characterOOP = context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+            Console.WriteLine($"[Primitive 63 DEBUG] Returning Character OOP: {characterOOP}");
+            return characterOOP;
         }
     }
 
