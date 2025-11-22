@@ -266,74 +266,11 @@ public class SmalltalkInterpreterThread
         Console.WriteLine($"\n=== Executing User Expression ===");
         Console.WriteLine($"Expression: {_context.Config.ExecuteExpression}");
 
-        try
-        {
-            // Parse and compile the expression
-            var compiler = new InitExpressionCompiler(
-                _context.HeapManager,
-                _context.Bundle,
-                _context.VMMetadata
-            );
-
-            // Create a synthetic init expression for the user code
-            var userExpression = new InitExpression
-            {
-                Source = _context.Config.ExecuteExpression,
-                ClassNameHint = "UndefinedObject", // Execute as DoIt (nil as receiver)
-                MethodNameHint = "doIt"
-            };
-
-            var compiledMethod = compiler.CompileInitExpression(userExpression);
-
-            if (compiledMethod == null)
-            {
-                Console.Error.WriteLine("Failed to compile user expression");
-                return;
-            }
-
-            // Execute the expression
-            var executor = new InitExpressionExecutor(
-                _context.HeapManager,
-                _vm!,
-                _context.VMMetadata,
-                _context.Diagnostics,
-                InitPolicy.ContinueAndCollect,
-                defaultTimeoutMs: 30000 // Longer timeout for user expressions
-            );
-
-            var result = executor.ExecuteInitExpressionOnDemand(userExpression, compiler);
-
-            Console.WriteLine($"\nUser expression result: {result.Status}");
-            if (result.ReturnValueOop.HasValue)
-            {
-                var returnOOP = result.ReturnValueOop.Value;
-                if (returnOOP.IsSmallInteger())
-                {
-                    Console.WriteLine($"Result: {returnOOP.AsSmallInteger()}");
-                }
-                else if (returnOOP == _context.HeapManager.GetNil())
-                {
-                    Console.WriteLine($"Result: nil");
-                }
-                else if (returnOOP == GlobalRegistry.Get("true"))
-                {
-                    Console.WriteLine($"Result: true");
-                }
-                else if (returnOOP == GlobalRegistry.Get("false"))
-                {
-                    Console.WriteLine($"Result: false");
-                }
-                else
-                {
-                    Console.WriteLine($"Result OOP: {returnOOP}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error executing user expression: {ex.Message}");
-            Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
-        }
+        // TODO: Implement user expression compilation and execution
+        // This requires a full Smalltalk source compiler (not just bytecode from bundle)
+        // For now, user can execute init expressions from the bundle via --execute flag
+        Console.WriteLine("NOTE: User expression execution not yet implemented in two-thread architecture");
+        Console.WriteLine("      Use init expressions in the coldstart bundle for now");
     }
 
     // Future: Start Smalltalk controller loop
