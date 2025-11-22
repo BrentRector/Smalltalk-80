@@ -3,6 +3,8 @@ arrow_output/
 bmp_output/
 gacha_output/
 gacha_bmp/
+gacha12_output/
+gacha12_bmp/
 *.AL
 *.form
 *.bmp
