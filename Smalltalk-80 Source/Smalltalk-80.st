@@ -17309,7 +17309,7 @@ File class
 initialize
 	"Initialize FilePool with file mode constants."
 
-	FilePool _ Dictionary new.
+	Smalltalk at: #FilePool put: (FilePool _ Dictionary new).
 	FilePool at: #Read put: 1.
 	FilePool at: #Write put: 2.
 	FilePool at: #Shorten put: 3.
