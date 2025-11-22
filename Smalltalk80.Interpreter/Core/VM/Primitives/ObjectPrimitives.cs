@@ -264,6 +264,7 @@ public static class SimpleObjectPrimitives
             }
 
             byte byteValue = context.HeapManager.GetIndexedByte(context.Receiver, index - 1);
+            Console.WriteLine($"[Primitive 63] String>>at:{index} fetched byte {byteValue} ('{(char)byteValue}')");
 
             // Get Character from CharacterTable (Character class pool variable)
             var characterOOP = GetCharacterForAscii(context, byteValue);
@@ -273,12 +274,15 @@ public static class SimpleObjectPrimitives
                 return PrimitiveResult.Fail(context.Metadata!);
             }
 
+            Console.WriteLine($"[Primitive 63] SUCCESS: Returning Character {characterOOP} for byte {byteValue}");
             return PrimitiveResult.Ok(characterOOP);
         }
 
         // Helper to get Character object for ASCII code
         private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
         {
+            Console.WriteLine($"[Primitive 63] GetCharacterForAscii({asciiValue})");
+
             if (context.RuntimeHeapAccess == null)
             {
                 Console.WriteLine($"[Primitive 63] ERROR: RuntimeHeapAccess is null!");
@@ -293,6 +297,8 @@ public static class SimpleObjectPrimitives
                 return context.HeapManager.GetNil();
             }
 
+            Console.WriteLine($"[Primitive 63] Found CharacterTable: {characterTableOOP}");
+
             // CharacterTable is an Array of 256 Character objects
             // Return the Character at the given ASCII value index
             int tableSize = context.HeapManager.GetIndexedSize(characterTableOOP);
@@ -303,7 +309,9 @@ public static class SimpleObjectPrimitives
                 return context.HeapManager.GetNil();
             }
 
-            return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+            var result = context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+            Console.WriteLine($"[Primitive 63] CharacterTable[{asciiValue}] = {result}");
+            return result;
         }
     }
 
