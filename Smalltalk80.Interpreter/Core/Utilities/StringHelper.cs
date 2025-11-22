@@ -1,3 +1,4 @@
+using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 
@@ -23,7 +24,7 @@ public static class StringHelper
 
         // Allocate ByteIndexed object for String
         // String has no instance variables, all data is in indexed portion
-        var stringOOP = heap.AllocateObject(ObjectFormat.ByteIndexed, instanceVarCount: 0, indexedSize: text.Length);
+        var stringOOP = heap.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots: 0, indexedSize: text.Length);
         heap.SetClassOOP(stringOOP, stringClassOOP);
 
         // Fill indexed bytes with character codes
@@ -83,20 +84,20 @@ public static class StringHelper
         var symbolClassOOP = GlobalRegistry.Get("class:Symbol");
 
         // Allocate ByteIndexed object for Symbol (same structure as String)
-        var symbolOOP = heap.AllocateObject(ObjectFormat.ByteIndexed, instanceVarCount: 0, indexedSize: text.Length);
-        heap.SetClassOOP(symbolOOP, symbolClassOOP);
+        var newSymbolOOP = heap.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots: 0, indexedSize: text.Length);
+        heap.SetClassOOP(newSymbolOOP, symbolClassOOP);
 
         // Fill indexed bytes with character codes
         for (int i = 0; i < text.Length; i++)
         {
             byte charCode = (byte)text[i];
-            heap.SetIndexedByte(symbolOOP, i, charCode);
+            heap.SetIndexedByte(newSymbolOOP, i, charCode);
         }
 
         // Register the new symbol
-        SymbolRegistry.RegisterSymbol(symbolOOP);
+        SymbolRegistry.RegisterSymbol(newSymbolOOP);
 
-        return symbolOOP;
+        return newSymbolOOP;
     }
 
     /// <summary>
@@ -110,37 +111,7 @@ public static class StringHelper
         if (oop.IsSmallInteger)
             return false;
 
-        var classOOP = heap.GetClassOOP(oop);
-        var className = GetClassName(heap, classOOP);
-
+        var className = heap.GetClassName(oop);
         return className == "String" || className == "Symbol";
-    }
-
-    /// <summary>
-    /// Gets the class name for a class OOP (helper method).
-    /// </summary>
-    private static string GetClassName(ISmalltalkHeap heap, SmalltalkOOP classOOP)
-    {
-        try
-        {
-            // Get class name from instance variable (Behavior>>name)
-            var nameOOP = heap.GetInstanceVariable(classOOP, VMConstants.BEHAVIOR_NAME_INDEX);
-            if (nameOOP.RawValue == 0)
-                return "<unnamed>";
-
-            // Symbol/String is ByteIndexed
-            int length = heap.GetIndexedSize(nameOOP);
-            var bytes = new byte[length];
-            for (int i = 0; i < length; i++)
-            {
-                bytes[i] = heap.GetIndexedByte(nameOOP, i);
-            }
-
-            return System.Text.Encoding.ASCII.GetString(bytes);
-        }
-        catch
-        {
-            return "<unknown>";
-        }
     }
 }

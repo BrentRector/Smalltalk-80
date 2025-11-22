@@ -99,6 +99,8 @@ public class MessageSender
 
     /// <summary>
     /// Gets the class name for a class OOP.
+    /// Note: This method receives a CLASS OOP, not an object OOP.
+    /// For classes, we need to get an instance first to use GetClassName.
     /// </summary>
     private string GetClassName(SmalltalkOOP classOOP)
     {
@@ -107,28 +109,8 @@ public class MessageSender
             return "nil";
         }
 
-        try
-        {
-            // Get class name from instance variable (Behavior>>name)
-            var nameOOP = _heap.GetInstanceVariable(classOOP, VMConstants.BEHAVIOR_NAME_INDEX);
-            if (nameOOP == _metadata.KnownObjects.Nil)
-            {
-                return "<unnamed class>";
-            }
-
-            // Symbol is a String, read bytes
-            int length = _heap.GetIndexedSize(nameOOP);
-            var bytes = new byte[length];
-            for (int i = 0; i < length; i++)
-            {
-                bytes[i] = _heap.GetIndexedByte(nameOOP, i);
-            }
-
-            return System.Text.Encoding.ASCII.GetString(bytes);
-        }
-        catch
-        {
-            return "<unknown class>";
-        }
+        // For a class OOP, we can use the heap's GetClassName by passing the class itself
+        // since classes are also objects (instances of their metaclass)
+        return _heap.GetClassName(classOOP);
     }
 }
