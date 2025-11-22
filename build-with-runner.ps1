@@ -9,7 +9,7 @@
     - BlockContextDiagnostics.st (9 diagnostic classes with initialize methods)
     - BlockContextTestRunner.st (runs testAllCombinations automatically)
 
-  Output: Smalltalk80.Compiler/bin/Debug/net9.0/coldstart_with_runner.json
+  Output: Smalltalk80.Interpreter/bin/Debug/net9.0-windows/coldstart_with_runner.json
 
 .PARAMETER Configuration
   Build configuration (Debug or Release). Default: Debug
@@ -85,7 +85,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # Copy to coldstart_with_runner.json
 $ColdstartSrc = "Smalltalk80.Compiler/bin/$Configuration/net9.0/coldstart.json"
-$ColdstartDst = "Smalltalk80.Compiler/bin/$Configuration/net9.0/coldstart_with_runner.json"
+$ColdstartDst = "Smalltalk80.Interpreter/bin/$Configuration/net9.0-windows/coldstart_with_runner.json"
 
 Write-Host
 Write-Host "Copying to coldstart_with_runner.json..." -ForegroundColor Yellow

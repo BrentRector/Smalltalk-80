@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Builds the Compiler and generates coldstart.json from Smalltalk-80.st
-  Output: Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json
+  Output: Smalltalk80.Interpreter/bin/Debug/net9.0-windows/coldstart.json
 
 .PARAMETER Configuration
   Build configuration (Debug or Release). Default: Debug
@@ -38,7 +38,7 @@ Write-Host "Generating standard coldstart.json..." -ForegroundColor Yellow
 
 $CompilerExe = "Smalltalk80.Compiler/bin/$Configuration/net9.0/Smalltalk80.Compiler.dll"
 $SourceFile = "Smalltalk-80 Source/Smalltalk-80.st"
-$OutputFile = "Smalltalk80.Compiler/bin/$Configuration/net9.0/coldstart.json"
+$OutputFile = "Smalltalk80.Interpreter/bin/$Configuration/net9.0-windows/coldstart.json"
 
 if (-not (Test-Path $SourceFile)) {
     Write-Error "Source file not found: $SourceFile"
@@ -57,4 +57,4 @@ Write-Host "Output: $OutputFile" -ForegroundColor Green
 Write-Host
 Write-Host "To run the interpreter:" -ForegroundColor Cyan
 Write-Host "  cd Smalltalk80.Interpreter" -ForegroundColor White
-Write-Host "  dotnet run -- --coldstart ../Smalltalk80.Compiler/bin/$Configuration/net9.0/coldstart.json" -ForegroundColor White
+Write-Host "  dotnet run -- " -ForegroundColor White

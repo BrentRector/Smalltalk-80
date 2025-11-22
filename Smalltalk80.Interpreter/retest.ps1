@@ -7,5 +7,5 @@ git pull
 
 # Run the tests
 cd Smalltalk80.Interpreter
-cls
+# cls
 dotnet run -- --coldstart ..\Smalltalk80.Compiler\bin\Debug\net9.0\coldstart.json

@@ -226,7 +226,7 @@ WindowsPathName class
 "==================== WindowsFile ===================="
 
 Object subclass: #WindowsFile
-    instanceVariableNames: 'fileHandle fileName position readLimit writeLimit isBinary'
+    instanceVariableNames: 'fileHandle fileName position readLimit writeLimit isBinary fileDirectory'
     classVariableNames: ''
     poolDictionaries: ''
     category: 'System-Files'!
@@ -246,7 +246,7 @@ named: aFileName mode: modeString
 !WindowsFile methodsFor: 'file operations'!
 
 openNamed: aFileName mode: modeString
-    <primitive: 98>
+    <primitive: 121>
     fileHandle _ self primOpen: aFileName mode: modeString.
     fileName _ aFileName.
     position _ 0.
@@ -256,14 +256,14 @@ openNamed: aFileName mode: modeString
     ^self!
 
 close
-    <primitive: 99>
+    <primitive: 122>
     fileHandle ifNotNil: [
         self primClose: fileHandle.
         fileHandle _ nil].
     ^self!
 
 delete
-    <primitive: 100>
+    <primitive: 125>
     self close.
     self primDelete: fileName.
     ^self! !
@@ -271,15 +271,15 @@ delete
 !WindowsFile methodsFor: 'accessing'!
 
 size
-    <primitive: 92>
+    <primitive: 144>
     ^self primSize: fileHandle!
 
 position
-    <primitive: 93>
+    <primitive: 145>
     ^position!
 
 position: anInteger
-    <primitive: 94>
+    <primitive: 124>
     self primSetPosition: fileHandle to: anInteger.
     position _ anInteger.
     ^self!
@@ -390,15 +390,15 @@ setToEnd
 !WindowsFile methodsFor: 'private-primitives'!
 
 primOpen: aFileName mode: modeString
-    <primitive: 98>
+    <primitive: 121>
     self primitiveFailed!
 
 primClose: handle
-    <primitive: 99>
+    <primitive: 122>
     self primitiveFailed!
 
 primDelete: aFileName
-    <primitive: 100>
+    <primitive: 125>
     self primitiveFailed!
 
 primAt: handle position: pos
@@ -410,16 +410,64 @@ primAt: handle position: pos put: byte
     self primitiveFailed!
 
 primSize: handle
-    <primitive: 92>
+    <primitive: 144>
     self primitiveFailed!
 
 primPosition: handle
-    <primitive: 93>
+    <primitive: 145>
     self primitiveFailed!
 
 primSetPosition: handle to: pos
-    <primitive: 94>
+    <primitive: 124>
     self primitiveFailed! !
+
+
+!WindowsFile methodsFor: 'file accessing'!
+
+directory
+    "Answer the directory containing this file."
+    ^fileDirectory!
+
+directory: aFileDirectory
+    "Set the directory."
+    fileDirectory _ aFileDirectory!
+
+fileName: aString
+    "Set the file name."
+    fileName _ aString!
+
+fullName
+    "Answer full path name."
+    fileDirectory isNil
+        ifTrue: [^fileName]
+        ifFalse: [^fileDirectory fullNameFor: fileName]!
+
+rename: newFileName
+    "Rename this file."
+    fileDirectory rename: self newName: newFileName! !
+
+!WindowsFile methodsFor: 'file status'!
+
+reinitialize
+    "Reset to initial status."
+    position _ 0.
+    isBinary _ false.
+    ^self!
+
+release
+    "Release the file."
+    self close!
+
+reopen
+    "Reopen the file."
+    self openNamed: fileName mode: 'r'! !
+
+!WindowsFile methodsFor: 'converting'!
+
+asFileStream
+    "Answer a FileStream on this file."
+    self reopen.
+    ^FileStream on: self! !
 
 WindowsFile class
     instanceVariableNames: ''!
@@ -427,20 +475,22 @@ WindowsFile class
 "==================== WindowsFileDirectory ===================="
 
 Object subclass: #WindowsFileDirectory
-    instanceVariableNames: 'pathName'
-    classVariableNames: 'PathSeparator CurrentDirectory'
-    poolDictionaries: ''
+    instanceVariableNames: 'pathName directoryName closed currentIndex fileList'
+    classVariableNames: 'PathSeparator CurrentDirectory ExternalReferences'
+    poolDictionaries: 'FilePool'
     category: 'System-Files'!
 
 WindowsFileDirectory comment:
-'I represent a directory in the Windows file system.'!
+'I represent a directory in the Windows file system. I implement the full
+FileDirectory protocol for compatibility with Smalltalk-80 file operations.'!
 
 !WindowsFileDirectory class methodsFor: 'class initialization'!
 
 initialize
     "Initialize class variables."
-    PathSeparator _ '\'.
+    PathSeparator _ $\.
     CurrentDirectory _ '.'.
+    ExternalReferences _ OrderedCollection new.
     ^self! !
 
 !WindowsFileDirectory class methodsFor: 'instance creation'!
@@ -455,7 +505,25 @@ current
 
 default
     "Answer the default directory."
-    ^self current! !
+    ^self current!
+
+directory: aFileDirectory directoryName: aString
+    "Answer an instance in directory aFileDirectory whose name is aString."
+    ^self new setDirectory: aFileDirectory directoryName: aString!
+
+directoryFromName: fileDesignator setFileName: localNameBlock
+    "Answer the file directory from the designator and evaluate block with filename."
+    | directory fileName sepIndex |
+    directory _ Disk.
+    "Extract just the filename from the path"
+    sepIndex _ fileDesignator findLast: [:c | c = $\ or: [c = $/]].
+    sepIndex = 0
+        ifTrue: [fileName _ fileDesignator]
+        ifFalse: [
+            fileName _ fileDesignator copyFrom: sepIndex + 1 to: fileDesignator size.
+            "Could also extract directory path here if needed"].
+    localNameBlock value: fileName.
+    ^directory! !
 
 !WindowsFileDirectory class methodsFor: 'accessing'!
 
@@ -463,11 +531,42 @@ pathSeparator
     "Answer the path separator character."
     ^PathSeparator! !
 
+!WindowsFileDirectory class methodsFor: 'external reference access'!
+
+addExternalReference: anElement
+    "Add anElement as a file that is currently referenced."
+    (ExternalReferences includes: anElement)
+        ifFalse: [ExternalReferences addLast: anElement]!
+
+initializeExternalReferences
+    "Initialize ExternalReferences collection."
+    ExternalReferences _ OrderedCollection new!
+
+releaseExternalReferences
+    "Release all referenced files."
+    [ExternalReferences isEmpty]
+        whileFalse: [ExternalReferences removeLast release]!
+
+removeExternalReference: anElement
+    "Remove anElement from tracked files."
+    ExternalReferences remove: anElement ifAbsent: []! !
+
 !WindowsFileDirectory methodsFor: 'initialize-release'!
 
 setPath: aPath
     "Set the directory path."
     pathName _ aPath.
+    directoryName _ aPath.
+    closed _ true.
+    currentIndex _ 0.
+    fileList _ nil.
+    ^self!
+
+setDirectory: aFileDirectory directoryName: aString
+    "Set the directory and name."
+    directoryName _ aString.
+    pathName _ aString.
+    closed _ true.
     ^self! !
 
 !WindowsFileDirectory methodsFor: 'accessing'!
@@ -476,14 +575,123 @@ pathName
     "Answer the full path of this directory."
     ^pathName!
 
+directoryName
+    "Answer the name of the receiver."
+    ^directoryName!
+
+fullName
+    "Answer the name in parseable form."
+    ^pathName!
+
 fullNameFor: fileName
     "Answer the full path for a file in this directory."
-    ^pathName, PathSeparator, fileName! !
+    pathName = '.' ifTrue: [^fileName].
+    ^pathName, PathSeparator asString, fileName!
+
+versionNumbers
+    "Answer true if version numbers are supported."
+    ^false!
+
+next
+    "Answer the next file instance in the receiver."
+    | name |
+    fileList isNil ifTrue: [self reset].
+    currentIndex _ currentIndex + 1.
+    currentIndex > fileList size ifTrue: [^nil].
+    name _ fileList at: currentIndex.
+    ^self initFileName: name! !
+
+!WindowsFileDirectory methodsFor: 'testing'!
+
+includes: aFile
+    "Answer whether aFile is in the receiver's list of files."
+    ^(self find: aFile) notNil!
+
+includesKey: fileName
+    "Answer whether a file with the given name exists."
+    | file |
+    file _ self find: (self initFileName: fileName).
+    file notNil ifTrue: [
+        file release.
+        ^true].
+    ^false!
+
+closed
+    "Answer whether the receiver is closed."
+    ^closed! !
+
+!WindowsFileDirectory methodsFor: 'adding'!
+
+add: aFile
+    "Add the file, creating a new version if needed."
+    | file |
+    file _ aFile.
+    (self find: file) notNil
+        ifTrue: [
+            "File exists - remove old version"
+            self removeOld: (self find: file)].
+    self addNew: file.
+    ^file!
+
+addKey: aFileName
+    "Create a new empty file with the given name."
+    ^self add: (self initFileName: aFileName)!
+
+addNew: aFile
+    "Add the argument as a new file in the receiver."
+    | fullPath handle |
+    fullPath _ self fullNameFor: aFile fileName.
+    handle _ self primCreate: fullPath.
+    handle ifNotNil: [self primClose: handle].
+    aFile directory: self.
+    ^aFile! !
+
+!WindowsFileDirectory methodsFor: 'removing'!
+
+remove: aFile
+    "Remove aFile if found. Error if not."
+    ^self remove: aFile ifAbsentDo: [:f | f error: 'file not found']!
+
+remove: aFile ifAbsentDo: aBlock
+    "Remove aFile if found, else evaluate aBlock."
+    | f |
+    f _ self find: aFile ifAbsentDo: aBlock.
+    f notNil
+        ifTrue: [^self removeOld: f]
+        ifFalse: [^aBlock value: f]!
+
+removeOld: aFile
+    "Remove an existing file."
+    | fullPath |
+    fullPath _ self fullNameFor: aFile fileName.
+    self primDelete: fullPath.
+    ^aFile!
+
+removeKey: aFileName
+    "Remove and answer the file by name."
+    ^self remove: (self initFileName: aFileName)
+        ifAbsentDo: [:f | f error: 'file not found']! !
+
+!WindowsFileDirectory methodsFor: 'enumerating'!
+
+do: aBlock
+    "Sequence over all files, evaluating aBlock for each."
+    | aFile |
+    self reset.
+    [aFile _ self next.
+     aFile notNil]
+        whileTrue: [aBlock value: aFile]!
+
+reset
+    "Set to the beginning of the directory."
+    fileList _ self entries.
+    currentIndex _ 0.
+    ^self! !
 
 !WindowsFileDirectory methodsFor: 'file operations'!
 
 fileNamed: fileName
-    "Answer a WindowsFile for the given filename in this directory."
+    "Answer a WindowsFile for the given filename."
     | fullPath |
     fullPath _ self fullNameFor: fileName.
     ^WindowsFile named: fullPath!
@@ -506,36 +714,246 @@ directoryNamed: dirName
     ^self class on: (self fullNameFor: dirName)!
 
 entries
-    "Answer a collection of file and directory names. Primitive 95."
-    <primitive: 95>
+    "Answer a collection of file and directory names."
+    <primitive: 146>
     ^self primLookup: pathName pattern: '*'!
 
 fileNames
     "Answer only the file names."
-    ^self entries select: [:name | (name endsWith: PathSeparator) not]!
+    ^self entries select: [:name | (name endsWith: PathSeparator asString) not]!
 
 directoryNames
     "Answer only the directory names."
-    ^self entries select: [:name | name endsWith: PathSeparator]! !
+    ^self entries select: [:name | name endsWith: PathSeparator asString]! !
 
-!WindowsFileDirectory methodsFor: 'testing'!
+!WindowsFileDirectory methodsFor: 'file accessing'!
 
-exists: fileName
-    "Answer whether the named file exists."
-    | file |
-    [file _ self fileNamed: fileName.
-     file close.
-     ^true] on: Error do: [^false]!
+fileClass
+    "Answer the proper subclass of File."
+    ^WindowsFile!
 
-includesKey: fileName
-    "Answer whether a file with the given name exists."
-    ^self exists: fileName! !
+file: aFileName
+    "Answer a FileStream on an old or new File."
+    ^(self findOrAddKey: aFileName) asFileStream!
+
+newFile: aFileName
+    "Answer a FileStream on a new File."
+    ^(self addKey: aFileName) asFileStream!
+
+oldFile: aFileName
+    "Answer a FileStream on an existing File."
+    ^(self findKey: aFileName) asFileStream!
+
+filesMatching: pattern
+    "Answer an Array of file names matching the pattern."
+    | names name |
+    names _ WriteStream on: (Array new: 10).
+    self do: [:each |
+        name _ each fileName.
+        (pattern match: name)
+            ifTrue: [
+                name last = $. ifTrue: [name _ name copyFrom: 1 to: name size - 1].
+                names nextPut: name]].
+    ^names contents!
+
+rename: aFile newName: newName
+    "Rename the file to newName."
+    | oldPath newPath |
+    oldPath _ self fullNameFor: aFile fileName.
+    newPath _ self fullNameFor: newName.
+    self primRename: oldPath to: newPath.
+    aFile fileName: newName.
+    ^aFile!
+
+checkName: aFileName fixErrors: aBoolean
+    "Check filename for validity."
+    aFileName isEmpty ifTrue: [
+        aBoolean ifFalse: [self error: 'file name empty']].
+    aFileName last = $.
+        ifTrue: [
+            aBoolean ifFalse: [self error: 'file name ends in .'].
+            ^aFileName copyFrom: 1 to: aFileName size - 1]
+        ifFalse: [^aFileName]!
+
+checkNameOfFile: aFileName
+    "Check filename without fixing errors."
+    ^self checkName: aFileName fixErrors: false!
+
+checkNameOfFile: aFile fixErrors: aBoolean
+    "Check the File's name."
+    ^self checkName: aFile fileName fixErrors: aBoolean!
+
+isLegalFileName: aString
+    "Answer whether aString is a legal file name."
+    ^(self checkName: aString fixErrors: true) = aString!
+
+isLegalOldFileName: aString
+    "Answer whether aString is legal and exists."
+    ^(self checkName: aString fixErrors: true) = aString
+        and: [self includesKey: aString]! !
+
+!WindowsFileDirectory methodsFor: 'file status'!
+
+close
+    "Close the receiver if not already closed."
+    closed ifFalse: [
+        ExternalReferences remove: self ifAbsent: [].
+        self release]!
+
+open
+    "Open the directory."
+    closed _ false.
+    (ExternalReferences includes: self)
+        ifFalse: [ExternalReferences addLast: self]!
+
+release
+    "Release the receiver."
+    closed _ true!
+
+flush
+    "Write any state to storage."
+    "No-op for Windows directories"
+    ^self! !
+
+!WindowsFileDirectory methodsFor: 'file copying'!
+
+retrieve: aFileName
+    "Copy file to itself."
+    ^self retrieveFrom: aFileName copyTo: aFileName!
+
+retrieveFrom: aFileName1 copyTo: aFileName2
+    "Copy from aFileName1 to aFileName2."
+    | f1 f2 |
+    f1 _ self oldFile: aFileName1.
+    f1 readOnly.
+    f2 _ self file: aFileName2.
+    f2 nextPutAll: f1.
+    f2 close.
+    f1 close!
+
+store: aFileName
+    "Store file to itself."
+    ^self storeFrom: aFileName copyTo: aFileName!
+
+storeFrom: aFileName1 copyTo: aFileName2
+    "Store from aFileName1 to aFileName2."
+    | f1 f2 |
+    f1 _ self oldFile: aFileName1.
+    f1 readOnly.
+    f2 _ self file: aFileName2.
+    f2 nextPutAll: f1.
+    f2 close.
+    f1 close! !
+
+!WindowsFileDirectory methodsFor: 'page accessing'!
+
+allocate: aFilePage after: virtualDiskAddress
+    "Allocate a page - not used for Windows files."
+    ^aFilePage!
+
+allocateSN: aFile
+    "Allocate serial number - not used for Windows."
+    ^aFile serialNumber: (ByteArray new: 4)!
+
+deallocate: aFilePage
+    "Deallocate page - not used for Windows files."
+    ^self!
+
+freePages
+    "Answer free pages - not applicable."
+    ^0!
+
+newPage
+    "Create a dummy file and page."
+    ^(self initFileName: '') initPageNumber: 0! !
+
+!WindowsFileDirectory methodsFor: 'printing'!
+
+listFilesOn: aStream
+    "Write file names to the stream."
+    self do: [:aFile |
+        aStream cr.
+        aFile fileName printOn: aStream]!
+
+printOn: aStream
+    aStream nextPutAll: (closed
+        ifTrue: ['a closed ']
+        ifFalse: ['an open ']).
+    aStream nextPutAll: self class name.
+    aStream nextPutAll: ' on '.
+    directoryName printOn: aStream! !
+
+!WindowsFileDirectory methodsFor: 'private'!
+
+find: aFile
+    "Find file or answer nil."
+    ^self find: aFile ifAbsentDo: [:f | nil]!
+
+find: aFile ifAbsentDo: aBlock
+    "Return aFile if found, otherwise evaluate aBlock."
+    | fname |
+    fname _ self checkNameOfFile: aFile fixErrors: true.
+    aFile fileName: fname.
+    self do: [:each |
+        (fname sameAs: each fileName) ifTrue: [^each]].
+    ^aBlock value: aFile!
+
+findKey: aFileName
+    "Find by name or error."
+    ^self find: (self initFileName: aFileName)
+        ifAbsentDo: [:file | file error: 'file not found']!
+
+findOrAdd: aFile
+    "Find old file or create new one."
+    | f |
+    (f _ self find: aFile) notNil
+        ifTrue: [^f]
+        ifFalse: [^self addNew: aFile]!
+
+findOrAddKey: aFileName
+    "Find or create by name."
+    ^self findOrAdd: (self initFileName: aFileName)!
+
+initFile: aFile
+    "Initialize file."
+    aFile reinitialize.
+    ^aFile!
+
+initFileName: aFileName
+    "Create and initialize a File with given name."
+    | aFile |
+    aFile _ self fileClass new.
+    aFile directory: self.
+    aFile fileName: aFileName.
+    aFile reinitialize.
+    ^aFile! !
 
 !WindowsFileDirectory methodsFor: 'private-primitives'!
 
 primLookup: dirPath pattern: pattern
-    <primitive: 95>
-    ^OrderedCollection new! !
+    "Primitive 146 - Directory listing."
+    <primitive: 146>
+    ^OrderedCollection new!
+
+primCreate: aFileName
+    "Primitive 121 - Create/open file."
+    <primitive: 121>
+    ^nil!
+
+primClose: handle
+    "Primitive 122 - Close file."
+    <primitive: 122>
+    ^self!
+
+primDelete: aFileName
+    "Primitive 125 - Delete file."
+    <primitive: 125>
+    self error: 'Cannot delete file'!
+
+primRename: oldPath to: newPath
+    "Primitive 126 - Rename file."
+    <primitive: 126>
+    self error: 'Cannot rename file'! !
 
 WindowsFileDirectory class
     instanceVariableNames: ''!
@@ -12999,6 +13417,8 @@ initialize
 		2r0000010000000000)
 			offset: -5@-7.
 
+	CurrentCursor _ NormalCursor.
+
 "Cursor initialize"! !
 
 !Cursor class methodsFor: 'instance creation'!
@@ -16891,10 +17311,11 @@ File class
 initialize
 	"Initialize FilePool with file mode constants."
 
-	FilePool _ Dictionary new.
+	Smalltalk at: #FilePool put: (FilePool _ Dictionary new).
 	FilePool at: #Read put: 1.
 	FilePool at: #Write put: 2.
-	FilePool at: #Shorten put: 3! !
+	FilePool at: #Shorten put: 3.
+	FilePool at: #Disk put: WindowsFileDirectory default! !
 
 !File class methodsFor: 'documentation'!
 documentation
@@ -17263,15 +17684,9 @@ directory: aFileDirectory directoryName: aString
 
 	^self new setDirectory: aFileDirectory directoryName: aString!
 directoryFromName: fileDesignator setFileName: localNameBlock
-	| directory stream | 
-	"Answer the file directory implied from the designator, presumably at the start of the
-	designator, and evaluate the block with the rest of the designator (presumably the
-	file name itself."
+	"Delegate to the actual Disk implementation for proper path parsing."
 
-	directory _ Disk.
-	stream _ ReadStream on: fileDesignator.
-	localNameBlock value: (stream upTo: nil).
-	^directory! !
+	^Disk class directoryFromName: fileDesignator setFileName: localNameBlock! !
 
 !FileDirectory class methodsFor: 'external reference access'!
 addExternalReference: anElement 
@@ -18380,21 +18795,24 @@ FileStream class
 fileNamed: fileDesignator
 	"Answer a FileStream on an old or new File designated by the string fileDesignator."
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:fName].
-	^(dir findOrAddKey: fName) asFileStream!
+	| dir fNameHolder |
+	fNameHolder _ Array new: 1.
+	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:name | fNameHolder at: 1 put: name].
+	^(dir findOrAddKey: (fNameHolder at: 1)) asFileStream!
 newFileNamed: fileDesignator
 	"Answer a FileStream on a new File designated by the string fileDesignator.  Error if the argument is not a new file name."
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:fName].
-	^(dir addKey: fName) asFileStream!
+	| dir fNameHolder |
+	fNameHolder _ Array new: 1.
+	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:name | fNameHolder at: 1 put: name].
+	^(dir addKey: (fNameHolder at: 1)) asFileStream!
 oldFileNamed: fileDesignator
 	"Answer a FileStream on an old File designated by the string fileDesignator.  Error if the argument is not an old file name."
 
-	| dir fName |
-	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:fName].
-	^(dir findKey: fName) asFileStream!
+	| dir fNameHolder |
+	fNameHolder _ Array new: 1.
+	dir _ FileDirectory directoryFromName: fileDesignator setFileName: [:name | fNameHolder at: 1 put: name].
+	^(dir findKey: (fNameHolder at: 1)) asFileStream!
 on: aFilePage 
 	^self new on: aFilePage! !StringHolder subclass: #FillInTheBlank
 	instanceVariableNames: 'actionBlock actionTaken '
@@ -21581,6 +21999,8 @@ initSensor
 	Sensor _ InputSensor new! !
 
 InputSensor initialize!
+InputSensor install!
+InputSensor initSensor!
 Object subclass: #InputState
 	instanceVariableNames: 'x y bitState lshiftState rshiftState ctrlState lockState metaState keyboardQueue deltaTime baseTime timeProtect '
 	classVariableNames: 'BitMax BitMin CtrlKey InputProcess InputSemaphore LockKey LshiftKey RshiftKey '
@@ -27451,12 +27871,19 @@ Object class
 
 
 !Object class methodsFor: 'class initialization'!
-initialize 
+initialize
+	"Initialize DependentsFields and ErrorRecursion for the system.
+	Note: GUI confirmation dialog commented out for headless bootstrap compatibility."
+
+	self initializeDependentsFields.
+	self initializeErrorRecursion.
+
+	"GUI confirmation dialog - requires interactive event loop (disabled for headless bootstrap):
 	(self confirm: 'Do you really want to initialize
 class Object?  It will reset all dependents.')
 		ifTrue:
 			[self initializeDependentsFields.
-			self initializeErrorRecursion]
+			self initializeErrorRecursion]"
 
 	"Object initialize"! !
 
