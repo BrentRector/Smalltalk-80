@@ -7,6 +7,7 @@ using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Attributes;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using System.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Engine;
@@ -181,13 +182,6 @@ public class ColdStartOrchestrator : IColdStartLoader
             // Store InitExpressionMethods for later use in BuildVMMetadata
             InitExpressionMethods = phase4.InitExpressionMethods;
         });
-
-        // DEBUG: Trace ProcessorScheduler class after Phase 4
-        if (GlobalRegistry.TryGet("ProcessorScheduler", out var processorOOP))
-        {
-            var classOOP = _allocator.GetClassOOP(processorOOP);
-            Console.WriteLine($"[After Phase 4] ProcessorScheduler class = {classOOP}");
-        }
 
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches

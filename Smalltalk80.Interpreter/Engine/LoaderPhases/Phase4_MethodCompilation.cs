@@ -5,6 +5,7 @@ using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 using Smalltalk80.Interpreter.Engine.Services;
 
@@ -689,71 +690,11 @@ public class Phase4_MethodCompilation : IPhase
 
     private void CreateInitExpressionMethods()
     {
-        if (_bundle.InitExpressions.Length == 0)
-        {
-            // No init expressions - leave as default
-            _initExpressionMethods = default;
-            return;
-        }
+        // NEW APPROACH: Don't compile ANY init expressions during cold start!
+        // They will be compiled on-demand during execution when they're reachable
+        // via Processor.activeProcess. This avoids GC collection issues.
 
-        // Look up CompiledMethod and ByteArray classes
-        if (!_localIdToObjectId.TryGetValue("class:CompiledMethod", out var compiledMethodClassOOP))
-        {
-            throw new InvalidOperationException("CompiledMethod class not found in _localIdToObjectId");
-        }
-
-        if (!_localIdToObjectId.TryGetValue("class:ByteArray", out var byteArrayClassOOP))
-        {
-            throw new InvalidOperationException("ByteArray class not found in _localIdToObjectId");
-        }
-
-        // NOTE: Store init expressions in ORIGINAL bundle order
-        // Program.cs handles the execution ordering (initialize -> comments -> other)
-        // We must maintain 1:1 index mapping between bundle.InitExpressions and InitExpressionMethods array
-
-        var initExprMethods = new List<SmalltalkOOP>();
-
-        foreach (var expr in _bundle.InitExpressions)
-        {
-            // Resolve literals using the SAME canonicalization mechanism as regular methods
-            var literalOOPs = expr.Literals.Select(_literalResolver.ResolveLiteralValueAsOOP).ToArray();
-
-            // Determine homeClass from the resolved literals (not by parsing source!)
-            // Init expressions like "BinaryChoiceView initialize" have first literal = Association for the class
-            // We extract the metaclass from the Association's value
-            string homeClassLocalId = ExtractHomeClassFromInitExpression(expr, literalOOPs);
-
-            // Create a CompiledMethod object for the init expression
-            var bytecodes = ClassHierarchyTraversal.DecodeBytecodes(expr.Bytecodes);
-            SmalltalkOOP initMethodOOP = CreateCompiledMethod(
-                new MethodDescriptor
-                {
-                    LocalId = expr.LocalId,
-                    HomeClassLocalId = homeClassLocalId,
-                    SelectorIndex = 0,
-                    Header = expr.Header,
-                    Literals = [],
-                    Bytecodes = expr.Bytecodes
-                },
-                literalOOPs,
-                bytecodes,
-                compiledMethodClassOOP,
-                byteArrayClassOOP);
-
-            initExprMethods.Add(initMethodOOP);
-            _localIdToObjectId[expr.LocalId] = initMethodOOP;
-        }
-
-        // Create array to hold all init expression methods
-        var arrayClassOOP = _localIdToObjectId["class:Array"];
-        var initArrayOOP = _allocator.AllocateArray(arrayClassOOP, initExprMethods.Count);
-
-        for (int i = 0; i < initExprMethods.Count; i++)
-        {
-            _allocator.SetIndexedOOP(initArrayOOP, i, initExprMethods[i]);
-        }
-
-        // Store for ColdStartOrchestrator to pass to BuildVMMetadata
-        _initExpressionMethods = initArrayOOP;
+        // Set to nil - no pre-compiled init expressions
+        _initExpressionMethods = _heapManager.GetNil();
     }
 }

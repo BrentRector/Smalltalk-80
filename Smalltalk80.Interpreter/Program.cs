@@ -2,6 +2,7 @@ using System.Windows.Forms;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Engine;
@@ -131,7 +132,7 @@ public static class Program
 
             // Create the heap manager
             Console.WriteLine("Initializing heap manager...");
-            var heapManager = new SmalltalkHeapManager();
+            var heapManager = new SmalltalkHeapManager(diagnostics);
 
             // Create and run the loader
             Console.WriteLine("Starting cold start loader (6-phase)...");
@@ -183,7 +184,7 @@ public static class Program
 
                 var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
-                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
+                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, platformBridge: null, diagnostics);
 
                 // Enable verbose debugging if requested
                 vm.VerboseDebug = verboseDebug;
@@ -191,10 +192,15 @@ public static class Program
                 // Initialize selector caches after cold start completes
                 vm.InitializeSelectorCaches();
 
+                // NOTE: Phase 3 already created an initial Process and set it as Processor.activeProcess
+                // with suspendedContext = nil and priority = 4 (UserSchedulingPriority).
+                // No need to create another Process here - we'll reuse the one from Phase 3.
+
                 var executor = new InitExpressionExecutor(
                     heapManager,
                     vm,
                     vmMetadata,
+                    diagnostics,  // Pass diagnostic hub for GC events
                     InitPolicy.ContinueAndCollect,  // Continue to run all init expressions including tests
                     defaultTimeoutMs: 5000
                 );
@@ -354,9 +360,9 @@ public static class Program
                         Console.WriteLine("******************************************");
                         Console.WriteLine($"[{index}] {expr.Source}");
                         Console.WriteLine("******************************************");
-                        var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
+                        var testResult = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
 
-                        if (result.Status == InitStatus.Success)
+                        if (testResult.Status == InitStatus.Success)
                         {
                             Console.WriteLine($"  ✓ Test completed successfully");
                             succeeded++;
@@ -365,16 +371,16 @@ public static class Program
                         {
                             failed++;
                             Console.WriteLine($"\n❌ TEST FAILED: {expr.Source}");
-                            Console.WriteLine($"   Status: {result.Status}");
-                            if (result.Diagnostic?.Message != null)
+                            Console.WriteLine($"   Status: {testResult.Status}");
+                            if (testResult.Diagnostic?.Message != null)
                             {
-                                Console.WriteLine($"   Error: {result.Diagnostic.Message}");
+                                Console.WriteLine($"   Error: {testResult.Diagnostic.Message}");
                             }
                             // Stack trace suppressed for cleaner output
-                            // if (result.Diagnostic?.StackTrace != null)
+                            // if (testResult.Diagnostic?.StackTrace != null)
                             // {
                             //     Console.WriteLine($"\n   Stack Trace:");
-                            //     Console.WriteLine($"   {result.Diagnostic.StackTrace}");
+                            //     Console.WriteLine($"   {testResult.Diagnostic.StackTrace}");
                             // }
                         }
                     }
@@ -386,113 +392,54 @@ public static class Program
                     return;
                 }
 
-                // Execute initialize! expressions in dependency order
-                Console.WriteLine($"\n=== Executing Initialize Expressions (Dependency Order) ===");
+                // Execute all initialize! expressions with on-demand compilation and GC verification
+                Console.WriteLine($"\n=== Init Expression Execution ===");
                 Console.WriteLine($"  Total initialize! expressions: {phase1Indices.Count}");
-                Console.WriteLine($"  Execution order determined by class dependencies");
+                Console.WriteLine($"  Executing all expressions (2 skipped)");
                 Console.WriteLine();
-
-                // Use dependency-ordered phase1 indices
-                var reorderedIndices = new List<int>();
-                reorderedIndices.AddRange(phase1Indices);
 
                 succeeded = 0;
                 failed = 0;
 
-                // Execute with per-expression status output
-                foreach (int index in reorderedIndices)
+                if (phase1Indices.Count == 0)
                 {
-                    var expr = bundle.InitExpressions[index];
-                    var initMethodOOP = heapManager.GetIndexedOOP(vmMetadata.InitExpressionMethods, index);
+                    Console.WriteLine("  No initialize! expressions found");
+                    return;
+                }
 
-                    // Show what we're executing
-                    Console.Write($"  [{index}] {expr.Source}... ");
+                // Create InitExpressionCompiler for on-demand compilation (runtime-safe)
+                var compiler = new InitExpressionCompiler(heapManager, bundle, vmMetadata);
 
-                    // Reset instruction count before each expression
-                    vm.ResetInstructionCount();
+                // Execute all init expressions
+                for (int i = 0; i < phase1Indices.Count; i++)
+                {
+                    int exprIndex = phase1Indices[i];
+                    var expr = bundle.InitExpressions[exprIndex];
 
-                    var result = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
-                    long instructionCount = vm.InstructionCount;
+                    var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
 
                     if (result.Status == InitStatus.Success)
                     {
                         succeeded++;
-
-                        // For Block test classes and diagnostic tests, show the actual return value
-                        if (expr.Source != null && ((expr.Source.Contains("Block") && expr.Source.Contains("Test")) || expr.Source.Contains("Diag")))
-                        {
-                            var returnOOP = result.ReturnValueOop;
-                            if (returnOOP.HasValue && returnOOP.Value.IsSmallInteger)
-                            {
-                                int value = returnOOP.Value.AsSmallInteger();
-                                Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS - Returned: {value}");
-                            }
-                            else
-                            {
-                                Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS - Returned: {returnOOP}");
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine($"{instructionCount:N0} instructions  ✓ SUCCESS");
-                        }
-
                     }
                     else
                     {
-                        // FAIL FAST: Stop on first failure with full diagnostics
                         failed++;
-                        Console.WriteLine($"{instructionCount:N0} instructions  ❌ FAILED");
-                        Console.WriteLine();
-                        Console.WriteLine("==========================================");
-                        Console.WriteLine($"❌ FIRST FAILURE: [{index}] {expr.Source}");
-                        Console.WriteLine("==========================================");
-                        Console.WriteLine($"Status: {result.Status}");
-                        if (result.Diagnostic?.Message != null)
+                        Console.WriteLine($"    Status: {result.Status}");
+                        if (result.Diagnostic != null)
                         {
-                            Console.WriteLine($"\nError: {result.Diagnostic.Message}");
+                            Console.WriteLine($"    Error: {result.Diagnostic.Message}");
+                            if (result.Diagnostic.StackTrace != null)
+                            {
+                                Console.WriteLine($"    Stack Trace: {result.Diagnostic.StackTrace}");
+                            }
                         }
-                        if (result.Diagnostic?.StackTrace != null)
-                        {
-                            Console.WriteLine($"\nStack Trace:");
-                            Console.WriteLine(result.Diagnostic.StackTrace);
-                        }
-
-                        Console.WriteLine($"\n✓ Successfully executed {succeeded} expression(s) before this failure");
-
-                        // FAIL FAST - stop execution here
-                        Console.WriteLine($"\n⚠️  Execution stopped at first failure to enable debugging");
-                        Console.WriteLine($"⚠️  Enable VM debug output and re-run to diagnose this specific failure");
-                        return;
                     }
                 }
 
                 Console.WriteLine($"\n=== Init Expression Execution Complete ===");
-                Console.WriteLine($"  Total attempted: {reorderedIndices.Count} initialize! expressions");
-                Console.WriteLine($"  Succeeded: {succeeded}");
-                Console.WriteLine($"  Failed: {failed}");
-                Console.WriteLine($"  Skipped: {skippedIndices.Count} (require runtime features)");
-
-                // Note: Test expressions already executed as init expressions above
-                // No need to re-run them here
-
-                // Phase 2: Skip ALL comment: expressions
-                // BUG: WriteStream>>nextPut: has infinite loop - 210/234 fail
-                // TODO: Fix WriteStream bug then re-enable comment expressions
-                if (phase2Indices.Count > 0)
-                {
-                    Console.WriteLine($"\n=== Phase 2: Class Documentation ===");
-                    Console.WriteLine($"  Skipped {phase2Indices.Count} comment expressions (WriteStream bug)");
-                }
-
-                // Run GC after all init expressions to collect temporary objects
-                Console.WriteLine($"\n=== Running GC after init expressions ===");
-                var gcStatsAfter = heapManager.GC.GarbageCollect();
-                Console.WriteLine($"  {gcStatsAfter.GetSummary()}");
-                if (gcStatsAfter.CollectedObjects > 0)
-                {
-                    Console.WriteLine($"  {gcStatsAfter.GetFormatBreakdown()}");
-                }
+                Console.WriteLine($"  {succeeded} succeeded, {failed} failed");
+                return;
             }
 
             Console.WriteLine("\n✓ All systems ready!");
@@ -537,14 +484,19 @@ public static class Program
 
                     var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
-                    var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata);
+                    var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, platformBridge: null, diagnostics);
                     vm.VerboseDebug = verboseDebug;
                     vm.InitializeSelectorCaches();
+
+                    // NOTE: Phase 3 already created an initial Process and set it as Processor.activeProcess
+                    // with suspendedContext = nil and priority = 4 (UserSchedulingPriority).
+                    // No need to create another Process here - we'll reuse the one from Phase 3.
 
                     var executor = new InitExpressionExecutor(
                         heapManager,
                         vm,
                         vmMetadata,
+                        diagnostics,  // Pass diagnostic hub for GC events
                         InitPolicy.AbortOnFirstError,
                         defaultTimeoutMs: 10000
                     );

@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Core.Diagnostics;
 
@@ -116,6 +117,16 @@ public class DiagnosticHub : IDiagnosticHub
             PrimitiveEvent e => e.Success ? DiagnosticEventTypes.PrimitiveCall : DiagnosticEventTypes.PrimitiveFailure,
             AllocationEvent => DiagnosticEventTypes.ObjectAllocate,
             GCEvent => DiagnosticEventTypes.GarbageCollect,
+
+            // Granular GC events
+            GCStartEvent => DiagnosticEventTypes.GCStart,
+            GCMarkPhaseStartEvent => DiagnosticEventTypes.GCMarkPhaseStart,
+            GCMarkPhaseEndEvent => DiagnosticEventTypes.GCMarkPhaseEnd,
+            GCSweepPhaseStartEvent => DiagnosticEventTypes.GCSweepPhaseStart,
+            GCSweepPhaseEndEvent => DiagnosticEventTypes.GCSweepPhaseEnd,
+            GCEndEvent => DiagnosticEventTypes.GCEnd,
+            GCObjectMarkedEvent => DiagnosticEventTypes.GCObjectMarked,
+            GCObjectCollectedEvent => DiagnosticEventTypes.GCObjectCollected,
 
             _ => DiagnosticEventTypes.None
         };

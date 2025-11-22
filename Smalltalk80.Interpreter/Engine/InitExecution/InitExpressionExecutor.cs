@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
+using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -27,17 +30,20 @@ public class InitExpressionExecutor
     private readonly VMMetadata _metadata;
     private readonly InitPolicy _policy;
     private readonly int _defaultTimeoutMs;
+    private readonly IDiagnosticHub? _diagnostics;
 
     public InitExpressionExecutor(
         ISmalltalkHeap heapManager,
         VirtualMachine vm,
         VMMetadata metadata,
+        IDiagnosticHub? diagnostics = null,
         InitPolicy policy = InitPolicy.AbortOnFirstError,
         int defaultTimeoutMs = 5000)
     {
         _heapManager = heapManager;
         _vm = vm;
         _metadata = metadata;
+        _diagnostics = diagnostics;
         _policy = policy;
         _defaultTimeoutMs = defaultTimeoutMs;
     }
@@ -122,6 +128,9 @@ public class InitExpressionExecutor
         var effectiveTimeout = timeoutMs ?? _defaultTimeoutMs;
         var stopwatch = Stopwatch.StartNew();
 
+        // Reset instruction counter for each init expression (prevents accumulation across expressions)
+        _vm.ResetInstructionCount();
+
         try
         {
             // Step 1: Lookup and sanity-check
@@ -179,6 +188,263 @@ public class InitExpressionExecutor
             stopwatch.Stop();
             return InitResult.FatalError(initLocalId, $"{ex.GetType().Name}: {ex.Message}\n\nStack trace:\n{ex.StackTrace}");
         }
+    }
+
+    /// <summary>
+    /// Executes an init expression with on-demand compilation and GC verification.
+    /// This method:
+    /// 1. Compiles the init expression from bundle on-demand
+    /// 2. Creates a MethodContext and wires it to the existing activeProcess.suspendedContext
+    /// 3. Runs GC to verify init expression NOT collected (reachable via Processor → activeProcess → suspendedContext → method)
+    /// 4. Executes the init expression
+    /// 5. Clears Process.suspendedContext (Process remains as activeProcess)
+    /// 6. Runs GC to verify init expression IS collected (MethodContext, CompiledMethod, ByteArray now unreachable)
+    /// </summary>
+    public InitResult ExecuteInitExpressionOnDemand(
+        InitExpression expr,
+        InitExpressionCompiler compiler,
+        int? timeoutMs = null)
+    {
+        var effectiveTimeout = timeoutMs ?? _defaultTimeoutMs;
+        var stopwatch = Stopwatch.StartNew();
+
+        Console.WriteLine($"  {expr.Source}...");
+
+        // CRITICAL: Reset instruction counter for EACH init expression
+        // Without this, the counter accumulates across ALL expressions:
+        // 40 expressions × 10K instructions each = 400K accumulated before #41 even starts!
+        _vm.ResetInstructionCount();
+
+        try
+        {
+            // Compile init expression on-demand
+            SmalltalkOOP compiledMethodOOP = compiler.CompileInitExpression(expr);
+
+            // Create MethodContext
+            SmalltalkOOP receiverOOP = GetCanonicalReceiverForDoIt();
+            SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
+
+            // Get existing activeProcess and wire MethodContext to it
+            var schedulerOOP = _metadata.ProcessorScheduler;
+            SmalltalkOOP processOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+
+            // Set the process's suspendedContext to our new MethodContext
+            _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, methodContextOOP);
+
+            // Execute the init expression
+            SmalltalkOOP resultOOP;
+            try
+            {
+                if (effectiveTimeout > 0)
+                {
+                    using var cts = new CancellationTokenSource(effectiveTimeout);
+                    resultOOP = ExecuteWithTimeout(processOOP, cts.Token);
+                }
+                else
+                {
+                    resultOOP = ResumeProcess(processOOP);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                stopwatch.Stop();
+                Console.WriteLine($" ❌ TIMEOUT");
+                return InitResult.Timeout(expr.LocalId, stopwatch.ElapsedMilliseconds);
+            }
+            catch (PrimitiveFailureException pex)
+            {
+                stopwatch.Stop();
+                Console.WriteLine($" ❌ PRIMITIVE FAILURE: {pex.Message}");
+                return InitResult.PrimitiveFailure(expr.LocalId, pex.PrimitiveIndex, pex.Message, stopwatch.ElapsedMilliseconds);
+            }
+            catch (SmalltalkException sex)
+            {
+                stopwatch.Stop();
+                Console.WriteLine($" ❌ EXCEPTION: {sex.Message}");
+                string stackTrace = CaptureStackTrace(sex);
+                return InitResult.Exception(expr.LocalId, sex.ExceptionOop, sex.Message, stackTrace, stopwatch.ElapsedMilliseconds);
+            }
+
+            // Clear the Process's suspendedContext
+            _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, _heapManager.GetNil());
+
+            // Register GC detail listener if diagnostics available
+            GCDetailListener? gcListener = null;
+            if (_diagnostics != null)
+            {
+                gcListener = new GCDetailListener();
+                _diagnostics.Register(gcListener, DiagnosticEventTypes.GCStart | DiagnosticEventTypes.GCEnd | DiagnosticEventTypes.GCObjectCollected);
+            }
+
+            // Run GC - SHOULD collect (MethodContext, CompiledMethod, ByteArray no longer reachable)
+            var gcStatsAfter = _heapManager.GC.GarbageCollect();
+
+            // Unregister listener
+            if (gcListener != null && _diagnostics != null)
+            {
+                _diagnostics.Unregister(gcListener);
+            }
+
+            // Verify the CompiledMethod was collected
+            bool compiledMethodAlive = IsObjectAlive(compiledMethodOOP);
+            bool methodContextAlive = IsObjectAlive(methodContextOOP);
+
+            stopwatch.Stop();
+
+            if (compiledMethodAlive || methodContextAlive)
+            {
+                // Check if contexts are kept alive by forked processes (expected behavior)
+                bool keptAliveByForkedProcess = IsKeptAliveByForkedProcess(methodContextOOP, schedulerOOP);
+
+                if (keptAliveByForkedProcess)
+                {
+                    // This is EXPECTED - init expression forked a persistent process
+                    Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, contexts kept alive by forked process)");
+                    return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
+                }
+                else
+                {
+                    // This is UNEXPECTED - contexts alive but NOT due to forked processes
+                    Console.WriteLine($" ❌ FAILED (objects not collected, not kept alive by forked process)");
+                    Console.WriteLine($"    CompiledMethod {compiledMethodOOP}: {(compiledMethodAlive ? "ALIVE" : "collected")}");
+                    Console.WriteLine($"    MethodContext {methodContextOOP}: {(methodContextAlive ? "ALIVE" : "collected")}");
+                    return InitResult.FatalError(expr.LocalId, $"CompiledMethod or MethodContext still alive after execution (not due to forked process)");
+                }
+            }
+
+            // Show simple GC summary (listener shows details)
+            Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, {gcStatsAfter.CollectedObjects} collected)");
+
+            return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            Console.WriteLine($" ❌ ERROR: {ex.Message}");
+            return InitResult.FatalError(expr.LocalId, $"{ex.GetType().Name}: {ex.Message}\n\nStack trace:\n{ex.StackTrace}");
+        }
+    }
+
+    /// <summary>
+    /// Checks if an object is still alive (not collected by GC).
+    /// </summary>
+    private bool IsObjectAlive(SmalltalkOOP oop)
+    {
+        if (oop.IsSmallInteger)
+            return true; // SmallIntegers are immediate values, always "alive"
+
+        try
+        {
+            // Try to access the object's class - if it's been collected, this will fail
+            var classOOP = _heapManager.GetClassOOP(oop);
+            return classOOP != _heapManager.GetNil();
+        }
+        catch
+        {
+            return false; // Object no longer exists
+        }
+    }
+
+    /// <summary>
+    /// Checks if a MethodContext is kept alive by a forked process in the ProcessorScheduler.
+    /// This is expected behavior when init expressions fork background processes.
+    /// </summary>
+    private bool IsKeptAliveByForkedProcess(SmalltalkOOP methodContextOOP, SmalltalkOOP schedulerOOP)
+    {
+        try
+        {
+            // Get process lists array from scheduler
+            SmalltalkOOP processListsArrayOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+            int numPriorities = _heapManager.GetIndexedSize(processListsArrayOOP);
+
+            // Check each priority level
+            for (int priorityIndex = 0; priorityIndex < numPriorities; priorityIndex++)
+            {
+                SmalltalkOOP processListOOP = _heapManager.GetIndexedOOP(processListsArrayOOP, priorityIndex);
+                if (processListOOP == _metadata.KnownObjects.Nil)
+                    continue;
+
+                // Get first process in list
+                SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(processListOOP, 0);
+                if (firstLinkOOP == _metadata.KnownObjects.Nil)
+                    continue;
+
+                // Walk linked list of processes
+                SmalltalkOOP currentProcessOOP = firstLinkOOP;
+                int processCount = 0;
+                while (currentProcessOOP != _metadata.KnownObjects.Nil && processCount < 100)
+                {
+                    processCount++;
+                    var procSuspendedCtx = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+
+                    // Check if suspended context is our MethodContext
+                    if (procSuspendedCtx == methodContextOOP)
+                        return true;
+
+                    // Check if it's a BlockContext whose home or sender chain reaches our MethodContext
+                    if (procSuspendedCtx != _metadata.KnownObjects.Nil && !procSuspendedCtx.IsSmallInteger)
+                    {
+                        var ctxClass = _heapManager.GetClassOOP(procSuspendedCtx);
+                        var ctxClassName = _heapManager.GetClassName(ctxClass);
+
+                        if (ctxClassName.Contains("BlockContext"))
+                        {
+                            // Check home pointer
+                            var homeCtx = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                            if (homeCtx == methodContextOOP)
+                                return true;
+
+                            // Check home's sender chain
+                            if (homeCtx != _metadata.KnownObjects.Nil && !homeCtx.IsSmallInteger)
+                            {
+                                if (IsSenderChainReaches(homeCtx, methodContextOOP))
+                                    return true;
+                            }
+
+                            // Check BlockContext's own sender chain
+                            if (IsSenderChainReaches(procSuspendedCtx, methodContextOOP))
+                                return true;
+                        }
+                        else if (ctxClassName.Contains("MethodContext"))
+                        {
+                            // Check MethodContext's sender chain
+                            if (IsSenderChainReaches(procSuspendedCtx, methodContextOOP))
+                                return true;
+                        }
+                    }
+
+                    // Move to next process
+                    currentProcessOOP = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_NEXTLINK_INDEX);
+                }
+            }
+
+            return false;
+        }
+        catch
+        {
+            // If any error occurs during checking, assume not kept alive by forked process
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Checks if a context's sender chain reaches the target context.
+    /// </summary>
+    private bool IsSenderChainReaches(SmalltalkOOP contextOOP, SmalltalkOOP targetOOP)
+    {
+        SmalltalkOOP currentSender = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_SENDER_INDEX);
+        int depth = 0;
+
+        while (currentSender != _metadata.KnownObjects.Nil && !currentSender.IsSmallInteger && depth < 20)
+        {
+            if (currentSender == targetOOP)
+                return true;
+
+            currentSender = _heapManager.GetInstanceVariable(currentSender, VMConstants.CONTEXT_SENDER_INDEX);
+            depth++;
+        }
+
+        return false;
     }
 
     /// <summary>

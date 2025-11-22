@@ -265,12 +265,17 @@ public static class SimpleObjectPrimitives
                 return context.HeapManager.GetNil();
 
             // Get classPool from Character class (instance variable index 7)
+            // Class instance variables: [0-3] Behavior (superclass, methodDict, format, subclasses)
+            //                          [4-5] ClassDescription (instanceVariables, organization)
+            //                          [6-8] Class (name, classPool, sharedPools)
+            // Note: Class variables are stored in the Class's classPool, NOT in the Metaclass
             var classPoolOOP = context.HeapManager.GetInstanceVariable(characterClassOOP, 7);
             if (classPoolOOP == context.HeapManager.GetNil())
                 return context.HeapManager.GetNil();
 
             // Search for CharacterTable in class pool
             int dictSize = context.HeapManager.GetIndexedSize(classPoolOOP);
+
             for (int i = 0; i < dictSize; i++)
             {
                 var entryOOP = context.HeapManager.GetIndexedOOP(classPoolOOP, i);
@@ -285,7 +290,8 @@ public static class SimpleObjectPrimitives
                 for (int j = 0; j < symbolSize; j++)
                     bytes[j] = context.HeapManager.GetIndexedByte(keyOOP, j);
 
-                if (System.Text.Encoding.ASCII.GetString(bytes) == "CharacterTable")
+                string symbolName = System.Text.Encoding.ASCII.GetString(bytes);
+                if (symbolName == "CharacterTable")
                 {
                     var characterTableOOP = context.HeapManager.GetInstanceVariable(entryOOP, 1);
                     return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);

@@ -6,6 +6,7 @@ using Smalltalk80.Interpreter.Core.VM.Caching;
 using Smalltalk80.Interpreter.Core.VM.Diagnostics;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.Attributes;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -85,7 +86,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         set => _tracer.SelectorTraceEnabled = value;
     }
 
-    public VirtualMachine(ISmalltalkHeap heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null)
+    public VirtualMachine(ISmalltalkHeap heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, IDiagnosticHub? diagnostics = null)
     {
         _heapManager = heapManager;
 
@@ -101,8 +102,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _contextManager = new ContextManager(
             heapManager,
             metadata,
-            this // IObjectMetadataAccessor
+            this, // IObjectMetadataAccessor
+            diagnostics // For GC event notifications
         );
+
+        // Initialize context manager to register for GC events
+        _contextManager.Initialize();
 
         _stackManager = new StackManager(
             heapManager,
@@ -427,6 +432,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Declare common variables once for all code paths
         int senderIndex = VMConstants.CONTEXT_SENDER_INDEX;
         SmalltalkOOP senderOOP;
+        SmalltalkOOP returningContext;
 
         // Handle non-local returns (NLR)
         if (_nlrHandler.IsPending)
@@ -446,8 +452,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 // Get sender to continue execution
                 senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
 
-                // Add context to size-specific pool for reuse
-                _contextManager.AddContextToPool(_contextManager.ActiveContext);
+                // Save context to pool AFTER switching (must not be active)
+                returningContext = _contextManager.ActiveContext;
 
                 // Decrement context depth
                 _contextManager.DecrementContextDepth();
@@ -457,6 +463,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 {
                     _returnValue = nlrValue;
                     _contextManager.SetActiveContext(_initialContextOOP);
+                    _contextManager.AddContextToPool(returningContext);
                     // if (_verboseDebugMode)
                     //     Console.WriteLine($"[HandleReturn NLR] Returning to initial context");
                     return InterpreterStatus.Return;
@@ -464,6 +471,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
                 // Switch to sender and push NLR value
                 _contextManager.SetActiveContext(senderOOP);
+                _contextManager.AddContextToPool(returningContext);
                 Push(nlrValue);
                 // if (_verboseDebugMode)
                 //     Console.WriteLine($"[HandleReturn NLR] Pushed NLR value onto sender {senderOOP}");
@@ -475,8 +483,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // if (_verboseDebugMode)
             //     Console.WriteLine($"[HandleReturn NLR] Unwinding through {_contextManager.ActiveContext}, next sender={senderOOP}");
 
-            // Add context to size-specific pool for reuse
-            _contextManager.AddContextToPool(_contextManager.ActiveContext);
+            // Save context to pool AFTER switching (must not be active)
+            returningContext = _contextManager.ActiveContext;
 
             // Decrement context depth
             _contextManager.DecrementContextDepth();
@@ -491,6 +499,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
             // Continue unwinding
             _contextManager.SetActiveContext(senderOOP);
+            _contextManager.AddContextToPool(returningContext);
             // if (_verboseDebugMode)
             //     Console.WriteLine($"[HandleReturn NLR] Switched to sender {_contextManager.ActiveContext}, continuing unwinding");
             return InterpreterStatus.Continue;
@@ -527,8 +536,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             TraceMessage($"← {className}>>{selector} => {returnValueStr}");
         }
 
-        // Add context to size-specific pool for reuse
-        _contextManager.AddContextToPool(_contextManager.ActiveContext);
+        // Save context to pool AFTER switching (must not be active)
+        returningContext = _contextManager.ActiveContext;
 
         // Decrement context depth
         _contextManager.DecrementContextDepth();
@@ -539,6 +548,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // Execution complete - return to caller
             _returnValue = returnValue;
             _contextManager.SetActiveContext(_initialContextOOP);
+            _contextManager.AddContextToPool(returningContext);
             // if (_verboseDebugMode)
             //     Console.WriteLine($"[HandleReturn] Execution complete, returning to initial context");
             return InterpreterStatus.Return;
@@ -546,6 +556,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Switch to sender context and push return value
         _contextManager.SetActiveContext(senderOOP);
+        _contextManager.AddContextToPool(returningContext);
         Push(returnValue);
         // if (_verboseDebugMode)
         //     Console.WriteLine($"  Pushed return value onto sender's stack");

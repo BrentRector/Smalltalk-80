@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 namespace Smalltalk80.Interpreter.HeapManager;
 
@@ -11,12 +12,17 @@ internal class GarbageCollector : IGarbageCollector
 {
     private readonly IObjectTableManager _tableManager;
     private readonly ISmalltalkHeap _heap;
+    private readonly IDiagnosticHub? _diagnostics;
     private SmalltalkOOP[] _gcRoots = Array.Empty<SmalltalkOOP>();
 
-    public GarbageCollector(IObjectTableManager tableManager, ISmalltalkHeap heap)
+    public GarbageCollector(
+        IObjectTableManager tableManager,
+        ISmalltalkHeap heap,
+        IDiagnosticHub? diagnostics = null)
     {
         _tableManager = tableManager;
         _heap = heap;
+        _diagnostics = diagnostics;
     }
 
     public void AddGCRoot(SmalltalkOOP oop)
@@ -100,16 +106,66 @@ internal class GarbageCollector : IGarbageCollector
         // Count objects before collection
         int objectsBeforeCollection = _tableManager.GetActiveObjectCount();
 
+        // Emit GCStart event
+        if (_diagnostics?.IsEnabled(DiagnosticEventTypes.GCStart) ?? false)
+        {
+            _diagnostics.Emit(new GCStartEvent
+            {
+                TotalObjects = objectsBeforeCollection,
+                EstimatedLiveObjects = objectsBeforeCollection,
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+        }
+
+        // Emit GCMarkPhaseStart event
+        if (_diagnostics?.IsEnabled(DiagnosticEventTypes.GCMarkPhaseStart) ?? false)
+        {
+            _diagnostics.Emit(new GCMarkPhaseStartEvent
+            {
+                RootCount = _gcRoots.Length,
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+        }
+
         // Steps 1-3: Clear marks → Mark reachable → Find unreachable
         double markStartTime = stopwatch.Elapsed.TotalMilliseconds;
         var unreachableObjects = GetUnreachableObjects();
         double markEndTime = stopwatch.Elapsed.TotalMilliseconds;
         double markTime = markEndTime - markStartTime;
 
+        // Emit GCMarkPhaseEnd event
+        if (_diagnostics?.IsEnabled(DiagnosticEventTypes.GCMarkPhaseEnd) ?? false)
+        {
+            _diagnostics.Emit(new GCMarkPhaseEndEvent
+            {
+                MarkedObjects = objectsBeforeCollection - unreachableObjects.Length,
+                UnreachableObjects = unreachableObjects.Length,
+                MarkTimeMs = markTime,
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+        }
+
+        // Emit GCSweepPhaseStart event
+        if (_diagnostics?.IsEnabled(DiagnosticEventTypes.GCSweepPhaseStart) ?? false)
+        {
+            _diagnostics.Emit(new GCSweepPhaseStartEvent
+            {
+                ObjectsToCollect = unreachableObjects.Length,
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+        }
+
         // Step 4: Collect unreachable objects
         var collectedByFormat = new Dictionary<ObjectFormat, int>();
         long estimatedBytesFreed = 0;
         var collectedObjectDetails = new List<(int oop, ObjectFormat format, int size, string? className)>();
+
+        // Check if per-object collection events are enabled
+        bool emitCollectedEvents = _diagnostics?.IsEnabled(DiagnosticEventTypes.GCObjectCollected) ?? false;
 
         foreach (var oop in unreachableObjects)
         {
@@ -120,19 +176,32 @@ internal class GarbageCollector : IGarbageCollector
             collectedByFormat[entry.FormatExplicit] = collectedByFormat.GetValueOrDefault(entry.FormatExplicit) + 1;
             estimatedBytesFreed += entry.SizeInWordsExplicit * 4;
 
-            // Track detailed info about first 50 collected objects
-            if (collectedObjectDetails.Count < 50)
+            // Track detailed info about collected objects (no limit - use events instead)
+            string? className = null;
+            try
             {
-                string? className = null;
-                try
+                className = _heap.GetClassName(oop);
+            }
+            catch
+            {
+                className = "<unknown>";
+            }
+
+            // IMPORTANT: Report OOP raw value (external API), not internal object table index
+            collectedObjectDetails.Add((oop.RawValue, entry.FormatExplicit, entry.SizeInWordsExplicit, className));
+
+            // Emit per-object collection event if listener registered
+            if (emitCollectedEvents)
+            {
+                _diagnostics!.Emit(new GCObjectCollectedEvent
                 {
-                    className = _heap.GetClassName(oop);
-                }
-                catch
-                {
-                    className = "<unknown>";
-                }
-                collectedObjectDetails.Add((objectId, entry.FormatExplicit, entry.SizeInWordsExplicit, className));
+                    ObjectOOP = oop,
+                    ClassName = className,
+                    Format = entry.FormatExplicit,
+                    SizeInWords = entry.SizeInWordsExplicit,
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
             }
 
             // Clear managed storage (allows .NET GC to reclaim memory)
@@ -149,8 +218,41 @@ internal class GarbageCollector : IGarbageCollector
         double sweepEndTime = stopwatch.Elapsed.TotalMilliseconds;
         double sweepTime = sweepEndTime - markEndTime;
 
+        // Emit GCSweepPhaseEnd event
+        if (_diagnostics?.IsEnabled(DiagnosticEventTypes.GCSweepPhaseEnd) ?? false)
+        {
+            _diagnostics.Emit(new GCSweepPhaseEndEvent
+            {
+                CollectedObjects = unreachableObjects.Length,
+                BytesFreed = estimatedBytesFreed,
+                SweepTimeMs = sweepTime,
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+        }
+
         int objectsAfterCollection = _tableManager.GetActiveObjectCount();
         int freeEntries = _tableManager.GetObjectTableSize() - objectsAfterCollection;
+
+        // Emit GCEnd event
+        if (_diagnostics?.IsEnabled(DiagnosticEventTypes.GCEnd) ?? false)
+        {
+            _diagnostics.Emit(new GCEndEvent
+            {
+                ObjectsBefore = objectsBeforeCollection,
+                ObjectsAfter = objectsAfterCollection,
+                ObjectsCollected = unreachableObjects.Length,
+                MarkTimeMs = markTime,
+                SweepTimeMs = sweepTime,
+                TotalTimeMs = stopwatch.Elapsed.TotalMilliseconds,
+                BytesFreed = estimatedBytesFreed,
+                CollectionEfficiency = objectsBeforeCollection > 0
+                    ? (double)unreachableObjects.Length / objectsBeforeCollection * 100.0
+                    : 0,
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+        }
 
         return new GCStatistics
         {

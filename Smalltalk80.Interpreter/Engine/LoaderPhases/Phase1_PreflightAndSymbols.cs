@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Schema;
@@ -320,6 +321,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
             // Check if symbol already exists (deduplication)
             if (_symbolTable.TryGetValue(name, out var existingOOP))
             {
+                Console.WriteLine($"[PHASE1 DEDUP] Symbol \"{name}\" already exists as {existingOOP}, returning existing OOP");
                 return existingOOP;
             }
 

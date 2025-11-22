@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
@@ -42,16 +43,6 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
             {
                 // Found empty slot - install association
                 context.Allocator.SetIndexedOOP(dictionaryOOP, location, associationOOP);
-
-                // Debug: Show actual installation slot for TextConstants
-                if (keyName == "TextConstants")
-                {
-                    Console.WriteLine($"  Actually installed at slot (0-based): {location}");
-                    if (location != startLocation)
-                    {
-                        Console.WriteLine($"  NOTE: Linear probing moved from {startLocation} to {location}");
-                    }
-                }
 
                 // Increment tally
                 if (incrementTally)

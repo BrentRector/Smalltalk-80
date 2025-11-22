@@ -1,7 +1,4 @@
-using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Shared.Types;
-
-namespace Smalltalk80.Interpreter.Core.Diagnostics;
+namespace Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 /// <summary>
 /// Base class for all diagnostic events.
@@ -150,7 +147,7 @@ public record AllocationEvent : DiagnosticEvent
     public required int SizeInWords { get; init; }
 }
 
-/// <summary>GC cycle event.</summary>
+/// <summary>GC cycle event (legacy - maps to GCEndEvent).</summary>
 public record GCEvent : DiagnosticEvent
 {
     public required int ObjectsBefore { get; init; }
@@ -159,4 +156,74 @@ public record GCEvent : DiagnosticEvent
     public required double MarkTimeMs { get; init; }
     public required double SweepTimeMs { get; init; }
     public required long BytesFreed { get; init; }
+}
+
+// ============================================================
+// Granular GC Events
+// ============================================================
+
+/// <summary>GC cycle beginning.</summary>
+public record GCStartEvent : DiagnosticEvent
+{
+    public required int TotalObjects { get; init; }
+    public required int EstimatedLiveObjects { get; init; }
+}
+
+/// <summary>Mark phase beginning.</summary>
+public record GCMarkPhaseStartEvent : DiagnosticEvent
+{
+    public required int RootCount { get; init; }
+}
+
+/// <summary>Mark phase complete.</summary>
+public record GCMarkPhaseEndEvent : DiagnosticEvent
+{
+    public required int MarkedObjects { get; init; }
+    public required int UnreachableObjects { get; init; }
+    public required double MarkTimeMs { get; init; }
+}
+
+/// <summary>Sweep phase beginning.</summary>
+public record GCSweepPhaseStartEvent : DiagnosticEvent
+{
+    public required int ObjectsToCollect { get; init; }
+}
+
+/// <summary>Sweep phase complete.</summary>
+public record GCSweepPhaseEndEvent : DiagnosticEvent
+{
+    public required int CollectedObjects { get; init; }
+    public required long BytesFreed { get; init; }
+    public required double SweepTimeMs { get; init; }
+}
+
+/// <summary>GC cycle complete with summary statistics.</summary>
+public record GCEndEvent : DiagnosticEvent
+{
+    public required int ObjectsBefore { get; init; }
+    public required int ObjectsAfter { get; init; }
+    public required int ObjectsCollected { get; init; }
+    public required double MarkTimeMs { get; init; }
+    public required double SweepTimeMs { get; init; }
+    public required double TotalTimeMs { get; init; }
+    public required long BytesFreed { get; init; }
+    public required double CollectionEfficiency { get; init; }
+}
+
+/// <summary>Individual object marked as reachable.</summary>
+public record GCObjectMarkedEvent : DiagnosticEvent
+{
+    public required SmalltalkOOP ObjectOOP { get; init; }
+    public required string? ClassName { get; init; }
+    public required ObjectFormat Format { get; init; }
+    public required int SizeInWords { get; init; }
+}
+
+/// <summary>Individual object collected (unreachable).</summary>
+public record GCObjectCollectedEvent : DiagnosticEvent
+{
+    public required SmalltalkOOP ObjectOOP { get; init; }
+    public required string? ClassName { get; init; }
+    public required ObjectFormat Format { get; init; }
+    public required int SizeInWords { get; init; }
 }

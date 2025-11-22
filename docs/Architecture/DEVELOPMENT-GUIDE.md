@@ -1,6 +1,6 @@
 # Development Guide
 
-**Last Updated**: 2025-11-18
+**Last Updated**: 2025-11-21
 
 This guide explains how to extend the Smalltalk-80 interpreter with new primitives, cold start phases, and VM components.
 
@@ -352,8 +352,41 @@ dotnet build
 
 ```bash
 dotnet run
-# Expected: 31/46 init expressions succeed
+# Expected: 44+/46 init expressions succeed (96%+ success rate)
 ```
+
+### Init Expression Test Expectations
+
+Init expressions execute class initialization code (e.g., `Delay initialize`). The test verifies that CompiledMethod and MethodContext objects are collected by GC after execution.
+
+**Expected behavior for forked processes:**
+
+When an init expression forks a background process, the MethodContext is **legitimately kept alive** as a GC root:
+
+```smalltalk
+Delay class>>initializeTimingProcess
+    "Forks a persistent timing process"
+    [[true] whileTrue: [...]] forkAt: Processor timingPriority
+```
+
+**Reference chain:**
+```
+SystemDictionary (root)
+  → Processor (ProcessorScheduler)
+    → quiescentProcessLists[priority]
+      → Process (forked background process)
+        → suspendedContext (BlockContext)
+          → home → sender chain
+            → MethodContext (kept alive) ✓ PASS
+```
+
+**The test automatically detects this case and returns SUCCESS** with a note: "contexts kept alive by forked process".
+
+**Test failures occur only when:**
+- Contexts remain alive but are NOT reachable through forked processes
+- This indicates a real memory leak
+
+See `InitExpressionExecutor.IsKeptAliveByForkedProcess()` for implementation details.
 
 ### Critical Files Requiring Test
 

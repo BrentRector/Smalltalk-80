@@ -1,4 +1,4 @@
-namespace Smalltalk80.Interpreter.Core.Diagnostics;
+namespace Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 /// <summary>
 /// Flags indicating which diagnostic events are enabled.
@@ -30,8 +30,20 @@ public enum DiagnosticEventTypes : ulong
 
     // Memory events (both phases)
     ObjectAllocate = 1UL << 30,
-    GarbageCollect = 1UL << 31,
+    GarbageCollect = 1UL << 31,  // Legacy: maps to GCEnd
     Become = 1UL << 32,
+
+    // GC lifecycle events (granular)
+    GCStart = 1UL << 51,           // GC cycle beginning
+    GCMarkPhaseStart = 1UL << 52,  // Mark phase beginning
+    GCMarkPhaseEnd = 1UL << 53,    // Mark phase complete
+    GCSweepPhaseStart = 1UL << 54, // Sweep phase beginning
+    GCSweepPhaseEnd = 1UL << 55,   // Sweep phase complete
+    GCEnd = 1UL << 56,             // GC cycle complete (summary)
+
+    // GC per-object events (very detailed)
+    GCObjectMarked = 1UL << 57,    // Individual object marked reachable
+    GCObjectCollected = 1UL << 58, // Individual object collected (unreachable)
 
     // Cold start phase events
     PhaseStart = 1UL << 40,
@@ -50,7 +62,9 @@ public enum DiagnosticEventTypes : ulong
     AllMethod = MethodEntry | MethodExit | PrimitiveCall | PrimitiveFailure | MessageNotUnderstood | NonLocalReturn,
     AllBytecode = InstructionExecute | StackPush | StackPop | Jump,
     AllContext = ContextActivate | ContextDeactivate | BlockCreate,
-    AllMemory = ObjectAllocate | GarbageCollect | Become,
+    AllGC = GCStart | GCMarkPhaseStart | GCMarkPhaseEnd | GCSweepPhaseStart | GCSweepPhaseEnd | GCEnd,
+    AllGCDetail = AllGC | GCObjectMarked | GCObjectCollected,
+    AllMemory = ObjectAllocate | AllGC | Become,
     AllRuntime = AllMethod | AllBytecode | AllContext | AllMemory,
 
     // Compound groups - Cold Start

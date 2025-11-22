@@ -67,4 +67,10 @@ public interface IContextManager
     /// </summary>
     /// <param name="contextOOP">Context to add to pool.</param>
     void AddContextToPool(SmalltalkOOP contextOOP);
+
+    /// <summary>
+    /// Initializes the ContextManager and registers for diagnostic events.
+    /// Must be called after construction to enable pool clearing before GC.
+    /// </summary>
+    void Initialize();
 }

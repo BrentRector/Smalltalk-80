@@ -1,14 +1,48 @@
 # Smalltalk-80 Interpreter Diagnostic Support Design
 
-**Date**: 2025-11-18
-**Status**: Draft - Proposal (v1.1)
+**Date**: 2025-11-21
+**Status**: Partially Implemented - GC Diagnostics Complete (v1.2)
 **Author**: Claude (Anthropic)
+
+---
+
+## Implementation Status
+
+### ✅ Implemented
+- **Core Infrastructure** (100% complete)
+  - DiagnosticHub with event dispatch
+  - DiagnosticEventTypes flags
+  - Event-based listener model
+  - Fast-path IsEnabled() checks
+
+- **Cold Start Diagnostics** (100% complete)
+  - Phase lifecycle events (PhaseStart, PhaseEnd)
+  - Cold start progress listener
+  - Cold start detail listener
+  - Symbol, Class, Method, Patch, Global events
+
+- **GC Diagnostics** (100% complete) - **NEW!**
+  - Granular lifecycle events (GCStart, Mark, Sweep, GCEnd)
+  - Per-object collection events (GCObjectCollected)
+  - GCDetailListener with complete class breakdown
+  - Zero overhead when disabled
+  - No collection limits (shows all collected objects)
+  - Integrated with GarbageCollector and InitExpressionExecutor
+
+### 🚧 Not Yet Implemented
+- Method tracing (MethodEntry, MethodExit)
+- Bytecode tracing (InstructionExecute)
+- Context events (ContextActivate, ContextDeactivate)
+- Allocation events (ObjectAllocate)
+- Filtering capabilities
+- JSON output format
+- Profiler listener
 
 ---
 
 ## Executive Summary
 
-This document proposes a comprehensive diagnostic subsystem for the Smalltalk-80 interpreter covering **both cold start and runtime phases**. The current ad-hoc diagnostic code is scattered throughout the codebase, making it difficult to maintain and extend. This design introduces a clean event-based listener model that decouples diagnostic concerns from core interpreter logic.
+This document describes the comprehensive diagnostic subsystem for the Smalltalk-80 interpreter covering **both cold start and runtime phases**. The system uses a clean event-based listener model that decouples diagnostic concerns from core interpreter logic.
 
 **Key Features:**
 - Unified diagnostic hub for cold start and runtime
@@ -16,6 +50,7 @@ This document proposes a comprehensive diagnostic subsystem for the Smalltalk-80
 - Zero-cost when disabled
 - Extensible event types and output formats
 - Support for ad-hoc messages alongside typed events
+- **Complete GC visibility without collection limits**
 
 ---
 
@@ -150,12 +185,45 @@ Current diagnostics are implemented as:
 
 ### 3.4 Memory Diagnostics
 
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| Object Allocation | Log class, format, size of new objects | Medium |
-| GC Cycle | Log mark/sweep statistics | Medium |
-| Become Operation | Log identity swaps | Low |
-| Large Object | Warn when allocating unusually large objects | Low |
+| Feature | Description | Priority | Status |
+|---------|-------------|----------|--------|
+| Object Allocation | Log class, format, size of new objects | Medium | ⏳ Not Implemented |
+| **GC Cycle** | **Log mark/sweep statistics** | **Medium** | **✅ IMPLEMENTED** |
+| Become Operation | Log identity swaps | Low | ⏳ Not Implemented |
+| Large Object | Warn when allocating unusually large objects | Low | ⏳ Not Implemented |
+
+#### GC Diagnostics Implementation (✅ Complete)
+
+**Implemented Features:**
+- Granular lifecycle events: `GCStart`, `GCMarkPhaseStart`, `GCMarkPhaseEnd`, `GCSweepPhaseStart`, `GCSweepPhaseEnd`, `GCEnd`
+- Per-object collection events: `GCObjectCollected` (emitted for every collected object when listeners registered)
+- `GCDetailListener` aggregates collected objects by class name and displays complete breakdown
+- Zero overhead when disabled via fast-path `IsEnabled()` checks
+- Removed hardcoded 50-object limit - now reports ALL collected objects
+
+**Example Output:**
+```
+Character initialize... ✓ (116ms, GC: 0/1035)
+  WARNING: Collected 1035 objects (expected ~3)
+  GC collected 1035 objects:
+    Character: 256
+    MethodContext: 34
+    BlockContext: 14
+    Array: 150
+    ByteArray: 75
+    CompiledMethod: 1
+    ... (all classes shown in descending order)
+```
+
+**Files Modified:**
+- `Core/Diagnostics/DiagnosticEventTypes.cs` - Added GC event flags
+- `Core/Diagnostics/DiagnosticEvents.cs` - Added 8 new GC event records
+- `Core/Diagnostics/DiagnosticHub.cs` - Added event type mappings
+- `Core/Diagnostics/Listeners/GCDetailListener.cs` - NEW FILE
+- `HeapManager/GarbageCollector.cs` - Integrated event emission
+- `HeapManager/SmalltalkHeapManager.cs` - Pass diagnostics to GC
+- `Engine/InitExecution/InitExpressionExecutor.cs` - Register GCDetailListener
+- `Program.cs` - Wire diagnostics through initialization chain
 
 ### 3.5 Filtering Capabilities
 
@@ -805,7 +873,17 @@ dotnet run -- --trace-coldstart-detail    # All cold start events
 
 ## 8. Implementation Plan
 
-### Phase 1: Core Infrastructure (3-4 days)
+**Status Update (2025-11-21):**
+- ✅ **Phase 1: Core Infrastructure** - COMPLETE
+- ⏳ Phase 2: Method Tracing - Not Started
+- ⏳ Phase 3: Bytecode Tracing - Not Started
+- ⏳ Phase 4: Filtering - Not Started
+- ✅ **Phase 5: Cold Start Integration** - COMPLETE
+- ✅ **Phase 6a: GC Diagnostics** - COMPLETE (Added as new phase)
+- ⏳ Phase 6b: Additional Listeners - Not Started
+- 🔄 Phase 7: Cleanup - Partial (GC diagnostics cleaned up)
+
+### Phase 1: Core Infrastructure (3-4 days) - ✅ COMPLETE
 
 1. **Create diagnostic namespace and interfaces**
    - `Core/Diagnostics/IDiagnosticHub.cs`
@@ -871,27 +949,66 @@ dotnet run -- --trace-coldstart-detail    # All cold start events
    - Pattern matching
    - Range specification
 
-### Phase 5: Cold Start Integration (3-4 days)
+### Phase 5: Cold Start Integration (3-4 days) - ✅ COMPLETE
 
-1. **Add hub parameter to ColdStartOrchestrator**
+1. ✅ **Add hub parameter to ColdStartOrchestrator**
    - Constructor accepts optional IDiagnosticHub
    - Passes hub to all phase classes
 
-2. **Implement ColdStartProgressListener**
+2. ✅ **Implement ColdStartProgressListener**
    - Phase start/end output
    - Message handling
    - Reproduces current console output
 
-3. **Add events to all 6 phases**
+3. ✅ **Add events to all 6 phases**
    - PhaseStart/PhaseEnd events
    - DiagnosticMessageEvent for informational output
    - Typed events for detail tracing (optional)
 
-4. **Add command line options**
+4. ✅ **Add command line options**
    - `--trace-coldstart`
    - `--trace-coldstart-detail`
 
-### Phase 6: Additional Listeners (2-3 days)
+### Phase 6a: GC Diagnostics (1-2 days) - ✅ COMPLETE (NEW!)
+
+**Completed Work:**
+1. ✅ **Extended event type infrastructure**
+   - Added 8 new GC event flags to DiagnosticEventTypes
+   - Added 8 new GC event records to DiagnosticEvents.cs
+   - Updated GetEventType() mapping in DiagnosticHub
+
+2. ✅ **Integrated GarbageCollector**
+   - Added IDiagnosticHub parameter to constructor
+   - Added emission points for lifecycle events (GCStart, MarkPhaseStart/End, SweepPhaseStart/End, GCEnd)
+   - Added emission points for per-object events (GCObjectCollected) - conditional on listener registration
+   - Removed 50-object limit on CollectedObjectDetails
+   - Optimized with IsEnabled() fast-path checks (zero overhead when disabled)
+
+3. ✅ **Created GCDetailListener**
+   - Aggregates collected objects by class name
+   - Displays comprehensive breakdown sorted by count
+   - Verifies accounting accuracy
+   - Clean console output integrated with init expression progress
+
+4. ✅ **Wired through initialization chain**
+   - SmalltalkHeapManager accepts and passes diagnostic hub to GC
+   - InitExpressionExecutor accepts diagnostic hub
+   - InitExpressionExecutor registers GCDetailListener for each GC cycle
+   - Program.cs passes diagnostic hub through entire chain
+
+**Files Modified:**
+- `Core/Diagnostics/DiagnosticEventTypes.cs` (+18 lines)
+- `Core/Diagnostics/DiagnosticEvents.cs` (+72 lines)
+- `Core/Diagnostics/DiagnosticHub.cs` (+10 lines)
+- `Core/Diagnostics/Listeners/GCDetailListener.cs` (+64 lines, NEW FILE)
+- `HeapManager/GarbageCollector.cs` (+127 lines)
+- `HeapManager/SmalltalkHeapManager.cs` (+5 lines)
+- `Engine/InitExecution/InitExpressionExecutor.cs` (+35 lines)
+- `Program.cs` (+4 lines)
+
+**Total: 8 files changed, 301 insertions(+), 34 deletions(-)**
+
+### Phase 6b: Additional Listeners (2-3 days) - ⏳ Not Started
 
 1. **JsonLogListener**
    - JSON Lines output

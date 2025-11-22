@@ -6,6 +6,7 @@ using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
@@ -778,11 +779,10 @@ public class Phase6_ValidationAndGC : IPhase
             ("Smalltalk", GlobalRegistry.SystemDictionaryOOP)
         };
 
-        // Add init expression methods if allocated
-        if (_initExpressionMethods != _heapManager.GetNil())
-        {
-            gcRootsList.Add(("InitExpressionMethods", _initExpressionMethods));
-        }
+        // NOTE: We no longer add InitExpressionMethods as a GC root!
+        // With full ProcessorScheduler integration, init expressions run in a Process context.
+        // The GC can trace: Processor (global) → activeProcess → suspendedContext → method
+        // This makes init expression methods naturally reachable during execution.
 
         // Set as GC roots (bulk operation - replaces any previous roots)
         _heapManager.GC.ClearGCRoots();
@@ -815,6 +815,7 @@ public class Phase6_ValidationAndGC : IPhase
 
         // Cold start expects exactly 1 collected object (the placeholder nil from heap manager initialization)
         // After become: swaps the placeholder with the real UndefinedObject, the placeholder becomes unreachable
+        // NOTE: No init expressions compiled during cold start, so no other objects to collect
         if (gcStats.CollectedObjects != 1)
         {
             _diagnostics?.Emit(new DiagnosticMessageEvent

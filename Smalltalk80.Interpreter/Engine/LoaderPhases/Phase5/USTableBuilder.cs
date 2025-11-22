@@ -32,6 +32,7 @@ public class USTableBuilder(Phase5Context context) : IUSTableBuilder
 
         // Pass 2: Insert symbols into buckets
         var bucketPositions = new int[ustableSize];
+
         foreach (var (index, symbolOOP) in symbolObjects)
         {
             string symbolName = context.Bundle.Symbols[index];

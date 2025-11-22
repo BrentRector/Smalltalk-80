@@ -1,3 +1,5 @@
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
+
 namespace Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 
 /// <summary>

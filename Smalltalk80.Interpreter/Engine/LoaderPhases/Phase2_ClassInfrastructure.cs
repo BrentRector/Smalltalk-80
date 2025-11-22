@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.Schema;
@@ -129,15 +130,6 @@ public class Phase2_ClassInfrastructure : IPhase
         
         // CRITICAL: Mark tally as initialized so Phase 3 won't overwrite it with nil
         _initializedFields.Add((systemDictOOP, 0));
-
-        _diagnostics?.Emit(new DiagnosticMessageEvent
-        {
-            Severity = MessageSeverity.Info,
-            Category = "Phase2",
-            Message = "Initialized SystemDictionary tally to SmallInteger(0) and marked as initialized",
-            Timestamp = Stopwatch.GetTimestamp(),
-            InstructionCount = 0
-        });
 
         GlobalRegistry.Register("Smalltalk", systemDictOOP);
 
