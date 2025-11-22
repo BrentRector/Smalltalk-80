@@ -415,6 +415,365 @@ public void Reschedule()
 
 ---
 
+### 2.4a Primitive-Fiber Integration: The Complete Flow
+
+**Critical Integration Point:** Primitives 87 and 88 are the bridge between Smalltalk's `Process` abstraction and Windows fibers. Here's how they integrate:
+
+#### Flow 1: Creating and Resuming a Process
+
+```
+Smalltalk Code:
+    | process |
+    process := [self doSomething] newProcess.  ← Creates Process object
+    process priority: 4.
+    process resume.  ← Calls Primitive 87
+```
+
+**Step-by-step:**
+
+1. **Smalltalk: `process resume`**
+   - Sends `resume` message to Process
+   - VM looks up Primitive 87
+
+2. **Primitive 87 Executes:**
+   ```csharp
+   public PrimitiveResult Execute(PrimitiveExecutionContext context)
+   {
+       var processOOP = context.Receiver;
+
+       // Add to Processor's run queue (LinkedList at priority 4)
+       LinkedListOperations.AddLast(heap, listOOP, processOOP);
+
+       // Check if higher priority than active process
+       if (priority > activePriority)
+       {
+           // FIBER INTEGRATION: Trigger immediate switch
+           context.FiberScheduler.Reschedule();
+           // Control never returns here if we switched
+       }
+
+       return PrimitiveResult.Ok(processOOP);
+   }
+   ```
+
+3. **FiberScheduler.Reschedule():**
+   ```csharp
+   public void Reschedule()
+   {
+       // Save current process's context
+       var currentContextOOP = _contextManager.ActiveContext;
+       _heap.SetInstanceVariable(
+           _currentProcessOOP,
+           VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX,
+           currentContextOOP
+       );
+
+       // Find highest priority runnable process
+       var nextProcessOOP = FindHighestPriorityProcess();
+
+       // Update Processor activeProcess
+       _heap.SetInstanceVariable(
+           _processorOOP,
+           VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX,
+           nextProcessOOP
+       );
+
+       // Get or create fiber for next process
+       if (!_processFibers.TryGetValue(nextProcessOOP, out var nextFiber))
+       {
+           nextFiber = CreateProcessFiber(nextProcessOOP);
+           _processFibers[nextProcessOOP] = nextFiber;
+       }
+
+       _currentProcessOOP = nextProcessOOP;
+
+       // FIBER SWITCH: This is the actual Windows fiber switch
+       SwitchToFiber(nextFiber);
+       // When we return here, another process switched back to us
+   }
+   ```
+
+4. **Windows Fiber Switch:**
+   - CPU execution jumps to new fiber's stack
+   - New fiber resumes where it left off (or starts if new)
+   - Original fiber is suspended (stack preserved)
+
+5. **New Process Runs:**
+   ```csharp
+   // ProcessFiberCallback for the new process
+   private static void ProcessFiberProc(IntPtr parameter)
+   {
+       var context = (FiberContext)GCHandle.FromIntPtr(parameter).Target;
+
+       // Get suspended context (where this process left off)
+       var contextOOP = context.Heap.GetInstanceVariable(
+           context.ProcessOOP,
+           VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX
+       );
+
+       // Execute from that context
+       context.VM.ExecuteExistingContext(contextOOP);
+       // Returns when process terminates or yields
+   }
+   ```
+
+#### Flow 2: Suspending a Process (Processor yield)
+
+```
+Smalltalk Code:
+    Processor yield.  ← Give other processes a chance
+```
+
+**Smalltalk Implementation of `yield`:**
+```smalltalk
+ProcessorScheduler>>yield
+    "Give other Processes at the current priority a chance to run"
+
+    | semaphore |
+    semaphore := Semaphore new.
+    [semaphore signal] fork.  ← Creates new process that will signal
+    semaphore wait.            ← Suspends current process (Primitive 86)
+```
+
+**Step-by-step:**
+
+1. **Smalltalk: `semaphore wait`**
+   - Calls Primitive 86 (wait on Semaphore)
+   - If semaphore has no signals, suspends active process
+
+2. **Primitive 86 (Wait):**
+   ```csharp
+   public PrimitiveResult Execute(PrimitiveExecutionContext context)
+   {
+       var semaphoreOOP = context.Receiver;
+       var excessSignals = GetExcessSignals(semaphoreOOP);
+
+       if (excessSignals > 0)
+       {
+           // Semaphore already signaled, just decrement
+           SetExcessSignals(semaphoreOOP, excessSignals - 1);
+           return PrimitiveResult.Ok(nil);
+       }
+       else
+       {
+           // No signals - must wait
+           // Add current process to semaphore's waiting list
+           var activeProcessOOP = GetActiveProcess();
+           AddToFirstLink(semaphoreOOP, activeProcessOOP);
+
+           // FIBER INTEGRATION: Suspend active process
+           context.FiberScheduler.SuspendActiveProcess();
+           // Never returns - fiber switched away
+       }
+   }
+   ```
+
+3. **FiberScheduler.SuspendActiveProcess():**
+   ```csharp
+   public void SuspendActiveProcess()
+   {
+       // Current process is already on semaphore's waiting list
+       // Just save context and switch to next runnable
+
+       var currentContextOOP = _contextManager.ActiveContext;
+       _heap.SetInstanceVariable(
+           _currentProcessOOP,
+           VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX,
+           currentContextOOP
+       );
+
+       // Find next highest priority runnable process
+       var nextProcessOOP = FindHighestPriorityProcess();
+
+       if (nextProcessOOP == _heap.NilOOP)
+       {
+           throw new InvalidOperationException("No runnable process!");
+       }
+
+       // Update Processor activeProcess
+       _heap.SetInstanceVariable(
+           _processorOOP,
+           VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX,
+           nextProcessOOP
+       );
+
+       // Switch to next process's fiber
+       var nextFiber = _processFibers[nextProcessOOP];
+       _currentProcessOOP = nextProcessOOP;
+
+       // FIBER SWITCH: Suspend current, resume next
+       SwitchToFiber(nextFiber);
+       // When we return here, we've been resumed (via Primitive 87)
+   }
+   ```
+
+4. **Next Process Runs:**
+   - Control jumps to next process's fiber
+   - That process continues execution
+   - Original process's fiber is suspended (stack intact)
+
+#### Flow 3: Resuming After Wait (Semaphore signal)
+
+```
+Smalltalk Code:
+    semaphore signal.  ← Wake up a waiting process
+```
+
+**Step-by-step:**
+
+1. **Smalltalk: `semaphore signal`**
+   - Calls Primitive 85 (signal Semaphore)
+
+2. **Primitive 85 (Signal):**
+   ```csharp
+   public PrimitiveResult Execute(PrimitiveExecutionContext context)
+   {
+       var semaphoreOOP = context.Receiver;
+       var firstLinkOOP = GetFirstLink(semaphoreOOP);
+
+       if (firstLinkOOP == _heap.NilOOP)
+       {
+           // No waiting processes, increment excessSignals
+           var excessSignals = GetExcessSignals(semaphoreOOP);
+           SetExcessSignals(semaphoreOOP, excessSignals + 1);
+       }
+       else
+       {
+           // Wake up first waiting process
+           var processOOP = firstLinkOOP;
+
+           // Remove from waiting list
+           RemoveFromFirstLink(semaphoreOOP);
+
+           // RESUME THE PROCESS
+           // This is essentially Primitive 87 inline:
+
+           // Add to run queue
+           var priority = GetPriority(processOOP);
+           var listOOP = GetRunQueueForPriority(priority);
+           LinkedListOperations.AddLast(_heap, listOOP, processOOP);
+
+           // If higher priority, switch immediately
+           if (priority > GetActivePriority())
+           {
+               context.FiberScheduler.Reschedule();
+           }
+       }
+
+       return PrimitiveResult.Ok(_heap.NilOOP);
+   }
+   ```
+
+3. **Process Resumes:**
+   - Process gets added back to run queue
+   - If high enough priority, FiberScheduler.Reschedule() switches to it
+   - Fiber resumes exactly where it suspended (in Primitive 86)
+   - Primitive 86 returns to Smalltalk code
+   - `semaphore wait` returns
+   - Process continues execution
+
+#### Key Integration Points
+
+**PrimitiveExecutionContext Must Include FiberScheduler:**
+
+```csharp
+public class PrimitiveExecutionContext
+{
+    // Existing fields...
+    public ISmalltalkHeap HeapManager { get; set; }
+    public VirtualMachine VM { get; set; }
+
+    // NEW: Fiber scheduler reference
+    public FiberScheduler FiberScheduler { get; set; }
+
+    // Other fields...
+}
+```
+
+**VirtualMachine Must Have FiberScheduler:**
+
+```csharp
+public class VirtualMachine
+{
+    private readonly FiberScheduler _fiberScheduler;
+
+    public VirtualMachine(/* ... */, FiberScheduler fiberScheduler)
+    {
+        _fiberScheduler = fiberScheduler;
+        // ...
+    }
+
+    public PrimitiveExecutionContext CreatePrimitiveContext(...)
+    {
+        return new PrimitiveExecutionContext
+        {
+            FiberScheduler = _fiberScheduler,
+            // ... other fields
+        };
+    }
+}
+```
+
+**Process State Preserved in Fiber Stack:**
+
+When a fiber is suspended via `SwitchToFiber()`:
+- **C# call stack is preserved** (entire .NET stack frame)
+- **VM state is preserved** (ActiveContext saved in Process)
+- **Smalltalk stack is preserved** (in MethodContext indexed slots)
+- **CPU registers are saved** (by Windows fiber mechanism)
+
+When resumed:
+- Fiber continues exactly where it left off
+- C# execution resumes at the line after `SwitchToFiber()`
+- VM state is restored from Process.suspendedContext
+- Execution continues seamlessly
+
+#### Example: Complete Process Switch Trace
+
+```
+Initial State:
+  Active Process: Process A (priority 4) - running in Fiber A
+  Run Queue: Empty
+
+Smalltalk Code in Process A:
+  | processB |
+  processB := [Transcript show: 'Hello from B'] newProcess.
+  processB priority: 5.  ← Higher than current
+  processB resume.       ← Calls Primitive 87
+
+Primitive 87 Executes:
+  1. Adds Process B to run queue at priority 5
+  2. Detects priority 5 > priority 4
+  3. Calls FiberScheduler.Reschedule()
+
+FiberScheduler.Reschedule():
+  1. Saves Process A's context in Process A.suspendedContext
+  2. Finds highest priority: Process B (priority 5)
+  3. Creates Fiber B for Process B
+  4. Sets Processor.activeProcess = Process B
+  5. Calls SwitchToFiber(Fiber B) ← WINDOWS FIBER SWITCH
+
+Now Running: Process B in Fiber B
+  - Starts executing [Transcript show: 'Hello from B']
+  - When done, process terminates
+  - ProcessFiberCallback calls Reschedule()
+
+FiberScheduler.Reschedule() (from Process B termination):
+  1. Removes Process B from system
+  2. Finds highest priority: Process A (priority 4)
+  3. Sets Processor.activeProcess = Process A
+  4. Calls SwitchToFiber(Fiber A) ← SWITCH BACK
+
+Now Running: Process A in Fiber A
+  - Resumes at line AFTER "processB resume"
+  - Primitive 87 returns
+  - Process A continues execution
+```
+
+**This is how Smalltalk's cooperative multitasking maps perfectly to Windows fibers!**
+
+---
+
 ### 2.5 Window Creation Timing and Lifecycle
 
 **Critical Design Point:** The WinForms window is created by C# **before** Smalltalk code runs, but the Smalltalk Display object already exists in the heap from cold start.
