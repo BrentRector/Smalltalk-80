@@ -226,6 +226,23 @@ public class SmalltalkInterpreterThread
             if (result.Status == InitStatus.Success)
             {
                 succeeded++;
+
+                // Display return value for test runners
+                if (expr.Source.Contains("TestRunner") && result.ReturnValueOop.HasValue)
+                {
+                    var returnOOP = result.ReturnValueOop.Value;
+                    if (returnOOP.IsSmallInteger)
+                    {
+                        int testResult = returnOOP.AsSmallInteger();
+                        Console.WriteLine($"\n  ✓✓✓ TEST RESULT: {testResult} ✓✓✓");
+
+                        // BlockContextTestRunner: 120 tests × 9 + 111 = 1191
+                        if (expr.Source.Contains("BlockContextTestRunner") && testResult == 1191)
+                        {
+                            Console.WriteLine($"  ✓✓✓ ALL 120 BLOCK CONTEXT TESTS PASSED ✓✓✓\n");
+                        }
+                    }
+                }
             }
             else
             {
