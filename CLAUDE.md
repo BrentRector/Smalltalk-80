@@ -134,10 +134,9 @@ See `docs/Testing-Guide.md` for complete testing documentation.
 
 ## Init Expression Status
 
-**✅ Passing (44)**: Character, Float, SmallInteger, Text, Symbol, Date, File, Scanner, Debugger, InputSensor, Cursor, Form, TextList, BitEditor, and 30 more
+**✅ Passing (45)**: Character, Float, SmallInteger, Object, Text, Symbol, Date, File, Scanner, Debugger, InputSensor, Cursor, Form, TextList, BitEditor, and 30 more
 
-**⏭️ Skipped (2)**:
-- Object initialize - Requires Sensor cursorPoint (GUI)
+**⏭️ Skipped (1)**:
 - FormMenuView initialize - Requires file I/O primitives (not implemented)
 
 ## Development Methodology

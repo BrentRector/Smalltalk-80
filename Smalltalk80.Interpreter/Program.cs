@@ -228,7 +228,6 @@ public static class Program
                 // Skip list for init expressions requiring runtime features not available during bootstrap
                 var skipList = new HashSet<string>
                 {
-                    "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
                     "FormMenuView initialize",               // ❌ Requires file I/O primitives (98, 92, 99, 146) - not yet implemented
                 };
 
