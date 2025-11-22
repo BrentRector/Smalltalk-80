@@ -416,6 +416,59 @@ public static class Program
                     int exprIndex = phase1Indices[i];
                     var expr = bundle.InitExpressions[exprIndex];
 
+                    // DEBUG: Print FilePool contents before FormMenuView initialize
+                    if (expr.Source == "FormMenuView initialize")
+                    {
+                        Console.WriteLine("\n=== DEBUG: FilePool Dictionary Contents ===");
+                        try
+                        {
+                            var filePoolOOP = GlobalRegistry.Get("FilePool");
+                            if (filePoolOOP == heapManager.GetNil())
+                            {
+                                Console.WriteLine("  FilePool is nil!");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"  FilePool OOP: {filePoolOOP}");
+                                Console.WriteLine($"  FilePool class: {heapManager.GetClassName(filePoolOOP)}");
+
+                                // Get dictionary size
+                                int dictSize = heapManager.GetIndexedSize(filePoolOOP);
+                                Console.WriteLine($"  Dictionary size: {dictSize} slots");
+
+                                // Iterate through dictionary associations
+                                for (int j = 0; j < dictSize; j++)
+                                {
+                                    var assocOOP = heapManager.GetIndexedOOP(filePoolOOP, j);
+                                    if (assocOOP != heapManager.GetNil())
+                                    {
+                                        var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
+                                        var valueOOP = heapManager.GetInstanceVariable(assocOOP, 1);
+
+                                        var keyStr = SymbolRegistry.GetSymbolString(keyOOP);
+                                        string valueStr;
+                                        if (valueOOP.IsSmallInteger)
+                                        {
+                                            valueStr = $"SmallInteger({valueOOP.AsSmallInteger()})";
+                                        }
+                                        else
+                                        {
+                                            var valueClass = heapManager.GetClassName(valueOOP);
+                                            valueStr = $"{valueClass}(OOP={valueOOP.RawValue})";
+                                        }
+
+                                        Console.WriteLine($"    [{j}] {keyStr} => {valueStr}");
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"  Error reading FilePool: {ex.Message}");
+                        }
+                        Console.WriteLine("=== END FilePool DEBUG ===\n");
+                    }
+
                     var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
 
                     if (result.Status == InitStatus.Success)
