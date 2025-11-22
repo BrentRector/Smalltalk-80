@@ -8,7 +8,7 @@
 
 - **Build**: 0 errors, 0 warnings
 - **Cold Start**: Phases 1-6 all succeed
-- **Init Expressions**: 45/46 succeed (98% success rate)
+- **Init Expressions**: 44/46 succeed (96% success rate)
 - **Comment Expressions**: Skipped (234 total - WriteStream bug)
 - **BlockContext Tests**: ✅ **120/120 tests PASS** (returns 1191)
 - **VM Core**: Fully functional, verified operational
@@ -136,8 +136,9 @@ See `docs/Testing-Guide.md` for complete testing documentation.
 
 **✅ Passing (44)**: Character, Float, SmallInteger, Text, Symbol, Date, File, Scanner, Debugger, InputSensor, Cursor, Form, TextList, BitEditor, and 30 more
 
-**⏭️ Skipped (1)**:
+**⏭️ Skipped (2)**:
 - Object initialize - Requires Sensor cursorPoint (GUI)
+- FormMenuView initialize - Requires file I/O primitives (not implemented)
 
 ## Development Methodology
 

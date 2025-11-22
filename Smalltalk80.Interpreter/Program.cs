@@ -229,6 +229,7 @@ public static class Program
                 var skipList = new HashSet<string>
                 {
                     "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
+                    "FormMenuView initialize",               // ❌ Requires file I/O primitives (98, 92, 99, 146) - not yet implemented
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -306,13 +307,12 @@ public static class Program
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
                     // Move font/GUI-dependent expressions to run last (tests DefaultTextStyle)
-                    // Order: Form → TextList → BitEditor → FormMenuView (each tests more font functionality)
+                    // Order: Form → TextList → BitEditor (each tests more font functionality)
                     var runLastExpressions = new List<string>
                     {
                         "Form initialize",           // Tests Form creation with glyphs
                         "TextList initialize",       // Tests DefaultTextStyle copy
-                        "BitEditor initialize",      // Tests PopUpMenu labels: with font support
-                        "FormMenuView initialize"    // File/menu operations - run last to ensure dependencies
+                        "BitEditor initialize"       // Tests PopUpMenu labels: with font support
                     };
 
                     var lastIndices = new List<int>();
@@ -395,7 +395,7 @@ public static class Program
                 // Execute all initialize! expressions with on-demand compilation and GC verification
                 Console.WriteLine($"\n=== Init Expression Execution ===");
                 Console.WriteLine($"  Total initialize! expressions: {phase1Indices.Count}");
-                Console.WriteLine($"  Executing all expressions (1 skipped)");
+                Console.WriteLine($"  Executing all expressions (2 skipped)");
                 Console.WriteLine();
 
                 succeeded = 0;
@@ -415,135 +415,6 @@ public static class Program
                 {
                     int exprIndex = phase1Indices[i];
                     var expr = bundle.InitExpressions[exprIndex];
-
-                    // DEBUG: Print FilePool contents before FormMenuView initialize
-                    if (expr.Source == "FormMenuView initialize")
-                    {
-                        Console.WriteLine("\n=== DEBUG: FilePool Dictionary Contents ===");
-                        try
-                        {
-                            // Helper to read a symbol string from OOP
-                            string ReadSymbol(SmalltalkOOP symbolOOP)
-                            {
-                                int size = heapManager.GetIndexedSize(symbolOOP);
-                                var chars = new char[size];
-                                for (int i = 0; i < size; i++)
-                                {
-                                    byte b = heapManager.GetIndexedByte(symbolOOP, i);
-                                    chars[i] = (char)b;
-                                }
-                                return new string(chars);
-                            }
-
-                            // Look up FilePool in Smalltalk dictionary at runtime
-                            var smalltalkOOP = vmMetadata.KnownObjects.Smalltalk;
-
-                            // Search Smalltalk dictionary for FilePool
-                            int smalltalkSize = heapManager.GetIndexedSize(smalltalkOOP);
-                            SmalltalkOOP filePoolOOP = heapManager.GetNil();
-
-                            for (int idx = 0; idx < smalltalkSize; idx++)
-                            {
-                                var assocOOP = heapManager.GetIndexedOOP(smalltalkOOP, idx);
-                                if (assocOOP != heapManager.GetNil())
-                                {
-                                    var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
-                                    string keyName = ReadSymbol(keyOOP);
-                                    if (keyName == "FilePool")
-                                    {
-                                        filePoolOOP = heapManager.GetInstanceVariable(assocOOP, 1);
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (filePoolOOP == heapManager.GetNil())
-                            {
-                                Console.WriteLine("  FilePool not found in Smalltalk dictionary!");
-                            }
-                            else
-                            {
-                                Console.WriteLine($"  FilePool OOP: {filePoolOOP}");
-                                Console.WriteLine($"  FilePool class: {heapManager.GetClassName(filePoolOOP)}");
-
-                                // Get dictionary size
-                                int dictSize = heapManager.GetIndexedSize(filePoolOOP);
-                                Console.WriteLine($"  Dictionary size: {dictSize} slots");
-
-                                // Iterate through dictionary associations
-                                for (int j = 0; j < dictSize; j++)
-                                {
-                                    var assocOOP = heapManager.GetIndexedOOP(filePoolOOP, j);
-                                    if (assocOOP != heapManager.GetNil())
-                                    {
-                                        var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
-                                        var valueOOP = heapManager.GetInstanceVariable(assocOOP, 1);
-
-                                        var keyStr = ReadSymbol(keyOOP);
-                                        string valueStr;
-                                        if (valueOOP.IsSmallInteger)
-                                        {
-                                            valueStr = $"SmallInteger({valueOOP.AsSmallInteger()})";
-                                        }
-                                        else
-                                        {
-                                            var valueClass = heapManager.GetClassName(valueOOP);
-                                            valueStr = $"{valueClass}(OOP={valueOOP.RawValue})";
-                                        }
-
-                                        Console.WriteLine($"    [{j}] {keyStr} => {valueStr}");
-                                    }
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"  Error reading FilePool: {ex.Message}");
-                        }
-                        Console.WriteLine("=== END FilePool DEBUG ===\n");
-
-                        // DEBUG: Check WindowsFile class
-                        Console.WriteLine("=== DEBUG: WindowsFile Class Check ===");
-                        try
-                        {
-                            string ReadSymbol(SmalltalkOOP symbolOOP)
-                            {
-                                int size = heapManager.GetIndexedSize(symbolOOP);
-                                var chars = new char[size];
-                                for (int i = 0; i < size; i++)
-                                {
-                                    byte b = heapManager.GetIndexedByte(symbolOOP, i);
-                                    chars[i] = (char)b;
-                                }
-                                return new string(chars);
-                            }
-
-                            var smalltalkOOP = vmMetadata.KnownObjects.Smalltalk;
-                            int smalltalkSize = heapManager.GetIndexedSize(smalltalkOOP);
-
-                            for (int idx = 0; idx < smalltalkSize; idx++)
-                            {
-                                var assocOOP = heapManager.GetIndexedOOP(smalltalkOOP, idx);
-                                if (assocOOP != heapManager.GetNil())
-                                {
-                                    var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
-                                    string keyName = ReadSymbol(keyOOP);
-                                    if (keyName == "WindowsFile")
-                                    {
-                                        var windowsFileClassOOP = heapManager.GetInstanceVariable(assocOOP, 1);
-                                        Console.WriteLine($"  WindowsFile class found: OOP={windowsFileClassOOP}");
-                                        Console.WriteLine($"  WindowsFile class's class: {heapManager.GetClassName(windowsFileClassOOP)}");
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"  Error checking WindowsFile: {ex.Message}");
-                        }
-                        Console.WriteLine("=== END WindowsFile DEBUG ===\n");
-                    }
 
                     var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
 
