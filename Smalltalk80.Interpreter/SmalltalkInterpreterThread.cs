@@ -264,35 +264,18 @@ public class SmalltalkInterpreterThread
             // Step 1: Look up required classes at runtime
             var stringClassOOP = LookupGlobal("String");
             var compilerClassOOP = LookupGlobal("Compiler");
-            var undefinedObjectClassOOP = LookupGlobal("UndefinedObject");
 
             // Step 2: Create Smalltalk String from user expression
             var sourceString = StringHelper.CreateString(_context.HeapManager, stringClassOOP, _context.Config.ExecuteExpression);
 
-            // Step 3: Send compile:in: to Compiler
-            // Compiler compile: sourceString in: UndefinedObject
-            Console.WriteLine("  Compiling expression using Smalltalk Compiler...");
-            var compiledMethodOOP = messageSender.SendKeyword(
+            // Step 3: Use Compiler class>>evaluate: to compile and execute
+            // This is the class-side method that handles DoIt semantics
+            // Compiler evaluate: sourceString
+            Console.WriteLine("  Evaluating expression using Compiler class>>evaluate:...");
+            var resultOOP = messageSender.SendKeyword(
                 compilerClassOOP,
-                "compile:in:",
-                sourceString,
-                undefinedObjectClassOOP);
-
-            Console.WriteLine($"  Compiled method: {compiledMethodOOP}");
-
-            // Step 4: Execute the compiled method
-            // We need to execute it with nil as receiver (DoIt semantics)
-            var nilOOP = _context.HeapManager.GetNil();
-
-            // Create a MethodContext and execute
-            var contextOOP = _vm!.ContextManager.CreateMethodContext(
-                compiledMethodOOP,
-                nilOOP,
-                Array.Empty<SmalltalkOOP>(),
-                callerContextOOP: _context.HeapManager.GetNil());
-
-            Console.WriteLine("  Executing compiled method...");
-            var resultOOP = _vm!.ExecuteExistingContext(contextOOP);
+                "evaluate:",
+                sourceString);
 
             // Step 5: Display the result
             Console.WriteLine($"\n=== Result ===");
