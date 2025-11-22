@@ -297,8 +297,8 @@ public class InitExpressionExecutor
                 }
             }
 
-            // Show simple GC summary (listener shows details)
-            Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, {gcStatsAfter.CollectedObjects} collected)");
+            // Show simple success message
+            Console.WriteLine($" ✓ {stopwatch.ElapsedMilliseconds}ms");
 
             return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
         }
