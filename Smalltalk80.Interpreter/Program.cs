@@ -422,9 +422,21 @@ public static class Program
                         Console.WriteLine("\n=== DEBUG: FilePool Dictionary Contents ===");
                         try
                         {
+                            // Helper to read a symbol string from OOP
+                            string ReadSymbol(SmalltalkOOP symbolOOP)
+                            {
+                                int size = heapManager.GetIndexedSize(symbolOOP);
+                                var chars = new char[size];
+                                for (int i = 0; i < size; i++)
+                                {
+                                    byte b = heapManager.GetIndexedByte(symbolOOP, i);
+                                    chars[i] = (char)b;
+                                }
+                                return new string(chars);
+                            }
+
                             // Look up FilePool in Smalltalk dictionary at runtime
                             var smalltalkOOP = vmMetadata.KnownObjects.Smalltalk;
-                            var filePoolSymbol = SymbolRegistry.GetSymbolOOP("FilePool");
 
                             // Search Smalltalk dictionary for FilePool
                             int smalltalkSize = heapManager.GetIndexedSize(smalltalkOOP);
@@ -436,7 +448,8 @@ public static class Program
                                 if (assocOOP != heapManager.GetNil())
                                 {
                                     var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
-                                    if (keyOOP == filePoolSymbol)
+                                    string keyName = ReadSymbol(keyOOP);
+                                    if (keyName == "FilePool")
                                     {
                                         filePoolOOP = heapManager.GetInstanceVariable(assocOOP, 1);
                                         break;
@@ -466,7 +479,7 @@ public static class Program
                                         var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
                                         var valueOOP = heapManager.GetInstanceVariable(assocOOP, 1);
 
-                                        var keyStr = SymbolRegistry.GetSymbolString(keyOOP);
+                                        var keyStr = ReadSymbol(keyOOP);
                                         string valueStr;
                                         if (valueOOP.IsSmallInteger)
                                         {
