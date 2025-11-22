@@ -18,6 +18,10 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     // Caching layer (invalidated by primitive 89)
     private readonly RuntimeClassCache _classCache;
 
+    // Cached CharacterTable OOP (invalidated by primitive 89)
+    private SmalltalkOOP _characterTableCache = SmalltalkOOP.Nil;
+    private bool _characterTableCacheValid = false;
+
     public RuntimeHeapAccessor(ISmalltalkHeap heapManager, VMMetadata metadata)
     {
         _heapManager = heapManager;
@@ -32,6 +36,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     {
         _classCache.InvalidateCache();
         RuntimeSpecialObjects.Instance.InvalidateCache();
+        _characterTableCacheValid = false;
     }
 
     /// <summary>
@@ -418,6 +423,32 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     /// <param name="varName">Name of the class variable</param>
     /// <returns>The value OOP of the class variable, or Nil if not found</returns>
     public virtual SmalltalkOOP LookupClassVariable(string className, string varName)
+    {
+        // OPTIMIZATION: Cache CharacterTable since it's accessed on every String>>at: call
+        if (className == "Character" && varName == "CharacterTable")
+        {
+            if (_characterTableCacheValid)
+                return _characterTableCache;
+
+            // Cache miss - look it up and cache the result
+            var characterTableOOP = LookupClassVariableUncached(className, varName);
+            if (characterTableOOP != metadata.KnownObjects.Nil)
+            {
+                _characterTableCache = characterTableOOP;
+                _characterTableCacheValid = true;
+            }
+            return characterTableOOP;
+        }
+
+        // For all other class variables, lookup without caching
+        return LookupClassVariableUncached(className, varName);
+    }
+
+    /// <summary>
+    /// Looks up a class variable without using the cache.
+    /// Used internally by LookupClassVariable.
+    /// </summary>
+    private SmalltalkOOP LookupClassVariableUncached(string className, string varName)
     {
         // Optimize for well-known classes using VMMetadata
         SmalltalkOOP classOOP;
