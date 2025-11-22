@@ -267,9 +267,9 @@ public partial class VirtualMachine
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
 
         // Diagnostic: Log at: sends to understand the infinite loop
-        if (selectorName == "at:" && _tracer.InstructionCount > 400000)
+        if (selectorName == "at:" && _tracer.InstructionCount > 499900)
         {
-            Console.WriteLine($"[at: DIAGNOSTIC] Receiver class: {recvClassName}, Primitive: {primitiveNumber}, Instruction: {_tracer.InstructionCount}");
+            Console.WriteLine($"[at: DIAGNOSTIC] Receiver class: {recvClassName}, Primitive: {primitiveNumber}, Instruction: {_tracer.InstructionCount}, Receiver OOP: {receiverOOP}");
         }
 
         if (primitiveNumber > 0)
