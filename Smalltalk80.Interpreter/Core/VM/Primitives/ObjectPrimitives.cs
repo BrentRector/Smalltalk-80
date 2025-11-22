@@ -264,54 +264,34 @@ public static class SimpleObjectPrimitives
             }
 
             byte byteValue = context.HeapManager.GetIndexedByte(context.Receiver, index - 1);
-            Console.WriteLine($"[Primitive 63] String>>at:{index} fetched byte {byteValue} ('{(char)byteValue}')");
 
             // Get Character from CharacterTable (Character class pool variable)
             var characterOOP = GetCharacterForAscii(context, byteValue);
             if (characterOOP == context.HeapManager.GetNil())
-            {
-                Console.WriteLine($"[Primitive 63] FAIL: GetCharacterForAscii returned nil for ASCII {byteValue}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
-            Console.WriteLine($"[Primitive 63] SUCCESS: Returning Character {characterOOP} for byte {byteValue}");
             return PrimitiveResult.Ok(characterOOP);
         }
 
         // Helper to get Character object for ASCII code
         private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
         {
-            Console.WriteLine($"[Primitive 63] GetCharacterForAscii({asciiValue})");
-
             if (context.RuntimeHeapAccess == null)
-            {
-                Console.WriteLine($"[Primitive 63] ERROR: RuntimeHeapAccess is null!");
                 return context.HeapManager.GetNil();
-            }
 
             // Use RuntimeHeapAccessor to look up CharacterTable class variable
             var characterTableOOP = context.RuntimeHeapAccess.LookupClassVariable("Character", "CharacterTable");
             if (characterTableOOP == context.HeapManager.GetNil())
-            {
-                Console.WriteLine($"[Primitive 63] ERROR: CharacterTable lookup returned nil!");
                 return context.HeapManager.GetNil();
-            }
-
-            Console.WriteLine($"[Primitive 63] Found CharacterTable: {characterTableOOP}");
 
             // CharacterTable is an Array of 256 Character objects
             // Return the Character at the given ASCII value index
             int tableSize = context.HeapManager.GetIndexedSize(characterTableOOP);
 
             if (asciiValue >= tableSize)
-            {
-                Console.WriteLine($"[Primitive 63] ERROR: ASCII {asciiValue} >= table size {tableSize}");
                 return context.HeapManager.GetNil();
-            }
 
-            var result = context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
-            Console.WriteLine($"[Primitive 63] CharacterTable[{asciiValue}] = {result}");
-            return result;
+            return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
         }
     }
 

@@ -107,14 +107,7 @@ public partial class VirtualMachine
         // Check if the method has a primitive
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
 
-        // DEBUG: Log primitive lookups for String>>at: and basicAt:
-        if (selectorName == "at:" || selectorName == "basicAt:")
-        {
-            var receiverClass = GetClassName(GetClass(receiverOOP));
-            Console.WriteLine($"[PRIMITIVE DEBUG] {receiverClass}>>{selectorName} primitiveNumber={primitiveNumber}");
-        }
-
-        // DEBUG: Log asciiValue sends to see what's receiving them
+        // DEBUG: Log asciiValue sends to track Scanner variable corruption bug
         if (selectorName == "asciiValue")
         {
             var receiverClass = GetClassName(GetClass(receiverOOP));
@@ -284,14 +277,7 @@ public partial class VirtualMachine
         // Check if the method has a primitive
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
 
-        // DEBUG: Log primitive lookups for String>>at: and basicAt:
-        if (selectorName == "at:" || selectorName == "basicAt:")
-        {
-            var receiverClass = GetClassName(classOOP);
-            Console.WriteLine($"[PRIMITIVE DEBUG] {receiverClass}>>{selectorName} primitiveNumber={primitiveNumber}");
-        }
-
-        // DEBUG: Log asciiValue sends to see what's receiving them
+        // DEBUG: Log asciiValue sends to track Scanner variable corruption bug
         if (selectorName == "asciiValue")
         {
             var receiverClass = GetClassName(classOOP);
