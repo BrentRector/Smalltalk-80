@@ -3,7 +3,6 @@ using System.Text.Json;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
-using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -268,22 +267,8 @@ public class InitExpressionExecutor
             // Clear the Process's suspendedContext
             _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, _heapManager.GetNil());
 
-            // Register GC detail listener if diagnostics available
-            GCDetailListener? gcListener = null;
-            if (_diagnostics != null)
-            {
-                gcListener = new GCDetailListener();
-                _diagnostics.Register(gcListener, DiagnosticEventTypes.GCStart | DiagnosticEventTypes.GCEnd | DiagnosticEventTypes.GCObjectCollected);
-            }
-
             // Run GC - SHOULD collect (MethodContext, CompiledMethod, ByteArray no longer reachable)
             var gcStatsAfter = _heapManager.GC.GarbageCollect();
-
-            // Unregister listener
-            if (gcListener != null && _diagnostics != null)
-            {
-                _diagnostics.Unregister(gcListener);
-            }
 
             // Verify the CompiledMethod was collected
             bool compiledMethodAlive = IsObjectAlive(compiledMethodOOP);
