@@ -8,7 +8,7 @@
 
 - **Build**: 0 errors, 0 warnings
 - **Cold Start**: Phases 1-6 all succeed
-- **Init Expressions**: 44/46 succeed (96% success rate)
+- **Init Expressions**: 45/47 succeed (96% success rate)
 - **Comment Expressions**: Skipped (234 total - WriteStream bug)
 - **BlockContext Tests**: ✅ **120/120 tests PASS** (returns 1191)
 - **VM Core**: Fully functional, verified operational
@@ -16,6 +16,8 @@
 ## Known Issues
 
 **WriteStream>>nextPut: Infinite Loop**: 210/234 comment expressions fail with infinite loop in WriteStream. All comment expressions skipped until bug is fixed.
+
+**Object initialize - Requires Interactive GUI**: Cannot run during headless bootstrap. Displays modal confirmation dialog requiring GUI event loop and user input. Architectural limitation, not a bug. The supporting infrastructure (Sensor, CurrentCursor, DependentsFields) is properly initialized for runtime use.
 
 ## Architecture Documentation
 
@@ -134,11 +136,16 @@ See `docs/Testing-Guide.md` for complete testing documentation.
 
 ## Init Expression Status
 
-**✅ Passing (44)**: Character, Float, SmallInteger, Text, Symbol, Date, File, Scanner, Debugger, InputSensor, Cursor, Form, TextList, BitEditor, and 30 more
+**✅ Passing (45)**: Character, Float, SmallInteger, Text, Symbol, Date, File, Scanner, Debugger, InputSensor (including install and initSensor), Cursor, Form, TextList, BitEditor, and 30 more
 
 **⏭️ Skipped (2)**:
-- Object initialize - Requires interactive GUI (displays confirmation dialog via Sensor cursorPoint)
-- FormMenuView initialize - Requires file I/O primitives (not implemented)
+- Object initialize - Requires interactive GUI event loop (displays modal confirmation dialog, waits for user input via Semaphore>>wait)
+- FormMenuView initialize - Requires file I/O primitives (98, 92, 99, 146 - not implemented)
+
+**Recent Fixes**:
+- Added InputSensor install and InputSensor initSensor init expressions to properly initialize Sensor global
+- Fixed Cursor initialize to set CurrentCursor (was nil, causing cursorPoint failures)
+- Fixed Object initialize to initialize DependentsFields before calling confirm: (chicken-egg problem)
 
 ## Development Methodology
 
