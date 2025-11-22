@@ -1,6 +1,8 @@
 # Generated files
 arrow_output/
+bmp_output/
 *.AL
 *.form
+*.bmp
 test_arrows.bin
 output/

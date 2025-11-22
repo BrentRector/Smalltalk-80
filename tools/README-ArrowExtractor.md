@@ -9,10 +9,12 @@ This directory contains utilities to extract cursor/arrow bitmaps from the ARROW
 ### Python Scripts (Recommended - Works on Linux/macOS/Windows)
 - **convert_octal_dump.py** - Converts octal dump output to binary file
 - **extract_arrow_bitmaps.py** - Extracts bitmaps from ARROWS10.AL to individual Form files
+- **form_to_bmp.py** - Converts Form files to Windows BMP format
 
 ### PowerShell Scripts (Windows/PowerShell Core)
 - **Extract-ArrowBitmaps.ps1** - Main extraction tool that converts ARROWS10.AL to individual Form files
 - **ConvertOctalDump-ToBinary.ps1** - Helper tool to convert octal dump output to binary file
+- **Convert-FormToBmp.ps1** - Converts Form files to Windows BMP format
 
 ### Data Files
 - **arrows_dump.txt** - Sample octal dump of ARROWS10.AL file
@@ -61,6 +63,36 @@ pwsh ./ConvertOctalDump-ToBinary.ps1 -InputFile arrows_dump.txt -OutputFile ARRO
 # Step 2: Extract bitmaps
 pwsh ./Extract-ArrowBitmaps.ps1 -InputFile ARROWS10.AL -OutputDirectory ../forms/arrows/
 ```
+
+## Converting Form Files to BMP
+
+After extracting Form files, you can convert them to standard Windows BMP format for easy viewing.
+
+### Python (Recommended)
+
+**Convert a single file:**
+```bash
+python3 form_to_bmp.py arrow1.form arrow1.bmp
+```
+
+**Convert all files in a directory:**
+```bash
+python3 form_to_bmp.py --dir ./arrow_output ./bmp_output
+```
+
+### PowerShell
+
+**Convert a single file:**
+```powershell
+pwsh ./Convert-FormToBmp.ps1 -FormFile arrow1.form -BmpFile arrow1.bmp
+```
+
+**Convert all files in a directory:**
+```powershell
+pwsh ./Convert-FormToBmp.ps1 -InputDirectory ./arrow_output -OutputDirectory ./bmp_output
+```
+
+The BMP files are standard monochrome (1-bit) Windows bitmaps that can be viewed with any image viewer.
 
 ## Output
 
