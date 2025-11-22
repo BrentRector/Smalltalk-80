@@ -27872,13 +27872,18 @@ Object class
 
 !Object class methodsFor: 'class initialization'!
 initialize
+	"Initialize DependentsFields and ErrorRecursion for the system.
+	Note: GUI confirmation dialog commented out for headless bootstrap compatibility."
+
 	self initializeDependentsFields.
 	self initializeErrorRecursion.
+
+	"GUI confirmation dialog - requires interactive event loop (disabled for headless bootstrap):
 	(self confirm: 'Do you really want to initialize
 class Object?  It will reset all dependents.')
 		ifTrue:
 			[self initializeDependentsFields.
-			self initializeErrorRecursion]
+			self initializeErrorRecursion]"
 
 	"Object initialize"! !
 
