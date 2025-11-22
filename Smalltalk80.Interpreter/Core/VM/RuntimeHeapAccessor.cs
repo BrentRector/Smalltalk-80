@@ -22,6 +22,10 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     private SmalltalkOOP _characterTableCache = SmalltalkOOP.Nil;
     private bool _characterTableCacheValid = false;
 
+    // Cached USTable OOP (invalidated by primitive 89)
+    private SmalltalkOOP _ustableCache = SmalltalkOOP.Nil;
+    private bool _ustableCacheValid = false;
+
     public RuntimeHeapAccessor(ISmalltalkHeap heapManager, VMMetadata metadata)
     {
         _heapManager = heapManager;
@@ -37,6 +41,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
         _classCache.InvalidateCache();
         RuntimeSpecialObjects.Instance.InvalidateCache();
         _characterTableCacheValid = false;
+        _ustableCacheValid = false;
     }
 
     /// <summary>
@@ -438,6 +443,22 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
                 _characterTableCacheValid = true;
             }
             return characterTableOOP;
+        }
+
+        // OPTIMIZATION: Cache USTable since it's accessed frequently by InternSymbol
+        if (className == "Symbol" && varName == "USTable")
+        {
+            if (_ustableCacheValid)
+                return _ustableCache;
+
+            // Cache miss - look it up and cache the result
+            var ustableOOP = LookupClassVariableUncached(className, varName);
+            if (ustableOOP != metadata.KnownObjects.Nil)
+            {
+                _ustableCache = ustableOOP;
+                _ustableCacheValid = true;
+            }
+            return ustableOOP;
         }
 
         // For all other class variables, lookup without caching
