@@ -21997,6 +21997,8 @@ initSensor
 	Sensor _ InputSensor new! !
 
 InputSensor initialize!
+InputSensor install!
+InputSensor initSensor!
 Object subclass: #InputState
 	instanceVariableNames: 'x y bitState lshiftState rshiftState ctrlState lockState metaState keyboardQueue deltaTime baseTime timeProtect '
 	classVariableNames: 'BitMax BitMin CtrlKey InputProcess InputSemaphore LockKey LshiftKey RshiftKey '
