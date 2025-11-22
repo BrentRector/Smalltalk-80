@@ -223,8 +223,8 @@ public static class Program
                     "SmallInteger initialize",   // Required for SmallInteger constants/utilities
                     "Float initialize",          // Required for Float constants (Pi, E, etc.)
                     "InputSensor initialize",    // Required for InputSensor keyboard map setup
-                    "InputSensor install!",      // Required to create CurrentInputState
-                    "InputSensor initSensor!",   // Required to create and assign Sensor global
+                    "InputSensor install",       // Required to create CurrentInputState
+                    "InputSensor initSensor",    // Required to create and assign Sensor global
                     "BlockContextTest validate",  // Test suite - runs even with --skip-init-expressions
                 };
 
@@ -282,8 +282,8 @@ public static class Program
 
                         // Phase-based execution: ALL initialize expressions, then ALL comments, then test expressions
                         if (expr.Source.EndsWith(" initialize") ||
-                            expr.Source == "InputSensor install!" ||
-                            expr.Source == "InputSensor initSensor!")
+                            expr.Source == "InputSensor install" ||
+                            expr.Source == "InputSensor initSensor")
                         {
                             phase1Indices.Add(i);
                         }
@@ -318,8 +318,7 @@ public static class Program
                         "Form initialize",           // Tests Form creation with glyphs
                         "TextList initialize",       // Tests DefaultTextStyle copy
                         "BitEditor initialize",      // Tests PopUpMenu labels: with font support
-                        "Object initialize!",        // MUST run last: requires Sensor global and displays interactive dialog
-                        "Object initialize"          // Try both with and without ! (depends on bundle format)
+                        "Object initialize"          // MUST run last: requires Sensor global and displays interactive dialog
                     };
 
                     var lastIndices = new List<int>();
