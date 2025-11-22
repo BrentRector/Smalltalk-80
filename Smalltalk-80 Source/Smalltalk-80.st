@@ -13417,6 +13417,8 @@ initialize
 		2r0000010000000000)
 			offset: -5@-7.
 
+	CurrentCursor _ NormalCursor.
+
 "Cursor initialize"! !
 
 !Cursor class methodsFor: 'instance creation'!
