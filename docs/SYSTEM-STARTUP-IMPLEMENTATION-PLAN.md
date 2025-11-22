@@ -100,8 +100,14 @@ This document specifies the complete implementation plan for bringing the Smallt
 ### 1.2 Key Design Principles
 
 1. **Two-Thread Model:**
-   - **WinForms Thread:** Runs Windows message pump, captures events
-   - **Smalltalk Thread:** Runs VM interpreter, converted to fiber
+   - **Main Thread (becomes WinForms Thread):**
+     - Does cold start (creates Smalltalk heap with Display object)
+     - Creates WinForms window
+     - Starts Smalltalk thread
+     - Becomes Windows message pump, captures events, renders display
+   - **Smalltalk Thread:**
+     - Runs VM interpreter, converted to fiber
+     - Runs all Smalltalk code (init expressions, controller loop, processes)
 
 2. **Fiber-Based Process Scheduling:**
    - Each Smalltalk `Process` maps to a Windows Fiber
@@ -115,7 +121,14 @@ This document specifies the complete implementation plan for bringing the Smallt
    - WinForms enqueues, Smalltalk dequeues
    - Preserves Smalltalk's polling semantics
 
-4. **Bluebook Compliance:**
+4. **Display Bridge via Primitive 96:**
+   - Smalltalk writes to Display Form (bitmap in heap)
+   - Primitive 96 (BitBlt) detects writes to Display
+   - Copies changed region from heap to local buffer
+   - Signals WinForms thread to repaint
+   - WinForms OnPaint reads local buffer and renders
+
+5. **Bluebook Compliance:**
    - Follow canonical startup sequence
    - Preserve all Smalltalk semantics
    - No shortcuts or workarounds
@@ -399,6 +412,407 @@ public void Reschedule()
     // When we return here, this process has been resumed
 }
 ```
+
+---
+
+### 2.5 Window Creation Timing and Lifecycle
+
+**Critical Design Point:** The WinForms window is created by C# **before** Smalltalk code runs, but the Smalltalk Display object already exists in the heap from cold start.
+
+**Startup Sequence:**
+
+```csharp
+[STAThread]
+static void Main(string[] args)
+{
+    Application.EnableVisualStyles();
+    Application.SetCompatibleTextRenderingDefault(false);
+
+    // STEP 1: Cold start creates Smalltalk heap (on main thread)
+    // This creates the Display Form object (640x480 bitmap in heap)
+    var bundle = ColdStartBundle.LoadFromFile(coldStartFile);
+    var heap = ColdStartOrchestrator.Execute(bundle, diagnosticHub);
+
+    // At this point:
+    // - Display global exists (points to a Form object)
+    // - Form has a bits ByteArray (38,400 bytes for 640x480)
+    // - No window exists yet
+
+    // STEP 2: Create event queue (shared between threads)
+    var eventQueue = new SmalltalkEventQueue();
+
+    // STEP 3: Create WinForms window (but don't show it yet)
+    var displayProvider = new WinFormsDisplayProvider(eventQueue, heap);
+    // displayProvider has:
+    // - Reference to heap
+    // - Reference to Display OOP
+    // - Local display buffer (copy of Display bits)
+    // - WinForms Form (window)
+
+    // STEP 4: Create and start Smalltalk thread
+    var smalltalkThread = new Thread(() => {
+        RunSmalltalkInterpreter(heap, eventQueue, vm);
+    });
+    smalltalkThread.SetApartmentState(ApartmentState.MTA);
+    smalltalkThread.Start();
+
+    // STEP 5: Show the window
+    displayProvider.Show();
+
+    // STEP 6: Main thread becomes WinForms message pump
+    Application.Run(displayProvider);
+    // This blocks until window closes
+
+    // STEP 7: Cleanup
+    smalltalkThread.Join();
+}
+
+static void RunSmalltalkInterpreter(ISmalltalkHeap heap,
+                                   SmalltalkEventQueue eventQueue,
+                                   VirtualMachine vm)
+{
+    // Convert this thread to a fiber
+    ConvertThreadToFiber(IntPtr.Zero);
+
+    // Create fiber scheduler
+    var fiberScheduler = new FiberScheduler(heap, vm, eventQueue);
+    fiberScheduler.Initialize();
+
+    // Run init expressions (in initial process fiber)
+    var initExecutor = new InitExpressionExecutor(heap, vm);
+    initExecutor.ExecuteAll();
+
+    // Start system processes and controller loop
+    // This never returns - fibers run forever
+    StartSystemProcesses(heap, vm, fiberScheduler);
+}
+```
+
+**Key Points:**
+
+1. **Display Form Created During Cold Start**
+   - Phase 3 of cold start creates the Display object
+   - It's just a Form with a ByteArray of bits
+   - Lives entirely in Smalltalk heap
+
+2. **WinForms Window Created After Cold Start**
+   - C# code creates actual OS window
+   - Window knows about Display OOP (via reference to heap)
+   - Window not shown until Smalltalk thread starts
+
+3. **Two Separate Bitmaps**
+   - **Smalltalk Display bits:** In heap (38,400 bytes)
+   - **WinForms local buffer:** In C# memory (38,400 bytes)
+   - Synchronized via Primitive 96 (BitBlt)
+
+4. **No Window Primitives in Smalltalk**
+   - Smalltalk doesn't create windows via primitives
+   - Smalltalk only draws to Display Form
+   - C# bridges Display to actual window
+
+---
+
+### 2.6 Display Bridge Architecture
+
+**The Problem:** Smalltalk draws to Display Form (heap memory), but WinForms needs to render to the screen.
+
+**The Solution:** Primitive 96 (BitBlt) acts as the bridge.
+
+#### Data Flow
+
+```
+Smalltalk Process (Controller Fiber)
+    ↓
+Sends: Display fillWhite  (or any drawing command)
+    ↓
+Calls: BitBlt>>copyBits
+    ↓
+Primitive 96 executes:
+    1. Performs raster op on Display Form's bits (in heap)
+    2. Detects destination is Display
+    3. Calls Platform.DisplayRegionChanged(rect)
+    ↓
+WinFormsDisplayProvider.DisplayRegionChanged (called from Smalltalk thread):
+    1. Locks _displayLock
+    2. Copies changed region from heap to _localDisplayBuffer
+    3. BeginInvoke → Invalidate(rect) (signals WinForms thread)
+    ↓
+WinFormsDisplayProvider.OnPaint (runs on WinForms thread):
+    1. Locks _displayLock
+    2. Converts 1bpp → 32bpp for changed region
+    3. Draws to screen via GDI+
+```
+
+#### Primitive 96 Implementation
+
+```csharp
+public class BitBltPrimitive : IPrimitive
+{
+    public PrimitiveResult Execute(PrimitiveExecutionContext context)
+    {
+        var bitBltOOP = context.Receiver;
+
+        // Get the destination Form
+        var destFormOOP = context.HeapManager.GetInstanceVariable(
+            bitBltOOP,
+            VMConstants.BITBLT_DESTFORM_INDEX
+        );
+
+        // Perform the BitBlt operation in Smalltalk memory
+        // This modifies the destination Form's bits in the heap
+        PerformBitBltOperation(context, bitBltOOP);
+
+        // Check if destination is Display
+        var displayOOP = context.RuntimeHeapAccess.GetGlobal("Display");
+
+        if (destFormOOP == displayOOP)
+        {
+            // Get the affected rectangle
+            var rect = GetDestinationRectangle(context, bitBltOOP);
+
+            // Notify platform bridge (thread-safe call)
+            context.Platform?.DisplayRegionChanged(rect);
+        }
+
+        return PrimitiveResult.Ok(context.Receiver);
+    }
+
+    private void PerformBitBltOperation(PrimitiveExecutionContext context,
+                                       SmalltalkOOP bitBltOOP)
+    {
+        // Extract BitBlt parameters
+        var sourceForm = GetSourceForm(context, bitBltOOP);
+        var destForm = GetDestForm(context, bitBltOOP);
+        var sourceRect = GetSourceRect(context, bitBltOOP);
+        var destPoint = GetDestPoint(context, bitBltOOP);
+        var rule = GetRule(context, bitBltOOP);
+
+        // Perform actual raster operation
+        // This operates directly on the ByteArray bits in the heap
+        RasterOp(sourceForm, destForm, sourceRect, destPoint, rule);
+    }
+}
+```
+
+#### WinFormsDisplayProvider Implementation
+
+```csharp
+public class WinFormsDisplayProvider : Form, IPlatformBridge
+{
+    private readonly ISmalltalkHeap _heap;
+    private readonly SmalltalkOOP _displayOOP;
+    private readonly byte[] _localDisplayBuffer; // 38,400 bytes (local copy)
+    private readonly Bitmap _backBuffer; // 32bpp for rendering
+    private readonly object _displayLock = new object();
+    private Rectangle _dirtyRegion = Rectangle.Empty;
+
+    public WinFormsDisplayProvider(SmalltalkEventQueue eventQueue,
+                                  ISmalltalkHeap heap)
+    {
+        _heap = heap;
+        _eventQueue = eventQueue;
+
+        // Get Display OOP from Smalltalk globals
+        _displayOOP = _heap.LookupGlobal("Display");
+
+        // Create local buffer (copy of Display bits)
+        _localDisplayBuffer = new byte[38400]; // 640x480 @ 1bpp
+
+        // Create 32bpp back buffer for rendering
+        _backBuffer = new Bitmap(640, 480, PixelFormat.Format32bppArgb);
+
+        // Configure window
+        this.ClientSize = new Size(640, 480);
+        this.DoubleBuffered = true;
+        this.FormBorderStyle = FormBorderStyle.FixedSingle;
+        this.Text = "Smalltalk-80";
+
+        // Initial sync from heap
+        CopyEntireDisplayFromHeap();
+    }
+
+    // Called from Smalltalk thread (Primitive 96)
+    public void DisplayRegionChanged(Rectangle region)
+    {
+        // Copy the changed region from heap to local buffer
+        lock (_displayLock)
+        {
+            CopyDisplayBitsFromHeap(region);
+
+            // Accumulate dirty region
+            _dirtyRegion = _dirtyRegion.IsEmpty
+                ? region
+                : Rectangle.Union(_dirtyRegion, region);
+        }
+
+        // Signal WinForms thread to repaint (thread-safe)
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() => {
+                Invalidate(_dirtyRegion);
+                _dirtyRegion = Rectangle.Empty;
+            }));
+        }
+        else
+        {
+            Invalidate(_dirtyRegion);
+            _dirtyRegion = Rectangle.Empty;
+        }
+    }
+
+    private void CopyDisplayBitsFromHeap(Rectangle region)
+    {
+        // Get Display Form's bits ByteArray OOP
+        var bitsOOP = _heap.GetInstanceVariable(
+            _displayOOP,
+            VMConstants.FORM_BITS_INDEX
+        );
+
+        // Copy bytes from heap to local buffer
+        int bytesPerRow = 80; // (640 + 7) / 8
+        int startY = region.Y;
+        int endY = region.Y + region.Height;
+        int startX = region.X / 8; // Byte boundary
+        int width = (region.Width + 7) / 8;
+
+        for (int y = startY; y < endY; y++)
+        {
+            int heapOffset = (y * bytesPerRow) + startX;
+            int localOffset = (y * bytesPerRow) + startX;
+
+            for (int x = 0; x < width; x++)
+            {
+                byte value = _heap.GetByteAt(bitsOOP, heapOffset + x);
+                _localDisplayBuffer[localOffset + x] = value;
+            }
+        }
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+
+        lock (_displayLock)
+        {
+            // Convert 1bpp _localDisplayBuffer to 32bpp _backBuffer
+            CopyBufferToBitmap(e.ClipRectangle);
+        }
+
+        // Render to screen
+        e.Graphics.DrawImageUnscaled(_backBuffer, 0, 0);
+    }
+
+    private void CopyBufferToBitmap(Rectangle region)
+    {
+        // Lock bitmap for direct pixel access
+        var bmpData = _backBuffer.LockBits(
+            region,
+            ImageLockMode.WriteOnly,
+            PixelFormat.Format32bppArgb
+        );
+
+        unsafe
+        {
+            byte* scan0 = (byte*)bmpData.Scan0;
+            int stride = bmpData.Stride;
+
+            for (int y = region.Y; y < region.Y + region.Height; y++)
+            {
+                for (int x = region.X; x < region.X + region.Width; x++)
+                {
+                    // Get bit from 1bpp buffer
+                    int byteIndex = (y * 80) + (x / 8);
+                    int bitIndex = 7 - (x % 8); // MSB first
+                    byte value = _localDisplayBuffer[byteIndex];
+                    bool bit = ((value >> bitIndex) & 1) == 1;
+
+                    // Set pixel in 32bpp buffer
+                    // Smalltalk: 1=black, 0=white
+                    uint color = bit ? 0xFF000000 : 0xFFFFFFFF;
+                    int pixelOffset = (y * stride) + (x * 4);
+                    *(uint*)(scan0 + pixelOffset) = color;
+                }
+            }
+        }
+
+        _backBuffer.UnlockBits(bmpData);
+    }
+}
+```
+
+#### Thread Safety
+
+**Three Critical Locks:**
+
+1. **Event Queue Lock** (ConcurrentQueue - lock-free)
+   - WinForms thread enqueues
+   - Smalltalk thread dequeues
+   - No explicit lock needed (ConcurrentQueue is thread-safe)
+
+2. **Display Buffer Lock** (`_displayLock`)
+   - Smalltalk thread writes (via `CopyDisplayBitsFromHeap`)
+   - WinForms thread reads (in `OnPaint`)
+   - Must lock to prevent tearing
+
+3. **Cross-Thread Invocation** (`BeginInvoke`)
+   - Smalltalk thread signals via `BeginInvoke`
+   - WinForms thread executes `Invalidate`
+   - .NET handles marshalling
+
+**Lock Hierarchy:** Event Queue → Display Buffer Lock → BeginInvoke
+
+**Deadlock Prevention:**
+- Never call from WinForms thread into Smalltalk thread (one-way only)
+- Use `BeginInvoke` (async) not `Invoke` (sync) to prevent blocking
+- Lock durations kept minimal (copy only)
+
+#### Optimization: Batched Updates
+
+For better performance, batch display updates at 60 FPS:
+
+```csharp
+public class WinFormsDisplayProvider : Form
+{
+    private readonly System.Windows.Forms.Timer _refreshTimer;
+
+    public WinFormsDisplayProvider(...)
+    {
+        // ... existing initialization ...
+
+        // Refresh at 60 FPS
+        _refreshTimer = new System.Windows.Forms.Timer();
+        _refreshTimer.Interval = 16; // ~60 FPS
+        _refreshTimer.Tick += (s, e) => {
+            if (!_dirtyRegion.IsEmpty)
+            {
+                Invalidate(_dirtyRegion);
+                _dirtyRegion = Rectangle.Empty;
+            }
+        };
+        _refreshTimer.Start();
+    }
+
+    public void DisplayRegionChanged(Rectangle region)
+    {
+        lock (_displayLock)
+        {
+            CopyDisplayBitsFromHeap(region);
+            _dirtyRegion = _dirtyRegion.IsEmpty
+                ? region
+                : Rectangle.Union(_dirtyRegion, region);
+        }
+        // Timer will trigger repaint (no immediate Invalidate)
+    }
+}
+```
+
+**Benefits:**
+- Reduces `OnPaint` calls (batch multiple BitBlts)
+- Smooth 60 FPS rendering
+- Lower CPU usage
+
+**Trade-off:**
+- Maximum 16ms latency (acceptable for UI)
 
 ---
 
