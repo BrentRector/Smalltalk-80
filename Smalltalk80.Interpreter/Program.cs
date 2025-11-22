@@ -229,7 +229,6 @@ public static class Program
                 var skipList = new HashSet<string>
                 {
                     "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
-                    "FormMenuView initialize",               // ❌ File operations failing - under investigation
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -307,12 +306,13 @@ public static class Program
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
                     // Move font/GUI-dependent expressions to run last (tests DefaultTextStyle)
-                    // Order: Form → TextList → BitEditor (each tests more font functionality)
+                    // Order: Form → TextList → BitEditor → FormMenuView (each tests more font functionality)
                     var runLastExpressions = new List<string>
                     {
                         "Form initialize",           // Tests Form creation with glyphs
                         "TextList initialize",       // Tests DefaultTextStyle copy
-                        "BitEditor initialize"       // Tests PopUpMenu labels: with font support
+                        "BitEditor initialize",      // Tests PopUpMenu labels: with font support
+                        "FormMenuView initialize"    // File/menu operations - run last to ensure dependencies
                     };
 
                     var lastIndices = new List<int>();
@@ -395,7 +395,7 @@ public static class Program
                 // Execute all initialize! expressions with on-demand compilation and GC verification
                 Console.WriteLine($"\n=== Init Expression Execution ===");
                 Console.WriteLine($"  Total initialize! expressions: {phase1Indices.Count}");
-                Console.WriteLine($"  Executing all expressions (2 skipped)");
+                Console.WriteLine($"  Executing all expressions (1 skipped)");
                 Console.WriteLine();
 
                 succeeded = 0;
