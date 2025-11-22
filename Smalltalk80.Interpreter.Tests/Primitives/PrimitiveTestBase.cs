@@ -32,6 +32,10 @@ public abstract class PrimitiveTestBase
         mock.Setup(h => h.GetObjectFormat(It.IsAny<SmalltalkOOP>()))
             .Returns(ObjectFormat.PointerIndexed);
 
+        // Setup mock BecomeHandler for become primitives
+        var mockBecomeHandler = new Mock<IBecomeHandler>(MockBehavior.Loose);
+        mock.Setup(h => h.Become).Returns(mockBecomeHandler.Object);
+
         return mock;
     }
 
