@@ -19,11 +19,11 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     private readonly RuntimeClassCache _classCache;
 
     // Cached CharacterTable OOP (invalidated by primitive 89)
-    private SmalltalkOOP _characterTableCache = SmalltalkOOP.Nil;
+    private SmalltalkOOP _characterTableCache;
     private bool _characterTableCacheValid = false;
 
     // Cached USTable OOP (invalidated by primitive 89)
-    private SmalltalkOOP _ustableCache = SmalltalkOOP.Nil;
+    private SmalltalkOOP _ustableCache;
     private bool _ustableCacheValid = false;
 
     public RuntimeHeapAccessor(ISmalltalkHeap heapManager, VMMetadata metadata)
