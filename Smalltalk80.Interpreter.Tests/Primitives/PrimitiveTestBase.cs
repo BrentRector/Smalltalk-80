@@ -19,9 +19,10 @@ public abstract class PrimitiveTestBase
         var mock = new Mock<ISmalltalkHeap>(MockBehavior.Loose);
 
         // Default behavior for GetNil - return a consistent OOP value
-        // This matches the typical first object allocation in SmalltalkHeapManager tests
+        // Use raw OOP value 4 (not ObjectOOP(4) which would be 8)
+        // This matches what tests expect for nil
         mock.Setup(h => h.GetNil())
-            .Returns(ObjectOOP(4));
+            .Returns(new SmalltalkOOP(4));
 
         // Default behavior for class name lookup
         mock.Setup(h => h.GetClassName(It.IsAny<SmalltalkOOP>()))
