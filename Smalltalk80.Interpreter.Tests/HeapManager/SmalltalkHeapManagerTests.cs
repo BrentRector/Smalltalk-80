@@ -25,13 +25,15 @@ public class SmalltalkHeapManagerTests : IDisposable
     {
         _heapManager = new SmalltalkHeapManager();
 
-        // Allocate special objects for SpecialObjectsArray
-        _nilOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
+        // Use the heap manager's internal nil object (allocated during construction)
+        _nilOOP = _heapManager.GetNil();
+
+        // Allocate false and true objects
         _falseOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
         _trueOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 0, 0);
 
         // Note: SpecialObjectsArray was replaced with KnownObjects in VMMetadata
-        // For unit tests, we just use the allocated test objects directly
+        // For unit tests, we use the heap manager's nil and allocate false/true
     }
 
     /// <summary>

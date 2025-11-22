@@ -8,11 +8,13 @@ Tests are organized into functional categories using xUnit's `[Trait]` attribute
 
 | Category | Test Count | Description |
 |----------|-----------|-------------|
-| **Primitives** | 258 | All primitive operation tests (arithmetic, comparison, control, strings, floats, etc.) |
+| **Primitives** | 263 | All primitive operation tests (arithmetic, comparison, control, strings, floats, etc.) |
 | **HeapManager** | 125 | Heap management, object allocation, GC tests |
 | **VM** | TBD | Virtual machine core: message dispatch, execution state |
 | **Context** | TBD | Context management and execution context tests |
 | **Compiler** | TBD | Bytecode compiler tests: emitter, variable resolution, temp frames |
+
+**Total Tests**: 388 (all passing)
 
 ## Running Tests by Category
 
@@ -108,16 +110,19 @@ dotnet test
 
 ## Current Test Status
 
-### Primitives: ✅ 258/258 Passing (100%)
+**Last Updated**: 2025-11-22
+**Status**: ✅ All 388 tests passing after RuntimeHeapAccessor refactoring
+
+### Primitives: ✅ 263/263 Passing (100%)
 - SmallInteger arithmetic (Add, Subtract, Multiply, Divide, etc.)
 - Comparison operations (LessThan, GreaterThan, Equal, etc.)
 - Bitwise operations (BitAnd, BitOr, BitXor, BitShift)
 - Float operations (Add, Subtract, Multiply, Divide, Truncate, etc.)
-- String operations (At, AtPut, Size, Hash, AsSymbol, etc.)
+- String operations (At, AtPut, Size, Hash, AsSymbol, StringReplace, etc.)
 - Large integer operations
-- Object operations (Class, Size, Hash, Become, etc.)
+- Object operations (Class, Size, Hash, Become, SomeInstance, NextInstance, etc.)
 - Control flow (BlockCopy, BlockValue, Signal, Wait, Resume, Suspend)
-- System operations (Snapshot, Quit, etc.)
+- System operations (CoreLeft, OopsLeft, InstSize, BecomeForward, etc.)
 
 ### HeapManager: ✅ 125/125 Passing (100%)
 - Object allocation (Pointer, PointerIndexed, ByteIndexed, WordIndexed formats)
@@ -325,24 +330,26 @@ To verify a specific primitive is tested and returns correct values:
 ### Example Coverage Analysis Output
 
 ```
-===== Smalltalk-80 Primitive Coverage Analysis =====
+===== Smalltalk-80 Test Suite Status =====
 
-Coverage by Category:
+Test Results by Category:
 
-  ✓ Arithmetic: 34/34 primitives (100.0% coverage)
-  ✓ Comparison: 8/8 primitives (100.0% coverage)
-  ✓ Control: 12/12 primitives (100.0% coverage)
-  ✓ Float: 42/42 primitives (100.0% coverage)
-  ✓ LargeInteger: 15/15 primitives (100.0% coverage)
-  ✓ Object: 28/28 primitives (100.0% coverage)
-  ✓ String: 8/8 primitives (100.0% coverage)
-  ✓ System: 6/6 primitives (100.0% coverage)
+  ✓ Arithmetic: 34 tests (100% passing)
+  ✓ Comparison: 8 tests (100% passing)
+  ✓ Control: 26 tests (100% passing)
+  ✓ Float: 42 tests (100% passing)
+  ✓ LargeInteger: 15 tests (100% passing)
+  ✓ Object: 43 tests (100% passing)
+  ✓ String: 20 tests (100% passing)
+  ✓ System: 75 tests (100% passing)
 
 ===== Summary =====
 
-  Total Primitives Implemented: 153
-  Total Test Methods: 258
-  Overall Test Coverage: 100.0%
+  Total Primitives Tests: 263
+  Total HeapManager Tests: 125
+  Total Tests: 388
+  Overall Pass Rate: 100.0%
+  Status: ✅ ALL TESTS PASSING
 ```
 
 ## Troubleshooting

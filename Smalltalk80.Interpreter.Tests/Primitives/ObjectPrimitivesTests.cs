@@ -608,12 +608,13 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
     {
         var primitive = new SimpleObjectPrimitives.SomeInstance();
         var mockHeap = CreateMockHeapManager();
+        var metadata = CreateDefaultTestMetadata(mockHeap.Object);
         var classOOP = ObjectOOP(100);
-        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
+        var nilOOP = metadata.KnownObjects.Nil;  // Use actual nil from metadata
 
         mockHeap.Setup(h => h.FindInstanceOf(classOOP)).Returns(nilOOP);
 
-        var context = CreateContext(classOOP, [], mockHeap.Object);
+        var context = CreateContext(classOOP, [], mockHeap.Object, metadata: metadata);
 
         var result = primitive.Execute(context);
 
@@ -648,14 +649,15 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
     {
         var primitive = new SimpleObjectPrimitives.NextInstance();
         var mockHeap = CreateMockHeapManager();
+        var metadata = CreateDefaultTestMetadata(mockHeap.Object);
         var objectOOP = ObjectOOP(100);
         var classOOP = ObjectOOP(50);
-        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
+        var nilOOP = metadata.KnownObjects.Nil;  // Use actual nil from metadata
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
         mockHeap.Setup(h => h.FindNextInstanceOf(classOOP, objectOOP)).Returns(nilOOP);
 
-        var context = CreateContext(objectOOP, [], mockHeap.Object);
+        var context = CreateContext(objectOOP, [], mockHeap.Object, metadata: metadata);
 
         var result = primitive.Execute(context);
 
@@ -690,7 +692,7 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var mockHeap = CreateMockHeapManager();
         var smallIntClassOOP = ObjectOOP(42);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("SmallInteger")).Returns(smallIntClassOOP);
 
         var context = CreateContext(SmallInt(10), [], mockHeap.Object, mockRuntimeAccess.Object);

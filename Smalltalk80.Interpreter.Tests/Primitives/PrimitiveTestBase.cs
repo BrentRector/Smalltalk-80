@@ -18,6 +18,12 @@ public abstract class PrimitiveTestBase
     {
         var mock = new Mock<ISmalltalkHeap>(MockBehavior.Loose);
 
+        // Default behavior for GetNil - return a consistent OOP value
+        // Use raw OOP value 4 (not ObjectOOP(4) which would be 8)
+        // This matches what tests expect for nil
+        mock.Setup(h => h.GetNil())
+            .Returns(new SmalltalkOOP(4));
+
         // Default behavior for class name lookup
         mock.Setup(h => h.GetClassName(It.IsAny<SmalltalkOOP>()))
             .Returns("Object");
@@ -25,6 +31,10 @@ public abstract class PrimitiveTestBase
         // Default behavior for object format
         mock.Setup(h => h.GetObjectFormat(It.IsAny<SmalltalkOOP>()))
             .Returns(ObjectFormat.PointerIndexed);
+
+        // Setup mock BecomeHandler for become primitives
+        var mockBecomeHandler = new Mock<IBecomeHandler>(MockBehavior.Loose);
+        mock.Setup(h => h.Become).Returns(mockBecomeHandler.Object);
 
         return mock;
     }
@@ -91,6 +101,7 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Creates a PrimitiveExecutionContext with the specified receiver and arguments.
     /// For tests that need metadata, call CreateTestMetadata() first and pass it in.
+    /// If no metadata is provided, a default test metadata is created automatically using the heap manager.
     /// </summary>
     protected static PrimitiveExecutionContext CreateContext(
         SmalltalkOOP receiver,
@@ -103,6 +114,10 @@ public abstract class PrimitiveTestBase
         int instructionPointer = 0,
         VMMetadata? metadata = null)
     {
+        // Ensure metadata is always provided (create default if not specified)
+        // Use the heap manager to get the correct nil OOP
+        var actualMetadata = metadata ?? CreateDefaultTestMetadata(heapManager);
+
         return new PrimitiveExecutionContext(
             receiver,
             arguments,
@@ -115,7 +130,7 @@ public abstract class PrimitiveTestBase
             instructionPointer: instructionPointer,
             cacheManager: cacheManager,
             messageSender: messageSender,
-            metadata: metadata);
+            metadata: actualMetadata);
     }
 
     /// <summary>
@@ -241,13 +256,53 @@ public abstract class PrimitiveTestBase
     /// Creates a basic mock RuntimeHeapAccessor that returns -1 for all field lookups.
     /// Tests can set up specific field indices as needed.
     /// </summary>
-    protected static Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccessor(Mock<ISmalltalkHeap> mockHeap)
+    protected static Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccessor(Mock<ISmalltalkHeap> mockHeap, VMMetadata? metadata = null)
     {
-        var mock = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        // Use provided metadata or create a default one using the heap
+        var testMetadata = metadata ?? CreateDefaultTestMetadata(mockHeap.Object);
+
+        var mock = new Mock<RuntimeHeapAccessor>(mockHeap.Object, testMetadata);
 
         // Default: return -1 (field not found) for any field lookup
         mock.Setup(r => r.GetFieldIndex(It.IsAny<SmalltalkOOP>(), It.IsAny<string>())).Returns(-1);
 
         return mock;
+    }
+
+    /// <summary>
+    /// Creates a minimal VMMetadata for tests that don't need specific metadata values.
+    /// Gets nil from the heap manager to ensure it matches the heap's actual nil OOP.
+    /// </summary>
+    protected static VMMetadata CreateDefaultTestMetadata(ISmalltalkHeap heap)
+    {
+        // Get the actual nil OOP from the heap manager
+        var nilOOP = heap.GetNil();
+
+        return new VMMetadata
+        {
+            KnownObjects = new KnownObjects(
+                nil: nilOOP,
+                @true: ObjectOOP(1),  // Placeholder - tests that need true/false should provide explicit metadata
+                @false: ObjectOOP(2), // Placeholder
+                smalltalk: ObjectOOP(3) // Placeholder
+            ),
+            ProcessorScheduler = ObjectOOP(4),
+            ClassNameFieldIndex = 6,
+            ClassSuperclassFieldIndex = 0,
+            ClassMethodDictFieldIndex = 1,
+            ClassFormatFieldIndex = 2,
+            MetaclassThisClassFieldIndex = 5,
+            MethodDictTallyFieldIndex = 0,
+            MethodDictKeysFieldIndex = 1,
+            MethodDictValuesFieldIndex = 2,
+            ClassClassOOP = ObjectOOP(10),
+            MetaclassClassOOP = ObjectOOP(11),
+            SymbolClassOOP = ObjectOOP(12),
+            StringClassOOP = ObjectOOP(13),
+            ArrayClassOOP = ObjectOOP(14),
+            CompiledMethodClassOOP = ObjectOOP(15),
+            SmallIntegerClassOOP = ObjectOOP(16),
+            BlockContextClassOOP = ObjectOOP(17)
+        };
     }
 }

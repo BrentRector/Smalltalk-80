@@ -40,14 +40,16 @@ public class ContextManagerTests
             ObjectOOP(101)  // ProcessorScheduler
         ));
 
-        // Initialize RuntimeSpecialObjects for tests
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>();
-        mockRuntimeAccess.Setup(r => r.GetClass("MethodContext")).Returns(_methodContextClassOOP);
-        RuntimeSpecialObjects.Instance.Initialize(mockRuntimeAccess.Object);
-
-        // Create metadata with test class OOPs
+        // Create metadata with test class OOPs (must be created before RuntimeHeapAccessor)
         _metadata = new VMMetadata
         {
+            KnownObjects = new KnownObjects(
+                nil: _nilOOP,
+                @true: _trueOOP,
+                @false: _falseOOP,
+                smalltalk: ObjectOOP(100)
+            ),
+            ProcessorScheduler = ObjectOOP(101),
             ClassNameFieldIndex = 6,
             ClassSuperclassFieldIndex = 0,
             ClassMethodDictFieldIndex = 1,
@@ -65,6 +67,11 @@ public class ContextManagerTests
             SmallIntegerClassOOP = ObjectOOP(26),
             BlockContextClassOOP = _blockContextClassOOP
         };
+
+        // Initialize RuntimeSpecialObjects for tests
+        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(_mockHeap.Object, _metadata);
+        mockRuntimeAccess.Setup(r => r.GetClass("MethodContext")).Returns(_methodContextClassOOP);
+        RuntimeSpecialObjects.Instance.Initialize(mockRuntimeAccess.Object);
 
         // Create layout resolver with MethodContext layout
         _layoutResolver = new LayoutResolver();

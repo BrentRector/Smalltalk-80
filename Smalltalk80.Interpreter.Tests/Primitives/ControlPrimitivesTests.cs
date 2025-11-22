@@ -28,7 +28,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10)); // Not BlockContext class
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         var context = CreateContext(
@@ -55,7 +55,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         var context = CreateContext(
@@ -83,7 +83,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         var context = CreateContext(
@@ -111,7 +111,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         var context = CreateContext(
@@ -139,7 +139,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         var context = CreateContext(
@@ -168,7 +168,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         var context = CreateContext(
@@ -196,7 +196,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         var context = CreateContext(
@@ -228,7 +228,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupInstanceVariable(mockHeap, outerBlockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, methodContextOOP);
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         var context = CreateContext(
@@ -261,7 +261,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(mockHeap.Object);
+        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         var context = CreateContext(
@@ -1086,6 +1086,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
     {
         var primitive = new ControlPrimitives.Signal();
         var mockHeap = CreateMockHeapManager();
+        var metadata = CreateDefaultTestMetadata(mockHeap.Object);
         var semaphoreOOP = ObjectOOP(100);
         var semaphoreClassOOP = ObjectOOP(200);
         var nonSmallIntOOP = ObjectOOP(999);  // Non-SmallInteger OOP
@@ -1093,13 +1094,13 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassName(mockHeap, semaphoreOOP, "Semaphore");
         mockHeap.Setup(h => h.GetClassOOP(semaphoreOOP)).Returns(semaphoreClassOOP);
 
-        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap, metadata);
         // Setup field indices for Semaphore fields
         mockRuntime.Setup(r => r.GetFieldIndex(semaphoreClassOOP, "firstLink")).Returns(0);
         mockRuntime.Setup(r => r.GetFieldIndex(semaphoreClassOOP, "excessSignals")).Returns(1);
 
         // firstLink is nil (no processes waiting)
-        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
+        var nilOOP = metadata.KnownObjects.Nil;  // Use actual nil from metadata
         mockHeap.Setup(h => h.GetInstanceVariable(semaphoreOOP, 0))
             .Returns(nilOOP);
 
@@ -1107,7 +1108,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         mockHeap.Setup(h => h.GetInstanceVariable(semaphoreOOP, 1))
             .Returns(nonSmallIntOOP);
 
-        var context = CreateContext(semaphoreOOP, [], mockHeap.Object, mockRuntime.Object);
+        var context = CreateContext(semaphoreOOP, [], mockHeap.Object, mockRuntime.Object, metadata: metadata);
 
         var result = primitive.Execute(context);
 

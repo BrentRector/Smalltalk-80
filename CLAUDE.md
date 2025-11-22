@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-20
+**Last Updated**: 2025-11-22
 
 ## Project Status
 
@@ -105,6 +105,32 @@ Changes to these files MUST pass the regression test:
 - `TempFrameAllocator.cs` - variable allocation
 - `VirtualMachine.cs` - execution
 - `ControlPrimitives.cs` - BlockCopy, BlockValue primitives
+
+### C# Unit Tests
+
+**Status**: ✅ **388/388 tests passing (100%)**
+
+Run the comprehensive C# unit test suite:
+
+```bash
+cd Smalltalk80.Interpreter.Tests
+dotnet test
+```
+
+**Test Coverage**:
+- **Primitives** (263 tests): All primitive operations including arithmetic, comparison, control flow, strings, floats, objects, and system operations
+- **HeapManager** (125 tests): Object allocation, garbage collection, memory management, and heap operations
+
+**Run tests by category**:
+```bash
+# Primitives only
+dotnet test --filter "Category=Primitives"
+
+# HeapManager only
+dotnet test --filter "Category=HeapManager"
+```
+
+See `docs/Testing-Guide.md` for complete testing documentation.
 
 ## Init Expression Status
 
