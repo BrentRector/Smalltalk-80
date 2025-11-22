@@ -19,6 +19,9 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="CommandLineParser.cs" />
+    <Compile Include="SmalltalkThreadContext.cs" />
+    <Compile Include="SmalltalkInterpreterThread.cs" />
+    <Compile Include="Platform\SmalltalkEventQueue.cs" />
     <Compile Include="Platform\Windows\WinFormsDisplayProvider.cs" />
   </ItemGroup>
 
