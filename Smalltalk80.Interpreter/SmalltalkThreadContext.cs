@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Engine;
 using Smalltalk80.Interpreter.Engine.LoaderPhases;
