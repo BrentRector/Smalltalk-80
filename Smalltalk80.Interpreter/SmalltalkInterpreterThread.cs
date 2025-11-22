@@ -228,9 +228,8 @@ public class SmalltalkInterpreterThread
                 succeeded++;
 
                 // Display return value for test runners
-                if (expr.Source.Contains("TestRunner") && result.ReturnValueOop.HasValue)
+                if (expr.Source.Contains("TestRunner") && result.ReturnValueOop is SmalltalkOOP returnOOP)
                 {
-                    var returnOOP = result.ReturnValueOop.Value;
                     if (returnOOP.IsSmallInteger)
                     {
                         int testResult = returnOOP.AsSmallInteger();
