@@ -68,11 +68,12 @@ public class Phase5Orchestrator : IPhase
         // Step 1: Apply patches
         _patchApplier.Apply(_context.Bundle.Patches);
 
-        // Step 2: Create and populate USTable
-        _ustableBuilder.Build();
+        // Step 2: Create and populate USTable (class variable of Symbol)
+        var ustableOOP = _ustableBuilder.Build();
 
         // Step 3: Install global variables in SystemDictionary
-        _systemDictInstaller.InstallGlobals();
+        // NOTE: USTable is passed directly, not looked up from GlobalRegistry
+        _systemDictInstaller.InstallGlobals(ustableOOP);
 
         // Step 4: Create runtime objects
         _runtimeObjectCreator.CreateDefaultTextStyle();

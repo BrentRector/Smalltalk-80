@@ -17,16 +17,13 @@ public class SystemDictionaryInstaller(
     IAssociationManager associationManager,
     IDictionaryOperations dictionaryOps) : ISystemDictionaryInstaller
 {
-    public void InstallGlobals()
+    public void InstallGlobals(SmalltalkOOP ustableOOP)
     {
         // Install Smalltalk -> SystemDictionary (self-reference)
         InstallSmalltalkGlobal();
 
-        // Install USTable in Symbol's classPool
-        if (GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableOOP))
-        {
-            InstallUSTableGlobal(ustableOOP);
-        }
+        // Install USTable in Symbol's classPool (it's a class variable, not a global)
+        InstallUSTableGlobal(ustableOOP);
 
         // Initialize SingleCharSymbols class variable
         InitializeSingleCharSymbols();

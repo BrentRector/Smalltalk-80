@@ -45,7 +45,10 @@ public class USTableBuilder(Phase5Context context) : IUSTableBuilder
             context.Allocator.SetIndexedOOP(bucketOOP, position, symbolOOP);
         }
 
-        GlobalRegistry.Register("USTable", ustableOOP);
+        // NOTE: USTable is a class variable of Symbol, not a global
+        // It is installed in Symbol's classPool by SystemDictionaryInstaller.InstallUSTableGlobal()
+        // Do NOT register it in GlobalRegistry
+
         context.Report.Metrics.USTableCapacity = ustableSize;
 
         return ustableOOP;
