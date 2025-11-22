@@ -438,25 +438,12 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
         if (classPoolOOP == metadata.KnownObjects.Nil)
             return metadata.KnownObjects.Nil;
 
-        // Search classPool dictionary for association with matching key
-        int size = _heapManager.GetIndexedSize(classPoolOOP);
-        for (int i = 0; i < size; i++)
-        {
-            var assocOOP = _heapManager.GetIndexedOOP(classPoolOOP, i);
-            if (assocOOP == metadata.KnownObjects.Nil)
-                continue;
+        // Find the symbol OOP for the variable name
+        var varSymbolOOP = InternSymbol(varName);
+        if (varSymbolOOP == metadata.KnownObjects.Nil)
+            return metadata.KnownObjects.Nil;
 
-            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-
-            // Check if this symbol matches the variable name
-            var keyString = ReadSymbolName(keyOOP);
-            if (keyString == varName)
-            {
-                // Return the value from the association
-                return _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-            }
-        }
-
-        return metadata.KnownObjects.Nil;
+        // Look up the symbol in the classPool dictionary
+        return DictionaryLookup(classPoolOOP, varSymbolOOP);
     }
 }

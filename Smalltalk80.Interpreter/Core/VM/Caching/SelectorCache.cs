@@ -87,8 +87,11 @@ public class SelectorCache
         if (classPoolOOP == _metadata.KnownObjects.Nil)
             return _metadata.KnownObjects.Nil;
 
-        // Find the class variable by searching classPool dictionary
+        // Linear search through classPool dictionary for matching variable name
+        // NOTE: Must use string comparison, not symbol OOP lookup (Symbol>>hash is OOP-based)
+        byte[] varNameBytes = System.Text.Encoding.Latin1.GetBytes(varName);
         int poolSize = _heapManager.GetIndexedSize(classPoolOOP);
+
         for (int i = 0; i < poolSize; i++)
         {
             var assocOOP = _heapManager.GetIndexedOOP(classPoolOOP, i);
@@ -97,15 +100,15 @@ public class SelectorCache
 
             var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
 
-            // Check if this is the variable we're looking for
+            // Compare symbol bytes
             int keySize = _heapManager.GetIndexedSize(keyOOP);
-            if (keySize != varName.Length)
+            if (keySize != varNameBytes.Length)
                 continue;
 
             bool match = true;
             for (int j = 0; j < keySize; j++)
             {
-                if (_heapManager.GetIndexedByte(keyOOP, j) != (byte)varName[j])
+                if (_heapManager.GetIndexedByte(keyOOP, j) != varNameBytes[j])
                 {
                     match = false;
                     break;
@@ -114,7 +117,6 @@ public class SelectorCache
 
             if (match)
             {
-                // Return the value from the association
                 return _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
             }
         }
