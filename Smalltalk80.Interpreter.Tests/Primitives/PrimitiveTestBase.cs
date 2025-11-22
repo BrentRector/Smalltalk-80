@@ -91,7 +91,7 @@ public abstract class PrimitiveTestBase
     /// <summary>
     /// Creates a PrimitiveExecutionContext with the specified receiver and arguments.
     /// For tests that need metadata, call CreateTestMetadata() first and pass it in.
-    /// If no metadata is provided, a default test metadata is created automatically.
+    /// If no metadata is provided, a default test metadata is created automatically using the heap manager.
     /// </summary>
     protected static PrimitiveExecutionContext CreateContext(
         SmalltalkOOP receiver,
@@ -105,7 +105,8 @@ public abstract class PrimitiveTestBase
         VMMetadata? metadata = null)
     {
         // Ensure metadata is always provided (create default if not specified)
-        var actualMetadata = metadata ?? CreateDefaultTestMetadata();
+        // Use the heap manager to get the correct nil OOP
+        var actualMetadata = metadata ?? CreateDefaultTestMetadata(heapManager);
 
         return new PrimitiveExecutionContext(
             receiver,
@@ -247,8 +248,8 @@ public abstract class PrimitiveTestBase
     /// </summary>
     protected static Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccessor(Mock<ISmalltalkHeap> mockHeap, VMMetadata? metadata = null)
     {
-        // Use provided metadata or create a default one
-        var testMetadata = metadata ?? CreateDefaultTestMetadata();
+        // Use provided metadata or create a default one using the heap
+        var testMetadata = metadata ?? CreateDefaultTestMetadata(mockHeap.Object);
 
         var mock = new Mock<RuntimeHeapAccessor>(mockHeap.Object, testMetadata);
 
@@ -260,16 +261,20 @@ public abstract class PrimitiveTestBase
 
     /// <summary>
     /// Creates a minimal VMMetadata for tests that don't need specific metadata values.
+    /// Gets nil from the heap manager to ensure it matches the heap's actual nil OOP.
     /// </summary>
-    protected static VMMetadata CreateDefaultTestMetadata()
+    protected static VMMetadata CreateDefaultTestMetadata(ISmalltalkHeap heap)
     {
+        // Get the actual nil OOP from the heap manager
+        var nilOOP = heap.GetNil();
+
         return new VMMetadata
         {
             KnownObjects = new KnownObjects(
-                nil: ObjectOOP(0),
-                @true: ObjectOOP(1),
-                @false: ObjectOOP(2),
-                smalltalk: ObjectOOP(3)
+                nil: nilOOP,
+                @true: ObjectOOP(1),  // Placeholder - tests that need true/false should provide explicit metadata
+                @false: ObjectOOP(2), // Placeholder
+                smalltalk: ObjectOOP(3) // Placeholder
             ),
             ProcessorScheduler = ObjectOOP(4),
             ClassNameFieldIndex = 6,
