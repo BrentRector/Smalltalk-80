@@ -67,6 +67,43 @@ dotnet run -- --diagnostics detail,method,gc
 dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart.json --skip-init-expressions
 ```
 
+### Execute User Expressions (--execute)
+
+**NEW**: Runtime expression evaluation using the built-in Smalltalk Compiler.
+
+```bash
+# Simple arithmetic
+dotnet run -- --execute "3 + 4"
+
+# Message sends
+dotnet run -- --execute "Array new: 10"
+
+# Method calls
+dotnet run -- --execute "BlockContextTest testAllCombinations"
+
+# Multiple messages
+dotnet run -- --execute "'Hello, World!' size"
+```
+
+**How it works**:
+1. Creates Smalltalk String from C# expression
+2. Sends `compile:in:` message to Smalltalk Compiler class
+3. Executes resulting CompiledMethod with nil receiver
+4. Displays result with type-aware formatting
+
+**Architecture**:
+- Uses `MessageSender` API for runtime message sending from C#
+- Uses `StringHelper` for C# ↔ Smalltalk String conversion
+- Works with runtime Smalltalk objects (not ColdStartBundle structures)
+- Leverages built-in Smalltalk Compiler (no third compiler needed)
+
+**See**: `docs/EXECUTE-FEATURE-DESIGN.md` for complete design documentation.
+
+**Limitations**:
+- Requires Smalltalk Compiler class to be loaded in the image
+- Expression must be valid Smalltalk syntax
+- No access to workspace variables (future enhancement)
+
 ## Building and Testing
 
 ### Quick Build
