@@ -5,24 +5,13 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <LangVersion>13.0</LangVersion>
     <Nullable>enable</Nullable>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <UseWindowsForms>true</UseWindowsForms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
-  
+
   <!-- Reference to Engine (which references Core) -->
   <ItemGroup>
     <ProjectReference Include="Engine\Smalltalk80.Interpreter.Engine.csproj" />
-  </ItemGroup>
-  
-  <!-- CLI and GUI files -->
-  <ItemGroup>
-    <Compile Include="Program.cs" />
-    <Compile Include="CommandLineParser.cs" />
-    <Compile Include="SmalltalkThreadContext.cs" />
-    <Compile Include="SmalltalkInterpreterThread.cs" />
-    <Compile Include="Platform\SmalltalkEventQueue.cs" />
-    <Compile Include="Platform\Windows\WinFormsDisplayProvider.cs" />
   </ItemGroup>
 
   <!-- Windows Forms and Graphics packages -->
