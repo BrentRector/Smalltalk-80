@@ -501,6 +501,48 @@ public static class Program
                             Console.WriteLine($"  Error reading FilePool: {ex.Message}");
                         }
                         Console.WriteLine("=== END FilePool DEBUG ===\n");
+
+                        // DEBUG: Check WindowsFile class
+                        Console.WriteLine("=== DEBUG: WindowsFile Class Check ===");
+                        try
+                        {
+                            string ReadSymbol(SmalltalkOOP symbolOOP)
+                            {
+                                int size = heapManager.GetIndexedSize(symbolOOP);
+                                var chars = new char[size];
+                                for (int i = 0; i < size; i++)
+                                {
+                                    byte b = heapManager.GetIndexedByte(symbolOOP, i);
+                                    chars[i] = (char)b;
+                                }
+                                return new string(chars);
+                            }
+
+                            var smalltalkOOP = vmMetadata.KnownObjects.Smalltalk;
+                            int smalltalkSize = heapManager.GetIndexedSize(smalltalkOOP);
+
+                            for (int idx = 0; idx < smalltalkSize; idx++)
+                            {
+                                var assocOOP = heapManager.GetIndexedOOP(smalltalkOOP, idx);
+                                if (assocOOP != heapManager.GetNil())
+                                {
+                                    var keyOOP = heapManager.GetInstanceVariable(assocOOP, 0);
+                                    string keyName = ReadSymbol(keyOOP);
+                                    if (keyName == "WindowsFile")
+                                    {
+                                        var windowsFileClassOOP = heapManager.GetInstanceVariable(assocOOP, 1);
+                                        Console.WriteLine($"  WindowsFile class found: OOP={windowsFileClassOOP}");
+                                        Console.WriteLine($"  WindowsFile class's class: {heapManager.GetClassName(windowsFileClassOOP)}");
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"  Error checking WindowsFile: {ex.Message}");
+                        }
+                        Console.WriteLine("=== END WindowsFile DEBUG ===\n");
                     }
 
                     var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
