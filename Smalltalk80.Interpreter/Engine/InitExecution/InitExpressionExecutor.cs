@@ -207,7 +207,7 @@ public class InitExpressionExecutor
         var effectiveTimeout = timeoutMs ?? _defaultTimeoutMs;
         var stopwatch = Stopwatch.StartNew();
 
-        Console.WriteLine($"  {expr.Source}...");
+        Console.Write($"  {expr.Source}... ");
 
         // CRITICAL: Reset instruction counter for EACH init expression
         // Without this, the counter accumulates across ALL expressions:
@@ -247,19 +247,19 @@ public class InitExpressionExecutor
             catch (OperationCanceledException)
             {
                 stopwatch.Stop();
-                Console.WriteLine($" ❌ TIMEOUT");
+                Console.WriteLine($"❌ TIMEOUT");
                 return InitResult.Timeout(expr.LocalId, stopwatch.ElapsedMilliseconds);
             }
             catch (PrimitiveFailureException pex)
             {
                 stopwatch.Stop();
-                Console.WriteLine($" ❌ PRIMITIVE FAILURE: {pex.Message}");
+                Console.WriteLine($"❌ PRIMITIVE FAILURE: {pex.Message}");
                 return InitResult.PrimitiveFailure(expr.LocalId, pex.PrimitiveIndex, pex.Message, stopwatch.ElapsedMilliseconds);
             }
             catch (SmalltalkException sex)
             {
                 stopwatch.Stop();
-                Console.WriteLine($" ❌ EXCEPTION: {sex.Message}");
+                Console.WriteLine($"❌ EXCEPTION: {sex.Message}");
                 string stackTrace = CaptureStackTrace(sex);
                 return InitResult.Exception(expr.LocalId, sex.ExceptionOop, sex.Message, stackTrace, stopwatch.ElapsedMilliseconds);
             }
@@ -284,7 +284,7 @@ public class InitExpressionExecutor
                 if (keptAliveByForkedProcess)
                 {
                     // This is EXPECTED - init expression forked a persistent process
-                    Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, contexts kept alive by forked process)");
+                    Console.WriteLine($"✓ {stopwatch.ElapsedMilliseconds}ms (contexts kept alive by forked process)");
                     return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
                 }
                 else
@@ -298,14 +298,14 @@ public class InitExpressionExecutor
             }
 
             // Show simple success message
-            Console.WriteLine($" ✓ {stopwatch.ElapsedMilliseconds}ms");
+            Console.WriteLine($"✓ {stopwatch.ElapsedMilliseconds}ms");
 
             return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
-            Console.WriteLine($" ❌ ERROR: {ex.Message}");
+            Console.WriteLine($"❌ ERROR: {ex.Message}");
             return InitResult.FatalError(expr.LocalId, $"{ex.GetType().Name}: {ex.Message}\n\nStack trace:\n{ex.StackTrace}");
         }
     }
