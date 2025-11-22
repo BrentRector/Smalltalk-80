@@ -6,6 +6,7 @@ using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Engine;
 using Smalltalk80.Interpreter.Engine.InitExecution;
 using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter;
 
@@ -228,8 +229,9 @@ public class SmalltalkInterpreterThread
                 succeeded++;
 
                 // Display return value for test runners
-                if (expr.Source.Contains("TestRunner") && result.ReturnValueOop is SmalltalkOOP returnOOP)
+                if (expr.Source.Contains("TestRunner") && result.ReturnValueOop.HasValue)
                 {
+                    var returnOOP = result.ReturnValueOop.Value;
                     if (returnOOP.IsSmallInteger)
                     {
                         int testResult = returnOOP.AsSmallInteger();
