@@ -31,6 +31,10 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
         _heapManager = heapManager;
         this.metadata = metadata;
         _classCache = new RuntimeClassCache(this, heapManager);
+
+        // Initialize cache fields to Nil
+        _characterTableCache = heapManager.GetNil();
+        _ustableCache = heapManager.GetNil();
     }
 
     /// <summary>
