@@ -282,6 +282,11 @@ public partial class VirtualMachine
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
                 _contextManager, currentPC, this, this, _metadata);
 
+            if (primitiveNumber == 63)
+            {
+                Console.WriteLine($"[VM] After Primitive 63: _primitiveSuccess={_primitiveSuccess}, result={primitiveResult}");
+            }
+
             if (_primitiveSuccess)
             {
                 // Check if primitive created a new context (e.g., block invocation via Primitive 207)
