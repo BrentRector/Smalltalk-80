@@ -86,24 +86,11 @@ public static class CommandLineParser
             }
         }
 
-        // Default: coldstart.json in the compiler's output directory
-        // Directory.Build.props sets BaseOutputPath to solution-level bin/
-        // Compiler outputs to: Smalltalk-80/bin/Debug/net9.0/coldstart.json
-        // Interpreter outputs to: Smalltalk-80/bin/Debug/net9.0-windows/
+        // Default: coldstart.bin in the same directory as the executable
         if (coldStartFile == null)
         {
             string exeDir = AppDomain.CurrentDomain.BaseDirectory;
-            // Navigate from interpreter output to compiler output and normalize the path
-            string compilerOutput = Path.GetFullPath(Path.Combine(exeDir, "..", "net9.0", "coldstart.json"));
-            if (File.Exists(compilerOutput))
-            {
-                coldStartFile = compilerOutput;
-            }
-            else
-            {
-                // Fallback to executable directory
-                coldStartFile = Path.Combine(exeDir, "coldstart.json");
-            }
+            coldStartFile = Path.Combine(exeDir, "coldstart.bin");
         }
 
         return new CommandLineConfig
@@ -127,7 +114,7 @@ public static class CommandLineParser
         Console.Error.WriteLine("\nUsage: Smalltalk80.Interpreter [options]");
         Console.Error.WriteLine("Options:");
         Console.Error.WriteLine("  --coldstart <file>     Specify the cold start bundle file to load");
-        Console.Error.WriteLine("                         (default: coldstart.json in compiler output directory)");
+        Console.Error.WriteLine("                         (default: coldstart.bin in executable directory)");
         Console.Error.WriteLine("  --dump-class <name>    Dump comprehensive information about a class");
         Console.Error.WriteLine("                         after cold start completes");
         Console.Error.WriteLine("  --test-filter <pattern> Run only init expressions matching pattern");

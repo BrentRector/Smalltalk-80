@@ -39,6 +39,8 @@
 
 ## Running the Interpreter
 
+**Default Behavior**: The interpreter automatically loads `coldstart.bin` from the same directory as the executable when no `--coldstart` parameter is provided.
+
 ### Standard Execution
 
 ```bash
@@ -46,7 +48,7 @@ cd Smalltalk80.Interpreter
 dotnet run
 ```
 
-Executes cold start phases 1-6 and 31 init expressions.
+Executes cold start phases 1-6 and init expressions from `coldstart.bin` in the executable directory.
 
 ### With Diagnostics
 
@@ -64,7 +66,11 @@ dotnet run -- --diagnostics detail,method,gc
 ### Skip Init Expressions
 
 ```bash
-dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart.json --skip-init-expressions
+# Uses default coldstart.bin in executable directory
+dotnet run -- --skip-init-expressions
+
+# Or specify a different coldstart file
+dotnet run -- --coldstart path/to/coldstart.bin --skip-init-expressions
 ```
 
 ### Execute User Expressions (--execute)
@@ -120,7 +126,7 @@ dotnet run
 
 ```bash
 cd Smalltalk80.Interpreter
-dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
+dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.bin
 ```
 
 **Expected**: Returns `1191` (120 tests pass)
@@ -131,7 +137,7 @@ dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
 cd "Smalltalk-80 Source"
 cat Smalltalk-80.st Tests/BlockContextTest.st Tests/BlockContextTestRunner.st > Smalltalk-80-with-runner.st
 dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80-with-runner.st"
-cp ../bin/Debug/net9.0/coldstart.json ../bin/Debug/net9.0/coldstart_with_runner.json
+cp ../bin/Debug/net9.0/coldstart.bin ../bin/Debug/net9.0/coldstart_with_runner.bin
 ```
 
 ### Critical Files Requiring Test
