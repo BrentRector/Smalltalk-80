@@ -27871,7 +27871,9 @@ Object class
 
 
 !Object class methodsFor: 'class initialization'!
-initialize 
+initialize
+	self initializeDependentsFields.
+	self initializeErrorRecursion.
 	(self confirm: 'Do you really want to initialize
 class Object?  It will reset all dependents.')
 		ifTrue:
