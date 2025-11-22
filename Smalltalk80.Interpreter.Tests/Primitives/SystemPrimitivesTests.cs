@@ -189,12 +189,13 @@ public class SystemPrimitivesTests : PrimitiveTestBase
     {
         var primitive = new SystemOperations.SomeInstance();
         var mockHeap = CreateMockHeapManager();
+        var metadata = CreateDefaultTestMetadata(mockHeap.Object);
         var classOOP = ObjectOOP(100);
-        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
+        var nilOOP = metadata.KnownObjects.Nil;  // Use actual nil from metadata
 
         mockHeap.Setup(h => h.FindInstanceOf(classOOP)).Returns(nilOOP);
 
-        var context = CreateContext(classOOP, [], mockHeap.Object);
+        var context = CreateContext(classOOP, [], mockHeap.Object, metadata: metadata);
 
         var result = primitive.Execute(context);
 
@@ -229,14 +230,15 @@ public class SystemPrimitivesTests : PrimitiveTestBase
     {
         var primitive = new SystemOperations.NextInstance();
         var mockHeap = CreateMockHeapManager();
+        var metadata = CreateDefaultTestMetadata(mockHeap.Object);
         var objectOOP = ObjectOOP(100);
         var classOOP = ObjectOOP(50);
-        var nilOOP = ObjectOOP(0);  // Placeholder for nil in mocked tests
+        var nilOOP = metadata.KnownObjects.Nil;  // Use actual nil from metadata
 
         SetupClassOOP(mockHeap, objectOOP, classOOP);
         mockHeap.Setup(h => h.FindNextInstanceOf(classOOP, objectOOP)).Returns(nilOOP);
 
-        var context = CreateContext(objectOOP, [], mockHeap.Object);
+        var context = CreateContext(objectOOP, [], mockHeap.Object, metadata: metadata);
 
         var result = primitive.Execute(context);
 
