@@ -231,7 +231,7 @@ public static class Program
                 // Skip list for init expressions requiring runtime features not available during bootstrap
                 var skipList = new HashSet<string>
                 {
-                    // "Object initialize" - NOW ENABLED: Sensor global properly initialized via InputSensor install/initSensor
+                    "Object initialize",                     // ❌ Requires interactive GUI: displays modal dialog and waits for user input via event loop
                     "FormMenuView initialize",               // ❌ Requires file I/O primitives (98, 92, 99, 146) - not yet implemented
                 };
 
@@ -312,13 +312,12 @@ public static class Program
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
                     // Move font/GUI-dependent expressions to run last (tests DefaultTextStyle)
-                    // Order: Form → TextList → BitEditor → Object (each tests more font functionality)
+                    // Order: Form → TextList → BitEditor (each tests more font functionality)
                     var runLastExpressions = new List<string>
                     {
                         "Form initialize",           // Tests Form creation with glyphs
                         "TextList initialize",       // Tests DefaultTextStyle copy
-                        "BitEditor initialize",      // Tests PopUpMenu labels: with font support
-                        "Object initialize"          // MUST run last: requires Sensor global and displays interactive dialog
+                        "BitEditor initialize"       // Tests PopUpMenu labels: with font support
                     };
 
                     var lastIndices = new List<int>();
