@@ -246,7 +246,7 @@ named: aFileName mode: modeString
 !WindowsFile methodsFor: 'file operations'!
 
 openNamed: aFileName mode: modeString
-    <primitive: 98>
+    <primitive: 121>
     fileHandle _ self primOpen: aFileName mode: modeString.
     fileName _ aFileName.
     position _ 0.
@@ -256,14 +256,14 @@ openNamed: aFileName mode: modeString
     ^self!
 
 close
-    <primitive: 99>
+    <primitive: 122>
     fileHandle ifNotNil: [
         self primClose: fileHandle.
         fileHandle _ nil].
     ^self!
 
 delete
-    <primitive: 100>
+    <primitive: 125>
     self close.
     self primDelete: fileName.
     ^self! !
@@ -271,15 +271,15 @@ delete
 !WindowsFile methodsFor: 'accessing'!
 
 size
-    <primitive: 92>
+    <primitive: 144>
     ^self primSize: fileHandle!
 
 position
-    <primitive: 93>
+    <primitive: 145>
     ^position!
 
 position: anInteger
-    <primitive: 94>
+    <primitive: 124>
     self primSetPosition: fileHandle to: anInteger.
     position _ anInteger.
     ^self!
@@ -390,15 +390,15 @@ setToEnd
 !WindowsFile methodsFor: 'private-primitives'!
 
 primOpen: aFileName mode: modeString
-    <primitive: 98>
+    <primitive: 121>
     self primitiveFailed!
 
 primClose: handle
-    <primitive: 99>
+    <primitive: 122>
     self primitiveFailed!
 
 primDelete: aFileName
-    <primitive: 100>
+    <primitive: 125>
     self primitiveFailed!
 
 primAt: handle position: pos
@@ -410,15 +410,15 @@ primAt: handle position: pos put: byte
     self primitiveFailed!
 
 primSize: handle
-    <primitive: 92>
+    <primitive: 144>
     self primitiveFailed!
 
 primPosition: handle
-    <primitive: 93>
+    <primitive: 145>
     self primitiveFailed!
 
 primSetPosition: handle to: pos
-    <primitive: 94>
+    <primitive: 124>
     self primitiveFailed! !
 
 
@@ -13417,6 +13417,8 @@ initialize
 		2r0000010000000000)
 			offset: -5@-7.
 
+	CurrentCursor _ NormalCursor.
+
 "Cursor initialize"! !
 
 !Cursor class methodsFor: 'instance creation'!
@@ -17309,7 +17311,7 @@ File class
 initialize
 	"Initialize FilePool with file mode constants."
 
-	FilePool _ Dictionary new.
+	Smalltalk at: #FilePool put: (FilePool _ Dictionary new).
 	FilePool at: #Read put: 1.
 	FilePool at: #Write put: 2.
 	FilePool at: #Shorten put: 3.
@@ -21997,6 +21999,8 @@ initSensor
 	Sensor _ InputSensor new! !
 
 InputSensor initialize!
+InputSensor install!
+InputSensor initSensor!
 Object subclass: #InputState
 	instanceVariableNames: 'x y bitState lshiftState rshiftState ctrlState lockState metaState keyboardQueue deltaTime baseTime timeProtect '
 	classVariableNames: 'BitMax BitMin CtrlKey InputProcess InputSemaphore LockKey LshiftKey RshiftKey '
@@ -27867,12 +27871,19 @@ Object class
 
 
 !Object class methodsFor: 'class initialization'!
-initialize 
+initialize
+	"Initialize DependentsFields and ErrorRecursion for the system.
+	Note: GUI confirmation dialog commented out for headless bootstrap compatibility."
+
+	self initializeDependentsFields.
+	self initializeErrorRecursion.
+
+	"GUI confirmation dialog - requires interactive event loop (disabled for headless bootstrap):
 	(self confirm: 'Do you really want to initialize
 class Object?  It will reset all dependents.')
 		ifTrue:
 			[self initializeDependentsFields.
-			self initializeErrorRecursion]
+			self initializeErrorRecursion]"
 
 	"Object initialize"! !
 

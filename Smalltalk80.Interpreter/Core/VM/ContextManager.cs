@@ -302,19 +302,13 @@ internal class ContextManager(
         if (totalPooled == 0)
             return;
 
-        // Display statistics based on whether there have been requests
-        long totalRequests = _poolHits + _poolMisses;
-        if (totalRequests > 0)
-        {
-            // Have requests - show hit rate
-            double hitRate = (_poolHits * 100.0) / totalRequests;
-            Console.WriteLine($"    Context Pool: {totalPooled} contexts, {_poolHits}/{totalRequests} hits ({hitRate:F1}%), {_poolEvictions} evicted");
-        }
-        else
-        {
-            // No requests yet - just show pool size and evictions
-            Console.WriteLine($"    Context Pool: {totalPooled} contexts (no requests yet), {_poolEvictions} evicted");
-        }
+        // Context pool statistics (disabled - too verbose)
+        // long totalRequests = _poolHits + _poolMisses;
+        // if (totalRequests > 0)
+        // {
+        //     double hitRate = (_poolHits * 100.0) / totalRequests;
+        //     Console.WriteLine($"    Context Pool: {totalPooled} contexts, {_poolHits}/{totalRequests} hits ({hitRate:F1}%), {_poolEvictions} evicted");
+        // }
     }
 
     /// <summary>

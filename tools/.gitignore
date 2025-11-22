@@ -1,0 +1,5 @@
+# Generated files
+*.AL
+test_arrows.bin
+__pycache__/
+arrows_visual.txt

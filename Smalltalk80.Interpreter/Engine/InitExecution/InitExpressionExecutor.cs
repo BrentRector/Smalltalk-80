@@ -3,7 +3,6 @@ using System.Text.Json;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
-using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -208,7 +207,7 @@ public class InitExpressionExecutor
         var effectiveTimeout = timeoutMs ?? _defaultTimeoutMs;
         var stopwatch = Stopwatch.StartNew();
 
-        Console.WriteLine($"  {expr.Source}...");
+        Console.Write($"  {expr.Source}... ");
 
         // CRITICAL: Reset instruction counter for EACH init expression
         // Without this, the counter accumulates across ALL expressions:
@@ -248,19 +247,19 @@ public class InitExpressionExecutor
             catch (OperationCanceledException)
             {
                 stopwatch.Stop();
-                Console.WriteLine($" ❌ TIMEOUT");
+                Console.WriteLine($"❌ TIMEOUT");
                 return InitResult.Timeout(expr.LocalId, stopwatch.ElapsedMilliseconds);
             }
             catch (PrimitiveFailureException pex)
             {
                 stopwatch.Stop();
-                Console.WriteLine($" ❌ PRIMITIVE FAILURE: {pex.Message}");
+                Console.WriteLine($"❌ PRIMITIVE FAILURE: {pex.Message}");
                 return InitResult.PrimitiveFailure(expr.LocalId, pex.PrimitiveIndex, pex.Message, stopwatch.ElapsedMilliseconds);
             }
             catch (SmalltalkException sex)
             {
                 stopwatch.Stop();
-                Console.WriteLine($" ❌ EXCEPTION: {sex.Message}");
+                Console.WriteLine($"❌ EXCEPTION: {sex.Message}");
                 string stackTrace = CaptureStackTrace(sex);
                 return InitResult.Exception(expr.LocalId, sex.ExceptionOop, sex.Message, stackTrace, stopwatch.ElapsedMilliseconds);
             }
@@ -268,22 +267,8 @@ public class InitExpressionExecutor
             // Clear the Process's suspendedContext
             _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, _heapManager.GetNil());
 
-            // Register GC detail listener if diagnostics available
-            GCDetailListener? gcListener = null;
-            if (_diagnostics != null)
-            {
-                gcListener = new GCDetailListener();
-                _diagnostics.Register(gcListener, DiagnosticEventTypes.GCStart | DiagnosticEventTypes.GCEnd | DiagnosticEventTypes.GCObjectCollected);
-            }
-
             // Run GC - SHOULD collect (MethodContext, CompiledMethod, ByteArray no longer reachable)
             var gcStatsAfter = _heapManager.GC.GarbageCollect();
-
-            // Unregister listener
-            if (gcListener != null && _diagnostics != null)
-            {
-                _diagnostics.Unregister(gcListener);
-            }
 
             // Verify the CompiledMethod was collected
             bool compiledMethodAlive = IsObjectAlive(compiledMethodOOP);
@@ -299,7 +284,7 @@ public class InitExpressionExecutor
                 if (keptAliveByForkedProcess)
                 {
                     // This is EXPECTED - init expression forked a persistent process
-                    Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, contexts kept alive by forked process)");
+                    Console.WriteLine($"✓ {stopwatch.ElapsedMilliseconds}ms (contexts kept alive by forked process)");
                     return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
                 }
                 else
@@ -312,15 +297,15 @@ public class InitExpressionExecutor
                 }
             }
 
-            // Show simple GC summary (listener shows details)
-            Console.WriteLine($" ✓ ({stopwatch.ElapsedMilliseconds}ms, {gcStatsAfter.CollectedObjects} collected)");
+            // Show simple success message
+            Console.WriteLine($"✓ {stopwatch.ElapsedMilliseconds}ms");
 
             return InitResult.Success(expr.LocalId, resultOOP, stopwatch.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
-            Console.WriteLine($" ❌ ERROR: {ex.Message}");
+            Console.WriteLine($"❌ ERROR: {ex.Message}");
             return InitResult.FatalError(expr.LocalId, $"{ex.GetType().Name}: {ex.Message}\n\nStack trace:\n{ex.StackTrace}");
         }
     }

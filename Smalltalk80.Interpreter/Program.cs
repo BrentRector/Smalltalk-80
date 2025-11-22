@@ -222,14 +222,17 @@ public static class Program
                     "Character initialize",      // Required for CharacterTable (used by String>>at: primitive 63)
                     "SmallInteger initialize",   // Required for SmallInteger constants/utilities
                     "Float initialize",          // Required for Float constants (Pi, E, etc.)
+                    "InputSensor initialize",    // Required for InputSensor keyboard map setup
+                    "InputSensor install",       // Required to create CurrentInputState
+                    "InputSensor initSensor",    // Required to create and assign Sensor global
                     "BlockContextTest validate",  // Test suite - runs even with --skip-init-expressions
                 };
 
                 // Skip list for init expressions requiring runtime features not available during bootstrap
                 var skipList = new HashSet<string>
                 {
-                    "Object initialize",                     // ❌ Method not found: cursorPoint (Sensor not initialized)
-                    "FormMenuView initialize",               // ❌ File operations failing - under investigation
+                    // "Object initialize" - NOW ENABLED: GUI confirmation dialog commented out, essential initialization preserved
+                    "FormMenuView initialize",               // ❌ Requires file I/O primitives (98, 92, 99, 146) - not yet implemented
                 };
 
                 // Build index lists for each phase (preserving source file order)
@@ -278,7 +281,9 @@ public static class Program
                         }
 
                         // Phase-based execution: ALL initialize expressions, then ALL comments, then test expressions
-                        if (expr.Source.EndsWith(" initialize"))
+                        if (expr.Source.EndsWith(" initialize") ||
+                            expr.Source == "InputSensor install" ||
+                            expr.Source == "InputSensor initSensor")
                         {
                             phase1Indices.Add(i);
                         }
@@ -307,12 +312,13 @@ public static class Program
                     phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
 
                     // Move font/GUI-dependent expressions to run last (tests DefaultTextStyle)
-                    // Order: Form → TextList → BitEditor (each tests more font functionality)
+                    // Order: Form → TextList → BitEditor → Object (each tests more functionality)
                     var runLastExpressions = new List<string>
                     {
                         "Form initialize",           // Tests Form creation with glyphs
                         "TextList initialize",       // Tests DefaultTextStyle copy
-                        "BitEditor initialize"       // Tests PopUpMenu labels: with font support
+                        "BitEditor initialize",      // Tests PopUpMenu labels: with font support
+                        "Object initialize"          // Initializes DependentsFields (GUI dialog commented out)
                     };
 
                     var lastIndices = new List<int>();
@@ -395,7 +401,7 @@ public static class Program
                 // Execute all initialize! expressions with on-demand compilation and GC verification
                 Console.WriteLine($"\n=== Init Expression Execution ===");
                 Console.WriteLine($"  Total initialize! expressions: {phase1Indices.Count}");
-                Console.WriteLine($"  Executing all expressions (2 skipped)");
+                Console.WriteLine($"  Executing all expressions ({skippedIndices.Count} skipped)");
                 Console.WriteLine();
 
                 succeeded = 0;
