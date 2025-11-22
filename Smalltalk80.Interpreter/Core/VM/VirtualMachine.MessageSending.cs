@@ -266,12 +266,6 @@ public partial class VirtualMachine
         // Check if the method has a primitive
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
 
-        // Diagnostic: Log at: sends to understand the infinite loop
-        if (selectorName == "at:" && _tracer.InstructionCount > 499900)
-        {
-            Console.WriteLine($"[at: DIAGNOSTIC] Receiver class: {recvClassName}, Primitive: {primitiveNumber}, Instruction: {_tracer.InstructionCount}, Receiver OOP: {receiverOOP}");
-        }
-
         if (primitiveNumber > 0)
         {
             // Count primitive execution as one instruction
@@ -287,11 +281,6 @@ public partial class VirtualMachine
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
                 _contextManager, currentPC, this, this, _metadata);
-
-            if (primitiveNumber == 63)
-            {
-                Console.WriteLine($"[VM] After Primitive 63: _primitiveSuccess={_primitiveSuccess}, result={primitiveResult}");
-            }
 
             if (_primitiveSuccess)
             {
