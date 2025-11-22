@@ -106,6 +106,14 @@ public partial class VirtualMachine
 
         // Check if the method has a primitive
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
+
+        // DEBUG: Log primitive lookups for String>>at:
+        if (selectorName == "at:")
+        {
+            var receiverClass = GetClassName(GetClass(receiverOOP));
+            Console.WriteLine($"[PRIMITIVE DEBUG] {receiverClass}>>at: primitiveNumber={primitiveNumber}");
+        }
+
         if (primitiveNumber > 0)
         {
             if (_tracer.ShouldTracePrimitive())
@@ -265,6 +273,13 @@ public partial class VirtualMachine
 
         // Check if the method has a primitive
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
+
+        // DEBUG: Log primitive lookups for String>>at:
+        if (selectorName == "at:")
+        {
+            var receiverClass = GetClassName(classOOP);
+            Console.WriteLine($"[PRIMITIVE DEBUG] {receiverClass}>>at: primitiveNumber={primitiveNumber}");
+        }
 
         if (primitiveNumber > 0)
         {
