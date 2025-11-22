@@ -128,6 +128,9 @@ public class InitExpressionExecutor
         var effectiveTimeout = timeoutMs ?? _defaultTimeoutMs;
         var stopwatch = Stopwatch.StartNew();
 
+        // Reset instruction counter for each init expression (prevents accumulation across expressions)
+        _vm.ResetInstructionCount();
+
         try
         {
             // Step 1: Lookup and sanity-check
@@ -206,6 +209,11 @@ public class InitExpressionExecutor
         var stopwatch = Stopwatch.StartNew();
 
         Console.WriteLine($"  {expr.Source}...");
+
+        // CRITICAL: Reset instruction counter for EACH init expression
+        // Without this, the counter accumulates across ALL expressions:
+        // 40 expressions × 10K instructions each = 400K accumulated before #41 even starts!
+        _vm.ResetInstructionCount();
 
         try
         {

@@ -248,12 +248,8 @@ public static class SimpleObjectPrimitives
             // Get Character from CharacterTable (Character class pool variable)
             var characterOOP = GetCharacterForAscii(context, byteValue);
             if (characterOOP == context.HeapManager.GetNil())
-            {
-                Console.WriteLine($"[Primitive 63] FAILED - CharacterForAscii returned nil for byte {byteValue}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
-            Console.WriteLine($"[Primitive 63] SUCCESS - returning Character {characterOOP} for byte {byteValue}");
             return PrimitiveResult.Ok(characterOOP);
         }
 
