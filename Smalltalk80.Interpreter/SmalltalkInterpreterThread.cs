@@ -38,6 +38,11 @@ public class SmalltalkInterpreterThread
         {
             Console.WriteLine("\n[Smalltalk Thread] Starting...");
 
+            // TESTING: Wait for UI thread to show window before executing init expressions
+            // This allows us to observe the window resize when DisplayScreen initialize runs
+            Console.WriteLine("[Smalltalk Thread] Waiting for window to be displayed...");
+            Thread.Sleep(1000);  // Wait 1 second for window to be fully shown
+
             // STEP 1: Convert this thread to a Windows fiber (future enhancement)
             // Console.WriteLine("[Smalltalk Thread] Converting to fiber...");
             // ConvertThreadToFiber();
