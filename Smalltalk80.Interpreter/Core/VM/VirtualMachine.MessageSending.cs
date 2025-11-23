@@ -300,6 +300,14 @@ public partial class VirtualMachine
             _tracer.TraceSendEntry(recvClass, selectorName ?? "unknown", currentMethod);
         }
 
+        // DIAGNOSTIC: Method trace output for debugging (shows all method calls during VariableNode initialize)
+        // This provides visibility into method calls when diagnostic listeners are active
+        // Depth tracking is handled by existing selector trace system below
+        var recvClass = GetClassName(classOOP);
+        var indent = new string(' ', _tracer.SelectorTraceDepth * 2);
+        var argInfo = args.Length > 0 ? $" ({args.Length} args)" : "";
+        Console.WriteLine($"{indent}-> {recvClass}>>{selectorName}{argInfo}");
+
         // Check if the method has a primitive
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
 
@@ -318,6 +326,10 @@ public partial class VirtualMachine
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
                 _contextManager, currentPC, this, this, _metadata);
+
+            // DIAGNOSTIC: Show primitive execution result
+            var status = _primitiveSuccess ? "OK" : "FAIL";
+            Console.WriteLine($"   [Primitive {primitiveNumber}] {selectorName}: {status}");
 
             if (_primitiveSuccess)
             {
