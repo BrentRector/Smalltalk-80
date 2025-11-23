@@ -256,6 +256,35 @@ public partial class VirtualMachine
             throw new InvalidOperationException($"Smalltalk error: message sent to {recvClassName}>>error:");
         }
 
+        // DIAGNOSTIC: Catch notify:at: to see parsing errors before GUI is accessed
+        if (selectorName == "notify:at:")
+        {
+            Console.WriteLine($"\n*** SMALLTALK NOTIFY:AT: BEING RAISED ***");
+            Console.WriteLine($"  Receiver class: {recvClassName}");
+
+            // Extract the error message if it's a String
+            if (args.Length >= 1)
+            {
+                var messageOOP = args[0];
+                if (!messageOOP.IsSmallInteger && _heapManager.GetObjectFormat(messageOOP) == ObjectFormat.ByteIndexed)
+                {
+                    var errorMsg = StringHelper.ExtractString(_heapManager, messageOOP);
+                    Console.WriteLine($"  Error message: \"{errorMsg}\"");
+                }
+            }
+
+            // Extract the position if it's a SmallInteger
+            if (args.Length >= 2 && args[1].IsSmallInteger)
+            {
+                Console.WriteLine($"  Position: {args[1].AsSmallInteger()}");
+            }
+
+            Console.WriteLine($"  Instruction count: {_tracer.InstructionCount}");
+            Console.WriteLine("\nSmalltalk Context Chain:");
+            _debugger.DumpSenderChain(_contextManager.ActiveContext, 20);
+            throw new InvalidOperationException($"Smalltalk notify:at: from {recvClassName}: stopping before GUI access");
+        }
+
         // Log ALL message sends during tracing (before primitive check)
         if (_tracer.ShouldTraceSend())
         {
