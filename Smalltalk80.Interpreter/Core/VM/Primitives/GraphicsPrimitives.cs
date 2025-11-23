@@ -330,33 +330,178 @@ public static class GraphicsOperations
         }
     }
 
-    /// <summary>Primitive 104: clipboardText - Clipboard operations</summary>
-    public class ClipboardText : IPrimitive
+    /// <summary>Primitive 104: drawLoopX:Y: - Bresenham line drawing for BitBlt</summary>
+    public class DrawLoop : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Platform == null) return PrimitiveResult.Fail(context.Metadata!);
+            // Receiver must be a BitBlt object with 14 instance variables
+            if (context.Receiver.IsSmallInteger)
+                return PrimitiveResult.Fail(context.Metadata!);
 
-            if (context.Arguments.Length == 0)
+            var receiverEntry = context.HeapManager.GetObjectTableEntry(context.Receiver);
+            if (receiverEntry.PointerCount < 14)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // Arguments: xDelta and yDelta (SmallIntegers)
+            if (context.Arguments.Length != 2)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            var xDeltaOOP = context.Arguments[0];
+            var yDeltaOOP = context.Arguments[1];
+
+            if (!xDeltaOOP.IsSmallInteger || !yDeltaOOP.IsSmallInteger)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            int xDelta = xDeltaOOP.AsSmallInteger();
+            int yDelta = yDeltaOOP.AsSmallInteger();
+
+            // Extract BitBlt instance variables
+            var destFormOOP = context.HeapManager.GetPointerField(context.Receiver, 0);
+            var sourceFormOOP = context.HeapManager.GetPointerField(context.Receiver, 1);
+            var halftoneFormOOP = context.HeapManager.GetPointerField(context.Receiver, 2);
+            var combinationRuleOOP = context.HeapManager.GetPointerField(context.Receiver, 3);
+            var destXOOP = context.HeapManager.GetPointerField(context.Receiver, 4);
+            var destYOOP = context.HeapManager.GetPointerField(context.Receiver, 5);
+            var widthOOP = context.HeapManager.GetPointerField(context.Receiver, 6);
+            var heightOOP = context.HeapManager.GetPointerField(context.Receiver, 7);
+            var sourceXOOP = context.HeapManager.GetPointerField(context.Receiver, 8);
+            var sourceYOOP = context.HeapManager.GetPointerField(context.Receiver, 9);
+            var clipXOOP = context.HeapManager.GetPointerField(context.Receiver, 10);
+            var clipYOOP = context.HeapManager.GetPointerField(context.Receiver, 11);
+            var clipWidthOOP = context.HeapManager.GetPointerField(context.Receiver, 12);
+            var clipHeightOOP = context.HeapManager.GetPointerField(context.Receiver, 13);
+
+            // Validate numeric fields
+            if (!combinationRuleOOP.IsSmallInteger || !destXOOP.IsSmallInteger || !destYOOP.IsSmallInteger ||
+                !widthOOP.IsSmallInteger || !heightOOP.IsSmallInteger || !sourceXOOP.IsSmallInteger ||
+                !sourceYOOP.IsSmallInteger || !clipXOOP.IsSmallInteger || !clipYOOP.IsSmallInteger ||
+                !clipWidthOOP.IsSmallInteger || !clipHeightOOP.IsSmallInteger)
             {
-                // Read clipboard
-                SmalltalkOOP stringOOP = context.Platform.ReadClipboardToStringOOP();
-                return PrimitiveResult.Ok(stringOOP);
+                return PrimitiveResult.Fail(context.Metadata!);
             }
-            else if (context.Arguments.Length == 1)
+
+            int combinationRule = combinationRuleOOP.AsSmallInteger();
+            int destX = destXOOP.AsSmallInteger();
+            int destY = destYOOP.AsSmallInteger();
+            int width = widthOOP.AsSmallInteger();
+            int height = heightOOP.AsSmallInteger();
+            int sourceX = sourceXOOP.AsSmallInteger();
+            int sourceY = sourceYOOP.AsSmallInteger();
+            int clipX = clipXOOP.AsSmallInteger();
+            int clipY = clipYOOP.AsSmallInteger();
+            int clipWidth = clipWidthOOP.AsSmallInteger();
+            int clipHeight = clipHeightOOP.AsSmallInteger();
+
+            // Extract Form bitmap data
+            var (destBits, destWidth, destHeight) = ExtractFormData(context, destFormOOP);
+            var (sourceBits, sourceWidth, sourceHeight) = ExtractFormData(context, sourceFormOOP);
+            var (halftoneBits, halftoneWidth, halftoneHeight) = ExtractFormData(context, halftoneFormOOP);
+
+            // Implement Bresenham line drawing algorithm
+            int dx = Math.Sign(xDelta);
+            int dy = Math.Sign(yDelta);
+            int px = Math.Abs(yDelta);
+            int py = Math.Abs(xDelta);
+
+            // Draw starting point
+            DrawPixel(destBits.Span, destWidth, destHeight, destX, destY,
+                     sourceBits.Span, sourceWidth, sourceHeight, sourceX, sourceY,
+                     width, height, clipX, clipY, clipWidth, clipHeight,
+                     halftoneBits.Span, halftoneWidth, halftoneHeight, combinationRule);
+
+            if (py > px)
             {
-                // Write clipboard
-                SmalltalkOOP stringOOP = context.Arguments[0];
-                if (stringOOP.IsSmallInteger || stringOOP == context.HeapManager.GetNil())
-                    return PrimitiveResult.Fail(context.Metadata!);
-
-                bool success = context.Platform.WriteClipboardFromStringOOP(stringOOP);
-                if (!success) return PrimitiveResult.Fail(context.Metadata!);
-
-                return PrimitiveResult.Ok(context.Receiver);
+                // More horizontal
+                int P = py / 2;
+                for (int i = 0; i < py; i++)
+                {
+                    destX += dx;
+                    P -= px;
+                    if (P < 0)
+                    {
+                        destY += dy;
+                        P += py;
+                    }
+                    DrawPixel(destBits.Span, destWidth, destHeight, destX, destY,
+                             sourceBits.Span, sourceWidth, sourceHeight, sourceX, sourceY,
+                             width, height, clipX, clipY, clipWidth, clipHeight,
+                             halftoneBits.Span, halftoneWidth, halftoneHeight, combinationRule);
+                }
+            }
+            else
+            {
+                // More vertical
+                int P = px / 2;
+                for (int i = 0; i < px; i++)
+                {
+                    destY += dy;
+                    P -= py;
+                    if (P < 0)
+                    {
+                        destX += dx;
+                        P += px;
+                    }
+                    DrawPixel(destBits.Span, destWidth, destHeight, destX, destY,
+                             sourceBits.Span, sourceWidth, sourceHeight, sourceX, sourceY,
+                             width, height, clipX, clipY, clipWidth, clipHeight,
+                             halftoneBits.Span, halftoneWidth, halftoneHeight, combinationRule);
+                }
             }
 
-            return PrimitiveResult.Fail(context.Metadata!);
+            // Write modified dest bits back
+            WriteFormData(context, destFormOOP, destBits);
+
+            return PrimitiveResult.Ok(context.Receiver);
+        }
+
+        private static void DrawPixel(Span<byte> destBits, int destWidth, int destHeight, int destX, int destY,
+                                      Span<byte> sourceBits, int sourceWidth, int sourceHeight, int sourceX, int sourceY,
+                                      int width, int height, int clipX, int clipY, int clipWidth, int clipHeight,
+                                      Span<byte> halftoneBits, int halftoneWidth, int halftoneHeight, int combinationRule)
+        {
+            // Handle paint mode (rule 16) with two-pass logic as per Smalltalk paintBits
+            if (combinationRule == 16)
+            {
+                // Paint mode requires two BitBlt operations:
+                // 1. Erase with nil halftone (if halftone is not nil/black)
+                // 2. Under with halftone
+
+                // For simplicity, always do both passes (optimization can be added later)
+                bool hasHalftone = halftoneBits.Length > 0;
+
+                if (hasHalftone)
+                {
+                    // First pass: erase with nil halftone (Form erase = rule 4)
+                    BitBltEngine.CopyBits(
+                        destBits, destWidth, destHeight, destX, destY,
+                        sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
+                        width, height,
+                        clipX, clipY, clipWidth, clipHeight,
+                        Span<byte>.Empty, 0, 0,  // nil halftone
+                        CombinationRule.AndInverted);  // Rule 4 (erase)
+                }
+
+                // Second pass: under with halftone (Form under = rule 7)
+                BitBltEngine.CopyBits(
+                    destBits, destWidth, destHeight, destX, destY,
+                    sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
+                    width, height,
+                    clipX, clipY, clipWidth, clipHeight,
+                    halftoneBits, halftoneWidth, halftoneHeight,
+                    CombinationRule.Or);  // Rule 7 (under)
+            }
+            else
+            {
+                // Simple rules 0-15: single BitBlt operation
+                BitBltEngine.CopyBits(
+                    destBits, destWidth, destHeight, destX, destY,
+                    sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
+                    width, height,
+                    clipX, clipY, clipWidth, clipHeight,
+                    halftoneBits, halftoneWidth, halftoneHeight,
+                    (CombinationRule)combinationRule);
+            }
         }
     }
 }
