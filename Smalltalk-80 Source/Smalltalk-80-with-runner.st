@@ -15894,11 +15894,19 @@ displayHeight: height
 
 !DisplayScreen class methodsFor: 'class initialization'!
 initialize
-	"Notify the platform of the Display dimensions.
-	Called during system initialization to ensure the host window
-	matches the Display object created during cold start."
+	"Draw a centered gray halftone square (1/4 area of Display).
+	Tests BitBlt operations during system initialization."
 
-	Display ifNotNil: [Display beDisplay]! !
+	| displayBox squareWidth squareHeight centerX centerY squareRect |
+	Display notNil ifTrue: [
+		Display beDisplay.
+		displayBox _ Display boundingBox.
+		squareWidth _ displayBox width // 2.
+		squareHeight _ displayBox height // 2.
+		centerX _ (displayBox width - squareWidth) // 2.
+		centerY _ (displayBox height - squareHeight) // 2.
+		squareRect _ (centerX @ centerY) extent: (squareWidth @ squareHeight).
+		Display fill: squareRect mask: Form gray]! !
 
 DisplayScreen initialize!
 
