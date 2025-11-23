@@ -87,7 +87,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
             // DIAGNOSTIC: Log primitive failures for debugging
             if (!result.Success && (primitiveNumber == 11 || primitiveNumber == 75))
             {
-                Console.WriteLine($"[VM] Primitive {primitiveNumber} FAILED - receiver={ctx.Receiver}");
+                Console.WriteLine($"[VM] Primitive {primitiveNumber} FAILED - receiver={receiver}");
             }
 
             // Detect if primitive changed the active context and propagate to VM
