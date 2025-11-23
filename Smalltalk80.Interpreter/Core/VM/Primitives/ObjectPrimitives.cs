@@ -43,6 +43,12 @@ public static class SimpleObjectPrimitives
                 // This deviation from canonical behavior is necessary for dictionary indexing.
                 int value = context.Receiver.AsSmallInteger();
                 hashValue = value & 0x3FFFFFFF;
+
+                // DIAGNOSTIC: Log hash operations for small integers (especially negative)
+                if (value < 0 || value <= 2)
+                {
+                    Console.WriteLine($"[Primitive 75 Hash] SmallInteger {value} -> hash {hashValue}");
+                }
             }
             else
             {

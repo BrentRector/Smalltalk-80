@@ -210,6 +210,13 @@ public static class SmallIntegerArithmetic
 
             // Smalltalk \\ uses floored division (result has same sign as divisor)
             int result = a - b * (int)Math.Floor((double)a / b);
+
+            // DIAGNOSTIC: Log modulo operations during dictionary key hashing
+            if ((a > 0 && a < 100 && b == 16) || (a < 0))
+            {
+                Console.WriteLine($"[Primitive 11 Mod] {a} \\\\ {b} = {result}");
+            }
+
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(result));
         }
     }
