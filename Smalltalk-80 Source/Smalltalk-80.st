@@ -15898,7 +15898,7 @@ initialize
 	Called during system initialization to ensure the host window
 	matches the Display object created during cold start."
 
-	Display ifNotNil: [Display beDisplay]! !
+	Display notNil ifTrue: [Display beDisplay]! !
 
 DisplayScreen initialize!
 
