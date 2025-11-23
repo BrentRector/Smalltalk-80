@@ -15913,86 +15913,46 @@ initialize
 		"Draw decorative border"
 		Display border: (Display boundingBox insetBy: 10) width: 3 mask: Form black.
 
-		"DIAGNOSTIC: Draw test shapes using calculated coordinates"
-		Display fill: (cx - 100 @ (cy - 50) extent: 50 @ 50) mask: Form black.
-		Display fill: (cx @ cy extent: 50 @ 50) mask: Form black.
-		Display fill: (cx + 100 @ (cy + 50) extent: 50 @ 50) mask: Form black.
-
-		"TEST: Simple horizontal line to verify loop works"
-		0 to: 20 do: [:i |
-			Display fill: ((100 + (i * 20)) @ 300 extent: 15 @ 15) mask: Form black].
-
-		"Dragon head at left end"
-		x _ cx - ((scale * 1.25) truncated).
-		y _ cy.
-
-		"Head circle using line shading - LARGER"
-		0 to: 359 by: 5 do: [:deg |
-			angle _ deg degreesToRadians.
-			radius _ 40.
-			dx _ ((radius * angle cos) truncated).
-			dy _ ((radius * angle sin) truncated).
-			Display fill: ((x + dx) @ (y + dy) extent: 8 @ 8) mask: Form black].
-
-		"Dragon horns - LARGER"
-		-30 to: 30 by: 2 do: [:offset |
-			Display fill: ((x - 25 - offset) @ (y - 40 + offset abs) extent: 8 @ 8) mask: Form black.
-			Display fill: ((x - 25 - offset) @ (y + 40 - offset abs) extent: 8 @ 8) mask: Form black].
-
-		"Dragon eye - LARGER"
-		Display fill: ((x - 10) @ (y - 8) extent: 20 @ 20) mask: Form black.
-
-		"Dragon wings - using curved line art"
-		x _ cx - (scale // 3).
-		y _ cy.
-
-		"Upper wing - LARGER"
+		"Dragon body - simple wave pattern using modulo arithmetic"
 		0 to: 100 do: [:i |
-			t _ i / 100.0.
-			angle _ t * Float pi.
-			dx _ ((t * scale * 1.2) truncated).
-			dy _ ((angle sin * scale * 0.8) truncated) negated.
-			Display fill: ((x + dx) @ (y + dy) extent: 8 @ 8) mask: Form black.
+			x _ 50 + (i * 6).
+			y _ cy + ((i \\ 20 - 10) * 8).
+			Display fill: (x @ y extent: 20 @ 20) mask: Form black].
 
-			"Wing membrane lines"
-			(i \\ 20 = 0) ifTrue: [
-				0 to: 40 by: 4 do: [:j |
-					Display fill: ((x + dx - j) @ (y + dy + (j // 2)) extent: 4 @ 4) mask: Form black]]].
-
-		"Lower wing - LARGER"
-		0 to: 100 do: [:i |
-			t _ i / 100.0.
-			angle _ t * Float pi.
-			dx _ ((t * scale * 1.2) truncated).
-			dy _ ((angle sin * scale * 0.8) truncated).
-			Display fill: ((x + dx) @ (y + dy) extent: 8 @ 8) mask: Form black.
-
-			"Wing membrane lines"
-			(i \\ 20 = 0) ifTrue: [
-				0 to: 40 by: 4 do: [:j |
-					Display fill: ((x + dx - j) @ (y + dy - (j // 2)) extent: 4 @ 4) mask: Form black]]].
-
-		"Dragon tail - spiral at right end - LARGER"
-		x _ cx + ((scale * 1.25) truncated).
+		"Dragon head - simple filled circle using overlapping squares"
+		x _ 40.
 		y _ cy.
-		0 to: 150 do: [:i |
-			t _ i / 30.0.
-			angle _ t * Float pi.
-			radius _ 60 - (i // 3).
-			dx _ ((radius * angle cos) truncated).
-			dy _ ((radius * angle sin) truncated).
-			Display fill: ((x + dx) @ (y + dy) extent: 8 @ 8) mask: Form black].
+		-30 to: 30 do: [:dy |
+			-30 to: 30 do: [:dx |
+				((dx * dx) + (dy * dy) < 900) ifTrue: [
+					Display fill: ((x + dx) @ (y + dy) extent: 8 @ 8) mask: Form black]]].
 
-		"Add flame breath - LARGER"
-		x _ cx - ((scale * 1.25) truncated) - 50.
+		"Dragon horns"
+		0 to: 15 do: [:i |
+			Display fill: ((x - 20 - i) @ (y - 30 - i) extent: 10 @ 10) mask: Form black.
+			Display fill: ((x - 20 - i) @ (y + 30 + i) extent: 10 @ 10) mask: Form black].
+
+		"Dragon eye"
+		Display fill: ((x + 10) @ (y - 5) extent: 15 @ 15) mask: Form black.
+
+		"Dragon wings - simple triangular shapes"
+		x _ cx - 50.
 		y _ cy.
-		0 to: 40 do: [:i |
-			| flameY |
-			flameY _ ((i * 2.0 degreesToRadians sin * 15) truncated).
-			Display fill: ((x - (i * 3)) @ (y + flameY - 8) extent: 8 @ 24) mask: Form black.
-			(i \\ 5 = 0) ifTrue: [
-				Display fill: ((x - (i * 3)) @ (y + flameY - 30) extent: 4 @ 30) mask: Form black.
-				Display fill: ((x - (i * 3)) @ (y + flameY + 10) extent: 4 @ 30) mask: Form black]]]! !
+		0 to: 60 do: [:i |
+			Display fill: ((x + i) @ (y - (i * 2)) extent: 12 @ 12) mask: Form black.
+			Display fill: ((x + i) @ (y + (i * 2)) extent: 12 @ 12) mask: Form black].
+
+		"Dragon tail - simple curl"
+		x _ w - 80.
+		y _ cy.
+		0 to: 50 do: [:i |
+			Display fill: ((x + (i \\ 10)) @ (y + (i - 25)) extent: 10 @ 10) mask: Form black].
+
+		"Flame breath - wavy pattern"
+		x _ 30.
+		y _ cy.
+		0 to: 30 do: [:i |
+			Display fill: ((x - i) @ (y + ((i \\ 6 - 3) * 5)) extent: 6 @ 18) mask: Form black]]! !
 
 testBitBltRules
 	"Test all 16 BitBlt combination rules with a visual grid.
