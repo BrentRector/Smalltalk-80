@@ -15894,65 +15894,124 @@ displayHeight: height
 
 !DisplayScreen class methodsFor: 'class initialization'!
 initialize
-	"Display an artistic line-shaded dragon spanning the entire window."
+	"Display a detailed vector dragon head based on the reference image."
 
-	| w h cx cy t x y prevX prevY scale angle radius dx dy pi |
+	| w h cx cy x y baseX baseY snoutTip eyeX eyeY scale |
 	Display notNil ifTrue: [
 		Display beDisplay.
 		w _ Display width.
 		h _ Display height.
 		cx _ w // 2.
 		cy _ h // 2.
-		scale _ (w min: h) // 3.
-		pi _ 3.14159.
+		scale _ (w min: h) // 4.
 
 		"Fill with white background"
 		Display fill: Display boundingBox mask: Form black.
 		Display reverse.
 
-		"Draw decorative border"
-		Display border: (Display boundingBox insetBy: 10) width: 3 mask: Form black.
+		"Position dragon head in center-left area"
+		baseX _ cx - 100.
+		baseY _ cy.
+		snoutTip _ baseX + 200.
 
-		"Dragon body - simple wave pattern using modulo arithmetic"
-		0 to: 100 do: [:i |
-			x _ 50 + (i * 6).
-			y _ cy + ((i \\ 20 - 10) * 8).
-			Display fill: (x @ y extent: 20 @ 20) mask: Form black].
+		"Dragon head outline - elongated snout tapering forward"
+		"Upper head contour"
+		0 to: 200 by: 4 do: [:i |
+			x _ baseX + i.
+			y _ baseY - (60 - (i // 4)).
+			Display fill: (x @ y extent: 5 @ 5) mask: Form black].
 
-		"Dragon head - simple filled circle using overlapping squares"
-		x _ 40.
-		y _ cy.
-		-30 to: 30 do: [:dy |
-			-30 to: 30 do: [:dx |
-				((dx * dx) + (dy * dy) < 900) ifTrue: [
-					Display fill: ((x + dx) @ (y + dy) extent: 8 @ 8) mask: Form black]]].
+		"Lower jaw contour"
+		0 to: 200 by: 4 do: [:i |
+			x _ baseX + i.
+			y _ baseY + (50 - (i // 5)).
+			Display fill: (x @ y extent: 5 @ 5) mask: Form black].
 
-		"Dragon horns"
-		0 to: 15 do: [:i |
-			Display fill: ((x - 20 - i) @ (y - 30 - i) extent: 10 @ 10) mask: Form black.
-			Display fill: ((x - 20 - i) @ (y + 30 + i) extent: 10 @ 10) mask: Form black].
+		"Back of head curve"
+		-60 to: 50 by: 3 do: [:dy |
+			x _ baseX - ((dy * dy) // 80).
+			y _ baseY + dy.
+			Display fill: (x @ y extent: 5 @ 5) mask: Form black].
 
-		"Dragon eye"
-		Display fill: ((x + 10) @ (y - 5) extent: 15 @ 15) mask: Form black.
+		"Main horns - large backward-pointing spikes"
+		"Horn 1 (top)"
+		0 to: 80 by: 2 do: [:i |
+			x _ baseX - i.
+			y _ baseY - 70 - (i // 2).
+			Display fill: ((x - 3) @ y extent: 6 @ 8) mask: Form black].
 
-		"Dragon wings - simple triangular shapes"
-		x _ cx - 50.
-		y _ cy.
-		0 to: 60 do: [:i |
-			Display fill: ((x + i) @ (y - (i * 2)) extent: 12 @ 12) mask: Form black.
-			Display fill: ((x + i) @ (y + (i * 2)) extent: 12 @ 12) mask: Form black].
+		"Horn 2 (upper middle)"
+		0 to: 70 by: 2 do: [:i |
+			x _ baseX - (i * 4 // 5).
+			y _ baseY - 55 - (i // 3).
+			Display fill: ((x - 2) @ y extent: 5 @ 7) mask: Form black].
 
-		"Dragon tail - simple curl"
-		x _ w - 80.
-		y _ cy.
-		0 to: 50 do: [:i |
-			Display fill: ((x + (i \\ 10)) @ (y + (i - 25)) extent: 10 @ 10) mask: Form black].
+		"Horn 3 (lower back)"
+		0 to: 60 by: 2 do: [:i |
+			x _ baseX - (i * 3 // 4).
+			y _ baseY - 30 - (i // 4).
+			Display fill: ((x - 2) @ y extent: 4 @ 6) mask: Form black].
 
-		"Flame breath - wavy pattern"
-		x _ 30.
-		y _ cy.
+		"Jaw spikes - small triangular spikes along lower jaw"
+		0 to: 150 by: 20 do: [:i |
+			x _ baseX + i.
+			y _ baseY + (50 - (i // 5)).
+			0 to: 8 do: [:s |
+				Display fill: ((x - (s // 2)) @ (y + s) extent: s max: 1 @ 2) mask: Form black]].
+
+		"Dragon eye - large detailed eye"
+		eyeX _ baseX + 80.
+		eyeY _ baseY - 20.
+
+		"Eye outer circle"
+		-25 to: 25 do: [:dy |
+			-25 to: 25 do: [:dx |
+				((dx * dx) + (dy * dy) < 625) ifTrue: [
+					Display fill: ((eyeX + dx) @ (eyeY + dy) extent: 3 @ 3) mask: Form black]]].
+
+		"Eye highlight (white area)"
+		Display fill: (eyeX - 8 @ (eyeY - 8) extent: 16 @ 16) mask: Form black.
+		Display reverse: (eyeX - 8 @ (eyeY - 8) extent: 16 @ 16).
+
+		"Pupil (vertical slit)"
+		Display fill: (eyeX - 2 @ (eyeY - 15) extent: 4 @ 30) mask: Form black.
+
+		"Eye ridge above"
 		0 to: 30 do: [:i |
-			Display fill: ((x - i) @ (y + ((i \\ 6 - 3) * 5)) extent: 6 @ 18) mask: Form black]]! !
+			Display fill: ((eyeX - 15 + i) @ (eyeY - 30 - (i // 3)) extent: 3 @ 5) mask: Form black].
+
+		"Nostril"
+		x _ snoutTip - 20.
+		y _ baseY + 15.
+		-8 to: 8 do: [:dy |
+			-5 to: 5 do: [:dx |
+				((dx * dx) + (dy * dy) < 40) ifTrue: [
+					Display fill: ((x + dx) @ (y + dy) extent: 2 @ 2) mask: Form black]]].
+
+		"Scales - diamond pattern across face"
+		baseX to: (snoutTip - 30) by: 15 do: [:sx |
+			(baseY - 40) to: (baseY + 30) by: 12 do: [:sy |
+				"Diamond scale"
+				-4 to: 4 do: [:d |
+					Display fill: ((sx - d abs) @ (sy + d) extent: (d abs * 2 + 1) @ 1) mask: Form black.
+					Display fill: ((sx - d abs) @ (sy - d) extent: (d abs * 2 + 1) @ 1) mask: Form black]]].
+
+		"Texture lines - cross-hatching for dimension"
+		baseX to: (snoutTip - 10) by: 8 do: [:tx |
+			(baseY - 50) to: (baseY + 40) by: 6 do: [:ty |
+				Display fill: (tx @ ty extent: 4 @ 1) mask: Form gray]].
+
+		"Snout ridge detail"
+		0 to: 180 by: 3 do: [:i |
+			x _ baseX + i.
+			y _ baseY - 5.
+			Display fill: (x @ y extent: 2 @ 2) mask: Form black].
+
+		"Mouth line"
+		0 to: 150 by: 2 do: [:i |
+			x _ baseX + i.
+			y _ baseY + 35 - (i // 8).
+			Display fill: (x @ y extent: 3 @ 2) mask: Form black]]! !
 
 testBitBltRules
 	"Test all 16 BitBlt combination rules with a visual grid.
