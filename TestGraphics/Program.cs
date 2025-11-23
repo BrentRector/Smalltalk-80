@@ -15,8 +15,8 @@ class Program
         Console.WriteLine("Smalltalk-80 Graphics & Input Test");
         Console.WriteLine("===================================\n");
 
-        // Create display provider (640x480 monochrome display)
-        var display = new WinFormsDisplayProvider(640, 480, "Graphics Test - Smalltalk-80");
+        // Create display provider (800x600 monochrome display)
+        var display = new WinFormsDisplayProvider(800, 600, "Graphics Test - Smalltalk-80");
 
         try
         {

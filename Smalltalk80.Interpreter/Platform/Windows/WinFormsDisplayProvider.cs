@@ -105,7 +105,6 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     /// </summary>
     private void OnPaint(object? sender, PaintEventArgs e)
     {
-        Console.WriteLine($"[Display] OnPaint called - clip bounds: {e.ClipRectangle}");
         lock (_bufferLock)
         {
             // Copy Display bitmap from heap to local buffer
@@ -117,7 +116,6 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
             // Draw bitmap to screen
             e.Graphics.DrawImageUnscaled(_backBuffer, 0, 0);
         }
-        Console.WriteLine($"[Display] OnPaint completed");
     }
 
     /// <summary>
@@ -127,10 +125,7 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     private void CopyDisplayFromHeap()
     {
         if (_heap == null || _vmMetadata == null)
-        {
-            Console.WriteLine($"[Display] CopyDisplayFromHeap - no heap or metadata");
             return;
-        }
 
         try
         {
@@ -138,65 +133,39 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
             var smalltalkOOP = _vmMetadata.KnownObjects.Smalltalk;
             var displayOOP = LookupGlobal(smalltalkOOP, "Display");
             if (displayOOP == _heap.GetNil())
-            {
-                Console.WriteLine($"[Display] CopyDisplayFromHeap - Display is nil");
                 return;
-            }
 
             // Get Display bitmap (Form instance variable 0)
             var bitsOOP = _heap.GetInstanceVariable(displayOOP, 0);
             if (bitsOOP == _heap.GetNil())
-            {
-                Console.WriteLine($"[Display] CopyDisplayFromHeap - Display bitmap is nil");
                 return;
-            }
 
             // Read bitmap data from heap
             var format = _heap.GetObjectFormat(bitsOOP);
             int size = _heap.GetIndexedSize(bitsOOP);
-            Console.WriteLine($"[Display] CopyDisplayFromHeap - format={format}, size={size}, bufferLength={_displayBuffer.Length}");
 
             if (format == ObjectFormat.WordIndexed)
             {
                 // WordArray: convert words to bytes
-                int wordsCopied = 0;
                 for (int i = 0; i < size && (i * 2 + 1) < _displayBuffer.Length; i++)
                 {
                     ushort word = _heap.GetIndexedWord(bitsOOP, i);
                     _displayBuffer[i * 2] = (byte)(word >> 8);
                     _displayBuffer[i * 2 + 1] = (byte)(word & 0xFF);
-                    wordsCopied++;
                 }
-                Console.WriteLine($"[Display] CopyDisplayFromHeap - copied {wordsCopied} words");
-
-                // Diagnostic: Sample center area where halftone should be
-                // Halftone square is at (160,120) 320x240 in a 640x480 display
-                // Sample row 120 (where square starts) bytes 160/8=20 through (160+320)/8=60
-                int rowStride = (Width + 7) / 8; // Should be 80 for 640px width
-                int sampleRow = 120;
-                int sampleStartByte = sampleRow * rowStride + 20;
-                Console.Write($"[Display] Sample row {sampleRow} bytes 20-30: ");
-                for (int i = 0; i < 11 && (sampleStartByte + i) < _displayBuffer.Length; i++)
-                {
-                    Console.Write($"{_displayBuffer[sampleStartByte + i]:X2} ");
-                }
-                Console.WriteLine();
             }
             else
             {
                 // ByteArray: copy bytes directly
-                int bytesCopied = 0;
                 for (int i = 0; i < size && i < _displayBuffer.Length; i++)
                 {
                     _displayBuffer[i] = _heap.GetIndexedByte(bitsOOP, i);
-                    bytesCopied++;
                 }
-                Console.WriteLine($"[Display] CopyDisplayFromHeap - copied {bytesCopied} bytes");
             }
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"[Display] CopyDisplayFromHeap error: {ex.Message}");
+            // Silently ignore errors
         }
     }
 
@@ -351,17 +320,14 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public void InvalidateDisplayRegion(int x, int y, int w, int h)
     {
-        Console.WriteLine($"[Display] InvalidateDisplayRegion called: ({x},{y}) {w}x{h}");
         // Signal WinForms thread to repaint
         // Note: Display buffer is updated by Smalltalk thread via direct memory access
         if (InvokeRequired)
         {
-            Console.WriteLine($"[Display] BeginInvoke to UI thread");
             BeginInvoke(new Action(() => Invalidate(new Rectangle(x, y, w, h))));
         }
         else
         {
-            Console.WriteLine($"[Display] Already on UI thread, invalidating directly");
             Invalidate(new Rectangle(x, y, w, h));
         }
     }

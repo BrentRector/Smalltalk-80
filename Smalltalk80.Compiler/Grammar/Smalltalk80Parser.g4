@@ -555,6 +555,7 @@ arrayLiteral
 // Array element
 arrayElement
     : literal
+    | MINUS numberLiteral  // Support negative numbers in arrays
     | symbolName
     | LEFT_PAREN arrayElement* RIGHT_PAREN
     ;
