@@ -87,14 +87,17 @@ public static class BitBltEngine
                 return;  // Halftone buffer too small - abort operation
         }
 
+        // Detect nil/empty source (fill operation)
+        bool isNilSource = (sourceWidth == 0 || sourceHeight == 0 || sourceBits.Length == 0);
+
         // Step 3: Main loop - process each pixel
         for (int y = 0; y < clippedHeight; y++)
         {
             int destRow = clipTop + y;
             int sourceRow = adjustedSourceY + y;
 
-            // Clip source row to source bounds
-            if (sourceRow < 0 || sourceRow >= sourceHeight)
+            // Clip source row to source bounds (skip check if nil source)
+            if (!isNilSource && (sourceRow < 0 || sourceRow >= sourceHeight))
                 continue;
 
             for (int x = 0; x < clippedWidth; x++)
@@ -102,12 +105,12 @@ public static class BitBltEngine
                 int destCol = clipLeft + x;
                 int sourceCol = adjustedSourceX + x;
 
-                // Clip source column to source bounds
-                if (sourceCol < 0 || sourceCol >= sourceWidth)
+                // Clip source column to source bounds (skip check if nil source)
+                if (!isNilSource && (sourceCol < 0 || sourceCol >= sourceWidth))
                     continue;
 
-                // Get source bit
-                bool sourceBit = GetBit(sourceBits, sourceStride, sourceCol, sourceRow);
+                // Get source bit (treat nil source as white/0 for fill operations)
+                bool sourceBit = isNilSource ? false : GetBit(sourceBits, sourceStride, sourceCol, sourceRow);
 
                 // Get destination bit
                 bool destBit = GetBit(destBits, destStride, destCol, destRow);
