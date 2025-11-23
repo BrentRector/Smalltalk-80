@@ -15894,124 +15894,175 @@ displayHeight: height
 
 !DisplayScreen class methodsFor: 'class initialization'!
 initialize
-	"Display a detailed vector dragon head based on the reference image."
+	"Display a detailed vector dragon head using Pen graphics."
 
-	| w h cx cy x y baseX baseY snoutTip eyeX eyeY scale |
+	| pen w h cx cy baseX baseY eyeX eyeY |
 	Display notNil ifTrue: [
 		Display beDisplay.
 		w _ Display width.
 		h _ Display height.
 		cx _ w // 2.
 		cy _ h // 2.
-		scale _ (w min: h) // 4.
 
-		"Fill with white background"
+		"Clear display to white"
 		Display fill: Display boundingBox mask: Form black.
 		Display reverse.
 
-		"Position dragon head in center-left area"
-		baseX _ cx - 100.
-		baseY _ cy.
-		snoutTip _ baseX + 200.
+		"Create pen for drawing"
+		pen _ Pen new.
+		pen defaultNib: 3.
 
-		"Dragon head outline - elongated snout tapering forward"
-		"Upper head contour"
-		0 to: 200 by: 4 do: [:i |
-			x _ baseX + i.
-			y _ baseY - (60 - (i // 4)).
-			Display fill: (x @ y extent: 5 @ 5) mask: Form black].
+		"Position dragon head center-left"
+		baseX _ cx - 120.
+		baseY _ cy.
+
+		"=== DRAGON HEAD OUTLINE ==="
+		"Upper head contour - curve from back to snout tip"
+		pen place: (baseX - 50) @ (baseY - 60).
+		pen down.
+		pen goto: (baseX - 30) @ (baseY - 75).
+		pen goto: (baseX) @ (baseY - 80).
+		pen goto: (baseX + 50) @ (baseY - 70).
+		pen goto: (baseX + 100) @ (baseY - 50).
+		pen goto: (baseX + 150) @ (baseY - 30).
+		pen goto: (baseX + 200) @ (baseY - 10).
+		pen goto: (baseX + 220) @ (baseY).
 
 		"Lower jaw contour"
-		0 to: 200 by: 4 do: [:i |
-			x _ baseX + i.
-			y _ baseY + (50 - (i // 5)).
-			Display fill: (x @ y extent: 5 @ 5) mask: Form black].
+		pen goto: (baseX + 200) @ (baseY + 20).
+		pen goto: (baseX + 150) @ (baseY + 35).
+		pen goto: (baseX + 100) @ (baseY + 45).
+		pen goto: (baseX + 50) @ (baseY + 50).
+		pen goto: (baseX) @ (baseY + 50).
+		pen goto: (baseX - 30) @ (baseY + 45).
+		pen goto: (baseX - 50) @ (baseY + 30).
 
-		"Back of head curve"
-		-60 to: 50 by: 3 do: [:dy |
-			x _ baseX - ((dy * dy) // 80).
-			y _ baseY + dy.
-			Display fill: (x @ y extent: 5 @ 5) mask: Form black].
+		"Back of head connection"
+		pen goto: (baseX - 60) @ (baseY).
+		pen goto: (baseX - 50) @ (baseY - 30).
+		pen goto: (baseX - 50) @ (baseY - 60).
+		pen up.
 
-		"Main horns - large backward-pointing spikes"
-		"Horn 1 (top)"
-		0 to: 80 by: 2 do: [:i |
-			x _ baseX - i.
-			y _ baseY - 70 - (i // 2).
-			Display fill: ((x - 3) @ y extent: 6 @ 8) mask: Form black].
+		"=== HORNS ==="
+		pen defaultNib: 4.
+		"Main horn 1 (top back)"
+		pen place: (baseX - 40) @ (baseY - 70).
+		pen down.
+		pen goto: (baseX - 70) @ (baseY - 95).
+		pen goto: (baseX - 90) @ (baseY - 115).
+		pen goto: (baseX - 100) @ (baseY - 125).
+		pen up.
+		pen place: (baseX - 40) @ (baseY - 70).
+		pen down.
+		pen goto: (baseX - 50) @ (baseY - 85).
+		pen goto: (baseX - 85) @ (baseY - 110).
+		pen up.
 
 		"Horn 2 (upper middle)"
-		0 to: 70 by: 2 do: [:i |
-			x _ baseX - (i * 4 // 5).
-			y _ baseY - 55 - (i // 3).
-			Display fill: ((x - 2) @ y extent: 5 @ 7) mask: Form black].
+		pen place: (baseX - 20) @ (baseY - 75).
+		pen down.
+		pen goto: (baseX - 40) @ (baseY - 95).
+		pen goto: (baseX - 55) @ (baseY - 110).
+		pen up.
 
 		"Horn 3 (lower back)"
-		0 to: 60 by: 2 do: [:i |
-			x _ baseX - (i * 3 // 4).
-			y _ baseY - 30 - (i // 4).
-			Display fill: ((x - 2) @ y extent: 4 @ 6) mask: Form black].
+		pen place: (baseX - 45) @ (baseY - 40).
+		pen down.
+		pen goto: (baseX - 65) @ (baseY - 55).
+		pen goto: (baseX - 75) @ (baseY - 65).
+		pen up.
 
-		"Jaw spikes - small triangular spikes along lower jaw"
-		0 to: 150 by: 20 do: [:i |
-			x _ baseX + i.
-			y _ baseY + (50 - (i // 5)).
-			0 to: 8 do: [:s |
-				Display fill: ((x - (s // 2)) @ (y + s) extent: s max: 1 @ 2) mask: Form black]].
+		"=== JAW SPIKES ==="
+		pen defaultNib: 2.
+		0 to: 180 by: 25 do: [:i |
+			pen place: (baseX + i) @ (baseY + 50 - (i // 6)).
+			pen down.
+			pen goto: (baseX + i + 5) @ (baseY + 63 - (i // 6)).
+			pen goto: (baseX + i + 10) @ (baseY + 50 - (i // 6)).
+			pen up].
 
-		"Dragon eye - large detailed eye"
-		eyeX _ baseX + 80.
-		eyeY _ baseY - 20.
+		"=== DRAGON EYE ==="
+		eyeX _ baseX + 70.
+		eyeY _ baseY - 25.
 
-		"Eye outer circle"
-		-25 to: 25 do: [:dy |
-			-25 to: 25 do: [:dx |
-				((dx * dx) + (dy * dy) < 625) ifTrue: [
-					Display fill: ((eyeX + dx) @ (eyeY + dy) extent: 3 @ 3) mask: Form black]]].
+		"Eye circle"
+		pen defaultNib: 2.
+		pen place: (eyeX + 20) @ eyeY.
+		pen down.
+		16 timesRepeat: [
+			pen turn: 22.5.
+			pen go: 8].
+		pen up.
 
-		"Eye highlight (white area)"
-		Display fill: (eyeX - 8 @ (eyeY - 8) extent: 16 @ 16) mask: Form black.
-		Display reverse: (eyeX - 8 @ (eyeY - 8) extent: 16 @ 16).
+		"Eye highlight"
+		Display fill: ((eyeX - 5) @ (eyeY - 8) extent: 12 @ 12) mask: Form black.
+		Display reverse: ((eyeX - 5) @ (eyeY - 8) extent: 12 @ 12).
 
 		"Pupil (vertical slit)"
-		Display fill: (eyeX - 2 @ (eyeY - 15) extent: 4 @ 30) mask: Form black.
+		pen defaultNib: 3.
+		pen place: (eyeX - 1) @ (eyeY - 12).
+		pen down.
+		pen goto: (eyeX - 1) @ (eyeY + 12).
+		pen up.
 
-		"Eye ridge above"
-		0 to: 30 do: [:i |
-			Display fill: ((eyeX - 15 + i) @ (eyeY - 30 - (i // 3)) extent: 3 @ 5) mask: Form black].
+		"Eye ridge"
+		pen defaultNib: 3.
+		pen place: (eyeX - 15) @ (eyeY - 30).
+		pen down.
+		pen goto: (eyeX + 15) @ (eyeY - 28).
+		pen up.
 
-		"Nostril"
-		x _ snoutTip - 20.
-		y _ baseY + 15.
-		-8 to: 8 do: [:dy |
-			-5 to: 5 do: [:dx |
-				((dx * dx) + (dy * dy) < 40) ifTrue: [
-					Display fill: ((x + dx) @ (y + dy) extent: 2 @ 2) mask: Form black]]].
+		"=== NOSTRIL ==="
+		pen defaultNib: 2.
+		pen place: (baseX + 200) @ (baseY + 8).
+		pen down.
+		8 timesRepeat: [
+			pen turn: 45.
+			pen go: 3].
+		pen up.
 
-		"Scales - diamond pattern across face"
-		baseX to: (snoutTip - 30) by: 15 do: [:sx |
-			(baseY - 40) to: (baseY + 30) by: 12 do: [:sy |
-				"Diamond scale"
-				-4 to: 4 do: [:d |
-					Display fill: ((sx - d abs) @ (sy + d) extent: (d abs * 2 + 1) @ 1) mask: Form black.
-					Display fill: ((sx - d abs) @ (sy - d) extent: (d abs * 2 + 1) @ 1) mask: Form black]]].
+		"=== SCALES ==="
+		pen defaultNib: 1.
+		baseX to: (baseX + 180) by: 18 do: [:sx |
+			(baseY - 45) to: (baseY + 35) by: 15 do: [:sy |
+				"Diamond scale outline"
+				pen place: sx @ (sy - 6).
+				pen down.
+				pen goto: (sx + 6) @ sy.
+				pen goto: sx @ (sy + 6).
+				pen goto: (sx - 6) @ sy.
+				pen goto: sx @ (sy - 6).
+				pen up]].
 
-		"Texture lines - cross-hatching for dimension"
-		baseX to: (snoutTip - 10) by: 8 do: [:tx |
-			(baseY - 50) to: (baseY + 40) by: 6 do: [:ty |
-				Display fill: (tx @ ty extent: 4 @ 1) mask: Form gray]].
+		"=== SNOUT RIDGE ==="
+		pen defaultNib: 2.
+		pen place: (baseX + 20) @ (baseY - 8).
+		pen down.
+		pen goto: (baseX + 220) @ (baseY - 3).
+		pen up.
 
-		"Snout ridge detail"
-		0 to: 180 by: 3 do: [:i |
-			x _ baseX + i.
-			y _ baseY - 5.
-			Display fill: (x @ y extent: 2 @ 2) mask: Form black].
+		"=== MOUTH LINE ==="
+		pen defaultNib: 2.
+		pen place: (baseX + 30) @ (baseY + 30).
+		pen down.
+		pen goto: (baseX + 180) @ (baseY + 20).
+		pen up.
 
-		"Mouth line"
-		0 to: 150 by: 2 do: [:i |
-			x _ baseX + i.
-			y _ baseY + 35 - (i // 8).
-			Display fill: (x @ y extent: 3 @ 2) mask: Form black]]! !
+		"=== TEXTURE DETAILS ==="
+		"Cross-hatching on lower jaw for texture"
+		pen defaultNib: 1.
+		baseX to: (baseX + 150) by: 12 do: [:tx |
+			pen place: tx @ (baseY + 35).
+			pen down.
+			pen goto: (tx + 8) @ (baseY + 45).
+			pen up].
+
+		"Cross-hatching on upper head"
+		baseX to: (baseX + 150) by: 12 do: [:tx |
+			pen place: tx @ (baseY - 40).
+			pen down.
+			pen goto: (tx + 8) @ (baseY - 50).
+			pen up]]! !
 
 testBitBltRules
 	"Test all 16 BitBlt combination rules with a visual grid.
