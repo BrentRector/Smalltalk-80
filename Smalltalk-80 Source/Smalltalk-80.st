@@ -15918,26 +15918,9 @@ initialize
 		Display fill: (cx @ cy extent: 50 @ 50) mask: Form black.
 		Display fill: (cx + 100 @ (cy + 50) extent: 50 @ 50) mask: Form black.
 
-		"Dragon body - sinuous curve with line shading"
-		prevX _ nil.
-		0 to: 200 do: [:i |
-			t _ i / 200.0.
-			angle _ t * pi * 3.
-			x _ cx + ((scale * (t - 0.5) * 2.5) truncated).
-			y _ cy + ((angle sin * scale * 0.6) truncated).
-
-			prevX notNil ifTrue: [
-				"Draw body segment - LARGER for visibility"
-				Display fill: (x @ (y - 8) extent: 12 @ 16) mask: Form black.
-
-				"Add line shading perpendicular to body"
-				(i \\ 8 = 0) ifTrue: [
-					dy _ ((angle cos * 30) truncated).
-					dx _ ((angle sin * 30) truncated).
-					Display fill: (x @ y extent: 8 @ 4) mask: Form black.
-					Display fill: ((x - dx) @ (y - dy) extent: 8 @ 4) mask: Form black.
-					Display fill: ((x + dx) @ (y + dy) extent: 8 @ 4) mask: Form black]].
-			prevX _ x. prevY _ y].
+		"TEST: Simple horizontal line to verify loop works"
+		0 to: 20 do: [:i |
+			Display fill: ((100 + (i * 20)) @ 300 extent: 15 @ 15) mask: Form black].
 
 		"Dragon head at left end"
 		x _ cx - ((scale * 1.25) truncated).
