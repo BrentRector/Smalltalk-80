@@ -77,15 +77,21 @@ public static class BitBltEngine
         int sourceStride = (sourceWidth + 7) / 8;
         int halftoneStride = halftoneWidth > 0 ? (halftoneWidth + 7) / 8 : 0;
 
+        // Detect nil/empty source FIRST (fill operation)
+        bool isNilSource = (sourceWidth == 0 || sourceHeight == 0 || sourceBits.Length == 0);
+
         // Validate buffer lengths before accessing
         int destRequiredBytes = destStride * destHeight;
-        int sourceRequiredBytes = sourceStride * sourceHeight;
-
         if (destBits.Length < destRequiredBytes)
             return;  // Dest buffer too small - abort operation
 
-        if (sourceBits.Length < sourceRequiredBytes)
-            return;  // Source buffer too small - abort operation
+        // Only validate source buffer if NOT a nil source operation
+        if (!isNilSource)
+        {
+            int sourceRequiredBytes = sourceStride * sourceHeight;
+            if (sourceBits.Length < sourceRequiredBytes)
+                return;  // Source buffer too small - abort operation
+        }
 
         if (halftone.Length > 0 && halftoneWidth > 0 && halftoneHeight > 0)
         {
@@ -93,9 +99,6 @@ public static class BitBltEngine
             if (halftone.Length < halftoneRequiredBytes)
                 return;  // Halftone buffer too small - abort operation
         }
-
-        // Detect nil/empty source (fill operation)
-        bool isNilSource = (sourceWidth == 0 || sourceHeight == 0 || sourceBits.Length == 0);
 
         // Check if we can use optimized paths
         bool hasHalftone = halftone.Length > 0 && halftoneWidth > 0 && halftoneHeight > 0;
