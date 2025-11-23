@@ -334,6 +334,8 @@ public static class GraphicsOperations
     /// <summary>Primitive 104: drawLoopX:Y: - Bresenham line drawing for BitBlt</summary>
     public class DrawLoop : IPrimitive
     {
+        private static int s_drawPixelCallCount = 0; // DIAGNOSTIC counter
+
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             // Receiver must be a BitBlt object
@@ -352,6 +354,9 @@ public static class GraphicsOperations
 
             int xDelta = xDeltaOOP.AsSmallInteger();
             int yDelta = yDeltaOOP.AsSmallInteger();
+
+            // DIAGNOSTIC: Reset counter at start of each primitive call
+            s_drawPixelCallCount = 0;
 
             // Extract BitBlt instance variables (14 fields)
             var destFormOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 0);
@@ -394,15 +399,6 @@ public static class GraphicsOperations
             var (destBits, destWidth, destHeight) = ExtractFormData(context, destFormOOP);
             var (sourceBits, sourceWidth, sourceHeight) = ExtractFormData(context, sourceFormOOP);
             var (halftoneBits, halftoneWidth, halftoneHeight) = ExtractFormData(context, halftoneFormOOP);
-
-            // DIAGNOSTIC: Log first line only
-            if (destX < 300 && destY < 300)
-            {
-                Console.WriteLine($"[Prim104] Rule={combinationRule}, Line ({destX},{destY}) delta=({xDelta},{yDelta})");
-                Console.WriteLine($"[Prim104] Source: {sourceWidth}x{sourceHeight}, {sourceBits.Length}bytes");
-                Console.WriteLine($"[Prim104] Halftone: {halftoneWidth}x{halftoneHeight}, {halftoneBits.Length}bytes");
-                Console.WriteLine($"[Prim104] Brush: {width}x{height}");
-            }
 
             // Implement Bresenham line drawing algorithm
             int dx = Math.Sign(xDelta);
@@ -458,6 +454,12 @@ public static class GraphicsOperations
             // Write modified dest bits back
             WriteFormData(context, destFormOOP, destBits);
 
+            // DIAGNOSTIC: Log total DrawPixel calls for this line
+            if (s_drawPixelCallCount > 0 && s_drawPixelCallCount < 100)
+            {
+                Console.WriteLine($"[Prim104] DrawPixel called {s_drawPixelCallCount} times for line delta=({xDelta},{yDelta})");
+            }
+
             return PrimitiveResult.Ok(context.Receiver);
         }
 
@@ -466,20 +468,60 @@ public static class GraphicsOperations
                                       int width, int height, int clipX, int clipY, int clipWidth, int clipHeight,
                                       Span<byte> halftoneBits, int halftoneWidth, int halftoneHeight, int combinationRule)
         {
-            // DIAGNOSTIC: Log first pixel only
-            if (destX == 236 && destY == 296)
+            // DIAGNOSTIC: Increment call counter
+            s_drawPixelCallCount++;
+
+            // DIAGNOSTIC: Log first pixel with before/after bytes
+            if (s_drawPixelCallCount == 1)
             {
-                Console.WriteLine($"[DrawPixel] Calling BitBltEngine at ({destX},{destY})");
-                Console.WriteLine($"[DrawPixel] Source bytes: {string.Join(" ", sourceBits.Slice(0, Math.Min(4, sourceBits.Length)).ToArray().Select(b => $"{b:X2}"))}");
-                Console.WriteLine($"[DrawPixel] Halftone bytes: {string.Join(" ", halftoneBits.Slice(0, Math.Min(8, halftoneBits.Length)).ToArray().Select(b => $"{b:X2}"))}");
-                Console.WriteLine($"[DrawPixel] TESTING: Will use rule Copy (3) instead of Or (7)");
+                int destStride = (destWidth + 7) / 8;
+                int byteIdx = destY * destStride + (destX / 8);
+                byte byteBefore = (byteIdx >= 0 && byteIdx < destBits.Length) ? destBits[byteIdx] : (byte)0;
+
+                Console.WriteLine($"[DrawPixel #{s_drawPixelCallCount}] Position ({destX},{destY}), rule={combinationRule}");
+                Console.WriteLine($"[DrawPixel] Source: {sourceWidth}x{sourceHeight}, bytes: {string.Join(" ", sourceBits.Slice(0, Math.Min(4, sourceBits.Length)).ToArray().Select(b => $"{b:X2}"))}");
+                Console.WriteLine($"[DrawPixel] Halftone: {halftoneWidth}x{halftoneHeight}, bytes: {string.Join(" ", halftoneBits.Slice(0, Math.Min(8, halftoneBits.Length)).ToArray().Select(b => $"{b:X2}"))}");
+                Console.WriteLine($"[DrawPixel] Dest byte BEFORE: destBits[{byteIdx}] = 0x{byteBefore:X2}");
+
+                // Handle paint mode (rule 16) - TEST with Copy rule
+                if (combinationRule == 16)
+                {
+                    Console.WriteLine($"[DrawPixel] TESTING: Using Copy rule instead of Or");
+                    BitBltEngine.CopyBits(
+                        destBits, destWidth, destHeight, destX, destY,
+                        sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
+                        width, height,
+                        clipX, clipY, clipWidth, clipHeight,
+                        halftoneBits, halftoneWidth, halftoneHeight,
+                        CombinationRule.Copy);  // TEST: Rule 3 (copy) instead of 7 (or)
+                }
+                else
+                {
+                    BitBltEngine.CopyBits(
+                        destBits, destWidth, destHeight, destX, destY,
+                        sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
+                        width, height,
+                        clipX, clipY, clipWidth, clipHeight,
+                        halftoneBits, halftoneWidth, halftoneHeight,
+                        (CombinationRule)combinationRule);
+                }
+
+                byte byteAfter = (byteIdx >= 0 && byteIdx < destBits.Length) ? destBits[byteIdx] : (byte)0;
+                Console.WriteLine($"[DrawPixel] Dest byte AFTER: destBits[{byteIdx}] = 0x{byteAfter:X2}");
+                if (byteBefore == byteAfter)
+                {
+                    Console.WriteLine($"[DrawPixel] ⚠️ WARNING: Dest byte UNCHANGED!");
+                }
+                else
+                {
+                    Console.WriteLine($"[DrawPixel] ✓ Dest byte changed: 0x{byteBefore:X2} → 0x{byteAfter:X2}");
+                }
+                return; // Exit after first diagnostic
             }
 
-            // Handle paint mode (rule 16) - TEST with Copy rule
-            // Pen uses Form black halftone, which skips erase pass and only does under pass
+            // Non-diagnostic path for remaining pixels
             if (combinationRule == 16)
             {
-                // DIAGNOSTIC TEST: Try Copy instead of Or to see if Or operation is broken
                 BitBltEngine.CopyBits(
                     destBits, destWidth, destHeight, destX, destY,
                     sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
@@ -490,7 +532,6 @@ public static class GraphicsOperations
             }
             else
             {
-                // Simple rules 0-15: single BitBlt operation
                 BitBltEngine.CopyBits(
                     destBits, destWidth, destHeight, destX, destY,
                     sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
