@@ -336,12 +336,8 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            // Receiver must be a BitBlt object with 14 instance variables
+            // Receiver must be a BitBlt object
             if (context.Receiver.IsSmallInteger)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            var receiverEntry = context.HeapManager.GetObjectTableEntry(context.Receiver);
-            if (receiverEntry.PointerCount < 14)
                 return PrimitiveResult.Fail(context.Metadata!);
 
             // Arguments: xDelta and yDelta (SmallIntegers)
@@ -357,21 +353,21 @@ public static class GraphicsOperations
             int xDelta = xDeltaOOP.AsSmallInteger();
             int yDelta = yDeltaOOP.AsSmallInteger();
 
-            // Extract BitBlt instance variables
-            var destFormOOP = context.HeapManager.GetPointerField(context.Receiver, 0);
-            var sourceFormOOP = context.HeapManager.GetPointerField(context.Receiver, 1);
-            var halftoneFormOOP = context.HeapManager.GetPointerField(context.Receiver, 2);
-            var combinationRuleOOP = context.HeapManager.GetPointerField(context.Receiver, 3);
-            var destXOOP = context.HeapManager.GetPointerField(context.Receiver, 4);
-            var destYOOP = context.HeapManager.GetPointerField(context.Receiver, 5);
-            var widthOOP = context.HeapManager.GetPointerField(context.Receiver, 6);
-            var heightOOP = context.HeapManager.GetPointerField(context.Receiver, 7);
-            var sourceXOOP = context.HeapManager.GetPointerField(context.Receiver, 8);
-            var sourceYOOP = context.HeapManager.GetPointerField(context.Receiver, 9);
-            var clipXOOP = context.HeapManager.GetPointerField(context.Receiver, 10);
-            var clipYOOP = context.HeapManager.GetPointerField(context.Receiver, 11);
-            var clipWidthOOP = context.HeapManager.GetPointerField(context.Receiver, 12);
-            var clipHeightOOP = context.HeapManager.GetPointerField(context.Receiver, 13);
+            // Extract BitBlt instance variables (14 fields)
+            var destFormOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 0);
+            var sourceFormOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 1);
+            var halftoneFormOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 2);
+            var combinationRuleOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 3);
+            var destXOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 4);
+            var destYOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 5);
+            var widthOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 6);
+            var heightOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 7);
+            var sourceXOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 8);
+            var sourceYOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 9);
+            var clipXOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 10);
+            var clipYOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 11);
+            var clipWidthOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 12);
+            var clipHeightOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 13);
 
             // Validate numeric fields
             if (!combinationRuleOOP.IsSmallInteger || !destXOOP.IsSmallInteger || !destYOOP.IsSmallInteger ||
