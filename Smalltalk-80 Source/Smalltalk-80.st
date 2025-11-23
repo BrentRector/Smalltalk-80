@@ -42857,3 +42857,11 @@ testComprehensive
 testAll
 	"Synonym for testComprehensive"
 	^self testComprehensive! !
+
+"==================== GraphicsTest Execution ===================="
+
+"Run GraphicsTest visual tests after all init expressions"
+GraphicsTest testBitBltVisual!
+GraphicsTest testPenVisual!
+GraphicsTest testFormDisplay!
+GraphicsTest testHalftonesVisual!
