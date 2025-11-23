@@ -31,12 +31,20 @@
 - ✅ Window remains responsive during init expression execution
 
 **Phase 2: Window Sizing** ✅ **COMPLETE**
-- ✅ Read Display dimensions from heap after cold start (Program.cs lines 110-112)
 - ✅ WinFormsDisplayProvider accepts width/height parameters (no heap access - thread safety)
 - ✅ DisplayResized() method added to IPlatformBridge interface
-- ✅ BeDisplay primitive (101) detects size changes and calls DisplayResized()
-- ✅ Window dimensions now dynamically match Smalltalk Display object
+- ✅ BeDisplay primitive (102) detects size changes and calls DisplayResized()
+- ✅ Window dimensions dynamically match Smalltalk Display object via resize flow
 - ✅ Supports runtime resizing: `DisplayScreen displayExtent: 800@600`
+
+**Testing Window Resize Flow:**
+- Window initially created at **800x600** (hardcoded in Program.cs)
+- Smalltalk Display object created at **640x480** (in RuntimeObjectCreator.cs)
+- When `DisplayScreen initialize` init expression runs, it calls `Display beDisplay`
+- BeDisplay primitive (102) reads Display dimensions (640x480) and calls `DisplayResized(640, 480)`
+- Window automatically resizes from 800x600 → 640x480
+- Console output shows: `[Display] Resizing from 800x600 to 640x480`
+- This validates the complete resize communication flow: Smalltalk thread → UI thread
 
 **Phase 3: Fiber Infrastructure** 📋 **ON HOLD**
 - Fiber work postponed pending other priorities

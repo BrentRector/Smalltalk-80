@@ -106,18 +106,20 @@ public static class Program
             // Build VM metadata (needed by Smalltalk thread)
             var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
-            // Read Display dimensions from heap (before creating UI)
-            var displayOOP = GlobalRegistry.Get("Display");
-            int displayWidth = heapManager.GetInstanceVariable(displayOOP, 1).AsSmallInteger();   // Form.width at index 1
-            int displayHeight = heapManager.GetInstanceVariable(displayOOP, 2).AsSmallInteger();  // Form.height at index 2
+            // NOTE: Intentionally creating window at 800x600 to test resize flow
+            // Smalltalk Display object is 640x480 (created during cold start)
+            // When beDisplay primitive is called, it should resize window from 800x600 → 640x480
+            // This tests the DisplayResized() communication from Smalltalk thread → UI thread
 
             // Create event queue (shared between threads)
             Console.WriteLine("\n=== Creating Event Queue ===");
             var eventQueue = new SmalltalkEventQueue();
 
             // Create display window (UI thread object - does NOT access heap)
+            // TESTING: Create window at 800x600 (different from Smalltalk Display size of 640x480)
             Console.WriteLine("\n=== Creating Display Window ===");
-            var displayProvider = new WinFormsDisplayProvider(displayWidth, displayHeight, eventQueue, "Smalltalk-80");
+            Console.WriteLine("  Initial window size: 800x600 (will resize to 640x480 when beDisplay is called)");
+            var displayProvider = new WinFormsDisplayProvider(800, 600, eventQueue, "Smalltalk-80");
             Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity
