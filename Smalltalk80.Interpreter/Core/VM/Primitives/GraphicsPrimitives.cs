@@ -208,18 +208,66 @@ public static class GraphicsOperations
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Invalidate display if platform bridge available
+            var newDisplayOOP = context.Receiver;
+
+            // Read new Display dimensions from Form instance variables
+            int newWidth = context.HeapManager.GetInstanceVariable(newDisplayOOP, 1).AsSmallInteger();
+            int newHeight = context.HeapManager.GetInstanceVariable(newDisplayOOP, 2).AsSmallInteger();
+
+            // Get current Display global (if it exists) to detect size changes
+            var oldDisplayOOP = context.HeapManager.GetNil();
+            bool sizeChanged = false;
+
+            if (context.RuntimeHeapAccess != null)
+            {
+                try
+                {
+                    oldDisplayOOP = context.RuntimeHeapAccess.GetGlobal("Display");
+
+                    // Check if dimensions changed
+                    if (oldDisplayOOP != context.HeapManager.GetNil() && oldDisplayOOP != newDisplayOOP)
+                    {
+                        int oldWidth = context.HeapManager.GetInstanceVariable(oldDisplayOOP, 1).AsSmallInteger();
+                        int oldHeight = context.HeapManager.GetInstanceVariable(oldDisplayOOP, 2).AsSmallInteger();
+                        sizeChanged = (newWidth != oldWidth || newHeight != oldHeight);
+                    }
+                }
+                catch
+                {
+                    // If we can't read old Display, assume no size change
+                    sizeChanged = false;
+                }
+
+                // Update Display global to point to new DisplayScreen
+                try
+                {
+                    context.RuntimeHeapAccess.SetGlobal("Display", newDisplayOOP);
+                }
+                catch
+                {
+                    // Ignore global update errors
+                }
+            }
+
+            // Notify platform bridge
             if (context.Platform != null)
             {
                 try
                 {
-                    int width = context.HeapManager.GetInstanceVariable(context.Receiver, 1).AsSmallInteger();
-                    int height = context.HeapManager.GetInstanceVariable(context.Receiver, 2).AsSmallInteger();
-                    context.Platform.InvalidateDisplayRegion(0, 0, width, height);
+                    if (sizeChanged)
+                    {
+                        // Display dimensions changed - notify platform to resize window
+                        context.Platform.DisplayResized(newWidth, newHeight);
+                    }
+                    else
+                    {
+                        // Just invalidate the display region (no size change)
+                        context.Platform.InvalidateDisplayRegion(0, 0, newWidth, newHeight);
+                    }
                 }
                 catch
                 {
-                    // Ignore invalidation errors
+                    // Ignore platform errors
                 }
             }
 

@@ -47,6 +47,16 @@ public interface IPlatformBridge
     /// <param name="h">Height of region.</param>
     void InvalidateDisplayRegion(int x, int y, int w, int h);
 
+    /// <summary>
+    /// Notifies the platform that the Display dimensions have changed.
+    /// Called by Primitive 102 (beDisplay) when a new DisplayScreen becomes active
+    /// with different dimensions than the previous Display.
+    /// The platform should resize its window and reallocate buffers to match.
+    /// </summary>
+    /// <param name="newWidth">New width of Display in pixels.</param>
+    /// <param name="newHeight">New height of Display in pixels.</param>
+    void DisplayResized(int newWidth, int newHeight);
+
     // ============================================================================
     // Input / Mouse / Cursor (Primitives 90-95)
     // ============================================================================
