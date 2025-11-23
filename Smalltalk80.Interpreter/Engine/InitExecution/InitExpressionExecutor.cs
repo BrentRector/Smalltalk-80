@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Core.Diagnostics.Listeners;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
@@ -209,6 +210,20 @@ public class InitExpressionExecutor
 
         Console.Write($"  {expr.Source}... ");
 
+        // Enable diagnostic listener for VariableNode initialize to debug hash/modulo issue
+        MethodTraceListener? traceListener = null;
+        bool enableTracing = expr.Source.Contains("VariableNode initialize");
+        if (enableTracing && _diagnostics != null)
+        {
+            Console.WriteLine();
+            Console.WriteLine("=== ENABLING METHOD TRACE ===");
+            traceListener = new MethodTraceListener { MaxDepth = 20 };
+            _diagnostics.Register(traceListener,
+                DiagnosticEventTypes.MethodEntry |
+                DiagnosticEventTypes.PrimitiveCall |
+                DiagnosticEventTypes.PrimitiveFailure);
+        }
+
         // CRITICAL: Reset instruction counter for EACH init expression
         // Without this, the counter accumulates across ALL expressions:
         // 40 expressions × 10K instructions each = 400K accumulated before #41 even starts!
@@ -307,6 +322,15 @@ public class InitExpressionExecutor
             stopwatch.Stop();
             Console.WriteLine($"❌ ERROR: {ex.Message}");
             return InitResult.FatalError(expr.LocalId, $"{ex.GetType().Name}: {ex.Message}\n\nStack trace:\n{ex.StackTrace}");
+        }
+        finally
+        {
+            // Unregister trace listener if it was added
+            if (traceListener != null && _diagnostics != null)
+            {
+                _diagnostics.Unregister(traceListener);
+                Console.WriteLine("=== METHOD TRACE DISABLED ===");
+            }
         }
     }
 
