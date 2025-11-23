@@ -336,10 +336,6 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            // TEMPORARY: Always fail to test Smalltalk fallback
-            return PrimitiveResult.Fail(context.Metadata!);
-
-#pragma warning disable CS0162 // Unreachable code detected
             // Receiver must be a BitBlt object
             if (context.Receiver.IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
@@ -399,6 +395,15 @@ public static class GraphicsOperations
             var (sourceBits, sourceWidth, sourceHeight) = ExtractFormData(context, sourceFormOOP);
             var (halftoneBits, halftoneWidth, halftoneHeight) = ExtractFormData(context, halftoneFormOOP);
 
+            // DIAGNOSTIC: Log first line only
+            if (destX < 300 && destY < 300)
+            {
+                Console.WriteLine($"[Prim104] Rule={combinationRule}, Line ({destX},{destY}) delta=({xDelta},{yDelta})");
+                Console.WriteLine($"[Prim104] Source: {sourceWidth}x{sourceHeight}, {sourceBits.Length}bytes");
+                Console.WriteLine($"[Prim104] Halftone: {halftoneWidth}x{halftoneHeight}, {halftoneBits.Length}bytes");
+                Console.WriteLine($"[Prim104] Brush: {width}x{height}");
+            }
+
             // Implement Bresenham line drawing algorithm
             int dx = Math.Sign(xDelta);
             int dy = Math.Sign(yDelta);
@@ -454,7 +459,6 @@ public static class GraphicsOperations
             WriteFormData(context, destFormOOP, destBits);
 
             return PrimitiveResult.Ok(context.Receiver);
-#pragma warning restore CS0162
         }
 
         private static void DrawPixel(Span<byte> destBits, int destWidth, int destHeight, int destX, int destY,
