@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-22
+**Last Updated**: 2025-11-23
 
 ## Project Status
 
@@ -173,6 +173,7 @@ See `docs/Testing-Guide.md` for complete testing documentation.
 - FormMenuView initialize - Requires file I/O primitives (98, 92, 99, 146 - not implemented)
 
 **Recent Fixes**:
+- **Primitive 65 (Stream>>next)**: Fixed to return Character objects (not SmallIntegers) when reading from Strings/Symbols, enabling Scanner and --execute feature to work correctly. Uses isKindOf: semantics to handle subclasses properly.
 - Added InputSensor install and InputSensor initSensor init expressions to properly initialize Sensor global
 - Fixed Cursor initialize to set CurrentCursor (was nil, causing cursorPoint failures)
 - Modified Object initialize to comment out GUI confirmation dialog while preserving DependentsFields initialization

@@ -1,6 +1,6 @@
 # Primitive Implementation Summary
 
-**Last Updated**: 2025-11-02
+**Last Updated**: 2025-11-23
 **Status**: ✅ 100% Blue Book Conformance Achieved
 **Total Primitives**: 115 implemented
 **Specification Reference**: [Formal Specification of the Primitive Methods.md](../Formal%20Specification%20of%20the%20Primitive%20Methods.md)
@@ -155,7 +155,7 @@ All 17 LargeInteger primitives fully implemented using `System.Numerics.BigInteg
 - 62: `size` - Array size
 - 63: `basicAt:` - String/ByteArray character access (with CharacterTable lookup)
 - 64: `basicAt:put:` - String/ByteArray character modification
-- 65: `next` - Stream read
+- 65: `next` - ✅ **FIXED 2025-11-23** Stream read (returns Character for String/Symbol, SmallInteger for ByteArray, uses isKindOf: semantics)
 - 66: `nextPut:` - Stream write
 - 67: `atEnd` - Stream exhaustion test
 
@@ -288,9 +288,39 @@ All 17 LargeInteger primitives fully implemented using `System.Numerics.BigInteg
 
 ---
 
-## Recent Fixes (2025-11-02)
+## Recent Fixes
 
-### Phase 1-5 Complete Primitive Specification Alignment
+### Primitive 65 Fix (2025-11-23)
+
+**Issue**: Primitive 65 (Stream>>next) was returning raw SmallInteger byte values when reading from Strings, causing Scanner to fail with "Method not found: asciiValue in class SmallInteger" error.
+
+**Root Cause**: When reading from ByteIndexed collections (Strings), the primitive returned `SmallInteger.FromSmallInteger(byteValue)` instead of looking up the corresponding Character object from CharacterTable.
+
+**Fix Applied**:
+1. Added isKindOf: helper method to traverse superclass chain
+2. Updated ByteIndexed type check to use isKindOf: instead of strict class equality
+3. For String/Symbol (and subclasses): Returns Character from CharacterTable
+4. For ByteArray: Returns raw SmallInteger
+5. For PointerIndexed (Arrays): Returns OOP directly
+
+**Blue Book Compliance**:
+- ✅ Implements optional optimization semantics (avoids message dispatch overhead)
+- ✅ Handles subclasses correctly (isKindOf: semantics)
+- ✅ Falls back to Smalltalk code on CharacterTable lookup failure
+- ✅ Matches behavior of fallback code: `^collection at: (position _ position + 1)`
+
+**Impact**:
+- ✅ Scanner now works correctly (can parse Smalltalk source)
+- ✅ --execute feature fully functional
+- ✅ String streams return proper Character objects
+- ✅ ByteArray streams return proper SmallIntegers
+
+**Files Modified**:
+- `ObjectPrimitives.cs` (Primitive 65 implementation)
+
+---
+
+### Phase 1-5 Complete Primitive Specification Alignment (2025-11-02)
 
 **Summary**: Comprehensive 5-phase project completed over 4 hours, achieving 100% Blue Book conformance.
 

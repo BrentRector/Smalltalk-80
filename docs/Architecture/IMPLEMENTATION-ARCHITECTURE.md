@@ -1,6 +1,6 @@
 # Implementation Architecture
 
-**Last Updated**: 2025-11-21
+**Last Updated**: 2025-11-23
 
 This document describes how the Smalltalk-80 interpreter executes bytecodes, manages contexts, dispatches messages, and handles primitives.
 
@@ -246,6 +246,20 @@ if (result.Success)
 else
     // Execute method bytecodes as fallback
 ```
+
+**Example**: Primitive 65 (Stream>>next) is marked as optional (*) in the Blue Book. It optimizes common cases (String, Symbol, ByteArray, Array) by avoiding message dispatch overhead. When it encounters exotic collection types or CharacterTable lookup fails, it returns `Fail` and delegates to the Smalltalk fallback:
+
+```smalltalk
+<primitive: 65>
+position >= readLimit
+    ifTrue: [^nil]
+    ifFalse: [^collection at: (position _ position + 1)]
+```
+
+The primitive uses **isKindOf: semantics** to handle subclasses correctly:
+- String/Symbol (and subclasses) → Returns Character from CharacterTable
+- ByteArray → Returns SmallInteger (raw byte value)
+- Array → Returns OOP directly
 
 ---
 
