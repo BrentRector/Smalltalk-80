@@ -787,7 +787,22 @@ namespace Smalltalk80.Compiler.AST
                 {
                     // Handle negative numbers in arrays
                     var numText = element.numberLiteral().GetText();
-                    elements.Add(new NumberLiteralNode { Value = "-" + numText });
+                    if (numText.Contains('.') || numText.Contains('e') || numText.Contains('E'))
+                    {
+                        elements.Add(new FloatLiteralNode { Value = -double.Parse(numText) });
+                    }
+                    else if (numText.Contains('r'))
+                    {
+                        // Handle radix notation
+                        var parts = numText.Split('r');
+                        var radix = int.Parse(parts[0]);
+                        var value = Convert.ToInt32(parts[1], radix);
+                        elements.Add(new IntegerLiteralNode { Value = -value });
+                    }
+                    else
+                    {
+                        elements.Add(new IntegerLiteralNode { Value = -int.Parse(numText) });
+                    }
                 }
                 else if (element.symbolName() != null)
                 {
@@ -808,7 +823,22 @@ namespace Smalltalk80.Compiler.AST
                         {
                             // Handle negative numbers in nested arrays
                             var numText = nested.numberLiteral().GetText();
-                            nestedElements.Add(new NumberLiteralNode { Value = "-" + numText });
+                            if (numText.Contains('.') || numText.Contains('e') || numText.Contains('E'))
+                            {
+                                nestedElements.Add(new FloatLiteralNode { Value = -double.Parse(numText) });
+                            }
+                            else if (numText.Contains('r'))
+                            {
+                                // Handle radix notation
+                                var parts = numText.Split('r');
+                                var radix = int.Parse(parts[0]);
+                                var value = Convert.ToInt32(parts[1], radix);
+                                nestedElements.Add(new IntegerLiteralNode { Value = -value });
+                            }
+                            else
+                            {
+                                nestedElements.Add(new IntegerLiteralNode { Value = -int.Parse(numText) });
+                            }
                         }
                         else if (nested.symbolName() != null)
                         {
