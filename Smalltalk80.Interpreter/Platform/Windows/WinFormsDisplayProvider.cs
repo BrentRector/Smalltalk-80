@@ -239,26 +239,34 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public void DisplayResized(int newWidth, int newHeight)
     {
-        // Called from Smalltalk thread when Display dimensions change
-        // Must marshal to UI thread for window resize
+        // Called from Smalltalk thread when Display dimensions may have changed
+        // Must marshal to UI thread for window operations
         if (InvokeRequired)
         {
             BeginInvoke(new Action(() => DisplayResized(newWidth, newHeight)));
             return;
         }
 
-        // On UI thread now - safe to resize window
+        // On UI thread now - check if dimensions actually changed
+        if (newWidth == Width && newHeight == Height)
+        {
+            // Dimensions unchanged - just invalidate the display
+            Invalidate();
+            return;
+        }
+
+        // Dimensions changed - resize window
         Console.WriteLine($"[Display] Resizing from {Width}x{Height} to {newWidth}x{newHeight}");
 
         // NOTE: Cannot reallocate buffers here because:
         // 1. Width and Height are readonly properties (set in constructor)
         // 2. _displayBuffer and _backBuffer are readonly fields
-        // 3. Window resizing currently not supported at runtime
+        // 3. Buffer reallocation requires replacing readonly fields (not currently supported)
         //
         // Future enhancement: Make Width/Height mutable and reallocate buffers
         // For now, just resize the window - buffer will be clipped/padded
 
-        // Resize window to match new dimensions
+        // Resize window to match new Display dimensions
         this.ClientSize = new Size(newWidth, newHeight);
         Invalidate(); // Repaint entire window
     }
