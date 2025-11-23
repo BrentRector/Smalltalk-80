@@ -1201,8 +1201,8 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 "-" => SmalltalkOOP.FromSmallInteger(a - b),
                 "*" => SmalltalkOOP.FromSmallInteger(a * b),
                 "/" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : metadata.KnownObjects.Nil,
-                "\\" => b != 0 ? SmalltalkOOP.FromSmallInteger(a % b) : metadata.KnownObjects.Nil,
-                "//" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : metadata.KnownObjects.Nil,
+                "\\" => b != 0 ? SmalltalkOOP.FromSmallInteger(a - b * (int)Math.Floor((double)a / b)) : metadata.KnownObjects.Nil,  // Smalltalk floored modulo
+                "//" => b != 0 ? SmalltalkOOP.FromSmallInteger((int)Math.Floor((double)a / b)) : metadata.KnownObjects.Nil,  // Smalltalk floored division
                 "<" => a < b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
                 ">" => a > b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
                 "<=" => a <= b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
