@@ -30,18 +30,16 @@
 - ✅ Program.cs refactored: UI thread (WinForms) + Smalltalk thread separation
 - ✅ Window remains responsive during init expression execution
 
-**Phase 2: Window Sizing** ⚠️ **IN PROGRESS**
-- ⏳ Read Display dimensions from heap after cold start
-- ⏳ Update WinFormsDisplayProvider to accept heap reference
-- ⏳ Add DisplayResized() method to IPlatformBridge
-- ⏳ Update BeDisplay primitive to detect size changes
+**Phase 2: Window Sizing** ✅ **COMPLETE**
+- ✅ Read Display dimensions from heap after cold start (Program.cs lines 110-112)
+- ✅ WinFormsDisplayProvider accepts width/height parameters (no heap access - thread safety)
+- ✅ DisplayResized() method added to IPlatformBridge interface
+- ✅ BeDisplay primitive (101) detects size changes and calls DisplayResized()
+- ✅ Window dimensions now dynamically match Smalltalk Display object
+- ✅ Supports runtime resizing: `DisplayScreen displayExtent: 800@600`
 
-**Phase 3: Fiber Infrastructure** 📋 **PLANNED**
-- 📋 Add fiber P/Invoke declarations (NativeMethods.Fibers.cs)
-- 📋 Create FiberScheduler class
-- 📋 Implement ConvertThreadToFiber, CreateProcessFiber, SwitchToFiber wrappers
-- 📋 Create FiberContext structure
-- 📋 Write unit tests for fiber creation and switching
+**Phase 3: Fiber Infrastructure** 📋 **ON HOLD**
+- Fiber work postponed pending other priorities
 
 See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, and `docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md` for complete migration documentation.
 
