@@ -171,7 +171,6 @@ public partial class VirtualMachine
         // Log method sends during tracing
         if (_tracer.ShouldTraceSend())
         {
-            var recvClass = GetClassName(GetClass(receiverOOP));
             var currentMethod = GetCurrentMethodLocalId();
             _tracer.TraceSendEntry(recvClass, selectorName ?? "unknown", currentMethod);
 
