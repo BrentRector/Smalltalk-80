@@ -37,14 +37,19 @@
 - ✅ Window dimensions dynamically match Smalltalk Display object via resize flow
 - ✅ Supports runtime resizing: `DisplayScreen displayExtent: 800@600`
 
-**Testing Window Resize Flow:**
-- Window initially created at **800x600** (hardcoded in Program.cs)
-- Smalltalk Display object created at **640x480** (in RuntimeObjectCreator.cs)
+**Display Configuration:**
+- Window created at **800x600** (hardcoded in Program.cs)
+- Smalltalk Display object created at **800x600** (in RuntimeObjectCreator.cs)
 - When `DisplayScreen initialize` init expression runs, it calls `Display beDisplay`
-- BeDisplay primitive (102) reads Display dimensions (640x480) and calls `DisplayResized(640, 480)`
-- Window automatically resizes from 800x600 → 640x480
-- Console output shows: `[Display] Resizing from 800x600 to 640x480`
-- This validates the complete resize communication flow: Smalltalk thread → UI thread
+- BeDisplay primitive (102) reads Display dimensions (800x600), no resize needed
+- Window size matches Display size by default
+- Resize flow tested dynamically: `DisplayScreen displayExtent: width@height`
+
+**DisplayScreen Initialize Enhancement:**
+- Tests all 16 BitBlt combination rules with visual 4×4 grid
+- Each tile shows different BitBlt operation (rules 0-15)
+- Uses checkerboard source pattern (8×8 checks) over gray halftone background
+- Comprehensive validation of BitBlt operations during system initialization
 
 **Phase 3: Fiber Infrastructure** 📋 **ON HOLD**
 - Fiber work postponed pending other priorities

@@ -15894,19 +15894,47 @@ displayHeight: height
 
 !DisplayScreen class methodsFor: 'class initialization'!
 initialize
-	"Draw a centered gray halftone square (1/4 area of Display).
-	Tests BitBlt operations during system initialization."
+	"Test all 16 BitBlt combination rules with a visual grid.
+	Creates a 4x4 grid, each tile showing a different combination rule
+	applied with a checkerboard source pattern over gray background."
 
-	| displayBox squareWidth squareHeight centerX centerY squareRect |
+	| displayBox tileWidth tileHeight sourcePattern checkSize rule tileRect |
 	Display notNil ifTrue: [
 		Display beDisplay.
 		displayBox _ Display boundingBox.
-		squareWidth _ displayBox width // 2.
-		squareHeight _ displayBox height // 2.
-		centerX _ (displayBox width - squareWidth) // 2.
-		centerY _ (displayBox height - squareHeight) // 2.
-		squareRect _ (centerX @ centerY) extent: (squareWidth @ squareHeight).
-		Display fill: squareRect mask: Form gray]! !
+
+		"Fill entire display with gray halftone background"
+		Display fill: displayBox mask: Form gray.
+
+		"Calculate tile dimensions (4x4 grid)"
+		tileWidth _ displayBox width // 4.
+		tileHeight _ displayBox height // 4.
+
+		"Create checkerboard source pattern (8x8 checks within each tile)"
+		sourcePattern _ Form extent: (tileWidth @ tileHeight).
+		checkSize _ (tileWidth min: tileHeight) // 8 max: 1.
+
+		"Fill checkerboard: alternating black squares on white background"
+		0 to: 7 do: [:rowIndex |
+			0 to: 7 do: [:colIndex |
+				((rowIndex + colIndex) odd) ifTrue: [
+					sourcePattern
+						fill: ((colIndex * checkSize) @ (rowIndex * checkSize)
+								extent: checkSize @ checkSize)
+						mask: Form black]]].
+
+		"Apply each of 16 combination rules to tiles in 4x4 grid"
+		0 to: 3 do: [:rowIndex |
+			0 to: 3 do: [:colIndex |
+				rule _ rowIndex * 4 + colIndex.
+				tileRect _ (colIndex * tileWidth) @ (rowIndex * tileHeight)
+					extent: (tileWidth @ tileHeight).
+				sourcePattern
+					displayOn: Display
+					at: tileRect origin
+					clippingBox: tileRect
+					rule: rule
+					mask: Form black]]]! !
 
 DisplayScreen initialize!
 
