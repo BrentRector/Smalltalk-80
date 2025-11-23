@@ -180,12 +180,23 @@ public static class GraphicsOperations
         Memory<byte> bits)
     {
         if (formOOP == context.HeapManager.GetNil() || formOOP.IsSmallInteger || bits.Length == 0)
+        {
+            Console.WriteLine("[WriteFormData] ABORT: formOOP is nil or SmallInteger, or bits is empty");
             return;
+        }
 
         // Get Form bitmap OOP
         SmalltalkOOP bitsOOP = context.HeapManager.GetInstanceVariable(formOOP, 0);
         if (bitsOOP == context.HeapManager.GetNil() || bitsOOP.IsSmallInteger)
+        {
+            Console.WriteLine("[WriteFormData] ABORT: bitsOOP is nil or SmallInteger");
             return;
+        }
+
+        // DIAGNOSTIC: Show what we're writing back
+        var sampleBytes = bits.Span.Slice(18000, Math.Min(50, bits.Length - 18000));
+        Console.WriteLine($"[WriteFormData] Writing {bits.Length} bytes back to heap");
+        Console.WriteLine($"[WriteFormData] Sample bytes [18000-18050]: {string.Join(" ", sampleBytes.ToArray().Select(b => $"{b:X2}"))}");
 
         // Write bytes back to heap using bulk operations (10-100x faster)
         var format = context.HeapManager.GetObjectFormat(bitsOOP);
@@ -194,11 +205,13 @@ public static class GraphicsOperations
         {
             // WordArray: bulk copy big-endian bytes to words
             context.HeapManager.SetIndexedWords(bitsOOP, bits.Span);
+            Console.WriteLine("[WriteFormData] ✓ Wrote as WordArray (big-endian)");
         }
         else
         {
             // ByteArray: bulk copy bytes directly
             context.HeapManager.SetIndexedBytes(bitsOOP, bits.Span);
+            Console.WriteLine("[WriteFormData] ✓ Wrote as ByteArray");
         }
     }
 
