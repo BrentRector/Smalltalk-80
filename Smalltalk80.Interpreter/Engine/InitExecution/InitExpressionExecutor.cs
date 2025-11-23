@@ -212,7 +212,7 @@ public class InitExpressionExecutor
 
         // Enable diagnostic listener for VariableNode initialize to debug hash/modulo issue
         MethodTraceListener? traceListener = null;
-        bool enableTracing = expr.Source.Contains("VariableNode initialize");
+        bool enableTracing = expr.Source?.Contains("VariableNode initialize") == true;
         if (enableTracing && _diagnostics != null)
         {
             Console.WriteLine();
