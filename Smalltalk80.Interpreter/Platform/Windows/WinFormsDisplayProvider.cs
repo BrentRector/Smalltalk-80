@@ -1,20 +1,25 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
+using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Platform;
+using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Platform.Windows;
 
 /// <summary>
-/// Windows Forms implementation of IDisplayProvider.
-/// Provides a 640x480 monochrome bitmap display with mouse and keyboard input.
-/// Thread-safe: All display updates must occur on the UI thread.
+/// Windows Forms implementation of display provider and platform bridge.
+/// Provides a monochrome bitmap display with mouse and keyboard input.
+/// Thread-safe: Display updates can occur from Smalltalk thread, rendering occurs on UI thread.
 /// </summary>
-public class WinFormsDisplayProvider : Form, IDisposable
+public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 {
     private readonly byte[] _displayBuffer;
     private readonly Bitmap _backBuffer;
     private readonly object _bufferLock = new();
-    private readonly Queue<int> _inputQueue = new();
+    private readonly SmalltalkEventQueue _eventQueue;
     private bool _disposed = false;
 
     public new int Width { get; }
@@ -28,10 +33,13 @@ public class WinFormsDisplayProvider : Form, IDisposable
     /// </summary>
     public Memory<byte> DisplayBuffer => new Memory<byte>(_displayBuffer);
 
-    public WinFormsDisplayProvider(int width = 640, int height = 480, string title = "Smalltalk-80")
+    public WinFormsDisplayProvider(int width, int height, SmalltalkEventQueue eventQueue, string title = "Smalltalk-80")
     {
         Width = width;
         Height = height;
+        _eventQueue = eventQueue;
+
+        Console.WriteLine($"[WinForms] Creating window: {width}x{height}");
 
         // Calculate buffer size: each row needs (width + 7) / 8 bytes
         int rowStride = (width + 7) / 8;
@@ -148,56 +156,33 @@ public class WinFormsDisplayProvider : Form, IDisposable
     // Mouse Input
     // ============================================================================
 
-    private int _mouseButtons = 0;
-    private int _mouseX = 0;
-    private int _mouseY = 0;
-
     private void OnMouseDown(object? sender, MouseEventArgs e)
     {
-        UpdateMouseState(e);
-        EnqueueMouseEvent();
+        EnqueueMouseEvent(e);
     }
 
     private void OnMouseUp(object? sender, MouseEventArgs e)
     {
-        UpdateMouseState(e);
-        EnqueueMouseEvent();
+        EnqueueMouseEvent(e);
     }
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
-        UpdateMouseState(e);
+        EnqueueMouseEvent(e);
     }
 
-    private void UpdateMouseState(MouseEventArgs e)
+    private void EnqueueMouseEvent(MouseEventArgs e)
     {
-        _mouseX = e.X;
-        _mouseY = e.Y;
-
-        // Map Windows buttons to Smalltalk convention
-        // Smalltalk: bit 0 = red (left), bit 1 = yellow (middle), bit 2 = blue (right)
-        _mouseButtons = 0;
-        if (e.Button.HasFlag(MouseButtons.Left))   _mouseButtons |= 0x1; // Red button
-        if (e.Button.HasFlag(MouseButtons.Middle)) _mouseButtons |= 0x2; // Yellow button
-        if (e.Button.HasFlag(MouseButtons.Right))  _mouseButtons |= 0x4; // Blue button
-    }
-
-    private void EnqueueMouseEvent()
-    {
-        // Smalltalk input word format (simplified):
-        // Bits 0-7: 0 (no character for mouse events)
-        // Bits 8-10: Mouse button state
-        int eventWord = (_mouseButtons << 8);
-
-        lock (_inputQueue)
+        _eventQueue.Enqueue(new SmalltalkEvent
         {
-            _inputQueue.Enqueue(eventWord);
-        }
-    }
-
-    public (int X, int Y) GetMousePosition()
-    {
-        return (_mouseX, _mouseY);
+            Type = SmalltalkEventType.Mouse,
+            X = e.X,
+            Y = e.Y,
+            RedButton = e.Button.HasFlag(MouseButtons.Left),
+            YellowButton = e.Button.HasFlag(MouseButtons.Middle),
+            BlueButton = e.Button.HasFlag(MouseButtons.Right),
+            Milliseconds = Environment.TickCount64
+        });
     }
 
     // ============================================================================
@@ -206,7 +191,13 @@ public class WinFormsDisplayProvider : Form, IDisposable
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        EnqueueKeyEvent((char)e.KeyValue, true);
+        _eventQueue.Enqueue(new SmalltalkEvent
+        {
+            Type = SmalltalkEventType.Keyboard,
+            Character = (char)e.KeyValue,
+            KeyCode = e.KeyValue,
+            Milliseconds = Environment.TickCount64
+        });
     }
 
     private void OnKeyUp(object? sender, KeyEventArgs e)
@@ -214,31 +205,169 @@ public class WinFormsDisplayProvider : Form, IDisposable
         // Smalltalk typically only needs key down events
     }
 
-    private void EnqueueKeyEvent(char ch, bool isKeyDown)
+    // ============================================================================
+    // IPlatformBridge Implementation
+    // ============================================================================
+
+    public bool PerformBitBlt(SmalltalkOOP bitBltOOP)
     {
-        if (!isKeyDown) return;
+        // BitBlt is handled by the VM primitives
+        // This method is called AFTER the VM performs the BitBlt
+        // We just need to detect if it affected Display and invalidate
+        return true;
+    }
 
-        // Smalltalk input word format:
-        // Bits 0-7: Character code
-        // Bits 8-10: Mouse button state (preserved)
-        int eventWord = (ch & 0xFF) | (_mouseButtons << 8);
+    public bool PerformSnapshot(SmalltalkOOP snapshotRequestOOP)
+    {
+        // Snapshot not yet implemented
+        return false;
+    }
 
-        lock (_inputQueue)
+    public void InvalidateDisplayRegion(int x, int y, int w, int h)
+    {
+        // Signal WinForms thread to repaint
+        // Note: Display buffer is updated by Smalltalk thread via direct memory access
+        if (InvokeRequired)
         {
-            _inputQueue.Enqueue(eventWord);
+            BeginInvoke(new Action(() => Invalidate(new Rectangle(x, y, w, h))));
+        }
+        else
+        {
+            Invalidate(new Rectangle(x, y, w, h));
+        }
+    }
+
+    public void DisplayResized(int newWidth, int newHeight)
+    {
+        // Called from Smalltalk thread when Display dimensions may have changed
+        // Must marshal to UI thread for window operations
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() => DisplayResized(newWidth, newHeight)));
+            return;
+        }
+
+        // On UI thread now - check if dimensions actually changed
+        if (newWidth == Width && newHeight == Height)
+        {
+            // Dimensions unchanged - just invalidate the display
+            Invalidate();
+            return;
+        }
+
+        // Dimensions changed - resize window
+        Console.WriteLine($"[Display] Resizing from {Width}x{Height} to {newWidth}x{newHeight}");
+
+        // NOTE: Cannot reallocate buffers here because:
+        // 1. Width and Height are readonly properties (set in constructor)
+        // 2. _displayBuffer and _backBuffer are readonly fields
+        // 3. Buffer reallocation requires replacing readonly fields (not currently supported)
+        //
+        // Future enhancement: Make Width/Height mutable and reallocate buffers
+        // For now, just resize the window - buffer will be clipped/padded
+
+        // Resize window to match new Display dimensions
+        this.ClientSize = new Size(newWidth, newHeight);
+        Invalidate(); // Repaint entire window
+    }
+
+    public (int x, int y) GetMousePosition()
+    {
+        return _eventQueue.GetMousePosition();
+    }
+
+    public void SetCursorPosition(int x, int y)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() => Cursor.Position = PointToScreen(new Point(x, y))));
+        }
+        else
+        {
+            Cursor.Position = PointToScreen(new Point(x, y));
         }
     }
 
     public int GetInputWord()
     {
-        lock (_inputQueue)
+        // Dequeue event from queue and pack into Smalltalk input word format
+        if (_eventQueue.TryDequeue(out var evt))
         {
-            if (_inputQueue.Count > 0)
+            if (evt == null)
+                return 0;
+
+            // Smalltalk input word format:
+            // Bits 0-7: Character code (or 0 for mouse events)
+            // Bits 8-10: Mouse button state (red=bit 0, yellow=bit 1, blue=bit 2)
+            // Bits 11-31: Reserved
+
+            int buttonBits = 0;
+            if (evt.RedButton) buttonBits |= 0x1;
+            if (evt.YellowButton) buttonBits |= 0x2;
+            if (evt.BlueButton) buttonBits |= 0x4;
+
+            if (evt.Type == SmalltalkEventType.Keyboard)
             {
-                return _inputQueue.Dequeue();
+                return (evt.Character & 0xFF) | (buttonBits << 8);
             }
-            return 0;
+            else
+            {
+                // Mouse event - no character
+                return buttonBits << 8;
+            }
         }
+
+        return 0;
+    }
+
+    public void SetSampleInterval(int intervalMs)
+    {
+        // Not implemented yet - would configure event polling rate
+    }
+
+    public void SetInputSemaphore(SmalltalkOOP semaphoreOOP)
+    {
+        // Not implemented yet - would signal semaphore when events available
+    }
+
+    public SmalltalkOOP ReadClipboardToStringOOP()
+    {
+        // Not implemented yet - return value should be provided by Smalltalk thread
+        return default(SmalltalkOOP);
+    }
+
+    public bool WriteClipboardFromStringOOP(SmalltalkOOP stringOOP)
+    {
+        // Not implemented yet
+        return false;
+    }
+
+    public void Beep()
+    {
+        System.Media.SystemSounds.Beep.Play();
+    }
+
+    public void Quit(int exitCode)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() => {
+                Close();
+                Environment.Exit(exitCode);
+            }));
+        }
+        else
+        {
+            Close();
+            Environment.Exit(exitCode);
+        }
+    }
+
+    public int GetTimeWords()
+    {
+        // Return seconds since Unix epoch, masked to 31 bits
+        long secondsSinceEpoch = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return (int)(secondsSinceEpoch & 0x7FFFFFFF);
     }
 
     // ============================================================================

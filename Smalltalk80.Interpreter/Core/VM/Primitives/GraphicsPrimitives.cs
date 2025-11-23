@@ -200,7 +200,7 @@ public static class GraphicsOperations
         }
     }
 
-    /// <summary>Primitive 101: beDisplay - Make Form the active display</summary>
+    /// <summary>Primitive 102: beDisplay - Make Form the active display (Blue Book Chapter 29)</summary>
     public class BeDisplay : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -208,18 +208,22 @@ public static class GraphicsOperations
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Invalidate display if platform bridge available
+            // Read Display dimensions from Form instance variables
+            // Form has: bits (0), width (1), height (2), offset (3)
+            int width = context.HeapManager.GetInstanceVariable(context.Receiver, 1).AsSmallInteger();
+            int height = context.HeapManager.GetInstanceVariable(context.Receiver, 2).AsSmallInteger();
+
+            // Notify platform bridge of new Display dimensions
+            // Platform will check if dimensions changed and resize window if needed
             if (context.Platform != null)
             {
                 try
                 {
-                    int width = context.HeapManager.GetInstanceVariable(context.Receiver, 1).AsSmallInteger();
-                    int height = context.HeapManager.GetInstanceVariable(context.Receiver, 2).AsSmallInteger();
-                    context.Platform.InvalidateDisplayRegion(0, 0, width, height);
+                    context.Platform.DisplayResized(width, height);
                 }
                 catch
                 {
-                    // Ignore invalidation errors
+                    // Ignore platform errors - display operations are optional
                 }
             }
 
@@ -227,7 +231,7 @@ public static class GraphicsOperations
         }
     }
 
-    /// <summary>Primitive 102: beCursor - Set hardware cursor</summary>
+    /// <summary>Primitive 101: beCursor - Set hardware cursor (Blue Book Chapter 29)</summary>
     public class BeCursor : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)

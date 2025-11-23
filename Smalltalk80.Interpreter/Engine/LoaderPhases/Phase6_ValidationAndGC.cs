@@ -316,8 +316,9 @@ public class Phase6_ValidationAndGC : IPhase
         // Validate SystemDictionary
         ValidateSpecialObject("SystemDictionary", GlobalRegistry.SystemDictionaryOOP, results);
 
-        // Validate USTable
-        if (GlobalRegistry.TryGet("USTable", out SmalltalkOOP ustableOOP))
+        // Validate USTable (class variable of Symbol)
+        var ustableOOP = LookupClassVariable("Symbol", "USTable");
+        if (ustableOOP != _allocator.GetNil())
         {
             ValidateSpecialObject("USTable", ustableOOP, results);
 
@@ -340,8 +341,56 @@ public class Phase6_ValidationAndGC : IPhase
         }
         else
         {
-            results.AddError("USTable not found in GlobalRegistry");
+            results.AddError("USTable not found in Symbol's classPool");
         }
+    }
+
+    /// <summary>
+    /// Looks up a class variable from a class's classPool dictionary.
+    /// </summary>
+    private SmalltalkOOP LookupClassVariable(string className, string varName)
+    {
+        // Get the class OOP (using GlobalRegistry is acceptable during cold start Phase 6)
+        var classOOP = GlobalRegistry.LookupClassOOP(className);
+        if (classOOP == _allocator.GetNil())
+            return _allocator.GetNil();
+
+        // Get classPool (instance variable 7 of Class)
+        var classPoolOOP = _allocator.GetInstanceVariable(classOOP, 7);
+        if (classPoolOOP == _allocator.GetNil())
+            return _allocator.GetNil();
+
+        // Find the symbol for the variable name
+        var varSymbolOOP = _allocator.GetNil();
+        foreach (var (index, symbolOOP) in SymbolRegistry.AllSymbols())
+        {
+            if (_bundle.Symbols[index] == varName)
+            {
+                varSymbolOOP = symbolOOP;
+                break;
+            }
+        }
+
+        if (varSymbolOOP == _allocator.GetNil())
+            return _allocator.GetNil();
+
+        // Search classPool dictionary for association with this key
+        int size = _allocator.GetIndexedSize(classPoolOOP);
+        for (int i = 0; i < size; i++)
+        {
+            var assocOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
+            if (assocOOP == _allocator.GetNil())
+                continue;
+
+            var keyOOP = _allocator.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            if (keyOOP == varSymbolOOP)
+            {
+                // Return the value from the association
+                return _allocator.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+            }
+        }
+
+        return _allocator.GetNil();
     }
 
     private void ValidateSpecialObject(string name, SmalltalkOOP objectOOP, ValidationResults results)

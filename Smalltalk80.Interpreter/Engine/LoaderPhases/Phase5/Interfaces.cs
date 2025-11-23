@@ -54,7 +54,7 @@ public interface IUSTableBuilder
 /// </summary>
 public interface ISystemDictionaryInstaller
 {
-    void InstallGlobals();
+    void InstallGlobals(SmalltalkOOP ustableOOP);
 }
 
 /// <summary>

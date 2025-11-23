@@ -5,12 +5,13 @@ using Smalltalk80.Interpreter.Core.VM.Graphics;
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
 /// <summary>
-/// Headless implementation of IPlatformBridge for testing and server scenarios.
-/// Provides fully functional implementations that work without a GUI display.
+/// Test implementation of IPlatformBridge for automated testing and non-GUI scenarios.
+/// Provides fully functional in-memory implementations without requiring a GUI display.
 /// All operations are complete - clipboard, input events, and time functions work correctly.
 /// BitBlt operations update heap memory (rendering handled elsewhere if needed).
+/// Includes test helper methods for simulating user input and verifying state.
 /// </summary>
-public class HeadlessPlatformBridge : IPlatformBridge
+public class TestPlatformBridge : IPlatformBridge
 {
     private readonly ISmalltalkHeap _heapManager;
     private readonly VMMetadata metadata;
@@ -22,7 +23,7 @@ public class HeadlessPlatformBridge : IPlatformBridge
     private string _clipboardText = "";
     private readonly Queue<int> _inputEvents = new();
 
-    public HeadlessPlatformBridge(
+    public TestPlatformBridge(
         ISmalltalkHeap heapManager,
         VMMetadata metadata,
         Func<string, SmalltalkOOP> getClassOOP,
@@ -136,16 +137,22 @@ public class HeadlessPlatformBridge : IPlatformBridge
 
     public bool PerformSnapshot(SmalltalkOOP snapshotRequestOOP)
     {
-        // In headless mode, snapshot would save image to file
+        // In test mode, snapshot would save image to file
         // Not implemented yet - would require image serialization infrastructure
-        Console.WriteLine("[HeadlessPlatformBridge] Snapshot requested (not yet implemented)");
+        Console.WriteLine("[TestPlatformBridge] Snapshot requested (not yet implemented)");
         return true;
     }
 
     public void InvalidateDisplayRegion(int x, int y, int w, int h)
     {
-        // No-op in headless mode - no display to invalidate
-        // A GUI implementation would queue this region for redrawing
+        // No-op in test mode - no display to invalidate
+        // WinFormsDisplayProvider queues this region for redrawing
+    }
+
+    public void DisplayResized(int newWidth, int newHeight)
+    {
+        // No-op in test mode - no display to resize
+        // WinFormsDisplayProvider resizes its window and reallocates buffers
     }
 
     // ============================================================================
@@ -175,14 +182,14 @@ public class HeadlessPlatformBridge : IPlatformBridge
 
     public void SetSampleInterval(int intervalMs)
     {
-        // No-op in headless mode - no actual event polling needed
-        // A GUI implementation would configure timer for polling
+        // No-op in test mode - no actual event polling needed
+        // WinFormsDisplayProvider would configure timer for polling
     }
 
     public void SetInputSemaphore(SmalltalkOOP semaphoreOOP)
     {
-        // No-op in headless mode - no async event generation
-        // A GUI implementation would store and signal this semaphore on events
+        // No-op in test mode - no async event generation
+        // WinFormsDisplayProvider would store and signal this semaphore on events
     }
 
     // ============================================================================
@@ -237,14 +244,14 @@ public class HeadlessPlatformBridge : IPlatformBridge
 
     public void Beep()
     {
-        // In headless mode, log beep to console
-        Console.WriteLine("[HeadlessPlatformBridge] Beep!");
+        // In test mode, log beep to console
+        Console.WriteLine("[TestPlatformBridge] Beep!");
     }
 
     public void Quit(int exitCode)
     {
         // Exit the process - works in all scenarios
-        Console.WriteLine($"[HeadlessPlatformBridge] Exiting with code {exitCode}");
+        Console.WriteLine($"[TestPlatformBridge] Exiting with code {exitCode}");
         Environment.Exit(exitCode);
     }
 

@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-22
+**Last Updated**: 2025-11-23
 
 ## Project Status
 
@@ -16,6 +16,32 @@
 ## Known Issues
 
 **WriteStream>>nextPut: Infinite Loop**: 210/234 comment expressions fail with infinite loop in WriteStream. All comment expressions skipped until bug is fixed.
+
+**Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
+
+## Migration Status
+
+**System Startup Migration** - Migrating from single-threaded cold start to full interactive system with fiber-based process scheduling.
+
+**Phase 1: Program Refactoring** ✅ **COMPLETE**
+- ✅ SmalltalkThreadContext class created
+- ✅ SmalltalkEventQueue and SmalltalkEvent classes created
+- ✅ SmalltalkInterpreterThread class created
+- ✅ Program.cs refactored: UI thread (WinForms) + Smalltalk thread separation
+- ✅ Window remains responsive during init expression execution
+
+**Phase 2: Window Sizing** ✅ **COMPLETE**
+- ✅ Read Display dimensions from heap after cold start (Program.cs lines 110-112)
+- ✅ WinFormsDisplayProvider accepts width/height parameters (no heap access - thread safety)
+- ✅ DisplayResized() method added to IPlatformBridge interface
+- ✅ BeDisplay primitive (101) detects size changes and calls DisplayResized()
+- ✅ Window dimensions now dynamically match Smalltalk Display object
+- ✅ Supports runtime resizing: `DisplayScreen displayExtent: 800@600`
+
+**Phase 3: Fiber Infrastructure** 📋 **ON HOLD**
+- Fiber work postponed pending other priorities
+
+See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, and `docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md` for complete migration documentation.
 
 ## Architecture Documentation
 
@@ -39,6 +65,8 @@
 
 ## Running the Interpreter
 
+**Default Behavior**: The interpreter automatically loads `coldstart.json` from the same directory as the executable when no `--coldstart` parameter is provided.
+
 ### Standard Execution
 
 ```bash
@@ -46,7 +74,7 @@ cd Smalltalk80.Interpreter
 dotnet run
 ```
 
-Executes cold start phases 1-6 and 31 init expressions.
+Executes cold start phases 1-6 and init expressions from `coldstart.json` in the executable directory.
 
 ### With Diagnostics
 
@@ -61,11 +89,42 @@ dotnet run -- --diagnostics method
 dotnet run -- --diagnostics detail,method,gc
 ```
 
-### Skip Init Expressions
+### Execute User Expressions (--execute)
+
+**NEW**: Runtime expression evaluation using the built-in Smalltalk Compiler.
 
 ```bash
-dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart.json --skip-init-expressions
+# Simple arithmetic
+dotnet run -- --execute "3 + 4"
+
+# Message sends
+dotnet run -- --execute "Array new: 10"
+
+# Method calls
+dotnet run -- --execute "BlockContextTest testAllCombinations"
+
+# Multiple messages
+dotnet run -- --execute "'Hello, World!' size"
 ```
+
+**How it works**:
+1. Creates Smalltalk String from C# expression
+2. Sends `compile:in:` message to Smalltalk Compiler class
+3. Executes resulting CompiledMethod with nil receiver
+4. Displays result with type-aware formatting
+
+**Architecture**:
+- Uses `MessageSender` API for runtime message sending from C#
+- Uses `StringHelper` for C# ↔ Smalltalk String conversion
+- Works with runtime Smalltalk objects (not ColdStartBundle structures)
+- Leverages built-in Smalltalk Compiler (no third compiler needed)
+
+**See**: `docs/EXECUTE-FEATURE-DESIGN.md` for complete design documentation.
+
+**Limitations**:
+- Requires Smalltalk Compiler class to be loaded in the image
+- Expression must be valid Smalltalk syntax
+- No access to workspace variables (future enhancement)
 
 ## Building and Testing
 
@@ -140,6 +199,7 @@ See `docs/Testing-Guide.md` for complete testing documentation.
 - FormMenuView initialize - Requires file I/O primitives (98, 92, 99, 146 - not implemented)
 
 **Recent Fixes**:
+- **Primitive 65 (Stream>>next)**: Fixed to return Character objects (not SmallIntegers) when reading from Strings/Symbols, enabling Scanner and --execute feature to work correctly. Uses isKindOf: semantics to handle subclasses properly.
 - Added InputSensor install and InputSensor initSensor init expressions to properly initialize Sensor global
 - Fixed Cursor initialize to set CurrentCursor (was nil, causing cursorPoint failures)
 - Modified Object initialize to comment out GUI confirmation dialog while preserving DependentsFields initialization

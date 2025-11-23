@@ -233,15 +233,35 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Arguments.Length != 1)
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: Wrong number of arguments ({context.Arguments.Length})");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (context.Receiver.IsSmallInteger)
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: Receiver is SmallInteger ({context.Receiver})");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (!context.Arguments[0].IsSmallInteger)
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: Index is not SmallInteger ({context.Arguments[0]})");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             int index = context.Arguments[0].AsSmallInteger();
-            if (index < 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (index < 1)
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: Index < 1 ({index})");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-            if (index > size) return PrimitiveResult.Fail(context.Metadata!);
+            if (index > size)
+            {
+                Console.WriteLine($"[Primitive 63] FAIL: Index {index} > size {size}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             byte byteValue = context.HeapManager.GetIndexedByte(context.Receiver, index - 1);
 
@@ -259,46 +279,19 @@ public static class SimpleObjectPrimitives
             if (context.RuntimeHeapAccess == null)
                 return context.HeapManager.GetNil();
 
-            // Get Character class from SystemDictionary
-            var characterClassOOP = context.RuntimeHeapAccess.GetClass("Character");
-            if (characterClassOOP == context.HeapManager.GetNil())
+            // Use RuntimeHeapAccessor to look up CharacterTable class variable
+            var characterTableOOP = context.RuntimeHeapAccess.LookupClassVariable("Character", "CharacterTable");
+            if (characterTableOOP == context.HeapManager.GetNil())
                 return context.HeapManager.GetNil();
 
-            // Get classPool from Character class (instance variable index 7)
-            // Class instance variables: [0-3] Behavior (superclass, methodDict, format, subclasses)
-            //                          [4-5] ClassDescription (instanceVariables, organization)
-            //                          [6-8] Class (name, classPool, sharedPools)
-            // Note: Class variables are stored in the Class's classPool, NOT in the Metaclass
-            var classPoolOOP = context.HeapManager.GetInstanceVariable(characterClassOOP, 7);
-            if (classPoolOOP == context.HeapManager.GetNil())
+            // CharacterTable is an Array of 256 Character objects
+            // Return the Character at the given ASCII value index
+            int tableSize = context.HeapManager.GetIndexedSize(characterTableOOP);
+
+            if (asciiValue >= tableSize)
                 return context.HeapManager.GetNil();
 
-            // Search for CharacterTable in class pool
-            int dictSize = context.HeapManager.GetIndexedSize(classPoolOOP);
-
-            for (int i = 0; i < dictSize; i++)
-            {
-                var entryOOP = context.HeapManager.GetIndexedOOP(classPoolOOP, i);
-                if (entryOOP == context.HeapManager.GetNil())
-                    continue;
-
-                var keyOOP = context.HeapManager.GetInstanceVariable(entryOOP, 0);
-                int symbolSize = context.HeapManager.GetIndexedSize(keyOOP);
-                if (symbolSize != 14) continue; // "CharacterTable" has 14 chars
-
-                byte[] bytes = new byte[symbolSize];
-                for (int j = 0; j < symbolSize; j++)
-                    bytes[j] = context.HeapManager.GetIndexedByte(keyOOP, j);
-
-                string symbolName = System.Text.Encoding.ASCII.GetString(bytes);
-                if (symbolName == "CharacterTable")
-                {
-                    var characterTableOOP = context.HeapManager.GetInstanceVariable(entryOOP, 1);
-                    return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
-                }
-            }
-
-            return context.HeapManager.GetNil();
+            return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
         }
     }
 
@@ -341,8 +334,55 @@ public static class SimpleObjectPrimitives
     }
 
     /// <summary>Primitive 65: Stream next - read next element from stream</summary>
+    /// <remarks>
+    /// Optional optimization primitive that avoids message dispatch overhead for common cases.
+    /// Handles canonical Blue Book collection types:
+    /// - String/Symbol (and subclasses): Returns Character objects from CharacterTable
+    /// - ByteArray: Returns SmallInteger (raw byte value)
+    /// - Array: Returns OOP directly
+    /// Subclasses and exotic types are supported via isKindOf: semantics.
+    /// </remarks>
     public class Next : IPrimitive
     {
+        // Helper to get Character object for ASCII code (shared with Primitive 63)
+        private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
+        {
+            if (context.RuntimeHeapAccess == null)
+                return context.HeapManager.GetNil();
+
+            // Use RuntimeHeapAccessor to look up CharacterTable class variable
+            var characterTableOOP = context.RuntimeHeapAccess.LookupClassVariable("Character", "CharacterTable");
+            if (characterTableOOP == context.HeapManager.GetNil())
+                return context.HeapManager.GetNil();
+
+            // CharacterTable is an Array of 256 Character objects
+            int tableSize = context.HeapManager.GetIndexedSize(characterTableOOP);
+            if (asciiValue >= tableSize)
+                return context.HeapManager.GetNil();
+
+            return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+        }
+
+        // Helper to implement isKindOf: semantics by traversing superclass chain
+        // This handles String subclasses and other inheritance relationships correctly
+        private static bool IsKindOf(PrimitiveExecutionContext context, SmalltalkOOP objectOOP, SmalltalkOOP targetClassOOP)
+        {
+            var currentClassOOP = context.HeapManager.GetClassOOP(objectOOP);
+            var nilOOP = context.HeapManager.GetNil();
+
+            // Traverse superclass chain
+            while (currentClassOOP != nilOOP)
+            {
+                if (currentClassOOP == targetClassOOP)
+                    return true;
+
+                // Move to superclass (instance variable 0 in Behavior)
+                currentClassOOP = context.HeapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
+            }
+
+            return false;
+        }
+
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
@@ -371,9 +411,27 @@ public static class SimpleObjectPrimitives
             if (format == ObjectFormat.ByteIndexed)
             {
                 byte byteValue = context.HeapManager.GetIndexedByte(collectionOOP, position - 1);
-                element = SmalltalkOOP.FromSmallInteger(byteValue);
+
+                // For String/Symbol (and subclasses), return Character object from CharacterTable
+                // For other byte arrays (ByteArray, etc.), return SmallInteger
+                // Use isKindOf: semantics to handle subclasses correctly
+                if (IsKindOf(context, collectionOOP, context.Metadata!.StringClassOOP) ||
+                    IsKindOf(context, collectionOOP, context.Metadata!.SymbolClassOOP))
+                {
+                    element = GetCharacterForAscii(context, byteValue);
+                    if (element == context.HeapManager.GetNil())
+                    {
+                        // CharacterTable lookup failed - fail primitive so fallback handles it
+                        return PrimitiveResult.Fail(context.Metadata!);
+                    }
+                }
+                else
+                {
+                    // ByteArray and other byte-indexed types return raw SmallInteger
+                    element = SmalltalkOOP.FromSmallInteger(byteValue);
+                }
             }
-            else
+            else  // PointerIndexed (Arrays, etc.)
             {
                 element = context.HeapManager.GetIndexedOOP(collectionOOP, position - 1);
             }

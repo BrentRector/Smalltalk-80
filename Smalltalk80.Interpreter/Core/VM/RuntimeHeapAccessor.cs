@@ -18,11 +18,23 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     // Caching layer (invalidated by primitive 89)
     private readonly RuntimeClassCache _classCache;
 
+    // Cached CharacterTable OOP (invalidated by primitive 89)
+    private SmalltalkOOP _characterTableCache;
+    private bool _characterTableCacheValid = false;
+
+    // Cached USTable OOP (invalidated by primitive 89)
+    private SmalltalkOOP _ustableCache;
+    private bool _ustableCacheValid = false;
+
     public RuntimeHeapAccessor(ISmalltalkHeap heapManager, VMMetadata metadata)
     {
         _heapManager = heapManager;
         this.metadata = metadata;
         _classCache = new RuntimeClassCache(this, heapManager);
+
+        // Initialize cache fields to Nil
+        _characterTableCache = heapManager.GetNil();
+        _ustableCache = heapManager.GetNil();
     }
 
     /// <summary>
@@ -32,6 +44,8 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     {
         _classCache.InvalidateCache();
         RuntimeSpecialObjects.Instance.InvalidateCache();
+        _characterTableCacheValid = false;
+        _ustableCacheValid = false;
     }
 
     /// <summary>
@@ -408,5 +422,98 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
 
         // Find the index of the requested field
         return fields.IndexOf(fieldName);
+    }
+
+    /// <summary>
+    /// Looks up a class variable from a class's classPool dictionary.
+    /// Runtime-safe: uses only heap access, no cold start structures.
+    /// </summary>
+    /// <param name="className">Name of the class that owns the class variable</param>
+    /// <param name="varName">Name of the class variable</param>
+    /// <returns>The value OOP of the class variable, or Nil if not found</returns>
+    public virtual SmalltalkOOP LookupClassVariable(string className, string varName)
+    {
+        // OPTIMIZATION: Cache CharacterTable since it's accessed on every String>>at: call
+        if (className == "Character" && varName == "CharacterTable")
+        {
+            if (_characterTableCacheValid)
+                return _characterTableCache;
+
+            // Cache miss - look it up and cache the result
+            var characterTableOOP = LookupClassVariableUncached(className, varName);
+            if (characterTableOOP != metadata.KnownObjects.Nil)
+            {
+                _characterTableCache = characterTableOOP;
+                _characterTableCacheValid = true;
+            }
+            return characterTableOOP;
+        }
+
+        // OPTIMIZATION: Cache USTable since it's accessed frequently by InternSymbol
+        if (className == "Symbol" && varName == "USTable")
+        {
+            if (_ustableCacheValid)
+                return _ustableCache;
+
+            // Cache miss - look it up and cache the result
+            var ustableOOP = LookupClassVariableUncached(className, varName);
+            if (ustableOOP != metadata.KnownObjects.Nil)
+            {
+                _ustableCache = ustableOOP;
+                _ustableCacheValid = true;
+            }
+            return ustableOOP;
+        }
+
+        // For all other class variables, lookup without caching
+        return LookupClassVariableUncached(className, varName);
+    }
+
+    /// <summary>
+    /// Looks up a class variable without using the cache.
+    /// Used internally by LookupClassVariable.
+    /// </summary>
+    private SmalltalkOOP LookupClassVariableUncached(string className, string varName)
+    {
+        // Optimize for well-known classes using VMMetadata
+        SmalltalkOOP classOOP;
+        if (className == "Symbol")
+        {
+            classOOP = metadata.SymbolClassOOP;
+        }
+        else
+        {
+            // For other classes, look up in Smalltalk dictionary
+            classOOP = GetClass(className);
+            if (classOOP == metadata.KnownObjects.Nil)
+            {
+                Console.WriteLine($"[LookupClassVariable] ERROR: Class {className} not found!");
+                return metadata.KnownObjects.Nil;
+            }
+        }
+
+        // Get classPool (instance variable 7 of Class)
+        var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, 7);
+        if (classPoolOOP == metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine($"[LookupClassVariable] ERROR: classPool is nil for {className}!");
+            return metadata.KnownObjects.Nil;
+        }
+
+        // Find the symbol OOP for the variable name
+        var varSymbolOOP = InternSymbol(varName);
+        if (varSymbolOOP == metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine($"[LookupClassVariable] ERROR: Symbol '{varName}' not found!");
+            return metadata.KnownObjects.Nil;
+        }
+
+        // Look up the symbol in the classPool dictionary
+        var result = DictionaryLookup(classPoolOOP, varSymbolOOP);
+        if (result == metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine($"[LookupClassVariable] ERROR: {className}>>{varName} not found in classPool!");
+        }
+        return result;
     }
 }

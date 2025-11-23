@@ -8,6 +8,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Engine;
 using Smalltalk80.Interpreter.Engine.InitExecution;
 using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Platform;
 using Smalltalk80.Interpreter.Platform.Windows;
 using Smalltalk80.Interpreter.Shared.Types;
 using ClassHierarchyTraversal = Smalltalk80.Interpreter.Core.ClassHierarchyTraversal;
@@ -55,68 +56,14 @@ public static class Program
             var verboseDebug = config.VerboseDebug;
             var testFilter = config.TestFilter;
             var reportOutput = config.ReportOutput;
-            var skipInitExpressions = config.SkipInitExpressions;
             var executeExpression = config.ExecuteExpression;
             var diagnosticCategories = config.DiagnosticCategories;
 
             // Create diagnostic hub for event-based logging
             var diagnostics = new DiagnosticHub();
 
-            // Register cold start progress listener for console output
-            var progressListener = new ColdStartProgressListener();
-            diagnostics.Register(progressListener, DiagnosticEventTypes.AllColdStart);
-
-            // Register additional diagnostic listeners based on --diagnostics flag
-            if (diagnosticCategories != null)
-            {
-                var categories = diagnosticCategories.ToLower().Split(',', StringSplitOptions.RemoveEmptyEntries);
-                foreach (var category in categories)
-                {
-                    switch (category.Trim())
-                    {
-                        case "detail":
-                        case "verbose":
-                            var detailListener = new ColdStartDetailListener();
-                            diagnostics.Register(detailListener, DiagnosticEventTypes.AllColdStartDetail);
-                            Console.WriteLine("Diagnostics: Cold start detail listener enabled");
-                            break;
-
-                        case "method":
-                        case "trace":
-                            var methodListener = new MethodTraceListener();
-                            diagnostics.Register(methodListener, DiagnosticEventTypes.AllMethod);
-                            Console.WriteLine("Diagnostics: Method trace listener enabled");
-                            break;
-
-                        case "gc":
-                        case "memory":
-                            var memoryListener = new RuntimeMemoryListener();
-                            diagnostics.Register(memoryListener, DiagnosticEventTypes.AllMemory);
-                            Console.WriteLine("Diagnostics: Runtime memory listener enabled");
-                            break;
-
-                        case "bytecode":
-                        case "instruction":
-                            var bytecodeListener = new BytecodeTraceListener();
-                            diagnostics.Register(bytecodeListener, DiagnosticEventTypes.AllBytecode);
-                            Console.WriteLine("Diagnostics: Bytecode trace listener enabled");
-                            break;
-
-                        case "all":
-                            diagnostics.Register(new ColdStartDetailListener(), DiagnosticEventTypes.AllColdStartDetail);
-                            diagnostics.Register(new MethodTraceListener(), DiagnosticEventTypes.AllMethod);
-                            diagnostics.Register(new RuntimeMemoryListener(), DiagnosticEventTypes.AllMemory);
-                            diagnostics.Register(new BytecodeTraceListener(), DiagnosticEventTypes.AllBytecode);
-                            Console.WriteLine("Diagnostics: All listeners enabled (detail, method, gc, bytecode)");
-                            break;
-
-                        default:
-                            Console.Error.WriteLine($"Warning: Unknown diagnostic category '{category}'");
-                            break;
-                    }
-                }
-                Console.WriteLine();
-            }
+            // Register diagnostic listeners
+            RegisterDiagnosticListeners(diagnostics, diagnosticCategories);
 
             Console.WriteLine($"Loading cold start bundle: {coldStartFile}");
 
@@ -139,7 +86,7 @@ public static class Program
 
             var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, diagnostics);
             loader.Run();
-            var layoutResolver = loader.LayoutResolver;
+            var layoutResolver = loader.LayoutResolver ?? throw new InvalidOperationException("LayoutResolver is null after cold start");
 
             // Write report if requested
             if (reportOutput != null)
@@ -156,431 +103,75 @@ public static class Program
 
             Console.WriteLine("Cold start completed successfully!");
 
-            // Create display window immediately after cold start
+            // Build VM metadata (needed by Smalltalk thread)
+            var vmMetadata = BuildVMMetadata(layoutResolver, loader);
+
+            // Read Display dimensions from heap (before creating UI)
+            var displayOOP = GlobalRegistry.Get("Display");
+            int displayWidth = heapManager.GetInstanceVariable(displayOOP, 1).AsSmallInteger();   // Form.width at index 1
+            int displayHeight = heapManager.GetInstanceVariable(displayOOP, 2).AsSmallInteger();  // Form.height at index 2
+
+            // Create event queue (shared between threads)
+            Console.WriteLine("\n=== Creating Event Queue ===");
+            var eventQueue = new SmalltalkEventQueue();
+
+            // Create display window (UI thread object - does NOT access heap)
             Console.WriteLine("\n=== Creating Display Window ===");
-            var displayProvider = new WinFormsDisplayProvider(640, 480, "Smalltalk-80 Display");
-            Console.WriteLine("Display window created - will show after init expressions complete...");
+            var displayProvider = new WinFormsDisplayProvider(displayWidth, displayHeight, eventQueue, "Smalltalk-80");
+            Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity
             Console.WriteLine("\n=== Running GC after cold start ===");
             var gcStatsBefore = heapManager.GC.GarbageCollect();
             Console.WriteLine($"  {gcStatsBefore.GetSummary()}");
 
-            // Execute init expressions - Run normal init expressions to check for regressions
-            bool executeInitExpressions = !skipInitExpressions;
-            bool onlyRunTests = false; // DISABLED - Run normal init expressions for debugging
-
-            // ALWAYS execute init expressions (essential ones ALWAYS run, others conditional on --skip-init-expressions)
-            if (bundle.InitExpressions.Length > 0)
+            // Create Smalltalk thread context
+            var threadContext = new SmalltalkThreadContext
             {
-                Console.WriteLine("\n=== Init Expression Execution ===");
-                Console.WriteLine($"  Found {bundle.InitExpressions.Length} init expression(s) in bundle (DISABLED)");
+                HeapManager = heapManager,
+                LayoutResolver = layoutResolver,
+                VMMetadata = vmMetadata,
+                Bundle = bundle,
+                EventQueue = eventQueue,
+                PlatformBridge = displayProvider,  // Smalltalk thread calls methods on UI object
+                Diagnostics = diagnostics,
+                Config = config
+            };
 
-                if (layoutResolver == null)
-                {
-                    Console.WriteLine("  ⚠️  Execution skipped - LayoutResolver not available");
-                    return;
-                }
+            // Create and start Smalltalk thread
+            Console.WriteLine("\n=== Starting Smalltalk Thread ===");
+            var interpreterThread = new SmalltalkInterpreterThread(threadContext);
 
-                var vmMetadata = BuildVMMetadata(layoutResolver, loader);
+            var smalltalkThread = new Thread(interpreterThread.Run);
+            smalltalkThread.SetApartmentState(ApartmentState.MTA);
+            smalltalkThread.IsBackground = false; // Foreground thread
+            smalltalkThread.Name = "Smalltalk Interpreter";
+            smalltalkThread.Start();
 
-                var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, platformBridge: null, diagnostics);
+            // Give Smalltalk thread time to start
+            Thread.Sleep(500);
 
-                // Enable verbose debugging if requested
-                vm.VerboseDebug = verboseDebug;
-
-                // Initialize selector caches after cold start completes
-                vm.InitializeSelectorCaches();
-
-                // NOTE: Phase 3 already created an initial Process and set it as Processor.activeProcess
-                // with suspendedContext = nil and priority = 4 (UserSchedulingPriority).
-                // No need to create another Process here - we'll reuse the one from Phase 3.
-
-                var executor = new InitExpressionExecutor(
-                    heapManager,
-                    vm,
-                    vmMetadata,
-                    diagnostics,  // Pass diagnostic hub for GC events
-                    InitPolicy.ContinueAndCollect,  // Continue to run all init expressions including tests
-                    defaultTimeoutMs: 5000
-                );
-
-                // Note: Init expressions are pre-allocated during coldstart Phase 4
-                // and stored in VMMetadata.InitExpressionMethods.
-
-                // Phase-based execution strategy:
-                // Phase 1: Execute all initialize! expressions (infrastructure setup)
-                // Phase 2: Execute all comment: expressions (documentation)
-                // Fast-fail: Stop on first error with full diagnostics
-
-                int totalExpressions = bundle.InitExpressions.Length;
-
-                // Essential init expressions that MUST run for basic VM functionality
-                // These are required even with --skip-init-expressions flag
-                var essentialList = new HashSet<string>
-                {
-                    "Character initialize",      // Required for CharacterTable (used by String>>at: primitive 63)
-                    "SmallInteger initialize",   // Required for SmallInteger constants/utilities
-                    "Float initialize",          // Required for Float constants (Pi, E, etc.)
-                    "InputSensor initialize",    // Required for InputSensor keyboard map setup
-                    "InputSensor install",       // Required to create CurrentInputState
-                    "InputSensor initSensor",    // Required to create and assign Sensor global
-                    "BlockContextTest validate",  // Test suite - runs even with --skip-init-expressions
-                };
-
-                // Skip list for init expressions requiring runtime features not available during bootstrap
-                var skipList = new HashSet<string>
-                {
-                    // "Object initialize" - NOW ENABLED: GUI confirmation dialog commented out, essential initialization preserved
-                    "FormMenuView initialize",               // ❌ Requires file I/O primitives (98, 92, 99, 146) - not yet implemented
-                };
-
-                // Build index lists for each phase (preserving source file order)
-                var phase1Indices = new List<int>(); // initialize! expressions
-                var phase2Indices = new List<int>(); // comment: expressions
-                var testIndices = new List<int>(); // test expressions
-                var skippedIndices = new List<(int index, string reason)>();
-
-                if (onlyRunTests)
-                {
-                    Console.WriteLine($"  DEBUG: Test mode enabled, scanning {totalExpressions} expressions...");
-                }
-
-                for (int i = 0; i < totalExpressions; i++)
-                {
-                    var expr = bundle.InitExpressions[i];
-
-                    // TESTING MODE: Only run test classes
-                    if (onlyRunTests)
-                    {
-                        if (expr.Source != null && (expr.Source.Contains("BlockContextTest") || expr.Source.Contains("SimpleBlockTest") || expr.Source.Contains("IfTrueTest") || expr.Source.Contains("PrimitiveTest")))
-                        {
-                            Console.WriteLine($"  DEBUG: Found test expression [{i}]: {expr.Source}");
-                            testIndices.Add(i);
-                        }
-                        continue;
-                    }
-
-                    if (expr.Source != null)
-                    {
-                        // ALWAYS include essential init expressions (required for basic VM functionality)
-                        bool isEssential = essentialList.Contains(expr.Source);
-
-                        // Check skip list first (unless essential)
-                        if (!isEssential && skipList.Contains(expr.Source))
-                        {
-                            skippedIndices.Add((i, "Requires runtime features not available during bootstrap"));
-                            continue;
-                        }
-
-                        // If --skip-init-expressions flag is set, ONLY run essential init expressions
-                        if (skipInitExpressions && !isEssential)
-                        {
-                            skippedIndices.Add((i, "Skipped by --skip-init-expressions flag (not essential)"));
-                            continue;
-                        }
-
-                        // Phase-based execution: ALL initialize expressions, then ALL comments, then test expressions
-                        if (expr.Source.EndsWith(" initialize") ||
-                            expr.Source == "InputSensor install" ||
-                            expr.Source == "InputSensor initSensor")
-                        {
-                            phase1Indices.Add(i);
-                        }
-                        else if (expr.Source.Contains(" comment:"))
-                        {
-                            phase2Indices.Add(i);
-                        }
-                        else if (expr.Source.Contains("Test ") || expr.Source.StartsWith("BlockContextTest"))
-                        {
-                            // Test expressions (e.g., "BlockContextTest validate", "BlockContextTest new testAllCombinations!")
-                            testIndices.Add(i);
-                        }
-                        // Skip other expressions (run! messages) in normal mode
-                    }
-                }
-
-                // Skip phase reordering when in test mode
-                if (!onlyRunTests)
-                {
-                    // DEPENDENCY-ORDERED EXECUTION
-                    // Based on comprehensive dependency analysis (see InitExpression-DependencyAnalysis.md)
-                    // 68 total classes: Level 0 (62), Level 1 (5), Level 2 (1)
-                    // No circular dependencies detected
-
-                    var dependencyOrder = InitExpressionOrdering.GetDependencyOrder();
-                    phase1Indices = InitExpressionOrdering.ReorderByDependencies(phase1Indices, bundle, dependencyOrder);
-
-                    // Move font/GUI-dependent expressions to run last (tests DefaultTextStyle)
-                    // Order: Form → TextList → BitEditor → Object (each tests more functionality)
-                    var runLastExpressions = new List<string>
-                    {
-                        "Form initialize",           // Tests Form creation with glyphs
-                        "TextList initialize",       // Tests DefaultTextStyle copy
-                        "BitEditor initialize",      // Tests PopUpMenu labels: with font support
-                        "Object initialize"          // Initializes DependentsFields (GUI dialog commented out)
-                    };
-
-                    var lastIndices = new List<int>();
-                    var indicesToRemove = new List<int>();
-
-                    foreach (var exprName in runLastExpressions)
-                    {
-                        for (int i = 0; i < phase1Indices.Count; i++)
-                        {
-                            var expr = bundle.InitExpressions[phase1Indices[i]];
-                            if (expr.Source == exprName)
-                            {
-                                lastIndices.Add(phase1Indices[i]);
-                                indicesToRemove.Add(i);
-                                break;
-                            }
-                        }
-                    }
-
-                    // Remove from current positions (in reverse index order)
-                    foreach (var idx in indicesToRemove.OrderByDescending(x => x))
-                    {
-                        phase1Indices.RemoveAt(idx);
-                    }
-                    // Add at end in order
-                    phase1Indices.AddRange(lastIndices);
-                }
-
-                int succeeded = 0;
-                int failed = 0;
-
-                // TEST MODE: Only run test expressions
-                if (onlyRunTests && testIndices.Count > 0)
-                {
-                    Console.WriteLine($"\n=== TEST MODE: Running Block Context Tests ===");
-                    Console.WriteLine($"  Executing {testIndices.Count} test expression(s)");
-                    Console.WriteLine();
-
-                    foreach (int index in testIndices)
-                    {
-                        var expr = bundle.InitExpressions[index];
-                        var initMethodOOP = heapManager.GetIndexedOOP(vmMetadata.InitExpressionMethods, index);
-
-                        Console.WriteLine();
-                        Console.WriteLine("******************************************");
-                        Console.WriteLine($"[{index}] {expr.Source}");
-                        Console.WriteLine("******************************************");
-                        var testResult = executor.ExecuteInitExpression(expr.LocalId, initMethodOOP);
-
-                        if (testResult.Status == InitStatus.Success)
-                        {
-                            Console.WriteLine($"  ✓ Test completed successfully");
-                            succeeded++;
-                        }
-                        else
-                        {
-                            failed++;
-                            Console.WriteLine($"\n❌ TEST FAILED: {expr.Source}");
-                            Console.WriteLine($"   Status: {testResult.Status}");
-                            if (testResult.Diagnostic?.Message != null)
-                            {
-                                Console.WriteLine($"   Error: {testResult.Diagnostic.Message}");
-                            }
-                            // Stack trace suppressed for cleaner output
-                            // if (testResult.Diagnostic?.StackTrace != null)
-                            // {
-                            //     Console.WriteLine($"\n   Stack Trace:");
-                            //     Console.WriteLine($"   {testResult.Diagnostic.StackTrace}");
-                            // }
-                        }
-                    }
-
-                    Console.WriteLine($"\n=== Test Execution Complete ===");
-                    Console.WriteLine($"  Tests run: {testIndices.Count}");
-                    Console.WriteLine($"  Succeeded: {succeeded}");
-                    Console.WriteLine($"  Failed: {failed}");
-                    return;
-                }
-
-                // Execute all initialize! expressions with on-demand compilation and GC verification
-                Console.WriteLine($"\n=== Init Expression Execution ===");
-                Console.WriteLine($"  Total initialize! expressions: {phase1Indices.Count}");
-                Console.WriteLine($"  Executing all expressions ({skippedIndices.Count} skipped)");
-                Console.WriteLine();
-
-                succeeded = 0;
-                failed = 0;
-
-                if (phase1Indices.Count == 0)
-                {
-                    Console.WriteLine("  No initialize! expressions found");
-                    return;
-                }
-
-                // Create InitExpressionCompiler for on-demand compilation (runtime-safe)
-                var compiler = new InitExpressionCompiler(heapManager, bundle, vmMetadata);
-
-                // Execute all init expressions
-                for (int i = 0; i < phase1Indices.Count; i++)
-                {
-                    int exprIndex = phase1Indices[i];
-                    var expr = bundle.InitExpressions[exprIndex];
-
-                    var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
-
-                    if (result.Status == InitStatus.Success)
-                    {
-                        succeeded++;
-                    }
-                    else
-                    {
-                        failed++;
-                        Console.WriteLine($"    Status: {result.Status}");
-                        if (result.Diagnostic != null)
-                        {
-                            Console.WriteLine($"    Error: {result.Diagnostic.Message}");
-                            if (result.Diagnostic.StackTrace != null)
-                            {
-                                Console.WriteLine($"    Stack Trace: {result.Diagnostic.StackTrace}");
-                            }
-                        }
-                    }
-                }
-
-                Console.WriteLine($"\n=== Init Expression Execution Complete ===");
-                Console.WriteLine($"  {succeeded} succeeded, {failed} failed");
-                return;
-            }
-
-            Console.WriteLine("\n✓ All systems ready!");
-            Console.WriteLine("Virtual machine initialized successfully.");
-
-            // Show the display window now that init expressions have completed
+            // Show display window
             Console.WriteLine("\n=== Showing Display Window ===");
             displayProvider.Show();
 
-            // Execute user-specified expression if provided
-            if (executeExpression != null)
-            {
-                Console.WriteLine($"\n=== Executing User Expression ===");
-                Console.WriteLine($"  Expression: {executeExpression}");
-                Console.WriteLine();
-
-                if (layoutResolver == null)
-                {
-                    Console.WriteLine("  ⚠️  Execution skipped - LayoutResolver not available");
-                }
-                else
-                {
-                    // Find the expression in the bundle's init expressions
-                    int exprIndex = -1;
-                    for (int i = 0; i < bundle.InitExpressions.Length; i++)
-                    {
-                        var source = bundle.InitExpressions[i].Source;
-                        if (source != null && source.Contains(executeExpression))
-                        {
-                            exprIndex = i;
-                            break;
-                        }
-                    }
-
-                    if (exprIndex == -1)
-                    {
-                        Console.WriteLine($"  ⚠️  Expression not found in bundle init expressions");
-                        Console.WriteLine($"  Searching for: {executeExpression}");
-                        Environment.Exit(1);
-                        return;
-                    }
-
-                    var vmMetadata = BuildVMMetadata(layoutResolver, loader);
-
-                    var vm = new VirtualMachine(heapManager, layoutResolver, vmMetadata, platformBridge: null, diagnostics);
-                    vm.VerboseDebug = verboseDebug;
-                    vm.InitializeSelectorCaches();
-
-                    // NOTE: Phase 3 already created an initial Process and set it as Processor.activeProcess
-                    // with suspendedContext = nil and priority = 4 (UserSchedulingPriority).
-                    // No need to create another Process here - we'll reuse the one from Phase 3.
-
-                    var executor = new InitExpressionExecutor(
-                        heapManager,
-                        vm,
-                        vmMetadata,
-                        diagnostics,  // Pass diagnostic hub for GC events
-                        InitPolicy.AbortOnFirstError,
-                        defaultTimeoutMs: 10000
-                    );
-
-                    var expr = bundle.InitExpressions[exprIndex];
-                    var methodOOP = heapManager.GetIndexedOOP(vmMetadata.InitExpressionMethods, exprIndex);
-
-                    Console.WriteLine($"  Found expression at index {exprIndex}: {expr.Source}");
-                    Console.WriteLine();
-
-                    var result = executor.ExecuteInitExpression(expr.LocalId, methodOOP);
-
-                    if (result.Status == InitStatus.Success)
-                    {
-                        Console.WriteLine($"\n✓ Expression executed successfully");
-                        if (result.ReturnValueOop.HasValue)
-                        {
-                            var returnOop = result.ReturnValueOop.Value;
-                            if (returnOop.IsSmallInteger)
-                            {
-                                Console.WriteLine($"   Return value: {returnOop.AsSmallInteger()}");
-                            }
-                            else
-                            {
-                                // Try to display as String if it's a String object
-                                var className = heapManager.GetClassName(returnOop);
-                                if (className == "String")
-                                {
-                                    try
-                                    {
-                                        int stringSize = heapManager.GetIndexedSize(returnOop);
-                                        var stringBytes = new byte[stringSize];
-                                        for (int i = 0; i < stringSize; i++)
-                                        {
-                                            stringBytes[i] = heapManager.GetIndexedByte(returnOop, i);
-                                        }
-                                        var stringValue = System.Text.Encoding.UTF8.GetString(stringBytes);
-                                        Console.WriteLine($"   Return value: \"{stringValue}\"");
-                                    }
-                                    catch
-                                    {
-                                        Console.WriteLine($"   Return value: String (OOP={returnOop.RawValue})");
-                                    }
-                                }
-                                else
-                                {
-                                    Console.WriteLine($"   Return value: {className} (OOP={returnOop.RawValue})");
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"\n❌ Expression execution failed");
-                        Console.WriteLine($"   Status: {result.Status}");
-                        if (result.Diagnostic?.Message != null)
-                        {
-                            Console.WriteLine($"   Error: {result.Diagnostic?.Message}");
-                        }
-                        if (verboseDebug && result.Diagnostic?.StackTrace != null)
-                        {
-                            Console.WriteLine($"   Stack trace:\n{result.Diagnostic?.StackTrace}");
-                        }
-                        Environment.Exit(1);
-                    }
-                }
-            }
-
-            // TODO: Implement --dump-class after ClassPrettyPrinter is migrated to new heap manager
-            if (dumpClassName != null)
-            {
-                Console.WriteLine($"\n⚠️  --dump-class not yet implemented (ClassPrettyPrinter not migrated to new heap manager)");
-            }
-
-            // Run the Windows Forms event loop
+            // Run WinForms event loop (blocks until window closes)
             Console.WriteLine("\n=== Entering GUI Event Loop ===");
             Console.WriteLine("Display window is visible. Close window to exit.\n");
             Application.Run(displayProvider);
+
+            // When window closes, signal Smalltalk thread to shutdown
+            Console.WriteLine("\n=== Shutting Down ===");
+            // interpreterThread.RequestShutdown();  // Future: for fiber event loop
+
+            // Wait for Smalltalk thread to finish (with timeout)
+            if (!smalltalkThread.Join(TimeSpan.FromSeconds(5)))
+            {
+                Console.WriteLine("Warning: Smalltalk thread did not shut down cleanly");
+                smalltalkThread.Interrupt();
+            }
+
+            Console.WriteLine("Interpreter shutdown complete");
         }
         catch (Exception ex)
         {
@@ -873,6 +464,68 @@ public static class Program
             ProcessorScheduler = processorSchedulerOOP,
             InitExpressionMethods = loader.InitExpressionMethods
         };
+    }
+
+    /// <summary>
+    /// Registers diagnostic listeners based on command-line flags.
+    /// </summary>
+    private static void RegisterDiagnosticListeners(DiagnosticHub diagnostics, string? diagnosticCategories)
+    {
+        // Always register cold start progress listener
+        var progressListener = new ColdStartProgressListener();
+        diagnostics.Register(progressListener, DiagnosticEventTypes.AllColdStart);
+
+        // Register additional diagnostic listeners based on --diagnostics flag
+        if (diagnosticCategories != null)
+        {
+            var categories = diagnosticCategories.ToLower().Split(',', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var category in categories)
+            {
+                switch (category.Trim())
+                {
+                    case "detail":
+                    case "verbose":
+                        var detailListener = new ColdStartDetailListener();
+                        diagnostics.Register(detailListener, DiagnosticEventTypes.AllColdStartDetail);
+                        Console.WriteLine("Diagnostics: Cold start detail listener enabled");
+                        break;
+
+                    case "method":
+                    case "trace":
+                        var methodListener = new MethodTraceListener();
+                        diagnostics.Register(methodListener, DiagnosticEventTypes.AllMethod);
+                        Console.WriteLine("Diagnostics: Method trace listener enabled");
+                        break;
+
+                    case "gc":
+                    case "memory":
+                        var memoryListener = new RuntimeMemoryListener();
+                        diagnostics.Register(memoryListener, DiagnosticEventTypes.AllMemory);
+                        Console.WriteLine("Diagnostics: Runtime memory listener enabled");
+                        break;
+
+                    case "bytecode":
+                    case "instruction":
+                        var bytecodeListener = new BytecodeTraceListener();
+                        diagnostics.Register(bytecodeListener, DiagnosticEventTypes.AllBytecode);
+                        Console.WriteLine("Diagnostics: Bytecode trace listener enabled");
+                        break;
+
+                    case "all":
+                        diagnostics.Register(new ColdStartDetailListener(), DiagnosticEventTypes.AllColdStartDetail);
+                        diagnostics.Register(new MethodTraceListener(), DiagnosticEventTypes.AllMethod);
+                        diagnostics.Register(new RuntimeMemoryListener(), DiagnosticEventTypes.AllMemory);
+                        diagnostics.Register(new BytecodeTraceListener(), DiagnosticEventTypes.AllBytecode);
+                        Console.WriteLine("Diagnostics: All listeners enabled (detail, method, gc, bytecode)");
+                        break;
+
+                    default:
+                        Console.Error.WriteLine($"Warning: Unknown diagnostic category '{category}'");
+                        break;
+                }
+            }
+            Console.WriteLine();
+        }
     }
 
 }

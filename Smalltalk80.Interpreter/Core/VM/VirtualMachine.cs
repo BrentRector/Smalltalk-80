@@ -86,6 +86,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         set => _tracer.SelectorTraceEnabled = value;
     }
 
+    /// <summary>Gets the message dispatcher for runtime message sending.</summary>
+    public IMessageDispatcher MessageDispatcher => _messageDispatcher;
+
+    /// <summary>Gets the context manager for runtime context management.</summary>
+    public IContextManager ContextManager => _contextManager;
+
     public VirtualMachine(ISmalltalkHeap heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, IDiagnosticHub? diagnostics = null)
     {
         _heapManager = heapManager;
@@ -1689,10 +1695,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // The _symbols array and SymbolRegistry are coldstart-time snapshots that become
         // stale as soon as the Smalltalk interpreter begins running and creates new symbols.
 
-        // Get USTable (Universal Symbol Table) from GlobalRegistry
-        // Get USTable from heap (via the Smalltalk global dictionary)
-        var smalltalkDictOOP = _metadata.KnownObjects.Smalltalk;
-        var ustableOOP = _runtimeHeapAccess.LookupGlobalByName(smalltalkDictOOP, "USTable");
+        // Get USTable from Symbol's classPool (it's a class variable, not a global)
+        var ustableOOP = _runtimeHeapAccess.LookupClassVariable("Symbol", "USTable");
         if (ustableOOP == _metadata.KnownObjects.Nil)
         {
             // USTable not yet created (shouldn't happen after cold start)
