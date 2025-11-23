@@ -42239,7 +42239,6 @@ noScale
 scale
 	"Answer a copy of the point that represents the current scale of the receiver."
 
-	scale == nil
 "Graphics Test Suite - Comprehensive validation of graphics facilities
 Blue Book Smalltalk-80 compatible test suite (no modern exception handling)"
 
@@ -42498,7 +42497,7 @@ testPenVisual
 	10 timesRepeat: [
 		pen go: 100.
 		pen up.
-		pen goto: (pen location x) @ (pen location y + 10).
+		pen goto: pen location x @ (pen location y + 10).
 		pen turn: 180.
 		pen down].
 

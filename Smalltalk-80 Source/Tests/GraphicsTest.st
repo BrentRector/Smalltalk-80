@@ -256,7 +256,7 @@ testPenVisual
 	10 timesRepeat: [
 		pen go: 100.
 		pen up.
-		pen goto: (pen location x) @ (pen location y + 10).
+		pen goto: pen location x @ (pen location y + 10).
 		pen turn: 180.
 		pen down].
 
