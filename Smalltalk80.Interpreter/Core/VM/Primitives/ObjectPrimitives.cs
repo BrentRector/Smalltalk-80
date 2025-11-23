@@ -355,23 +355,6 @@ public static class SimpleObjectPrimitives
             return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
         }
 
-        // Helper to safely get class name
-        private static string GetClassNameSafe(PrimitiveExecutionContext context, SmalltalkOOP classOOP)
-        {
-            try
-            {
-                if (context.RuntimeHeapAccess != null)
-                {
-                    return context.RuntimeHeapAccess.GetClassName(classOOP);
-                }
-            }
-            catch
-            {
-                // Ignore errors during class name lookup
-            }
-            return "";
-        }
-
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
@@ -401,13 +384,13 @@ public static class SimpleObjectPrimitives
             {
                 byte byteValue = context.HeapManager.GetIndexedByte(collectionOOP, position - 1);
 
-                // Check if collection is a String by checking its class
+                // Check if collection is a String or Symbol
                 var collectionClass = context.HeapManager.GetClassOOP(collectionOOP);
-                var className = GetClassNameSafe(context, collectionClass);
 
                 // For String/Symbol, return Character object from CharacterTable
                 // For other byte arrays (ByteArray, etc.), return SmallInteger
-                if (className == "String" || className == "Symbol")
+                if (collectionClass == context.Metadata!.StringClassOOP ||
+                    collectionClass == context.Metadata!.SymbolClassOOP)
                 {
                     element = GetCharacterForAscii(context, byteValue);
                     if (element == context.HeapManager.GetNil())
