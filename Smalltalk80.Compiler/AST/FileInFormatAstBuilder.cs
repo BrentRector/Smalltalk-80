@@ -783,6 +783,12 @@ namespace Smalltalk80.Compiler.AST
                 {
                     elements.Add(ProcessLiteral(element.literal()));
                 }
+                else if (element.MINUS() != null && element.numberLiteral() != null)
+                {
+                    // Handle negative numbers in arrays
+                    var numText = element.numberLiteral().GetText();
+                    elements.Add(new NumberLiteralNode { Value = "-" + numText });
+                }
                 else if (element.symbolName() != null)
                 {
                     elements.Add(ProcessSymbolName(element.symbolName()));
@@ -797,6 +803,12 @@ namespace Smalltalk80.Compiler.AST
                         if (nested.literal() != null)
                         {
                             nestedElements.Add(ProcessLiteral(nested.literal()));
+                        }
+                        else if (nested.MINUS() != null && nested.numberLiteral() != null)
+                        {
+                            // Handle negative numbers in nested arrays
+                            var numText = nested.numberLiteral().GetText();
+                            nestedElements.Add(new NumberLiteralNode { Value = "-" + numText });
                         }
                         else if (nested.symbolName() != null)
                         {
