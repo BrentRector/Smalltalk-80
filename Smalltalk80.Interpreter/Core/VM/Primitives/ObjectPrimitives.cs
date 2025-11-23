@@ -30,12 +30,11 @@ public static class SimpleObjectPrimitives
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Blue Book: hash returns half the object pointer
-            // SmallIntegers hash to their value
+            // SmallIntegers hash to their value (return self)
             if (context.Receiver.IsSmallInteger)
             {
-                int value = context.Receiver.AsSmallInteger();
-                // For SmallIntegers, hash is typically the value itself (or abs value)
-                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(value & 0x3FFFFFFF));
+                // Canonical Smalltalk-80: SmallInteger>>hash ^self
+                return PrimitiveResult.Ok(context.Receiver);
             }
 
             // For objects, hash is half the OOP (Primitive 75 semantics)
