@@ -15906,33 +15906,33 @@ initialize
 		Display fill: Display boundingBox mask: Form black.
 		Display reverse.
 
-		"=== TEST 0: Is Float pi the correct value? ==="
+		"=== TEST 1: Is Float pi the correct value? ==="
 		piValue _ Float pi.
 		piError _ (piValue - 3.14159) abs.
 		(piError < 0.001) ifTrue: [
 			"Pi is correct - draw line at width proportional to pi"
-			Display fill: (10 @ 5 extent: (piValue * 10.0) truncated @ 5) mask: Form black].
+			Display fill: (10 @ 10 extent: (piValue * 10.0) truncated @ 5) mask: Form black].
 
-		"=== TEST 1: Can we multiply Floats? ==="
+		"=== TEST 2: Can we multiply Floats? ==="
 		result _ 3.14 * 2.0.
-		Display fill: (10 @ 10 extent: result truncated @ 5) mask: Form black.
+		Display fill: (10 @ 20 extent: result truncated @ 5) mask: Form black.
 
-		"=== TEST 2: Can we access Float class variables in comparisons? ==="
+		"=== TEST 3: Can we access Float class variables in comparisons? ==="
 		angle _ 0.5.
 		(angle > Float pi) ifTrue: [
-			Display fill: (10 @ 20 extent: 50 @ 5) mask: Form black].
+			Display fill: (10 @ 30 extent: 50 @ 5) mask: Form black].
 
-		"=== TEST 3: Can we iterate over a local Array literal? ==="
+		"=== TEST 4: Can we iterate over a local Array literal? ==="
 		testArray _ #(-0.166667 0.00833333).
 		sum _ 0.0.
 		testArray do: [:coeff | sum _ sum + coeff].
-		Display fill: (10 @ 30 extent: ((sum + 1.0) * 100.0) truncated @ 5) mask: Form black.
+		Display fill: (10 @ 40 extent: ((sum + 1.0) * 100.0) truncated @ 5) mask: Form black.
 
-		"=== TEST 4: Test Float>>sin with VERY small angle (direct path) ==="
+		"=== TEST 5: Test Float>>sin with VERY small angle (direct path) ==="
 		"For angle = 0.1, all comparisons fail, goes straight to polynomial"
 		angle _ 0.1.
 		result _ angle sin.
-		Display fill: (10 @ 40 extent: (result * 100.0) truncated @ 5) mask: Form black]! !
+		Display fill: (10 @ 50 extent: (result * 100.0) truncated @ 5) mask: Form black]! !
 
 testBitBltRules
 	"Test all 16 BitBlt combination rules with a visual grid.
