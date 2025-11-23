@@ -15896,7 +15896,7 @@ displayHeight: height
 initialize
 	"Test Float>>sin code paths to isolate the bug."
 
-	| w h angle result testArray sum |
+	| w h angle result testArray sum piValue piError |
 	Display notNil ifTrue: [
 		Display beDisplay.
 		w _ Display width.
@@ -15905,6 +15905,13 @@ initialize
 		"Clear display to white"
 		Display fill: Display boundingBox mask: Form black.
 		Display reverse.
+
+		"=== TEST 0: Is Float pi the correct value? ==="
+		piValue _ Float pi.
+		piError _ (piValue - 3.14159) abs.
+		(piError < 0.001) ifTrue: [
+			"Pi is correct - draw line at width proportional to pi"
+			Display fill: (10 @ 5 extent: (piValue * 10.0) truncated @ 5) mask: Form black].
 
 		"=== TEST 1: Can we multiply Floats? ==="
 		result _ 3.14 * 2.0.
