@@ -129,75 +129,76 @@ public static class GraphicsOperations
 
             return PrimitiveResult.Ok(context.Receiver);
         }
+    }
 
-        private static (Memory<byte> bits, int width, int height) ExtractFormData(
-            PrimitiveExecutionContext context, SmalltalkOOP formOOP)
+    // Shared helper methods for Form data extraction/writing (used by CopyBits and DrawLoop)
+    private static (Memory<byte> bits, int width, int height) ExtractFormData(
+        PrimitiveExecutionContext context, SmalltalkOOP formOOP)
+    {
+        if (formOOP == context.HeapManager.GetNil() || formOOP.IsSmallInteger)
+            return (Memory<byte>.Empty, 0, 0);
+
+        // Get Form instance variables: bits (0), width (1), height (2)
+        SmalltalkOOP bitsOOP = context.HeapManager.GetInstanceVariable(formOOP, 0);
+        SmalltalkOOP widthOOP = context.HeapManager.GetInstanceVariable(formOOP, 1);
+        SmalltalkOOP heightOOP = context.HeapManager.GetInstanceVariable(formOOP, 2);
+
+        if (!widthOOP.IsSmallInteger || !heightOOP.IsSmallInteger)
+            return (Memory<byte>.Empty, 0, 0);
+
+        int width = widthOOP.AsSmallInteger();
+        int height = heightOOP.AsSmallInteger();
+
+        // Get bitmap data
+        if (bitsOOP == context.HeapManager.GetNil() || bitsOOP.IsSmallInteger)
+            return (Memory<byte>.Empty, 0, 0);
+
+        // Check object format to determine how to extract bits
+        var format = context.HeapManager.GetObjectFormat(bitsOOP);
+        int size = context.HeapManager.GetIndexedSize(bitsOOP);
+        byte[] bits;
+
+        if (format == ObjectFormat.WordIndexed)
         {
-            if (formOOP == context.HeapManager.GetNil() || formOOP.IsSmallInteger)
-                return (Memory<byte>.Empty, 0, 0);
-
-            // Get Form instance variables: bits (0), width (1), height (2)
-            SmalltalkOOP bitsOOP = context.HeapManager.GetInstanceVariable(formOOP, 0);
-            SmalltalkOOP widthOOP = context.HeapManager.GetInstanceVariable(formOOP, 1);
-            SmalltalkOOP heightOOP = context.HeapManager.GetInstanceVariable(formOOP, 2);
-
-            if (!widthOOP.IsSmallInteger || !heightOOP.IsSmallInteger)
-                return (Memory<byte>.Empty, 0, 0);
-
-            int width = widthOOP.AsSmallInteger();
-            int height = heightOOP.AsSmallInteger();
-
-            // Get bitmap data
-            if (bitsOOP == context.HeapManager.GetNil() || bitsOOP.IsSmallInteger)
-                return (Memory<byte>.Empty, 0, 0);
-
-            // Check object format to determine how to extract bits
-            var format = context.HeapManager.GetObjectFormat(bitsOOP);
-            int size = context.HeapManager.GetIndexedSize(bitsOOP);
-            byte[] bits;
-
-            if (format == ObjectFormat.WordIndexed)
-            {
-                // WordArray: bulk copy words as big-endian bytes (10-100x faster)
-                bits = new byte[size * 2];
-                context.HeapManager.CopyIndexedWords(bitsOOP, bits.AsSpan());
-            }
-            else
-            {
-                // ByteArray: bulk copy bytes directly (10-100x faster)
-                bits = new byte[size];
-                context.HeapManager.CopyIndexedBytes(bitsOOP, bits.AsSpan());
-            }
-
-            return (bits, width, height);
+            // WordArray: bulk copy words as big-endian bytes (10-100x faster)
+            bits = new byte[size * 2];
+            context.HeapManager.CopyIndexedWords(bitsOOP, bits.AsSpan());
+        }
+        else
+        {
+            // ByteArray: bulk copy bytes directly (10-100x faster)
+            bits = new byte[size];
+            context.HeapManager.CopyIndexedBytes(bitsOOP, bits.AsSpan());
         }
 
-        private static void WriteFormData(
-            PrimitiveExecutionContext context,
-            SmalltalkOOP formOOP,
-            Memory<byte> bits)
+        return (bits, width, height);
+    }
+
+    private static void WriteFormData(
+        PrimitiveExecutionContext context,
+        SmalltalkOOP formOOP,
+        Memory<byte> bits)
+    {
+        if (formOOP == context.HeapManager.GetNil() || formOOP.IsSmallInteger || bits.Length == 0)
+            return;
+
+        // Get Form bitmap OOP
+        SmalltalkOOP bitsOOP = context.HeapManager.GetInstanceVariable(formOOP, 0);
+        if (bitsOOP == context.HeapManager.GetNil() || bitsOOP.IsSmallInteger)
+            return;
+
+        // Write bytes back to heap using bulk operations (10-100x faster)
+        var format = context.HeapManager.GetObjectFormat(bitsOOP);
+
+        if (format == ObjectFormat.WordIndexed)
         {
-            if (formOOP == context.HeapManager.GetNil() || formOOP.IsSmallInteger || bits.Length == 0)
-                return;
-
-            // Get Form bitmap OOP
-            SmalltalkOOP bitsOOP = context.HeapManager.GetInstanceVariable(formOOP, 0);
-            if (bitsOOP == context.HeapManager.GetNil() || bitsOOP.IsSmallInteger)
-                return;
-
-            // Write bytes back to heap using bulk operations (10-100x faster)
-            var format = context.HeapManager.GetObjectFormat(bitsOOP);
-
-            if (format == ObjectFormat.WordIndexed)
-            {
-                // WordArray: bulk copy big-endian bytes to words
-                context.HeapManager.SetIndexedWords(bitsOOP, bits.Span);
-            }
-            else
-            {
-                // ByteArray: bulk copy bytes directly
-                context.HeapManager.SetIndexedBytes(bitsOOP, bits.Span);
-            }
+            // WordArray: bulk copy big-endian bytes to words
+            context.HeapManager.SetIndexedWords(bitsOOP, bits.Span);
+        }
+        else
+        {
+            // ByteArray: bulk copy bytes directly
+            context.HeapManager.SetIndexedBytes(bitsOOP, bits.Span);
         }
     }
 
