@@ -15896,7 +15896,7 @@ displayHeight: height
 initialize
 	"Display an artistic line-shaded dragon spanning the entire window."
 
-	| w h cx cy t x y prevX prevY scale angle radius dx dy |
+	| w h cx cy t x y prevX prevY scale angle radius dx dy pi |
 	Display notNil ifTrue: [
 		Display beDisplay.
 		w _ Display width.
@@ -15904,6 +15904,7 @@ initialize
 		cx _ w // 2.
 		cy _ h // 2.
 		scale _ (w min: h) // 3.
+		pi _ 3.14159.
 
 		"Fill with white background"
 		Display fill: Display boundingBox mask: Form black.
@@ -15921,7 +15922,7 @@ initialize
 		prevX _ nil.
 		0 to: 200 do: [:i |
 			t _ i / 200.0.
-			angle _ t * Float pi * 3.
+			angle _ t * pi * 3.
 			x _ cx + ((scale * (t - 0.5) * 2.5) truncated).
 			y _ cy + ((angle sin * scale * 0.6) truncated).
 
