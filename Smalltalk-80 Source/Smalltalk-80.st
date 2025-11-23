@@ -15900,7 +15900,7 @@ initialize
 
 	Display ifNotNil: [Display beDisplay]! !
 
-"DisplayScreen initialize"
+DisplayScreen initialize!
 
 !DisplayScreen class methodsFor: 'display box access'!
 boundingBox
