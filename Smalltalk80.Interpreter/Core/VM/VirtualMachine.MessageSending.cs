@@ -1,5 +1,6 @@
 using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core.VM.Interpreter;
@@ -95,6 +96,22 @@ public partial class VirtualMachine
         // Get selector name for diagnostics
         string? selectorName = GetSymbolName(selectorOOP);
 
+        // Get receiver class for diagnostic event
+        var recvClass = GetClassName(GetClass(receiverOOP));
+
+        // Emit diagnostic event for super method entry
+        _diagnostics?.Emit(new MethodEntryEvent
+        {
+            Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            InstructionCount = _tracer.InstructionCount,
+            ReceiverOOP = receiverOOP,
+            ReceiverClass = recvClass,
+            Selector = selectorName ?? "unknown",
+            Arguments = args,
+            CallDepth = _tracer.SelectorTraceDepth,
+            IsSuper = true
+        });
+
         // Now look up the method starting from the superclass
         var methodInfo = _messageDispatcher.LookupMethod(superclassOOP, selectorName!);
 
@@ -121,6 +138,20 @@ public partial class VirtualMachine
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
                 _contextManager, currentPC, this, this, _metadata);
+
+            // Emit diagnostic event for primitive execution in super send
+            _diagnostics?.Emit(new PrimitiveEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                InstructionCount = _tracer.InstructionCount,
+                PrimitiveIndex = primitiveNumber,
+                PrimitiveName = $"Primitive{primitiveNumber}",
+                ReceiverOOP = receiverOOP,
+                Arguments = args,
+                Success = _primitiveSuccess,
+                Result = _primitiveSuccess ? primitiveResult : null,
+                FailureReason = _primitiveSuccess ? null : "Primitive failed"
+            });
 
             if (_primitiveSuccess)
             {
@@ -292,21 +323,28 @@ public partial class VirtualMachine
             throw new InvalidOperationException($"Smalltalk notify:at: from {recvClassName}: stopping before GUI access");
         }
 
+        // Get receiver class name once for all uses
+        var recvClass = GetClassName(classOOP);
+
+        // Emit diagnostic event for method entry
+        _diagnostics?.Emit(new MethodEntryEvent
+        {
+            Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            InstructionCount = _tracer.InstructionCount,
+            ReceiverOOP = receiverOOP,
+            ReceiverClass = recvClass,
+            Selector = selectorName ?? "unknown",
+            Arguments = args,
+            CallDepth = _tracer.SelectorTraceDepth,
+            IsSuper = false
+        });
+
         // Log ALL message sends during tracing (before primitive check)
         if (_tracer.ShouldTraceSend())
         {
-            var recvClass = GetClassName(classOOP);
             var currentMethod = GetCurrentMethodLocalId();
             _tracer.TraceSendEntry(recvClass, selectorName ?? "unknown", currentMethod);
         }
-
-        // DIAGNOSTIC: Method trace output for debugging (shows all method calls during VariableNode initialize)
-        // This provides visibility into method calls when diagnostic listeners are active
-        // Depth tracking is handled by existing selector trace system below
-        var recvClass = GetClassName(classOOP);
-        var indent = new string(' ', _tracer.SelectorTraceDepth * 2);
-        var argInfo = args.Length > 0 ? $" ({args.Length} args)" : "";
-        Console.WriteLine($"{indent}-> {recvClass}>>{selectorName}{argInfo}");
 
         // Check if the method has a primitive
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
@@ -327,9 +365,19 @@ public partial class VirtualMachine
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
                 _contextManager, currentPC, this, this, _metadata);
 
-            // DIAGNOSTIC: Show primitive execution result
-            var status = _primitiveSuccess ? "OK" : "FAIL";
-            Console.WriteLine($"   [Primitive {primitiveNumber}] {selectorName}: {status}");
+            // Emit diagnostic event for primitive execution
+            _diagnostics?.Emit(new PrimitiveEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                InstructionCount = _tracer.InstructionCount,
+                PrimitiveIndex = primitiveNumber,
+                PrimitiveName = $"Primitive{primitiveNumber}",
+                ReceiverOOP = receiverOOP,
+                Arguments = args,
+                Success = _primitiveSuccess,
+                Result = _primitiveSuccess ? primitiveResult : null,
+                FailureReason = _primitiveSuccess ? null : "Primitive failed"
+            });
 
             if (_primitiveSuccess)
             {

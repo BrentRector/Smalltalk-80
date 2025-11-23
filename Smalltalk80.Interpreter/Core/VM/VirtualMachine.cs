@@ -35,11 +35,12 @@ namespace Smalltalk80.Interpreter.Core.VM;
 public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICacheManager, IPrimitiveMessageSender
 {
     private readonly ISmalltalkHeap _heapManager;
-    
+
     private readonly RuntimeHeapAccessor _runtimeHeapAccess;
     private readonly LayoutResolver _layoutResolver;
     private readonly VMMetadata _metadata;
     private readonly IPlatformBridge? _platformBridge;
+    private readonly IDiagnosticHub? _diagnostics;
     private readonly IStackManager _stackManager;
     private readonly IContextManager _contextManager;
     private readonly IMessageDispatcher _messageDispatcher;
@@ -101,6 +102,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
         _metadata = metadata;
         _platformBridge = platformBridge;
+        _diagnostics = diagnostics;
 
         // Initialize tracer first as other components may need it
         _tracer = new ExecutionTracer();
