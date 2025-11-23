@@ -209,8 +209,8 @@ public class RuntimeObjectCreator(
         SetInstanceVarByName(pointOOP, "Point", "y", SmalltalkOOP.FromSmallInteger(0));
 
         // Step 2: Create DisplayBitmap
-        int displayWidth = 640;
-        int displayHeight = 480;
+        int displayWidth = 800;
+        int displayHeight = 600;
         int bytesPerRow = displayWidth / 8;
         int totalBytes = bytesPerRow * displayHeight;
         int totalWords = totalBytes / 2;
@@ -234,8 +234,8 @@ public class RuntimeObjectCreator(
 
         // Set Form instance variables
         SetInstanceVarByName(displayScreenOOP, "Form", "bits", displayBitmapOOP);
-        SetInstanceVarByName(displayScreenOOP, "Form", "width", SmalltalkOOP.FromSmallInteger(640));
-        SetInstanceVarByName(displayScreenOOP, "Form", "height", SmalltalkOOP.FromSmallInteger(480));
+        SetInstanceVarByName(displayScreenOOP, "Form", "width", SmalltalkOOP.FromSmallInteger(800));
+        SetInstanceVarByName(displayScreenOOP, "Form", "height", SmalltalkOOP.FromSmallInteger(600));
         SetInstanceVarByName(displayScreenOOP, "Form", "offset", pointOOP);
 
         // Initialize remaining fields to nil

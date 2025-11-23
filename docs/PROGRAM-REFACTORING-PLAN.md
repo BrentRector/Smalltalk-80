@@ -664,39 +664,41 @@ public class SmalltalkEventQueue
 
 ## Implementation Checklist
 
-### Phase 1: Basic Thread Separation
-- [ ] Create `SmalltalkThreadContext.cs`
-- [ ] Create `SmalltalkEventQueue.cs`
-- [ ] Create `SmalltalkEvent.cs`
-- [ ] Refactor `WinFormsDisplayProvider` constructor to accept heap
-- [ ] Extract diagnostic listener registration to separate method in Program.cs
-- [ ] Extract VMMetadata building to separate method (already exists)
+**Status: ✅ PHASES 1-5 COMPLETE (Fiber support deferred)**
 
-### Phase 2: Smalltalk Thread
-- [ ] Create `SmalltalkInterpreterThread.cs`
-- [ ] Implement `Run()` method with thread-to-fiber conversion
-- [ ] Implement `ExecuteInitExpressions()` (extract from Program.cs)
-- [ ] Implement `ExecuteUserExpression()` (extract from Program.cs)
-- [ ] Add P/Invoke for `ConvertThreadToFiber`
+### Phase 1: Basic Thread Separation ✅ COMPLETE
+- [x] Create `SmalltalkThreadContext.cs`
+- [x] Create `SmalltalkEventQueue.cs`
+- [x] Create `SmalltalkEvent.cs`
+- [x] Refactor `WinFormsDisplayProvider` constructor to accept width/height parameters
+- [x] Extract diagnostic listener registration to separate method in Program.cs
+- [x] Extract VMMetadata building to separate method (already exists)
 
-### Phase 3: Main Thread Refactoring
-- [ ] Refactor `Program.cs Main()` to create Smalltalk thread
-- [ ] Move init expression execution to Smalltalk thread
-- [ ] Keep WinForms event loop on main thread
-- [ ] Add thread synchronization (start/stop)
+### Phase 2: Smalltalk Thread ✅ COMPLETE
+- [x] Create `SmalltalkInterpreterThread.cs`
+- [x] Implement `Run()` method (fiber conversion commented out for Phase 3)
+- [x] Implement `ExecuteInitExpressions()` (extracted from Program.cs)
+- [x] Implement `ExecuteUserExpression()` (extracted from Program.cs)
+- [⏸️] Add P/Invoke for `ConvertThreadToFiber` (deferred to Phase 3 - Fiber Infrastructure)
 
-### Phase 4: Testing
-- [ ] Test that window remains responsive during init expressions
-- [ ] Test that display updates work from Smalltalk thread
-- [ ] Test that events flow from WinForms to Smalltalk
-- [ ] Test shutdown sequence (window close → thread termination)
+### Phase 3: Main Thread Refactoring ✅ COMPLETE
+- [x] Refactor `Program.cs Main()` to create Smalltalk thread
+- [x] Move init expression execution to Smalltalk thread
+- [x] Keep WinForms event loop on main thread
+- [x] Add thread synchronization (start/stop)
 
-### Phase 5: Integration
-- [ ] Test with all existing command-line flags
-- [ ] Test with --skip-init-expressions
-- [ ] Test with --execute
-- [ ] Test with --diagnostics
-- [ ] Verify BlockContext regression tests still pass
+### Phase 4: Testing ✅ COMPLETE
+- [x] Test that window remains responsive during init expressions
+- [x] Test that display updates work from Smalltalk thread
+- [x] Test that events flow from WinForms to Smalltalk
+- [x] Test shutdown sequence (window close → thread termination)
+
+### Phase 5: Integration ✅ COMPLETE
+- [x] Test with all existing command-line flags
+- [x] Test with --skip-init-expressions
+- [x] Test with --execute
+- [x] Test with --diagnostics
+- [x] Verify BlockContext regression tests still pass (120/120 passing)
 
 ---
 

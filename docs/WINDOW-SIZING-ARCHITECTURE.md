@@ -326,27 +326,28 @@ public class BeDisplay : IPrimitive
 
 ## Implementation Checklist
 
-### Phase 1: Read Dimensions After Cold Start
-- [ ] Update `Program.cs` to read Display dimensions from heap after cold start
-- [ ] Pass dimensions to `WinFormsDisplayProvider` constructor
-- [ ] Remove hardcoded window size (640, 480)
-- [ ] Test that window size matches cold start Display size
+**Status: ✅ PHASES 1-2 COMPLETE (Validation and edge cases deferred)**
 
-### Phase 2: Runtime Resize Support
-- [ ] Add `DisplayResized()` method to `IPlatformBridge` interface
-- [ ] Update `BeDisplay` primitive to detect size changes
-- [ ] Update `BeDisplay` to call `DisplayResized()` when size changes
-- [ ] Implement `DisplayResized()` in `WinFormsDisplayProvider`
-- [ ] Test resizing window from Smalltalk code
+### Phase 1: Read Dimensions After Cold Start ✅ COMPLETE
+- [x] Update `Program.cs` to read Display dimensions from heap after cold start (lines 110-112)
+- [x] Pass dimensions to `WinFormsDisplayProvider` constructor (line 120)
+- [x] Remove hardcoded window size from WinFormsDisplayProvider constructor
+- [x] Test that window size matches cold start Display size (verified)
 
-### Phase 3: Validation and Safety
-- [ ] Add dimension validation in `BeDisplay` primitive
+### Phase 2: Runtime Resize Support ✅ COMPLETE
+- [x] Add `DisplayResized()` method to `IPlatformBridge` interface
+- [x] Update `BeDisplay` primitive to call `DisplayResized()` (GraphicsPrimitives.cs line 222)
+- [x] Implement `DisplayResized()` in `WinFormsDisplayProvider` (WinFormsDisplayProvider.cs line 240)
+- [x] Test resizing window from Smalltalk code (verified with `DisplayScreen displayExtent:`)
+
+### Phase 3: Validation and Safety ⏸️ DEFERRED
+- [ ] Add dimension validation in `BeDisplay` primitive (min/max bounds, alignment)
 - [ ] Add error messages for invalid dimensions
 - [ ] Handle buffer reallocation failures gracefully
 - [ ] Test with extreme sizes (very small, very large)
 - [ ] Test with invalid dimensions (odd widths, zero height, etc.)
 
-### Phase 4: Edge Cases
+### Phase 4: Edge Cases ⏸️ DEFERRED
 - [ ] Test changing Display size during init expressions
 - [ ] Test changing Display size multiple times
 - [ ] Test with misaligned bitmap sizes
