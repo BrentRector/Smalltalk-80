@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Platform;

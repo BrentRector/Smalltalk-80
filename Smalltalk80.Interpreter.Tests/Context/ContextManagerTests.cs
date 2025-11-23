@@ -47,7 +47,8 @@ public class ContextManagerTests
                 nil: _nilOOP,
                 @true: _trueOOP,
                 @false: _falseOOP,
-                smalltalk: ObjectOOP(100)
+                smalltalk: ObjectOOP(100),
+                display: _nilOOP  // Use nil for test - no Display needed
             ),
             ProcessorScheduler = ObjectOOP(101),
             ClassNameFieldIndex = 6,

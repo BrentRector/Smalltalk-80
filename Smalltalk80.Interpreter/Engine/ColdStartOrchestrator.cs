@@ -250,13 +250,15 @@ public class ColdStartOrchestrator : IColdStartLoader
         var trueOOP = GlobalRegistry.Get("true");
         var falseOOP = GlobalRegistry.Get("false");
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
+        var displayOOP = GlobalRegistry.Get("Display");
         var processorSchedulerOOP = GlobalRegistry.Get("ProcessorScheduler");
 
         var knownObjects = new KnownObjects(
             nil: nilOOP,
             @true: trueOOP,
             @false: falseOOP,
-            smalltalk: smalltalkOOP
+            smalltalk: smalltalkOOP,
+            display: displayOOP
         );
 
         var metadata = new VMMetadata

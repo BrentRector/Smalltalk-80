@@ -84,13 +84,12 @@ public static class GraphicsOperations
             WriteFormData(context, destForm, destBits);
 
             // Invalidate Display region if destination is Display
-            if (context.Platform != null && context.RuntimeHeapAccess != null && context.Metadata != null)
+            if (context.Platform != null && context.Metadata != null)
             {
                 try
                 {
-                    // Look up Display global
-                    var smalltalkOOP = context.Metadata.KnownObjects.Smalltalk;
-                    var displayOOP = context.RuntimeHeapAccess.LookupGlobalByName(smalltalkOOP, "Display");
+                    // Get cached Display global
+                    var displayOOP = context.Metadata.KnownObjects.Display;
 
                     // Check if destination Form is the Display
                     if (destForm == displayOOP && displayOOP != context.HeapManager.GetNil())
