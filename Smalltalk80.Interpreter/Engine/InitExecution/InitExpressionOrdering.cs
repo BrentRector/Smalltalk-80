@@ -41,7 +41,6 @@ public static class InitExpressionOrdering
             "Decompiler class",
             "DigitBuffer class",
             "DiskBrowserView class",
-            "DisplayScreen class",
             "DisplayTextView class",
             "Encoder class",
             "Explainer class",
@@ -101,6 +100,7 @@ public static class InitExpressionOrdering
             "WindowsFileDirectory class",
             "WindowsFileSystem class",
             "WorkspaceView class",
+            "DisplayScreen class",        // MUST RUN AFTER Object: uses ifNotNil: method
 
             // LEVEL 1: 6 classes that depend on Level 0
             "BitEditor class",      // depends on: OrderedCollection, Point
