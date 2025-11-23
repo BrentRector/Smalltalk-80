@@ -15892,6 +15892,16 @@ displayHeight: height
 
 	^self displayExtent: self boundingBox width @ height! !
 
+!DisplayScreen class methodsFor: 'class initialization'!
+initialize
+	"Notify the platform of the Display dimensions.
+	Called during system initialization to ensure the host window
+	matches the Display object created during cold start."
+
+	Display ifNotNil: [Display beDisplay]! !
+
+DisplayScreen initialize!
+
 !DisplayScreen class methodsFor: 'display box access'!
 boundingBox
 	"Answer the bounding box for the form representing the current display screen."
