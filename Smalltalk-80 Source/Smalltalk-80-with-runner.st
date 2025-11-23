@@ -15894,9 +15894,122 @@ displayHeight: height
 
 !DisplayScreen class methodsFor: 'class initialization'!
 initialize
+	"Display an artistic line-shaded dragon spanning the entire window."
+
+	| w h cx cy t x y prevX prevY scale angle radius dx dy |
+	Display notNil ifTrue: [
+		Display beDisplay.
+		w _ Display width.
+		h _ Display height.
+		cx _ w // 2.
+		cy _ h // 2.
+		scale _ (w min: h) // 3.
+
+		"Fill with white background"
+		Display fill: Display boundingBox mask: Form black.
+		Display reverse.
+
+		"Draw decorative border"
+		Display border: (Display boundingBox insetBy: 10) width: 3 mask: Form black.
+
+		"Dragon body - sinuous curve with line shading"
+		prevX _ nil.
+		0 to: 200 do: [:i |
+			t _ i / 200.0.
+			angle _ t * Float pi * 3.
+			x _ cx + ((scale * (t - 0.5) * 2.5) truncated).
+			y _ cy + ((angle sin * scale * 0.6) truncated).
+
+			prevX notNil ifTrue: [
+				"Draw body segment"
+				Display fill: (x @ (y - 2) extent: 3 @ 5) mask: Form black.
+
+				"Add line shading perpendicular to body"
+				(i \\ 8 = 0) ifTrue: [
+					dy _ ((angle cos * 30) truncated).
+					dx _ ((angle sin * 30) truncated).
+					Display fill: (x @ y extent: 2 @ 1) mask: Form black.
+					Display fill: ((x - dx) @ (y - dy) extent: 2 @ 1) mask: Form black.
+					Display fill: ((x + dx) @ (y + dy) extent: 2 @ 1) mask: Form black]].
+			prevX _ x. prevY _ y].
+
+		"Dragon head at left end"
+		x _ cx - ((scale * 1.25) truncated).
+		y _ cy.
+
+		"Head circle using line shading"
+		0 to: 359 by: 5 do: [:deg |
+			angle _ deg degreesToRadians.
+			radius _ 40.
+			dx _ ((radius * angle cos) truncated).
+			dy _ ((radius * angle sin) truncated).
+			Display fill: ((x + dx) @ (y + dy) extent: 2 @ 2) mask: Form black].
+
+		"Dragon horns"
+		-30 to: 30 by: 2 do: [:offset |
+			Display fill: ((x - 25 - offset) @ (y - 40 + offset abs) extent: 2 @ 2) mask: Form black.
+			Display fill: ((x - 25 - offset) @ (y + 40 - offset abs) extent: 2 @ 2) mask: Form black].
+
+		"Dragon eye"
+		Display fill: ((x - 10) @ (y - 8) extent: 8 @ 8) mask: Form black.
+
+		"Dragon wings - using curved line art"
+		x _ cx - (scale // 3).
+		y _ cy.
+
+		"Upper wing"
+		0 to: 100 do: [:i |
+			t _ i / 100.0.
+			angle _ t * Float pi.
+			dx _ ((t * scale * 1.2) truncated).
+			dy _ ((angle sin * scale * 0.8) truncated) negated.
+			Display fill: ((x + dx) @ (y + dy) extent: 2 @ 2) mask: Form black.
+
+			"Wing membrane lines"
+			(i \\ 20 = 0) ifTrue: [
+				0 to: 40 by: 4 do: [:j |
+					Display fill: ((x + dx - j) @ (y + dy + (j // 2)) extent: 1 @ 1) mask: Form black]]].
+
+		"Lower wing"
+		0 to: 100 do: [:i |
+			t _ i / 100.0.
+			angle _ t * Float pi.
+			dx _ ((t * scale * 1.2) truncated).
+			dy _ ((angle sin * scale * 0.8) truncated).
+			Display fill: ((x + dx) @ (y + dy) extent: 2 @ 2) mask: Form black.
+
+			"Wing membrane lines"
+			(i \\ 20 = 0) ifTrue: [
+				0 to: 40 by: 4 do: [:j |
+					Display fill: ((x + dx - j) @ (y + dy - (j // 2)) extent: 1 @ 1) mask: Form black]]].
+
+		"Dragon tail - spiral at right end"
+		x _ cx + ((scale * 1.25) truncated).
+		y _ cy.
+		0 to: 150 do: [:i |
+			t _ i / 30.0.
+			angle _ t * Float pi.
+			radius _ 60 - (i // 3).
+			dx _ ((radius * angle cos) truncated).
+			dy _ ((radius * angle sin) truncated).
+			Display fill: ((x + dx) @ (y + dy) extent: 2 @ 2) mask: Form black].
+
+		"Add flame breath"
+		x _ cx - ((scale * 1.25) truncated) - 50.
+		y _ cy.
+		0 to: 40 do: [:i |
+			| flameY |
+			flameY _ ((i * 2.0 degreesToRadians sin * 15) truncated).
+			Display fill: ((x - (i * 3)) @ (y + flameY - 4) extent: 2 @ 8) mask: Form black.
+			(i \\ 5 = 0) ifTrue: [
+				Display fill: ((x - (i * 3)) @ (y + flameY - 15) extent: 1 @ 10) mask: Form black.
+				Display fill: ((x - (i * 3)) @ (y + flameY + 5) extent: 1 @ 10) mask: Form black]]]! !
+
+testBitBltRules
 	"Test all 16 BitBlt combination rules with a visual grid.
 	Creates a 4x4 grid, each tile showing a different combination rule
-	applied with a checkerboard source pattern over gray background."
+	applied with a checkerboard source pattern over gray background.
+	Usage: DisplayScreen testBitBltRules"
 
 	| displayBox tileWidth tileHeight sourcePattern checkSize rule tileRect |
 	Display notNil ifTrue: [
