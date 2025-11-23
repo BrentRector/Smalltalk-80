@@ -199,23 +199,31 @@ public static class SmallIntegerArithmetic
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
+            Console.WriteLine($"[Primitive 11] INVOKED - receiver={context.Receiver}, args={context.Arguments.Length}");
+
+            if (context.Arguments.Length != 1)
+            {
+                Console.WriteLine("[Primitive 11] FAILED - wrong argument count");
                 return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (!context.Receiver.IsSmallInteger || !context.Arguments[0].IsSmallInteger)
+            {
+                Console.WriteLine($"[Primitive 11] FAILED - not SmallIntegers");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
 
-            if (b == 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (b == 0)
+            {
+                Console.WriteLine("[Primitive 11] FAILED - division by zero");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             // Smalltalk \\ uses floored division (result has same sign as divisor)
             int result = a - b * (int)Math.Floor((double)a / b);
-
-            // DIAGNOSTIC: Log modulo operations during dictionary key hashing
-            if ((a > 0 && a < 100 && b == 16) || (a < 0))
-            {
-                Console.WriteLine($"[Primitive 11 Mod] {a} \\\\ {b} = {result}");
-            }
+            Console.WriteLine($"[Primitive 11] SUCCESS: {a} \\\\ {b} = {result}");
 
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(result));
         }
