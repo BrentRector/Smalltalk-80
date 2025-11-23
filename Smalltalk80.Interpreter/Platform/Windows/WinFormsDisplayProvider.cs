@@ -168,6 +168,19 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
                     wordsCopied++;
                 }
                 Console.WriteLine($"[Display] CopyDisplayFromHeap - copied {wordsCopied} words");
+
+                // Diagnostic: Sample center area where halftone should be
+                // Halftone square is at (160,120) 320x240 in a 640x480 display
+                // Sample row 120 (where square starts) bytes 160/8=20 through (160+320)/8=60
+                int rowStride = (Width + 7) / 8; // Should be 80 for 640px width
+                int sampleRow = 120;
+                int sampleStartByte = sampleRow * rowStride + 20;
+                Console.Write($"[Display] Sample row {sampleRow} bytes 20-30: ");
+                for (int i = 0; i < 11 && (sampleStartByte + i) < _displayBuffer.Length; i++)
+                {
+                    Console.Write($"{_displayBuffer[sampleStartByte + i]:X2} ");
+                }
+                Console.WriteLine();
             }
             else
             {
