@@ -29,6 +29,8 @@ public static class SimpleObjectPrimitives
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
+            int hashValue;
+
             // Blue Book: hash returns half the object pointer
             // SmallIntegers hash to their value, but MUST be positive for dictionary indexing
             if (context.Receiver.IsSmallInteger)
@@ -38,13 +40,15 @@ public static class SimpleObjectPrimitives
                 // If hash is negative, modulo can produce 0, causing "basicAt: 0" error.
                 // Mask with 0x3FFFFFFF to ensure positive result while preserving uniqueness.
                 int value = context.Receiver.AsSmallInteger();
-                int hash = value & 0x3FFFFFFF;
-                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(hash));
+                hashValue = value & 0x3FFFFFFF;
+            }
+            else
+            {
+                // For objects, hash is half the OOP (Primitive 75 semantics)
+                hashValue = (int)(context.Receiver.RawValue >> 1);
             }
 
-            // For objects, hash is half the OOP (Primitive 75 semantics)
-            int hash = (int)(context.Receiver.RawValue >> 1);
-            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(hash));
+            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(hashValue));
         }
     }
 
