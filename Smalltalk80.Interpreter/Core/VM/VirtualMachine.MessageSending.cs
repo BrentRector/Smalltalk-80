@@ -107,16 +107,6 @@ public partial class VirtualMachine
         // Check if the method has a primitive
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
 
-        // DEBUG: Log asciiValue sends to track Scanner variable corruption bug
-        if (selectorName == "asciiValue")
-        {
-            var receiverClass = GetClassName(GetClass(receiverOOP));
-            string receiverInfo = receiverOOP.IsSmallInteger
-                ? $"SmallInteger({receiverOOP.AsSmallInteger()})"
-                : $"OOP({receiverOOP.RawValue})";
-            Console.WriteLine($"[ASCII DEBUG] {receiverClass}>>asciiValue sent to {receiverInfo} (SUPER)");
-        }
-
         if (primitiveNumber > 0)
         {
             if (_tracer.ShouldTracePrimitive())
@@ -276,16 +266,6 @@ public partial class VirtualMachine
 
         // Check if the method has a primitive
         int primitiveNumber = _messageDispatcher.GetPrimitiveNumber(methodInfo.MethodOOP);
-
-        // DEBUG: Log asciiValue sends to track Scanner variable corruption bug
-        if (selectorName == "asciiValue")
-        {
-            var receiverClass = GetClassName(classOOP);
-            string receiverInfo = receiverOOP.IsSmallInteger
-                ? $"SmallInteger({receiverOOP.AsSmallInteger()})"
-                : $"OOP({receiverOOP.RawValue})";
-            Console.WriteLine($"[ASCII DEBUG] {receiverClass}>>asciiValue sent to {receiverInfo}");
-        }
 
         if (primitiveNumber > 0)
         {

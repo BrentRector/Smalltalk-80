@@ -336,6 +336,42 @@ public static class SimpleObjectPrimitives
     /// <summary>Primitive 65: Stream next - read next element from stream</summary>
     public class Next : IPrimitive
     {
+        // Helper to get Character object for ASCII code (shared with Primitive 63)
+        private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
+        {
+            if (context.RuntimeHeapAccess == null)
+                return context.HeapManager.GetNil();
+
+            // Use RuntimeHeapAccessor to look up CharacterTable class variable
+            var characterTableOOP = context.RuntimeHeapAccess.LookupClassVariable("Character", "CharacterTable");
+            if (characterTableOOP == context.HeapManager.GetNil())
+                return context.HeapManager.GetNil();
+
+            // CharacterTable is an Array of 256 Character objects
+            int tableSize = context.HeapManager.GetIndexedSize(characterTableOOP);
+            if (asciiValue >= tableSize)
+                return context.HeapManager.GetNil();
+
+            return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+        }
+
+        // Helper to safely get class name
+        private static string GetClassNameSafe(PrimitiveExecutionContext context, SmalltalkOOP classOOP)
+        {
+            try
+            {
+                if (context.RuntimeHeapAccess != null)
+                {
+                    return context.RuntimeHeapAccess.GetClassName(classOOP);
+                }
+            }
+            catch
+            {
+                // Ignore errors during class name lookup
+            }
+            return "";
+        }
+
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
@@ -364,7 +400,27 @@ public static class SimpleObjectPrimitives
             if (format == ObjectFormat.ByteIndexed)
             {
                 byte byteValue = context.HeapManager.GetIndexedByte(collectionOOP, position - 1);
-                element = SmalltalkOOP.FromSmallInteger(byteValue);
+
+                // Check if collection is a String by checking its class
+                var collectionClass = context.HeapManager.GetClassOOP(collectionOOP);
+                var className = GetClassNameSafe(context, collectionClass);
+
+                // For String/Symbol, return Character object from CharacterTable
+                // For other byte arrays (ByteArray, etc.), return SmallInteger
+                if (className == "String" || className == "Symbol")
+                {
+                    element = GetCharacterForAscii(context, byteValue);
+                    if (element == context.HeapManager.GetNil())
+                    {
+                        // CharacterTable lookup failed - fall back to SmallInteger
+                        // so Smalltalk fallback code can handle it
+                        return PrimitiveResult.Fail(context.Metadata!);
+                    }
+                }
+                else
+                {
+                    element = SmalltalkOOP.FromSmallInteger(byteValue);
+                }
             }
             else
             {
