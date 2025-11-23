@@ -280,6 +280,12 @@ public partial class VirtualMachine
                 Console.WriteLine($"  Position: {args[1].AsSmallInteger()}");
             }
 
+            // DIAGNOSTIC: If receiver is Parser, dump Scanner state
+            if (recvClassName == "Parser")
+            {
+                DumpScannerState(receiverOOP);
+            }
+
             Console.WriteLine($"  Instruction count: {_tracer.InstructionCount}");
             Console.WriteLine("\nSmalltalk Context Chain:");
             _debugger.DumpSenderChain(_contextManager.ActiveContext, 20);
@@ -512,5 +518,45 @@ public partial class VirtualMachine
         }
 
         Console.WriteLine(new string('=', 80) + "\n");
+    }
+
+    /// <summary>
+    /// Dumps Scanner state from Parser object for diagnostic purposes.
+    /// Parser inherits from Scanner, so it has Scanner's instance variables.
+    /// </summary>
+    private void DumpScannerState(SmalltalkOOP parserOOP)
+    {
+        Console.WriteLine("\n=== Scanner State (from Parser) ===");
+
+        try
+        {
+            // Scanner instance variables (Parser inherits from Scanner):
+            // 0: source (ReadStream)
+            // 1: mark
+            // 2: hereChar (Character)
+            // 3: aheadChar (Character)
+            // 4: token
+            // 5: tokenType (Symbol)
+            // 6: hereType (Symbol)
+            // 7: hereMark
+            // 8: prevMark
+            // Plus others from Scanner/Parser
+
+            var hereCharOOP = _heapManager.GetInstanceVariable(parserOOP, 2);
+            var tokenOOP = _heapManager.GetInstanceVariable(parserOOP, 4);
+            var tokenTypeOOP = _heapManager.GetInstanceVariable(parserOOP, 5);
+            var hereTypeOOP = _heapManager.GetInstanceVariable(parserOOP, 6);
+
+            Console.WriteLine($"  hereChar: {_debugger.DescribeValue(hereCharOOP)}");
+            Console.WriteLine($"  token: {_debugger.DescribeValue(tokenOOP)}");
+            Console.WriteLine($"  tokenType: {_debugger.DescribeValue(tokenTypeOOP)}");
+            Console.WriteLine($"  hereType: {_debugger.DescribeValue(hereTypeOOP)}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  Error dumping Scanner state: {ex.Message}");
+        }
+
+        Console.WriteLine("===================================\n");
     }
 }

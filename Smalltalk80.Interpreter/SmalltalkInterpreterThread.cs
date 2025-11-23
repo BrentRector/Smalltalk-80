@@ -266,13 +266,9 @@ public class SmalltalkInterpreterThread
             var compilerClassOOP = LookupGlobal("Compiler");
 
             // Step 2: Create Smalltalk String from user expression
-            // DIAGNOSTIC: Try adding explicit return syntax
+            // DoIt expressions should NOT have explicit return - Parser adds returnLast automatically
             var expression = _context.Config.ExecuteExpression;
-            if (!expression.TrimStart().StartsWith("^"))
-            {
-                expression = "^" + expression;  // Add explicit return
-                Console.WriteLine($"  [DIAGNOSTIC] Adding explicit return: \"{expression}\"");
-            }
+            Console.WriteLine($"  [DIAGNOSTIC] Expression as-is: \"{expression}\"");
             var sourceString = StringHelper.CreateString(_context.HeapManager, stringClassOOP, expression);
 
             // Step 3: Use Compiler class>>evaluate: to compile and execute
