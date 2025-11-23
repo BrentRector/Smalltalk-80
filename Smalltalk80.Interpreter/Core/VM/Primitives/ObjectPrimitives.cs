@@ -334,6 +334,14 @@ public static class SimpleObjectPrimitives
     }
 
     /// <summary>Primitive 65: Stream next - read next element from stream</summary>
+    /// <remarks>
+    /// Optional optimization primitive that avoids message dispatch overhead for common cases.
+    /// Handles canonical Blue Book collection types:
+    /// - String/Symbol (and subclasses): Returns Character objects from CharacterTable
+    /// - ByteArray: Returns SmallInteger (raw byte value)
+    /// - Array: Returns OOP directly
+    /// Subclasses and exotic types are supported via isKindOf: semantics.
+    /// </remarks>
     public class Next : IPrimitive
     {
         // Helper to get Character object for ASCII code (shared with Primitive 63)
@@ -353,6 +361,26 @@ public static class SimpleObjectPrimitives
                 return context.HeapManager.GetNil();
 
             return context.HeapManager.GetIndexedOOP(characterTableOOP, asciiValue);
+        }
+
+        // Helper to implement isKindOf: semantics by traversing superclass chain
+        // This handles String subclasses and other inheritance relationships correctly
+        private static bool IsKindOf(PrimitiveExecutionContext context, SmalltalkOOP objectOOP, SmalltalkOOP targetClassOOP)
+        {
+            var currentClassOOP = context.HeapManager.GetClassOOP(objectOOP);
+            var nilOOP = context.HeapManager.GetNil();
+
+            // Traverse superclass chain
+            while (currentClassOOP != nilOOP)
+            {
+                if (currentClassOOP == targetClassOOP)
+                    return true;
+
+                // Move to superclass (instance variable 0 in Behavior)
+                currentClassOOP = context.HeapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
+            }
+
+            return false;
         }
 
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -384,28 +412,26 @@ public static class SimpleObjectPrimitives
             {
                 byte byteValue = context.HeapManager.GetIndexedByte(collectionOOP, position - 1);
 
-                // Check if collection is a String or Symbol
-                var collectionClass = context.HeapManager.GetClassOOP(collectionOOP);
-
-                // For String/Symbol, return Character object from CharacterTable
+                // For String/Symbol (and subclasses), return Character object from CharacterTable
                 // For other byte arrays (ByteArray, etc.), return SmallInteger
-                if (collectionClass == context.Metadata!.StringClassOOP ||
-                    collectionClass == context.Metadata!.SymbolClassOOP)
+                // Use isKindOf: semantics to handle subclasses correctly
+                if (IsKindOf(context, collectionOOP, context.Metadata!.StringClassOOP) ||
+                    IsKindOf(context, collectionOOP, context.Metadata!.SymbolClassOOP))
                 {
                     element = GetCharacterForAscii(context, byteValue);
                     if (element == context.HeapManager.GetNil())
                     {
-                        // CharacterTable lookup failed - fall back to SmallInteger
-                        // so Smalltalk fallback code can handle it
+                        // CharacterTable lookup failed - fail primitive so fallback handles it
                         return PrimitiveResult.Fail(context.Metadata!);
                     }
                 }
                 else
                 {
+                    // ByteArray and other byte-indexed types return raw SmallInteger
                     element = SmalltalkOOP.FromSmallInteger(byteValue);
                 }
             }
-            else
+            else  // PointerIndexed (Arrays, etc.)
             {
                 element = context.HeapManager.GetIndexedOOP(collectionOOP, position - 1);
             }
