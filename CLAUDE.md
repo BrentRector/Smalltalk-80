@@ -17,6 +17,34 @@
 
 **WriteStream>>nextPut: Infinite Loop**: 210/234 comment expressions fail with infinite loop in WriteStream. All comment expressions skipped until bug is fixed.
 
+**Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
+
+## Migration Status
+
+**System Startup Migration** - Migrating from single-threaded cold start to full interactive system with fiber-based process scheduling.
+
+**Phase 1: Program Refactoring** ✅ **COMPLETE**
+- ✅ SmalltalkThreadContext class created
+- ✅ SmalltalkEventQueue and SmalltalkEvent classes created
+- ✅ SmalltalkInterpreterThread class created
+- ✅ Program.cs refactored: UI thread (WinForms) + Smalltalk thread separation
+- ✅ Window remains responsive during init expression execution
+
+**Phase 2: Window Sizing** ⚠️ **IN PROGRESS**
+- ⏳ Read Display dimensions from heap after cold start
+- ⏳ Update WinFormsDisplayProvider to accept heap reference
+- ⏳ Add DisplayResized() method to IPlatformBridge
+- ⏳ Update BeDisplay primitive to detect size changes
+
+**Phase 3: Fiber Infrastructure** 📋 **PLANNED**
+- 📋 Add fiber P/Invoke declarations (NativeMethods.Fibers.cs)
+- 📋 Create FiberScheduler class
+- 📋 Implement ConvertThreadToFiber, CreateProcessFiber, SwitchToFiber wrappers
+- 📋 Create FiberContext structure
+- 📋 Write unit tests for fiber creation and switching
+
+See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, and `docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md` for complete migration documentation.
+
 ## Architecture Documentation
 
 **See `docs/Architecture/` for complete architecture documentation:**
