@@ -80,6 +80,9 @@ public static class GraphicsOperations
                 halftoneBits.Span, halftoneWidth, halftoneHeight,
                 (CombinationRule)(combinationRule & 0x0F));
 
+            // Write modified dest bits back to heap Form bitmap
+            WriteFormData(context, destForm, destBits);
+
             // Invalidate Display region if destination is Display
             if (context.Platform != null && context.RuntimeHeapAccess != null)
             {
@@ -165,6 +168,42 @@ public static class GraphicsOperations
             }
 
             return (bits, width, height);
+        }
+
+        private static void WriteFormData(
+            PrimitiveExecutionContext context,
+            SmalltalkOOP formOOP,
+            Memory<byte> bits)
+        {
+            if (formOOP == context.HeapManager.GetNil() || formOOP.IsSmallInteger || bits.Length == 0)
+                return;
+
+            // Get Form bitmap OOP
+            SmalltalkOOP bitsOOP = context.HeapManager.GetInstanceVariable(formOOP, 0);
+            if (bitsOOP == context.HeapManager.GetNil() || bitsOOP.IsSmallInteger)
+                return;
+
+            // Write bytes back to heap
+            var format = context.HeapManager.GetObjectFormat(bitsOOP);
+            int size = context.HeapManager.GetIndexedSize(bitsOOP);
+
+            if (format == ObjectFormat.WordIndexed)
+            {
+                // WordArray: convert bytes back to 16-bit words
+                for (int i = 0; i < size && (i * 2 + 1) < bits.Length; i++)
+                {
+                    ushort word = (ushort)((bits.Span[i * 2] << 8) | bits.Span[i * 2 + 1]);
+                    context.HeapManager.SetIndexedWord(bitsOOP, i, word);
+                }
+            }
+            else
+            {
+                // ByteArray: write bytes directly
+                for (int i = 0; i < size && i < bits.Length; i++)
+                {
+                    context.HeapManager.SetIndexedByte(bitsOOP, i, bits.Span[i]);
+                }
+            }
         }
     }
 

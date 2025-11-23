@@ -115,11 +115,11 @@ public static class Program
             Console.WriteLine("\n=== Creating Event Queue ===");
             var eventQueue = new SmalltalkEventQueue();
 
-            // Create display window (UI thread object - does NOT access heap)
+            // Create display window (UI thread object - has heap access for Display bitmap rendering)
             // TESTING: Create window at 800x600 (different from Smalltalk Display size of 640x480)
             Console.WriteLine("\n=== Creating Display Window ===");
             Console.WriteLine("  Initial window size: 800x600 (will resize to 640x480 when beDisplay is called)");
-            var displayProvider = new WinFormsDisplayProvider(800, 600, eventQueue, "Smalltalk-80");
+            var displayProvider = new WinFormsDisplayProvider(800, 600, eventQueue, "Smalltalk-80", heapManager, vmMetadata);
             Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity
