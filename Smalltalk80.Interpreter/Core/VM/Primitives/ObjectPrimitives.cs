@@ -30,11 +30,16 @@ public static class SimpleObjectPrimitives
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Blue Book: hash returns half the object pointer
-            // SmallIntegers hash to their value (return self)
+            // SmallIntegers hash to their value, but MUST be positive for dictionary indexing
             if (context.Receiver.IsSmallInteger)
             {
-                // Canonical Smalltalk-80: SmallInteger>>hash ^self
-                return PrimitiveResult.Ok(context.Receiver);
+                // Hash values must always be POSITIVE for dictionary lookup to work correctly.
+                // Dictionary algorithms assume: location = (key hash \\ length) + 1 gives 1..length
+                // If hash is negative, modulo can produce 0, causing "basicAt: 0" error.
+                // Mask with 0x3FFFFFFF to ensure positive result while preserving uniqueness.
+                int value = context.Receiver.AsSmallInteger();
+                int hash = value & 0x3FFFFFFF;
+                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(hash));
             }
 
             // For objects, hash is half the OOP (Primitive 75 semantics)
