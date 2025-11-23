@@ -168,65 +168,78 @@ public static class BitBltEngine
 
     /// <summary>
     /// Word-level processing for operations without halftone.
-    /// Processes 32 bits at a time when possible, falling back to bytes for edges.
+    /// Processes 8 bits at a time when source and dest are aligned, otherwise falls back to pixels.
     /// </summary>
     private static void CopyBitsWordLevel(
         Span<byte> destBits, int destStride, int destX, int destY,
         ReadOnlySpan<byte> sourceBits, int sourceStride, int sourceX, int sourceY,
         int width, int height, CombinationRule rule)
     {
-        for (int y = 0; y < height; y++)
+        // Check if source and dest have same bit alignment within byte
+        // This is required for byte-level processing to work correctly
+        bool sameAlignment = (destX % 8) == (sourceX % 8);
+
+        if (sameAlignment)
         {
-            int destRow = destY + y;
-            int sourceRow = sourceY + y;
-
-            int destByteOffset = destRow * destStride;
-            int sourceByteOffset = sourceRow * sourceStride;
-
-            int x = 0;
-
-            // Process leading unaligned pixels
-            int destBitStart = destX;
-            int sourceBitStart = sourceX;
-            while (x < width && (destBitStart + x) % 8 != 0)
+            // Fast path: source and dest aligned the same, can use byte-level processing
+            for (int y = 0; y < height; y++)
             {
-                bool sourceBit = GetBit(sourceBits, sourceStride, sourceBitStart + x, sourceRow);
-                bool destBit = GetBit(destBits, destStride, destBitStart + x, destRow);
-                bool result = ApplyRule(sourceBit, destBit, true, rule, false);
-                SetBit(destBits, destStride, destBitStart + x, destRow, result);
-                x++;
-            }
+                int destRow = destY + y;
+                int sourceRow = sourceY + y;
+                int destByteOffset = destRow * destStride;
+                int sourceByteOffset = sourceRow * sourceStride;
+                int x = 0;
 
-            // Process aligned bytes
-            int bytesRemaining = (width - x) / 8;
-            int destByteX = (destBitStart + x) / 8;
-            int sourceByteX = (sourceBitStart + x) / 8;
-
-            for (int b = 0; b < bytesRemaining; b++)
-            {
-                int destIdx = destByteOffset + destByteX + b;
-                int sourceIdx = sourceByteOffset + sourceByteX + b;
-
-                if (destIdx >= 0 && destIdx < destBits.Length &&
-                    sourceIdx >= 0 && sourceIdx < sourceBits.Length)
+                // Process leading unaligned pixels to reach byte boundary
+                while (x < width && (destX + x) % 8 != 0)
                 {
-                    byte sourceByte = sourceBits[sourceIdx];
-                    byte destByte = destBits[destIdx];
-                    destBits[destIdx] = ApplyRuleByte(sourceByte, destByte, rule);
+                    bool sourceBit = GetBit(sourceBits, sourceStride, sourceX + x, sourceRow);
+                    bool destBit = GetBit(destBits, destStride, destX + x, destRow);
+                    bool result = ApplyRule(sourceBit, destBit, true, rule, false);
+                    SetBit(destBits, destStride, destX + x, destRow, result);
+                    x++;
+                }
+
+                // Process complete aligned bytes
+                int bytesRemaining = (width - x) / 8;
+                int destByteX = (destX + x) / 8;
+                int sourceByteX = (sourceX + x) / 8;
+
+                for (int b = 0; b < bytesRemaining; b++)
+                {
+                    int destIdx = destByteOffset + destByteX + b;
+                    int sourceIdx = sourceByteOffset + sourceByteX + b;
+
+                    if (destIdx >= 0 && destIdx < destBits.Length &&
+                        sourceIdx >= 0 && sourceIdx < sourceBits.Length)
+                    {
+                        byte sourceByte = sourceBits[sourceIdx];
+                        byte destByte = destBits[destIdx];
+                        destBits[destIdx] = ApplyRuleByte(sourceByte, destByte, rule);
+                    }
+                }
+
+                x += bytesRemaining * 8;
+
+                // Process trailing unaligned pixels
+                while (x < width)
+                {
+                    bool sourceBit = GetBit(sourceBits, sourceStride, sourceX + x, sourceRow);
+                    bool destBit = GetBit(destBits, destStride, destX + x, destRow);
+                    bool result = ApplyRule(sourceBit, destBit, true, rule, false);
+                    SetBit(destBits, destStride, destX + x, destRow, result);
+                    x++;
                 }
             }
-
-            x += bytesRemaining * 8;
-
-            // Process trailing unaligned pixels
-            while (x < width)
-            {
-                bool sourceBit = GetBit(sourceBits, sourceStride, sourceBitStart + x, sourceRow);
-                bool destBit = GetBit(destBits, destStride, destBitStart + x, destRow);
-                bool result = ApplyRule(sourceBit, destBit, true, rule, false);
-                SetBit(destBits, destStride, destBitStart + x, destRow, result);
-                x++;
-            }
+        }
+        else
+        {
+            // Slow path: source and dest have different bit alignment, must use pixel-level
+            CopyBitsPixelLevel(destBits, destStride, destX, destY,
+                              sourceBits, sourceStride, sourceX, sourceY,
+                              width, height,
+                              ReadOnlySpan<byte>.Empty, 0, 0, 0,
+                              rule, false);
         }
     }
 
