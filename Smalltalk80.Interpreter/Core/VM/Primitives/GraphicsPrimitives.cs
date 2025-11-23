@@ -75,6 +75,20 @@ public static class GraphicsOperations
             var (sourceBits, sourceWidth, sourceHeight) = ExtractFormData(context, sourceForm);
             var (halftoneBits, halftoneWidth, halftoneHeight) = ExtractFormData(context, halftoneForm);
 
+            // Diagnostic: Log halftone mask data
+            Console.WriteLine($"[BitBlt] Halftone mask: {halftoneWidth}x{halftoneHeight}, {halftoneBits.Length} bytes");
+            if (halftoneBits.Length > 0)
+            {
+                Console.Write($"[BitBlt] Halftone first 16 bytes: ");
+                for (int i = 0; i < Math.Min(16, halftoneBits.Length); i++)
+                {
+                    Console.Write($"{halftoneBits.Span[i]:X2} ");
+                }
+                Console.WriteLine();
+            }
+            Console.WriteLine($"[BitBlt] Combination rule: {combinationRule} ({(CombinationRule)(combinationRule & 0x0F)})");
+            Console.WriteLine($"[BitBlt] Source: {sourceWidth}x{sourceHeight}, Dest: {destWidth}x{destHeight}");
+
             // Perform BitBlt
             BitBltEngine.CopyBits(
                 destBits.Span, destWidth, destHeight, destX, destY,
