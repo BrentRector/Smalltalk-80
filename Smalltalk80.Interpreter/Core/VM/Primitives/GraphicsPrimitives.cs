@@ -466,6 +466,15 @@ public static class GraphicsOperations
                                       int width, int height, int clipX, int clipY, int clipWidth, int clipHeight,
                                       Span<byte> halftoneBits, int halftoneWidth, int halftoneHeight, int combinationRule)
         {
+            // DIAGNOSTIC: Log first pixel only
+            if (destX == 236 && destY == 296)
+            {
+                Console.WriteLine($"[DrawPixel] Calling BitBltEngine at ({destX},{destY})");
+                Console.WriteLine($"[DrawPixel] Source bytes: {string.Join(" ", sourceBits.Slice(0, Math.Min(4, sourceBits.Length)).ToArray().Select(b => $"{b:X2}"))}");
+                Console.WriteLine($"[DrawPixel] Halftone bytes: {string.Join(" ", halftoneBits.Slice(0, Math.Min(8, halftoneBits.Length)).ToArray().Select(b => $"{b:X2}"))}");
+                Console.WriteLine($"[DrawPixel] Will use rule Or (7) for paint mode 16");
+            }
+
             // Handle paint mode (rule 16) with simplified logic
             // Pen uses Form black halftone, which skips erase pass and only does under pass
             if (combinationRule == 16)
