@@ -17,12 +17,16 @@ public static class GraphicsOperations
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Prefer hardware-accelerated BitBlt if available
+            // Try hardware-accelerated BitBlt if available
             if (context.Platform != null)
             {
                 bool success = context.Platform.PerformBitBlt(context.Receiver);
-                if (!success) return PrimitiveResult.Fail(context.Metadata!);
-                return PrimitiveResult.Ok(context.Receiver);
+                if (success)
+                {
+                    // Hardware BitBlt succeeded - return immediately
+                    return PrimitiveResult.Ok(context.Receiver);
+                }
+                // Hardware BitBlt declined (returned false) - fall through to software implementation
             }
 
             // Software BitBlt implementation
