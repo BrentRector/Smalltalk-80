@@ -80,8 +80,9 @@ public static class GraphicsOperations
                 halftoneBits.Span, halftoneWidth, halftoneHeight,
                 (CombinationRule)(combinationRule & 0x0F));
 
+            // TEMPORARY: Disable WriteFormData to diagnose failure
             // Write modified dest bits back to heap Form bitmap
-            WriteFormData(context, destForm, destBits);
+            // WriteFormData(context, destForm, destBits);
 
             // Invalidate Display region if destination is Display
             if (context.Platform != null && context.Metadata != null)
