@@ -91,7 +91,13 @@ public static class SimpleObjectPrimitives
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
 
             // Smalltalk indices are 1-based
-            if (index < 1 || index > size) return PrimitiveResult.Fail(context.Metadata!);
+            if (index < 1 || index > size)
+            {
+                // DIAGNOSTIC: Print details when basicAt: fails
+                var className = context.HeapManager.GetClassOOP(context.Receiver);
+                Console.WriteLine($"[Primitive 60 FAIL] basicAt: {index} failed - receiver={context.Receiver}, size={size}, class={className}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var format = context.HeapManager.GetObjectFormat(context.Receiver);
             SmalltalkOOP value;
