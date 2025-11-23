@@ -193,10 +193,13 @@ public static class GraphicsOperations
             return;
         }
 
-        // DIAGNOSTIC: Show what we're writing back
-        var sampleBytes = bits.Span.Slice(18000, Math.Min(50, bits.Length - 18000));
-        Console.WriteLine($"[WriteFormData] Writing {bits.Length} bytes back to heap");
-        Console.WriteLine($"[WriteFormData] Sample bytes [18000-18050]: {string.Join(" ", sampleBytes.ToArray().Select(b => $"{b:X2}"))}");
+        // DIAGNOSTIC: Show what we're writing back (only for large Forms like Display)
+        if (bits.Length > 18050)
+        {
+            var sampleBytes = bits.Span.Slice(18000, 50);
+            Console.WriteLine($"[WriteFormData] Writing {bits.Length} bytes back to heap");
+            Console.WriteLine($"[WriteFormData] Sample bytes [18000-18050]: {string.Join(" ", sampleBytes.ToArray().Select(b => $"{b:X2}"))}");
+        }
 
         // Write bytes back to heap using bulk operations (10-100x faster)
         var format = context.HeapManager.GetObjectFormat(bitsOOP);
