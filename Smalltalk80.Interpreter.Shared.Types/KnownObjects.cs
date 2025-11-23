@@ -38,14 +38,22 @@ public readonly struct KnownObjects
     public required SmalltalkOOP Smalltalk { get; init; }
 
     /// <summary>
+    /// The Display global (DisplayScreen instance).
+    /// Primary display bitmap for rendering graphics.
+    /// Cached for fast access during BitBlt operations.
+    /// </summary>
+    public required SmalltalkOOP Display { get; init; }
+
+    /// <summary>
     /// Creates a KnownObjects instance with all required objects.
     /// </summary>
     [SetsRequiredMembers]
-    public KnownObjects(SmalltalkOOP nil, SmalltalkOOP @true, SmalltalkOOP @false, SmalltalkOOP smalltalk)
+    public KnownObjects(SmalltalkOOP nil, SmalltalkOOP @true, SmalltalkOOP @false, SmalltalkOOP smalltalk, SmalltalkOOP display)
     {
         Nil = nil;
         True = @true;
         False = @false;
         Smalltalk = smalltalk;
+        Display = display;
     }
 }

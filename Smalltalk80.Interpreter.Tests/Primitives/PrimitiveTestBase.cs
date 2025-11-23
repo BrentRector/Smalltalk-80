@@ -68,7 +68,8 @@ public abstract class PrimitiveTestBase
                 nil: nilOOP,
                 @true: trueOOP,
                 @false: falseOOP,
-                smalltalk: smalltalkOOP
+                smalltalk: smalltalkOOP,
+                display: nilOOP  // Use nil for test - no Display needed
             ),
             ProcessorScheduler = processorSchedulerOOP,
 
@@ -284,7 +285,8 @@ public abstract class PrimitiveTestBase
                 nil: nilOOP,
                 @true: ObjectOOP(1),  // Placeholder - tests that need true/false should provide explicit metadata
                 @false: ObjectOOP(2), // Placeholder
-                smalltalk: ObjectOOP(3) // Placeholder
+                smalltalk: ObjectOOP(3), // Placeholder
+                display: nilOOP  // Use nil for test - no Display needed
             ),
             ProcessorScheduler = ObjectOOP(4),
             ClassNameFieldIndex = 6,

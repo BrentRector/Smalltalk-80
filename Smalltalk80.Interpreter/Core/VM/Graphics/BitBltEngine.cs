@@ -87,14 +87,17 @@ public static class BitBltEngine
                 return;  // Halftone buffer too small - abort operation
         }
 
+        // Detect nil/empty source (fill operation)
+        bool isNilSource = (sourceWidth == 0 || sourceHeight == 0 || sourceBits.Length == 0);
+
         // Step 3: Main loop - process each pixel
         for (int y = 0; y < clippedHeight; y++)
         {
             int destRow = clipTop + y;
             int sourceRow = adjustedSourceY + y;
 
-            // Clip source row to source bounds
-            if (sourceRow < 0 || sourceRow >= sourceHeight)
+            // Clip source row to source bounds (skip check if nil source)
+            if (!isNilSource && (sourceRow < 0 || sourceRow >= sourceHeight))
                 continue;
 
             for (int x = 0; x < clippedWidth; x++)
@@ -102,19 +105,38 @@ public static class BitBltEngine
                 int destCol = clipLeft + x;
                 int sourceCol = adjustedSourceX + x;
 
-                // Clip source column to source bounds
-                if (sourceCol < 0 || sourceCol >= sourceWidth)
+                // Clip source column to source bounds (skip check if nil source)
+                if (!isNilSource && (sourceCol < 0 || sourceCol >= sourceWidth))
                     continue;
 
                 // Get source bit
-                bool sourceBit = GetBit(sourceBits, sourceStride, sourceCol, sourceRow);
+                bool sourceBit;
+                if (isNilSource)
+                {
+                    // For fill operations (nil source), use halftone pattern AS the source
+                    if (halftone.Length > 0 && halftoneWidth > 0 && halftoneHeight > 0)
+                    {
+                        int htX = destCol % halftoneWidth;
+                        int htY = destRow % halftoneHeight;
+                        sourceBit = GetBit(halftone, halftoneStride, htX, htY);
+                    }
+                    else
+                    {
+                        sourceBit = false;  // No halftone = white
+                    }
+                }
+                else
+                {
+                    // Normal source from bitmap
+                    sourceBit = GetBit(sourceBits, sourceStride, sourceCol, sourceRow);
+                }
 
                 // Get destination bit
                 bool destBit = GetBit(destBits, destStride, destCol, destRow);
 
-                // Get halftone bit if present (tiles across destination)
+                // Get halftone bit for masking (only used for non-nil source)
                 bool halftoneBit = true;
-                if (halftone.Length > 0 && halftoneWidth > 0 && halftoneHeight > 0)
+                if (!isNilSource && halftone.Length > 0 && halftoneWidth > 0 && halftoneHeight > 0)
                 {
                     int htX = destCol % halftoneWidth;
                     int htY = destRow % halftoneHeight;
@@ -122,7 +144,7 @@ public static class BitBltEngine
                 }
 
                 // Apply combination rule
-                bool resultBit = ApplyRule(sourceBit, destBit, halftoneBit, rule);
+                bool resultBit = ApplyRule(sourceBit, destBit, halftoneBit, rule, isNilSource);
 
                 // Set destination bit
                 SetBit(destBits, destStride, destCol, destRow, resultBit);
@@ -168,11 +190,11 @@ public static class BitBltEngine
     /// Implements all 16 boolean operations per Blue Book specification.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool ApplyRule(bool source, bool dest, bool halftone, CombinationRule rule)
+    private static bool ApplyRule(bool source, bool dest, bool halftone, CombinationRule rule, bool isNilSource)
     {
-        // Halftone acts as a mask on the source
-        // If halftone bit is false, treat source as false
-        if (!halftone)
+        // Halftone acts as a mask on the source (but NOT for nil source fill operations)
+        // For nil source, the halftone pattern IS the source and should not be masked
+        if (!isNilSource && !halftone)
             source = false;
 
         return rule switch

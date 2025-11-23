@@ -447,20 +447,89 @@ DisplayScreen displayExtent: 800@600.
 
 ---
 
+## Current Status
+
+**Last Updated**: 2025-11-23
+**Overall Status**: ✅ **COMPLETE AND VERIFIED**
+
+### Implementation Status
+
+**Phase 1: Read Dimensions After Cold Start** ✅ **COMPLETE**
+- Window dimensions correctly read from Display object after cold start
+- Initial window size: 640×480 (matches Display object created in RuntimeObjectCreator.cs)
+- Verified working in production
+
+**Phase 2: Runtime Resize Support** ✅ **COMPLETE**
+- `DisplayResized()` method implemented in IPlatformBridge and WinFormsDisplayProvider
+- BeDisplay primitive (102) detects size changes and calls DisplayResized()
+- Buffer reallocation working correctly (both _displayBuffer and _backBuffer)
+- Verified with window resize from 800×600 → 640×480 during DisplayScreen initialize
+
+**BitBlt Integration** ✅ **COMPLETE AND VERIFIED**
+- Complete BitBlt → Display → UI thread rendering pipeline operational
+- `DisplayScreen initialize` successfully draws centered gray halftone square (320×240)
+- Region invalidation working (Smalltalk thread → UI thread)
+- Display buffer synchronization working (heap → WinForms rendering)
+- Validates complete flow: Smalltalk BitBlt → Display bitmap → Window rendering
+
+### Verified Test Cases
+
+1. ✅ **Window resize during init expressions**
+   - Window starts at 800×600 (hardcoded in Program.cs for testing)
+   - Display object created at 640×480 (RuntimeObjectCreator.cs)
+   - `DisplayScreen initialize` calls `Display beDisplay`
+   - BeDisplay primitive reads Display dimensions and calls `DisplayResized(640, 480)`
+   - Window automatically resizes to match Display dimensions
+   - Console output confirms: `[Display] Resizing from 800x600 to 640x480`
+
+2. ✅ **BitBlt rendering to Display**
+   - `DisplayScreen initialize` draws gray halftone square using `Form>>fill:mask:`
+   - Square dimensions: 320×240 pixels (exactly 1/4 Display area)
+   - Square position: (160, 120) - centered in 640×480 Display
+   - Halftone pattern (55 AA) renders correctly
+   - Validates nil source handling, combination rule 3 (Copy), and pattern fills
+
+### Remaining Work
+
+**Phase 3: Validation and Safety** ⏸️ **DEFERRED**
+- Dimension validation (min/max bounds)
+- Error handling for invalid dimensions
+- Buffer reallocation failure handling
+
+**Phase 4: Edge Cases** ⏸️ **DEFERRED**
+- Multiple resize operations
+- Extreme sizes (very small, very large)
+- Multi-monitor support
+
+**Testing Needs:**
+- ⏸️ Test all 16 BitBlt combination rules (currently only Rule 3 verified)
+- ⏸️ Test runtime resizing via `DisplayScreen displayExtent:`
+- ⏸️ Test with various Display sizes beyond 640×480
+
+---
+
 ## References
 
 **Smalltalk-80 Source:**
 - `DisplayScreen class>>displayExtent:` (line 15877)
 - `DisplayScreen>>beDisplay` (line 15836)
+- `DisplayScreen class>>initialize` (line 15896) - **NEW: Halftone square test**
 - `Form` instance variables (line 19523)
+- `Form>>fill:mask:` (line 19739) - Sets sourceForm: nil for fill operations
 
 **Current Implementation:**
 - `RuntimeObjectCreator.cs` CreateDisplay() (line 199)
 - `GraphicsPrimitives.cs` BeDisplay primitive (line 203)
+- `GraphicsPrimitives.cs` CopyBits primitive (line 20) - BitBlt implementation
+- `BitBltEngine.cs` - Pure C# BitBlt engine with all 16 combination rules
+- `WinFormsDisplayProvider.cs` DisplayResized() (line 377)
+- `WinFormsDisplayProvider.cs` CopyDisplayFromHeap() (line 127)
 - `Program.cs` window creation (line 161)
+- `KnownObjects.cs` Display caching (line 45)
 
 **Blue Book:**
 - Chapter 29: Primitives
+- Primitive 96: copyBits (BitBlt)
 - Primitive 102: beDisplay
 
 ---

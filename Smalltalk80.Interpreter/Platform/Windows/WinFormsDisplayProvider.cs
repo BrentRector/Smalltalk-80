@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
 using Smalltalk80.Interpreter.Core;
+using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Platform;
@@ -16,14 +17,16 @@ namespace Smalltalk80.Interpreter.Platform.Windows;
 /// </summary>
 public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 {
-    private readonly byte[] _displayBuffer;
-    private readonly Bitmap _backBuffer;
+    private byte[] _displayBuffer;
+    private Bitmap _backBuffer;
     private readonly object _bufferLock = new();
     private readonly SmalltalkEventQueue _eventQueue;
+    private readonly ISmalltalkHeap? _heap;
+    private readonly VMMetadata? _vmMetadata;
     private bool _disposed = false;
 
-    public new int Width { get; }
-    public new int Height { get; }
+    public new int Width { get; private set; }
+    public new int Height { get; private set; }
 
     /// <summary>
     /// Gets direct access to the display buffer (1-bit monochrome bitmap).
@@ -33,11 +36,13 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     /// </summary>
     public Memory<byte> DisplayBuffer => new Memory<byte>(_displayBuffer);
 
-    public WinFormsDisplayProvider(int width, int height, SmalltalkEventQueue eventQueue, string title = "Smalltalk-80")
+    public WinFormsDisplayProvider(int width, int height, SmalltalkEventQueue eventQueue, string title = "Smalltalk-80", ISmalltalkHeap? heap = null, VMMetadata? vmMetadata = null)
     {
         Width = width;
         Height = height;
         _eventQueue = eventQueue;
+        _heap = heap;
+        _vmMetadata = vmMetadata;
 
         Console.WriteLine($"[WinForms] Creating window: {width}x{height}");
 
@@ -100,14 +105,135 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     /// </summary>
     private void OnPaint(object? sender, PaintEventArgs e)
     {
+        Console.WriteLine($"[Display] OnPaint called - clip bounds: {e.ClipRectangle}");
         lock (_bufferLock)
         {
+            // Copy Display bitmap from heap to local buffer
+            CopyDisplayFromHeap();
+
             // Copy display buffer to bitmap
             CopyBufferToBitmap();
 
             // Draw bitmap to screen
             e.Graphics.DrawImageUnscaled(_backBuffer, 0, 0);
         }
+        Console.WriteLine($"[Display] OnPaint completed");
+    }
+
+    /// <summary>
+    /// Copies the Display bitmap from the Smalltalk heap to the local buffer.
+    /// This syncs the heap changes (from BitBlt, etc.) to the renderable buffer.
+    /// </summary>
+    private void CopyDisplayFromHeap()
+    {
+        if (_heap == null || _vmMetadata == null)
+        {
+            Console.WriteLine($"[Display] CopyDisplayFromHeap - no heap or metadata");
+            return;
+        }
+
+        try
+        {
+            // Look up Display global
+            var smalltalkOOP = _vmMetadata.KnownObjects.Smalltalk;
+            var displayOOP = LookupGlobal(smalltalkOOP, "Display");
+            if (displayOOP == _heap.GetNil())
+            {
+                Console.WriteLine($"[Display] CopyDisplayFromHeap - Display is nil");
+                return;
+            }
+
+            // Get Display bitmap (Form instance variable 0)
+            var bitsOOP = _heap.GetInstanceVariable(displayOOP, 0);
+            if (bitsOOP == _heap.GetNil())
+            {
+                Console.WriteLine($"[Display] CopyDisplayFromHeap - Display bitmap is nil");
+                return;
+            }
+
+            // Read bitmap data from heap
+            var format = _heap.GetObjectFormat(bitsOOP);
+            int size = _heap.GetIndexedSize(bitsOOP);
+            Console.WriteLine($"[Display] CopyDisplayFromHeap - format={format}, size={size}, bufferLength={_displayBuffer.Length}");
+
+            if (format == ObjectFormat.WordIndexed)
+            {
+                // WordArray: convert words to bytes
+                int wordsCopied = 0;
+                for (int i = 0; i < size && (i * 2 + 1) < _displayBuffer.Length; i++)
+                {
+                    ushort word = _heap.GetIndexedWord(bitsOOP, i);
+                    _displayBuffer[i * 2] = (byte)(word >> 8);
+                    _displayBuffer[i * 2 + 1] = (byte)(word & 0xFF);
+                    wordsCopied++;
+                }
+                Console.WriteLine($"[Display] CopyDisplayFromHeap - copied {wordsCopied} words");
+
+                // Diagnostic: Sample center area where halftone should be
+                // Halftone square is at (160,120) 320x240 in a 640x480 display
+                // Sample row 120 (where square starts) bytes 160/8=20 through (160+320)/8=60
+                int rowStride = (Width + 7) / 8; // Should be 80 for 640px width
+                int sampleRow = 120;
+                int sampleStartByte = sampleRow * rowStride + 20;
+                Console.Write($"[Display] Sample row {sampleRow} bytes 20-30: ");
+                for (int i = 0; i < 11 && (sampleStartByte + i) < _displayBuffer.Length; i++)
+                {
+                    Console.Write($"{_displayBuffer[sampleStartByte + i]:X2} ");
+                }
+                Console.WriteLine();
+            }
+            else
+            {
+                // ByteArray: copy bytes directly
+                int bytesCopied = 0;
+                for (int i = 0; i < size && i < _displayBuffer.Length; i++)
+                {
+                    _displayBuffer[i] = _heap.GetIndexedByte(bitsOOP, i);
+                    bytesCopied++;
+                }
+                Console.WriteLine($"[Display] CopyDisplayFromHeap - copied {bytesCopied} bytes");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Display] CopyDisplayFromHeap error: {ex.Message}");
+        }
+    }
+
+    private SmalltalkOOP LookupGlobal(SmalltalkOOP smalltalkDictOOP, string globalName)
+    {
+        if (_heap == null || _vmMetadata == null)
+            return _heap?.GetNil() ?? default;
+
+        int dictSize = _heap.GetIndexedSize(smalltalkDictOOP);
+        for (int i = 0; i < dictSize; i++)
+        {
+            var assocOOP = _heap.GetIndexedOOP(smalltalkDictOOP, i);
+            if (assocOOP == _heap.GetNil())
+                continue;
+
+            // Get key (Symbol)
+            var keyOOP = _heap.GetInstanceVariable(assocOOP, 0); // Association key
+            if (keyOOP == _heap.GetNil())
+                continue;
+
+            // Extract symbol string
+            int symbolSize = _heap.GetIndexedSize(keyOOP);
+            var symbolBytes = new byte[symbolSize];
+            for (int j = 0; j < symbolSize; j++)
+            {
+                symbolBytes[j] = _heap.GetIndexedByte(keyOOP, j);
+            }
+            string symbolText = System.Text.Encoding.UTF8.GetString(symbolBytes);
+
+            if (symbolText == globalName)
+            {
+                // Return value
+                return _heap.GetInstanceVariable(assocOOP, 1); // Association value
+            }
+        }
+
+        return _heap.GetNil();
     }
 
     /// <summary>
@@ -211,10 +337,10 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public bool PerformBitBlt(SmalltalkOOP bitBltOOP)
     {
-        // BitBlt is handled by the VM primitives
-        // This method is called AFTER the VM performs the BitBlt
-        // We just need to detect if it affected Display and invalidate
-        return true;
+        // Return false to use software BitBlt implementation
+        // Software BitBlt modifies Display bitmap in heap
+        // InvalidateDisplayRegion will be called afterward to trigger redraw
+        return false;
     }
 
     public bool PerformSnapshot(SmalltalkOOP snapshotRequestOOP)
@@ -225,14 +351,17 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public void InvalidateDisplayRegion(int x, int y, int w, int h)
     {
+        Console.WriteLine($"[Display] InvalidateDisplayRegion called: ({x},{y}) {w}x{h}");
         // Signal WinForms thread to repaint
         // Note: Display buffer is updated by Smalltalk thread via direct memory access
         if (InvokeRequired)
         {
+            Console.WriteLine($"[Display] BeginInvoke to UI thread");
             BeginInvoke(new Action(() => Invalidate(new Rectangle(x, y, w, h))));
         }
         else
         {
+            Console.WriteLine($"[Display] Already on UI thread, invalidating directly");
             Invalidate(new Rectangle(x, y, w, h));
         }
     }
@@ -258,13 +387,23 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         // Dimensions changed - resize window
         Console.WriteLine($"[Display] Resizing from {Width}x{Height} to {newWidth}x{newHeight}");
 
-        // NOTE: Cannot reallocate buffers here because:
-        // 1. Width and Height are readonly properties (set in constructor)
-        // 2. _displayBuffer and _backBuffer are readonly fields
-        // 3. Buffer reallocation requires replacing readonly fields (not currently supported)
-        //
-        // Future enhancement: Make Width/Height mutable and reallocate buffers
-        // For now, just resize the window - buffer will be clipped/padded
+        // Reallocate display buffers to match new dimensions
+        lock (_bufferLock)
+        {
+            // Update dimensions
+            Width = newWidth;
+            Height = newHeight;
+
+            // Reallocate display buffer (1 bit per pixel = width × height / 8 bytes)
+            int newBufferSize = (newWidth * newHeight) / 8;
+            _displayBuffer = new byte[newBufferSize];
+            Console.WriteLine($"[Display] Reallocated _displayBuffer: {newBufferSize} bytes");
+
+            // Dispose old back buffer and create new one
+            _backBuffer?.Dispose();
+            _backBuffer = new Bitmap(newWidth, newHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            Console.WriteLine($"[Display] Reallocated _backBuffer: {newWidth}×{newHeight}");
+        }
 
         // Resize window to match new Display dimensions
         this.ClientSize = new Size(newWidth, newHeight);

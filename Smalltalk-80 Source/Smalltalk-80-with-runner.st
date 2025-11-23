@@ -15892,6 +15892,24 @@ displayHeight: height
 
 	^self displayExtent: self boundingBox width @ height! !
 
+!DisplayScreen class methodsFor: 'class initialization'!
+initialize
+	"Draw a centered gray halftone square (1/4 area of Display).
+	Tests BitBlt operations during system initialization."
+
+	| displayBox squareWidth squareHeight centerX centerY squareRect |
+	Display notNil ifTrue: [
+		Display beDisplay.
+		displayBox _ Display boundingBox.
+		squareWidth _ displayBox width // 2.
+		squareHeight _ displayBox height // 2.
+		centerX _ (displayBox width - squareWidth) // 2.
+		centerY _ (displayBox height - squareHeight) // 2.
+		squareRect _ (centerX @ centerY) extent: (squareWidth @ squareHeight).
+		Display fill: squareRect mask: Form gray]! !
+
+DisplayScreen initialize!
+
 !DisplayScreen class methodsFor: 'display box access'!
 boundingBox
 	"Answer the bounding box for the form representing the current display screen."

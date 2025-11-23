@@ -17,12 +17,16 @@ public static class GraphicsOperations
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Prefer hardware-accelerated BitBlt if available
+            // Try hardware-accelerated BitBlt if available
             if (context.Platform != null)
             {
                 bool success = context.Platform.PerformBitBlt(context.Receiver);
-                if (!success) return PrimitiveResult.Fail(context.Metadata!);
-                return PrimitiveResult.Ok(context.Receiver);
+                if (success)
+                {
+                    // Hardware BitBlt succeeded - return immediately
+                    return PrimitiveResult.Ok(context.Receiver);
+                }
+                // Hardware BitBlt declined (returned false) - fall through to software implementation
             }
 
             // Software BitBlt implementation
@@ -71,6 +75,20 @@ public static class GraphicsOperations
             var (sourceBits, sourceWidth, sourceHeight) = ExtractFormData(context, sourceForm);
             var (halftoneBits, halftoneWidth, halftoneHeight) = ExtractFormData(context, halftoneForm);
 
+            // Diagnostic: Log halftone mask data
+            Console.WriteLine($"[BitBlt] Halftone mask: {halftoneWidth}x{halftoneHeight}, {halftoneBits.Length} bytes");
+            if (halftoneBits.Length > 0)
+            {
+                Console.Write($"[BitBlt] Halftone first 16 bytes: ");
+                for (int i = 0; i < Math.Min(16, halftoneBits.Length); i++)
+                {
+                    Console.Write($"{halftoneBits.Span[i]:X2} ");
+                }
+                Console.WriteLine();
+            }
+            Console.WriteLine($"[BitBlt] Combination rule: {combinationRule} ({(CombinationRule)(combinationRule & 0x0F)})");
+            Console.WriteLine($"[BitBlt] Source: {sourceWidth}x{sourceHeight}, Dest: {destWidth}x{destHeight}");
+
             // Perform BitBlt
             BitBltEngine.CopyBits(
                 destBits.Span, destWidth, destHeight, destX, destY,
@@ -79,6 +97,61 @@ public static class GraphicsOperations
                 clipX, clipY, clipWidth, clipHeight,
                 halftoneBits.Span, halftoneWidth, halftoneHeight,
                 (CombinationRule)(combinationRule & 0x0F));
+
+            // Write modified dest bits back to heap Form bitmap
+            WriteFormData(context, destForm, destBits);
+            Console.WriteLine($"[BitBlt] WriteFormData called for form OOP={destForm}");
+
+            // Invalidate Display region if destination is Display
+            if (context.Platform != null && context.Metadata != null)
+            {
+                try
+                {
+                    // Get cached Display global
+                    var displayOOP = context.Metadata.KnownObjects.Display;
+                    Console.WriteLine($"[BitBlt] Display OOP={displayOOP}, destForm OOP={destForm}");
+
+                    // Check if destination Form is the Display
+                    if (destForm == displayOOP && displayOOP != context.HeapManager.GetNil())
+                    {
+                        Console.WriteLine($"[BitBlt] Drawing to Display! Dest rect: ({destX},{destY}) {width}x{height}");
+
+                        // Calculate affected rectangle (intersection of dest rect and clip rect)
+                        int invalidX = Math.Max(destX, clipX);
+                        int invalidY = Math.Max(destY, clipY);
+                        int invalidRight = Math.Min(destX + width, clipX + clipWidth);
+                        int invalidBottom = Math.Min(destY + height, clipY + clipHeight);
+                        int invalidWidth = Math.Max(0, invalidRight - invalidX);
+                        int invalidHeight = Math.Max(0, invalidBottom - invalidY);
+
+                        Console.WriteLine($"[BitBlt] Invalidation rect: ({invalidX},{invalidY}) {invalidWidth}x{invalidHeight}");
+
+                        // Invalidate the affected region
+                        if (invalidWidth > 0 && invalidHeight > 0)
+                        {
+                            Console.WriteLine($"[BitBlt] Calling InvalidateDisplayRegion");
+                            context.Platform.InvalidateDisplayRegion(
+                                invalidX, invalidY, invalidWidth, invalidHeight);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[BitBlt] Skipping invalidation - empty rectangle");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[BitBlt] NOT Display target");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[BitBlt] Display invalidation error: {ex.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[BitBlt] No platform or metadata available for invalidation");
+            }
 
             return PrimitiveResult.Ok(context.Receiver);
         }
@@ -132,6 +205,42 @@ public static class GraphicsOperations
             }
 
             return (bits, width, height);
+        }
+
+        private static void WriteFormData(
+            PrimitiveExecutionContext context,
+            SmalltalkOOP formOOP,
+            Memory<byte> bits)
+        {
+            if (formOOP == context.HeapManager.GetNil() || formOOP.IsSmallInteger || bits.Length == 0)
+                return;
+
+            // Get Form bitmap OOP
+            SmalltalkOOP bitsOOP = context.HeapManager.GetInstanceVariable(formOOP, 0);
+            if (bitsOOP == context.HeapManager.GetNil() || bitsOOP.IsSmallInteger)
+                return;
+
+            // Write bytes back to heap
+            var format = context.HeapManager.GetObjectFormat(bitsOOP);
+            int size = context.HeapManager.GetIndexedSize(bitsOOP);
+
+            if (format == ObjectFormat.WordIndexed)
+            {
+                // WordArray: convert bytes back to 16-bit words
+                for (int i = 0; i < size && (i * 2 + 1) < bits.Length; i++)
+                {
+                    ushort word = (ushort)((bits.Span[i * 2] << 8) | bits.Span[i * 2 + 1]);
+                    context.HeapManager.SetIndexedWord(bitsOOP, i, word);
+                }
+            }
+            else
+            {
+                // ByteArray: write bytes directly
+                for (int i = 0; i < size && i < bits.Length; i++)
+                {
+                    context.HeapManager.SetIndexedByte(bitsOOP, i, bits.Span[i]);
+                }
+            }
         }
     }
 

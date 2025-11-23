@@ -31,12 +31,20 @@
 - ✅ Window remains responsive during init expression execution
 
 **Phase 2: Window Sizing** ✅ **COMPLETE**
-- ✅ Read Display dimensions from heap after cold start (Program.cs lines 110-112)
 - ✅ WinFormsDisplayProvider accepts width/height parameters (no heap access - thread safety)
 - ✅ DisplayResized() method added to IPlatformBridge interface
-- ✅ BeDisplay primitive (101) detects size changes and calls DisplayResized()
-- ✅ Window dimensions now dynamically match Smalltalk Display object
+- ✅ BeDisplay primitive (102) detects size changes and calls DisplayResized()
+- ✅ Window dimensions dynamically match Smalltalk Display object via resize flow
 - ✅ Supports runtime resizing: `DisplayScreen displayExtent: 800@600`
+
+**Testing Window Resize Flow:**
+- Window initially created at **800x600** (hardcoded in Program.cs)
+- Smalltalk Display object created at **640x480** (in RuntimeObjectCreator.cs)
+- When `DisplayScreen initialize` init expression runs, it calls `Display beDisplay`
+- BeDisplay primitive (102) reads Display dimensions (640x480) and calls `DisplayResized(640, 480)`
+- Window automatically resizes from 800x600 → 640x480
+- Console output shows: `[Display] Resizing from 800x600 to 640x480`
+- This validates the complete resize communication flow: Smalltalk thread → UI thread
 
 **Phase 3: Fiber Infrastructure** 📋 **ON HOLD**
 - Fiber work postponed pending other priorities
@@ -135,6 +143,28 @@ cd Smalltalk80.Interpreter
 dotnet build
 dotnet run
 ```
+
+### 🔄 Regenerating Cold Start Bundle
+
+**When to regenerate**: After ANY changes to `Smalltalk-80 Source/Smalltalk-80.st`
+
+Changes to the Smalltalk source (including adding init expressions like `DisplayScreen initialize`) require regenerating the coldstart bundle:
+
+```bash
+# Navigate to source directory
+cd "Smalltalk-80 Source"
+
+# Compile Smalltalk source to generate new coldstart.json
+dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
+
+# Copy to interpreter bin directory (Windows)
+copy ..\Smalltalk80.Compiler\bin\Debug\net9.0\coldstart.json ..\Smalltalk80.Interpreter\bin\Debug\net9.0-windows\coldstart.json
+
+# Copy to interpreter bin directory (Linux/Mac)
+cp ../Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/coldstart.json
+```
+
+**Important**: The `coldstart.json` file in the Interpreter's bin directory is now tracked in git to ensure init expressions are always in sync with the source code.
 
 ### 🔴 MANDATORY: BlockContext Regression Test
 

@@ -28,6 +28,14 @@ Smalltalk80.Compiler/bin/Debug/*
 !Smalltalk80.Compiler/bin/Debug/net9.0/
 Smalltalk80.Compiler/bin/Debug/net9.0/*
 !Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json
+# Exception: Allow coldstart.json in Interpreter output directory
+!Smalltalk80.Interpreter/bin/
+Smalltalk80.Interpreter/bin/*
+!Smalltalk80.Interpreter/bin/Debug/
+Smalltalk80.Interpreter/bin/Debug/*
+!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/
+Smalltalk80.Interpreter/bin/Debug/net9.0-windows/*
+!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/coldstart.json
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/

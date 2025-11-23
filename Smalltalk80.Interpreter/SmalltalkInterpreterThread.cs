@@ -38,6 +38,11 @@ public class SmalltalkInterpreterThread
         {
             Console.WriteLine("\n[Smalltalk Thread] Starting...");
 
+            // TESTING: Wait for UI thread to show window before executing init expressions
+            // This allows us to observe the window resize when DisplayScreen initialize runs
+            Console.WriteLine("[Smalltalk Thread] Waiting for window to be displayed...");
+            Thread.Sleep(1000);  // Wait 1 second for window to be fully shown
+
             // STEP 1: Convert this thread to a Windows fiber (future enhancement)
             // Console.WriteLine("[Smalltalk Thread] Converting to fiber...");
             // ConvertThreadToFiber();
@@ -168,7 +173,8 @@ public class SmalltalkInterpreterThread
             }
 
             // Include initialize methods and test validation
-            if (expr.Source.EndsWith(" initialize") ||
+            // EXCEPT DisplayScreen initialize which runs last to draw the halftone square
+            if ((expr.Source.EndsWith(" initialize") && expr.Source != "DisplayScreen initialize") ||
                 expr.Source == "InputSensor install" ||
                 expr.Source == "InputSensor initSensor" ||
                 expr.Source.Contains("Test validate"))
@@ -181,6 +187,17 @@ public class SmalltalkInterpreterThread
         var dependencyOrder = InitExpressionOrdering.GetDependencyOrder();
         phase1Indices = InitExpressionOrdering.ReorderByDependencies(
             phase1Indices, _context.Bundle, dependencyOrder);
+
+        // Add DisplayScreen initialize at the END (runs last to draw halftone square)
+        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
+        {
+            var expr = _context.Bundle.InitExpressions[i];
+            if (expr.Source == "DisplayScreen initialize")
+            {
+                phase1Indices.Add(i);
+                break;
+            }
+        }
 
         // Execute all selected expressions
         var compiler = new InitExpressionCompiler(
