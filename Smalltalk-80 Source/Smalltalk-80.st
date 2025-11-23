@@ -15904,20 +15904,17 @@ initialize
 		cx _ w // 2.
 		cy _ h // 2.
 
-		"=== DIAGNOSTIC: Test Float degreesToRadians (what Pen needs) ==="
-		"Test the actual method Pen uses"
+		"=== ROOT CAUSE: Float class variables not initialized ==="
+		"Sin/cos methods use: Twopi, Pi, Halfpi, SinCoefficients"
+		"If Float initialize didn't run properly, these are Symbols"
 		testPi _ Float pi.
-		testRad _ 270.0 degreesToRadians.  "This is what Pen's north uses"
-		testHalfpi _ testPi / 2.0.
 
-		"Display diagnostic values as rectangles (width = value * scale)"
+		"Line 1: Display Pi (should be ~31 pixels wide)"
 		Display fill: (10 @ 10 extent: (testPi * 10) truncated @ 5) mask: Form black.
-		Display fill: (10 @ 20 extent: ((testRad abs) * 10) truncated @ 5) mask: Form black.
-		Display fill: (10 @ 30 extent: (testHalfpi * 10) truncated @ 5) mask: Form black.
 
-		"Test cos/sin on the result (what Pen's go: method needs)"
-		Display fill: (10 @ 40 extent: ((testRad cos abs) * 30) truncated @ 5) mask: Form black.
-		Display fill: (10 @ 50 extent: ((testRad sin abs) * 30) truncated @ 5) mask: Form black.
+		"Line 2: Check if SinCoefficients is an Array (should be 5 pixels)"
+		"If it's a Symbol, size will fail and we'll see the error"
+		Display fill: (10 @ 20 extent: (Float perform: #SinCoefficients) size @ 5) mask: Form black.
 
 		"Clear display to white for actual drawing"
 		Display fill: Display boundingBox mask: Form black.
