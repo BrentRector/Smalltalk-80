@@ -15894,45 +15894,257 @@ displayHeight: height
 
 !DisplayScreen class methodsFor: 'class initialization'!
 initialize
-	"Test Float>>sin code paths to isolate the bug."
+	"Reproduce the detailed pencil sketch dragon head from dragon head.png using Pen graphics.
+	Features: Multiple backward-swept horns, intricate scales covering the entire head,
+	detailed eye structure, textured snout, and extensive cross-hatching for depth."
 
-	| w h angle result testArray sum piValue piError |
+	| pen w h cx cy baseX baseY eyeX eyeY sx sy angle |
 	Display notNil ifTrue: [
 		Display beDisplay.
 		w _ Display width.
 		h _ Display height.
+		cx _ w // 2.
+		cy _ h // 2.
 
 		"Clear display to white"
 		Display fill: Display boundingBox mask: Form black.
 		Display reverse.
 
-		"=== TEST 1: Is Float pi the correct value? ==="
-		piValue _ Float pi.
-		piError _ (piValue - 3.14159) abs.
-		(piError < 0.001) ifTrue: [
-			"Pi is correct - draw line at width proportional to pi"
-			Display fill: (10 @ 10 extent: (piValue * 10.0) truncated @ 5) mask: Form black].
+		"Create pen for drawing"
+		pen _ Pen new.
+		pen defaultNib: 1.
 
-		"=== TEST 2: Can we multiply Floats? ==="
-		result _ 3.14 * 2.0.
-		Display fill: (10 @ 20 extent: result truncated @ 5) mask: Form black.
+		"Position dragon head - facing right, slightly tilted down"
+		baseX _ cx - 150.
+		baseY _ cy.
 
-		"=== TEST 3: Can we access Float class variables in comparisons? ==="
-		angle _ 0.5.
-		(angle > Float pi) ifTrue: [
-			Display fill: (10 @ 30 extent: 50 @ 5) mask: Form black].
+		"=== MAIN HEAD STRUCTURE ==="
+		pen defaultNib: 2.
 
-		"=== TEST 4: Can we iterate over a local Array literal? ==="
-		testArray _ #(-0.166667 0.00833333).
-		sum _ 0.0.
-		testArray do: [:coeff | sum _ sum + coeff].
-		Display fill: (10 @ 40 extent: ((sum + 1.0) * 100.0) truncated @ 5) mask: Form black.
+		"Upper cranium - curved back of head"
+		pen place: (baseX - 60) @ (baseY - 80).
+		pen down.
+		pen goto: (baseX - 50) @ (baseY - 100).
+		pen goto: (baseX - 30) @ (baseY - 110).
+		pen goto: (baseX) @ (baseY - 115).
+		pen goto: (baseX + 30) @ (baseY - 115).
+		pen goto: (baseX + 60) @ (baseY - 110).
+		pen up.
 
-		"=== TEST 5: Test Float>>sin with VERY small angle (direct path) ==="
-		"For angle = 0.1, all comparisons fail, goes straight to polynomial"
-		angle _ 0.1.
-		result _ angle sin.
-		Display fill: (10 @ 50 extent: (result * 100.0) truncated @ 5) mask: Form black]! !
+		"Upper snout ridge - flowing forward"
+		pen place: (baseX + 60) @ (baseY - 110).
+		pen down.
+		pen goto: (baseX + 100) @ (baseY - 100).
+		pen goto: (baseX + 150) @ (baseY - 80).
+		pen goto: (baseX + 200) @ (baseY - 55).
+		pen goto: (baseX + 240) @ (baseY - 30).
+		pen goto: (baseX + 270) @ (baseY - 10).
+		pen goto: (baseX + 280) @ (baseY).
+		pen up.
+
+		"Lower jaw line"
+		pen place: (baseX + 280) @ (baseY).
+		pen down.
+		pen goto: (baseX + 270) @ (baseY + 15).
+		pen goto: (baseX + 240) @ (baseY + 30).
+		pen goto: (baseX + 200) @ (baseY + 45).
+		pen goto: (baseX + 150) @ (baseY + 55).
+		pen goto: (baseX + 100) @ (baseY + 60).
+		pen goto: (baseX + 50) @ (baseY + 62).
+		pen goto: (baseX) @ (baseY + 60).
+		pen goto: (baseX - 30) @ (baseY + 50).
+		pen goto: (baseX - 50) @ (baseY + 30).
+		pen goto: (baseX - 60) @ (baseY).
+		pen goto: (baseX - 60) @ (baseY - 40).
+		pen goto: (baseX - 60) @ (baseY - 80).
+		pen up.
+
+		"=== MULTIPLE BACKWARD-SWEPT HORNS ==="
+		pen defaultNib: 3.
+
+		"Main horn 1 - largest, top back"
+		pen place: (baseX - 40) @ (baseY - 100).
+		pen down.
+		pen goto: (baseX - 70) @ (baseY - 130).
+		pen goto: (baseX - 95) @ (baseY - 155).
+		pen goto: (baseX - 110) @ (baseY - 175).
+		pen up.
+		pen place: (baseX - 35) @ (baseY - 100).
+		pen down.
+		pen goto: (baseX - 60) @ (baseY - 125).
+		pen goto: (baseX - 85) @ (baseY - 150).
+		pen goto: (baseX - 100) @ (baseY - 170).
+		pen up.
+
+		"Horn 2 - upper middle"
+		pen place: (baseX - 10) @ (baseY - 110).
+		pen down.
+		pen goto: (baseX - 35) @ (baseY - 135).
+		pen goto: (baseX - 55) @ (baseY - 155).
+		pen goto: (baseX - 65) @ (baseY - 165).
+		pen up.
+		pen place: (baseX - 5) @ (baseY - 110).
+		pen down.
+		pen goto: (baseX - 25) @ (baseY - 130).
+		pen goto: (baseX - 45) @ (baseY - 148).
+		pen up.
+
+		"Horn 3 - forward upper"
+		pen place: (baseX + 25) @ (baseY - 110).
+		pen down.
+		pen goto: (baseX + 10) @ (baseY - 135).
+		pen goto: (baseX - 5) @ (baseY - 153).
+		pen goto: (baseX - 15) @ (baseY - 160).
+		pen up.
+
+		"Horn 4 - lower back"
+		pen place: (baseX - 45) @ (baseY - 60).
+		pen down.
+		pen goto: (baseX - 70) @ (baseY - 80).
+		pen goto: (baseX - 88) @ (baseY - 95).
+		pen goto: (baseX - 95) @ (baseY - 105).
+		pen up.
+
+		"Horn 5 - mid lower"
+		pen place: (baseX - 20) @ (baseY - 70).
+		pen down.
+		pen goto: (baseX - 40) @ (baseY - 90).
+		pen goto: (baseX - 53) @ (baseY - 105).
+		pen up.
+
+		"=== DETAILED EYE STRUCTURE ==="
+		eyeX _ baseX + 90.
+		eyeY _ baseY - 45.
+
+		pen defaultNib: 2.
+
+		"Eye socket ridge"
+		pen place: (eyeX - 25) @ (eyeY - 20).
+		pen down.
+		pen goto: (eyeX - 10) @ (eyeY - 25).
+		pen goto: (eyeX + 10) @ (eyeY - 25).
+		pen goto: (eyeX + 25) @ (eyeY - 20).
+		pen up.
+
+		"Eye outline - almond shaped"
+		pen place: (eyeX - 20) @ eyeY.
+		pen down.
+		pen goto: (eyeX - 10) @ (eyeY - 12).
+		pen goto: (eyeX + 10) @ (eyeY - 12).
+		pen goto: (eyeX + 22) @ eyeY.
+		pen goto: (eyeX + 10) @ (eyeY + 10).
+		pen goto: (eyeX - 10) @ (eyeY + 10).
+		pen goto: (eyeX - 20) @ eyeY.
+		pen up.
+
+		"Pupil - vertical slit"
+		pen defaultNib: 3.
+		pen place: (eyeX + 2) @ (eyeY - 10).
+		pen down.
+		pen goto: (eyeX + 2) @ (eyeY + 8).
+		pen up.
+
+		"Eye highlight"
+		pen defaultNib: 2.
+		Display fill: ((eyeX - 5) @ (eyeY - 6) extent: 8 @ 8) mask: Form black.
+		Display reverse: ((eyeX - 5) @ (eyeY - 6) extent: 8 @ 8).
+
+		"=== INTRICATE SCALE PATTERN ==="
+		pen defaultNib: 1.
+
+		"Scales on upper snout - decreasing size toward tip"
+		baseX + 60 to: (baseX + 260) by: 12 do: [:scaleX |
+			| scaleSize offsetY |
+			scaleSize _ 8 - ((scaleX - baseX - 60) // 40 max: 0).
+			offsetY _ (baseY - 90) + ((scaleX - baseX - 60) // 8).
+			offsetY to: (offsetY + 40) by: (scaleSize + 2) do: [:scaleY |
+				"Individual overlapping scale"
+				pen place: scaleX @ scaleY.
+				pen down.
+				pen goto: (scaleX + scaleSize) @ (scaleY + (scaleSize // 2)).
+				pen goto: scaleX @ (scaleY + scaleSize).
+				pen goto: (scaleX - scaleSize) @ (scaleY + (scaleSize // 2)).
+				pen goto: scaleX @ scaleY.
+				pen up]].
+
+		"Scales on lower jaw"
+		baseX + 40 to: (baseX + 250) by: 14 do: [:scaleX |
+			| scaleSize offsetY |
+			scaleSize _ 7 - ((scaleX - baseX - 40) // 45 max: 0).
+			offsetY _ (baseY + 20) + ((scaleX - baseX - 40) // 10).
+			offsetY to: (offsetY + 35) by: (scaleSize + 2) do: [:scaleY |
+				pen place: scaleX @ scaleY.
+				pen down.
+				pen goto: (scaleX + scaleSize) @ (scaleY + (scaleSize // 2)).
+				pen goto: scaleX @ (scaleY + scaleSize).
+				pen goto: (scaleX - scaleSize) @ (scaleY + (scaleSize // 2)).
+				pen goto: scaleX @ scaleY.
+				pen up]].
+
+		"Scales on side of head"
+		baseX - 40 to: (baseX + 60) by: 13 do: [:scaleX |
+			(baseY - 70) to: (baseY + 20) by: 11 do: [:scaleY |
+				pen place: scaleX @ scaleY.
+				pen down.
+				pen goto: (scaleX + 6) @ (scaleY + 4).
+				pen goto: scaleX @ (scaleY + 8).
+				pen goto: (scaleX - 6) @ (scaleY + 4).
+				pen goto: scaleX @ scaleY.
+				pen up]].
+
+		"=== NOSTRIL DETAIL ==="
+		pen defaultNib: 2.
+		pen place: (baseX + 265) @ (baseY - 5).
+		pen down.
+		pen goto: (baseX + 270) @ (baseY - 8).
+		pen goto: (baseX + 273) @ (baseY - 5).
+		pen goto: (baseX + 270) @ (baseY - 2).
+		pen goto: (baseX + 265) @ (baseY - 5).
+		pen up.
+
+		"Nostril shading"
+		Display fill: ((baseX + 267) @ (baseY - 6) extent: 4 @ 4) mask: Form gray.
+
+		"=== EXTENSIVE CROSS-HATCHING FOR DEPTH ==="
+		pen defaultNib: 1.
+
+		"Cross-hatch under jaw for shadow"
+		baseX to: (baseX + 200) by: 8 do: [:hx |
+			pen place: hx @ (baseY + 45).
+			pen down.
+			pen goto: (hx + 15) @ (baseY + 60).
+			pen up].
+		baseX to: (baseX + 200) by: 8 do: [:hx |
+			pen place: (hx + 5) @ (baseY + 45).
+			pen down.
+			pen goto: (hx - 10) @ (baseY + 58).
+			pen up].
+
+		"Cross-hatch on side of head for texture"
+		baseX - 50 to: baseX by: 6 do: [:hx |
+			(baseY - 70) to: (baseY + 20) by: 6 do: [:hy |
+				pen place: hx @ hy.
+				pen down.
+				pen goto: (hx + 8) @ (hy + 8).
+				pen up]].
+
+		"Cross-hatch on upper snout for form"
+		baseX + 100 to: (baseX + 250) by: 10 do: [:hx |
+			pen place: hx @ (baseY - 85).
+			pen down.
+			pen goto: (hx + 12) @ (baseY - 70).
+			pen up].
+
+		"Vertical hatching on horns for dimension"
+		0 to: 4 do: [:hornIdx |
+			| hornBaseX hornBaseY |
+			hornBaseX _ (baseX - 40) + (hornIdx * 15).
+			hornBaseY _ (baseY - 100) + (hornIdx * 10).
+			0 to: 6 do: [:i |
+				pen place: (hornBaseX - (i * 5)) @ (hornBaseY - (i * 8)).
+				pen down.
+				pen goto: (hornBaseX - (i * 5) - 3) @ (hornBaseY - (i * 8) - 10).
+				pen up]]]! !
 
 testBitBltRules
 	"Test all 16 BitBlt combination rules with a visual grid.
