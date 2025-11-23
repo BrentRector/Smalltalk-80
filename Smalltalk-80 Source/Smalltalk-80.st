@@ -15894,187 +15894,38 @@ displayHeight: height
 
 !DisplayScreen class methodsFor: 'class initialization'!
 initialize
-	"Display a detailed vector dragon head using Pen graphics."
+	"Test Float>>sin code paths to isolate the bug."
 
-	| pen w h cx cy baseX baseY eyeX eyeY testPi testRad testHalfpi |
+	| w h angle result testArray sum |
 	Display notNil ifTrue: [
 		Display beDisplay.
 		w _ Display width.
 		h _ Display height.
-		cx _ w // 2.
-		cy _ h // 2.
 
-		"=== ROOT CAUSE: Float class variables not initialized ==="
-		"Sin/cos methods use: Twopi, Pi, Halfpi, SinCoefficients"
-		"If Float initialize didn't run properly, these are Symbols"
-		testPi _ Float pi.
-
-		"Line 1: Display Pi (should be ~31 pixels wide)"
-		Display fill: (10 @ 10 extent: (testPi * 10) truncated @ 5) mask: Form black.
-
-		"Line 2: Check if SinCoefficients is an Array (should be 5 pixels)"
-		"If it's a Symbol, size will fail and we'll see the error"
-		Display fill: (10 @ 20 extent: (Float perform: #SinCoefficients) size @ 5) mask: Form black.
-
-		"Clear display to white for actual drawing"
+		"Clear display to white"
 		Display fill: Display boundingBox mask: Form black.
 		Display reverse.
 
-		"Create pen for drawing"
-		pen _ Pen new.
-		pen defaultNib: 3.
+		"=== TEST 1: Can we multiply Floats? ==="
+		result _ 3.14 * 2.0.
+		Display fill: (10 @ 10 extent: result truncated @ 5) mask: Form black.
 
-		"Position dragon head center-left"
-		baseX _ cx - 120.
-		baseY _ cy.
+		"=== TEST 2: Can we access Float class variables in comparisons? ==="
+		angle _ 0.5.
+		(angle > Float pi) ifTrue: [
+			Display fill: (10 @ 20 extent: 50 @ 5) mask: Form black].
 
-		"=== DRAGON HEAD OUTLINE ==="
-		"Upper head contour - curve from back to snout tip"
-		pen place: (baseX - 50) @ (baseY - 60).
-		pen down.
-		pen goto: (baseX - 30) @ (baseY - 75).
-		pen goto: (baseX) @ (baseY - 80).
-		pen goto: (baseX + 50) @ (baseY - 70).
-		pen goto: (baseX + 100) @ (baseY - 50).
-		pen goto: (baseX + 150) @ (baseY - 30).
-		pen goto: (baseX + 200) @ (baseY - 10).
-		pen goto: (baseX + 220) @ (baseY).
+		"=== TEST 3: Can we iterate over a local Array literal? ==="
+		testArray _ #(-0.166667 0.00833333).
+		sum _ 0.0.
+		testArray do: [:coeff | sum _ sum + coeff].
+		Display fill: (10 @ 30 extent: ((sum + 1.0) * 100.0) truncated @ 5) mask: Form black.
 
-		"Lower jaw contour"
-		pen goto: (baseX + 200) @ (baseY + 20).
-		pen goto: (baseX + 150) @ (baseY + 35).
-		pen goto: (baseX + 100) @ (baseY + 45).
-		pen goto: (baseX + 50) @ (baseY + 50).
-		pen goto: (baseX) @ (baseY + 50).
-		pen goto: (baseX - 30) @ (baseY + 45).
-		pen goto: (baseX - 50) @ (baseY + 30).
-
-		"Back of head connection"
-		pen goto: (baseX - 60) @ (baseY).
-		pen goto: (baseX - 50) @ (baseY - 30).
-		pen goto: (baseX - 50) @ (baseY - 60).
-		pen up.
-
-		"=== HORNS ==="
-		pen defaultNib: 4.
-		"Main horn 1 (top back)"
-		pen place: (baseX - 40) @ (baseY - 70).
-		pen down.
-		pen goto: (baseX - 70) @ (baseY - 95).
-		pen goto: (baseX - 90) @ (baseY - 115).
-		pen goto: (baseX - 100) @ (baseY - 125).
-		pen up.
-		pen place: (baseX - 40) @ (baseY - 70).
-		pen down.
-		pen goto: (baseX - 50) @ (baseY - 85).
-		pen goto: (baseX - 85) @ (baseY - 110).
-		pen up.
-
-		"Horn 2 (upper middle)"
-		pen place: (baseX - 20) @ (baseY - 75).
-		pen down.
-		pen goto: (baseX - 40) @ (baseY - 95).
-		pen goto: (baseX - 55) @ (baseY - 110).
-		pen up.
-
-		"Horn 3 (lower back)"
-		pen place: (baseX - 45) @ (baseY - 40).
-		pen down.
-		pen goto: (baseX - 65) @ (baseY - 55).
-		pen goto: (baseX - 75) @ (baseY - 65).
-		pen up.
-
-		"=== JAW SPIKES ==="
-		pen defaultNib: 2.
-		0 to: 180 by: 25 do: [:i |
-			pen place: (baseX + i) @ (baseY + 50 - (i // 6)).
-			pen down.
-			pen goto: (baseX + i + 5) @ (baseY + 63 - (i // 6)).
-			pen goto: (baseX + i + 10) @ (baseY + 50 - (i // 6)).
-			pen up].
-
-		"=== DRAGON EYE ==="
-		eyeX _ baseX + 70.
-		eyeY _ baseY - 25.
-
-		"Eye circle"
-		pen defaultNib: 2.
-		pen place: (eyeX + 20) @ eyeY.
-		pen down.
-		16 timesRepeat: [
-			pen turn: 22.5.
-			pen go: 8].
-		pen up.
-
-		"Eye highlight"
-		Display fill: ((eyeX - 5) @ (eyeY - 8) extent: 12 @ 12) mask: Form black.
-		Display reverse: ((eyeX - 5) @ (eyeY - 8) extent: 12 @ 12).
-
-		"Pupil (vertical slit)"
-		pen defaultNib: 3.
-		pen place: (eyeX - 1) @ (eyeY - 12).
-		pen down.
-		pen goto: (eyeX - 1) @ (eyeY + 12).
-		pen up.
-
-		"Eye ridge"
-		pen defaultNib: 3.
-		pen place: (eyeX - 15) @ (eyeY - 30).
-		pen down.
-		pen goto: (eyeX + 15) @ (eyeY - 28).
-		pen up.
-
-		"=== NOSTRIL ==="
-		pen defaultNib: 2.
-		pen place: (baseX + 200) @ (baseY + 8).
-		pen down.
-		8 timesRepeat: [
-			pen turn: 45.
-			pen go: 3].
-		pen up.
-
-		"=== SCALES ==="
-		pen defaultNib: 1.
-		baseX to: (baseX + 180) by: 18 do: [:sx |
-			(baseY - 45) to: (baseY + 35) by: 15 do: [:sy |
-				"Diamond scale outline"
-				pen place: sx @ (sy - 6).
-				pen down.
-				pen goto: (sx + 6) @ sy.
-				pen goto: sx @ (sy + 6).
-				pen goto: (sx - 6) @ sy.
-				pen goto: sx @ (sy - 6).
-				pen up]].
-
-		"=== SNOUT RIDGE ==="
-		pen defaultNib: 2.
-		pen place: (baseX + 20) @ (baseY - 8).
-		pen down.
-		pen goto: (baseX + 220) @ (baseY - 3).
-		pen up.
-
-		"=== MOUTH LINE ==="
-		pen defaultNib: 2.
-		pen place: (baseX + 30) @ (baseY + 30).
-		pen down.
-		pen goto: (baseX + 180) @ (baseY + 20).
-		pen up.
-
-		"=== TEXTURE DETAILS ==="
-		"Cross-hatching on lower jaw for texture"
-		pen defaultNib: 1.
-		baseX to: (baseX + 150) by: 12 do: [:tx |
-			pen place: tx @ (baseY + 35).
-			pen down.
-			pen goto: (tx + 8) @ (baseY + 45).
-			pen up].
-
-		"Cross-hatching on upper head"
-		baseX to: (baseX + 150) by: 12 do: [:tx |
-			pen place: tx @ (baseY - 40).
-			pen down.
-			pen goto: (tx + 8) @ (baseY - 50).
-			pen up]]! !
+		"=== TEST 4: Test Float>>sin with VERY small angle (direct path) ==="
+		"For angle = 0.1, all comparisons fail, goes straight to polynomial"
+		angle _ 0.1.
+		result _ angle sin.
+		Display fill: (10 @ 40 extent: (result * 100.0) truncated @ 5) mask: Form black]! !
 
 testBitBltRules
 	"Test all 16 BitBlt combination rules with a visual grid.
