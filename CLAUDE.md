@@ -51,6 +51,15 @@
 - Uses checkerboard source pattern (8×8 checks) over gray halftone background
 - Comprehensive validation of BitBlt operations during system initialization
 
+**Graphics Optimization** ✅ **COMPLETE**
+- ✅ **Primitive 104 (drawLoopX:Y:)**: Implemented Bresenham line drawing in C#
+- ✅ **Display Invalidation**: Fixed missing `InvalidateDisplayRegion()` call
+- ✅ **Performance**: Dragon drawing - 4.6s (primitive 104) vs 16.6s (Smalltalk fallback) = **3.6x speedup**
+- ✅ **Paint Mode**: Correctly converts rule 16 to Or (rule 7) for Form black halftone
+- ✅ **BitBlt Engine**: Verified working correctly - all 16 combination rules operational
+
+**Key Lesson**: Display refresh architecture requires `InvalidateDisplayRegion()` after modifying Display bitmap. Without it, WinForms display shows stale cached data even though heap is correctly updated.
+
 **Phase 3: Fiber Infrastructure** 📋 **ON HOLD**
 - Fiber work postponed pending other priorities
 
