@@ -70,6 +70,13 @@ public static class GraphicsOperations
             int clipWidth = clipWidthOOP.AsSmallInteger();
             int clipHeight = clipHeightOOP.AsSmallInteger();
 
+            // Fail primitive if combination rule is outside 0-15
+            // Rules 16+ (like Form paint) require special Smalltalk handling (paintBits)
+            if (combinationRule < 0 || combinationRule > 15)
+            {
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+
             // Extract bitmap data from Form objects
             var (destBits, destWidth, destHeight) = ExtractFormData(context, destForm);
             var (sourceBits, sourceWidth, sourceHeight) = ExtractFormData(context, sourceForm);
@@ -82,7 +89,7 @@ public static class GraphicsOperations
                 width, height,
                 clipX, clipY, clipWidth, clipHeight,
                 halftoneBits.Span, halftoneWidth, halftoneHeight,
-                (CombinationRule)(combinationRule & 0x0F));
+                (CombinationRule)combinationRule);
 
             // Write modified dest bits back to heap Form bitmap
             WriteFormData(context, destForm, destBits);
