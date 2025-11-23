@@ -339,6 +339,7 @@ public static class GraphicsOperations
             // TEMPORARY: Always fail to test Smalltalk fallback
             return PrimitiveResult.Fail(context.Metadata!);
 
+#pragma warning disable CS0162 // Unreachable code detected
             // Receiver must be a BitBlt object
             if (context.Receiver.IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
@@ -453,6 +454,7 @@ public static class GraphicsOperations
             WriteFormData(context, destFormOOP, destBits);
 
             return PrimitiveResult.Ok(context.Receiver);
+#pragma warning restore CS0162
         }
 
         private static void DrawPixel(Span<byte> destBits, int destWidth, int destHeight, int destX, int destY,
