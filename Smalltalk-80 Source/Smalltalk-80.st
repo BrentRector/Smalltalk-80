@@ -42239,6 +42239,8 @@ noScale
 scale
 	"Answer a copy of the point that represents the current scale of the receiver."
 
+	^scale copy! !
+
 "Graphics Test Suite - Comprehensive validation of graphics facilities
 Blue Book Smalltalk-80 compatible test suite (no modern exception handling)"
 
