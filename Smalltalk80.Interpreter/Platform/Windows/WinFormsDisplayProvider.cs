@@ -374,13 +374,23 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         // Dimensions changed - resize window
         Console.WriteLine($"[Display] Resizing from {Width}x{Height} to {newWidth}x{newHeight}");
 
-        // NOTE: Cannot reallocate buffers here because:
-        // 1. Width and Height are readonly properties (set in constructor)
-        // 2. _displayBuffer and _backBuffer are readonly fields
-        // 3. Buffer reallocation requires replacing readonly fields (not currently supported)
-        //
-        // Future enhancement: Make Width/Height mutable and reallocate buffers
-        // For now, just resize the window - buffer will be clipped/padded
+        // Reallocate display buffers to match new dimensions
+        lock (_bufferLock)
+        {
+            // Update dimensions
+            Width = newWidth;
+            Height = newHeight;
+
+            // Reallocate display buffer (1 bit per pixel = width × height / 8 bytes)
+            int newBufferSize = (newWidth * newHeight) / 8;
+            _displayBuffer = new byte[newBufferSize];
+            Console.WriteLine($"[Display] Reallocated _displayBuffer: {newBufferSize} bytes");
+
+            // Dispose old back buffer and create new one
+            _backBuffer?.Dispose();
+            _backBuffer = new Bitmap(newWidth, newHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            Console.WriteLine($"[Display] Reallocated _backBuffer: {newWidth}×{newHeight}");
+        }
 
         // Resize window to match new Display dimensions
         this.ClientSize = new Size(newWidth, newHeight);
