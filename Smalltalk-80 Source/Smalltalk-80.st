@@ -15904,19 +15904,20 @@ initialize
 		cx _ w // 2.
 		cy _ h // 2.
 
-		"=== DIAGNOSTIC: Test Float class variables ==="
-		"Retrieve Float class variables to verify they're accessible"
+		"=== DIAGNOSTIC: Test Float degreesToRadians (what Pen needs) ==="
+		"Test the actual method Pen uses"
 		testPi _ Float pi.
-		testRad _ Float perform: #RadiansPerDegree.
-		testHalfpi _ Float perform: #Halfpi.
+		testRad _ 270.0 degreesToRadians.  "This is what Pen's north uses"
+		testHalfpi _ testPi / 2.0.
 
-		"Display diagnostic values as rectangles (width = value * 10)"
+		"Display diagnostic values as rectangles (width = value * scale)"
 		Display fill: (10 @ 10 extent: (testPi * 10) truncated @ 5) mask: Form black.
-		Display fill: (10 @ 20 extent: (testRad * 1000) truncated @ 5) mask: Form black.
+		Display fill: (10 @ 20 extent: ((testRad abs) * 10) truncated @ 5) mask: Form black.
 		Display fill: (10 @ 30 extent: (testHalfpi * 10) truncated @ 5) mask: Form black.
 
-		"Test if testRad is actually a number by trying arithmetic"
-		Display fill: (10 @ 40 extent: ((testRad * 100.0) truncated) @ 5) mask: Form black.
+		"Test cos/sin on the result (what Pen's go: method needs)"
+		Display fill: (10 @ 40 extent: ((testRad cos abs) * 30) truncated @ 5) mask: Form black.
+		Display fill: (10 @ 50 extent: ((testRad sin abs) * 30) truncated @ 5) mask: Form black.
 
 		"Clear display to white for actual drawing"
 		Display fill: Display boundingBox mask: Form black.
