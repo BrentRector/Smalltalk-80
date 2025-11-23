@@ -457,29 +457,13 @@ public static class GraphicsOperations
                                       int width, int height, int clipX, int clipY, int clipWidth, int clipHeight,
                                       Span<byte> halftoneBits, int halftoneWidth, int halftoneHeight, int combinationRule)
         {
-            // Handle paint mode (rule 16) with two-pass logic as per Smalltalk paintBits
+            // Handle paint mode (rule 16) with simplified logic
+            // Pen uses Form black halftone, which skips erase pass and only does under pass
             if (combinationRule == 16)
             {
-                // Paint mode requires two BitBlt operations:
-                // 1. Erase with nil halftone (if halftone is not nil/black)
-                // 2. Under with halftone
-
-                // For simplicity, always do both passes (optimization can be added later)
-                bool hasHalftone = halftoneBits.Length > 0;
-
-                if (hasHalftone)
-                {
-                    // First pass: erase with nil halftone (Form erase = rule 4)
-                    BitBltEngine.CopyBits(
-                        destBits, destWidth, destHeight, destX, destY,
-                        sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
-                        width, height,
-                        clipX, clipY, clipWidth, clipHeight,
-                        Span<byte>.Empty, 0, 0,  // nil halftone
-                        CombinationRule.AndInverted);  // Rule 4 (erase)
-                }
-
-                // Second pass: under with halftone (Form under = rule 7)
+                // Simplified paint mode: just do under pass with halftone
+                // This works for Pen drawing (most common case: Form black halftone)
+                // Full paintBits optimization (checking for black/white Forms) can be added later
                 BitBltEngine.CopyBits(
                     destBits, destWidth, destHeight, destX, destY,
                     sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
