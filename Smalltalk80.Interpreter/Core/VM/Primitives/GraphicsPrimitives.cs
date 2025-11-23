@@ -336,6 +336,9 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
+            // TEMPORARY: Always fail to test Smalltalk fallback
+            return PrimitiveResult.Fail(context.Metadata!);
+
             // Receiver must be a BitBlt object
             if (context.Receiver.IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
