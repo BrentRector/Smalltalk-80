@@ -15896,7 +15896,7 @@ displayHeight: height
 initialize
 	"Display a detailed vector dragon head using Pen graphics."
 
-	| pen w h cx cy baseX baseY eyeX eyeY |
+	| pen w h cx cy baseX baseY eyeX eyeY testPi testRad testHalfpi |
 	Display notNil ifTrue: [
 		Display beDisplay.
 		w _ Display width.
@@ -15904,7 +15904,21 @@ initialize
 		cx _ w // 2.
 		cy _ h // 2.
 
-		"Clear display to white"
+		"=== DIAGNOSTIC: Test Float class variables ==="
+		"Retrieve Float class variables to verify they're accessible"
+		testPi _ Float pi.
+		testRad _ Float perform: #RadiansPerDegree.
+		testHalfpi _ Float perform: #Halfpi.
+
+		"Display diagnostic values as rectangles (width = value * 10)"
+		Display fill: (10 @ 10 extent: (testPi * 10) truncated @ 5) mask: Form black.
+		Display fill: (10 @ 20 extent: (testRad * 1000) truncated @ 5) mask: Form black.
+		Display fill: (10 @ 30 extent: (testHalfpi * 10) truncated @ 5) mask: Form black.
+
+		"Test if testRad is actually a number by trying arithmetic"
+		Display fill: (10 @ 40 extent: ((testRad * 100.0) truncated) @ 5) mask: Form black.
+
+		"Clear display to white for actual drawing"
 		Display fill: Display boundingBox mask: Form black.
 		Display reverse.
 
