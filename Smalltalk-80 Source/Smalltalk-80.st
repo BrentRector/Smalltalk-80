@@ -15917,7 +15917,7 @@ initialize
 		0 to: 200 do: [:i |
 			t _ i / 200.0.
 			angle _ t * Float pi * 3.
-			x _ cx + (scale * (t - 0.5) * 2.5) truncated.
+			x _ cx + ((scale * (t - 0.5) * 2.5) truncated).
 			y _ cy + ((angle sin * scale * 0.6) truncated).
 
 			prevX notNil ifTrue: [
@@ -15926,23 +15926,23 @@ initialize
 
 				"Add line shading perpendicular to body"
 				(i \\ 8 = 0) ifTrue: [
-					dy _ (angle cos * 30) truncated.
-					dx _ (angle sin * 30) truncated.
+					dy _ ((angle cos * 30) truncated).
+					dx _ ((angle sin * 30) truncated).
 					Display fill: (x @ y extent: 2 @ 1) mask: Form black.
 					Display fill: ((x - dx) @ (y - dy) extent: 2 @ 1) mask: Form black.
 					Display fill: ((x + dx) @ (y + dy) extent: 2 @ 1) mask: Form black]].
 			prevX _ x. prevY _ y].
 
 		"Dragon head at left end"
-		x _ cx - (scale * 1.25) truncated.
+		x _ cx - ((scale * 1.25) truncated).
 		y _ cy.
 
 		"Head circle using line shading"
 		0 to: 359 by: 5 do: [:deg |
 			angle _ deg degreesToRadians.
 			radius _ 40.
-			dx _ (radius * angle cos) truncated.
-			dy _ (radius * angle sin) truncated.
+			dx _ ((radius * angle cos) truncated).
+			dy _ ((radius * angle sin) truncated).
 			Display fill: ((x + dx) @ (y + dy) extent: 2 @ 2) mask: Form black].
 
 		"Dragon horns"
@@ -15961,7 +15961,7 @@ initialize
 		0 to: 100 do: [:i |
 			t _ i / 100.0.
 			angle _ t * Float pi.
-			dx _ (t * scale * 1.2) truncated.
+			dx _ ((t * scale * 1.2) truncated).
 			dy _ ((angle sin * scale * 0.8) truncated) negated.
 			Display fill: ((x + dx) @ (y + dy) extent: 2 @ 2) mask: Form black.
 
@@ -15974,8 +15974,8 @@ initialize
 		0 to: 100 do: [:i |
 			t _ i / 100.0.
 			angle _ t * Float pi.
-			dx _ (t * scale * 1.2) truncated.
-			dy _ (angle sin * scale * 0.8) truncated.
+			dx _ ((t * scale * 1.2) truncated).
+			dy _ ((angle sin * scale * 0.8) truncated).
 			Display fill: ((x + dx) @ (y + dy) extent: 2 @ 2) mask: Form black.
 
 			"Wing membrane lines"
@@ -15984,22 +15984,22 @@ initialize
 					Display fill: ((x + dx - j) @ (y + dy - (j // 2)) extent: 1 @ 1) mask: Form black]]].
 
 		"Dragon tail - spiral at right end"
-		x _ cx + (scale * 1.25) truncated.
+		x _ cx + ((scale * 1.25) truncated).
 		y _ cy.
 		0 to: 150 do: [:i |
 			t _ i / 30.0.
 			angle _ t * Float pi.
 			radius _ 60 - (i // 3).
-			dx _ (radius * angle cos) truncated.
-			dy _ (radius * angle sin) truncated.
+			dx _ ((radius * angle cos) truncated).
+			dy _ ((radius * angle sin) truncated).
 			Display fill: ((x + dx) @ (y + dy) extent: 2 @ 2) mask: Form black].
 
 		"Add flame breath"
-		x _ cx - (scale * 1.25) truncated - 50.
+		x _ cx - ((scale * 1.25) truncated) - 50.
 		y _ cy.
 		0 to: 40 do: [:i |
 			| flameY |
-			flameY _ (i * 2.0 degreesToRadians sin * 15) truncated.
+			flameY _ ((i * 2.0 degreesToRadians sin * 15) truncated).
 			Display fill: ((x - (i * 3)) @ (y + flameY - 4) extent: 2 @ 8) mask: Form black.
 			(i \\ 5 = 0) ifTrue: [
 				Display fill: ((x - (i * 3)) @ (y + flameY - 15) extent: 1 @ 10) mask: Form black.
