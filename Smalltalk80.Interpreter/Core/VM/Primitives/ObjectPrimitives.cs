@@ -32,13 +32,15 @@ public static class SimpleObjectPrimitives
             int hashValue;
 
             // Blue Book: hash returns half the object pointer
-            // SmallIntegers hash to their value, but MUST be positive for dictionary indexing
+            // Canonical Smalltalk-80: SmallInteger>>hash ^self
             if (context.Receiver.IsSmallInteger)
             {
-                // Hash values must always be POSITIVE for dictionary lookup to work correctly.
+                // NOTE: We cannot simply return self (as canonical code does) because hash values
+                // MUST be positive for dictionary lookup to work correctly.
                 // Dictionary algorithms assume: location = (key hash \\ length) + 1 gives 1..length
-                // If hash is negative, modulo can produce 0, causing "basicAt: 0" error.
-                // Mask with 0x3FFFFFFF to ensure positive result while preserving uniqueness.
+                // If hash is negative, this fails (e.g., -1 hash causes "basicAt: 0" error).
+                // Solution: Mask with 0x3FFFFFFF to ensure positive result while preserving uniqueness.
+                // This deviation from canonical behavior is necessary for dictionary indexing.
                 int value = context.Receiver.AsSmallInteger();
                 hashValue = value & 0x3FFFFFFF;
             }
