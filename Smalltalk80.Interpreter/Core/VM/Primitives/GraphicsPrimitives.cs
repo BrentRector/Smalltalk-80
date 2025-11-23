@@ -80,6 +80,39 @@ public static class GraphicsOperations
                 halftoneBits.Span, halftoneWidth, halftoneHeight,
                 (CombinationRule)(combinationRule & 0x0F));
 
+            // Invalidate Display region if destination is Display
+            if (context.Platform != null && context.RuntimeHeapAccess != null)
+            {
+                try
+                {
+                    // Look up Display global
+                    var displayOOP = context.RuntimeHeapAccess.GetGlobal("Display");
+
+                    // Check if destination Form is the Display
+                    if (destForm == displayOOP && displayOOP != context.HeapManager.GetNil())
+                    {
+                        // Calculate affected rectangle (intersection of dest rect and clip rect)
+                        int invalidX = Math.Max(destX, clipX);
+                        int invalidY = Math.Max(destY, clipY);
+                        int invalidRight = Math.Min(destX + width, clipX + clipWidth);
+                        int invalidBottom = Math.Min(destY + height, clipY + clipHeight);
+                        int invalidWidth = Math.Max(0, invalidRight - invalidX);
+                        int invalidHeight = Math.Max(0, invalidBottom - invalidY);
+
+                        // Invalidate the affected region
+                        if (invalidWidth > 0 && invalidHeight > 0)
+                        {
+                            context.Platform.InvalidateDisplayRegion(
+                                invalidX, invalidY, invalidWidth, invalidHeight);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore errors in display invalidation - it's optional
+                }
+            }
+
             return PrimitiveResult.Ok(context.Receiver);
         }
 
