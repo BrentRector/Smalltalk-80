@@ -15912,6 +15912,11 @@ initialize
 		"Draw decorative border"
 		Display border: (Display boundingBox insetBy: 10) width: 3 mask: Form black.
 
+		"TEST: Draw large obvious shapes"
+		Display fill: (100 @ 100 extent: 200 @ 100) mask: Form black.
+		Display fill: (500 @ 200 extent: 100 @ 200) mask: Form black.
+		Display fill: (200 @ 400 extent: 400 @ 50) mask: Form black.
+
 		"Dragon body - sinuous curve with line shading"
 		prevX _ nil.
 		0 to: 200 do: [:i |
