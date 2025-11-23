@@ -29,18 +29,34 @@ public static class SimpleObjectPrimitives
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
+            int hashValue;
+
             // Blue Book: hash returns half the object pointer
-            // SmallIntegers hash to their value
+            // Canonical Smalltalk-80: SmallInteger>>hash ^self
             if (context.Receiver.IsSmallInteger)
             {
+                // NOTE: We cannot simply return self (as canonical code does) because hash values
+                // MUST be positive for dictionary lookup to work correctly.
+                // Dictionary algorithms assume: location = (key hash \\ length) + 1 gives 1..length
+                // If hash is negative, this fails (e.g., -1 hash causes "basicAt: 0" error).
+                // Solution: Mask with 0x3FFFFFFF to ensure positive result while preserving uniqueness.
+                // This deviation from canonical behavior is necessary for dictionary indexing.
                 int value = context.Receiver.AsSmallInteger();
-                // For SmallIntegers, hash is typically the value itself (or abs value)
-                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(value & 0x3FFFFFFF));
+                hashValue = value & 0x3FFFFFFF;
+
+                // DIAGNOSTIC: Log hash operations for small integers (especially negative)
+                if (value < 0 || value <= 2)
+                {
+                    Console.WriteLine($"[Primitive 75 Hash] SmallInteger {value} -> hash {hashValue}");
+                }
+            }
+            else
+            {
+                // For objects, hash is half the OOP (Primitive 75 semantics)
+                hashValue = (int)(context.Receiver.RawValue >> 1);
             }
 
-            // For objects, hash is half the OOP (Primitive 75 semantics)
-            int hash = (int)(context.Receiver.RawValue >> 1);
-            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(hash));
+            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(hashValue));
         }
     }
 
@@ -92,7 +108,13 @@ public static class SimpleObjectPrimitives
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
 
             // Smalltalk indices are 1-based
-            if (index < 1 || index > size) return PrimitiveResult.Fail(context.Metadata!);
+            if (index < 1 || index > size)
+            {
+                // DIAGNOSTIC: Print details when basicAt: fails
+                var className = context.HeapManager.GetClassOOP(context.Receiver);
+                Console.WriteLine($"[Primitive 60 FAIL] basicAt: {index} failed - receiver={context.Receiver}, size={size}, class={className}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var format = context.HeapManager.GetObjectFormat(context.Receiver);
             SmalltalkOOP value;

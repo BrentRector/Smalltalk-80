@@ -8,7 +8,7 @@ public class ExecutionTracer
 {
     // Instruction execution counter for debugging infinite loops
     private long _instructionCount;
-    private const long MAX_INSTRUCTIONS = 500000;  // Halt at 500K instructions per expression (infinite loop threshold)
+    private const long MAX_INSTRUCTIONS = 5000000;  // Halt at 5M instructions per expression (increased for complex graphics like dragon drawing)
     // IMPORTANT: This counter MUST be reset before each init expression to prevent accumulation.
     // Without reset: 40 expressions × 10K each = 400K accumulated before #41 even starts!
 

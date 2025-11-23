@@ -15894,19 +15894,89 @@ displayHeight: height
 
 !DisplayScreen class methodsFor: 'class initialization'!
 initialize
-	"Draw a centered gray halftone square (1/4 area of Display).
-	Tests BitBlt operations during system initialization."
+	"Test Float>>sin code paths to isolate the bug."
 
-	| displayBox squareWidth squareHeight centerX centerY squareRect |
+	| w h angle result testArray sum piValue piError |
+	Display notNil ifTrue: [
+		Display beDisplay.
+		w _ Display width.
+		h _ Display height.
+
+		"Clear display to white"
+		Display fill: Display boundingBox mask: Form black.
+		Display reverse.
+
+		"=== TEST 1: Is Float pi the correct value? ==="
+		piValue _ Float pi.
+		piError _ (piValue - 3.14159) abs.
+		(piError < 0.001) ifTrue: [
+			"Pi is correct - draw line at width proportional to pi"
+			Display fill: (10 @ 10 extent: (piValue * 10.0) truncated @ 5) mask: Form black].
+
+		"=== TEST 2: Can we multiply Floats? ==="
+		result _ 3.14 * 2.0.
+		Display fill: (10 @ 20 extent: result truncated @ 5) mask: Form black.
+
+		"=== TEST 3: Can we access Float class variables in comparisons? ==="
+		angle _ 0.5.
+		(angle > Float pi) ifTrue: [
+			Display fill: (10 @ 30 extent: 50 @ 5) mask: Form black].
+
+		"=== TEST 4: Can we iterate over a local Array literal? ==="
+		testArray _ #(-0.166667 0.00833333).
+		sum _ 0.0.
+		testArray do: [:coeff | sum _ sum + coeff].
+		Display fill: (10 @ 40 extent: ((sum + 1.0) * 100.0) truncated @ 5) mask: Form black.
+
+		"=== TEST 5: Test Float>>sin with VERY small angle (direct path) ==="
+		"For angle = 0.1, all comparisons fail, goes straight to polynomial"
+		angle _ 0.1.
+		result _ angle sin.
+		Display fill: (10 @ 50 extent: (result * 100.0) truncated @ 5) mask: Form black]! !
+
+testBitBltRules
+	"Test all 16 BitBlt combination rules with a visual grid.
+	Creates a 4x4 grid, each tile showing a different combination rule
+	applied with a checkerboard source pattern over gray background.
+	Usage: DisplayScreen testBitBltRules"
+
+	| displayBox tileWidth tileHeight sourcePattern checkSize rule tileRect |
 	Display notNil ifTrue: [
 		Display beDisplay.
 		displayBox _ Display boundingBox.
-		squareWidth _ displayBox width // 2.
-		squareHeight _ displayBox height // 2.
-		centerX _ (displayBox width - squareWidth) // 2.
-		centerY _ (displayBox height - squareHeight) // 2.
-		squareRect _ (centerX @ centerY) extent: (squareWidth @ squareHeight).
-		Display fill: squareRect mask: Form gray]! !
+
+		"Fill entire display with gray halftone background"
+		Display fill: displayBox mask: Form gray.
+
+		"Calculate tile dimensions (4x4 grid)"
+		tileWidth _ displayBox width // 4.
+		tileHeight _ displayBox height // 4.
+
+		"Create checkerboard source pattern (8x8 checks within each tile)"
+		sourcePattern _ Form extent: (tileWidth @ tileHeight).
+		checkSize _ (tileWidth min: tileHeight) // 8 max: 1.
+
+		"Fill checkerboard: alternating black squares on white background"
+		0 to: 7 do: [:rowIndex |
+			0 to: 7 do: [:colIndex |
+				((rowIndex + colIndex) odd) ifTrue: [
+					sourcePattern
+						fill: ((colIndex * checkSize) @ (rowIndex * checkSize)
+								extent: checkSize @ checkSize)
+						mask: Form black]]].
+
+		"Apply each of 16 combination rules to tiles in 4x4 grid"
+		0 to: 3 do: [:rowIndex |
+			0 to: 3 do: [:colIndex |
+				rule _ rowIndex * 4 + colIndex.
+				tileRect _ (colIndex * tileWidth) @ (rowIndex * tileHeight)
+					extent: (tileWidth @ tileHeight).
+				sourcePattern
+					displayOn: Display
+					at: tileRect origin
+					clippingBox: tileRect
+					rule: rule
+					mask: Form black]]]! !
 
 DisplayScreen initialize!
 

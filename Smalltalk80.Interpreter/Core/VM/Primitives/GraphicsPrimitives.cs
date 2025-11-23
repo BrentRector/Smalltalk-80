@@ -75,20 +75,6 @@ public static class GraphicsOperations
             var (sourceBits, sourceWidth, sourceHeight) = ExtractFormData(context, sourceForm);
             var (halftoneBits, halftoneWidth, halftoneHeight) = ExtractFormData(context, halftoneForm);
 
-            // Diagnostic: Log halftone mask data
-            Console.WriteLine($"[BitBlt] Halftone mask: {halftoneWidth}x{halftoneHeight}, {halftoneBits.Length} bytes");
-            if (halftoneBits.Length > 0)
-            {
-                Console.Write($"[BitBlt] Halftone first 16 bytes: ");
-                for (int i = 0; i < Math.Min(16, halftoneBits.Length); i++)
-                {
-                    Console.Write($"{halftoneBits.Span[i]:X2} ");
-                }
-                Console.WriteLine();
-            }
-            Console.WriteLine($"[BitBlt] Combination rule: {combinationRule} ({(CombinationRule)(combinationRule & 0x0F)})");
-            Console.WriteLine($"[BitBlt] Source: {sourceWidth}x{sourceHeight}, Dest: {destWidth}x{destHeight}");
-
             // Perform BitBlt
             BitBltEngine.CopyBits(
                 destBits.Span, destWidth, destHeight, destX, destY,
@@ -100,7 +86,6 @@ public static class GraphicsOperations
 
             // Write modified dest bits back to heap Form bitmap
             WriteFormData(context, destForm, destBits);
-            Console.WriteLine($"[BitBlt] WriteFormData called for form OOP={destForm}");
 
             // Invalidate Display region if destination is Display
             if (context.Platform != null && context.Metadata != null)
@@ -109,13 +94,10 @@ public static class GraphicsOperations
                 {
                     // Get cached Display global
                     var displayOOP = context.Metadata.KnownObjects.Display;
-                    Console.WriteLine($"[BitBlt] Display OOP={displayOOP}, destForm OOP={destForm}");
 
                     // Check if destination Form is the Display
                     if (destForm == displayOOP && displayOOP != context.HeapManager.GetNil())
                     {
-                        Console.WriteLine($"[BitBlt] Drawing to Display! Dest rect: ({destX},{destY}) {width}x{height}");
-
                         // Calculate affected rectangle (intersection of dest rect and clip rect)
                         int invalidX = Math.Max(destX, clipX);
                         int invalidY = Math.Max(destY, clipY);
@@ -124,33 +106,18 @@ public static class GraphicsOperations
                         int invalidWidth = Math.Max(0, invalidRight - invalidX);
                         int invalidHeight = Math.Max(0, invalidBottom - invalidY);
 
-                        Console.WriteLine($"[BitBlt] Invalidation rect: ({invalidX},{invalidY}) {invalidWidth}x{invalidHeight}");
-
                         // Invalidate the affected region
                         if (invalidWidth > 0 && invalidHeight > 0)
                         {
-                            Console.WriteLine($"[BitBlt] Calling InvalidateDisplayRegion");
                             context.Platform.InvalidateDisplayRegion(
                                 invalidX, invalidY, invalidWidth, invalidHeight);
                         }
-                        else
-                        {
-                            Console.WriteLine($"[BitBlt] Skipping invalidation - empty rectangle");
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"[BitBlt] NOT Display target");
                     }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Console.WriteLine($"[BitBlt] Display invalidation error: {ex.Message}");
+                    // Silently ignore display invalidation errors
                 }
-            }
-            else
-            {
-                Console.WriteLine($"[BitBlt] No platform or metadata available for invalidation");
             }
 
             return PrimitiveResult.Ok(context.Receiver);

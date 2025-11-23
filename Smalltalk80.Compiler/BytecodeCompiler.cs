@@ -1667,6 +1667,24 @@ namespace Smalltalk80.Compiler
                     return lit.byteArrayLiteral().GetText();
                 }
             }
+            // Handle negative numbers (MINUS numberLiteral)
+            else if (element.MINUS() != null && element.numberLiteral() != null)
+            {
+                var text = element.numberLiteral().GetText();
+                if (TryParseSmalltalkNumber(text, out object? numValue) && numValue != null)
+                {
+                    // Negate the value
+                    if (numValue is int intVal)
+                    {
+                        return -intVal;
+                    }
+                    else if (numValue is double doubleVal)
+                    {
+                        return -doubleVal;
+                    }
+                }
+                return "-" + text; // Fallback
+            }
             // Handle symbol names (identifiers in arrays become symbols)
             else if (element.symbolName() != null)
             {

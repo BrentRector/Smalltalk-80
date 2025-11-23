@@ -106,19 +106,19 @@ public static class Program
             // Build VM metadata (needed by Smalltalk thread)
             var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
-            // NOTE: Intentionally creating window at 800x600 to test resize flow
-            // Smalltalk Display object is 640x480 (created during cold start)
-            // When beDisplay primitive is called, it should resize window from 800x600 → 640x480
-            // This tests the DisplayResized() communication from Smalltalk thread → UI thread
+            // NOTE: Window and Display both use 800x600
+            // Smalltalk Display object is 800x600 (created during cold start)
+            // When beDisplay primitive is called, window size matches Display (no resize needed)
+            // Resize flow is tested when user calls: DisplayScreen displayExtent: width@height
 
             // Create event queue (shared between threads)
             Console.WriteLine("\n=== Creating Event Queue ===");
             var eventQueue = new SmalltalkEventQueue();
 
             // Create display window (UI thread object - has heap access for Display bitmap rendering)
-            // TESTING: Create window at 800x600 (different from Smalltalk Display size of 640x480)
+            // Window size: 800x600 (matches Smalltalk Display size)
             Console.WriteLine("\n=== Creating Display Window ===");
-            Console.WriteLine("  Initial window size: 800x600 (will resize to 640x480 when beDisplay is called)");
+            Console.WriteLine("  Window size: 800x600 (matches Smalltalk Display)");
             var displayProvider = new WinFormsDisplayProvider(800, 600, eventQueue, "Smalltalk-80", heapManager, vmMetadata);
             Console.WriteLine("Display window created (not shown yet)...");
 
