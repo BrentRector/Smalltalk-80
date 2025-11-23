@@ -144,6 +144,28 @@ dotnet build
 dotnet run
 ```
 
+### 🔄 Regenerating Cold Start Bundle
+
+**When to regenerate**: After ANY changes to `Smalltalk-80 Source/Smalltalk-80.st`
+
+Changes to the Smalltalk source (including adding init expressions like `DisplayScreen initialize`) require regenerating the coldstart bundle:
+
+```bash
+# Navigate to source directory
+cd "Smalltalk-80 Source"
+
+# Compile Smalltalk source to generate new coldstart.json
+dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
+
+# Copy to interpreter bin directory (Windows)
+copy ..\Smalltalk80.Compiler\bin\Debug\net9.0\coldstart.json ..\Smalltalk80.Interpreter\bin\Debug\net9.0-windows\coldstart.json
+
+# Copy to interpreter bin directory (Linux/Mac)
+cp ../Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/coldstart.json
+```
+
+**Important**: The `coldstart.json` file in the Interpreter's bin directory is now tracked in git to ensure init expressions are always in sync with the source code.
+
 ### 🔴 MANDATORY: BlockContext Regression Test
 
 **Run after EVERY compiler or interpreter change**:
