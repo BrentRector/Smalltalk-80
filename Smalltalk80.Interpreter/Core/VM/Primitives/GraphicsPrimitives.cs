@@ -200,7 +200,7 @@ public static class GraphicsOperations
         }
     }
 
-    /// <summary>Primitive 101: beDisplay - Make Form the active display</summary>
+    /// <summary>Primitive 102: beDisplay - Make Form the active display (Blue Book Chapter 29)</summary>
     public class BeDisplay : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -231,7 +231,7 @@ public static class GraphicsOperations
         }
     }
 
-    /// <summary>Primitive 102: beCursor - Set hardware cursor</summary>
+    /// <summary>Primitive 101: beCursor - Set hardware cursor (Blue Book Chapter 29)</summary>
     public class BeCursor : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)

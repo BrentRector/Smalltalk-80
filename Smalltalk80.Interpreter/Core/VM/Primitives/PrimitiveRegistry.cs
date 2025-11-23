@@ -222,8 +222,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(98, new GraphicsOperations.OopsLeft());
         registry.Register(99, new GraphicsOperations.CoreLeft());
         registry.Register(100, new GraphicsOperations.TimeWords());
-        registry.Register(101, new GraphicsOperations.BeDisplay());
-        registry.Register(102, new GraphicsOperations.BeCursor());
+        registry.Register(101, new GraphicsOperations.BeCursor());     // Blue Book: Primitive 101 = beCursor
+        registry.Register(102, new GraphicsOperations.BeDisplay());    // Blue Book: Primitive 102 = beDisplay
         registry.Register(103, new GraphicsOperations.Beep());
         registry.Register(104, new GraphicsOperations.ClipboardText());
 
