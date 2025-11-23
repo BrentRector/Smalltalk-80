@@ -130,6 +130,44 @@ public interface ISmalltalkHeap
     /// </summary>
     void SetIndexedWord(SmalltalkOOP objectOOP, int index, ushort value);
 
+    /// <summary>
+    /// Bulk copy indexed bytes from heap object to destination span.
+    /// Much faster than element-by-element access for large bitmaps.
+    /// </summary>
+    /// <param name="objectOOP">ByteIndexed object to read from</param>
+    /// <param name="destination">Destination span to copy bytes into</param>
+    /// <param name="startIndex">Starting index in source object (default 0)</param>
+    void CopyIndexedBytes(SmalltalkOOP objectOOP, Span<byte> destination, int startIndex = 0);
+
+    /// <summary>
+    /// Bulk copy indexed words from heap object to destination span as big-endian bytes.
+    /// Each word (16-bit) is stored as 2 bytes in big-endian format.
+    /// Much faster than element-by-element access for large bitmaps.
+    /// </summary>
+    /// <param name="objectOOP">WordIndexed object to read from</param>
+    /// <param name="destination">Destination span to copy bytes into</param>
+    /// <param name="startIndex">Starting index in source object (default 0)</param>
+    void CopyIndexedWords(SmalltalkOOP objectOOP, Span<byte> destination, int startIndex = 0);
+
+    /// <summary>
+    /// Bulk copy bytes from source span to indexed bytes in heap object.
+    /// Much faster than element-by-element access for large bitmaps.
+    /// </summary>
+    /// <param name="objectOOP">ByteIndexed object to write to</param>
+    /// <param name="source">Source span to copy bytes from</param>
+    /// <param name="startIndex">Starting index in destination object (default 0)</param>
+    void SetIndexedBytes(SmalltalkOOP objectOOP, ReadOnlySpan<byte> source, int startIndex = 0);
+
+    /// <summary>
+    /// Bulk copy bytes to indexed words in heap object, converting from big-endian format.
+    /// Each 2 bytes in source represents one 16-bit word in big-endian format.
+    /// Much faster than element-by-element access for large bitmaps.
+    /// </summary>
+    /// <param name="objectOOP">WordIndexed object to write to</param>
+    /// <param name="source">Source span containing big-endian bytes</param>
+    /// <param name="startIndex">Starting index in destination object (default 0)</param>
+    void SetIndexedWords(SmalltalkOOP objectOOP, ReadOnlySpan<byte> source, int startIndex = 0);
+
     // ========================================
     // Object Metadata Access
     // ========================================
