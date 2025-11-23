@@ -472,23 +472,21 @@ public static class GraphicsOperations
                 Console.WriteLine($"[DrawPixel] Calling BitBltEngine at ({destX},{destY})");
                 Console.WriteLine($"[DrawPixel] Source bytes: {string.Join(" ", sourceBits.Slice(0, Math.Min(4, sourceBits.Length)).ToArray().Select(b => $"{b:X2}"))}");
                 Console.WriteLine($"[DrawPixel] Halftone bytes: {string.Join(" ", halftoneBits.Slice(0, Math.Min(8, halftoneBits.Length)).ToArray().Select(b => $"{b:X2}"))}");
-                Console.WriteLine($"[DrawPixel] Will use rule Or (7) for paint mode 16");
+                Console.WriteLine($"[DrawPixel] TESTING: Will use rule Copy (3) instead of Or (7)");
             }
 
-            // Handle paint mode (rule 16) with simplified logic
+            // Handle paint mode (rule 16) - TEST with Copy rule
             // Pen uses Form black halftone, which skips erase pass and only does under pass
             if (combinationRule == 16)
             {
-                // Simplified paint mode: just do under pass with halftone
-                // This works for Pen drawing (most common case: Form black halftone)
-                // Full paintBits optimization (checking for black/white Forms) can be added later
+                // DIAGNOSTIC TEST: Try Copy instead of Or to see if Or operation is broken
                 BitBltEngine.CopyBits(
                     destBits, destWidth, destHeight, destX, destY,
                     sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
                     width, height,
                     clipX, clipY, clipWidth, clipHeight,
                     halftoneBits, halftoneWidth, halftoneHeight,
-                    CombinationRule.Or);  // Rule 7 (under)
+                    CombinationRule.Copy);  // TEST: Rule 3 (copy) instead of 7 (or)
             }
             else
             {
