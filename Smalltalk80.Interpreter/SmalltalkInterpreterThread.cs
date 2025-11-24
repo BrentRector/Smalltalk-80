@@ -199,15 +199,15 @@ public class SmalltalkInterpreterThread
             }
         }
 
-        // Build phase 2 list: GraphicsTest expressions (run AFTER init expressions)
+        // Build phase 2 list: Test expressions (run AFTER init expressions)
         var phase2Indices = new List<int>();
         for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
         {
             var expr = _context.Bundle.InitExpressions[i];
             if (expr.Source == null) continue;
 
-            // Include GraphicsTest method calls
-            if (expr.Source.StartsWith("GraphicsTest "))
+            // Include FloatTest and GraphicsTest method calls
+            if (expr.Source.StartsWith("FloatTest ") || expr.Source.StartsWith("GraphicsTest "))
             {
                 phase2Indices.Add(i);
             }
@@ -257,10 +257,10 @@ public class SmalltalkInterpreterThread
             }
         }
 
-        // PHASE 2: Execute GraphicsTest expressions (if any)
+        // PHASE 2: Execute Test expressions (FloatTest, GraphicsTest, etc.)
         if (phase2Indices.Count > 0)
         {
-            Console.WriteLine($"\n--- Phase 2: GraphicsTest expressions ---");
+            Console.WriteLine($"\n--- Phase 2: Test expressions ---");
             foreach (int index in phase2Indices)
             {
                 var expr = _context.Bundle.InitExpressions[index];
@@ -302,7 +302,7 @@ public class SmalltalkInterpreterThread
         Console.WriteLine($"  {succeeded} succeeded, {failed} failed, {skippedIndices.Count} skipped");
         if (phase2Indices.Count > 0)
         {
-            Console.WriteLine($"  Phase 1: {phase1Indices.Count} init expressions, Phase 2: {phase2Indices.Count} GraphicsTest expressions");
+            Console.WriteLine($"  Phase 1: {phase1Indices.Count} init expressions, Phase 2: {phase2Indices.Count} test expressions");
         }
     }
 

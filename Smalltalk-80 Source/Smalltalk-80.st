@@ -43206,7 +43206,197 @@ testAll
 	"Synonym for testComprehensive"
 	^self testComprehensive! !
 
+"==================== FloatTest - Comprehensive Float Operations Test ===================="
+
+Object subclass: #FloatTest
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-Float'!
+
+FloatTest comment:
+'Comprehensive Float test suite for Smalltalk-80 numeric operations.
+Tests Float class variable initialization, arithmetic, comparisons,
+trigonometric functions, and numeric coercion.'!
+
+
+!FloatTest class methodsFor: 'running'!
+
+testAll
+	"Run all Float tests and return results Dictionary."
+
+	| results |
+	results _ Dictionary new.
+
+	Transcript show: 'FloatTest: Testing class variables...'; cr.
+	results at: #classVars put: (self testClassVars).
+
+	Transcript show: 'FloatTest: Testing arithmetic...'; cr.
+	results at: #arithmetic put: (self testArithmetic).
+
+	Transcript show: 'FloatTest: Testing comparisons...'; cr.
+	results at: #comparisons put: (self testComparisons).
+
+	Transcript show: 'FloatTest: Testing trigonometry...'; cr.
+	results at: #trigonometry put: (self testTrigonometry).
+
+	Transcript show: 'FloatTest: Testing coercion...'; cr.
+	results at: #coercion put: (self testCoercion).
+
+	Transcript show: 'FloatTest: Testing Point with Floats...'; cr.
+	results at: #pointFloats put: (self testPointWithFloats).
+
+	Transcript show: 'FloatTest: All tests complete.'; cr.
+	^results! !
+
+!FloatTest class methodsFor: 'tests - class variables'!
+
+testClassVars
+	"Test that Float class variables are properly initialized."
+
+	| results |
+	results _ Dictionary new.
+
+	"Test Pi is set"
+	results at: 'Pi notNil' put: Float pi notNil.
+	results at: 'Pi value' put: (Float pi > 3.14 and: [Float pi < 3.15]).
+
+	"Test RadiansPerDegree indirectly via degreesToRadians"
+	results at: '90 degreesToRadians' put: ((90 degreesToRadians - 1.5708) abs < 0.001).
+
+	^results! !
+
+!FloatTest class methodsFor: 'tests - arithmetic'!
+
+testArithmetic
+	"Test Float arithmetic operations."
+
+	| results a b |
+	results _ Dictionary new.
+
+	a _ 3.5.
+	b _ 2.0.
+
+	results at: 'Float + Float' put: ((a + b) = 5.5).
+	results at: 'Float - Float' put: ((a - b) = 1.5).
+	results at: 'Float * Float' put: ((a * b) = 7.0).
+	results at: 'Float / Float' put: ((a / b) = 1.75).
+	results at: 'Float + SmallInteger' put: ((a + 2) = 5.5).
+	results at: 'SmallInteger + Float' put: ((2 + a) = 5.5).
+	results at: 'Float * SmallInteger' put: ((a * 2) = 7.0).
+	results at: 'SmallInteger * Float' put: ((2 * a) = 7.0).
+	results at: 'Float negated' put: (a negated = -3.5).
+
+	^results! !
+
+!FloatTest class methodsFor: 'tests - comparisons'!
+
+testComparisons
+	"Test Float comparison operations."
+
+	| results a b c |
+	results _ Dictionary new.
+
+	a _ 3.5.
+	b _ 2.0.
+	c _ 3.5.
+
+	results at: 'Float < Float (true)' put: (b < a).
+	results at: 'Float < Float (false)' put: (a < b) not.
+	results at: 'Float > Float (true)' put: (a > b).
+	results at: 'Float = Float (true)' put: (a = c).
+	results at: 'Float <= Float' put: (b <= a).
+	results at: 'Float >= Float' put: (a >= b).
+	results at: 'positive < 0.0' put: (a < 0.0) not.
+	results at: 'negative < 0.0' put: (a negated < 0.0).
+
+	^results! !
+
+!FloatTest class methodsFor: 'tests - trigonometry'!
+
+testTrigonometry
+	"Test trigonometric functions."
+
+	| results angle radians sinVal cosVal |
+	results _ Dictionary new.
+
+	results at: 'sin 0' put: (0.0 sin abs < 0.0001).
+	results at: 'cos 0' put: ((0.0 cos - 1.0) abs < 0.0001).
+
+	"Test degreesToRadians -> cos sequence (like Pen>>go:)"
+	angle _ 0.
+	radians _ angle degreesToRadians.
+	cosVal _ radians cos.
+	results at: '0 deg cos' put: ((cosVal - 1.0) abs < 0.0001).
+
+	"Test 90 degrees"
+	angle _ 90.
+	radians _ angle degreesToRadians.
+	cosVal _ radians cos.
+	sinVal _ radians sin.
+	results at: '90 deg cos' put: (cosVal abs < 0.0001).
+	results at: '90 deg sin' put: ((sinVal - 1.0) abs < 0.0001).
+
+	^results! !
+
+!FloatTest class methodsFor: 'tests - coercion'!
+
+testCoercion
+	"Test numeric coercion between Float and SmallInteger."
+
+	| results f i |
+	results _ Dictionary new.
+
+	f _ 3.5.
+	i _ 2.
+
+	results at: 'SmallInteger < Float' put: (i < f).
+	results at: 'Float < SmallInteger' put: (f < 10).
+	results at: 'SmallInteger > Float' put: (10 > f).
+	results at: 'Float > SmallInteger' put: (f > i).
+	results at: '350 + 0.5' put: ((350 + 0.5) = 350.5).
+	results at: '0.5 + 350' put: ((0.5 + 350) = 350.5).
+
+	^results! !
+
+!FloatTest class methodsFor: 'tests - Point'!
+
+testPointWithFloats
+	"Test creating Points with Float coordinates (used by Pen)."
+
+	| results p1 p2 cosVal sinVal dir |
+	results _ Dictionary new.
+
+	"Test Float @ Float"
+	cosVal _ 0.5.
+	sinVal _ 0.866.
+	p1 _ cosVal @ sinVal.
+	results at: 'Float @ Float creates Point' put: (p1 isKindOf: Point).
+	results at: 'Float @ Float x correct' put: (p1 x = 0.5).
+
+	"Test Point * SmallInteger (used in Pen>>go:)"
+	p2 _ p1 * 10.
+	results at: 'Point * SmallInteger creates Point' put: (p2 isKindOf: Point).
+	results at: 'Point * SmallInteger x correct' put: (p2 x = 5.0).
+
+	"Test the exact sequence from Pen>>go:"
+	dir _ 0 degreesToRadians.
+	dir _ dir cos @ dir sin.
+	results at: 'Pen go: Point creation' put: (dir isKindOf: Point).
+	results at: 'Pen go: Point x (cos 0)' put: ((dir x - 1.0) abs < 0.0001).
+
+	"Test full sequence"
+	dir _ 45 degreesToRadians.
+	dir _ dir cos @ dir sin.
+	p1 _ dir * 50 + (100@100).
+	results at: 'Full Pen go: sequence' put: (p1 isKindOf: Point).
+
+	^results! !
+
 "==================== GraphicsTest Execution ===================="
+
+"Run FloatTest first to diagnose any Float issues"
+FloatTest testAll!
 
 "Run GraphicsTest visual tests after all init expressions"
 GraphicsTest testBitBltVisual!
