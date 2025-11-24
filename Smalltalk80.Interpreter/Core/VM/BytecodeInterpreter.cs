@@ -152,13 +152,13 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 // If it's an Association, show the key and value
                 if (litClassName == "Association" && litInstVars >= 2)
                 {
-                    var keyOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                    var valueOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-                    string? keyName = context.GetSymbolName(keyOOP);
-                    var valueClass = heapManager.GetClassOOP(valueOOP);
-                    string? valueClassName = context.GetClassName(valueClass);
+                    var diagKeyOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                    var diagValueOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                    string? keyName = context.GetSymbolName(diagKeyOOP);
+                    var diagValueClass = heapManager.GetClassOOP(diagValueOOP);
+                    string? valueClassName = context.GetClassName(diagValueClass);
                     Console.WriteLine($"  Association key: {keyName}");
-                    Console.WriteLine($"  Association value: {valueOOP} ({valueClassName})");
+                    Console.WriteLine($"  Association value: {diagValueOOP} ({valueClassName})");
                 }
                 // If it's a non-2-element Array, dump contents
                 else if (litFormat == "PointerIndexed" && litSize > 0 && litSize <= 10)
