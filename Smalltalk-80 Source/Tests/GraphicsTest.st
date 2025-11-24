@@ -616,3 +616,281 @@ testComprehensive
 testAll
 	"Synonym for testComprehensive"
 	^self testComprehensive! !
+
+"Float Test Suite - Comprehensive validation of Float operations
+Needed to diagnose issues with Float arithmetic before Pen tests"
+
+Object subclass: #FloatTest
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Tests-Float'!
+
+FloatTest comment:
+'Comprehensive Float test suite for Smalltalk-80 numeric operations.
+Tests Float class variable initialization, arithmetic, comparisons,
+trigonometric functions, and numeric coercion.
+
+Usage:
+	FloatTest testAll            "Run all tests"
+	FloatTest testClassVars      "Test class variable initialization"
+	FloatTest testArithmetic     "Test +, -, *, /"
+	FloatTest testComparisons    "Test <, >, =, <=, >="
+	FloatTest testTrigonometry   "Test sin, cos, tan"
+	FloatTest testCoercion       "Test SmallInteger/Float coercion"'!
+
+
+!FloatTest class methodsFor: 'running'!
+
+testAll
+	"Run all Float tests and return results Dictionary.
+	Usage: FloatTest testAll"
+
+	| results |
+	results _ Dictionary new.
+
+	"Run each test category"
+	Transcript show: 'Testing Float class variables...'; cr.
+	results at: #classVars put: (self testClassVars).
+
+	Transcript show: 'Testing Float arithmetic...'; cr.
+	results at: #arithmetic put: (self testArithmetic).
+
+	Transcript show: 'Testing Float comparisons...'; cr.
+	results at: #comparisons put: (self testComparisons).
+
+	Transcript show: 'Testing Float trigonometry...'; cr.
+	results at: #trigonometry put: (self testTrigonometry).
+
+	Transcript show: 'Testing numeric coercion...'; cr.
+	results at: #coercion put: (self testCoercion).
+
+	Transcript show: 'Testing Point with Floats...'; cr.
+	results at: #pointFloats put: (self testPointWithFloats).
+
+	Transcript show: 'All Float tests complete.'; cr.
+	^results! !
+
+!FloatTest class methodsFor: 'tests - class variables'!
+
+testClassVars
+	"Test that Float class variables are properly initialized.
+	These must be set by Float initialize."
+
+	| results |
+	results _ Dictionary new.
+
+	"Test Pi is set"
+	results at: 'Pi notNil' put: Float pi notNil.
+	results at: 'Pi value' put: (Float pi > 3.14 and: [Float pi < 3.15]).
+
+	"Test RadiansPerDegree indirectly via degreesToRadians"
+	results at: '90 degreesToRadians' put: ((90 degreesToRadians - 1.5708) abs < 0.001).
+	results at: '180 degreesToRadians' put: ((180 degreesToRadians - 3.14159) abs < 0.01).
+
+	^results! !
+
+!FloatTest class methodsFor: 'tests - arithmetic'!
+
+testArithmetic
+	"Test Float arithmetic operations."
+
+	| results a b |
+	results _ Dictionary new.
+
+	a _ 3.5.
+	b _ 2.0.
+
+	"Test Float + Float"
+	results at: 'Float + Float' put: ((a + b) = 5.5).
+
+	"Test Float - Float"
+	results at: 'Float - Float' put: ((a - b) = 1.5).
+
+	"Test Float * Float"
+	results at: 'Float * Float' put: ((a * b) = 7.0).
+
+	"Test Float / Float"
+	results at: 'Float / Float' put: ((a / b) = 1.75).
+
+	"Test Float + SmallInteger"
+	results at: 'Float + SmallInteger' put: ((a + 2) = 5.5).
+
+	"Test SmallInteger + Float"
+	results at: 'SmallInteger + Float' put: ((2 + a) = 5.5).
+
+	"Test Float * SmallInteger"
+	results at: 'Float * SmallInteger' put: ((a * 2) = 7.0).
+
+	"Test SmallInteger * Float"
+	results at: 'SmallInteger * Float' put: ((2 * a) = 7.0).
+
+	"Test Float negation"
+	results at: 'Float negated' put: (a negated = -3.5).
+
+	^results! !
+
+!FloatTest class methodsFor: 'tests - comparisons'!
+
+testComparisons
+	"Test Float comparison operations."
+
+	| results a b c |
+	results _ Dictionary new.
+
+	a _ 3.5.
+	b _ 2.0.
+	c _ 3.5.
+
+	"Test Float < Float"
+	results at: 'Float < Float (true)' put: (b < a).
+	results at: 'Float < Float (false)' put: (a < b) not.
+
+	"Test Float > Float"
+	results at: 'Float > Float (true)' put: (a > b).
+	results at: 'Float > Float (false)' put: (b > a) not.
+
+	"Test Float = Float"
+	results at: 'Float = Float (true)' put: (a = c).
+	results at: 'Float = Float (false)' put: (a = b) not.
+
+	"Test Float <= Float"
+	results at: 'Float <= Float (less)' put: (b <= a).
+	results at: 'Float <= Float (equal)' put: (a <= c).
+
+	"Test Float >= Float"
+	results at: 'Float >= Float (greater)' put: (a >= b).
+	results at: 'Float >= Float (equal)' put: (a >= c).
+
+	"Test Float < 0.0 (used in sin)"
+	results at: 'positive Float < 0.0' put: (a < 0.0) not.
+	results at: 'negative Float < 0.0' put: (a negated < 0.0).
+
+	^results! !
+
+!FloatTest class methodsFor: 'tests - trigonometry'!
+
+testTrigonometry
+	"Test trigonometric functions (sin, cos, tan, etc.)"
+
+	| results angle radians sinVal cosVal |
+	results _ Dictionary new.
+
+	"Test sin of 0"
+	results at: 'sin 0' put: (0.0 sin abs < 0.0001).
+
+	"Test sin of pi/2 (should be 1)"
+	results at: 'sin pi/2' put: ((Float pi / 2.0) sin - 1.0) abs < 0.0001.
+
+	"Test cos of 0 (should be 1)"
+	results at: 'cos 0' put: ((0.0 cos - 1.0) abs < 0.0001).
+
+	"Test cos of pi/2 (should be 0)"
+	results at: 'cos pi/2' put: ((Float pi / 2.0) cos abs < 0.0001).
+
+	"Test degreesToRadians -> cos sequence (like Pen>>go:)"
+	angle _ 0.
+	radians _ angle degreesToRadians.
+	cosVal _ radians cos.
+	results at: '0 deg cos' put: ((cosVal - 1.0) abs < 0.0001).
+
+	"Test 90 degrees"
+	angle _ 90.
+	radians _ angle degreesToRadians.
+	cosVal _ radians cos.
+	sinVal _ radians sin.
+	results at: '90 deg cos' put: (cosVal abs < 0.0001).
+	results at: '90 deg sin' put: ((sinVal - 1.0) abs < 0.0001).
+
+	"Test 45 degrees (both should be ~0.707)"
+	angle _ 45.
+	radians _ angle degreesToRadians.
+	cosVal _ radians cos.
+	sinVal _ radians sin.
+	results at: '45 deg cos' put: ((cosVal - 0.707) abs < 0.01).
+	results at: '45 deg sin' put: ((sinVal - 0.707) abs < 0.01).
+
+	^results! !
+
+!FloatTest class methodsFor: 'tests - coercion'!
+
+testCoercion
+	"Test numeric coercion between Float and SmallInteger."
+
+	| results f i |
+	results _ Dictionary new.
+
+	f _ 3.5.
+	i _ 2.
+
+	"Test SmallInteger < Float"
+	results at: 'SmallInteger < Float' put: (i < f).
+
+	"Test Float < SmallInteger"
+	results at: 'Float < SmallInteger' put: (f < 10).
+
+	"Test SmallInteger > Float"
+	results at: 'SmallInteger > Float' put: (10 > f).
+
+	"Test Float > SmallInteger"
+	results at: 'Float > SmallInteger' put: (f > i).
+
+	"Test SmallInteger = Float"
+	results at: 'SmallInteger = Float (false)' put: (i = f) not.
+	results at: '2 = 2.0' put: (2 = 2.0).
+
+	"Test coercion in arithmetic"
+	results at: '350 + 0.5' put: ((350 + 0.5) = 350.5).
+	results at: '0.5 + 350' put: ((0.5 + 350) = 350.5).
+
+	^results! !
+
+!FloatTest class methodsFor: 'tests - Point'!
+
+testPointWithFloats
+	"Test creating Points with Float coordinates (used by Pen)."
+
+	| results p1 p2 cosVal sinVal dir |
+	results _ Dictionary new.
+
+	"Test Float @ Float"
+	cosVal _ 0.5.
+	sinVal _ 0.866.
+	p1 _ cosVal @ sinVal.
+	results at: 'Float @ Float creates Point' put: (p1 isKindOf: Point).
+	results at: 'Float @ Float x correct' put: (p1 x = 0.5).
+	results at: 'Float @ Float y correct' put: ((p1 y - 0.866) abs < 0.001).
+
+	"Test Point * SmallInteger (used in Pen>>go:)"
+	p2 _ p1 * 10.
+	results at: 'Point * SmallInteger creates Point' put: (p2 isKindOf: Point).
+	results at: 'Point * SmallInteger x correct' put: (p2 x = 5.0).
+	results at: 'Point * SmallInteger y correct' put: ((p2 y - 8.66) abs < 0.01).
+
+	"Test Point + Point (used in Pen>>go:)"
+	p1 _ 100@200.
+	p2 _ 0.5 @ 0.866.
+	results at: 'Point + Point with Floats' put: ((p1 + p2) isKindOf: Point).
+
+	"Test the exact sequence from Pen>>go:"
+	"dir _ direction degreesToRadians.
+	 dir _ dir cos @ dir sin.
+	 self goto: dir * distance + location"
+	dir _ 0 degreesToRadians.
+	dir _ dir cos @ dir sin.
+	results at: 'Pen go: Point creation' put: (dir isKindOf: Point).
+	results at: 'Pen go: Point x (cos 0)' put: ((dir x - 1.0) abs < 0.0001).
+	results at: 'Pen go: Point y (sin 0)' put: (dir y abs < 0.0001).
+
+	"Test multiplication by distance"
+	results at: 'dir * 10 Point' put: ((dir * 10) isKindOf: Point).
+
+	"Test full sequence"
+	dir _ 45 degreesToRadians.
+	dir _ dir cos @ dir sin.
+	p1 _ dir * 50 + (100@100).
+	results at: 'Full Pen go: sequence' put: (p1 isKindOf: Point).
+
+	^results! !
+
+FloatTest testAll!
