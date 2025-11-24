@@ -82,8 +82,52 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+
+            var heap = context.HeapManager;
+            var receiver = context.Receiver;
+            var arg = context.Arguments[0];
+
+            if (!TryGetDouble(heap, receiver, out double a))
+            {
+                // DEBUG: Log receiver details when it fails
+                Console.WriteLine($"[Float+] Receiver failed TryGetDouble:");
+                Console.WriteLine($"  OOP: {receiver}, IsSmallInt: {receiver.IsSmallInteger}");
+                if (!receiver.IsSmallInteger)
+                {
+                    var format = heap.GetObjectFormat(receiver);
+                    var size = heap.GetIndexedSize(receiver);
+                    var classOop = heap.GetClassOOP(receiver);
+                    Console.WriteLine($"  Format: {format}, IndexedSize: {size}, ClassOOP: {classOop}");
+                }
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+
+            if (!TryGetDouble(heap, arg, out double b))
+            {
+                // DEBUG: Log argument details when it fails
+                Console.WriteLine($"[Float+] Argument failed TryGetDouble:");
+                Console.WriteLine($"  OOP: {arg}, IsSmallInt: {arg.IsSmallInteger}");
+                if (!arg.IsSmallInteger)
+                {
+                    var format = heap.GetObjectFormat(arg);
+                    var size = heap.GetIndexedSize(arg);
+                    var classOop = heap.GetClassOOP(arg);
+                    Console.WriteLine($"  Format: {format}, IndexedSize: {size}, ClassOOP: {classOop}");
+
+                    // If it's PointerIndexed (like Array), dump indexed contents
+                    if (format == ObjectFormat.PointerIndexed && size <= 10)
+                    {
+                        Console.WriteLine($"  Indexed contents (Array?):");
+                        for (int i = 0; i < size; i++)
+                        {
+                            var elem = heap.GetIndexedOOP(arg, i);
+                            Console.WriteLine($"    [{i}]: {elem}");
+                        }
+                    }
+                }
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+
             return PrimitiveResult.Ok(FromDouble(context, a + b));
         }
     }
