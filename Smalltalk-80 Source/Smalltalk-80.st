@@ -43214,39 +43214,25 @@ Object subclass: #FloatTest
 	poolDictionaries: ''
 	category: 'Tests-Float'!
 
-FloatTest comment:
-'Comprehensive Float test suite for Smalltalk-80 numeric operations.
-Tests Float class variable initialization, arithmetic, comparisons,
-trigonometric functions, and numeric coercion.'!
-
 
 !FloatTest class methodsFor: 'running'!
 
 testAll
-	"Run all Float tests and return results Dictionary."
+	"Run all Float tests and return results Dictionary.
+	Comprehensive Float test suite for Smalltalk-80 numeric operations.
+	Tests Float class variable initialization, arithmetic, comparisons,
+	trigonometric functions, and numeric coercion."
 
 	| results |
 	results _ Dictionary new.
 
-	Transcript show: 'FloatTest: Testing class variables...'; cr.
 	results at: #classVars put: (self testClassVars).
-
-	Transcript show: 'FloatTest: Testing arithmetic...'; cr.
 	results at: #arithmetic put: (self testArithmetic).
-
-	Transcript show: 'FloatTest: Testing comparisons...'; cr.
 	results at: #comparisons put: (self testComparisons).
-
-	Transcript show: 'FloatTest: Testing trigonometry...'; cr.
 	results at: #trigonometry put: (self testTrigonometry).
-
-	Transcript show: 'FloatTest: Testing coercion...'; cr.
 	results at: #coercion put: (self testCoercion).
-
-	Transcript show: 'FloatTest: Testing Point with Floats...'; cr.
 	results at: #pointFloats put: (self testPointWithFloats).
 
-	Transcript show: 'FloatTest: All tests complete.'; cr.
 	^results! !
 
 !FloatTest class methodsFor: 'tests - class variables'!
