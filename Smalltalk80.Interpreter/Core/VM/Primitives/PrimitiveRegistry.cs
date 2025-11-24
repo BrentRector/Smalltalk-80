@@ -231,7 +231,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(101, new GraphicsOperations.BeCursor());     // Blue Book: Primitive 101 = beCursor
         registry.Register(102, new GraphicsOperations.BeDisplay());    // Blue Book: Primitive 102 = beDisplay
         registry.Register(103, new GraphicsOperations.Beep());
-        registry.Register(104, new GraphicsOperations.ClipboardText());
+        registry.Register(104, new GraphicsOperations.DrawLoop());     // Blue Book: Primitive 104 = drawLoopX:Y: (Bresenham)
 
         // String primitives (105-106)
         registry.Register(105, new StringPrimitives.StringReplace());

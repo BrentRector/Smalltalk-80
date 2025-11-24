@@ -383,6 +383,130 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         WriteIndexedWord(entry, index, value);
     }
 
+    /// <summary>
+    /// Bulk copy indexed bytes from heap object to destination span.
+    /// Much faster than element-by-element access.
+    /// </summary>
+    public void CopyIndexedBytes(SmalltalkOOP objectOOP, Span<byte> destination, int startIndex = 0)
+    {
+        if (objectOOP.IsSmallInteger)
+            throw new ArgumentException("Cannot get indexed bytes from SmallInteger");
+
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+
+        if (entry.FormatExplicit != ObjectFormat.ByteIndexed)
+            throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support byte indexing");
+
+        var byteArray = entry.AsByteArray();
+        if (byteArray == null)
+            throw new InvalidOperationException($"ByteIndexed object has no byte array storage");
+
+        // Calculate copy length
+        int availableBytes = Math.Max(0, byteArray.Length - startIndex);
+        int copyLength = Math.Min(destination.Length, availableBytes);
+
+        if (copyLength > 0 && startIndex >= 0)
+        {
+            byteArray.AsSpan(startIndex, copyLength).CopyTo(destination);
+        }
+    }
+
+    /// <summary>
+    /// Bulk copy indexed words from heap object to destination span as big-endian bytes.
+    /// Each word (16-bit) is stored as 2 bytes in big-endian format.
+    /// Much faster than element-by-element access.
+    /// </summary>
+    public void CopyIndexedWords(SmalltalkOOP objectOOP, Span<byte> destination, int startIndex = 0)
+    {
+        if (objectOOP.IsSmallInteger)
+            throw new ArgumentException("Cannot get indexed words from SmallInteger");
+
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+
+        if (entry.FormatExplicit != ObjectFormat.WordIndexed)
+            throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support word indexing");
+
+        var wordArray = entry.AsWordArray();
+        if (wordArray == null)
+            throw new InvalidOperationException($"WordIndexed object has no word array storage");
+
+        // Calculate how many words we can copy
+        int availableWords = Math.Max(0, wordArray.Length - startIndex);
+        int maxWords = destination.Length / 2;
+        int copyWords = Math.Min(maxWords, availableWords);
+
+        // Copy words as big-endian bytes
+        for (int i = 0; i < copyWords; i++)
+        {
+            ushort word = wordArray[startIndex + i];
+            destination[i * 2] = (byte)(word >> 8);
+            destination[i * 2 + 1] = (byte)(word & 0xFF);
+        }
+    }
+
+    /// <summary>
+    /// Bulk copy bytes from source span to indexed bytes in heap object.
+    /// Much faster than element-by-element access.
+    /// </summary>
+    public void SetIndexedBytes(SmalltalkOOP objectOOP, ReadOnlySpan<byte> source, int startIndex = 0)
+    {
+        if (objectOOP.IsSmallInteger)
+            throw new ArgumentException("Cannot set indexed bytes in SmallInteger");
+
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+
+        if (entry.FormatExplicit != ObjectFormat.ByteIndexed)
+            throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support byte indexing");
+
+        var byteArray = entry.AsByteArray();
+        if (byteArray == null)
+            throw new InvalidOperationException($"ByteIndexed object has no byte array storage");
+
+        // Calculate copy length
+        int availableBytes = Math.Max(0, byteArray.Length - startIndex);
+        int copyLength = Math.Min(source.Length, availableBytes);
+
+        if (copyLength > 0 && startIndex >= 0)
+        {
+            source.Slice(0, copyLength).CopyTo(byteArray.AsSpan(startIndex, copyLength));
+        }
+    }
+
+    /// <summary>
+    /// Bulk copy bytes to indexed words in heap object, converting from big-endian format.
+    /// Each 2 bytes in source represents one 16-bit word in big-endian format.
+    /// Much faster than element-by-element access.
+    /// </summary>
+    public void SetIndexedWords(SmalltalkOOP objectOOP, ReadOnlySpan<byte> source, int startIndex = 0)
+    {
+        if (objectOOP.IsSmallInteger)
+            throw new ArgumentException("Cannot set indexed words in SmallInteger");
+
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+
+        if (entry.FormatExplicit != ObjectFormat.WordIndexed)
+            throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support word indexing");
+
+        var wordArray = entry.AsWordArray();
+        if (wordArray == null)
+            throw new InvalidOperationException($"WordIndexed object has no word array storage");
+
+        // Calculate how many words we can write
+        int sourceWords = source.Length / 2;
+        int availableWords = Math.Max(0, wordArray.Length - startIndex);
+        int copyWords = Math.Min(sourceWords, availableWords);
+
+        // Copy big-endian bytes to words
+        for (int i = 0; i < copyWords; i++)
+        {
+            if ((i * 2 + 1) < source.Length)
+            {
+                ushort word = (ushort)((source[i * 2] << 8) | source[i * 2 + 1]);
+                wordArray[startIndex + i] = word;
+            }
+        }
+    }
+
     #endregion
 
     #region Managed Storage Access Helpers

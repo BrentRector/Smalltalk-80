@@ -199,6 +199,20 @@ public class SmalltalkInterpreterThread
             }
         }
 
+        // Build phase 2 list: GraphicsTest expressions (run AFTER init expressions)
+        var phase2Indices = new List<int>();
+        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
+        {
+            var expr = _context.Bundle.InitExpressions[i];
+            if (expr.Source == null) continue;
+
+            // Include GraphicsTest method calls
+            if (expr.Source.StartsWith("GraphicsTest "))
+            {
+                phase2Indices.Add(i);
+            }
+        }
+
         // Execute all selected expressions
         var compiler = new InitExpressionCompiler(
             _context.HeapManager, _context.Bundle, _context.VMMetadata);
@@ -206,6 +220,8 @@ public class SmalltalkInterpreterThread
         int succeeded = 0;
         int failed = 0;
 
+        // PHASE 1: Execute init expressions
+        Console.WriteLine("\n--- Phase 1: Initialize expressions ---");
         foreach (int index in phase1Indices)
         {
             var expr = _context.Bundle.InitExpressions[index];
@@ -241,6 +257,32 @@ public class SmalltalkInterpreterThread
             }
         }
 
+        // PHASE 2: Execute GraphicsTest expressions (if any)
+        if (phase2Indices.Count > 0)
+        {
+            Console.WriteLine($"\n--- Phase 2: GraphicsTest expressions ---");
+            foreach (int index in phase2Indices)
+            {
+                var expr = _context.Bundle.InitExpressions[index];
+                var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
+
+                if (result.Status == InitStatus.Success)
+                {
+                    succeeded++;
+                }
+                else
+                {
+                    failed++;
+                    Console.WriteLine($"    ❌ Failed: {expr.Source}");
+                    Console.WriteLine($"       Status: {result.Status}");
+                    if (result.Diagnostic?.Message != null)
+                    {
+                        Console.WriteLine($"       Error: {result.Diagnostic.Message}");
+                    }
+                }
+            }
+        }
+
         // Report skipped expressions
         if (skippedIndices.Count > 0)
         {
@@ -258,6 +300,10 @@ public class SmalltalkInterpreterThread
 
         Console.WriteLine($"\n=== Init Expression Execution Complete ===");
         Console.WriteLine($"  {succeeded} succeeded, {failed} failed, {skippedIndices.Count} skipped");
+        if (phase2Indices.Count > 0)
+        {
+            Console.WriteLine($"  Phase 1: {phase1Indices.Count} init expressions, Phase 2: {phase2Indices.Count} GraphicsTest expressions");
+        }
     }
 
     private void ExecuteUserExpression()
