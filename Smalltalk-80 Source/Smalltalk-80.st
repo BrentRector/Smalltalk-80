@@ -6542,8 +6542,18 @@ WordArray class
 
 !WordArray class methodsFor: 'constants'!
 maxSize
-	"The maximum size of a WordArray is 64640 elements."
-	^64640! !
+	"The maximum size of a WordArray.
+
+	Original Blue Book limit: 64640 words (for 16-bit Xerox Alto/Dorado systems)
+	Modern C# implementation: 100,000,000 words (supports 8K+ displays, ~200MB)
+
+	This limit is appropriate for:
+	- .NET managed heap (no 64KB segment constraints)
+	- 30-bit SmallInteger range (-2^30 to 2^30-1)
+	- Modern display resolutions (8K = 7680×4320 needs ~2M words)
+	- Multi-monitor setups and future display technology"
+
+	^100000000! !
 
 ParseNode subclass: #CascadeNode
 	instanceVariableNames: 'receiver messages '
@@ -11311,9 +11321,19 @@ maxPrint
 	"Answer the maximum number of characters to print with printOn:."
 	^5000!
 maxSize
-	"Answer the largest basicSize which is valid for the receiver's class."
+	"Answer the largest basicSize which is valid for the receiver's class.
 
-	^65486 "for VM3 interpreter DoradoST80Aug19"! !
+	Original Blue Book limit: 65486 (for VM3 interpreter DoradoST80Aug19)
+	Modern C# implementation: 1,000,000,000 (1 billion elements)
+
+	This limit is constrained by:
+	- SmallInteger maxVal (2^30 - 1 = 1,073,741,823)
+	- .NET Array.MaxLength (approximately 2^31 - 1)
+	- Practical memory limits (~4GB for largest collections)
+
+	Subclasses may override with more specific limits (e.g., WordArray maxSize)."
+
+	^1000000000! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 Collection class
