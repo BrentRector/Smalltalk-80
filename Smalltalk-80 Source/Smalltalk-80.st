@@ -6485,7 +6485,67 @@ primReplaceFrom: start to: stop with: replacement startingAt: repStart
 	receiver.  No range checks are performed - this may be primitively implemented."
 
 	<primitive: 105>
-	super replaceFrom: start to: stop with: replacement startingAt: repStart! !ParseNode subclass: #CascadeNode
+	super replaceFrom: start to: stop with: replacement startingAt: repStart! !
+
+ArrayedCollection variableWordSubclass: #WordArray
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Graphics-Support'!
+WordArray comment:
+'WordArrays provide contiguous storage of data, primarily to hold the graphical data of Forms.  Forms and their subclasses provide the additional structural information as to how the bits should be interpreted in two dimensions.'!
+
+
+!WordArray methodsFor: 'initialize-release'!
+fromByteStream: aStream
+	"Initialize the array of bits by reading integers from the Stream, aStream."
+
+	| high low |
+	1 to: self size do:
+		[:i |
+		high _ aStream next asInteger.
+					"be cautious, it may be a char"
+		low _ aStream next asInteger.
+		self at: i put: (high bitShift: 8) + low]! !
+
+!WordArray methodsFor: 'bit counting'!
+countBits
+	"Answer the number of on bits (1's) in me."
+	| count bitMask |
+	count _ 0.
+	self do:
+		[:word |
+		bitMask _ 1.
+		word highBit timesRepeat:
+			[(word bitAnd: bitMask) ~= 0
+				ifTrue: [count _ count + 1]]].
+	^count! !
+
+!WordArray methodsFor: 'printing'!
+printOn: aStream
+	aStream nextPutAll: 'a WordArray of length '.
+	self size printOn: aStream! !
+
+!WordArray methodsFor: 'filing'!
+toStream: aStream
+	"Store the array of bits onto the Stream, aStream."
+
+	1 to: self size do:
+		[:i |
+		aStream nextPut: ((self at: i) bitShift: -8).
+		aStream nextPut: ((self at: i) bitAnd: 255)]! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WordArray class
+	instanceVariableNames: ''!
+
+
+!WordArray class methodsFor: 'constants'!
+maxSize
+	"The maximum size of a WordArray is 64640 elements."
+	^64640! !
+
+ParseNode subclass: #CascadeNode
 	instanceVariableNames: 'receiver messages '
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -15272,7 +15332,9 @@ example
 
 !DictionaryInspector class methodsFor: 'initialization'!
 flushMenus
-	DictListMenu _ nil! !WordArray variableWordSubclass: #DisplayBitmap
+	DictListMenu _ nil! !
+
+WordArray variableWordSubclass: #DisplayBitmap
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
