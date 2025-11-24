@@ -42609,19 +42609,6 @@ Object subclass: #GraphicsTest
 	poolDictionaries: ''
 	category: 'Tests-Graphics'!
 
-GraphicsTest comment:
-'Comprehensive graphics test suite for Smalltalk-80 graphics facilities.
-Tests all 16 BitBlt combination rules, Pen drawing operations, Form operations,
-clipping, and halftone patterns. All tests use pure Blue Book Smalltalk-80 syntax
-with no modern exception handling features.
-
-Usage:
-	GraphicsTest runAll          "Run all tests, return results Dictionary"
-	GraphicsTest testBitBltVisual  "Visual 4x4 grid of all 16 BitBlt rules"
-	GraphicsTest testPenVisual     "Visual Pen drawing demonstration"
-	GraphicsTest testAllRules      "Test all combination rules programmatically"'!
-
-
 !GraphicsTest class methodsFor: 'running'!
 
 runAll
