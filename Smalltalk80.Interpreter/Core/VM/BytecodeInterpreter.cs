@@ -779,6 +779,40 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                             $"This likely means the compiler generated wrong bytecode (should be POP_STORE_TEMP for temp variable).");
                     }
 
+                    // DEBUG: Trace class variable stores to Float associations
+                    var keyOOP = heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                    string? keyName = context.GetSymbolName(keyOOP);
+                    string? methodId = context.GetLocalId(methodOOP);
+
+                    // Check if value is NOT a Float when storing to Float class variables
+                    if (methodId?.Contains("Float") == true)
+                    {
+                        var valueClass = heapManager.GetClassOOP(valueOOP);
+                        string? valueClassName = context.GetClassName(valueClass);
+                        var valueFormat = valueOOP.IsSmallInteger ? "SmallInteger" : heapManager.GetObjectFormat(valueOOP).ToString();
+                        int valueIndexedSize = valueOOP.IsSmallInteger ? 0 : heapManager.GetIndexedSize(valueOOP);
+
+                        Console.WriteLine($"[POP_STORE_LITERAL_VAR] Storing to '{keyName}' in {methodId}:");
+                        Console.WriteLine($"  Value OOP: {valueOOP}");
+                        Console.WriteLine($"  Value class: {valueClassName}");
+                        Console.WriteLine($"  Value format: {valueFormat}, IndexedSize: {valueIndexedSize}");
+
+                        // If storing a non-Float to a Float class variable, dump more details
+                        if (valueClassName != "Float" && !valueOOP.IsSmallInteger)
+                        {
+                            Console.WriteLine($"  WARNING: Storing non-Float to Float class variable!");
+                            if (valueFormat == "PointerIndexed" && valueIndexedSize <= 10)
+                            {
+                                Console.WriteLine($"  Array/Object contents:");
+                                for (int i = 0; i < valueIndexedSize; i++)
+                                {
+                                    var elem = heapManager.GetIndexedOOP(valueOOP, i);
+                                    Console.WriteLine($"    [{i}]: {elem}");
+                                }
+                            }
+                        }
+                    }
+
                     // Store the value in the Association
                     heapManager.SetInstanceVariableWithBarrier(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
 
