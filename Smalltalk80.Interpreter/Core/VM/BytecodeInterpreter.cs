@@ -134,6 +134,44 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             int index = BytecodeUtil.PushLiteralVarIndex(bytecode);
             var literalOOP = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
 
+            // DEBUG: Trace literal variable access for Float-related methods
+            string? methodId = context.GetLocalId(methodOOP);
+            if (methodId?.Contains("Float") == true || methodId?.Contains("degreesToRadians") == true)
+            {
+                var litClass = heapManager.GetClassOOP(literalOOP);
+                string? litClassName = context.GetClassName(litClass);
+                var litFormat = literalOOP.IsSmallInteger ? "SmallInteger" : heapManager.GetObjectFormat(literalOOP).ToString();
+                int litSize = literalOOP.IsSmallInteger ? 0 : heapManager.GetIndexedSize(literalOOP);
+                int litInstVars = literalOOP.IsSmallInteger ? 0 : heapManager.GetInstanceVariableCount(literalOOP);
+
+                Console.WriteLine($"[PUSH_LITERAL_VAR] Method: {methodId}, lit[{index}]:");
+                Console.WriteLine($"  Literal OOP: {literalOOP}");
+                Console.WriteLine($"  Literal class: {litClassName}");
+                Console.WriteLine($"  Format: {litFormat}, IndexedSize: {litSize}, InstVarCount: {litInstVars}");
+
+                // If it's an Association, show the key and value
+                if (litClassName == "Association" && litInstVars >= 2)
+                {
+                    var keyOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                    var valueOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                    string? keyName = context.GetSymbolName(keyOOP);
+                    var valueClass = heapManager.GetClassOOP(valueOOP);
+                    string? valueClassName = context.GetClassName(valueClass);
+                    Console.WriteLine($"  Association key: {keyName}");
+                    Console.WriteLine($"  Association value: {valueOOP} ({valueClassName})");
+                }
+                // If it's a non-2-element Array, dump contents
+                else if (litFormat == "PointerIndexed" && litSize > 0 && litSize <= 10)
+                {
+                    Console.WriteLine($"  UNEXPECTED Array in literal frame! Contents:");
+                    for (int i = 0; i < litSize; i++)
+                    {
+                        var elem = heapManager.GetIndexedOOP(literalOOP, i);
+                        Console.WriteLine($"    [{i}]: {elem}");
+                    }
+                }
+            }
+
             if (literalOOP == metadata.KnownObjects.Nil)
             {
                 context.Push(metadata.KnownObjects.Nil);
