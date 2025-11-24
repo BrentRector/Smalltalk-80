@@ -6485,7 +6485,77 @@ primReplaceFrom: start to: stop with: replacement startingAt: repStart
 	receiver.  No range checks are performed - this may be primitively implemented."
 
 	<primitive: 105>
-	super replaceFrom: start to: stop with: replacement startingAt: repStart! !ParseNode subclass: #CascadeNode
+	super replaceFrom: start to: stop with: replacement startingAt: repStart! !
+
+ArrayedCollection variableWordSubclass: #WordArray
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Graphics-Support'!
+WordArray comment:
+'WordArrays provide contiguous storage of data, primarily to hold the graphical data of Forms.  Forms and their subclasses provide the additional structural information as to how the bits should be interpreted in two dimensions.'!
+
+
+!WordArray methodsFor: 'initialize-release'!
+fromByteStream: aStream
+	"Initialize the array of bits by reading integers from the Stream, aStream."
+
+	| high low |
+	1 to: self size do:
+		[:i |
+		high _ aStream next asInteger.
+					"be cautious, it may be a char"
+		low _ aStream next asInteger.
+		self at: i put: (high bitShift: 8) + low]! !
+
+!WordArray methodsFor: 'bit counting'!
+countBits
+	"Answer the number of on bits (1's) in me."
+	| count bitMask |
+	count _ 0.
+	self do:
+		[:word |
+		bitMask _ 1.
+		word highBit timesRepeat:
+			[(word bitAnd: bitMask) ~= 0
+				ifTrue: [count _ count + 1]]].
+	^count! !
+
+!WordArray methodsFor: 'printing'!
+printOn: aStream
+	aStream nextPutAll: 'a WordArray of length '.
+	self size printOn: aStream! !
+
+!WordArray methodsFor: 'filing'!
+toStream: aStream
+	"Store the array of bits onto the Stream, aStream."
+
+	1 to: self size do:
+		[:i |
+		aStream nextPut: ((self at: i) bitShift: -8).
+		aStream nextPut: ((self at: i) bitAnd: 255)]! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WordArray class
+	instanceVariableNames: ''!
+
+
+!WordArray class methodsFor: 'constants'!
+maxSize
+	"The maximum size of a WordArray.
+
+	Original Blue Book limit: 64640 words (for 16-bit Xerox Alto/Dorado systems)
+	Modern C# implementation: 100,000,000 words (supports 8K+ displays, ~200MB)
+
+	This limit is appropriate for:
+	- .NET managed heap (no 64KB segment constraints)
+	- 30-bit SmallInteger range (-2^30 to 2^30-1)
+	- Modern display resolutions (8K = 7680×4320 needs ~2M words)
+	- Multi-monitor setups and future display technology"
+
+	^100000000! !
+
+ParseNode subclass: #CascadeNode
 	instanceVariableNames: 'receiver messages '
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -11251,9 +11321,19 @@ maxPrint
 	"Answer the maximum number of characters to print with printOn:."
 	^5000!
 maxSize
-	"Answer the largest basicSize which is valid for the receiver's class."
+	"Answer the largest basicSize which is valid for the receiver's class.
 
-	^65486 "for VM3 interpreter DoradoST80Aug19"! !
+	Original Blue Book limit: 65486 (for VM3 interpreter DoradoST80Aug19)
+	Modern C# implementation: 1,000,000,000 (1 billion elements)
+
+	This limit is constrained by:
+	- SmallInteger maxVal (2^30 - 1 = 1,073,741,823)
+	- .NET Array.MaxLength (approximately 2^31 - 1)
+	- Practical memory limits (~4GB for largest collections)
+
+	Subclasses may override with more specific limits (e.g., WordArray maxSize)."
+
+	^1000000000! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 Collection class
@@ -15272,7 +15352,9 @@ example
 
 !DictionaryInspector class methodsFor: 'initialization'!
 flushMenus
-	DictListMenu _ nil! !WordArray variableWordSubclass: #DisplayBitmap
+	DictListMenu _ nil! !
+
+WordArray variableWordSubclass: #DisplayBitmap
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -42239,7 +42321,284 @@ noScale
 scale
 	"Answer a copy of the point that represents the current scale of the receiver."
 
-	^scale copy! !
+	scale == nil
+		ifTrue: [^1.0 @ 1.0]
+		ifFalse: [^scale copy]!
+scaleBy: aScale
+	"Answer a new WindowingTransformation with the scale and translation of
+	the receiver both scaled by aScale."
+
+	| checkedScale newScale newTranslation |
+	aScale == nil
+		ifTrue:
+			[newScale _ scale.
+			newTranslation _ translation]
+		ifFalse:
+			[checkedScale _ self checkScale: aScale.
+			scale == nil
+				ifTrue: [newScale _ checkedScale]
+				ifFalse: [newScale _ scale * checkedScale].
+			newTranslation _ checkedScale * translation].
+	^WindowingTransformation scale: newScale translation: newTranslation!
+scaleOfOne
+	scale _ 1.0 @ 1.0.!
+translateBy: aPoint
+	"Answer a new WindowingTransformation with the same scale as the
+	receiver and with a translation of the current translation plus aPoint. It is used
+	when the translation is known in scaled source coordinates, rather than source
+	coordinates (see WindowingTransformation|scrollBy:). If no scaling is in effect
+	(scale = nil), then WindowingTransformation|translateBy: and
+	WindowingTransformation|scrollBy: are equivalent."
+
+	^WindowingTransformation scale: scale translation: translation + aPoint!
+translation
+	"Answer a copy of the receiver's translation."
+
+	^translation copy! !
+
+!WindowingTransformation methodsFor: 'applying transform'!
+applyInverseTo: anObject
+	"Apply the inverse of the receiver to anObject and answer the result.
+	Used to map some object in destination coordinates to one in source coordinates."
+
+	| transformedObject |
+	transformedObject _ anObject translateBy: translation x negated @ translation y negated.
+	scale == nil
+		ifFalse: [transformedObject _ transformedObject scaleBy: 1.0 / scale x @ (1.0 / scale y)].
+	^transformedObject!
+applyTo: anObject
+	"Apply the receiver to anObject and answer the result.
+	Used to map some object in source coordinates to one in destination
+	coordinates."
+
+	| transformedObject |
+	scale == nil
+		ifTrue: [transformedObject _ anObject]
+		ifFalse: [transformedObject _ anObject scaleBy: scale].
+	transformedObject _ transformedObject translateBy: translation.
+	^transformedObject!
+compose: aTransformation
+	"Answer a new WindowingTransformation that is the composition of the
+	receiver and aTransformation.  The effect of applying
+	the resulting WindowingTransformation to an object is the same as that of
+	first applying aTransformation to the object and then applying the
+	receiver to its result."
+
+	| aTransformationScale newScale newTranslation |
+	aTransformationScale _ aTransformation scale.
+	scale == nil
+		ifTrue:
+			[aTransformation noScale
+				ifTrue: [newScale _ nil]
+				ifFalse: [newScale _ aTransformationScale].
+			newTranslation _ translation + aTransformation translation]
+		ifFalse:
+			[aTransformation noScale
+				ifTrue: [newScale _ scale]
+				ifFalse: [newScale _ scale * aTransformationScale].
+			newTranslation _ translation + (scale * aTransformation translation)].
+	^WindowingTransformation scale: newScale translation: newTranslation! !
+
+!WindowingTransformation methodsFor: 'printing'!
+printOn: aStream
+	aStream nextPutAll: self class name, ' scale: ';
+		print: scale; nextPutAll: ' translation: ';
+		print: translation!
+storeOn: aStream
+	aStream nextPut: $(; nextPutAll: self species name;
+	nextPutAll: ' scale: ';
+	store: scale; cr;
+	nextPutAll: ' translation: ';
+	store: translation;
+	nextPut: $).! !
+
+!WindowingTransformation methodsFor: 'private'!
+checkScale: aScale
+	"Converts aScale to the internal format of a floating-point Point."
+ 	| checkedScale |
+	checkedScale _ aScale asPoint.
+	^checkedScale x asFloat @ checkedScale y asFloat!
+setScale: aScale translation: aTranslation
+	"Sets the scale to aScale and the translation to aTranslation."
+
+	scale _ aScale.
+	translation _ aTranslation! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WindowingTransformation class
+	instanceVariableNames: ''!
+
+
+!WindowingTransformation class methodsFor: 'instance creation'!
+identity
+	"Answer an instance of me with no scaling (nil) and no translation (0@0)."
+
+	^self new setScale: nil translation: 0 @ 0!
+scale: aScale translation: aTranslation
+	"Answer an instance of me with a scale factor of
+	aScale and a translation offset of aTranslation. When the transformation is
+	applied (see WindowingTransformation|apply:), the scale is applied first,
+	followed by the translation."
+
+	^self new setScale: aScale translation: aTranslation!
+window: aWindow viewport: aViewport
+	"Answer an instance of me with a scale and translation based on aWindow and
+	aViewport. The scale and translation are computed such that aWindow, when
+	transformed, coincides with aViewport. "
+
+	| scale translation |
+	aViewport width = aWindow width & (aViewport height = aWindow height)
+		ifTrue:
+			[scale _ nil]
+		ifFalse:
+			[scale _ aViewport width asFloat / aWindow width asFloat
+						@ (aViewport height asFloat / aWindow height asFloat)].
+	scale == nil
+		ifTrue: [translation _ aViewport left - aWindow left
+								@ (aViewport top - aWindow top)]
+		ifFalse: [translation _ aViewport left - (scale x * aWindow left)
+								@ (aViewport top - (scale y * aWindow top))].
+	^self new setScale: scale translation: translation! !
+PositionableStream subclass: #WriteStream
+	instanceVariableNames: 'writeLimit '
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Streams'!
+WriteStream comment: 'I am a writer of an indexable collection. writeLimit marks the farthest that has been written into the collection, not the actual size of the collection.'!
+
+
+!WriteStream methodsFor: 'accessing'!
+contents
+	readLimit _ readLimit max: position.
+	^collection copyFrom: 1 to: position!
+next
+	self shouldNotImplement!
+nextPut: anObject
+	"Insert the argument at the next position in the Stream represented by the
+	receiver. Fail if the collection of this stream is not an Array or a String.
+	Fail if the stream is positioned at its end, or if the position is out of
+	bounds in the collection. Fail if the argument is not of the right type for
+	the collection. Optional. See Object documentation whatIsAPrimitive."
+
+	<primitive: 66>
+	position = writeLimit
+		ifTrue: [^self pastEndPut: anObject]
+		ifFalse:
+			[^collection at: (position _ position + 1) put: anObject]!
+size
+	^readLimit _ readLimit max: position! !
+
+!WriteStream methodsFor: 'positioning'!
+position: anInteger
+	readLimit _ readLimit max: position.
+	super position: anInteger!
+reset
+	readLimit _ readLimit max: position.
+	position _ 0! !
+
+!WriteStream methodsFor: 'character writing'!
+cr
+	"Append a return character to the receiver."
+
+	self nextPut: Character cr!
+crtab
+	"Append a return character, followed by a single tab character, to the receiver."
+
+	self nextPut: Character cr.
+	self nextPut: Character tab!
+crtab: anInteger
+	"Append a return character, followed by anInteger tab characters, to the receiver."
+
+	self nextPut: Character cr.
+	anInteger timesRepeat: [self nextPut: Character tab]!
+emphasis
+	^ 1
+	"Allows compatibility with streams which carry emphasis"!
+emphasis: ignored
+	"Allows compatibility with streams which carry emphasis"!
+space
+	"Append a space character to the receiver."
+
+	self nextPut: Character space!
+tab
+	"Append a tab character to the receiver."
+
+	self nextPut: Character tab! !
+
+!WriteStream methodsFor: 'printing'!
+print: anObject
+	"Have anObject print on the receiver."
+
+	anObject printOn: self!
+store: anObject
+	"Have anObject print on me for rereading."
+
+	anObject storeOn: self! !
+
+!WriteStream methodsFor: 'fileIn/Out'!
+nextChunkPut: aString
+	"Put aString onto self, doubling embedded terminators."
+
+	| index stringSize char terminator |
+	terminator _ $!!.
+	index _ 0.
+	stringSize _ aString size.
+	[(index _ index + 1) <= stringSize]
+		whileTrue:
+			[char _ aString at: index.
+			self nextPut: char.
+			char == terminator ifTrue: ["double imbedded terminator"
+				self nextPut: char]].
+	self nextPut: terminator! !
+
+!WriteStream methodsFor: 'private'!
+on: aCollection
+	super on: aCollection.
+	readLimit _ 0.
+	writeLimit _ aCollection size!
+on: aCollection from: firstIndex to: lastIndex
+	| len |
+	collection _ aCollection.
+	readLimit _
+		writeLimit _ lastIndex > (len _ collection size)
+						ifTrue: [len]
+						ifFalse: [lastIndex].
+	position _ firstIndex <= 1
+				ifTrue: [0]
+				ifFalse: [firstIndex - 1]!
+pastEndPut: anObject
+	collection grow.
+	writeLimit _ collection size.
+	collection at: (position _ position + 1) put: anObject!
+with: aCollection
+	super on: aCollection.
+	position _ readLimit _ writeLimit _ aCollection size! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+WriteStream class
+	instanceVariableNames: ''!
+
+
+!WriteStream class methodsFor: 'instance creation'!
+on: aCollection from: firstIndex to: lastIndex
+	"Answer with a new instance streaming over a copy of aCollection from
+	firstIndex to lastIndex."
+
+	^self basicNew
+		on: aCollection
+		from: firstIndex
+		to: lastIndex!
+with: aCollection
+	"Answer a new instance of me streaming on aCollection.  Assume that the
+	collection is already full so the position and the limits are set to the end."
+
+	^self basicNew with: aCollection!
+with: aCollection from: firstIndex to: lastIndex
+	"Answer a new instance of me streaming on the subcollection of aCollection, starting
+	at index firstIndex and ending at lastIndex.  Assume that the
+	resulting collection is already full so the position and the limits are set to the end."
+
+	^self basicNew with: (aCollection copyFrom: firstIndex to: lastIndex)! !
 
 "Graphics Test Suite - Comprehensive validation of graphics facilities
 Blue Book Smalltalk-80 compatible test suite (no modern exception handling)"
@@ -42249,19 +42608,6 @@ Object subclass: #GraphicsTest
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Tests-Graphics'!
-
-GraphicsTest comment:
-'Comprehensive graphics test suite for Smalltalk-80 graphics facilities.
-Tests all 16 BitBlt combination rules, Pen drawing operations, Form operations,
-clipping, and halftone patterns. All tests use pure Blue Book Smalltalk-80 syntax
-with no modern exception handling features.
-
-Usage:
-	GraphicsTest runAll          "Run all tests, return results Dictionary"
-	GraphicsTest testBitBltVisual  "Visual 4x4 grid of all 16 BitBlt rules"
-	GraphicsTest testPenVisual     "Visual Pen drawing demonstration"
-	GraphicsTest testAllRules      "Test all combination rules programmatically"'!
-
 
 !GraphicsTest class methodsFor: 'running'!
 
