@@ -1,13 +1,35 @@
 #!/bin/bash
 #
-# Build and run Smalltalk-80 with tests
+# Build and run Smalltalk-80 with specified test file(s)
 #
-# Usage: ./runtests.sh [Debug|Release]
+# Usage: ./runtests.sh [test_file1.st] [test_file2.st] ...
+#
+# If no test files specified, defaults to "Smalltalk-80 Source/Tests/GraphicsTest.st"
+#
+# Examples:
+#   ./runtests.sh
+#   ./runtests.sh "Smalltalk-80 Source/Tests/BlockContextTest_full.st"
+#   ./runtests.sh "Smalltalk-80 Source/Tests/BlockContextTest_full.st" "Smalltalk-80 Source/Tests/GraphicsTest.st"
 #
 
 set -e
 
-CONFIGURATION="${1:-Debug}"
+CONFIGURATION="Debug"
+TEST_FILES=()
+
+# Parse arguments - collect all .st files as test files
+for arg in "$@"; do
+    if [[ "$arg" == *.st ]]; then
+        TEST_FILES+=("$arg")
+    elif [[ "$arg" == "Release" || "$arg" == "Debug" ]]; then
+        CONFIGURATION="$arg"
+    fi
+done
+
+# Default test file if none specified
+if [ ${#TEST_FILES[@]} -eq 0 ]; then
+    TEST_FILES=("Smalltalk-80 Source/Tests/GraphicsTest.st")
+fi
 
 echo "=== Smalltalk-80 Test Runner ==="
 echo
@@ -16,26 +38,33 @@ echo
 echo "Building Compiler..."
 dotnet build "Smalltalk80.Compiler/Smalltalk80.Compiler.csproj" -c "$CONFIGURATION"
 
+# Verify source files exist
+SOURCE_FILE="Smalltalk-80 Source/Smalltalk-80.st"
+if [ ! -f "$SOURCE_FILE" ]; then
+    echo "Error: Source file not found: $SOURCE_FILE"
+    exit 1
+fi
+
+for TEST_FILE in "${TEST_FILES[@]}"; do
+    if [ ! -f "$TEST_FILE" ]; then
+        echo "Error: Test file not found: $TEST_FILE"
+        exit 1
+    fi
+done
+
 # Generate coldstart_with_tests.json
 echo
 echo "Generating coldstart_with_tests.json..."
+echo "  Source: $SOURCE_FILE"
+for TEST_FILE in "${TEST_FILES[@]}"; do
+    echo "  Test:   $TEST_FILE"
+done
 
 COMPILER_EXE="Smalltalk80.Compiler/bin/$CONFIGURATION/net9.0/Smalltalk80.Compiler.dll"
-SOURCE_FILE1="Smalltalk-80 Source/Smalltalk-80.st"
-SOURCE_FILE2="Smalltalk-80 Source/Smalltalk-80-with-tests.st"
 OUTPUT_FILE="Smalltalk80.Compiler/bin/$CONFIGURATION/net9.0/coldstart_with_tests.json"
 
-if [ ! -f "$SOURCE_FILE1" ]; then
-    echo "Error: Source file not found: $SOURCE_FILE1"
-    exit 1
-fi
-
-if [ ! -f "$SOURCE_FILE2" ]; then
-    echo "Error: Test file not found: $SOURCE_FILE2"
-    exit 1
-fi
-
-dotnet "$COMPILER_EXE" "$SOURCE_FILE1" "$SOURCE_FILE2" "$OUTPUT_FILE"
+# Build compiler arguments: source file, test files, output file
+dotnet "$COMPILER_EXE" "$SOURCE_FILE" "${TEST_FILES[@]}" "$OUTPUT_FILE"
 
 # Copy to interpreter directory (both Linux and Windows paths)
 echo
