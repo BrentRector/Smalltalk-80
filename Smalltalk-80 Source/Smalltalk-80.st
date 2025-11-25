@@ -43386,3 +43386,12 @@ GraphicsTest testBitBltVisual!
 GraphicsTest testPenVisual!
 GraphicsTest testFormDisplay!
 GraphicsTest testHalftonesVisual!
+
+"Path subclass visual tests"
+GraphicsTest testLineVisual!
+GraphicsTest testArcVisual!
+GraphicsTest testCircleVisual!
+GraphicsTest testCurveVisual!
+GraphicsTest testSplineVisual!
+GraphicsTest testLinearFitVisual!
+GraphicsTest testPathVisual!

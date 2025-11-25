@@ -37,6 +37,16 @@ runAll
 	results at: #halftones put: (self testHalftones).
 	results at: #allRules put: (self testAllRules).
 
+	"Path subclass tests"
+	results at: #path put: (self testPath).
+	results at: #pathTransform put: (self testPathTransform).
+	results at: #line put: (self testLine).
+	results at: #arc put: (self testArc).
+	results at: #circle put: (self testCircle).
+	results at: #curve put: (self testCurve).
+	results at: #spline put: (self testSpline).
+	results at: #linearFit put: (self testLinearFit).
+
 	^results! !
 
 !GraphicsTest class methodsFor: 'tests - BitBlt rules'!
@@ -611,11 +621,728 @@ testComprehensive
 	"Test halftones"
 	results at: #halftones put: (self testHalftones).
 
+	"Test Path and subclasses"
+	results at: #path put: (self testPath).
+	results at: #pathTransform put: (self testPathTransform).
+	results at: #line put: (self testLine).
+	results at: #arc put: (self testArc).
+	results at: #circle put: (self testCircle).
+	results at: #curve put: (self testCurve).
+	results at: #spline put: (self testSpline).
+	results at: #linearFit put: (self testLinearFit).
+
 	^results!
 
 testAll
 	"Synonym for testComprehensive"
 	^self testComprehensive! !
+
+!GraphicsTest class methodsFor: 'tests - Path'!
+
+testPath
+	"Test Path class basic operations.
+	Returns Dictionary with test results."
+
+	| results path |
+	results _ Dictionary new.
+
+	"Test 1: Path creation"
+	path _ Path new.
+	results at: 'Path creation' put: path notNil.
+
+	"Test 2: Path is initially empty"
+	results at: 'Path isEmpty' put: path isEmpty.
+
+	"Test 3: Add points to path"
+	path add: 10@10.
+	path add: 50@50.
+	path add: 100@20.
+	results at: 'Path size after adds' put: (path size = 3).
+
+	"Test 4: Path at: accessor"
+	results at: 'Path at: 1' put: ((path at: 1) = (10@10)).
+	results at: 'Path at: 2' put: ((path at: 2) = (50@50)).
+
+	"Test 5: Path first and last"
+	results at: 'Path first' put: (path first = (10@10)).
+	results at: 'Path last' put: (path last = (100@20)).
+
+	"Test 6: Path form (default is 1x1 black)"
+	results at: 'Path default form' put: (path form notNil).
+	results at: 'Path form extent' put: (path form extent = (1@1)).
+
+	"Test 7: Path at:put:"
+	path at: 2 put: 75@75.
+	results at: 'Path at:put:' put: ((path at: 2) = (75@75)).
+
+	"Test 8: Path firstPoint, secondPoint, thirdPoint accessors"
+	results at: 'Path firstPoint' put: (path firstPoint = (10@10)).
+	results at: 'Path secondPoint' put: (path secondPoint = (75@75)).
+	results at: 'Path thirdPoint' put: (path thirdPoint = (100@20)).
+
+	"Test 9: Path firstPoint:, secondPoint: setters"
+	path firstPoint: 5@5.
+	path secondPoint: 60@60.
+	results at: 'Path firstPoint:' put: (path firstPoint = (5@5)).
+	results at: 'Path secondPoint:' put: (path secondPoint = (60@60)).
+
+	^results!
+
+testPathTransform
+	"Test Path transformation operations (translateBy:, scaleBy:).
+	Returns Dictionary with test results."
+
+	| results path translated scaled |
+	results _ Dictionary new.
+
+	"Create test path"
+	path _ Path new.
+	path add: 10@10.
+	path add: 20@20.
+	path add: 30@30.
+
+	"Test translateBy:"
+	translated _ path translateBy: 100@50.
+	results at: 'translateBy: creates new Path' put: (translated ~~ path).
+	results at: 'translateBy: first point' put: ((translated at: 1) = (110@60)).
+	results at: 'translateBy: second point' put: ((translated at: 2) = (120@70)).
+	results at: 'original unchanged' put: ((path at: 1) = (10@10)).
+
+	"Test scaleBy:"
+	scaled _ path scaleBy: 2@3.
+	results at: 'scaleBy: creates new Path' put: (scaled ~~ path).
+	results at: 'scaleBy: first point' put: ((scaled at: 1) = (20@30)).
+	results at: 'scaleBy: second point' put: ((scaled at: 2) = (40@60)).
+
+	"Test computeBoundingBox"
+	results at: 'computeBoundingBox origin' put: (path computeBoundingBox origin = (10@10)).
+	results at: 'computeBoundingBox corner' put: (path computeBoundingBox corner = (30@30)).
+
+	^results! !
+
+!GraphicsTest class methodsFor: 'tests - Line'!
+
+testLine
+	"Test Line class operations.
+	Returns Dictionary with test results."
+
+	| results line |
+	results _ Dictionary new.
+
+	"Test 1: Line creation"
+	line _ Line new.
+	results at: 'Line creation' put: line notNil.
+
+	"Test 2: Line has two points by default"
+	results at: 'Line size' put: (line size = 2).
+
+	"Test 3: Set begin and end points"
+	line beginPoint: 50@50.
+	line endPoint: 150@100.
+	results at: 'Line beginPoint:' put: (line beginPoint = (50@50)).
+	results at: 'Line endPoint:' put: (line endPoint = (150@100)).
+
+	"Test 4: Line from:to:withForm:"
+	line _ Line from: 10@10 to: 90@90 withForm: (Form dotOfSize: 2).
+	results at: 'Line from:to:withForm: begin' put: (line beginPoint = (10@10)).
+	results at: 'Line from:to:withForm: end' put: (line endPoint = (90@90)).
+	results at: 'Line form set' put: (line form notNil).
+
+	^results!
+
+testLineVisual
+	"Visual test: Display Line objects on screen.
+	Tests Line drawing with different orientations.
+	Usage: GraphicsTest testLineVisual"
+
+	| line form |
+
+	"Clear display to white"
+	Display white.
+
+	"Create a small black form for the line brush"
+	form _ Form extent: 2@2.
+	form black.
+
+	"Test 1: Horizontal line"
+	line _ Line new.
+	line form: form.
+	line beginPoint: 50@50.
+	line endPoint: 200@50.
+	line displayOn: Display.
+
+	"Test 2: Vertical line"
+	line _ Line new.
+	line form: form.
+	line beginPoint: 250@50.
+	line endPoint: 250@200.
+	line displayOn: Display.
+
+	"Test 3: Diagonal line (positive slope)"
+	line _ Line new.
+	line form: form.
+	line beginPoint: 300@50.
+	line endPoint: 450@200.
+	line displayOn: Display.
+
+	"Test 4: Diagonal line (negative slope)"
+	line _ Line new.
+	line form: form.
+	line beginPoint: 500@200.
+	line endPoint: 650@50.
+	line displayOn: Display.
+
+	"Test 5: Line with factory method"
+	line _ Line from: 50@250 to: 200@350 withForm: form.
+	line displayOn: Display.
+
+	^true! !
+
+!GraphicsTest class methodsFor: 'tests - Arc'!
+
+testArc
+	"Test Arc class operations.
+	Returns Dictionary with test results."
+
+	| results arc |
+	results _ Dictionary new.
+
+	"Test 1: Arc creation"
+	arc _ Arc new.
+	results at: 'Arc creation' put: arc notNil.
+
+	"Test 2: Set center, radius, quadrant"
+	arc center: 100@100.
+	arc radius: 50.
+	arc quadrant: 1.
+	results at: 'Arc center:' put: (arc center = (100@100)).
+	results at: 'Arc radius:' put: (arc radius = 50).
+	results at: 'Arc quadrant:' put: (arc quadrant = 1).
+
+	"Test 3: Combined setter"
+	arc center: 200@200 radius: 75 quadrant: 3.
+	results at: 'Arc center:radius:quadrant: center' put: (arc center = (200@200)).
+	results at: 'Arc center:radius:quadrant: radius' put: (arc radius = 75).
+	results at: 'Arc center:radius:quadrant: quadrant' put: (arc quadrant = 3).
+
+	"Test 4: Arc center:radius: (keeps quadrant)"
+	arc center: 150@150 radius: 60.
+	results at: 'Arc center:radius: preserves quadrant' put: (arc quadrant = 3).
+
+	^results!
+
+testArcVisual
+	"Visual test: Display Arc objects showing all four quadrants.
+	Usage: GraphicsTest testArcVisual"
+
+	| arc form centerX centerY |
+
+	"Clear display to white"
+	Display white.
+
+	"Create a small black form for the arc brush"
+	form _ Form extent: 2@2.
+	form black.
+
+	centerX _ 150.
+	centerY _ 150.
+
+	"Draw all four quadrants of an arc to form a complete circle"
+	1 to: 4 do: [:q |
+		arc _ Arc new.
+		arc form: form.
+		arc center: centerX@centerY.
+		arc radius: 80.
+		arc quadrant: q.
+		arc displayOn: Display].
+
+	"Draw another set of arcs at different location with larger radius"
+	centerX _ 400.
+	centerY _ 150.
+
+	"Quadrant 1 only (top-right)"
+	arc _ Arc new.
+	arc form: form.
+	arc center: centerX@centerY radius: 60 quadrant: 1.
+	arc displayOn: Display.
+
+	"Quadrant 2 only (top-left)"
+	arc _ Arc new.
+	arc form: form.
+	arc center: (centerX + 150)@centerY radius: 60 quadrant: 2.
+	arc displayOn: Display.
+
+	"Quadrant 3 only (bottom-left)"
+	centerY _ 300.
+	arc _ Arc new.
+	arc form: form.
+	arc center: centerX@centerY radius: 60 quadrant: 3.
+	arc displayOn: Display.
+
+	"Quadrant 4 only (bottom-right)"
+	arc _ Arc new.
+	arc form: form.
+	arc center: (centerX + 150)@centerY radius: 60 quadrant: 4.
+	arc displayOn: Display.
+
+	^true! !
+
+!GraphicsTest class methodsFor: 'tests - Circle'!
+
+testCircle
+	"Test Circle class operations.
+	Returns Dictionary with test results."
+
+	| results circle |
+	results _ Dictionary new.
+
+	"Test 1: Circle creation"
+	circle _ Circle new.
+	results at: 'Circle creation' put: circle notNil.
+
+	"Test 2: Circle inherits from Arc"
+	results at: 'Circle isKindOf Arc' put: (circle isKindOf: Arc).
+
+	"Test 3: Set center and radius"
+	circle center: 200@200.
+	circle radius: 100.
+	results at: 'Circle center:' put: (circle center = (200@200)).
+	results at: 'Circle radius:' put: (circle radius = 100).
+
+	"Test 4: Circle computeBoundingBox"
+	circle center: 100@100.
+	circle radius: 50.
+	results at: 'Circle bounding box computed' put: (circle computeBoundingBox notNil).
+
+	^results!
+
+testCircleVisual
+	"Visual test: Display Circle objects on screen.
+	Usage: GraphicsTest testCircleVisual"
+
+	| circle form |
+
+	"Clear display to white"
+	Display white.
+
+	"Create a small black form for the circle brush"
+	form _ Form extent: 2@2.
+	form black.
+
+	"Test 1: Simple circle"
+	circle _ Circle new.
+	circle form: form.
+	circle center: 150@150.
+	circle radius: 80.
+	circle displayOn: Display.
+
+	"Test 2: Smaller circle"
+	circle _ Circle new.
+	circle form: form.
+	circle center: 350@150.
+	circle radius: 50.
+	circle displayOn: Display.
+
+	"Test 3: Large circle"
+	circle _ Circle new.
+	circle form: form.
+	circle center: 550@150.
+	circle radius: 100.
+	circle displayOn: Display.
+
+	"Test 4: Concentric circles"
+	20 to: 80 by: 20 do: [:r |
+		circle _ Circle new.
+		circle form: form.
+		circle center: 150@350.
+		circle radius: r.
+		circle displayOn: Display].
+
+	"Test 5: Row of circles with increasing size"
+	1 to: 5 do: [:i |
+		circle _ Circle new.
+		circle form: form.
+		circle center: (250 + (i * 70))@350.
+		circle radius: i * 12.
+		circle displayOn: Display].
+
+	^true! !
+
+!GraphicsTest class methodsFor: 'tests - Curve'!
+
+testCurve
+	"Test Curve class operations (conic section through 3 points).
+	Returns Dictionary with test results."
+
+	| results curve |
+	results _ Dictionary new.
+
+	"Test 1: Curve creation"
+	curve _ Curve new.
+	results at: 'Curve creation' put: curve notNil.
+
+	"Test 2: Curve has three points by default"
+	results at: 'Curve size' put: (curve size = 3).
+
+	"Test 3: Set three control points"
+	curve firstPoint: 50@100.
+	curve secondPoint: 100@50.
+	curve thirdPoint: 150@100.
+	results at: 'Curve firstPoint:' put: (curve firstPoint = (50@100)).
+	results at: 'Curve secondPoint:' put: (curve secondPoint = (100@50)).
+	results at: 'Curve thirdPoint:' put: (curve thirdPoint = (150@100)).
+
+	^results!
+
+testCurveVisual
+	"Visual test: Display Curve objects on screen.
+	Usage: GraphicsTest testCurveVisual"
+
+	| curve form |
+
+	"Clear display to white"
+	Display white.
+
+	"Create a small black form for the curve brush"
+	form _ Form extent: 2@2.
+	form black.
+
+	"Test 1: Simple curve (parabola-like, bowing upward)"
+	curve _ Curve new.
+	curve form: form.
+	curve firstPoint: 50@150.
+	curve secondPoint: 150@50.
+	curve thirdPoint: 250@150.
+	curve displayOn: Display.
+
+	"Test 2: Curve bowing downward"
+	curve _ Curve new.
+	curve form: form.
+	curve firstPoint: 300@50.
+	curve secondPoint: 400@150.
+	curve thirdPoint: 500@50.
+	curve displayOn: Display.
+
+	"Test 3: Asymmetric curve"
+	curve _ Curve new.
+	curve form: form.
+	curve firstPoint: 550@150.
+	curve secondPoint: 650@50.
+	curve thirdPoint: 700@120.
+	curve displayOn: Display.
+
+	"Test 4: Series of connected curves (wave pattern)"
+	50 to: 550 by: 100 do: [:x |
+		curve _ Curve new.
+		curve form: form.
+		curve firstPoint: x@300.
+		curve secondPoint: (x + 50)@250.
+		curve thirdPoint: (x + 100)@300.
+		curve displayOn: Display].
+
+	"Test 5: Curves forming a flower-like pattern"
+	0 to: 315 by: 45 do: [:angle |
+		| radians dx dy |
+		radians _ angle degreesToRadians.
+		dx _ radians cos * 60.
+		dy _ radians sin * 60.
+		curve _ Curve new.
+		curve form: form.
+		curve firstPoint: 200@450.
+		curve secondPoint: (200 + dx)@(450 + dy).
+		curve thirdPoint: (200 + (dx * 0.7))@(450 + (dy * 0.7) + 30).
+		curve displayOn: Display].
+
+	^true! !
+
+!GraphicsTest class methodsFor: 'tests - Spline'!
+
+testSpline
+	"Test Spline class operations (cubic spline through multiple points).
+	Returns Dictionary with test results."
+
+	| results spline |
+	results _ Dictionary new.
+
+	"Test 1: Spline creation"
+	spline _ Spline new.
+	results at: 'Spline creation' put: spline notNil.
+
+	"Test 2: Spline inherits from Path"
+	results at: 'Spline isKindOf Path' put: (spline isKindOf: Path).
+
+	"Test 3: Add points to spline"
+	spline add: 10@100.
+	spline add: 50@50.
+	spline add: 100@100.
+	spline add: 150@50.
+	results at: 'Spline size after adds' put: (spline size = 4).
+
+	"Test 4: Spline first and last"
+	results at: 'Spline first' put: (spline first = (10@100)).
+	results at: 'Spline last' put: (spline last = (150@50)).
+
+	"Test 5: Spline isCyclic (not cyclic)"
+	results at: 'Spline not cyclic' put: (spline isCyclic not).
+
+	"Test 6: Cyclic spline"
+	spline add: 200@100.
+	spline add: 10@100.  "Close the loop"
+	results at: 'Spline cyclic when closed' put: spline isCyclic.
+
+	^results!
+
+testSplineVisual
+	"Visual test: Display Spline curves on screen.
+	Usage: GraphicsTest testSplineVisual"
+
+	| spline form |
+
+	"Clear display to white"
+	Display white.
+
+	"Create a small black form for the spline brush"
+	form _ Form extent: 2@2.
+	form black.
+
+	"Test 1: Simple wave spline"
+	spline _ Spline new.
+	spline form: form.
+	spline add: 50@100.
+	spline add: 100@50.
+	spline add: 150@100.
+	spline add: 200@50.
+	spline add: 250@100.
+	spline computeCurve.
+	spline displayOn: Display.
+
+	"Test 2: S-curve spline"
+	spline _ Spline new.
+	spline form: form.
+	spline add: 300@50.
+	spline add: 350@100.
+	spline add: 400@100.
+	spline add: 450@50.
+	spline computeCurve.
+	spline displayOn: Display.
+
+	"Test 3: More complex spline with many points"
+	spline _ Spline new.
+	spline form: form.
+	spline add: 500@75.
+	spline add: 550@50.
+	spline add: 600@80.
+	spline add: 650@40.
+	spline add: 700@90.
+	spline add: 750@60.
+	spline computeCurve.
+	spline displayOn: Display.
+
+	"Test 4: Spline forming a loop pattern"
+	spline _ Spline new.
+	spline form: form.
+	spline add: 100@250.
+	spline add: 150@200.
+	spline add: 200@250.
+	spline add: 200@300.
+	spline add: 150@350.
+	spline add: 100@300.
+	spline add: 100@250.  "Close the loop"
+	spline computeCurve.
+	spline displayOn: Display.
+
+	"Test 5: Multiple small splines in a row"
+	1 to: 5 do: [:i |
+		spline _ Spline new.
+		spline form: form.
+		spline add: (250 + (i * 80))@300.
+		spline add: (270 + (i * 80))@250.
+		spline add: (290 + (i * 80))@300.
+		spline add: (310 + (i * 80))@350.
+		spline add: (330 + (i * 80))@300.
+		spline computeCurve.
+		spline displayOn: Display].
+
+	^true! !
+
+!GraphicsTest class methodsFor: 'tests - LinearFit'!
+
+testLinearFit
+	"Test LinearFit class operations (piecewise linear approximation).
+	Returns Dictionary with test results."
+
+	| results linearFit |
+	results _ Dictionary new.
+
+	"Test 1: LinearFit creation"
+	linearFit _ LinearFit new.
+	results at: 'LinearFit creation' put: linearFit notNil.
+
+	"Test 2: LinearFit inherits from Path"
+	results at: 'LinearFit isKindOf Path' put: (linearFit isKindOf: Path).
+
+	"Test 3: Add points to linearFit"
+	linearFit add: 10@100.
+	linearFit add: 50@50.
+	linearFit add: 100@80.
+	linearFit add: 150@30.
+	results at: 'LinearFit size after adds' put: (linearFit size = 4).
+
+	"Test 4: LinearFit first and last"
+	results at: 'LinearFit first' put: (linearFit first = (10@100)).
+	results at: 'LinearFit last' put: (linearFit last = (150@30)).
+
+	^results!
+
+testLinearFitVisual
+	"Visual test: Display LinearFit paths on screen.
+	Usage: GraphicsTest testLinearFitVisual"
+
+	| linearFit form |
+
+	"Clear display to white"
+	Display white.
+
+	"Create a small black form for the brush"
+	form _ Form extent: 2@2.
+	form black.
+
+	"Test 1: Simple zigzag pattern"
+	linearFit _ LinearFit new.
+	linearFit form: form.
+	linearFit add: 50@100.
+	linearFit add: 100@50.
+	linearFit add: 150@100.
+	linearFit add: 200@50.
+	linearFit add: 250@100.
+	linearFit displayOn: Display.
+
+	"Test 2: Staircase pattern"
+	linearFit _ LinearFit new.
+	linearFit form: form.
+	linearFit add: 300@100.
+	linearFit add: 350@100.
+	linearFit add: 350@70.
+	linearFit add: 400@70.
+	linearFit add: 400@40.
+	linearFit add: 450@40.
+	linearFit displayOn: Display.
+
+	"Test 3: Triangle"
+	linearFit _ LinearFit new.
+	linearFit form: form.
+	linearFit add: 500@100.
+	linearFit add: 550@30.
+	linearFit add: 600@100.
+	linearFit add: 500@100.
+	linearFit displayOn: Display.
+
+	"Test 4: Star shape"
+	linearFit _ LinearFit new.
+	linearFit form: form.
+	linearFit add: 150@250.
+	linearFit add: 170@300.
+	linearFit add: 130@320.
+	linearFit add: 180@320.
+	linearFit add: 160@360.
+	linearFit add: 200@330.
+	linearFit add: 230@370.
+	linearFit add: 220@320.
+	linearFit add: 270@310.
+	linearFit add: 220@290.
+	linearFit add: 250@250.
+	linearFit add: 200@280.
+	linearFit add: 150@250.
+	linearFit displayOn: Display.
+
+	"Test 5: Polygon approximation of a curve"
+	linearFit _ LinearFit new.
+	linearFit form: form.
+	0 to: 360 by: 30 do: [:angle |
+		| radians x y |
+		radians _ angle degreesToRadians.
+		x _ 450 + (radians cos * 60).
+		y _ 320 + (radians sin * 60).
+		linearFit add: x truncated @ y truncated].
+	linearFit displayOn: Display.
+
+	^true! !
+
+!GraphicsTest class methodsFor: 'tests - Path visual'!
+
+testPathVisual
+	"Visual test: Comprehensive display of all Path subclasses.
+	Usage: GraphicsTest testPathVisual"
+
+	| form path line arc circle curve spline linearFit |
+
+	"Clear display to white"
+	Display white.
+
+	"Create a small black form for drawing"
+	form _ Form extent: 2@2.
+	form black.
+
+	"Section 1: Path (top-left)"
+	path _ Path new.
+	path form: form.
+	path add: 50@50.
+	path add: 80@30.
+	path add: 110@60.
+	path add: 140@40.
+	path displayOn: Display.
+
+	"Section 2: Line (top-center)"
+	line _ Line new.
+	line form: form.
+	line beginPoint: 200@50.
+	line endPoint: 350@80.
+	line displayOn: Display.
+
+	"Section 3: Arc (top-right)"
+	arc _ Arc new.
+	arc form: form.
+	arc center: 500@80 radius: 50 quadrant: 1.
+	arc displayOn: Display.
+
+	"Section 4: Circle (middle-left)"
+	circle _ Circle new.
+	circle form: form.
+	circle center: 100@200.
+	circle radius: 50.
+	circle displayOn: Display.
+
+	"Section 5: Curve (middle-center)"
+	curve _ Curve new.
+	curve form: form.
+	curve firstPoint: 200@230.
+	curve secondPoint: 275@150.
+	curve thirdPoint: 350@230.
+	curve displayOn: Display.
+
+	"Section 6: Spline (middle-right)"
+	spline _ Spline new.
+	spline form: form.
+	spline add: 400@230.
+	spline add: 450@170.
+	spline add: 500@230.
+	spline add: 550@170.
+	spline add: 600@230.
+	spline computeCurve.
+	spline displayOn: Display.
+
+	"Section 7: LinearFit (bottom)"
+	linearFit _ LinearFit new.
+	linearFit form: form.
+	linearFit add: 50@350.
+	linearFit add: 150@300.
+	linearFit add: 250@380.
+	linearFit add: 350@320.
+	linearFit add: 450@370.
+	linearFit add: 550@310.
+	linearFit displayOn: Display.
+
+	^true! !
 
 "Float Test Suite - Comprehensive validation of Float operations
 Needed to diagnose issues with Float arithmetic before Pen tests"
