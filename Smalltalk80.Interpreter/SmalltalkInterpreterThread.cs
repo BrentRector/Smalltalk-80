@@ -199,6 +199,20 @@ public class SmalltalkInterpreterThread
             }
         }
 
+        // Build comment expression list: ClassName comment: 'text' expressions
+        var commentIndices = new List<int>();
+        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
+        {
+            var expr = _context.Bundle.InitExpressions[i];
+            if (expr.Source == null) continue;
+
+            // Include comment: expressions (e.g., "ClassName comment:'text'")
+            if (expr.Source.Contains(" comment:"))
+            {
+                commentIndices.Add(i);
+            }
+        }
+
         // Build phase 2 list: Test expressions (run AFTER init expressions)
         var phase2Indices = new List<int>();
         for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
@@ -255,6 +269,45 @@ public class SmalltalkInterpreterThread
                     Console.WriteLine($"       Error: {result.Diagnostic.Message}");
                 }
             }
+        }
+
+        // Execute comment expressions (ClassName comment: 'text')
+        if (commentIndices.Count > 0)
+        {
+            Console.WriteLine($"\n--- Comment expressions ({commentIndices.Count} total) ---");
+            int commentSucceeded = 0;
+            int commentFailed = 0;
+            foreach (int index in commentIndices)
+            {
+                var expr = _context.Bundle.InitExpressions[index];
+                var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
+
+                if (result.Status == InitStatus.Success)
+                {
+                    commentSucceeded++;
+                    succeeded++;
+                }
+                else
+                {
+                    commentFailed++;
+                    failed++;
+                    // Only show first few failures to avoid flooding output
+                    if (commentFailed <= 5)
+                    {
+                        Console.WriteLine($"    ❌ Failed: {expr.Source?.Substring(0, Math.Min(60, expr.Source?.Length ?? 0))}...");
+                        Console.WriteLine($"       Status: {result.Status}");
+                        if (result.Diagnostic?.Message != null)
+                        {
+                            Console.WriteLine($"       Error: {result.Diagnostic.Message}");
+                        }
+                    }
+                    else if (commentFailed == 6)
+                    {
+                        Console.WriteLine($"    ... suppressing further comment failures ...");
+                    }
+                }
+            }
+            Console.WriteLine($"  Comment expressions: {commentSucceeded} succeeded, {commentFailed} failed");
         }
 
         // PHASE 2: Execute Test expressions (GraphicsTest, etc.)
