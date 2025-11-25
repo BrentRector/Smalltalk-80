@@ -109,6 +109,64 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         {
             int index = BytecodeUtil.PushLiteralConstIndex(bytecode);
             var literal = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
+
+            // DEBUG: Trace literal constant pushes for Float-related methods
+            string? constMethodId = context.GetLocalId(methodOOP);
+            if (constMethodId?.Contains("Float") == true || constMethodId?.Contains("degreesToRadians") == true)
+            {
+                string litDesc;
+                if (literal.IsSmallInteger)
+                {
+                    litDesc = $"SmallInteger({literal.AsSmallInteger()})";
+                }
+                else
+                {
+                    var litClass = heapManager.GetClassOOP(literal);
+                    string? litClassName = context.GetClassName(litClass);
+                    var litFormat = heapManager.GetObjectFormat(literal).ToString();
+                    int litSize = heapManager.GetIndexedSize(literal);
+                    litDesc = $"{litClassName} (Format: {litFormat}, Size: {litSize})";
+
+                    // If it's an unexpected Array, dump contents
+                    if (litClassName == "Array" && litSize <= 10)
+                    {
+                        Console.WriteLine($"[PUSH_LITERAL_CONST] Method: {constMethodId}, lit[{index}]: ARRAY FOUND!");
+                        Console.WriteLine($"  Literal OOP: {literal}");
+                        Console.WriteLine($"  Array contents:");
+                        for (int i = 0; i < litSize; i++)
+                        {
+                            var elem = heapManager.GetIndexedOOP(literal, i);
+                            string elemDesc;
+                            if (elem.IsSmallInteger)
+                            {
+                                elemDesc = $"SmallInteger({elem.AsSmallInteger()})";
+                            }
+                            else
+                            {
+                                var elemClass = heapManager.GetClassOOP(elem);
+                                var elemClassName = context.GetClassName(elemClass);
+                                elemDesc = $"{elemClassName} OOP={elem}";
+                            }
+                            Console.WriteLine($"    [{i}]: {elemDesc}");
+                        }
+                    }
+                    // If it's a Float, show value
+                    else if (litClassName == "Float" && litFormat == "WordIndexed" && litSize == 4)
+                    {
+                        byte[] bytes = new byte[8];
+                        for (int i = 0; i < 4; i++)
+                        {
+                            ushort word = heapManager.GetIndexedWord(literal, i);
+                            bytes[i * 2] = (byte)(word & 0xFF);
+                            bytes[i * 2 + 1] = (byte)((word >> 8) & 0xFF);
+                        }
+                        double floatVal = BitConverter.ToDouble(bytes, 0);
+                        litDesc = $"Float({floatVal})";
+                    }
+                }
+                Console.WriteLine($"[PUSH_LITERAL_CONST] Method: {constMethodId}, lit[{index}]: {litDesc}");
+            }
+
             context.Push(literal);
             return true;
         }
