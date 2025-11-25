@@ -26,7 +26,7 @@ ROW_SPACING = 16   # Vertical spacing between rows (icon+label)
 FONT_SIZE = 12     # Font size for labels
 
 # Icon layout: (display_name, label, filename_patterns)
-# Icons are arranged in rows, positions calculated automatically
+# Icons are arranged in rows of 6, positions calculated automatically
 ROW1_ICONS = [
     ('select', 'select', ['select.form.bmp']),
     ('singlecopy', 'single', ['single.copy.bmp', 'singlecopy.form.bmp']),
@@ -34,32 +34,35 @@ ROW1_ICONS = [
     ('line', 'line', ['line.form.bmp']),
     ('curve', 'curve', ['curve.form.bmp']),
     ('block', 'block', ['block.form.bmp']),
+]
+
+ROW2_ICONS = [
     ('over', 'over', ['over.form.bmp']),
     ('under', 'under', ['under.form.bmp']),
     ('reverse', 'reverse', ['reverse.form.bmp']),
     ('erase', 'erase', ['erase.form.bmp']),
     ('in', 'in', ['in.form.bmp']),
+    ('magnify', 'magnify', ['magnify.form.bmp']),
 ]
 
-ROW2_ICONS = [
-    ('magnify', 'magnify', ['magnify.form.bmp']),
+ROW3_ICONS = [
     ('white', 'white', ['white.form.bmp']),
     ('lightgray', 'ltgray', ['lightgray.form.bmp']),
     ('gray', 'gray', ['gray.form.bmp']),
     ('darkgray', 'dkgray', ['darkgray.form.bmp']),
     ('black', 'black', ['black.form.bmp']),
     ('xgrid', 'xgrid', ['xgrid.form.bmp']),
+]
+
+ROW4_ICONS = [
     ('ygrid', 'ygrid', ['ygrid.form.bmp']),
     ('togglegrids', 'grids', ['togglegrids.form.bmp']),
     ('out', 'out', ['out.form.bmp']),
-]
-
-ROW3_ICONS = [
     ('borderform', 'border', ['border.form.bmp', 'borderform.form.bmp']),
     ('specialborderform', 'special', ['special.form.bmp', 'specialborderform.form.bmp']),
 ]
 
-ALL_ROWS = [ROW1_ICONS, ROW2_ICONS, ROW3_ICONS]
+ALL_ROWS = [ROW1_ICONS, ROW2_ICONS, ROW3_ICONS, ROW4_ICONS]
 
 
 def create_panel(bitmaps_dir: Path, output_dir: Path):
