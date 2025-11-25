@@ -151,7 +151,7 @@ public class SmalltalkInterpreterThread
         // Skip list (requires features not yet implemented)
         var skipList = new HashSet<string>
         {
-            "FormMenuView initialize", // Requires file I/O primitives (92, 98, 99, 146)
+            // FormMenuView initialize now enabled - file I/O primitives implemented
         };
 
         // Build phase lists

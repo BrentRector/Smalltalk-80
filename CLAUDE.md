@@ -235,10 +235,9 @@ See `docs/Testing-Guide.md` for complete testing documentation.
 
 ## Init Expression Status
 
-**✅ Passing (46)**: Character, Float, SmallInteger, Text, Symbol, Date, File, Scanner, Debugger, InputSensor (including install and initSensor), Cursor, Object, Form, TextList, BitEditor, and 30 more
+**✅ Passing (47)**: Character, Float, SmallInteger, Text, Symbol, Date, File, Scanner, Debugger, InputSensor (including install and initSensor), Cursor, Object, Form, FormMenuView, TextList, BitEditor, and 30 more
 
-**⏭️ Skipped (1)**:
-- FormMenuView initialize - Requires file I/O primitives (98, 92, 99, 146 - not implemented)
+**⏭️ Skipped (0)**: None - all init expressions enabled
 
 **Recent Fixes**:
 - **Primitive 65 (Stream>>next)**: Fixed to return Character objects (not SmallIntegers) when reading from Strings/Symbols, enabling Scanner and --execute feature to work correctly. Uses isKindOf: semantics to handle subclasses properly.
