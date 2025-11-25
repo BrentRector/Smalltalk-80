@@ -173,8 +173,11 @@ public class SmalltalkInterpreterThread
             }
 
             // Include initialize methods and test validation
-            // EXCEPT DisplayScreen initialize which runs last to draw the halftone square
-            if ((expr.Source.EndsWith(" initialize") && expr.Source != "DisplayScreen initialize") ||
+            // EXCEPT DisplayScreen initialize (runs last to draw halftone square)
+            // EXCEPT FormMenuView initialize (runs after DisplayScreen, needs file I/O)
+            if ((expr.Source.EndsWith(" initialize") &&
+                 expr.Source != "DisplayScreen initialize" &&
+                 expr.Source != "FormMenuView initialize") ||
                 expr.Source == "InputSensor install" ||
                 expr.Source == "InputSensor initSensor" ||
                 expr.Source.Contains("Test validate"))
@@ -193,6 +196,17 @@ public class SmalltalkInterpreterThread
         {
             var expr = _context.Bundle.InitExpressions[i];
             if (expr.Source == "DisplayScreen initialize")
+            {
+                phase1Indices.Add(i);
+                break;
+            }
+        }
+
+        // Add FormMenuView initialize AFTER DisplayScreen (needs file I/O for .form files)
+        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
+        {
+            var expr = _context.Bundle.InitExpressions[i];
+            if (expr.Source == "FormMenuView initialize")
             {
                 phase1Indices.Add(i);
                 break;
@@ -271,39 +285,40 @@ public class SmalltalkInterpreterThread
             }
         }
 
+        // Comment expressions disabled - uncomment to enable
         // Execute comment expressions (ClassName comment: 'text') - show abbreviated progress
-        if (commentIndices.Count > 0)
-        {
-            Console.WriteLine($"\n--- Comment expressions ({commentIndices.Count} total) ---");
-            int commentSucceeded = 0;
-            int commentFailed = 0;
-            long totalCommentTimeMs = 0;
-            foreach (int index in commentIndices)
-            {
-                var expr = _context.Bundle.InitExpressions[index];
-
-                // Extract class name from "ClassName comment: 'text'"
-                var className = expr.Source?.Split(' ')[0] ?? "Unknown";
-                Console.Write($"  {className} comment: ... ");
-
-                var result = executor.ExecuteInitExpressionOnDemand(expr, compiler, verbose: false);
-                totalCommentTimeMs += result.ElapsedMilliseconds;
-
-                if (result.Status == InitStatus.Success)
-                {
-                    Console.WriteLine($"✓ {result.ElapsedMilliseconds}ms");
-                    commentSucceeded++;
-                    succeeded++;
-                }
-                else
-                {
-                    Console.WriteLine($"❌ {result.ElapsedMilliseconds}ms");
-                    commentFailed++;
-                    failed++;
-                }
-            }
-            Console.WriteLine($"  Comment expressions: {commentSucceeded}/{commentIndices.Count} succeeded in {totalCommentTimeMs / 1000.0:F1}s total");
-        }
+        // if (commentIndices.Count > 0)
+        // {
+        //     Console.WriteLine($"\n--- Comment expressions ({commentIndices.Count} total) ---");
+        //     int commentSucceeded = 0;
+        //     int commentFailed = 0;
+        //     long totalCommentTimeMs = 0;
+        //     foreach (int index in commentIndices)
+        //     {
+        //         var expr = _context.Bundle.InitExpressions[index];
+        //
+        //         // Extract class name from "ClassName comment: 'text'"
+        //         var className = expr.Source?.Split(' ')[0] ?? "Unknown";
+        //         Console.Write($"  {className} comment: ... ");
+        //
+        //         var result = executor.ExecuteInitExpressionOnDemand(expr, compiler, verbose: false);
+        //         totalCommentTimeMs += result.ElapsedMilliseconds;
+        //
+        //         if (result.Status == InitStatus.Success)
+        //         {
+        //             Console.WriteLine($"✓ {result.ElapsedMilliseconds}ms");
+        //             commentSucceeded++;
+        //             succeeded++;
+        //         }
+        //         else
+        //         {
+        //             Console.WriteLine($"❌ {result.ElapsedMilliseconds}ms");
+        //             commentFailed++;
+        //             failed++;
+        //         }
+        //     }
+        //     Console.WriteLine($"  Comment expressions: {commentSucceeded}/{commentIndices.Count} succeeded in {totalCommentTimeMs / 1000.0:F1}s total");
+        // }
 
         // Run GC after all initialization to show stats
         Console.WriteLine($"\n=== Running GC after all initialization ===");
