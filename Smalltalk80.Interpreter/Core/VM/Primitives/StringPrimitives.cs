@@ -124,9 +124,9 @@ public static class StringPrimitives
             int requiredSpace = 1 + stringSize + quoteCount + 1;
 
             // Get stream fields
-            var collectionOop = context.HeapManager.GetField(streamOop, STREAM_COLLECTION_INDEX);
-            var positionField = context.HeapManager.GetField(streamOop, STREAM_POSITION_INDEX);
-            var writeLimitField = context.HeapManager.GetField(streamOop, STREAM_WRITELIMIT_INDEX);
+            var collectionOop = context.HeapManager.GetInstanceVariable(streamOop, STREAM_COLLECTION_INDEX);
+            var positionField = context.HeapManager.GetInstanceVariable(streamOop, STREAM_POSITION_INDEX);
+            var writeLimitField = context.HeapManager.GetInstanceVariable(streamOop, STREAM_WRITELIMIT_INDEX);
 
             if (!positionField.IsSmallInteger || !writeLimitField.IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
@@ -159,7 +159,7 @@ public static class StringPrimitives
             context.HeapManager.SetIndexedByte(collectionOop, position++, QUOTE);
 
             // Update stream position (Smalltalk position is 1-based index of last written)
-            context.HeapManager.SetField(streamOop, STREAM_POSITION_INDEX, SmalltalkOOP.FromSmallInteger(position));
+            context.HeapManager.SetInstanceVariable(streamOop, STREAM_POSITION_INDEX, SmalltalkOOP.FromSmallInteger(position));
 
             // Return the receiver (String)
             return PrimitiveResult.Ok(context.Receiver);
