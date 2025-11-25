@@ -207,7 +207,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(81, new ControlPrimitives.Value());
         registry.Register(82, new ControlPrimitives.ValueWithArguments());
         registry.Register(83, new ControlPrimitives.Perform());
-        registry.Register(84, new ControlPrimitives.PerformWith());
+        registry.Register(84, new ControlPrimitives.PerformWithArguments());
         registry.Register(85, new ControlPrimitives.Signal());
         registry.Register(86, new ControlPrimitives.Wait());
         registry.Register(87, new ControlPrimitives.Resume());

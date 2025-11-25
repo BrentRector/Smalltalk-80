@@ -228,45 +228,102 @@ public static class ControlPrimitives
         }
     }
 
-    /// <summary>Primitive 83: perform: - Dynamically sends a message with no arguments</summary>
+    /// <summary>
+    /// Primitive 83: perform:, perform:with:, perform:with:with:, perform:with:with:with:
+    /// Dynamically sends a message with variable arguments.
+    ///
+    /// Arguments:
+    /// - args[0] = selector (Symbol)
+    /// - args[1..n] = message arguments (0-3 additional args)
+    ///
+    /// This primitive handles all perform: variants:
+    /// - perform: aSymbol                              → 1 arg (selector only), send with 0 args
+    /// - perform: aSymbol with: arg1                   → 2 args, send with 1 arg
+    /// - perform: aSymbol with: arg1 with: arg2        → 3 args, send with 2 args
+    /// - perform: aSymbol with: arg1 with: arg2 with: arg3 → 4 args, send with 3 args
+    /// </summary>
     public class Perform : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            // Must have at least 1 argument (the selector)
+            if (context.Arguments.Length < 1) return PrimitiveResult.Fail(context.Metadata!);
 
-            // args[0] should be a Symbol
+            // Maximum 4 arguments (selector + up to 3 message args)
+            if (context.Arguments.Length > 4) return PrimitiveResult.Fail(context.Metadata!);
+
+            // args[0] should be a Symbol (selector)
             if (context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             if (context.MessageSender == null) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP selectorOop = context.Arguments[0];
 
-            // Send the message with empty arguments
+            // Extract message arguments (args[1..n])
+            int messageArgCount = context.Arguments.Length - 1;
+            SmalltalkOOP[] messageArgs;
+
+            if (messageArgCount == 0)
+            {
+                messageArgs = Array.Empty<SmalltalkOOP>();
+            }
+            else
+            {
+                messageArgs = new SmalltalkOOP[messageArgCount];
+                for (int i = 0; i < messageArgCount; i++)
+                {
+                    messageArgs[i] = context.Arguments[i + 1];
+                }
+            }
+
+            // Send the message with extracted arguments
             SmalltalkOOP resultOop = context.MessageSender.SendMessage(
-                context.Receiver, selectorOop, Array.Empty<SmalltalkOOP>());
+                context.Receiver, selectorOop, messageArgs);
 
             return PrimitiveResult.Ok(resultOop);
         }
     }
 
-    /// <summary>Primitive 84: perform:with: - Dynamically sends a message with one argument</summary>
-    public class PerformWith : IPrimitive
+    /// <summary>
+    /// Primitive 84: perform:withArguments:
+    /// Dynamically sends a message using arguments from an Array.
+    ///
+    /// Arguments:
+    /// - args[0] = selector (Symbol)
+    /// - args[1] = Array containing the message arguments
+    ///
+    /// The elements of the Array are extracted and passed as individual arguments
+    /// to the message send.
+    /// </summary>
+    public class PerformWithArguments : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
 
-            // args[0] = selector (Symbol), args[1] = argument
+            // args[0] = selector (Symbol)
             if (context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            // args[1] = Array of arguments
+            if (context.Arguments[1].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             if (context.MessageSender == null) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP selectorOop = context.Arguments[0];
+            SmalltalkOOP argsArrayOop = context.Arguments[1];
 
-            // Send the message with one argument
+            // Extract elements from the Array
+            int arraySize = context.HeapManager.GetIndexedSize(argsArrayOop);
+            SmalltalkOOP[] messageArgs = new SmalltalkOOP[arraySize];
+
+            for (int i = 0; i < arraySize; i++)
+            {
+                messageArgs[i] = context.HeapManager.GetIndexedOOP(argsArrayOop, i);
+            }
+
+            // Send the message with extracted arguments
             SmalltalkOOP resultOop = context.MessageSender.SendMessage(
-                context.Receiver, selectorOop, new[] { context.Arguments[1] });
+                context.Receiver, selectorOop, messageArgs);
 
             return PrimitiveResult.Ok(resultOop);
         }
