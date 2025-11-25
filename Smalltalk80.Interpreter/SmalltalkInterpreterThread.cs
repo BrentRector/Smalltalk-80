@@ -271,16 +271,15 @@ public class SmalltalkInterpreterThread
             }
         }
 
-        // Execute comment expressions (ClassName comment: 'text')
+        // Execute comment expressions (ClassName comment: 'text') - silently, just count results
         if (commentIndices.Count > 0)
         {
-            Console.WriteLine($"\n--- Comment expressions ({commentIndices.Count} total) ---");
             int commentSucceeded = 0;
             int commentFailed = 0;
             foreach (int index in commentIndices)
             {
                 var expr = _context.Bundle.InitExpressions[index];
-                var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
+                var result = executor.ExecuteInitExpressionOnDemand(expr, compiler, verbose: false);
 
                 if (result.Status == InitStatus.Success)
                 {
@@ -291,23 +290,9 @@ public class SmalltalkInterpreterThread
                 {
                     commentFailed++;
                     failed++;
-                    // Only show first few failures to avoid flooding output
-                    if (commentFailed <= 5)
-                    {
-                        Console.WriteLine($"    ❌ Failed: {expr.Source?.Substring(0, Math.Min(60, expr.Source?.Length ?? 0))}...");
-                        Console.WriteLine($"       Status: {result.Status}");
-                        if (result.Diagnostic?.Message != null)
-                        {
-                            Console.WriteLine($"       Error: {result.Diagnostic.Message}");
-                        }
-                    }
-                    else if (commentFailed == 6)
-                    {
-                        Console.WriteLine($"    ... suppressing further comment failures ...");
-                    }
                 }
             }
-            Console.WriteLine($"  Comment expressions: {commentSucceeded} succeeded, {commentFailed} failed");
+            Console.WriteLine($"  Comment expressions: {commentSucceeded}/{commentIndices.Count} succeeded");
         }
 
         // PHASE 2: Execute Test expressions (GraphicsTest, etc.)

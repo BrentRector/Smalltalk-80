@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-23
+**Last Updated**: 2025-11-25
 
 ## Project Status
 
@@ -8,14 +8,12 @@
 
 - **Build**: 0 errors, 0 warnings
 - **Cold Start**: Phases 1-6 all succeed
-- **Init Expressions**: 46/47 succeed (98% success rate)
-- **Comment Expressions**: Skipped (234 total - WriteStream bug)
+- **Init Expressions**: 47/48 succeed (98% success rate)
+- **Comment Expressions**: ✅ **234/234 succeed** (100% success rate)
 - **BlockContext Tests**: ✅ **120/120 tests PASS** (returns 1191)
 - **VM Core**: Fully functional, verified operational
 
 ## Known Issues
-
-**WriteStream>>nextPut: Infinite Loop**: 210/234 comment expressions fail with infinite loop in WriteStream. All comment expressions skipped until bug is fixed.
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 
