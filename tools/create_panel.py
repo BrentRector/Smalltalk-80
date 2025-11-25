@@ -12,8 +12,15 @@ import struct
 from pathlib import Path
 from PIL import Image
 
+# Panel margins
+MARGIN_LEFT = 16
+MARGIN_RIGHT = 16
+MARGIN_TOP = 16
+MARGIN_BOTTOM = 16
+
 # Icon layout: (display_name, filename_patterns, x, y)
 # filename_patterns is a list of possible filenames to try
+# Note: x, y coordinates are relative to content area (margins added automatically)
 ICON_LAYOUT = [
     # Row 1 (y=0) - Tools and Modes
     ('select', ['select.form.bmp'], 0, 0),
@@ -49,20 +56,23 @@ ICON_LAYOUT = [
 def create_panel(bitmaps_dir: Path, output_dir: Path):
     """Create Panel.form from individual icon BMPs."""
 
-    # Calculate panel dimensions
-    max_x = max(x + 32 for _, _, x, _ in ICON_LAYOUT)
-    max_y = max(y + 32 for _, _, _, y in ICON_LAYOUT)
+    # Calculate content dimensions (without margins)
+    content_width = max(x + 32 for _, _, x, _ in ICON_LAYOUT)
+    content_height = max(y + 32 for _, _, _, y in ICON_LAYOUT)
 
-    # Round up to word boundary (16 pixels)
-    panel_width = ((max_x + 15) // 16) * 16
-    panel_height = max_y
+    # Add margins to get total panel dimensions
+    panel_width = MARGIN_LEFT + content_width + MARGIN_RIGHT
+    panel_height = MARGIN_TOP + content_height + MARGIN_BOTTOM
 
-    print(f"Creating Panel: {panel_width}x{panel_height}")
+    # Round up width to word boundary (16 pixels)
+    panel_width = ((panel_width + 15) // 16) * 16
+
+    print(f"Creating Panel: {panel_width}x{panel_height} (margins: L={MARGIN_LEFT}, R={MARGIN_RIGHT}, T={MARGIN_TOP}, B={MARGIN_BOTTOM})")
 
     # Create blank white panel
     panel = Image.new('1', (panel_width, panel_height), 1)  # 1 = white in mode '1'
 
-    # Paste each icon
+    # Paste each icon (offset by margins)
     for name, patterns, x, y in ICON_LAYOUT:
         # Try each filename pattern
         bmp_path = None
@@ -81,9 +91,11 @@ def create_panel(bitmaps_dir: Path, output_dir: Path):
         if icon.mode != '1':
             icon = icon.convert('1')
 
-        # Paste onto panel
-        panel.paste(icon, (x, y))
-        print(f"  Placed {name} at ({x}, {y})")
+        # Paste onto panel with margin offset
+        paste_x = MARGIN_LEFT + x
+        paste_y = MARGIN_TOP + y
+        panel.paste(icon, (paste_x, paste_y))
+        print(f"  Placed {name} at ({paste_x}, {paste_y})")
 
     # Save as BMP for verification
     panel_bmp = output_dir / 'Panel.bmp'
