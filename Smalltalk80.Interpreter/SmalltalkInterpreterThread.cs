@@ -303,6 +303,11 @@ public class SmalltalkInterpreterThread
             Console.WriteLine($"  Comment expressions: {commentSucceeded}/{commentIndices.Count} succeeded");
         }
 
+        // Run GC after all initialization to show stats
+        Console.WriteLine($"\n=== Running GC after all initialization ===");
+        var gcStats = _context.HeapManager.GC.GarbageCollect();
+        Console.WriteLine($"  {gcStats.GetSummary()}");
+
         // PHASE 2: Execute Test expressions (GraphicsTest, etc.)
         if (phase2Indices.Count > 0)
         {
