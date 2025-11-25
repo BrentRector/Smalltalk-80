@@ -60,7 +60,9 @@ public static class FileOperations
                         _ => FileMode.OpenOrCreate
                     };
 
-                    var stream = new FileStream(path, mode, access, share);
+                    // Sanitize path for Windows - remove trailing periods which Windows doesn't accept
+                    var sanitizedPath = path.TrimEnd('.');
+                    var stream = new FileStream(sanitizedPath, mode, access, share);
                     int handle = _nextHandle++;
                     _openFiles[handle] = stream;
                     return handle;
