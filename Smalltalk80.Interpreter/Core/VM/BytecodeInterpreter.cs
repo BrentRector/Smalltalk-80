@@ -216,7 +216,37 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     var diagValueClass = heapManager.GetClassOOP(diagValueOOP);
                     string? valueClassName = context.GetClassName(diagValueClass);
                     Console.WriteLine($"  Association key: {keyName}");
-                    Console.WriteLine($"  Association value: {diagValueOOP} ({valueClassName})");
+
+                    // If value is a Float, decode and show the actual value
+                    if (valueClassName == "Float" && !diagValueOOP.IsSmallInteger)
+                    {
+                        var valFormat = heapManager.GetObjectFormat(diagValueOOP);
+                        var valSize = heapManager.GetIndexedSize(diagValueOOP);
+                        if (valFormat == ObjectFormat.WordIndexed && valSize == 4)
+                        {
+                            byte[] bytes = new byte[8];
+                            for (int i = 0; i < 4; i++)
+                            {
+                                ushort word = heapManager.GetIndexedWord(diagValueOOP, i);
+                                bytes[i * 2] = (byte)(word & 0xFF);
+                                bytes[i * 2 + 1] = (byte)((word >> 8) & 0xFF);
+                            }
+                            double floatVal = BitConverter.ToDouble(bytes, 0);
+                            Console.WriteLine($"  Association value: {diagValueOOP} ({valueClassName} = {floatVal})");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"  Association value: {diagValueOOP} ({valueClassName}) INVALID FORMAT: {valFormat}, size: {valSize}");
+                        }
+                    }
+                    else if (diagValueOOP.IsSmallInteger)
+                    {
+                        Console.WriteLine($"  Association value: SmallInteger({diagValueOOP.AsSmallInteger()})");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"  Association value: {diagValueOOP} ({valueClassName})");
+                    }
                 }
                 // If it's a non-2-element Array, dump contents
                 else if (litFormat == "PointerIndexed" && litSize > 0 && litSize <= 10)
