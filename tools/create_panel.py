@@ -3,14 +3,14 @@
 Create Panel.form by compositing all 23 FormMenuView icons.
 
 Layout from Form-File-Format.md:
-Row 1 (y=0): select, singlecopy, repeatcopy, line, curve, block, over, under, reverse, erase, in
-Row 2 (y=48): magnify, white, lightgray, gray, darkgray, black, xgrid, ygrid, togglegrids, out
-Row 3 (y=96): borderform, specialborderform
+Row 1: select, singlecopy, repeatcopy, line, curve, block, over, under, reverse, erase, in
+Row 2: magnify, white, lightgray, gray, darkgray, black, xgrid, ygrid, togglegrids, out
+Row 3: borderform, specialborderform
 """
 
 import struct
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 # Panel margins
 MARGIN_LEFT = 16
@@ -18,47 +18,59 @@ MARGIN_RIGHT = 16
 MARGIN_TOP = 16
 MARGIN_BOTTOM = 16
 
-# Icon layout: (display_name, filename_patterns, x, y)
-# filename_patterns is a list of possible filenames to try
-# Note: x, y coordinates are relative to content area (margins added automatically)
-ICON_LAYOUT = [
-    # Row 1 (y=0) - Tools and Modes
-    ('select', ['select.form.bmp'], 0, 0),
-    ('singlecopy', ['single.copy.bmp', 'singlecopy.form.bmp'], 32, 0),
-    ('repeatcopy', ['repeat.copy.bmp', 'repeatcopy.form.bmp'], 64, 0),
-    ('line', ['line.form.bmp'], 96, 0),
-    ('curve', ['curve.form.bmp'], 128, 0),
-    ('block', ['block.form.bmp'], 160, 0),
-    ('over', ['over.form.bmp'], 208, 0),
-    ('under', ['under.form.bmp'], 240, 0),
-    ('reverse', ['reverse.form.bmp'], 272, 0),
-    ('erase', ['erase.form.bmp'], 304, 0),
-    ('in', ['in.form.bmp'], 352, 0),
+# Icon dimensions and spacing
+ICON_SIZE = 32
+ICON_SPACING = 16  # Horizontal spacing between icons
+LABEL_HEIGHT = 12  # Space for label below icon
+ROW_SPACING = 16   # Vertical spacing between rows (icon+label)
 
-    # Row 2 (y=48) - Editor, Colors, Grids, File Out
-    ('magnify', ['magnify.form.bmp'], 0, 48),
-    ('white', ['white.form.bmp'], 32, 48),
-    ('lightgray', ['lightgray.form.bmp'], 64, 48),
-    ('gray', ['gray.form.bmp'], 96, 48),
-    ('darkgray', ['darkgray.form.bmp'], 128, 48),
-    ('black', ['black.form.bmp'], 160, 48),
-    ('xgrid', ['xgrid.form.bmp'], 208, 48),
-    ('ygrid', ['ygrid.form.bmp'], 240, 48),
-    ('togglegrids', ['togglegrids.form.bmp'], 272, 48),
-    ('out', ['out.form.bmp'], 352, 48),
-
-    # Row 3 (y=96) - Border forms
-    ('borderform', ['border.form.bmp', 'borderform.form.bmp'], 0, 96),
-    ('specialborderform', ['special.form.bmp', 'specialborderform.form.bmp'], 32, 96),
+# Icon layout: (display_name, label, filename_patterns)
+# Icons are arranged in rows, positions calculated automatically
+ROW1_ICONS = [
+    ('select', 'select', ['select.form.bmp']),
+    ('singlecopy', 'single', ['single.copy.bmp', 'singlecopy.form.bmp']),
+    ('repeatcopy', 'repeat', ['repeat.copy.bmp', 'repeatcopy.form.bmp']),
+    ('line', 'line', ['line.form.bmp']),
+    ('curve', 'curve', ['curve.form.bmp']),
+    ('block', 'block', ['block.form.bmp']),
+    ('over', 'over', ['over.form.bmp']),
+    ('under', 'under', ['under.form.bmp']),
+    ('reverse', 'reverse', ['reverse.form.bmp']),
+    ('erase', 'erase', ['erase.form.bmp']),
+    ('in', 'in', ['in.form.bmp']),
 ]
+
+ROW2_ICONS = [
+    ('magnify', 'magnify', ['magnify.form.bmp']),
+    ('white', 'white', ['white.form.bmp']),
+    ('lightgray', 'ltgray', ['lightgray.form.bmp']),
+    ('gray', 'gray', ['gray.form.bmp']),
+    ('darkgray', 'dkgray', ['darkgray.form.bmp']),
+    ('black', 'black', ['black.form.bmp']),
+    ('xgrid', 'xgrid', ['xgrid.form.bmp']),
+    ('ygrid', 'ygrid', ['ygrid.form.bmp']),
+    ('togglegrids', 'grids', ['togglegrids.form.bmp']),
+    ('out', 'out', ['out.form.bmp']),
+]
+
+ROW3_ICONS = [
+    ('borderform', 'border', ['border.form.bmp', 'borderform.form.bmp']),
+    ('specialborderform', 'special', ['special.form.bmp', 'specialborderform.form.bmp']),
+]
+
+ALL_ROWS = [ROW1_ICONS, ROW2_ICONS, ROW3_ICONS]
 
 
 def create_panel(bitmaps_dir: Path, output_dir: Path):
     """Create Panel.form from individual icon BMPs."""
 
-    # Calculate content dimensions (without margins)
-    content_width = max(x + 32 for _, _, x, _ in ICON_LAYOUT)
-    content_height = max(y + 32 for _, _, _, y in ICON_LAYOUT)
+    # Calculate content dimensions
+    max_icons_per_row = max(len(row) for row in ALL_ROWS)
+    content_width = max_icons_per_row * ICON_SIZE + (max_icons_per_row - 1) * ICON_SPACING
+
+    row_height = ICON_SIZE + LABEL_HEIGHT
+    num_rows = len(ALL_ROWS)
+    content_height = num_rows * row_height + (num_rows - 1) * ROW_SPACING
 
     # Add margins to get total panel dimensions
     panel_width = MARGIN_LEFT + content_width + MARGIN_RIGHT
@@ -67,35 +79,61 @@ def create_panel(bitmaps_dir: Path, output_dir: Path):
     # Round up width to word boundary (16 pixels)
     panel_width = ((panel_width + 15) // 16) * 16
 
-    print(f"Creating Panel: {panel_width}x{panel_height} (margins: L={MARGIN_LEFT}, R={MARGIN_RIGHT}, T={MARGIN_TOP}, B={MARGIN_BOTTOM})")
+    print(f"Creating Panel: {panel_width}x{panel_height}")
+    print(f"  Margins: L={MARGIN_LEFT}, R={MARGIN_RIGHT}, T={MARGIN_TOP}, B={MARGIN_BOTTOM}")
+    print(f"  Icon spacing: {ICON_SPACING}px horizontal, {ROW_SPACING}px between rows")
+    print(f"  Label height: {LABEL_HEIGHT}px")
 
-    # Create blank white panel
-    panel = Image.new('1', (panel_width, panel_height), 1)  # 1 = white in mode '1'
+    # Create blank white panel (use 'L' mode for drawing, convert to '1' later)
+    panel = Image.new('L', (panel_width, panel_height), 255)
+    draw = ImageDraw.Draw(panel)
 
-    # Paste each icon (offset by margins)
-    for name, patterns, x, y in ICON_LAYOUT:
-        # Try each filename pattern
-        bmp_path = None
-        for pattern in patterns:
-            candidate = bitmaps_dir / pattern
-            if candidate.exists():
-                bmp_path = candidate
-                break
+    # Try to get a small font for labels
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 8)
+    except:
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/TTF/DejaVuSansMono.ttf", 8)
+        except:
+            font = ImageFont.load_default()
 
-        if bmp_path is None:
-            print(f"  WARNING: Could not find bitmap for {name}")
-            continue
+    # Paste each icon row by row
+    for row_idx, row_icons in enumerate(ALL_ROWS):
+        row_y = MARGIN_TOP + row_idx * (row_height + ROW_SPACING)
 
-        # Load and convert icon
-        icon = Image.open(bmp_path)
-        if icon.mode != '1':
-            icon = icon.convert('1')
+        for col_idx, (name, label, patterns) in enumerate(row_icons):
+            icon_x = MARGIN_LEFT + col_idx * (ICON_SIZE + ICON_SPACING)
+            icon_y = row_y
 
-        # Paste onto panel with margin offset
-        paste_x = MARGIN_LEFT + x
-        paste_y = MARGIN_TOP + y
-        panel.paste(icon, (paste_x, paste_y))
-        print(f"  Placed {name} at ({paste_x}, {paste_y})")
+            # Try each filename pattern
+            bmp_path = None
+            for pattern in patterns:
+                candidate = bitmaps_dir / pattern
+                if candidate.exists():
+                    bmp_path = candidate
+                    break
+
+            if bmp_path is None:
+                print(f"  WARNING: Could not find bitmap for {name}")
+                continue
+
+            # Load and convert icon
+            icon = Image.open(bmp_path).convert('L')
+
+            # Paste onto panel
+            panel.paste(icon, (icon_x, icon_y))
+            print(f"  Placed {name} at ({icon_x}, {icon_y})")
+
+            # Draw label below icon (centered)
+            label_y = icon_y + ICON_SIZE + 1
+            # Get text bounding box for centering
+            bbox = draw.textbbox((0, 0), label, font=font)
+            text_width = bbox[2] - bbox[0]
+            label_x = icon_x + (ICON_SIZE - text_width) // 2
+            draw.text((label_x, label_y), label, fill=0, font=font)
+
+    # Convert to 1-bit
+    panel = panel.point(lambda x: 0 if x < 128 else 255).convert('1')
 
     # Save as BMP for verification
     panel_bmp = output_dir / 'Panel.bmp'
