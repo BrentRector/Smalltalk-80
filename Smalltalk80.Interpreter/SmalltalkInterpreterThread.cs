@@ -307,8 +307,18 @@ public class SmalltalkInterpreterThread
 
         // Run GC after all initialization to show stats
         Console.WriteLine($"\n=== Running GC after all initialization ===");
+        var gcRoots = _context.HeapManager.GC.GetGCRoots();
+        Console.WriteLine($"  GC Roots: {gcRoots.Length}");
         var gcStats = _context.HeapManager.GC.GarbageCollect();
         Console.WriteLine($"  {gcStats.GetSummary()}");
+        if (gcStats.CollectedObjects > 0 && gcStats.CollectedObjects <= 20)
+        {
+            Console.WriteLine($"  Collected objects by class:");
+            foreach (var (oop, format, size, className) in gcStats.CollectedObjectDetails.Take(20))
+            {
+                Console.WriteLine($"    OOP({oop}): {className} ({format}, {size} words)");
+            }
+        }
 
         // PHASE 2: Execute Test expressions (GraphicsTest, etc.)
         if (phase2Indices.Count > 0)
