@@ -206,8 +206,8 @@ public class SmalltalkInterpreterThread
             var expr = _context.Bundle.InitExpressions[i];
             if (expr.Source == null) continue;
 
-            // Include FloatTest and GraphicsTest method calls
-            if (expr.Source.StartsWith("FloatTest ") || expr.Source.StartsWith("GraphicsTest "))
+            // Include GraphicsTest method calls (FloatTest removed - no longer needed)
+            if (expr.Source.StartsWith("GraphicsTest "))
             {
                 phase2Indices.Add(i);
             }
@@ -257,13 +257,23 @@ public class SmalltalkInterpreterThread
             }
         }
 
-        // PHASE 2: Execute Test expressions (FloatTest, GraphicsTest, etc.)
+        // PHASE 2: Execute Test expressions (GraphicsTest, etc.)
         if (phase2Indices.Count > 0)
         {
             Console.WriteLine($"\n--- Phase 2: Test expressions ---");
+            bool isFirstTest = true;
             foreach (int index in phase2Indices)
             {
                 var expr = _context.Bundle.InitExpressions[index];
+
+                // Add 5-second delay between graphics tests to allow viewing each result
+                if (!isFirstTest)
+                {
+                    Console.WriteLine("  [Waiting 5 seconds before next test...]");
+                    Thread.Sleep(5000);
+                }
+                isFirstTest = false;
+
                 var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
 
                 if (result.Status == InitStatus.Success)

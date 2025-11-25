@@ -43381,9 +43381,6 @@ testPointWithFloats
 
 "==================== GraphicsTest Execution ===================="
 
-"Run FloatTest first to diagnose any Float issues"
-FloatTest testAll!
-
 "Run GraphicsTest visual tests after all init expressions"
 GraphicsTest testBitBltVisual!
 GraphicsTest testPenVisual!
