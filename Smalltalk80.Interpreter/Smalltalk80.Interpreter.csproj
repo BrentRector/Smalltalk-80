@@ -36,6 +36,13 @@
     </ProjectReference>
   </ItemGroup>
   
+  <!-- Form files needed by FormMenuView initialize -->
+  <ItemGroup>
+    <None Include="*.form">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- Verify coldstart.json exists after build -->
   <!-- Note: Each project has its own bin/obj directories -->
   <!-- Compiler outputs to: Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json -->
