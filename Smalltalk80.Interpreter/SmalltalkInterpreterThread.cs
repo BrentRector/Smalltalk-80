@@ -271,23 +271,31 @@ public class SmalltalkInterpreterThread
             }
         }
 
-        // Execute comment expressions (ClassName comment: 'text') - silently, just count results
+        // Execute comment expressions (ClassName comment: 'text') - show abbreviated progress
         if (commentIndices.Count > 0)
         {
+            Console.WriteLine($"\n--- Comment expressions ({commentIndices.Count} total) ---");
             int commentSucceeded = 0;
             int commentFailed = 0;
             foreach (int index in commentIndices)
             {
                 var expr = _context.Bundle.InitExpressions[index];
+
+                // Extract class name from "ClassName comment: 'text'"
+                var className = expr.Source?.Split(' ')[0] ?? "Unknown";
+                Console.Write($"  {className} comment: ... ");
+
                 var result = executor.ExecuteInitExpressionOnDemand(expr, compiler, verbose: false);
 
                 if (result.Status == InitStatus.Success)
                 {
+                    Console.WriteLine($"✓ {result.ElapsedMilliseconds}ms");
                     commentSucceeded++;
                     succeeded++;
                 }
                 else
                 {
+                    Console.WriteLine($"❌ {result.ElapsedMilliseconds}ms");
                     commentFailed++;
                     failed++;
                 }
