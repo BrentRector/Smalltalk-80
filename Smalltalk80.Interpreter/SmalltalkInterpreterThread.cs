@@ -199,14 +199,28 @@ public class SmalltalkInterpreterThread
             }
         }
 
-        // Build phase 2 list: GraphicsTest expressions (run AFTER init expressions)
+        // Build comment expression list: ClassName comment: 'text' expressions
+        var commentIndices = new List<int>();
+        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
+        {
+            var expr = _context.Bundle.InitExpressions[i];
+            if (expr.Source == null) continue;
+
+            // Include comment: expressions (e.g., "ClassName comment:'text'")
+            if (expr.Source.Contains(" comment:"))
+            {
+                commentIndices.Add(i);
+            }
+        }
+
+        // Build phase 2 list: Test expressions (run AFTER init expressions)
         var phase2Indices = new List<int>();
         for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
         {
             var expr = _context.Bundle.InitExpressions[i];
             if (expr.Source == null) continue;
 
-            // Include GraphicsTest method calls
+            // Include GraphicsTest method calls (FloatTest removed - no longer needed)
             if (expr.Source.StartsWith("GraphicsTest "))
             {
                 phase2Indices.Add(i);
@@ -257,13 +271,76 @@ public class SmalltalkInterpreterThread
             }
         }
 
-        // PHASE 2: Execute GraphicsTest expressions (if any)
+        // Execute comment expressions (ClassName comment: 'text') - show abbreviated progress
+        if (commentIndices.Count > 0)
+        {
+            Console.WriteLine($"\n--- Comment expressions ({commentIndices.Count} total) ---");
+            int commentSucceeded = 0;
+            int commentFailed = 0;
+            long totalCommentTimeMs = 0;
+            foreach (int index in commentIndices)
+            {
+                var expr = _context.Bundle.InitExpressions[index];
+
+                // Extract class name from "ClassName comment: 'text'"
+                var className = expr.Source?.Split(' ')[0] ?? "Unknown";
+                Console.Write($"  {className} comment: ... ");
+
+                var result = executor.ExecuteInitExpressionOnDemand(expr, compiler, verbose: false);
+                totalCommentTimeMs += result.ElapsedMilliseconds;
+
+                if (result.Status == InitStatus.Success)
+                {
+                    Console.WriteLine($"✓ {result.ElapsedMilliseconds}ms");
+                    commentSucceeded++;
+                    succeeded++;
+                }
+                else
+                {
+                    Console.WriteLine($"❌ {result.ElapsedMilliseconds}ms");
+                    commentFailed++;
+                    failed++;
+                }
+            }
+            Console.WriteLine($"  Comment expressions: {commentSucceeded}/{commentIndices.Count} succeeded in {totalCommentTimeMs / 1000.0:F1}s total");
+        }
+
+        // Run GC after all initialization to show stats
+        Console.WriteLine($"\n=== Running GC after all initialization ===");
+        var gcRoots = _context.HeapManager.GC.GetGCRoots();
+        Console.WriteLine($"  GC Roots: {gcRoots.Length}");
+        var gcStats = _context.HeapManager.GC.GarbageCollect();
+        Console.WriteLine($"  {gcStats.GetSummary()}");
+        if (gcStats.CollectedObjects > 0 && gcStats.CollectedObjects <= 20)
+        {
+            Console.WriteLine($"  Collected objects by class:");
+            foreach (var (oop, format, size, className) in gcStats.CollectedObjectDetails.Take(20))
+            {
+                Console.WriteLine($"    OOP({oop}): {className} ({format}, {size} words)");
+            }
+        }
+
+        // Display cumulative GC statistics and reset for next phase
+        var cumulativeStats = _context.HeapManager.GC.GetAndResetCumulativeStatistics();
+        Console.WriteLine($"  {cumulativeStats.GetSummary()}");
+
+        // PHASE 2: Execute Test expressions (GraphicsTest, etc.)
         if (phase2Indices.Count > 0)
         {
-            Console.WriteLine($"\n--- Phase 2: GraphicsTest expressions ---");
+            Console.WriteLine($"\n--- Phase 2: Test expressions ---");
+            bool isFirstTest = true;
             foreach (int index in phase2Indices)
             {
                 var expr = _context.Bundle.InitExpressions[index];
+
+                // Add 5-second delay between graphics tests to allow viewing each result
+                if (!isFirstTest)
+                {
+                    Console.WriteLine("  [Waiting 5 seconds before next test...]");
+                    Thread.Sleep(5000);
+                }
+                isFirstTest = false;
+
                 var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
 
                 if (result.Status == InitStatus.Success)
@@ -302,7 +379,7 @@ public class SmalltalkInterpreterThread
         Console.WriteLine($"  {succeeded} succeeded, {failed} failed, {skippedIndices.Count} skipped");
         if (phase2Indices.Count > 0)
         {
-            Console.WriteLine($"  Phase 1: {phase1Indices.Count} init expressions, Phase 2: {phase2Indices.Count} GraphicsTest expressions");
+            Console.WriteLine($"  Phase 1: {phase1Indices.Count} init expressions, Phase 2: {phase2Indices.Count} test expressions");
         }
     }
 

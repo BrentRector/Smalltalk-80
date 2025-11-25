@@ -207,7 +207,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(81, new ControlPrimitives.Value());
         registry.Register(82, new ControlPrimitives.ValueWithArguments());
         registry.Register(83, new ControlPrimitives.Perform());
-        registry.Register(84, new ControlPrimitives.PerformWith());
+        registry.Register(84, new ControlPrimitives.PerformWithArguments());
         registry.Register(85, new ControlPrimitives.Signal());
         registry.Register(86, new ControlPrimitives.Wait());
         registry.Register(87, new ControlPrimitives.Resume());
@@ -233,9 +233,10 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(103, new GraphicsOperations.Beep());
         registry.Register(104, new GraphicsOperations.DrawLoop());     // Blue Book: Primitive 104 = drawLoopX:Y: (Bresenham)
 
-        // String primitives (105-106)
+        // String primitives (105-107)
         registry.Register(105, new StringPrimitives.StringReplace());
         registry.Register(106, new StringPrimitives.AsSymbol());
+        registry.Register(107, new StringPrimitives.StoreOn());
 
         // Font primitives (147-150)
         // These provide performance optimizations for text operations.

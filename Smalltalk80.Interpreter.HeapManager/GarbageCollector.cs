@@ -15,6 +15,16 @@ internal class GarbageCollector : IGarbageCollector
     private readonly IDiagnosticHub? _diagnostics;
     private SmalltalkOOP[] _gcRoots = Array.Empty<SmalltalkOOP>();
 
+    // Cumulative statistics (thread-safe accumulation with overflow protection)
+    private readonly object _cumulativeStatsLock = new();
+    private long _cumulativeGCCount;
+    private long _cumulativeCollectedObjects;
+    private long _cumulativeBytesFreed;
+    private double _cumulativeMarkTimeMs;
+    private double _cumulativeSweepTimeMs;
+    private double _cumulativeTotalTimeMs;
+    private long _cumulativeObjectsExamined;
+
     public GarbageCollector(
         IObjectTableManager tableManager,
         ISmalltalkHeap heap,
@@ -254,6 +264,16 @@ internal class GarbageCollector : IGarbageCollector
             });
         }
 
+        // Accumulate cumulative statistics (thread-safe, overflow-protected)
+        double totalTime = stopwatch.Elapsed.TotalMilliseconds;
+        AccumulateCumulativeStats(
+            objectsBeforeCollection,
+            unreachableObjects.Length,
+            estimatedBytesFreed,
+            markTime,
+            sweepTime,
+            totalTime);
+
         return new GCStatistics
         {
             TotalObjects = objectsBeforeCollection,
@@ -261,12 +281,56 @@ internal class GarbageCollector : IGarbageCollector
             CollectedObjects = unreachableObjects.Length,
             MarkTimeMs = markTime,
             SweepTimeMs = sweepTime,
-            TotalTimeMs = stopwatch.Elapsed.TotalMilliseconds,
+            TotalTimeMs = totalTime,
             EstimatedBytesFreed = estimatedBytesFreed,
             CollectedByFormat = collectedByFormat,
             FreeObjectTableEntries = freeEntries,
             CollectedObjectDetails = collectedObjectDetails
         };
+    }
+
+    /// <summary>
+    /// Accumulates statistics from a GC cycle with overflow protection.
+    /// </summary>
+    private void AccumulateCumulativeStats(
+        int objectsExamined,
+        int collectedObjects,
+        long bytesFreed,
+        double markTimeMs,
+        double sweepTimeMs,
+        double totalTimeMs)
+    {
+        lock (_cumulativeStatsLock)
+        {
+            // Increment GC count with overflow protection
+            if (_cumulativeGCCount < long.MaxValue)
+                _cumulativeGCCount++;
+
+            // Accumulate with overflow protection using checked arithmetic
+            _cumulativeObjectsExamined = SafeAddLong(_cumulativeObjectsExamined, objectsExamined);
+            _cumulativeCollectedObjects = SafeAddLong(_cumulativeCollectedObjects, collectedObjects);
+            _cumulativeBytesFreed = SafeAddLong(_cumulativeBytesFreed, bytesFreed);
+
+            // Accumulate time (double has enough precision for practical use)
+            _cumulativeMarkTimeMs += markTimeMs;
+            _cumulativeSweepTimeMs += sweepTimeMs;
+            _cumulativeTotalTimeMs += totalTimeMs;
+        }
+    }
+
+    /// <summary>
+    /// Safely adds two long values, capping at long.MaxValue on overflow.
+    /// </summary>
+    private static long SafeAddLong(long a, long b)
+    {
+        try
+        {
+            return checked(a + b);
+        }
+        catch (OverflowException)
+        {
+            return long.MaxValue;
+        }
     }
 
     public GCStatistics GetStatistics()
@@ -302,6 +366,34 @@ internal class GarbageCollector : IGarbageCollector
             CollectedByFormat = new Dictionary<ObjectFormat, int>(),
             FreeObjectTableEntries = _tableManager.GetObjectTableSize() - activeObjects
         };
+    }
+
+    public GCCumulativeStatistics GetAndResetCumulativeStatistics()
+    {
+        lock (_cumulativeStatsLock)
+        {
+            var stats = new GCCumulativeStatistics
+            {
+                GCCount = _cumulativeGCCount,
+                TotalCollectedObjects = _cumulativeCollectedObjects,
+                TotalBytesFreed = _cumulativeBytesFreed,
+                TotalMarkTimeMs = _cumulativeMarkTimeMs,
+                TotalSweepTimeMs = _cumulativeSweepTimeMs,
+                TotalGCTimeMs = _cumulativeTotalTimeMs,
+                TotalObjectsExamined = _cumulativeObjectsExamined
+            };
+
+            // Reset all counters
+            _cumulativeGCCount = 0;
+            _cumulativeCollectedObjects = 0;
+            _cumulativeBytesFreed = 0;
+            _cumulativeMarkTimeMs = 0;
+            _cumulativeSweepTimeMs = 0;
+            _cumulativeTotalTimeMs = 0;
+            _cumulativeObjectsExamined = 0;
+
+            return stats;
+        }
     }
 
     /// <summary>Recursively marks an object and all objects it references.</summary>

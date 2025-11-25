@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
@@ -220,7 +221,14 @@ public class InitExpressionCompiler
                     return SmalltalkOOP.FromSmallInteger(intValue);
                 if (literalValue.Value is long longValue)
                     return SmalltalkOOP.FromSmallInteger((int)longValue);
+                if (literalValue.Value is JsonElement jsonInt && jsonInt.ValueKind == JsonValueKind.Number)
+                    return SmalltalkOOP.FromSmallInteger(jsonInt.GetInt32());
                 throw new InvalidOperationException($"Invalid SmallInteger value: {literalValue.Value}");
+
+            case "float":
+                // Float value - create a Float object
+                double floatValue = GetFloatValue(literalValue.Value!);
+                return AllocateFloat(floatValue);
 
             case "symbol":
                 // Symbols use Index to look up in bundle's symbol table
@@ -230,6 +238,15 @@ public class InitExpressionCompiler
                     return FindSymbol(symbolText);
                 }
                 throw new InvalidOperationException("Symbol literal missing Index");
+
+            case "string":
+                // String literals - allocate a new String object
+                if (literalValue.Index.HasValue)
+                {
+                    string stringText = _bundle.Strings[literalValue.Index.Value];
+                    return AllocateString(stringText);
+                }
+                throw new InvalidOperationException("String literal missing Index");
 
             case "association":
                 // Association has a key (symbol) and value
@@ -353,5 +370,78 @@ public class InitExpressionCompiler
         }
 
         return _heapManager.GetNil();
+    }
+
+    /// <summary>
+    /// Extracts a double value from various possible runtime representations.
+    /// </summary>
+    private double GetFloatValue(object value)
+    {
+        return value switch
+        {
+            double d => d,
+            float f => f,
+            int i => i,
+            long l => l,
+            JsonElement json when json.ValueKind == JsonValueKind.Number => json.GetDouble(),
+            _ => throw new InvalidOperationException($"Cannot convert {value?.GetType().Name ?? "null"} to double")
+        };
+    }
+
+    /// <summary>
+    /// Allocates a Float object at runtime using the heap manager.
+    /// Float is WordIndexed with 4 words (IEEE 754 double precision).
+    /// </summary>
+    private SmalltalkOOP AllocateFloat(double value)
+    {
+        // Allocate WordIndexed object with 4 words for IEEE 754 double
+        var floatOOP = _heapManager.AllocateObject(ObjectFormat.WordIndexed, fixedSlots: 0, indexedSize: 4);
+
+        // Set Float class
+        var floatClassOOP = LookupGlobal("Float");
+        if (floatClassOOP != _heapManager.GetNil())
+        {
+            _heapManager.SetClassOOP(floatOOP, floatClassOOP);
+        }
+
+        // Convert double to IEEE 754 binary representation in little-endian byte order
+        byte[] bytes = BitConverter.GetBytes(value);
+
+        // Store as 4 words (16-bit each) preserving little-endian byte order
+        for (int i = 0; i < 4; i++)
+        {
+            // Combine 2 bytes into a 16-bit word (little-endian)
+            ushort word = (ushort)(bytes[i * 2] | (bytes[i * 2 + 1] << 8));
+            _heapManager.SetIndexedWord(floatOOP, i, word);
+        }
+
+        return floatOOP;
+    }
+
+    /// <summary>
+    /// Allocates a String object at runtime using the heap manager.
+    /// String is ByteIndexed with one byte per character.
+    /// </summary>
+    private SmalltalkOOP AllocateString(string value)
+    {
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(value);
+
+        // Allocate ByteIndexed object for the string bytes
+        var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots: 0, indexedSize: bytes.Length);
+
+        // Set String class
+        var stringClassOOP = LookupGlobal("String");
+        if (stringClassOOP != _heapManager.GetNil())
+        {
+            _heapManager.SetClassOOP(stringOOP, stringClassOOP);
+        }
+
+        // Store the bytes
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            _heapManager.SetIndexedByte(stringOOP, i, bytes[i]);
+        }
+
+        return stringOOP;
     }
 }

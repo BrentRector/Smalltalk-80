@@ -88,4 +88,81 @@ public static class StringPrimitives
             return PrimitiveResult.Ok(symbolOOP);
         }
     }
+
+    /// <summary>
+    /// Primitive 107: String storeOn: aStream
+    /// Fast bulk write of string with quote doubling to a WriteStream.
+    /// WriteStream layout: collection(0), position(1), readLimit(2), writeLimit(3)
+    /// </summary>
+    public class StoreOn : IPrimitive
+    {
+        private const int STREAM_COLLECTION_INDEX = 0;
+        private const int STREAM_POSITION_INDEX = 1;
+        private const int STREAM_WRITELIMIT_INDEX = 3;
+        private const byte QUOTE = (byte)'\'';
+
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            var streamOop = context.Arguments[0];
+            if (streamOop.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            // Get string contents
+            int stringSize = context.HeapManager.GetIndexedSize(context.Receiver);
+
+            // Count embedded quotes to calculate required space
+            int quoteCount = 0;
+            for (int i = 0; i < stringSize; i++)
+            {
+                if (context.HeapManager.GetIndexedByte(context.Receiver, i) == QUOTE)
+                    quoteCount++;
+            }
+
+            // Required space: opening quote + string + doubled quotes + closing quote
+            int requiredSpace = 1 + stringSize + quoteCount + 1;
+
+            // Get stream fields
+            var collectionOop = context.HeapManager.GetInstanceVariable(streamOop, STREAM_COLLECTION_INDEX);
+            var positionField = context.HeapManager.GetInstanceVariable(streamOop, STREAM_POSITION_INDEX);
+            var writeLimitField = context.HeapManager.GetInstanceVariable(streamOop, STREAM_WRITELIMIT_INDEX);
+
+            if (!positionField.IsSmallInteger || !writeLimitField.IsSmallInteger)
+                return PrimitiveResult.Fail(context.Metadata!);
+            if (collectionOop.IsSmallInteger)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            int position = positionField.AsSmallInteger();
+            int writeLimit = writeLimitField.AsSmallInteger();
+            int collectionSize = context.HeapManager.GetIndexedSize(collectionOop);
+
+            // Check if we have enough space (fail to let Smalltalk grow the collection)
+            if (position + requiredSpace > writeLimit || position + requiredSpace > collectionSize)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // Write opening quote
+            context.HeapManager.SetIndexedByte(collectionOop, position++, QUOTE);
+
+            // Write string contents, doubling embedded quotes
+            for (int i = 0; i < stringSize; i++)
+            {
+                byte ch = context.HeapManager.GetIndexedByte(context.Receiver, i);
+                context.HeapManager.SetIndexedByte(collectionOop, position++, ch);
+                if (ch == QUOTE)
+                {
+                    context.HeapManager.SetIndexedByte(collectionOop, position++, QUOTE);
+                }
+            }
+
+            // Write closing quote
+            context.HeapManager.SetIndexedByte(collectionOop, position++, QUOTE);
+
+            // Update stream position (Smalltalk position is 1-based index of last written)
+            context.HeapManager.SetInstanceVariable(streamOop, STREAM_POSITION_INDEX, SmalltalkOOP.FromSmallInteger(position));
+
+            // Return the receiver (String)
+            return PrimitiveResult.Ok(context.Receiver);
+        }
+    }
 }

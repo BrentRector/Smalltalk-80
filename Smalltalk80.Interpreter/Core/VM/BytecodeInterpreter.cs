@@ -1015,15 +1015,6 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         var argOOP = context.Pop();
         var receiverOOP = context.Pop();
 
-        // DEBUG: Only log when @ is sent to non-SmallInteger (error case)
-        if (bytecode == 187 && (!receiverOOP.IsSmallInteger || !argOOP.IsSmallInteger))
-        {
-            string recClass = receiverOOP.IsSmallInteger ? "SmallInteger" : heapManager.GetClassName(receiverOOP);
-            string argClass = argOOP.IsSmallInteger ? "SmallInteger" : heapManager.GetClassName(argOOP);
-            string? recSymbol = recClass == "Symbol" ? context.GetSymbolName(receiverOOP) : null;
-            Console.WriteLine($"[@ ERROR] receiver={receiverOOP} ({recClass}{(recSymbol != null ? $" #{recSymbol}" : "")}), arg={argOOP} ({argClass})");
-        }
-
         // Try primitive arithmetic for SmallIntegers
         if (receiverOOP.IsSmallInteger && argOOP.IsSmallInteger)
         {
