@@ -233,9 +233,10 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(103, new GraphicsOperations.Beep());
         registry.Register(104, new GraphicsOperations.DrawLoop());     // Blue Book: Primitive 104 = drawLoopX:Y: (Bresenham)
 
-        // String primitives (105-106)
+        // String primitives (105-107)
         registry.Register(105, new StringPrimitives.StringReplace());
         registry.Register(106, new StringPrimitives.AsSymbol());
+        registry.Register(107, new StringPrimitives.StoreOn());
 
         // Font primitives (147-150)
         // These provide performance optimizations for text operations.

@@ -36822,15 +36822,17 @@ printOn: aStream
 	"Print inside string quotes, doubling inbedded quotes."
 
 	^self storeOn: aStream!
-storeOn: aStream 
-	"Print inside string quotes, doubling inbedded quotes."
+storeOn: aStream
+	"Print inside string quotes, doubling embedded quotes.
+	 Primitive 107 provides fast bulk write. Falls back to Smalltalk if stream needs to grow."
 
+	<primitive: 107>
 	| i length x |
 	aStream nextPut: $'.
 	i _ 0.
 	length _ self size.
 	[(i _ i + 1) <= length]
-		whileTrue: 
+		whileTrue:
 			[aStream nextPut: (x _ self at: i).
 			x == $' ifTrue: [aStream nextPut: x]].
 	"embedded quotes get doubled"
