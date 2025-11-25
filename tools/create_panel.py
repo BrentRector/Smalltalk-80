@@ -21,8 +21,9 @@ MARGIN_BOTTOM = 16
 # Icon dimensions and spacing
 ICON_SIZE = 32
 ICON_SPACING = 16  # Horizontal spacing between icons
-LABEL_HEIGHT = 12  # Space for label below icon
+LABEL_HEIGHT = 16  # Space for label below icon
 ROW_SPACING = 16   # Vertical spacing between rows (icon+label)
+FONT_SIZE = 12     # Font size for labels
 
 # Icon layout: (display_name, label, filename_patterns)
 # Icons are arranged in rows, positions calculated automatically
@@ -88,14 +89,17 @@ def create_panel(bitmaps_dir: Path, output_dir: Path):
     panel = Image.new('L', (panel_width, panel_height), 255)
     draw = ImageDraw.Draw(panel)
 
-    # Try to get a small font for labels
+    # Try to get a readable font for labels
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 8)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", FONT_SIZE)
     except:
         try:
-            font = ImageFont.truetype("/usr/share/fonts/TTF/DejaVuSansMono.ttf", 8)
+            font = ImageFont.truetype("/usr/share/fonts/TTF/DejaVuSansMono.ttf", FONT_SIZE)
         except:
-            font = ImageFont.load_default()
+            try:
+                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", FONT_SIZE)
+            except:
+                font = ImageFont.load_default()
 
     # Paste each icon row by row
     for row_idx, row_icons in enumerate(ALL_ROWS):
