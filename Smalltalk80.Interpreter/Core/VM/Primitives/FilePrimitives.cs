@@ -898,10 +898,26 @@ public static class FileOperations
             try
             {
                 // Handle "." as current directory
-                if (dirPath == ".") dirPath = Directory.GetCurrentDirectory();
+                if (dirPath == ".")
+                {
+                    dirPath = Directory.GetCurrentDirectory();
+                    Console.WriteLine($"[DEBUG Primitive 146] Searching in current directory: {dirPath}");
+                }
+                else
+                {
+                    Console.WriteLine($"[DEBUG Primitive 146] Searching in: {dirPath}");
+                }
+                Console.WriteLine($"[DEBUG Primitive 146] Pattern: {pattern}");
 
                 var entries = Directory.GetFileSystemEntries(dirPath, pattern);
                 var names = entries.Select(Path.GetFileName).Where(n => n != null).ToArray();
+
+                Console.WriteLine($"[DEBUG Primitive 146] Found {names.Length} entries:");
+                foreach (var name in names.Take(20))
+                {
+                    Console.WriteLine($"[DEBUG Primitive 146]   - {name}");
+                }
+                if (names.Length > 20) Console.WriteLine($"[DEBUG Primitive 146]   ... and {names.Length - 20} more");
 
                 // Create Array
                 var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
