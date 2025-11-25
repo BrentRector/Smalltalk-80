@@ -59,6 +59,12 @@ public interface IGarbageCollector
     /// </summary>
     GCStatistics GetStatistics();
 
+    /// <summary>
+    /// Gets cumulative statistics accumulated over multiple GC cycles and resets the counters.
+    /// Statistics are accumulated safely (capped at max values to prevent overflow).
+    /// </summary>
+    GCCumulativeStatistics GetAndResetCumulativeStatistics();
+
     // ========================================
     // Debug and Testing
     // ========================================

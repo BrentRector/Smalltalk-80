@@ -320,6 +320,10 @@ public class SmalltalkInterpreterThread
             }
         }
 
+        // Display cumulative GC statistics and reset for next phase
+        var cumulativeStats = _context.HeapManager.GC.GetAndResetCumulativeStatistics();
+        Console.WriteLine($"  {cumulativeStats.GetSummary()}");
+
         // PHASE 2: Execute Test expressions (GraphicsTest, etc.)
         if (phase2Indices.Count > 0)
         {
