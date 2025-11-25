@@ -10082,16 +10082,18 @@ comment
 	aString size = 0 ifTrue: [^''].
 	"get string only of classComment, undoubling quotes"
 	^ String readFromString: aString!
-comment: aString 
+comment: aString
 	"Set the receiver's comment to be the argument, aString."
 
-	| aStream |
+	| aStream bufferSize |
 	aString size = 0
-		ifTrue: 
+		ifTrue:
 			[self organization classComment: aString]
-		ifFalse: 
+		ifFalse:
 			["double internal quotes of the comment string"
-			aStream _ WriteStream on: (String new: aString size).
+			"Pre-allocate enough space: name + ' comment:\n' + quoted string"
+			bufferSize _ self name size + 12 + aString size + 10.
+			aStream _ WriteStream on: (String new: bufferSize).
 			aStream nextPutAll: self name , ' comment:'; cr.
 			aString storeOn: aStream.
 			self organization classComment: aStream contents.
