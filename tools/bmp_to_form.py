@@ -94,8 +94,15 @@ def convert_all_forms(input_dir: Path, output_dir: Path):
     for bmp_path in bmp_files:
         # Output filename: replace .form.bmp with .form
         form_name = bmp_path.stem  # e.g., "black.form"
-        if not form_name.endswith('.form'):
+
+        # Handle special naming cases
+        if form_name == 'border.form':
+            form_name = 'borderform.form'
+        elif form_name == 'special.form':
+            form_name = 'specialborderform.form'
+        elif not form_name.endswith('.form'):
             form_name = form_name + '.form'
+
         form_path = output_dir / form_name
 
         bmp_to_form(bmp_path, form_path)
@@ -108,20 +115,20 @@ def convert_all_forms(input_dir: Path, output_dir: Path):
 
         stem = bmp_path.stem
         # Handle files like "single.copy.bmp" -> "singlecopy.form"
-        if 'copy' in stem.lower() or 'border' in stem.lower() or 'special' in stem.lower():
+        if 'copy' in stem.lower():
             # Normalize the name
-            if 'single' in stem.lower() and 'copy' in stem.lower():
+            if 'single' in stem.lower():
                 form_name = 'singlecopy.form'
-            elif 'repeat' in stem.lower() and 'copy' in stem.lower():
+            elif 'repeat' in stem.lower():
                 form_name = 'repeatcopy.form'
-            elif 'border' in stem.lower():
-                form_name = 'borderform.form'
-            elif 'special' in stem.lower():
-                form_name = 'specialborderform.form'
             else:
                 form_name = stem.replace('.', '') + '.form'
 
             form_path = output_dir / form_name
+            bmp_to_form(bmp_path, form_path)
+        elif stem == 'Panel':
+            # Convert Panel.bmp to Panel.form
+            form_path = output_dir / 'Panel.form'
             bmp_to_form(bmp_path, form_path)
 
     print(f"\nConversion complete. Files written to: {output_dir}")
@@ -130,7 +137,7 @@ def convert_all_forms(input_dir: Path, output_dir: Path):
 def main():
     # Default paths
     script_dir = Path(__file__).parent
-    input_dir = script_dir.parent / 'forms'
+    input_dir = script_dir.parent / 'bitmaps'
     output_dir = script_dir.parent / 'Forms'
 
     convert_all_forms(input_dir, output_dir)
