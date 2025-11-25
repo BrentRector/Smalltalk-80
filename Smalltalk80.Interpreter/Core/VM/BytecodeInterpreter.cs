@@ -109,64 +109,6 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         {
             int index = BytecodeUtil.PushLiteralConstIndex(bytecode);
             var literal = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-
-            // DEBUG: Trace literal constant pushes for Float-related methods
-            string? constMethodId = context.GetLocalId(methodOOP);
-            if (constMethodId?.Contains("Float") == true || constMethodId?.Contains("degreesToRadians") == true)
-            {
-                string litDesc;
-                if (literal.IsSmallInteger)
-                {
-                    litDesc = $"SmallInteger({literal.AsSmallInteger()})";
-                }
-                else
-                {
-                    var litClass = heapManager.GetClassOOP(literal);
-                    string? litClassName = context.GetClassName(litClass);
-                    var litFormat = heapManager.GetObjectFormat(literal).ToString();
-                    int litSize = heapManager.GetIndexedSize(literal);
-                    litDesc = $"{litClassName} (Format: {litFormat}, Size: {litSize})";
-
-                    // If it's an unexpected Array, dump contents
-                    if (litClassName == "Array" && litSize <= 10)
-                    {
-                        Console.WriteLine($"[PUSH_LITERAL_CONST] Method: {constMethodId}, lit[{index}]: ARRAY FOUND!");
-                        Console.WriteLine($"  Literal OOP: {literal}");
-                        Console.WriteLine($"  Array contents:");
-                        for (int i = 0; i < litSize; i++)
-                        {
-                            var elem = heapManager.GetIndexedOOP(literal, i);
-                            string elemDesc;
-                            if (elem.IsSmallInteger)
-                            {
-                                elemDesc = $"SmallInteger({elem.AsSmallInteger()})";
-                            }
-                            else
-                            {
-                                var elemClass = heapManager.GetClassOOP(elem);
-                                var elemClassName = context.GetClassName(elemClass);
-                                elemDesc = $"{elemClassName} OOP={elem}";
-                            }
-                            Console.WriteLine($"    [{i}]: {elemDesc}");
-                        }
-                    }
-                    // If it's a Float, show value
-                    else if (litClassName == "Float" && litFormat == "WordIndexed" && litSize == 4)
-                    {
-                        byte[] bytes = new byte[8];
-                        for (int i = 0; i < 4; i++)
-                        {
-                            ushort word = heapManager.GetIndexedWord(literal, i);
-                            bytes[i * 2] = (byte)(word & 0xFF);
-                            bytes[i * 2 + 1] = (byte)((word >> 8) & 0xFF);
-                        }
-                        double floatVal = BitConverter.ToDouble(bytes, 0);
-                        litDesc = $"Float({floatVal})";
-                    }
-                }
-                Console.WriteLine($"[PUSH_LITERAL_CONST] Method: {constMethodId}, lit[{index}]: {litDesc}");
-            }
-
             context.Push(literal);
             return true;
         }
@@ -191,74 +133,6 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         {
             int index = BytecodeUtil.PushLiteralVarIndex(bytecode);
             var literalOOP = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-
-            // DEBUG: Trace literal variable access for Float-related methods
-            string? methodId = context.GetLocalId(methodOOP);
-            if (methodId?.Contains("Float") == true || methodId?.Contains("degreesToRadians") == true)
-            {
-                var litClass = heapManager.GetClassOOP(literalOOP);
-                string? litClassName = context.GetClassName(litClass);
-                var litFormat = literalOOP.IsSmallInteger ? "SmallInteger" : heapManager.GetObjectFormat(literalOOP).ToString();
-                int litSize = literalOOP.IsSmallInteger ? 0 : heapManager.GetIndexedSize(literalOOP);
-                int litInstVars = literalOOP.IsSmallInteger ? 0 : heapManager.GetInstanceVariableCount(literalOOP);
-
-                Console.WriteLine($"[PUSH_LITERAL_VAR] Method: {methodId}, lit[{index}]:");
-                Console.WriteLine($"  Literal OOP: {literalOOP}");
-                Console.WriteLine($"  Literal class: {litClassName}");
-                Console.WriteLine($"  Format: {litFormat}, IndexedSize: {litSize}, InstVarCount: {litInstVars}");
-
-                // If it's an Association, show the key and value
-                if (litClassName == "Association" && litInstVars >= 2)
-                {
-                    var diagKeyOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                    var diagValueOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-                    string? keyName = context.GetSymbolName(diagKeyOOP);
-                    var diagValueClass = heapManager.GetClassOOP(diagValueOOP);
-                    string? valueClassName = context.GetClassName(diagValueClass);
-                    Console.WriteLine($"  Association key: {keyName}");
-
-                    // If value is a Float, decode and show the actual value
-                    if (valueClassName == "Float" && !diagValueOOP.IsSmallInteger)
-                    {
-                        var valFormat = heapManager.GetObjectFormat(diagValueOOP);
-                        var valSize = heapManager.GetIndexedSize(diagValueOOP);
-                        if (valFormat == ObjectFormat.WordIndexed && valSize == 4)
-                        {
-                            byte[] bytes = new byte[8];
-                            for (int i = 0; i < 4; i++)
-                            {
-                                ushort word = heapManager.GetIndexedWord(diagValueOOP, i);
-                                bytes[i * 2] = (byte)(word & 0xFF);
-                                bytes[i * 2 + 1] = (byte)((word >> 8) & 0xFF);
-                            }
-                            double floatVal = BitConverter.ToDouble(bytes, 0);
-                            Console.WriteLine($"  Association value: {diagValueOOP} ({valueClassName} = {floatVal})");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"  Association value: {diagValueOOP} ({valueClassName}) INVALID FORMAT: {valFormat}, size: {valSize}");
-                        }
-                    }
-                    else if (diagValueOOP.IsSmallInteger)
-                    {
-                        Console.WriteLine($"  Association value: SmallInteger({diagValueOOP.AsSmallInteger()})");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"  Association value: {diagValueOOP} ({valueClassName})");
-                    }
-                }
-                // If it's a non-2-element Array, dump contents
-                else if (litFormat == "PointerIndexed" && litSize > 0 && litSize <= 10)
-                {
-                    Console.WriteLine($"  UNEXPECTED Array in literal frame! Contents:");
-                    for (int i = 0; i < litSize; i++)
-                    {
-                        var elem = heapManager.GetIndexedOOP(literalOOP, i);
-                        Console.WriteLine($"    [{i}]: {elem}");
-                    }
-                }
-            }
 
             if (literalOOP == metadata.KnownObjects.Nil)
             {
@@ -905,40 +779,6 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                             $"This likely means the compiler generated wrong bytecode (should be POP_STORE_TEMP for temp variable).");
                     }
 
-                    // DEBUG: Trace class variable stores to Float associations
-                    var keyOOP = heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                    string? keyName = context.GetSymbolName(keyOOP);
-                    string? methodId = context.GetLocalId(methodOOP);
-
-                    // Check if value is NOT a Float when storing to Float class variables
-                    if (methodId?.Contains("Float") == true)
-                    {
-                        var valueClass = heapManager.GetClassOOP(valueOOP);
-                        string? valueClassName = context.GetClassName(valueClass);
-                        var valueFormat = valueOOP.IsSmallInteger ? "SmallInteger" : heapManager.GetObjectFormat(valueOOP).ToString();
-                        int valueIndexedSize = valueOOP.IsSmallInteger ? 0 : heapManager.GetIndexedSize(valueOOP);
-
-                        Console.WriteLine($"[POP_STORE_LITERAL_VAR] Storing to '{keyName}' in {methodId}:");
-                        Console.WriteLine($"  Value OOP: {valueOOP}");
-                        Console.WriteLine($"  Value class: {valueClassName}");
-                        Console.WriteLine($"  Value format: {valueFormat}, IndexedSize: {valueIndexedSize}");
-
-                        // If storing a non-Float to a Float class variable, dump more details
-                        if (valueClassName != "Float" && !valueOOP.IsSmallInteger)
-                        {
-                            Console.WriteLine($"  WARNING: Storing non-Float to Float class variable!");
-                            if (valueFormat == "PointerIndexed" && valueIndexedSize <= 10)
-                            {
-                                Console.WriteLine($"  Array/Object contents:");
-                                for (int i = 0; i < valueIndexedSize; i++)
-                                {
-                                    var elem = heapManager.GetIndexedOOP(valueOOP, i);
-                                    Console.WriteLine($"    [{i}]: {elem}");
-                                }
-                            }
-                        }
-                    }
-
                     // Store the value in the Association
                     heapManager.SetInstanceVariableWithBarrier(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
 
@@ -1174,15 +1014,6 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
         var argOOP = context.Pop();
         var receiverOOP = context.Pop();
-
-        // DEBUG: Only log when @ is sent to non-SmallInteger (error case)
-        if (bytecode == 187 && (!receiverOOP.IsSmallInteger || !argOOP.IsSmallInteger))
-        {
-            string recClass = receiverOOP.IsSmallInteger ? "SmallInteger" : heapManager.GetClassName(receiverOOP);
-            string argClass = argOOP.IsSmallInteger ? "SmallInteger" : heapManager.GetClassName(argOOP);
-            string? recSymbol = recClass == "Symbol" ? context.GetSymbolName(receiverOOP) : null;
-            Console.WriteLine($"[@ ERROR] receiver={receiverOOP} ({recClass}{(recSymbol != null ? $" #{recSymbol}" : "")}), arg={argOOP} ({argClass})");
-        }
 
         // Try primitive arithmetic for SmallIntegers
         if (receiverOOP.IsSmallInteger && argOOP.IsSmallInteger)
