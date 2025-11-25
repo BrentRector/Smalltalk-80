@@ -277,6 +277,7 @@ public class SmalltalkInterpreterThread
             Console.WriteLine($"\n--- Comment expressions ({commentIndices.Count} total) ---");
             int commentSucceeded = 0;
             int commentFailed = 0;
+            long totalCommentTimeMs = 0;
             foreach (int index in commentIndices)
             {
                 var expr = _context.Bundle.InitExpressions[index];
@@ -286,6 +287,7 @@ public class SmalltalkInterpreterThread
                 Console.Write($"  {className} comment: ... ");
 
                 var result = executor.ExecuteInitExpressionOnDemand(expr, compiler, verbose: false);
+                totalCommentTimeMs += result.ElapsedMilliseconds;
 
                 if (result.Status == InitStatus.Success)
                 {
@@ -300,7 +302,7 @@ public class SmalltalkInterpreterThread
                     failed++;
                 }
             }
-            Console.WriteLine($"  Comment expressions: {commentSucceeded}/{commentIndices.Count} succeeded");
+            Console.WriteLine($"  Comment expressions: {commentSucceeded}/{commentIndices.Count} succeeded in {totalCommentTimeMs / 1000.0:F1}s total");
         }
 
         // Run GC after all initialization to show stats
