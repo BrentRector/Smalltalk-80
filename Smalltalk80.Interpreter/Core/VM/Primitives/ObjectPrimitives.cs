@@ -129,10 +129,6 @@ public static class SimpleObjectPrimitives
     /// <summary>Primitive 60: Array at: - get indexed element</summary>
     public class At : IPrimitive
     {
-        // Track if we've logged recently to avoid excessive output
-        private static int _logCount = 0;
-        private const int MAX_LOGS = 200;
-
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
@@ -141,19 +137,6 @@ public static class SimpleObjectPrimitives
 
             int index = context.Arguments[0].AsSmallInteger();
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-
-            // Debug: Track ALL Array accesses to see if fileList is being accessed
-            var receiverClassName = context.HeapManager.GetClassName(context.Receiver);
-            // Unconditionally log Array with size 38 (fileList) regardless of log count
-            if (receiverClassName == "Array" && size == 38)
-            {
-                Console.WriteLine($"[DEBUG Primitive 60] Array at: {index} (size={size}, OOP={context.Receiver.RawValue})");
-            }
-            else if (_logCount < MAX_LOGS && receiverClassName == "Array")
-            {
-                _logCount++;
-                Console.WriteLine($"[DEBUG Primitive 60] Array at: {index} (size={size}, OOP={context.Receiver.RawValue})");
-            }
 
             // Smalltalk indices are 1-based
             if (index < 1 || index > size)

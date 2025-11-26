@@ -519,41 +519,9 @@ public class Phase3_ObjectAllocation : IPhase
         // Set the CharacterTable Array OOP in CharacterRegistry
         CharacterRegistry.SetCharacterTableArrayOOP(characterTableOOP);
 
-        // Install CharacterTable as class variable of Character class
-        // Following the same pattern as USTable installation in Phase 5
-        InstallCharacterTableInClassPool(characterClassOOP, characterTableOOP);
-    }
-
-    /// <summary>
-    /// Installs CharacterTable in Character class's classPool Dictionary.
-    /// CharacterTable is a CLASS VARIABLE, not a global.
-    /// Same pattern as USTable installation in Phase 5.
-    /// </summary>
-    private void InstallCharacterTableInClassPool(SmalltalkOOP characterClassOOP, SmalltalkOOP characterTableOOP)
-    {
-        // Get classPool (instance variable 7 of Class)
-        var classPoolOOP = _allocator.GetInstanceVariable(characterClassOOP, 7);
-        if (classPoolOOP == _heapManager.GetNil())
-        {
-            throw new InvalidOperationException("Character classPool is nil - Phase 2 should have created it");
-        }
-
-        // Create canonical Association via AssociationRegistry
-        // This ensures Phase 4 method compilation uses the same Association
-        var keySymbolOOP = _fieldValueResolver.InternSymbol("CharacterTable");
-        var associationOOP = AssociationRegistry.GetOrCreate("CharacterTable", () =>
-        {
-            return _dictionaryInstaller.AllocateAssociation(keySymbolOOP, _heapManager.GetNil());
-        });
-
-        // Set Association's value (instance variable 1) to CharacterTable Array
-        _allocator.SetInstanceVariable(associationOOP, 1, characterTableOOP);
-        _initializedFields.Add((associationOOP, 1));
-
-        // Install Association in classPool Dictionary using hash-based lookup
-        // CRITICAL: Must use hash-based installation, not linear search!
-        // The VM's LookupClassVariable uses hash-based lookup to find entries.
-        _dictionaryInstaller.InstallInDictionary(classPoolOOP, associationOOP, "CharacterTable");
+        // NOTE: CharacterTable installation in Character class's classPool is done in Phase 5
+        // (same pattern as USTable). Phase 3 Dictionary structures are not fully initialized yet.
+        // CharacterRegistry provides the Character objects for Phase 4 literal resolution.
     }
 
     #endregion
