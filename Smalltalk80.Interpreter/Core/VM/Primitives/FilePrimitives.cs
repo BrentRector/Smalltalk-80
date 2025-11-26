@@ -1042,7 +1042,8 @@ public static class FileOperations
                 var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
                     ?? throw new InvalidOperationException("Cannot find Array class");
                 var arrayOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP, names.Length);
-                Console.WriteLine($"[DEBUG Primitive 146] Created array OOP={arrayOOP.RawValue} with {names.Length} slots");
+                var arrayClassName = context.HeapManager.GetClassName(arrayOOP);
+                Console.WriteLine($"[DEBUG Primitive 146] Created array OOP={arrayOOP.RawValue} with {names.Length} slots, class={arrayClassName}, classOOP={arrayClassOOP.RawValue}");
 
                 for (int i = 0; i < names.Length; i++)
                 {

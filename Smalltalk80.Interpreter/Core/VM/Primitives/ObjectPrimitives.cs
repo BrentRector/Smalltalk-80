@@ -13,7 +13,7 @@ public static class SimpleObjectPrimitives
     public class Size : IPrimitive
     {
         private static int _logCount = 0;
-        private const int MAX_LOGS = 100;
+        private const int MAX_LOGS = 500;
 
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
@@ -22,9 +22,9 @@ public static class SimpleObjectPrimitives
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
 
-            // Debug: Track size checks on arrays that might be fileList
+            // Debug: Track ALL Array size checks to see if fileList is being accessed
             var className = context.HeapManager.GetClassName(context.Receiver);
-            if (_logCount < MAX_LOGS && className == "Array" && size > 10 && size < 50)
+            if (_logCount < MAX_LOGS && className == "Array")
             {
                 _logCount++;
                 Console.WriteLine($"[DEBUG Primitive 62] Array size={size} (OOP={context.Receiver.RawValue})");
@@ -123,9 +123,9 @@ public static class SimpleObjectPrimitives
             int index = context.Arguments[0].AsSmallInteger();
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
 
-            // Debug: Track Array accesses to help trace file iteration
+            // Debug: Track ALL Array accesses to see if fileList is being accessed
             var receiverClassName = context.HeapManager.GetClassName(context.Receiver);
-            if (_logCount < MAX_LOGS && receiverClassName == "Array" && size > 10 && size < 50)
+            if (_logCount < MAX_LOGS && receiverClassName == "Array")
             {
                 _logCount++;
                 Console.WriteLine($"[DEBUG Primitive 60] Array at: {index} (size={size}, OOP={context.Receiver.RawValue})");

@@ -84,6 +84,18 @@ public class PrimitiveRegistry : IPrimitiveRegistry
             var result = primitive.Execute(execContext);
             ctx.PrimitiveSuccess = result.Success;
 
+            // DIAGNOSTIC: Log primitive 146 return flow
+            if (primitiveNumber == 146)
+            {
+                Console.WriteLine($"[DEBUG Primitive 146 RETURN] Success={result.Success}, Value={result.Value.RawValue}, IsSmallInt={result.Value.IsSmallInteger}");
+                if (result.Success && !result.Value.IsSmallInteger)
+                {
+                    var className = ctx.HeapManager.GetClassName(result.Value);
+                    var size = ctx.HeapManager.GetIndexedSize(result.Value);
+                    Console.WriteLine($"[DEBUG Primitive 146 RETURN] Returning {className} OOP={result.Value.RawValue} with {size} elements");
+                }
+            }
+
             // DIAGNOSTIC: Log primitive failures for debugging
             if (!result.Success && (primitiveNumber == 11 || primitiveNumber == 75))
             {
