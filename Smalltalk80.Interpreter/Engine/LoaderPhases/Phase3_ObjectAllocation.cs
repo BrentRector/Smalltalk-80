@@ -519,9 +519,95 @@ public class Phase3_ObjectAllocation : IPhase
         // Set the CharacterTable Array OOP in CharacterRegistry
         CharacterRegistry.SetCharacterTableArrayOOP(characterTableOOP);
 
-        // Register CharacterTable in GlobalRegistry to ensure it's a GC root
-        // and accessible as a global. Phase 5 will install it in SystemDictionary.
-        GlobalRegistry.Register("CharacterTable", characterTableOOP);
+        // Install CharacterTable as class variable of Character class
+        // Following the same pattern as USTable installation in Phase 5
+        InstallCharacterTableInClassPool(characterClassOOP, characterTableOOP);
+    }
+
+    /// <summary>
+    /// Installs CharacterTable in Character class's classPool Dictionary.
+    /// CharacterTable is a CLASS VARIABLE, not a global.
+    /// Same pattern as USTable installation in Phase 5.
+    /// </summary>
+    private void InstallCharacterTableInClassPool(SmalltalkOOP characterClassOOP, SmalltalkOOP characterTableOOP)
+    {
+        // Get classPool (instance variable 7 of Class)
+        var classPoolOOP = _allocator.GetInstanceVariable(characterClassOOP, 7);
+        if (classPoolOOP == _heapManager.GetNil())
+        {
+            throw new InvalidOperationException("Character classPool is nil - Phase 2 should have created it");
+        }
+
+        // Create canonical Association via AssociationRegistry
+        // This ensures Phase 4 method compilation uses the same Association
+        var keySymbolOOP = _fieldValueResolver.InternSymbol("CharacterTable");
+        var associationOOP = AssociationRegistry.GetOrCreate("CharacterTable", () =>
+        {
+            return _dictionaryInstaller.AllocateAssociation(keySymbolOOP, _heapManager.GetNil());
+        });
+
+        // Set Association's value (instance variable 1) to CharacterTable Array
+        _allocator.SetInstanceVariable(associationOOP, 1, characterTableOOP);
+        _initializedFields.Add((associationOOP, 1));
+
+        // Install Association in classPool Dictionary using hash-based lookup
+        InstallInClassPool(classPoolOOP, associationOOP, "CharacterTable");
+    }
+
+    /// <summary>
+    /// Installs an Association in a classPool Dictionary.
+    /// Same algorithm as Phase 5's InstallInClassPool.
+    /// </summary>
+    private void InstallInClassPool(SmalltalkOOP classPoolOOP, SmalltalkOOP associationOOP, string keyName)
+    {
+        int classPoolSize = _allocator.GetIndexedSize(classPoolOOP);
+        var nilOOP = _heapManager.GetNil();
+        int emptySlotIndex = -1;
+
+        // Get key from association
+        var keyOOP = _allocator.GetInstanceVariable(associationOOP, 0);
+
+        // Search for existing or empty slot
+        for (int i = 0; i < classPoolSize; i++)
+        {
+            var entryOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
+
+            if (entryOOP == nilOOP)
+            {
+                if (emptySlotIndex < 0)
+                    emptySlotIndex = i;
+                continue;
+            }
+
+            // Check if this entry has matching key
+            var entryKeyOOP = _allocator.GetInstanceVariable(entryOOP, 0);
+            if (entryKeyOOP == keyOOP)
+            {
+                // Key already exists - update the entry (shouldn't happen for new class variable)
+                _allocator.SetIndexedOOP(classPoolOOP, i, associationOOP);
+                return;
+            }
+        }
+
+        // Install in first empty slot
+        if (emptySlotIndex >= 0)
+        {
+            _allocator.SetIndexedOOP(classPoolOOP, emptySlotIndex, associationOOP);
+
+            // Increment tally (instance variable 0 of Dictionary)
+            var tallyOOP = _allocator.GetInstanceVariable(classPoolOOP, 0);
+            int tally = 0;
+            if (tallyOOP.IsSmallInteger)
+            {
+                tally = tallyOOP.IsSmallInteger ? (int)((tallyOOP.Value - 1) >> 1) : 0;
+            }
+            _allocator.SetInstanceVariable(classPoolOOP, 0, SmalltalkOOP.FromSmallInteger(tally + 1));
+            _initializedFields.Add((classPoolOOP, 0));
+        }
+        else
+        {
+            throw new InvalidOperationException($"classPool is full, cannot install {keyName}");
+        }
     }
 
     #endregion
