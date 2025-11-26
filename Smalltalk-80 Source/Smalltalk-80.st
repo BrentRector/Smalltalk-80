@@ -467,7 +467,12 @@ reopen
 asFileStream
     "Answer a FileStream on this file."
     self reopen.
-    ^FileStream on: self! !
+    ^FileStream on: self!
+
+asFileStream: aStream
+    "Initialize aStream (typically a FileStream) to access the receiver.
+    This is called by FileStream>>on: to set up the stream."
+    aStream position: 0 size: self size! !
 
 WindowsFile class
     instanceVariableNames: ''!
