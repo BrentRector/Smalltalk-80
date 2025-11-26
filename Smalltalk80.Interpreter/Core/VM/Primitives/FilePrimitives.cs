@@ -160,67 +160,87 @@ public static class FileOperations
 
     /// <summary>
     /// Primitive 121: Open a file (CreateFile equivalent).
-    /// Receiver: WindowsFileReference instance.
-    /// Arguments: path (String), accessMode (Integer), shareMode (Integer), createMode (Integer).
+    /// Supports TWO calling conventions:
+    /// 1. WindowsFile>>primOpen:mode: - 2 args: path (String), mode (String like 'r', 'w', 'rw', 'a')
+    /// 2. WindowsFileReference>>primOpen:accessMode:shareMode:createMode: - 4 args: path, access, share, create (Integers)
     /// Returns: Integer handle or -1 on failure.
     /// </summary>
     public class FileOpen : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            Console.WriteLine($"[DEBUG Primitive 121 FileOpen] Arguments.Length={context.Arguments.Length}");
-            if (context.Arguments.Length != 4)
-            {
-                Console.WriteLine($"[DEBUG Primitive 121] FAIL: Expected 4 args, got {context.Arguments.Length}");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+            int accessMode, shareMode, createMode;
+            string? path;
 
-            var pathOOP = context.Arguments[0];
-            var accessOOP = context.Arguments[1];
-            var shareOOP = context.Arguments[2];
-            var createOOP = context.Arguments[3];
+            if (context.Arguments.Length == 2)
+            {
+                // WindowsFile>>primOpen:mode: - 2 args: path (String), mode (String)
+                var pathOOP = context.Arguments[0];
+                var modeOOP = context.Arguments[1];
 
-            Console.WriteLine($"[DEBUG Primitive 121] pathOOP={pathOOP}, IsSmallInt={pathOOP.IsSmallInteger}");
-            Console.WriteLine($"[DEBUG Primitive 121] accessOOP={accessOOP}, IsSmallInt={accessOOP.IsSmallInteger}");
-            Console.WriteLine($"[DEBUG Primitive 121] shareOOP={shareOOP}, IsSmallInt={shareOOP.IsSmallInteger}");
-            Console.WriteLine($"[DEBUG Primitive 121] createOOP={createOOP}, IsSmallInt={createOOP.IsSmallInteger}");
+                if (pathOOP.IsSmallInteger || modeOOP.IsSmallInteger)
+                    return PrimitiveResult.Fail(context.Metadata!);
 
-            if (pathOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 121] FAIL: path is SmallInteger");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
-            if (!accessOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 121] FAIL: access not SmallInteger");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
-            if (!shareOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 121] FAIL: share not SmallInteger");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
-            if (!createOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 121] FAIL: create not SmallInteger");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+                path = ExtractString(context, pathOOP);
+                string? modeStr = ExtractString(context, modeOOP);
 
-            string? path = ExtractString(context, pathOOP);
-            Console.WriteLine($"[DEBUG Primitive 121] Extracted path: '{path}'");
-            if (path == null)
+                if (path == null || modeStr == null)
+                    return PrimitiveResult.Fail(context.Metadata!);
+
+                // Convert mode string to access/share/create modes
+                switch (modeStr.ToLower())
+                {
+                    case "r":
+                        accessMode = 1;  // GENERIC_READ
+                        shareMode = 1;   // FILE_SHARE_READ
+                        createMode = 3;  // OPEN_EXISTING
+                        break;
+                    case "w":
+                        accessMode = 2;  // GENERIC_WRITE
+                        shareMode = 0;   // No sharing
+                        createMode = 2;  // CREATE_ALWAYS
+                        break;
+                    case "rw":
+                        accessMode = 3;  // GENERIC_READ | GENERIC_WRITE
+                        shareMode = 0;   // No sharing
+                        createMode = 3;  // OPEN_EXISTING
+                        break;
+                    case "a":
+                        accessMode = 2;  // GENERIC_WRITE
+                        shareMode = 0;   // No sharing
+                        createMode = 4;  // OPEN_ALWAYS
+                        break;
+                    default:
+                        return PrimitiveResult.Fail(context.Metadata!);
+                }
+            }
+            else if (context.Arguments.Length == 4)
             {
-                Console.WriteLine($"[DEBUG Primitive 121] FAIL: path extraction returned null");
+                // WindowsFileReference>>primOpen:accessMode:shareMode:createMode: - 4 args
+                var pathOOP = context.Arguments[0];
+                var accessOOP = context.Arguments[1];
+                var shareOOP = context.Arguments[2];
+                var createOOP = context.Arguments[3];
+
+                if (pathOOP.IsSmallInteger)
+                    return PrimitiveResult.Fail(context.Metadata!);
+                if (!accessOOP.IsSmallInteger || !shareOOP.IsSmallInteger || !createOOP.IsSmallInteger)
+                    return PrimitiveResult.Fail(context.Metadata!);
+
+                path = ExtractString(context, pathOOP);
+                if (path == null)
+                    return PrimitiveResult.Fail(context.Metadata!);
+
+                accessMode = accessOOP.AsSmallInteger();
+                shareMode = shareOOP.AsSmallInteger();
+                createMode = createOOP.AsSmallInteger();
+            }
+            else
+            {
                 return PrimitiveResult.Fail(context.Metadata!);
             }
-
-            int accessMode = accessOOP.AsSmallInteger();
-            int shareMode = shareOOP.AsSmallInteger();
-            int createMode = createOOP.AsSmallInteger();
-            Console.WriteLine($"[DEBUG Primitive 121] accessMode={accessMode}, shareMode={shareMode}, createMode={createMode}");
 
             int handle = FileHandleManager.OpenFile(path, accessMode, shareMode, createMode);
-            Console.WriteLine($"[DEBUG Primitive 121] OpenFile returned handle={handle}");
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(handle));
         }
     }
