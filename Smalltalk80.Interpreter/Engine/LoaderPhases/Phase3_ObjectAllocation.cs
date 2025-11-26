@@ -551,59 +551,9 @@ public class Phase3_ObjectAllocation : IPhase
         _initializedFields.Add((associationOOP, 1));
 
         // Install Association in classPool Dictionary using hash-based lookup
-        InstallInClassPool(classPoolOOP, associationOOP, "CharacterTable");
-    }
-
-    /// <summary>
-    /// Installs an Association in a classPool Dictionary.
-    /// Same algorithm as Phase 5's InstallInClassPool.
-    /// </summary>
-    private void InstallInClassPool(SmalltalkOOP classPoolOOP, SmalltalkOOP associationOOP, string keyName)
-    {
-        int classPoolSize = _allocator.GetIndexedSize(classPoolOOP);
-        var nilOOP = _heapManager.GetNil();
-        int emptySlotIndex = -1;
-
-        // Get key from association
-        var keyOOP = _allocator.GetInstanceVariable(associationOOP, 0);
-
-        // Search for existing or empty slot
-        for (int i = 0; i < classPoolSize; i++)
-        {
-            var entryOOP = _allocator.GetIndexedOOP(classPoolOOP, i);
-
-            if (entryOOP == nilOOP)
-            {
-                if (emptySlotIndex < 0)
-                    emptySlotIndex = i;
-                continue;
-            }
-
-            // Check if this entry has matching key
-            var entryKeyOOP = _allocator.GetInstanceVariable(entryOOP, 0);
-            if (entryKeyOOP == keyOOP)
-            {
-                // Key already exists - update the entry (shouldn't happen for new class variable)
-                _allocator.SetIndexedOOP(classPoolOOP, i, associationOOP);
-                return;
-            }
-        }
-
-        // Install in first empty slot
-        if (emptySlotIndex >= 0)
-        {
-            _allocator.SetIndexedOOP(classPoolOOP, emptySlotIndex, associationOOP);
-
-            // Increment tally (instance variable 0 of Dictionary)
-            var tallyOOP = _allocator.GetInstanceVariable(classPoolOOP, 0);
-            int tally = tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger() : 0;
-            _allocator.SetInstanceVariable(classPoolOOP, 0, SmalltalkOOP.FromSmallInteger(tally + 1));
-            _initializedFields.Add((classPoolOOP, 0));
-        }
-        else
-        {
-            throw new InvalidOperationException($"classPool is full, cannot install {keyName}");
-        }
+        // CRITICAL: Must use hash-based installation, not linear search!
+        // The VM's LookupClassVariable uses hash-based lookup to find entries.
+        _dictionaryInstaller.InstallInDictionary(classPoolOOP, associationOOP, "CharacterTable");
     }
 
     #endregion
