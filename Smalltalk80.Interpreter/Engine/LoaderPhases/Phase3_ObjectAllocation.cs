@@ -101,6 +101,11 @@ public class Phase3_ObjectAllocation : IPhase
     {
         // Section 1: Allocation (ALL object creation happens here)
         AllocateSentinelObjects();
+
+        // Section 1.5: Create CharacterTable with 256 unique Character objects
+        // CRITICAL: Must happen BEFORE Phase 4 (method compilation) which resolves Character literals
+        CreateCharacterTable();
+
         AllocateSpecialObjects();
 
         // Phase 3.5: Pre-create Associations for Undeclared Variables
@@ -453,6 +458,70 @@ public class Phase3_ObjectAllocation : IPhase
             var undeclaredOOP = GlobalRegistry.Get("Undeclared");
             _dictionaryInstaller.InstallInDictionary(undeclaredOOP, defaultTextStyleAssoc, "DefaultTextStyle");
         }
+    }
+
+    #endregion
+
+    #region CharacterTable Creation
+
+    /// <summary>
+    /// Creates the CharacterTable with 256 unique Character objects.
+    /// Blue Book specification: Characters are unique and stored in class variable CharacterTable.
+    ///
+    /// This method:
+    /// 1. Creates an Array of 256 slots for CharacterTable
+    /// 2. Creates 256 Character objects with values 0-255
+    /// 3. Registers each Character in CharacterRegistry for Phase 4 literal resolution
+    /// 4. Sets the CharacterTable class variable on Character class
+    ///
+    /// CRITICAL: Must run BEFORE Phase 4 (method compilation) so that Character literals
+    /// reference the canonical Character objects from CharacterTable.
+    /// </summary>
+    private void CreateCharacterTable()
+    {
+        var nilOOP = _heapManager.GetNil();
+
+        // Get Character class OOP
+        var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
+
+        // Get Array class OOP for the CharacterTable array
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+
+        // Create Array of 256 slots for CharacterTable
+        var characterTableOOP = _allocator.AllocateArray(arrayClassOOP, 256);
+
+        // Get the index of Character's 'value' instance variable
+        int valueIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Character", "value", _bundle);
+        if (valueIndex < 0)
+        {
+            throw new InvalidOperationException("Character class must have 'value' instance variable");
+        }
+
+        // Create 256 Character objects
+        for (int codePoint = 0; codePoint < 256; codePoint++)
+        {
+            // Allocate Character object
+            var characterOOP = _allocator.AllocateFixedObject("Character");
+            _allocator.SetClassOOP(characterOOP, characterClassOOP);
+
+            // Set the 'value' instance variable to the code point
+            var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
+            _allocator.SetInstanceVariable(characterOOP, valueIndex, codePointOOP);
+            _initializedFields.Add((characterOOP, valueIndex));
+
+            // Store in CharacterTable array (1-based indexing in Smalltalk)
+            _allocator.SetIndexedOOP(characterTableOOP, codePoint, characterOOP);
+
+            // Register in CharacterRegistry for Phase 4 literal resolution
+            CharacterRegistry.Register(codePoint, characterOOP);
+        }
+
+        // Set the CharacterTable Array OOP in CharacterRegistry
+        CharacterRegistry.SetCharacterTableArrayOOP(characterTableOOP);
+
+        // NOTE: CharacterTable installation in Character class's classPool is done in Phase 5
+        // (same pattern as USTable). Phase 3 Dictionary structures are not fully initialized yet.
+        // CharacterRegistry provides the Character objects for Phase 4 literal resolution.
     }
 
     #endregion

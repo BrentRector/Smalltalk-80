@@ -46,28 +46,46 @@ internal sealed class VMDebugger(
                 string selectorName = "<unknown>";
                 try
                 {
-                    var selectorOOP = helpers.GetMethodLiteral(methodOOP, 1);
-                    var symbolName = helpers.GetSymbolName(selectorOOP);
-
-                    // Check if this is a selector (Symbol) or something else (likely a block)
-                    if (symbolName is not null && selectorOOP != metadata.KnownObjects.Nil)
+                    // Check if methodOOP is valid before trying to access it
+                    // SmallIntegers and special objects (nil=1, true=2, false=3) are not valid methods
+                    if (methodOOP.IsSmallInteger)
                     {
-                        selectorName = symbolName;
+                        selectorName = $"<invalid method: SmallInt {methodOOP.RawValue}>";
                     }
-                    else if (selectorOOP == metadata.KnownObjects.Nil)
+                    else if (methodOOP == metadata.KnownObjects.Nil)
                     {
-                        // No literal[0] - this is a block
-                        selectorName = "<block>";
+                        selectorName = "<invalid method: nil>";
                     }
-                    else if (selectorOOP.IsSmallInteger)
+                    else if (methodOOP.RawValue <= 10)
                     {
-                        // Probably a block with SmallInt literal
-                        selectorName = "<block>";
+                        // Very low OOP values are special objects, not methods
+                        selectorName = $"<invalid method: OOP({methodOOP.RawValue})>";
                     }
                     else
                     {
-                        // Has literal[0] but it's not a Symbol - likely a block
-                        selectorName = "<block>";
+                        var selectorOOP = helpers.GetMethodLiteral(methodOOP, 1);
+                        var symbolName = helpers.GetSymbolName(selectorOOP);
+
+                        // Check if this is a selector (Symbol) or something else (likely a block)
+                        if (symbolName is not null && selectorOOP != metadata.KnownObjects.Nil)
+                        {
+                            selectorName = symbolName;
+                        }
+                        else if (selectorOOP == metadata.KnownObjects.Nil)
+                        {
+                            // No literal[0] - this is a block
+                            selectorName = "<block>";
+                        }
+                        else if (selectorOOP.IsSmallInteger)
+                        {
+                            // Probably a block with SmallInt literal
+                            selectorName = "<block>";
+                        }
+                        else
+                        {
+                            // Has literal[0] but it's not a Symbol - likely a block
+                            selectorName = "<block>";
+                        }
                     }
                 }
                 catch (Exception ex)

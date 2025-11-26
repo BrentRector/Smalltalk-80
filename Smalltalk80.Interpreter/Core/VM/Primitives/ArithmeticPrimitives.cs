@@ -77,6 +77,9 @@ public static class SmallIntegerArithmetic
     /// <summary>Primitive 4: SmallInteger &gt; (greater than)</summary>
     public class GreaterThan : IPrimitive
     {
+        private static int _logCount = 0;
+        private const int MAX_LOGS = 50;
+
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
@@ -85,7 +88,16 @@ public static class SmallIntegerArithmetic
 
             int a = context.Receiver.AsSmallInteger();
             int b = context.Arguments[0].AsSmallInteger();
-            return PrimitiveResult.FromBool(a > b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
+            bool result = a > b;
+
+            // Debug: trace comparisons involving 38 (fileList size)
+            if (b == 38 && _logCount < MAX_LOGS)
+            {
+                _logCount++;
+                Console.WriteLine($"[DEBUG Primitive 4] {a} > {b} = {result}");
+            }
+
+            return PrimitiveResult.FromBool(result, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 

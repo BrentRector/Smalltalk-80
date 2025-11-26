@@ -60,7 +60,9 @@ public static class FileOperations
                         _ => FileMode.OpenOrCreate
                     };
 
-                    var stream = new FileStream(path, mode, access, share);
+                    // Sanitize path for Windows - remove trailing periods which Windows doesn't accept
+                    var sanitizedPath = path.TrimEnd('.');
+                    var stream = new FileStream(sanitizedPath, mode, access, share);
                     int handle = _nextHandle++;
                     _openFiles[handle] = stream;
                     return handle;
@@ -158,32 +160,85 @@ public static class FileOperations
 
     /// <summary>
     /// Primitive 121: Open a file (CreateFile equivalent).
-    /// Receiver: WindowsFileReference instance.
-    /// Arguments: path (String), accessMode (Integer), shareMode (Integer), createMode (Integer).
+    /// Supports TWO calling conventions:
+    /// 1. WindowsFile>>primOpen:mode: - 2 args: path (String), mode (String like 'r', 'w', 'rw', 'a')
+    /// 2. WindowsFileReference>>primOpen:accessMode:shareMode:createMode: - 4 args: path, access, share, create (Integers)
     /// Returns: Integer handle or -1 on failure.
     /// </summary>
     public class FileOpen : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 4) return PrimitiveResult.Fail(context.Metadata!);
+            int accessMode, shareMode, createMode;
+            string? path;
 
-            var pathOOP = context.Arguments[0];
-            var accessOOP = context.Arguments[1];
-            var shareOOP = context.Arguments[2];
-            var createOOP = context.Arguments[3];
+            if (context.Arguments.Length == 2)
+            {
+                // WindowsFile>>primOpen:mode: - 2 args: path (String), mode (String)
+                var pathOOP = context.Arguments[0];
+                var modeOOP = context.Arguments[1];
 
-            if (pathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (!accessOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (!shareOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (!createOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+                if (pathOOP.IsSmallInteger || modeOOP.IsSmallInteger)
+                    return PrimitiveResult.Fail(context.Metadata!);
 
-            string? path = ExtractString(context, pathOOP);
-            if (path == null) return PrimitiveResult.Fail(context.Metadata!);
+                path = ExtractString(context, pathOOP);
+                string? modeStr = ExtractString(context, modeOOP);
 
-            int accessMode = accessOOP.AsSmallInteger();
-            int shareMode = shareOOP.AsSmallInteger();
-            int createMode = createOOP.AsSmallInteger();
+                if (path == null || modeStr == null)
+                    return PrimitiveResult.Fail(context.Metadata!);
+
+                // Convert mode string to access/share/create modes
+                switch (modeStr.ToLower())
+                {
+                    case "r":
+                        accessMode = 1;  // GENERIC_READ
+                        shareMode = 1;   // FILE_SHARE_READ
+                        createMode = 3;  // OPEN_EXISTING
+                        break;
+                    case "w":
+                        accessMode = 2;  // GENERIC_WRITE
+                        shareMode = 0;   // No sharing
+                        createMode = 2;  // CREATE_ALWAYS
+                        break;
+                    case "rw":
+                        accessMode = 3;  // GENERIC_READ | GENERIC_WRITE
+                        shareMode = 0;   // No sharing
+                        createMode = 3;  // OPEN_EXISTING
+                        break;
+                    case "a":
+                        accessMode = 2;  // GENERIC_WRITE
+                        shareMode = 0;   // No sharing
+                        createMode = 4;  // OPEN_ALWAYS
+                        break;
+                    default:
+                        return PrimitiveResult.Fail(context.Metadata!);
+                }
+            }
+            else if (context.Arguments.Length == 4)
+            {
+                // WindowsFileReference>>primOpen:accessMode:shareMode:createMode: - 4 args
+                var pathOOP = context.Arguments[0];
+                var accessOOP = context.Arguments[1];
+                var shareOOP = context.Arguments[2];
+                var createOOP = context.Arguments[3];
+
+                if (pathOOP.IsSmallInteger)
+                    return PrimitiveResult.Fail(context.Metadata!);
+                if (!accessOOP.IsSmallInteger || !shareOOP.IsSmallInteger || !createOOP.IsSmallInteger)
+                    return PrimitiveResult.Fail(context.Metadata!);
+
+                path = ExtractString(context, pathOOP);
+                if (path == null)
+                    return PrimitiveResult.Fail(context.Metadata!);
+
+                accessMode = accessOOP.AsSmallInteger();
+                shareMode = shareOOP.AsSmallInteger();
+                createMode = createOOP.AsSmallInteger();
+            }
+            else
+            {
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             int handle = FileHandleManager.OpenFile(path, accessMode, shareMode, createMode);
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(handle));
@@ -200,13 +255,25 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            Console.WriteLine($"[DEBUG Primitive 122 FileClose] Arguments.Length={context.Arguments.Length}");
+            if (context.Arguments.Length != 1)
+            {
+                Console.WriteLine($"[DEBUG Primitive 122] FAIL: Expected 1 arg, got {context.Arguments.Length}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var handleOOP = context.Arguments[0];
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            Console.WriteLine($"[DEBUG Primitive 122] handleOOP={handleOOP}, IsSmallInt={handleOOP.IsSmallInteger}");
+            if (!handleOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[DEBUG Primitive 122] FAIL: handle not SmallInteger");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             int handle = handleOOP.AsSmallInteger();
+            Console.WriteLine($"[DEBUG Primitive 122] Closing handle={handle}");
             bool success = FileHandleManager.CloseFile(handle);
+            Console.WriteLine($"[DEBUG Primitive 122] CloseFile returned success={success}");
 
             return success
                 ? PrimitiveResult.Ok(context.HeapManager.GetNil())
@@ -224,31 +291,59 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 3) return PrimitiveResult.Fail(context.Metadata!);
+            Console.WriteLine($"[DEBUG Primitive 123 FileRead] Arguments.Length={context.Arguments.Length}");
+            if (context.Arguments.Length != 3)
+            {
+                Console.WriteLine($"[DEBUG Primitive 123] FAIL: Expected 3 args, got {context.Arguments.Length}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var handleOOP = context.Arguments[0];
             var bufferOOP = context.Arguments[1];
             var countOOP = context.Arguments[2];
 
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (bufferOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (!countOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            Console.WriteLine($"[DEBUG Primitive 123] handleOOP={handleOOP}, IsSmallInt={handleOOP.IsSmallInteger}");
+            Console.WriteLine($"[DEBUG Primitive 123] bufferOOP={bufferOOP}, IsSmallInt={bufferOOP.IsSmallInteger}");
+            Console.WriteLine($"[DEBUG Primitive 123] countOOP={countOOP}, IsSmallInt={countOOP.IsSmallInteger}");
+
+            if (!handleOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[DEBUG Primitive 123] FAIL: handle not SmallInteger");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (bufferOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[DEBUG Primitive 123] FAIL: buffer is SmallInteger");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (!countOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[DEBUG Primitive 123] FAIL: count not SmallInteger");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             int handle = handleOOP.AsSmallInteger();
             int count = countOOP.AsSmallInteger();
+            Console.WriteLine($"[DEBUG Primitive 123] handle={handle}, count={count}");
 
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (stream == null)
+            {
+                Console.WriteLine($"[DEBUG Primitive 123] FAIL: stream is null for handle {handle}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             try
             {
                 // Get buffer size
                 int bufferSize = context.HeapManager.GetIndexedSize(bufferOOP);
+                Console.WriteLine($"[DEBUG Primitive 123] bufferSize={bufferSize}");
                 if (count > bufferSize) count = bufferSize;
 
                 // Read into temporary buffer
                 byte[] tempBuffer = new byte[count];
                 int bytesRead = stream.Read(tempBuffer, 0, count);
+                Console.WriteLine($"[DEBUG Primitive 123] bytesRead={bytesRead}");
 
                 // Copy to Smalltalk ByteArray
                 for (int i = 0; i < bytesRead; i++)
@@ -256,10 +351,12 @@ public static class FileOperations
                     context.HeapManager.SetIndexedByte(bufferOOP, i, tempBuffer[i]);
                 }
 
+                Console.WriteLine($"[DEBUG Primitive 123] SUCCESS: returning {bytesRead}");
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(bytesRead));
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[DEBUG Primitive 123] EXCEPTION: {ex.Message}");
                 return PrimitiveResult.Fail(context.Metadata!);
             }
         }
@@ -805,9 +902,15 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            Console.WriteLine($"[DEBUG Primitive 144 GetFileSize] Arguments.Length={context.Arguments.Length}");
+            if (context.Arguments.Length != 1)
+            {
+                Console.WriteLine($"[DEBUG Primitive 144] FAIL: Expected 1 arg, got {context.Arguments.Length}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var arg = context.Arguments[0];
+            Console.WriteLine($"[DEBUG Primitive 144] arg={arg}, IsSmallInt={arg.IsSmallInteger}");
 
             long size;
 
@@ -815,24 +918,41 @@ public static class FileOperations
             {
                 // Handle is an integer - get size from stream
                 int handle = arg.AsSmallInteger();
+                Console.WriteLine($"[DEBUG Primitive 144] Getting size for handle={handle}");
                 var stream = FileHandleManager.GetStream(handle);
-                if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
+                if (stream == null)
+                {
+                    Console.WriteLine($"[DEBUG Primitive 144] FAIL: stream is null");
+                    return PrimitiveResult.Fail(context.Metadata!);
+                }
                 size = stream.Length;
+                Console.WriteLine($"[DEBUG Primitive 144] stream.Length={size}");
             }
             else
             {
                 // Path is a string
                 string? path = ExtractString(context, arg);
-                if (path == null) return PrimitiveResult.Fail(context.Metadata!);
+                Console.WriteLine($"[DEBUG Primitive 144] Getting size for path='{path}'");
+                if (path == null)
+                {
+                    Console.WriteLine($"[DEBUG Primitive 144] FAIL: path is null");
+                    return PrimitiveResult.Fail(context.Metadata!);
+                }
 
                 try
                 {
                     var info = new FileInfo(path);
-                    if (!info.Exists) return PrimitiveResult.Fail(context.Metadata!);
+                    if (!info.Exists)
+                    {
+                        Console.WriteLine($"[DEBUG Primitive 144] FAIL: file does not exist");
+                        return PrimitiveResult.Fail(context.Metadata!);
+                    }
                     size = info.Length;
+                    Console.WriteLine($"[DEBUG Primitive 144] file.Length={size}");
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Console.WriteLine($"[DEBUG Primitive 144] EXCEPTION: {ex.Message}");
                     return PrimitiveResult.Fail(context.Metadata!);
                 }
             }
@@ -840,6 +960,7 @@ public static class FileOperations
             // Clamp to SmallInteger range
             if (size > 0x3FFFFFFF) size = 0x3FFFFFFF;
 
+            Console.WriteLine($"[DEBUG Primitive 144] SUCCESS: returning {size}");
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)size));
         }
     }
@@ -854,18 +975,35 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            Console.WriteLine($"[DEBUG Primitive 145 GetFilePosition] Arguments.Length={context.Arguments.Length}");
+            if (context.Arguments.Length != 1)
+            {
+                Console.WriteLine($"[DEBUG Primitive 145] FAIL: Expected 1 arg, got {context.Arguments.Length}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var handleOOP = context.Arguments[0];
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            Console.WriteLine($"[DEBUG Primitive 145] handleOOP={handleOOP}, IsSmallInt={handleOOP.IsSmallInteger}");
+            if (!handleOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[DEBUG Primitive 145] FAIL: handle not SmallInteger");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             int handle = handleOOP.AsSmallInteger();
+            Console.WriteLine($"[DEBUG Primitive 145] Getting position for handle={handle}");
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (stream == null)
+            {
+                Console.WriteLine($"[DEBUG Primitive 145] FAIL: stream is null");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             long position = stream.Position;
+            Console.WriteLine($"[DEBUG Primitive 145] stream.Position={position}");
             if (position > 0x3FFFFFFF) position = 0x3FFFFFFF;
 
+            Console.WriteLine($"[DEBUG Primitive 145] SUCCESS: returning {position}");
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)position));
         }
     }
@@ -880,23 +1018,26 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Arguments.Length != 2)
+                return PrimitiveResult.Fail(context.Metadata!);
 
             var dirPathOOP = context.Arguments[0];
             var patternOOP = context.Arguments[1];
 
-            if (dirPathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (patternOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (dirPathOOP.IsSmallInteger || patternOOP.IsSmallInteger)
+                return PrimitiveResult.Fail(context.Metadata!);
 
             string? dirPath = ExtractString(context, dirPathOOP);
             string? pattern = ExtractString(context, patternOOP);
 
-            if (dirPath == null || pattern == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (dirPath == null || pattern == null)
+                return PrimitiveResult.Fail(context.Metadata!);
 
             try
             {
                 // Handle "." as current directory
-                if (dirPath == ".") dirPath = Directory.GetCurrentDirectory();
+                if (dirPath == ".")
+                    dirPath = Directory.GetCurrentDirectory();
 
                 var entries = Directory.GetFileSystemEntries(dirPath, pattern);
                 var names = entries.Select(Path.GetFileName).Where(n => n != null).ToArray();

@@ -201,30 +201,19 @@ internal class LiteralResolver(
     }
 
     /// <summary>
-    /// Allocates a Character object.
+    /// Gets a Character object from CharacterTable.
+    /// Blue Book specification: Characters are unique and stored in CharacterTable.
+    /// Phase 3 creates the CharacterTable with 256 canonical Character objects.
+    /// This method returns the canonical Character for the given code point.
     /// </summary>
-    /// <param name="codePoint">The Unicode code point for the character.</param>
-    /// <returns>The allocated Character object OOP.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when Character class not found.</exception>
+    /// <param name="codePoint">The character code point (0-255).</param>
+    /// <returns>The canonical Character object OOP from CharacterTable.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when CharacterTable not initialized or code point out of range.</exception>
     public SmalltalkOOP AllocateCharacter(int codePoint)
     {
-        // Look up Character class layout
-        var characterClassDefinition = ClassHierarchyTraversal.FindClassDefinition("Character", _bundle);
-        if (characterClassDefinition == null)
-        {
-            throw new InvalidOperationException("Character class not found in bundle");
-        }
-
-        var characterOOP = _allocator.AllocateFixedObject("Character");
-        // Set Character class reference
-        var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
-        _allocator.SetClassOOP(characterOOP, characterClassOOP);
-
-        // Store the code point in the Character object
-        var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
-        _allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
-
-        return characterOOP;
+        // Use CharacterRegistry to get the canonical Character from CharacterTable
+        // CharacterTable is created in Phase 3, before Phase 4 method compilation
+        return CharacterRegistry.GetCharacter(codePoint);
     }
 
     /// <summary>

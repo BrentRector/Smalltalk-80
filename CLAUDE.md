@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-25
+**Last Updated**: 2025-11-26
 
 ## Project Status
 
@@ -16,6 +16,8 @@
 ## Known Issues
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
+
+**FormMenuView .form File Loading**: `WindowsFile>>asFileStream:` calls `self size` before the file is open. Primitive 144 (GetFileSize) fails because `fileHandle` is nil. Fix needed: add `self reopen` before querying size, or handle nil handle in primitive by getting path from receiver's `fileName` instance variable.
 
 ## Migration Status
 
@@ -235,17 +237,19 @@ See `docs/Testing-Guide.md` for complete testing documentation.
 
 ## Init Expression Status
 
-**✅ Passing (46)**: Character, Float, SmallInteger, Text, Symbol, Date, File, Scanner, Debugger, InputSensor (including install and initSensor), Cursor, Object, Form, TextList, BitEditor, and 30 more
+**✅ Passing (47)**: Character, Float, SmallInteger, Text, Symbol, Date, File, Scanner, Debugger, InputSensor (including install and initSensor), Cursor, Object, Form, FormMenuView, TextList, BitEditor, and 30 more
 
-**⏭️ Skipped (1)**:
-- FormMenuView initialize - Requires file I/O primitives (98, 92, 99, 146 - not implemented)
+**⏭️ Skipped (0)**: None - all init expressions enabled
 
 **Recent Fixes**:
+- **CharacterTable Implementation**: Phase 3 creates CharacterTable Array with 256 Character objects. Phase 5 installs it as CLASS VARIABLE in Character's classPool (following USTable pattern, NOT as a global).
+- **Primitive 121 (FileOpen)**: Fixed to support both 2-arg (path, mode string) and 4-arg (path, access, share, create integers) calling conventions for WindowsFile compatibility.
+- **Primitive 110 (Character literal identity)**: Fixed comparison bug with runtime canonicalization using CharacterRegistry.
+- **WindowsFile>>asFileStream:**: Added method for FileStream compatibility. Currently fails because file not open before size query.
 - **Primitive 65 (Stream>>next)**: Fixed to return Character objects (not SmallIntegers) when reading from Strings/Symbols, enabling Scanner and --execute feature to work correctly. Uses isKindOf: semantics to handle subclasses properly.
 - Added InputSensor install and InputSensor initSensor init expressions to properly initialize Sensor global
 - Fixed Cursor initialize to set CurrentCursor (was nil, causing cursorPoint failures)
 - Modified Object initialize to comment out GUI confirmation dialog while preserving DependentsFields initialization
-- Fixed Object initialize to initialize DependentsFields before calling confirm: (chicken-egg problem)
 
 ## Development Methodology
 

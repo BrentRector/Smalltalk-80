@@ -497,29 +497,69 @@ The form editor predates modern pixel art tools but provided sophisticated bitma
 - `/home/user/Smalltalk-80/docs/Form-File-Resources.md` - Online resources for obtaining files
 - `/home/user/Smalltalk-80/docs/Graphics-Architecture.md` - Graphics system architecture
 
-## Next Steps
+## Implementation Status
 
-To enable FormMenuView initialize:
+### Form Files: COMPLETE
 
-1. **Option A: Obtain Original Files**
-   - Download from Wolczko's ST80 archive
-   - Extract from Computer History Museum Alto archive
-   - Request from Smalltalk-80 collectors/historians
+All 23 .form files have been recreated and are located in `/forms/`:
 
-2. **Option B: Recreate Files**
-   - Design icons based on tool descriptions above
-   - Use Python/C# script to generate .form files
-   - Test in Smalltalk-80 interpreter
+| File | Size | Description |
+|------|------|-------------|
+| `select.form` | 32x32 | Corner brackets for form selection |
+| `singlecopy.form` | 32x32 | Single dot for single stamp |
+| `repeatcopy.form` | 32x32 | Multiple dots for continuous copying |
+| `line.form` | 32x32 | Diagonal line for line drawing |
+| `curve.form` | 32x32 | Curved stroke for conic curves |
+| `block.form` | 32x32 | Rectangle for block fill |
+| `over.form` | 32x32 | Black over checkerboard (BitBlt rule 3) |
+| `under.form` | 32x32 | Paint behind pattern (BitBlt rule 7) |
+| `reverse.form` | 32x32 | Hourglass/XOR pattern (BitBlt rule 6) |
+| `erase.form` | 32x32 | Dashed outline with arrow (BitBlt rule 4) |
+| `in.form` | 32x32 | Left arrow (retrieve/load) |
+| `out.form` | 32x32 | Right arrow (save) |
+| `magnify.form` | 32x32 | Filled square (8x pixel editing) |
+| `white.form` | 32x32 | Empty square (white fill) |
+| `lightgray.form` | 32x32 | 25% halftone pattern |
+| `gray.form` | 32x32 | 50% checkerboard pattern |
+| `darkgray.form` | 32x32 | 75% halftone pattern |
+| `black.form` | 32x32 | Solid black square |
+| `xgrid.form` | 32x32 | Horizontal line (X snap) |
+| `ygrid.form` | 32x32 | Vertical line (Y snap) |
+| `togglegrids.form` | 32x32 | Grid with 4 quadrants |
+| `borderform.form` | 16x16 | Simple 2-line border |
+| `specialborderform.form` | 16x16 | Emphasized dashed border |
 
-3. **Option C: Screenshot Extraction**
-   - Run Smalltalk Zoo emulator
-   - Capture form editor screenshots
-   - Extract and convert icon bitmaps
+**Note**: The original Smalltalk-80 used trailing periods in filenames (e.g., `select.form.`)
+but Windows doesn't support filenames ending with periods, so they have been omitted.
 
-4. **Implement File I/O Primitives**
-   - Primitive 98, 92, 99, 146
-   - Enable FormMenuView initialize to run
-   - Unlock form editor functionality
+### Viewing the Icons
+
+To display all icons in a visual grid:
+
+```bash
+python3 tools/display_form_icons.py
+```
+
+### Regenerating Icons
+
+If icons need to be modified or regenerated:
+
+```bash
+python3 tools/generate_form_files.py
+```
+
+### Remaining Steps
+
+To fully enable FormMenuView initialize:
+
+1. **Implement File I/O Primitives** (still required)
+   - Primitive 98: File open
+   - Primitive 92: File read (nextWord for binary reads)
+   - Primitive 99: File close
+   - Primitive 146: File operations (readOnly, binary mode)
+
+2. **Copy form files to working directory**
+   - Form files must be accessible from the interpreter's working directory
 
 ## Appendix: Keyboard Reference
 
@@ -551,6 +591,7 @@ Complete keyboard mapping from `FormEditor class>>setKeyboardMap`:
 
 ---
 
-**Document Status**: Complete specification
+**Document Status**: Complete - Form files implemented
 **Last Updated**: 2025-11-25
 **Purpose**: Enable recreation of FormMenuView required .form files for Smalltalk-80 interpreter
+**Implementation**: All 23 .form files created in `/forms/` directory

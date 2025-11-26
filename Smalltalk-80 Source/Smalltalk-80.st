@@ -467,7 +467,12 @@ reopen
 asFileStream
     "Answer a FileStream on this file."
     self reopen.
-    ^FileStream on: self! !
+    ^FileStream on: self!
+
+asFileStream: aStream
+    "Initialize aStream (typically a FileStream) to access the receiver.
+    This is called by FileStream>>on: to set up the stream."
+    aStream position: 0 size: self size! !
 
 WindowsFile class
     instanceVariableNames: ''!
@@ -8064,11 +8069,8 @@ Character class
 
 !Character class methodsFor: 'class initialization'!
 initialize
-	"Create the table of unique Characters."
-	CharacterTable := Array new: 256.
-	0 to: 255 do: [:i | | char |
-		char := self basicNew setValue: i.
-		CharacterTable at: i + 1 put: char]! !
+	"Create the table of unique Characters.  This code is not shown so that the
+	user can not destroy the system by trying to recreate the table."! !
 
 !Character methodsFor: 'private'!
 setValue: anInteger

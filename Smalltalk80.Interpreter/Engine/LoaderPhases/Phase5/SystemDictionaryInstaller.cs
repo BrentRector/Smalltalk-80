@@ -25,6 +25,9 @@ public class SystemDictionaryInstaller(
         // Install USTable in Symbol's classPool (it's a class variable, not a global)
         InstallUSTableGlobal(ustableOOP);
 
+        // Install CharacterTable in Character's classPool (it's a class variable, not a global)
+        InstallCharacterTableClassVariable();
+
         // Initialize SingleCharSymbols class variable
         InitializeSingleCharSymbols();
 
@@ -75,6 +78,35 @@ public class SystemDictionaryInstaller(
         context.Allocator.SetInstanceVariable(associationOOP, 1, ustableOOP);
 
         InstallInClassPool(classPoolOOP, associationOOP, "USTable");
+    }
+
+    private void InstallCharacterTableClassVariable()
+    {
+        // CharacterTable is a CLASS VARIABLE of Character, not a global
+        // Created in Phase 3, installed here in Character's classPool
+        var characterClassOOP = GlobalRegistry.LookupClassOOP("Character");
+        if (characterClassOOP == context.HeapManager.GetNil())
+        {
+            throw new InvalidOperationException("Character class not found during CharacterTable installation");
+        }
+
+        var classPoolOOP = context.Allocator.GetInstanceVariable(characterClassOOP, 7);
+        if (classPoolOOP == context.HeapManager.GetNil())
+        {
+            throw new InvalidOperationException("Character classPool is nil during CharacterTable installation");
+        }
+
+        // Get the CharacterTable Array created in Phase 3
+        var characterTableOOP = CharacterRegistry.CharacterTableArrayOOP;
+        if (characterTableOOP == default)
+        {
+            throw new InvalidOperationException("CharacterTable not created - CharacterRegistry not initialized");
+        }
+
+        var associationOOP = associationManager.GetOrCreateCanonical("CharacterTable");
+        context.Allocator.SetInstanceVariable(associationOOP, 1, characterTableOOP);
+
+        InstallInClassPool(classPoolOOP, associationOOP, "CharacterTable");
     }
 
     private void InitializeSingleCharSymbols()

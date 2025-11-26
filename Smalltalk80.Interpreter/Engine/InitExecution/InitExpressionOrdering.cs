@@ -45,7 +45,7 @@ public static class InitExpressionOrdering
             "DisplayTextView class",
             "Encoder class",
             "Explainer class",
-            "File class",
+            // File class moved to Level 1 - depends on WindowsFileDirectory
             "FileDirectory class",
             "FileList class",
             "Form class",
@@ -102,11 +102,12 @@ public static class InitExpressionOrdering
             "WindowsFileSystem class",
             "WorkspaceView class",
 
-            // LEVEL 1: 6 classes that depend on Level 0
+            // LEVEL 1: 7 classes that depend on Level 0
+            "File class",           // depends on: WindowsFileDirectory (calls WindowsFileDirectory default)
             "BitEditor class",      // depends on: OrderedCollection, Point
             "FormEditor class",     // depends on: TextConstants (DefaultLineGrid)
             "Debugger class",       // depends on: NotifierView, Project
-            "FormMenuView class",   // depends on: DisplayScreen
+            "FormMenuView class",   // depends on: DisplayScreen, File (uses Disk from FilePool)
             "LargePositiveInteger class",  // depends on: DigitBuffer
             "Spline class",         // depends on: Point
 
