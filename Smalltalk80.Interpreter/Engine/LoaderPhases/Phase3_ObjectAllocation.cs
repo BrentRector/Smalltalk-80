@@ -519,64 +519,9 @@ public class Phase3_ObjectAllocation : IPhase
         // Set the CharacterTable Array OOP in CharacterRegistry
         CharacterRegistry.SetCharacterTableArrayOOP(characterTableOOP);
 
-        // Set CharacterTable class variable on Character class
-        // Character class has classPool dictionary containing 'CharacterTable' -> Array
-        SetCharacterTableClassVariable(characterClassOOP, characterTableOOP);
-    }
-
-    /// <summary>
-    /// Sets the CharacterTable class variable on the Character class.
-    /// In Smalltalk-80, class variables are stored in the class's classPool dictionary.
-    /// </summary>
-    private void SetCharacterTableClassVariable(SmalltalkOOP characterClassOOP, SmalltalkOOP characterTableOOP)
-    {
-        // Get classPool field index
-        int classPoolIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Class", "classPool", _bundle);
-        if (classPoolIndex < 0)
-        {
-            throw new InvalidOperationException("Class must have 'classPool' instance variable");
-        }
-
-        // Get the classPool Dictionary
-        var classPoolOOP = _allocator.GetInstanceVariable(characterClassOOP, classPoolIndex);
-
-        // If classPool is nil, we need to create a Dictionary for it
-        if (classPoolOOP == _heapManager.GetNil())
-        {
-            // Allocate a Dictionary with enough capacity for CharacterTable
-            classPoolOOP = _allocator.AllocateArray("Dictionary", 4); // Small dictionary
-
-            // Initialize Dictionary instance variables
-            int dictInstVarCount = ClassHierarchyTraversal.CalculateTotalInstanceVariableCount("Dictionary", _bundle);
-            var nilOOP = _heapManager.GetNil();
-            for (int i = 0; i < dictInstVarCount; i++)
-            {
-                _allocator.SetInstanceVariable(classPoolOOP, i, nilOOP);
-                _initializedFields.Add((classPoolOOP, i));
-            }
-
-            // Initialize indexed slots to nil
-            int capacity = _allocator.GetIndexedSize(classPoolOOP);
-            for (int i = 0; i < capacity; i++)
-            {
-                _allocator.SetIndexedOOP(classPoolOOP, i, nilOOP);
-            }
-
-            // Set class reference for the Dictionary
-            var dictionaryClassOOP = GlobalRegistry.LookupClassOOP("Dictionary");
-            _allocator.SetClassOOP(classPoolOOP, dictionaryClassOOP);
-
-            // Set the classPool on Character class
-            _allocator.SetInstanceVariable(characterClassOOP, classPoolIndex, classPoolOOP);
-            _initializedFields.Add((characterClassOOP, classPoolIndex));
-        }
-
-        // Create Association for CharacterTable -> Array
-        var characterTableSymbol = _fieldValueResolver.InternSymbol("CharacterTable");
-        var associationOOP = _dictionaryInstaller.AllocateAssociation(characterTableSymbol, characterTableOOP);
-
-        // Install Association in classPool dictionary
-        _dictionaryInstaller.InstallInDictionary(classPoolOOP, associationOOP, "CharacterTable");
+        // Register CharacterTable in GlobalRegistry to ensure it's a GC root
+        // and accessible as a global. Phase 5 will install it in SystemDictionary.
+        GlobalRegistry.Register("CharacterTable", characterTableOOP);
     }
 
     #endregion
