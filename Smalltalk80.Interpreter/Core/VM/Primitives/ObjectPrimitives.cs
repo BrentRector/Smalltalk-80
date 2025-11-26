@@ -92,49 +92,14 @@ public static class SimpleObjectPrimitives
     }
 
     /// <summary>Primitive 110: Object == (identity equals)</summary>
-    /// <remarks>
-    /// Standard identity comparison, with special handling for Character objects.
-    /// Character literals in method literal frames are created during cold start,
-    /// while CharacterTable is populated by Character initialize. These are different
-    /// objects but should compare equal if they have the same value.
-    /// </remarks>
     public class IdentityEquals : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
-            var receiver = context.Receiver;
-            var argument = context.Arguments[0];
-
-            // Fast path: identity comparison
-            if (receiver == argument)
-            {
-                return PrimitiveResult.FromBool(true, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
-            }
-
-            // Special case: Character comparison by value
-            // Character literals in compiled methods are different objects than CharacterTable entries,
-            // but they should compare equal if they have the same value (asciiValue).
-            if (!receiver.IsSmallInteger && !argument.IsSmallInteger)
-            {
-                var receiverClass = context.HeapManager.GetClassName(receiver);
-                var argumentClass = context.HeapManager.GetClassName(argument);
-
-                if (receiverClass == "Character" && argumentClass == "Character")
-                {
-                    // Compare Character values (stored in instance variable 0)
-                    var receiverValue = context.HeapManager.GetInstanceVariable(receiver, 0);
-                    var argumentValue = context.HeapManager.GetInstanceVariable(argument, 0);
-
-                    if (receiverValue == argumentValue)
-                    {
-                        return PrimitiveResult.FromBool(true, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
-                    }
-                }
-            }
-
-            return PrimitiveResult.FromBool(false, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
+            bool identical = context.Receiver == context.Arguments[0];
+            return PrimitiveResult.FromBool(identical, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 

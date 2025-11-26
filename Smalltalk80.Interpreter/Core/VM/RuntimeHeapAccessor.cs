@@ -470,6 +470,81 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     }
 
     /// <summary>
+    /// Gets the canonical Character object for a given Character OOP.
+    /// If CharacterTable is initialized, returns the canonical entry from CharacterTable.
+    /// If CharacterTable is not yet initialized (before Character initialize runs),
+    /// returns the original Character OOP unchanged.
+    ///
+    /// This is used by the bytecode interpreter to canonicalize Character literals
+    /// at runtime. Character literals in method literal frames are created during
+    /// cold start as NEW Character objects, but CharacterTable entries (created by
+    /// Character initialize) are the canonical ones that String>>at: returns.
+    /// Without canonicalization, identity comparison (==) would fail between
+    /// a literal like $. and a Character from CharacterTable.
+    /// </summary>
+    /// <param name="characterOOP">A Character object OOP (may be from literal frame or CharacterTable)</param>
+    /// <returns>The canonical Character from CharacterTable, or original if CharacterTable not initialized</returns>
+    public virtual SmalltalkOOP GetCanonicalCharacter(SmalltalkOOP characterOOP)
+    {
+        // Fast path: if CharacterTable cache is not valid, it means Character initialize
+        // hasn't run yet, so there's no canonical table to look up from
+        if (!_characterTableCacheValid)
+        {
+            // Try to get CharacterTable - this will cache it if available
+            var characterTableOOP = LookupClassVariable("Character", "CharacterTable");
+            if (characterTableOOP == metadata.KnownObjects.Nil)
+            {
+                // CharacterTable not initialized yet - return original
+                return characterOOP;
+            }
+        }
+
+        // CharacterTable is available - get the code point from the Character
+        // Character has instance variable 0 = value (the code point as SmallInteger)
+        var codePointOOP = _heapManager.GetInstanceVariable(characterOOP, 0);
+        if (!codePointOOP.IsSmallInteger)
+        {
+            // Invalid Character structure - return original
+            return characterOOP;
+        }
+
+        int codePoint = codePointOOP.AsSmallInteger();
+
+        // CharacterTable is an Array of 256 Characters indexed by ASCII value
+        // Validate code point is in range
+        int tableSize = _heapManager.GetIndexedSize(_characterTableCache);
+        if (codePoint < 0 || codePoint >= tableSize)
+        {
+            // Code point out of range - return original
+            return characterOOP;
+        }
+
+        // Get the canonical Character from CharacterTable
+        var canonicalCharacter = _heapManager.GetIndexedOOP(_characterTableCache, codePoint);
+        if (canonicalCharacter == metadata.KnownObjects.Nil)
+        {
+            // CharacterTable entry is nil - return original (shouldn't happen)
+            return characterOOP;
+        }
+
+        return canonicalCharacter;
+    }
+
+    /// <summary>
+    /// Checks if the given OOP is a Character object.
+    /// </summary>
+    public virtual bool IsCharacter(SmalltalkOOP oop)
+    {
+        if (oop.IsSmallInteger)
+            return false;
+
+        var classOOP = _heapManager.GetClassOOP(oop);
+        var characterClassOOP = GetClass("Character");
+
+        return classOOP == characterClassOOP;
+    }
+
+    /// <summary>
     /// Looks up a class variable without using the cache.
     /// Used internally by LookupClassVariable.
     /// </summary>

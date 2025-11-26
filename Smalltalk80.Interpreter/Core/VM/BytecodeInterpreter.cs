@@ -109,6 +109,16 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         {
             int index = BytecodeUtil.PushLiteralConstIndex(bytecode);
             var literal = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
+
+            // CRITICAL: Canonicalize Character literals at runtime.
+            // Character literals in method literal frames were created during cold start,
+            // but CharacterTable entries (created by Character initialize) are canonical.
+            // Without this, identity comparison (==) fails between literals and CharacterTable entries.
+            if (!literal.IsSmallInteger && runtimeHeapAccess.IsCharacter(literal))
+            {
+                literal = runtimeHeapAccess.GetCanonicalCharacter(literal);
+            }
+
             context.Push(literal);
             return true;
         }
@@ -641,6 +651,16 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     byte index = bytecodes[ip++];
                     heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var literal = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
+
+                    // CRITICAL: Canonicalize Character literals at runtime.
+                    // Character literals in method literal frames were created during cold start,
+                    // but CharacterTable entries (created by Character initialize) are canonical.
+                    // Without this, identity comparison (==) fails between literals and CharacterTable entries.
+                    if (!literal.IsSmallInteger && runtimeHeapAccess.IsCharacter(literal))
+                    {
+                        literal = runtimeHeapAccess.GetCanonicalCharacter(literal);
+                    }
+
                     context.Push(literal);
                     return true;
                 }
