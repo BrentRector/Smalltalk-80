@@ -12,12 +12,24 @@ public static class SimpleObjectPrimitives
     /// <summary>Primitive 62: Object size - returns number of indexed elements</summary>
     public class Size : IPrimitive
     {
+        private static int _logCount = 0;
+        private const int MAX_LOGS = 100;
+
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
+
+            // Debug: Track size checks on arrays that might be fileList
+            var className = context.HeapManager.GetClassName(context.Receiver);
+            if (_logCount < MAX_LOGS && className == "Array" && size > 10 && size < 50)
+            {
+                _logCount++;
+                Console.WriteLine($"[DEBUG Primitive 62] Array size={size} (OOP={context.Receiver.RawValue})");
+            }
+
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(size));
         }
     }
@@ -98,6 +110,10 @@ public static class SimpleObjectPrimitives
     /// <summary>Primitive 60: Array at: - get indexed element</summary>
     public class At : IPrimitive
     {
+        // Track if we've logged recently to avoid excessive output
+        private static int _logCount = 0;
+        private const int MAX_LOGS = 200;
+
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
@@ -106,6 +122,14 @@ public static class SimpleObjectPrimitives
 
             int index = context.Arguments[0].AsSmallInteger();
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
+
+            // Debug: Track Array accesses to help trace file iteration
+            var receiverClassName = context.HeapManager.GetClassName(context.Receiver);
+            if (_logCount < MAX_LOGS && receiverClassName == "Array" && size > 10 && size < 50)
+            {
+                _logCount++;
+                Console.WriteLine($"[DEBUG Primitive 60] Array at: {index} (size={size}, OOP={context.Receiver.RawValue})");
+            }
 
             // Smalltalk indices are 1-based
             if (index < 1 || index > size)

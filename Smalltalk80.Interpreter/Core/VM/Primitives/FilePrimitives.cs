@@ -1031,7 +1031,10 @@ public static class FileOperations
                 Console.WriteLine($"[DEBUG Primitive 146] Found {names.Length} entries:");
                 foreach (var name in names.Take(20))
                 {
-                    Console.WriteLine($"[DEBUG Primitive 146]   - {name}");
+                    // Show detailed byte info for debugging
+                    var bytes = System.Text.Encoding.ASCII.GetBytes(name!);
+                    var hexBytes = string.Join(" ", bytes.Select(b => $"{b:X2}"));
+                    Console.WriteLine($"[DEBUG Primitive 146]   - '{name}' (len={name!.Length}, bytes={hexBytes})");
                 }
                 if (names.Length > 20) Console.WriteLine($"[DEBUG Primitive 146]   ... and {names.Length - 20} more");
 
@@ -1039,11 +1042,16 @@ public static class FileOperations
                 var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
                     ?? throw new InvalidOperationException("Cannot find Array class");
                 var arrayOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP, names.Length);
+                Console.WriteLine($"[DEBUG Primitive 146] Created array OOP={arrayOOP.RawValue} with {names.Length} slots");
 
                 for (int i = 0; i < names.Length; i++)
                 {
                     var nameOOP = CreateString(context, names[i]!);
                     context.HeapManager.SetIndexedOOP(arrayOOP, i, nameOOP);
+                    // Verify the string was stored correctly
+                    var storedOOP = context.HeapManager.GetIndexedOOP(arrayOOP, i);
+                    var storedLen = context.HeapManager.GetIndexedSize(storedOOP);
+                    Console.WriteLine($"[DEBUG Primitive 146]   Stored [{i}]: OOP={nameOOP.RawValue}, len={storedLen}, verified={storedOOP.RawValue == nameOOP.RawValue}");
                 }
 
                 return PrimitiveResult.Ok(arrayOOP);
