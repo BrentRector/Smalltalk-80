@@ -1018,84 +1018,39 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            Console.WriteLine($"[DEBUG Primitive 146 ENTRY] ArgCount={context.Arguments.Length}, Receiver={context.Receiver.RawValue}");
-
             if (context.Arguments.Length != 2)
-            {
-                Console.WriteLine($"[DEBUG Primitive 146 FAIL] Wrong arg count: {context.Arguments.Length}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             var dirPathOOP = context.Arguments[0];
             var patternOOP = context.Arguments[1];
-            Console.WriteLine($"[DEBUG Primitive 146] Args: dirPath OOP={dirPathOOP.RawValue} (IsSmallInt={dirPathOOP.IsSmallInteger}), pattern OOP={patternOOP.RawValue} (IsSmallInt={patternOOP.IsSmallInteger})");
 
-            if (dirPathOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 146 FAIL] dirPath is SmallInteger");
+            if (dirPathOOP.IsSmallInteger || patternOOP.IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
-            if (patternOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 146 FAIL] pattern is SmallInteger");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             string? dirPath = ExtractString(context, dirPathOOP);
             string? pattern = ExtractString(context, patternOOP);
-            Console.WriteLine($"[DEBUG Primitive 146] Extracted: dirPath='{dirPath}', pattern='{pattern}'");
 
             if (dirPath == null || pattern == null)
-            {
-                Console.WriteLine($"[DEBUG Primitive 146 FAIL] String extraction failed: dirPath={dirPath ?? "null"}, pattern={pattern ?? "null"}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             try
             {
                 // Handle "." as current directory
                 if (dirPath == ".")
-                {
                     dirPath = Directory.GetCurrentDirectory();
-                    Console.WriteLine($"[DEBUG Primitive 146] Searching in current directory: {dirPath}");
-                }
-                else
-                {
-                    Console.WriteLine($"[DEBUG Primitive 146] Searching in: {dirPath}");
-                }
-                Console.WriteLine($"[DEBUG Primitive 146] Pattern: {pattern}");
 
                 var entries = Directory.GetFileSystemEntries(dirPath, pattern);
                 var names = entries.Select(Path.GetFileName).Where(n => n != null).ToArray();
-
-                Console.WriteLine($"[DEBUG Primitive 146] Found {names.Length} entries:");
-                // Show all .form files specifically, plus first 10 others
-                var formFiles = names.Where(n => n!.EndsWith(".form", StringComparison.OrdinalIgnoreCase)).ToList();
-                var otherFiles = names.Where(n => !n!.EndsWith(".form", StringComparison.OrdinalIgnoreCase)).ToList();
-                Console.WriteLine($"[DEBUG Primitive 146] .form files ({formFiles.Count}):");
-                foreach (var name in formFiles)
-                {
-                    var bytes = System.Text.Encoding.ASCII.GetBytes(name!);
-                    var hexBytes = string.Join(" ", bytes.Select(b => $"{b:X2}"));
-                    Console.WriteLine($"[DEBUG Primitive 146]   - '{name}' (len={name!.Length}, bytes={hexBytes})");
-                }
-                Console.WriteLine($"[DEBUG Primitive 146] Other files ({otherFiles.Count}): {string.Join(", ", otherFiles.Take(10))}{(otherFiles.Count > 10 ? "..." : "")}");
 
                 // Create Array
                 var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
                     ?? throw new InvalidOperationException("Cannot find Array class");
                 var arrayOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP, names.Length);
-                var arrayClassName = context.HeapManager.GetClassName(arrayOOP);
-                Console.WriteLine($"[DEBUG Primitive 146] Created array OOP={arrayOOP.RawValue} with {names.Length} slots, class={arrayClassName}, classOOP={arrayClassOOP.RawValue}");
 
                 for (int i = 0; i < names.Length; i++)
                 {
                     var nameOOP = CreateString(context, names[i]!);
                     context.HeapManager.SetIndexedOOP(arrayOOP, i, nameOOP);
-                    // Verify the string was stored correctly
-                    var storedOOP = context.HeapManager.GetIndexedOOP(arrayOOP, i);
-                    var storedLen = context.HeapManager.GetIndexedSize(storedOOP);
-                    Console.WriteLine($"[DEBUG Primitive 146]   Stored [{i}]: OOP={nameOOP.RawValue}, len={storedLen}, verified={storedOOP.RawValue == nameOOP.RawValue}");
                 }
 
                 return PrimitiveResult.Ok(arrayOOP);
