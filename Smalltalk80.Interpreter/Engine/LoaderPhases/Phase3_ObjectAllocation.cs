@@ -596,11 +596,7 @@ public class Phase3_ObjectAllocation : IPhase
 
             // Increment tally (instance variable 0 of Dictionary)
             var tallyOOP = _allocator.GetInstanceVariable(classPoolOOP, 0);
-            int tally = 0;
-            if (tallyOOP.IsSmallInteger)
-            {
-                tally = tallyOOP.IsSmallInteger ? (int)((tallyOOP.Value - 1) >> 1) : 0;
-            }
+            int tally = tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger() : 0;
             _allocator.SetInstanceVariable(classPoolOOP, 0, SmalltalkOOP.FromSmallInteger(tally + 1));
             _initializedFields.Add((classPoolOOP, 0));
         }
