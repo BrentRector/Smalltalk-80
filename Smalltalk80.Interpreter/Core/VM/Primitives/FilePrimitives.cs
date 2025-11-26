@@ -998,18 +998,38 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            Console.WriteLine($"[DEBUG Primitive 146 ENTRY] ArgCount={context.Arguments.Length}, Receiver={context.Receiver.RawValue}");
+
+            if (context.Arguments.Length != 2)
+            {
+                Console.WriteLine($"[DEBUG Primitive 146 FAIL] Wrong arg count: {context.Arguments.Length}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var dirPathOOP = context.Arguments[0];
             var patternOOP = context.Arguments[1];
+            Console.WriteLine($"[DEBUG Primitive 146] Args: dirPath OOP={dirPathOOP.RawValue} (IsSmallInt={dirPathOOP.IsSmallInteger}), pattern OOP={patternOOP.RawValue} (IsSmallInt={patternOOP.IsSmallInteger})");
 
-            if (dirPathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (patternOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (dirPathOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[DEBUG Primitive 146 FAIL] dirPath is SmallInteger");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (patternOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[DEBUG Primitive 146 FAIL] pattern is SmallInteger");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             string? dirPath = ExtractString(context, dirPathOOP);
             string? pattern = ExtractString(context, patternOOP);
+            Console.WriteLine($"[DEBUG Primitive 146] Extracted: dirPath='{dirPath}', pattern='{pattern}'");
 
-            if (dirPath == null || pattern == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (dirPath == null || pattern == null)
+            {
+                Console.WriteLine($"[DEBUG Primitive 146 FAIL] String extraction failed: dirPath={dirPath ?? "null"}, pattern={pattern ?? "null"}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             try
             {
