@@ -1049,14 +1049,17 @@ public static class FileOperations
                 var names = entries.Select(Path.GetFileName).Where(n => n != null).ToArray();
 
                 Console.WriteLine($"[DEBUG Primitive 146] Found {names.Length} entries:");
-                foreach (var name in names.Take(20))
+                // Show all .form files specifically, plus first 10 others
+                var formFiles = names.Where(n => n!.EndsWith(".form", StringComparison.OrdinalIgnoreCase)).ToList();
+                var otherFiles = names.Where(n => !n!.EndsWith(".form", StringComparison.OrdinalIgnoreCase)).ToList();
+                Console.WriteLine($"[DEBUG Primitive 146] .form files ({formFiles.Count}):");
+                foreach (var name in formFiles)
                 {
-                    // Show detailed byte info for debugging
                     var bytes = System.Text.Encoding.ASCII.GetBytes(name!);
                     var hexBytes = string.Join(" ", bytes.Select(b => $"{b:X2}"));
                     Console.WriteLine($"[DEBUG Primitive 146]   - '{name}' (len={name!.Length}, bytes={hexBytes})");
                 }
-                if (names.Length > 20) Console.WriteLine($"[DEBUG Primitive 146]   ... and {names.Length - 20} more");
+                Console.WriteLine($"[DEBUG Primitive 146] Other files ({otherFiles.Count}): {string.Join(", ", otherFiles.Take(10))}{(otherFiles.Count > 10 ? "..." : "")}");
 
                 // Create Array
                 var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
