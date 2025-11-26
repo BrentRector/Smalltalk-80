@@ -126,7 +126,12 @@ public static class SimpleObjectPrimitives
 
             // Debug: Track ALL Array accesses to see if fileList is being accessed
             var receiverClassName = context.HeapManager.GetClassName(context.Receiver);
-            if (_logCount < MAX_LOGS && receiverClassName == "Array")
+            // Unconditionally log Array with size 38 (fileList) regardless of log count
+            if (receiverClassName == "Array" && size == 38)
+            {
+                Console.WriteLine($"[DEBUG Primitive 60] Array at: {index} (size={size}, OOP={context.Receiver.RawValue})");
+            }
+            else if (_logCount < MAX_LOGS && receiverClassName == "Array")
             {
                 _logCount++;
                 Console.WriteLine($"[DEBUG Primitive 60] Array at: {index} (size={size}, OOP={context.Receiver.RawValue})");
