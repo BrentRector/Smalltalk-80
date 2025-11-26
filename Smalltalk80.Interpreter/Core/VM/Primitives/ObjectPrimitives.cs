@@ -12,43 +12,12 @@ public static class SimpleObjectPrimitives
     /// <summary>Primitive 62: Object size - returns number of indexed elements</summary>
     public class Size : IPrimitive
     {
-        private static int _logCount = 0;
-        private const int MAX_LOGS = 500;
-        private static int _stringLogCount = 0;
-        private const int MAX_STRING_LOGS = 100;
-
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-
-            var className = context.HeapManager.GetClassName(context.Receiver);
-
-            // Debug: Track size checks on Arrays to see if fileList is being accessed
-            if (_logCount < MAX_LOGS && className == "Array" && size > 30)
-            {
-                _logCount++;
-                Console.WriteLine($"[DEBUG Primitive 62] Array size={size} (OOP={context.Receiver.RawValue})");
-            }
-
-            // Debug: Track String size checks to see what filenames are being compared
-            // String comparisons in sameAs: call size on both strings first
-            if (_stringLogCount < MAX_STRING_LOGS && (className == "String" || className == "Symbol") && size >= 5 && size <= 25)
-            {
-                // Extract string content for debugging
-                var bytes = new byte[size];
-                for (int i = 0; i < size; i++)
-                    bytes[i] = context.HeapManager.GetIndexedByte(context.Receiver, i);
-                var stringContent = System.Text.Encoding.ASCII.GetString(bytes);
-                if (stringContent.Contains(".form") || stringContent.Contains("form"))
-                {
-                    _stringLogCount++;
-                    Console.WriteLine($"[DEBUG Primitive 62] String size={size}: '{stringContent}'");
-                }
-            }
-
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(size));
         }
     }
