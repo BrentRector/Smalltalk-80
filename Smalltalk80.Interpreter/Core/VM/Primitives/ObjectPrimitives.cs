@@ -22,9 +22,10 @@ public static class SimpleObjectPrimitives
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
 
-            // Debug: Track ALL Array size checks to see if fileList is being accessed
+            // Debug: Track size checks on Arrays to see if fileList is being accessed
+            // fileList should be an Array with ~38 elements
             var className = context.HeapManager.GetClassName(context.Receiver);
-            if (_logCount < MAX_LOGS && className == "Array")
+            if (_logCount < MAX_LOGS && className == "Array" && size > 30)
             {
                 _logCount++;
                 Console.WriteLine($"[DEBUG Primitive 62] Array size={size} (OOP={context.Receiver.RawValue})");

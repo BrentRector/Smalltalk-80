@@ -380,6 +380,13 @@ public partial class VirtualMachine
 
             if (_primitiveSuccess)
             {
+                // DEBUG: Trace primitive 146 return handling
+                if (primitiveNumber == 146)
+                {
+                    var className = primitiveResult.IsSmallInteger ? "SmallInteger" : _heapManager.GetClassName(primitiveResult);
+                    Console.WriteLine($"[DEBUG Primitive 146 PUSH] About to push {className} OOP={primitiveResult.RawValue} to stack in context {_contextManager.ActiveContext.RawValue}");
+                }
+
                 // Check if primitive created a new context (e.g., block invocation via Primitive 207)
                 if (_contextSwitchedByPrimitive)
                 {
