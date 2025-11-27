@@ -42551,45 +42551,64 @@ My initialize method displays all 23 forms in a grid on the Display.'!
 !FormDisplayTest class methodsFor: 'class initialization'!
 
 initialize
-	"Display all 23 forms loaded by FormMenuView in a grid on the Display.
-	Forms are: 21 from FormButtons + SpecialBorderForm + BorderForm."
+	"Display forms in two grids: direct file reads on top, cache reads below."
 
-	| forms x y spacing formWidth formHeight cols rows index form buttons |
+	| directForms cacheForms x y spacing formWidth formHeight cols rows index form buttons names |
 
-	"Collect all forms from FormMenuView class variables"
-	forms _ OrderedCollection new.
-
-	"Get FormButtons - each is a FormButtonCache with a form"
-	buttons _ FormMenuView classPool at: #FormButtons ifAbsent: [nil].
-	buttons isNil ifFalse: [
-		buttons do: [:cache |
-			cache form isNil ifFalse: [forms add: cache form]]].
-
-	"Get SpecialBorderForm and BorderForm"
-	(FormMenuView classPool at: #SpecialBorderForm ifAbsent: [nil]) isNil ifFalse: [
-		forms add: (FormMenuView classPool at: #SpecialBorderForm)].
-	(FormMenuView classPool at: #BorderForm ifAbsent: [nil]) isNil ifFalse: [
-		forms add: (FormMenuView classPool at: #BorderForm)].
-
-	forms isEmpty ifTrue: [^self].
-
-	"Calculate grid layout - 6 columns x 4 rows for 23 forms"
 	cols _ 6.
 	rows _ 4.
 	formWidth _ 64.
 	formHeight _ 48.
-	spacing _ 20.
+	spacing _ 16.
 
-	"Starting position - center the grid"
+	"=== PART 1: Direct file reads ==="
+	names _ #('select.form' 'singlecopy.form' 'repeatcopy.form' 'line.form' 'curve.form'
+		'block.form' 'over.form' 'under.form' 'reverse.form' 'erase.form' 'in.form'
+		'magnify.form' 'white.form' 'lightgray.form' 'gray.form' 'darkgray.form' 'black.form'
+		'xgrid.form' 'ygrid.form' 'togglegrids.form' 'out.form'
+		'specialborderform.form' 'borderform.form').
+
+	directForms _ OrderedCollection new.
+	names do: [:name |
+		form _ Form readFrom: name.
+		form isNil ifFalse: [directForms add: form]].
+
+	"Display direct-read forms at top"
 	x _ (Display width - (cols * (formWidth + spacing))) // 2.
-	y _ (Display height - (rows * (formHeight + spacing))) // 2.
+	y _ 20.
 
-	"Display each form in the grid"
 	index _ 1.
 	0 to: rows - 1 do: [:row |
 		0 to: cols - 1 do: [:col |
-			index <= forms size ifTrue: [
-				form _ forms at: index.
+			index <= directForms size ifTrue: [
+				form _ directForms at: index.
+				form displayOn: Display
+					at: (x + (col * (formWidth + spacing))) @ (y + (row * (formHeight + spacing))).
+				index _ index + 1]]].
+
+	"=== PART 2: Cache reads ==="
+	cacheForms _ OrderedCollection new.
+
+	"Get FormButtons from cache"
+	buttons _ FormMenuView classPool at: #FormButtons ifAbsent: [nil].
+	buttons isNil ifFalse: [
+		buttons do: [:cache |
+			cache form isNil ifFalse: [cacheForms add: cache form]]].
+
+	"Get SpecialBorderForm and BorderForm from cache"
+	(FormMenuView classPool at: #SpecialBorderForm ifAbsent: [nil]) isNil ifFalse: [
+		cacheForms add: (FormMenuView classPool at: #SpecialBorderForm)].
+	(FormMenuView classPool at: #BorderForm ifAbsent: [nil]) isNil ifFalse: [
+		cacheForms add: (FormMenuView classPool at: #BorderForm)].
+
+	"Display cache forms below direct forms"
+	y _ 20 + (rows * (formHeight + spacing)) + 40.
+
+	index _ 1.
+	0 to: rows - 1 do: [:row |
+		0 to: cols - 1 do: [:col |
+			index <= cacheForms size ifTrue: [
+				form _ cacheForms at: index.
 				form displayOn: Display
 					at: (x + (col * (formWidth + spacing))) @ (y + (row * (formHeight + spacing))).
 				index _ index + 1]]].
