@@ -379,7 +379,18 @@ error
     ^error!
 
 error: aBoolean
-    error _ aBoolean! !
+    error _ aBoolean!
+
+exists
+    "Answer whether this file exists on disk."
+    | attrs |
+    attrs _ self primGetAttributes: self fullName.
+    ^attrs notNil and: [(attrs at: #attributes ifAbsent: [16rFFFFFFFF]) ~= 16rFFFFFFFF]!
+
+primGetAttributes: path
+    "Get file attributes. Primitive 154 returns a Dictionary or nil."
+    <primitive: 154>
+    ^nil! !
 
 !WindowsFile methodsFor: 'page initialization'!
 
@@ -1131,8 +1142,9 @@ find: aFile ifAbsentDo: aBlock
     | fname |
     fname _ self checkNameOfFile: aFile fixErrors: true.
     aFile fileName: fname.
-    "Check if file exists by trying to get its size (avoids directory scan)"
-    [aFile size. ^aFile] on: Error do: [:ex | ^aBlock value: aFile]!
+    "Check if file exists directly (avoids directory scan)"
+    aFile exists ifTrue: [^aFile].
+    ^aBlock value: aFile!
 
 findKey: aFileName
     "Find by name or error."
