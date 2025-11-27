@@ -1126,13 +1126,13 @@ find: aFile
     ^self find: aFile ifAbsentDo: [:f | nil]!
 
 find: aFile ifAbsentDo: aBlock
-    "Return aFile if found, otherwise evaluate aBlock."
+    "Return aFile if found, otherwise evaluate aBlock.
+     Optimized to check file existence directly instead of iterating directory."
     | fname |
     fname _ self checkNameOfFile: aFile fixErrors: true.
     aFile fileName: fname.
-    self do: [:each |
-        (fname sameAs: each fileName) ifTrue: [^each]].
-    ^aBlock value: aFile!
+    "Check if file exists by trying to get its size (avoids directory scan)"
+    [aFile size. ^aFile] on: Error do: [:ex | ^aBlock value: aFile]!
 
 findKey: aFileName
     "Find by name or error."
