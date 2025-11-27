@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 
@@ -172,6 +173,20 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("FileOpen", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
+        {
             int accessMode, shareMode, createMode;
             string? path;
 
@@ -258,6 +273,20 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("FileClose", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
+        {
             if (context.Arguments.Length != 1)
                 return PrimitiveResult.Fail(context.Metadata!);
 
@@ -281,6 +310,20 @@ public static class FileOperations
     public class FileRead : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("FileRead", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 3)
                 return PrimitiveResult.Fail(context.Metadata!);
@@ -655,6 +698,20 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("GetFileAttributes", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
+        {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
@@ -931,6 +988,20 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("FileExists", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
+        {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
@@ -955,6 +1026,20 @@ public static class FileOperations
     public class GetFileSize : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("GetFileSize", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1)
                 return PrimitiveResult.Fail(context.Metadata!);
