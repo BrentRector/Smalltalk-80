@@ -226,273 +226,478 @@ WindowsPathName class
 "==================== WindowsFile ===================="
 
 Object subclass: #WindowsFile
-    instanceVariableNames: 'fileHandle fileName position readLimit writeLimit isBinary fileDirectory'
+    instanceVariableNames: 'fileName fileDirectory serialNumber lastPageNumber binary readWrite error'
     classVariableNames: ''
     poolDictionaries: ''
     category: 'System-Files'!
 
 WindowsFile comment:
-'I represent a file in the Windows file system. I provide basic file operations
-using primitives 90–100 which interface directly with the Windows OS file system.'!
+'I represent a file in the Windows file system. I implement the File protocol,
+managing file metadata and creating WindowsFilePage instances for I/O operations.
+
+Instance Variables:
+    fileName        <String> the name of the file
+    fileDirectory   <WindowsFileDirectory> the directory containing this file
+    serialNumber    <Integer> unique identifier for the file
+    lastPageNumber  <Integer> number of pages (always 1 for Windows files)
+    binary          <Boolean> true if file is in binary mode
+    readWrite       <Integer> access mode flags
+    error           <Boolean> true if an error has occurred'!
 
 !WindowsFile class methodsFor: 'instance creation'!
 
 named: aFileName
-    ^self new openNamed: aFileName mode: 'r'!
+    "Create a file with the given name."
+    ^self new fileName: aFileName!
 
 named: aFileName mode: modeString
-    ^self new openNamed: aFileName mode: modeString! !
+    "Create a file with the given name and mode."
+    | file |
+    file _ self new fileName: aFileName.
+    modeString = 'w' ifTrue: [file readWrite].
+    ^file!
 
-!WindowsFile methodsFor: 'file operations'!
+on: aFileDirectory named: aFileName
+    "Create a file in the given directory."
+    ^self new directory: aFileDirectory; fileName: aFileName! !
 
-openNamed: aFileName mode: modeString
-    "Open the file with given name and mode. Sets all instance variables."
-    fileHandle _ self primOpen: aFileName mode: modeString.
-    fileName _ aFileName.
-    position _ 0.
-    readLimit _ self size.
-    writeLimit _ self size.
-    isBinary _ false.
-    ^self!
+!WindowsFile methodsFor: 'initialization'!
 
-close
-    <primitive: 122>
-    fileHandle ifNotNil: [
-        self primClose: fileHandle.
-        fileHandle _ nil].
-    ^self!
-
-delete
-    <primitive: 125>
-    self close.
-    self primDelete: fileName.
+initialize
+    "Initialize a new file."
+    serialNumber _ 0.
+    lastPageNumber _ 1.
+    binary _ false.
+    readWrite _ 0.
+    error _ false.
     ^self! !
 
 !WindowsFile methodsFor: 'accessing'!
 
-size
-    <primitive: 144>
-    ^self primSize: fileHandle!
-
-dataSize
-    "Answer the size of the data portion. For WindowsFile, this is the same as size
-    (no header or page structure)."
-    ^self size!
-
-position
-    <primitive: 145>
-    ^position!
-
-position: anInteger
-    "Set the file position to anInteger. Uses the primitive via primSetPosition:to:."
-    self primSetPosition: fileHandle to: anInteger.
-    position _ anInteger.
-    ^self!
-
 fileName
     ^fileName!
 
-isBinary
-    ^isBinary!
-
-binary
-    isBinary _ true.
-    ^self!
-
-text
-    isBinary _ false.
-    ^self!
-
-file
-    "Answer the file associated with this page. For WindowsFile, this is self
-    since WindowsFile combines the file and page functionality."
-    ^self! !
-
-!WindowsFile methodsFor: 'reading'!
-
-next
-    | byte |
-    byte _ self nextByte.
-    isBinary ifTrue: [^byte].
-    byte = 13 ifTrue: [
-        self peek = 10 ifTrue: [position _ position + 1]].
-    ^byte!
-
-nextByte
-    "Read and return the next byte from the file."
-    | byte |
-    byte _ self primAt: fileHandle position: position.
-    position _ position + 1.
-    ^byte!
-
-peek
-    ^self primAt: fileHandle position: position!
-
-next: count
-    | bytes |
-    bytes _ ByteArray new: count.
-    1 to: count do: [:i | bytes at: i put: self nextByte].
-    ^bytes!
-
-nextWord
-    | low high |
-    low _ self nextByte.
-    high _ self nextByte.
-    ^(high bitShift: 8) + low! !
-
-!WindowsFile methodsFor: 'writing'!
-
-nextPut: aByte
-    isBinary 
-        ifTrue: [self nextPutByte: aByte]
-        ifFalse: [
-            self nextPutByte: aByte.
-            aByte = 13 ifTrue: [self nextPutByte: 10]].
-    ^aByte!
-
-nextPutByte: aByte
-    "Write a byte to the file at the current position."
-    self primAt: fileHandle position: position put: aByte.
-    position _ position + 1.
-    ^aByte!
-
-nextPutAll: aCollection
-    aCollection do: [:byte | self nextPut: byte].
-    ^aCollection!
-
-nextWordPut: anInteger
-    self nextPutByte: (anInteger bitAnd: 255).
-    self nextPutByte: ((anInteger bitShift: -8) bitAnd: 255).
-    ^anInteger!
-
-cr
-    self nextPut: 13!
-
-lf
-    self nextPut: 10!
-
-crlf
-    self cr; lf!
-
-flush
-    "No explicit flush primitive — handled by OS."
-    ^self! !
-
-!WindowsFile methodsFor: 'testing'!
-
-atEnd
-    ^position >= self size!
-
-exists
-    ^fileHandle notNil! !
-
-!WindowsFile methodsFor: 'positioning'!
-
-reset
-    self position: 0!
-
-skip: anInteger
-    self position: position + anInteger!
-
-setToEnd
-    self position: self size! !
-
-!WindowsFile methodsFor: 'private-primitives'!
-
-primOpen: aFileName mode: modeString
-    <primitive: 121>
-    self primitiveFailed!
-
-primClose: handle
-    <primitive: 122>
-    self primitiveFailed!
-
-primDelete: aFileName
-    <primitive: 125>
-    self primitiveFailed!
-
-primAt: handle position: pos
-    <primitive: 132>
-    self primitiveFailed!
-
-primAt: handle position: pos put: byte
-    <primitive: 134>
-    self primitiveFailed!
-
-primSize: handle
-    <primitive: 144>
-    self primitiveFailed!
-
-primPosition: handle
-    <primitive: 145>
-    self primitiveFailed!
-
-primSetPosition: handle to: pos
-    <primitive: 124>
-    self primitiveFailed! !
-
-
-!WindowsFile methodsFor: 'file accessing'!
+fileName: aString
+    fileName _ aString!
 
 directory
-    "Answer the directory containing this file."
     ^fileDirectory!
 
 directory: aFileDirectory
-    "Set the directory."
     fileDirectory _ aFileDirectory!
 
-fileName: aString
-    "Set the file name."
-    fileName _ aString!
-
 fullName
-    "Answer full path name."
+    "Answer the full path name."
     fileDirectory isNil
         ifTrue: [^fileName]
         ifFalse: [^fileDirectory fullNameFor: fileName]!
 
-rename: newFileName
-    "Rename this file."
-    fileDirectory rename: self newName: newFileName! !
+serialNumber
+    "Answer the serial number for this file."
+    ^serialNumber!
+
+serialNumber: anInteger
+    serialNumber _ anInteger!
+
+lastPageNumber
+    "Answer the last page number. Windows files are single-page."
+    ^lastPageNumber!
+
+characterSize
+    "Answer the size of the file in characters."
+    | page |
+    page _ self readPageNumber: 1.
+    page isNil ifTrue: [^0].
+    ^page size!
+
+size
+    "Answer the number of pages in the file."
+    ^lastPageNumber! !
+
+!WindowsFile methodsFor: 'file modes'!
+
+binary
+    "Set the file to binary mode."
+    binary _ true!
+
+text
+    "Set the file to text mode."
+    binary _ false!
+
+isBinary
+    ^binary!
+
+isText
+    ^binary == false!
+
+readOnly
+    "Set the file to read-only mode."
+    readWrite _ 0!
+
+readWrite
+    "Set the file to read-write mode."
+    readWrite _ 1! !
 
 !WindowsFile methodsFor: 'file status'!
 
-reinitialize
-    "Reset to initial status."
-    position _ 0.
-    isBinary _ false.
+open
+    "Open the file for access."
+    lastPageNumber _ 1.
     ^self!
+
+close
+    "Close the file."
+    ^self!
+
+reopen
+    "Reopen the file."
+    ^self open!
 
 release
     "Release the file."
     self close!
 
-reopen
-    "Reopen the file."
-    self openNamed: fileName mode: 'r'! !
+reinitialize
+    "Reset to initial state."
+    serialNumber _ 0.
+    lastPageNumber _ 1.
+    binary _ false.
+    readWrite _ 0.
+    error _ false.
+    ^self!
+
+delete
+    "Delete the file."
+    <primitive: 125>
+    ^self!
+
+rename: newFileName
+    "Rename this file."
+    fileDirectory rename: self newName: newFileName!
+
+error
+    ^error!
+
+error: aBoolean
+    error _ aBoolean! !
+
+!WindowsFile methodsFor: 'page initialization'!
+
+initPageNumber: aPageNumber
+    "Initialize for a specific page number. Used by WindowsFileDirectory>>newPage."
+    lastPageNumber _ aPageNumber max: 1.
+    ^self! !
+
+!WindowsFile methodsFor: 'page accessing'!
+
+pageClass
+    "Answer the class to use for file pages."
+    ^WindowsFilePage!
+
+readPageNumber: aPageNumber
+    "Answer a page for the given page number, or nil if it doesn't exist."
+    | page |
+    aPageNumber < 1 ifTrue: [^nil].
+    aPageNumber > lastPageNumber ifTrue: [^nil].
+    page _ self pageClass new.
+    page file: self.
+    page pageNumber: aPageNumber.
+    binary ifTrue: [page binary] ifFalse: [page text].
+    ^page!
+
+readOrAddPageNumber: aPageNumber
+    "Answer a page for the given page number, creating it if needed."
+    | page |
+    aPageNumber < 1 ifTrue: [^nil].
+    aPageNumber > lastPageNumber ifTrue: [lastPageNumber _ aPageNumber].
+    page _ self pageClass new.
+    page file: self.
+    page pageNumber: aPageNumber.
+    binary ifTrue: [page binary] ifFalse: [page text].
+    ^page!
+
+initPage: aPage
+    "Initialize a page for this file."
+    aPage file: self.
+    binary ifTrue: [aPage binary] ifFalse: [aPage text].
+    ^aPage!
+
+read: aPage
+    "Read the page from disk. For Windows, this is a no-op as we read on demand."
+    ^aPage!
+
+write: aPage
+    "Write the page to disk. For Windows, handled by the page itself."
+    ^aPage!
+
+endFile: aPage
+    "Truncate the file at the given page."
+    ^aPage! !
 
 !WindowsFile methodsFor: 'converting'!
 
 asFileStream
     "Answer a FileStream on this file."
-    self reopen.
-    ^FileStream on: self!
-
-asFileStream: aStream
-    "Initialize aStream (typically a FileStream) to access the receiver.
-    This is called by FileStream>>on: to set up the stream.
-    Read file contents into a String buffer and set up the stream directly,
-    avoiding the page-based read: mechanism which requires closed to be initialized."
-    | contents sz |
-    fileHandle isNil ifTrue: [self reopen].
-    sz _ self size.
-    self position: 0.
-    contents _ String new: sz.
-    1 to: sz do: [:i | contents at: i put: (self nextByte) asCharacter].
-    aStream on: contents from: 1 to: sz! !
+    self open.
+    ^FileStream on: (self readOrAddPageNumber: 1)! !
 
 WindowsFile class
+    instanceVariableNames: ''!
+
+"==================== WindowsFilePage ===================="
+
+Object subclass: #WindowsFilePage
+    instanceVariableNames: 'file binary fileHandle position pageNumber dataEnd'
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'System-Files'!
+
+WindowsFilePage comment:
+'I represent a page of data from a WindowsFile. I implement the FilePage protocol
+for FileStream compatibility.
+
+For Windows files, there is always exactly one page per file (no paging).
+I handle the actual file I/O through primitives.
+
+Instance Variables:
+    file        <WindowsFile> the file I belong to
+    binary      <Boolean> true if in binary mode
+    fileHandle  <Integer> the OS file handle
+    position    <Integer> current position in the file
+    pageNumber  <Integer> my page number (always 1)
+    dataEnd     <Integer> end of valid data in the page'!
+
+!WindowsFilePage methodsFor: 'initialization'!
+
+initialize
+    binary _ false.
+    position _ 0.
+    pageNumber _ 1.
+    dataEnd _ 0.
+    ^self! !
+
+!WindowsFilePage methodsFor: 'file accessing'!
+
+file
+    "Answer the file I belong to."
+    ^file!
+
+file: aFile
+    "Set the file I belong to."
+    file _ aFile! !
+
+!WindowsFilePage methodsFor: 'page accessing'!
+
+pageNumber
+    "Answer my page number."
+    ^pageNumber ifNil: [1]!
+
+pageNumber: anInteger
+    "Set my page number."
+    pageNumber _ anInteger!
+
+serialNumber
+    "Answer the serial number of my file."
+    ^file serialNumber! !
+
+!WindowsFilePage methodsFor: 'accessing'!
+
+size
+    "Answer the size of data in this page."
+    fileHandle isNil ifTrue: [self openForRead].
+    fileHandle isNil ifTrue: [^0].
+    ^self primSize: fileHandle!
+
+dataSize
+    "Answer the maximum data size. For Windows files, this is the file size."
+    ^self size!
+
+headerSize
+    "Answer the header size. Windows files have no header."
+    ^0!
+
+trailerSize
+    "Answer the trailer size. Windows files have no trailer."
+    ^0!
+
+pageSize
+    "Answer the total page size."
+    ^self headerSize + self dataSize + self trailerSize!
+
+dataBeginning
+    "Answer the index for the first data element minus 1."
+    binary
+        ifTrue: [^self headerSize]
+        ifFalse: [^0]!
+
+dataEnd
+    "Answer the index for the last data element."
+    ^self dataBeginning + (dataEnd ifNil: [self size])!
+
+dataEnd: anIndex
+    "Set the end of valid data."
+    dataEnd _ anIndex - self dataBeginning!
+
+dataMaxEnd
+    "Answer the maximum possible data end index."
+    ^self dataBeginning + self dataSize!
+
+dataString
+    "Answer the page data as a string."
+    | contents sz |
+    sz _ self size.
+    contents _ String new: sz.
+    self openForRead.
+    self primSetPosition: fileHandle to: 0.
+    1 to: sz do: [:i |
+        contents at: i put: (self primAt: fileHandle position: i - 1) asCharacter].
+    ^contents! !
+
+!WindowsFilePage methodsFor: 'testing'!
+
+isEmpty
+    "Answer whether this page has no data."
+    ^self size = 0!
+
+isFull
+    "Answer whether this page is full."
+    ^true!
+
+lastPage
+    "Answer whether this is the last page. Windows files are single-page."
+    ^true!
+
+isBinary
+    ^binary!
+
+isText
+    ^binary == false! !
+
+!WindowsFilePage methodsFor: 'file modes'!
+
+binary
+    "Set to binary mode."
+    binary _ true!
+
+text
+    "Set to text mode."
+    binary _ false! !
+
+!WindowsFilePage methodsFor: 'file status'!
+
+reinitialize
+    "Reset to initial state."
+    position _ 0.
+    dataEnd _ 0.
+    ^self!
+
+reopen
+    "Reopen the file."
+    self close.
+    self openForRead!
+
+close
+    "Close the file handle."
+    fileHandle ifNotNil: [
+        self primClose: fileHandle.
+        fileHandle _ nil]! !
+
+!WindowsFilePage methodsFor: 'converting'!
+
+asFileStream: aStream
+    "Initialize aStream to access my data. Called by FileStream>>on:.
+    This is the CRITICAL method for FileStream integration."
+    | contents sz offset sourceData |
+
+    "Open file and read contents"
+    self openForRead.
+    sz _ self size.
+    offset _ self headerSize.
+    sourceData _ self dataString.
+
+    "Initialize the stream with file contents"
+    binary
+        ifTrue: [
+            aStream
+                on: sourceData
+                from: offset + 1
+                to: offset + sz]
+        ifFalse: [
+            | destData |
+            destData _ String new: self dataSize.
+            destData replaceFrom: 1 to: sz withByteArray: sourceData startingAt: offset + 1.
+            aStream on: destData from: 1 to: sz]!
+
+fromFileStream: aStream
+    "Copy data from aStream back to file. Called by FileStream>>flush."
+    | sourceData |
+
+    "Open file for writing"
+    self openForWrite.
+
+    "Write stream contents to file"
+    sourceData _ aStream contents.
+    position _ 0.
+    sourceData do: [:char |
+        self primAt: fileHandle position: position put: char asInteger.
+        position _ position + 1].
+
+    "Update data end"
+    dataEnd _ sourceData size! !
+
+!WindowsFilePage methodsFor: 'nonhomogeneous accessing'!
+
+readPageNumber: aPageNumber
+    "Read and return a page with the given number."
+    self pageNumber: aPageNumber.
+    dataEnd _ 0.
+    ^file read: self!
+
+write
+    "Write this page to its file."
+    ^file write: self! !
+
+!WindowsFilePage methodsFor: 'private'!
+
+openForRead
+    "Open the file for reading."
+    fileHandle ifNil: [
+        file isNil ifFalse: [
+            fileHandle _ self primOpen: file fullName mode: 'r']]!
+
+openForWrite
+    "Open the file for writing."
+    fileHandle ifNotNil: [self close].
+    file isNil ifFalse: [
+        fileHandle _ self primOpen: file fullName mode: 'w']! !
+
+!WindowsFilePage methodsFor: 'private-primitives'!
+
+primOpen: aFileName mode: modeString
+    <primitive: 121>
+    ^nil!
+
+primClose: handle
+    <primitive: 122>
+    ^self!
+
+primAt: handle position: pos
+    <primitive: 132>
+    ^0!
+
+primAt: handle position: pos put: byte
+    <primitive: 134>
+    ^byte!
+
+primSize: handle
+    <primitive: 144>
+    ^0!
+
+primSetPosition: handle to: pos
+    <primitive: 124>
+    ^self! !
+
+WindowsFilePage class
     instanceVariableNames: ''!
 
 "==================== WindowsFileDirectory ===================="
