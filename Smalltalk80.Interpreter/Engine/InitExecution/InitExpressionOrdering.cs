@@ -142,20 +142,21 @@ public static class InitExpressionOrdering
         // LEVEL 1: 7 classes (indices 80-86)
         // LEVEL 2: 1 class (index 87)
         // LEVEL 3: 1 class (index 88) - Delay
-        // LEVEL 4: 1 class (index 89) - FormDisplayTest (runs last)
-        var levels = new List<List<string>>
+        // LEVEL 4: 1 class (index 89) - FormDisplayTest (runs LAST, after remaining)
+        var mainLevels = new List<List<string>>
         {
             dependencyOrder.Take(80).ToList(),      // Level 0
             dependencyOrder.Skip(80).Take(7).ToList(), // Level 1
             dependencyOrder.Skip(87).Take(1).ToList(), // Level 2
-            dependencyOrder.Skip(88).Take(1).ToList(), // Level 3
-            dependencyOrder.Skip(89).ToList()       // Level 4
+            dependencyOrder.Skip(88).Take(1).ToList()  // Level 3
         };
 
-        // Process each level
-        foreach (var levelClasses in levels)
+        // Level 4 is special - runs AFTER all remaining expressions
+        var testClasses = dependencyOrder.Skip(89).ToList(); // Level 4
+
+        // Helper function to process a level
+        void ProcessLevel(List<string> levelClasses)
         {
-            // Find indices for all classes in this level
             var levelIndices = new List<(int index, int bytecodeLength)>();
 
             foreach (var className in levelClasses)
@@ -194,13 +195,45 @@ public static class InitExpressionOrdering
             result.AddRange(sortedLevel.Select(x => x.index));
         }
 
-        // Add any remaining indices that weren't in dependency order (at the end)
-        // These are init expressions that don't match our dependency analysis
+        // Process Levels 0-3 first
+        foreach (var levelClasses in mainLevels)
+        {
+            ProcessLevel(levelClasses);
+        }
+
+        // Add any remaining indices that weren't in dependency order
+        // These run BEFORE test classes (Level 4)
         if (remainingIndices.Count > 0)
         {
-            Console.WriteLine($"  ⚠️  {remainingIndices.Count} init expressions not in dependency order (appending at end)");
-            result.AddRange(remainingIndices.OrderBy(i => i));
+            // Save test class indices before adding remaining
+            var testClassIndices = new HashSet<int>();
+            foreach (var className in testClasses)
+            {
+                var bareClassName = className.Replace(" class", "");
+                var expectedSource = $"{bareClassName} initialize";
+                for (int i = 0; i < bundle.InitExpressions.Length; i++)
+                {
+                    if (remainingIndices.Contains(i) && bundle.InitExpressions[i].Source == expectedSource)
+                    {
+                        testClassIndices.Add(i);
+                        break;
+                    }
+                }
+            }
+
+            // Add non-test remaining indices
+            var nonTestRemaining = remainingIndices.Where(i => !testClassIndices.Contains(i)).OrderBy(i => i).ToList();
+            if (nonTestRemaining.Count > 0)
+            {
+                Console.WriteLine($"  ⚠️  {nonTestRemaining.Count} init expressions not in dependency order (appending before test classes)");
+                result.AddRange(nonTestRemaining);
+                foreach (var idx in nonTestRemaining)
+                    remainingIndices.Remove(idx);
+            }
         }
+
+        // Finally, process Level 4 (test classes) - runs LAST
+        ProcessLevel(testClasses);
 
         return result;
     }
