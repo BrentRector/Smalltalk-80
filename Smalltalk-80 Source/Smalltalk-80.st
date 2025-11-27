@@ -20600,11 +20600,10 @@ fromUser: aPoint
 	aRectangle _ Rectangle fromUser: aPoint.
 	^self new fromDisplay: aRectangle!
 readFormFile: file
-	"Answer an instance of me with bitmap initialized from the external file.  The file format is:  fileCode(1), extent, offset, bits."
+	"Answer an instance of me with bitmap initialized from the external file.  The file format is:  fileCode(1), extent, offset, bits.
+	Note: fileCode has already been read and validated by readFrom:, so file is positioned at the extent."
 
 	| newForm newWidth newHeight theBits filePosition offsetX offsetY |
-	file readOnly; binary.
-	file nextWord = 1 ifFalse: [^(Form new extent: 8 @ 8) black].	"reads fileCode"
 	newForm _ self new.
 	newWidth _ file nextWord.
 	newHeight _ file nextWord.
