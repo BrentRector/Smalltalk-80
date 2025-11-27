@@ -143,17 +143,21 @@ public static class InitExpressionOrdering
             }
         }
 
-        // Debug: Check if FormMenuView is in the bundle
-        var hasFormMenuView = sourceToIndex.ContainsKey("FormMenuView initialize");
-        if (!hasFormMenuView)
+        // Debug: Find FormMenuView in bundle (regardless of whether it's in remaining)
+        Console.WriteLine($"  🔍 Looking for FormMenuView:");
+        Console.WriteLine($"      originalIndices count: {originalIndices.Count}");
+        Console.WriteLine($"      remaining count: {remaining.Count}");
+        Console.WriteLine($"      sourceToIndex has 'FormMenuView initialize': {sourceToIndex.ContainsKey("FormMenuView initialize")}");
+
+        // Search entire bundle for FormMenuView
+        for (int i = 0; i < bundle.InitExpressions.Length; i++)
         {
-            // Try to find what FormMenuView's actual source looks like
-            foreach (var kvp in sourceToIndex)
+            var src = bundle.InitExpressions[i].Source;
+            if (src != null && src.Contains("FormMenuView"))
             {
-                if (kvp.Key.Contains("FormMenuView"))
-                {
-                    Console.WriteLine($"  ⚠️  Found FormMenuView as: '{kvp.Key}'");
-                }
+                Console.WriteLine($"      Bundle[{i}] = '{src}'");
+                Console.WriteLine($"        In originalIndices: {originalIndices.Contains(i)}");
+                Console.WriteLine($"        In remaining: {remaining.Contains(i)}");
             }
         }
 
