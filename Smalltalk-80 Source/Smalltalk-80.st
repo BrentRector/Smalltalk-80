@@ -490,7 +490,8 @@ file: aFile
 
 pageNumber
     "Answer my page number."
-    ^pageNumber ifNil: [1]!
+    pageNumber isNil ifTrue: [^1].
+    ^pageNumber!
 
 pageNumber: anInteger
     "Set my page number."
@@ -532,7 +533,10 @@ dataBeginning
 
 dataEnd
     "Answer the index for the last data element."
-    ^self dataBeginning + (dataEnd ifNil: [self size])!
+    | end |
+    end _ dataEnd.
+    end isNil ifTrue: [end _ self size].
+    ^self dataBeginning + end!
 
 dataEnd: anIndex
     "Set the end of valid data."
@@ -598,7 +602,7 @@ reopen
 
 close
     "Close the file handle."
-    fileHandle ifNotNil: [
+    fileHandle isNil ifFalse: [
         self primClose: fileHandle.
         fileHandle _ nil]! !
 
@@ -661,13 +665,13 @@ write
 
 openForRead
     "Open the file for reading."
-    fileHandle ifNil: [
+    fileHandle isNil ifTrue: [
         file isNil ifFalse: [
             fileHandle _ self primOpen: file fullName mode: 'r']]!
 
 openForWrite
     "Open the file for writing."
-    fileHandle ifNotNil: [self close].
+    fileHandle isNil ifFalse: [self close].
     file isNil ifFalse: [
         fileHandle _ self primOpen: file fullName mode: 'w']! !
 
