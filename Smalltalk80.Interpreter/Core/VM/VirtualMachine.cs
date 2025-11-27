@@ -81,14 +81,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private SmalltalkOOP _whileFalseSelectorOOP;
     private bool _conditionalSelectorsInitialized;
 
-    // While loop state stack for iterative whileTrue:/whileFalse: (supports nested loops)
-    private readonly record struct WhileLoopState(
-        SmalltalkOOP ConditionBlock,
-        SmalltalkOOP BodyBlock,
-        bool IsWhileTrue,  // true for whileTrue:, false for whileFalse:
-        bool InBodyPhase); // false = evaluating condition, true = evaluating body
-
-    private readonly Stack<WhileLoopState> _whileLoopStack = new();
+    // While loop state for iterative whileTrue:/whileFalse: (avoids recursive context creation)
+    private bool _whileLoopActive;
+    private SmalltalkOOP _whileConditionBlock;
+    private SmalltalkOOP _whileBodyBlock;
+    private bool _whileIsWhileTrue; // true for whileTrue:, false for whileFalse:
+    private bool _whileInBodyPhase; // false = evaluating condition, true = evaluating body
 
     // Blue Book architectural constants are defined in VMConstants.cs
     // All context field indices are now static constants shared across the VM
@@ -471,8 +469,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Handle non-local returns (NLR)
         if (_nlrHandler.IsPending)
         {
-            // Clear while loop state - NLR aborts all active while loops
-            _whileLoopStack.Clear();
+            // Clear while loop state - NLR aborts any active while loop
+            _whileLoopActive = false;
 
             // if (_verboseDebugMode)
             //     Console.WriteLine($"[HandleReturn NLR] Unwinding from {_contextManager.ActiveContext} to target {_nlrHandler.TargetContext}, value={_nlrHandler.Value}");
@@ -598,57 +596,55 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _contextManager.DecrementContextDepth();
 
         // Check for while loop continuation (whileTrue:/whileFalse: fast path)
-        if (_whileLoopStack.Count > 0)
+        if (_whileLoopActive)
         {
-            var state = _whileLoopStack.Pop();
-
             // Add returning context to pool and switch to sender BEFORE activating next block
             // This ensures ActivateBlock sets the block's caller to sender (not the returning block)
             _contextManager.AddContextToPool(returningContext);
             _contextManager.SetActiveContext(senderOOP);
 
-            if (!state.InBodyPhase)
+            if (!_whileInBodyPhase)
             {
                 // Just returned from condition block - check result
                 bool conditionResult = (returnValue == _metadata.KnownObjects.True);
-                bool shouldContinue = state.IsWhileTrue ? conditionResult : !conditionResult;
+                bool shouldContinue = _whileIsWhileTrue ? conditionResult : !conditionResult;
 
                 if (shouldContinue)
                 {
                     // Continue loop: activate body block
-                    _whileLoopStack.Push(state with { InBodyPhase = true });
-                    var bodyClassOOP = _heapManager.GetClassOOP(state.BodyBlock);
+                    _whileInBodyPhase = true;
+                    var bodyClassOOP = _heapManager.GetClassOOP(_whileBodyBlock);
                     if (bodyClassOOP == _metadata.BlockContextClassOOP)
                     {
-                        if (((IBytecodeContext)this).ActivateBlock(state.BodyBlock, []))
+                        if (((IBytecodeContext)this).ActivateBlock(_whileBodyBlock, []))
                         {
                             return InterpreterStatus.Continue; // Context switched to body block
                         }
                     }
                     // Body is not a block (edge case) - treat as nil, continue loop
-                    _whileLoopStack.Pop(); // Remove the state we just pushed
-                    _whileLoopStack.Push(state with { InBodyPhase = false });
+                    _whileInBodyPhase = false;
                     // Re-activate condition block
-                    if (((IBytecodeContext)this).ActivateBlock(state.ConditionBlock, []))
+                    if (((IBytecodeContext)this).ActivateBlock(_whileConditionBlock, []))
                     {
                         return InterpreterStatus.Continue;
                     }
                 }
 
-                // Exit loop: state already popped, push nil (sender is already active)
+                // Exit loop: clear state, push nil (sender is already active)
+                _whileLoopActive = false;
                 Push(_metadata.KnownObjects.Nil);
                 return InterpreterStatus.Continue;
             }
             else
             {
                 // Just returned from body block - re-activate condition block
-                _whileLoopStack.Push(state with { InBodyPhase = false });
-                if (((IBytecodeContext)this).ActivateBlock(state.ConditionBlock, []))
+                _whileInBodyPhase = false;
+                if (((IBytecodeContext)this).ActivateBlock(_whileConditionBlock, []))
                 {
                     return InterpreterStatus.Continue; // Context switched to condition block
                 }
                 // Condition block activation failed (shouldn't happen)
-                _whileLoopStack.Pop();
+                _whileLoopActive = false;
                 Push(_metadata.KnownObjects.Nil);
                 return InterpreterStatus.Continue;
             }
@@ -1126,35 +1122,35 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 }
             }
             // whileTrue: - 1 arg (receiver is condition block)
-            // Supports nested loops via stack-based state
-            else if (selectorOOP == _whileTrueSelectorOOP && args.Length == 1)
+            // Note: Only optimize if no while loop already active (nested loops use standard dispatch)
+            else if (selectorOOP == _whileTrueSelectorOOP && args.Length == 1 && !_whileLoopActive)
             {
                 var receiverClassOOP = _heapManager.GetClassOOP(receiverOOP);
                 if (receiverClassOOP == _metadata.BlockContextClassOOP)
                 {
-                    // Push iterative while loop state onto stack
-                    _whileLoopStack.Push(new WhileLoopState(
-                        ConditionBlock: receiverOOP,
-                        BodyBlock: args[0],
-                        IsWhileTrue: true,
-                        InBodyPhase: false));
+                    // Set up iterative while loop
+                    _whileLoopActive = true;
+                    _whileConditionBlock = receiverOOP;
+                    _whileBodyBlock = args[0];
+                    _whileIsWhileTrue = true;
+                    _whileInBodyPhase = false;
                     // Activate condition block
                     return ActivateBlockForConditional(receiverOOP);
                 }
             }
             // whileFalse: - 1 arg (receiver is condition block)
-            // Supports nested loops via stack-based state
-            else if (selectorOOP == _whileFalseSelectorOOP && args.Length == 1)
+            // Note: Only optimize if no while loop already active (nested loops use standard dispatch)
+            else if (selectorOOP == _whileFalseSelectorOOP && args.Length == 1 && !_whileLoopActive)
             {
                 var receiverClassOOP = _heapManager.GetClassOOP(receiverOOP);
                 if (receiverClassOOP == _metadata.BlockContextClassOOP)
                 {
-                    // Push iterative while loop state onto stack
-                    _whileLoopStack.Push(new WhileLoopState(
-                        ConditionBlock: receiverOOP,
-                        BodyBlock: args[0],
-                        IsWhileTrue: false,
-                        InBodyPhase: false));
+                    // Set up iterative while loop
+                    _whileLoopActive = true;
+                    _whileConditionBlock = receiverOOP;
+                    _whileBodyBlock = args[0];
+                    _whileIsWhileTrue = false;
+                    _whileInBodyPhase = false;
                     // Activate condition block
                     return ActivateBlockForConditional(receiverOOP);
                 }
