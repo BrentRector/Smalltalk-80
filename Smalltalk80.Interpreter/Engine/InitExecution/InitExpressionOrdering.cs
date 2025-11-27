@@ -113,7 +113,11 @@ public static class InitExpressionOrdering
         {
             if (remaining.Contains(i))
             {
-                sourceToIndex[bundle.InitExpressions[i].Source] = i;
+                var source = bundle.InitExpressions[i].Source;
+                if (source != null)
+                {
+                    sourceToIndex[source] = i;
+                }
             }
         }
 
