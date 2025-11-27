@@ -11,13 +11,14 @@ public static class FileOperations
 {
     /// <summary>
     /// Manages open file handles for the interpreter session.
-    /// Maps Smalltalk integer handles to .NET FileStream objects.
+    /// Maps Smalltalk integer handles to .NET Stream objects (BufferedStream wrapping FileStream).
     /// </summary>
     private static class FileHandleManager
     {
-        private static readonly Dictionary<int, FileStream> _openFiles = [];
+        private static readonly Dictionary<int, Stream> _openFiles = [];
         private static int _nextHandle = 1;
         private static readonly object _lock = new();
+        private const int BufferSize = 4096;
 
         /// <summary>
         /// Opens a file and returns a handle.
@@ -62,9 +63,11 @@ public static class FileOperations
 
                     // Sanitize path for Windows - remove trailing periods which Windows doesn't accept
                     var sanitizedPath = path.TrimEnd('.');
-                    var stream = new FileStream(sanitizedPath, mode, access, share);
+                    var fileStream = new FileStream(sanitizedPath, mode, access, share);
+                    // Wrap in BufferedStream for efficient byte-by-byte reads (Smalltalk reads 1 byte at a time)
+                    var bufferedStream = new BufferedStream(fileStream, BufferSize);
                     int handle = _nextHandle++;
-                    _openFiles[handle] = stream;
+                    _openFiles[handle] = bufferedStream;
                     return handle;
                 }
                 catch
@@ -75,9 +78,9 @@ public static class FileOperations
         }
 
         /// <summary>
-        /// Gets the FileStream for a handle.
+        /// Gets the Stream for a handle.
         /// </summary>
-        public static FileStream? GetStream(int handle)
+        public static Stream? GetStream(int handle)
         {
             lock (_lock)
             {
