@@ -3,129 +3,101 @@ using Smalltalk80.Interpreter.Core.Schema;
 namespace Smalltalk80.Interpreter.Engine.InitExecution;
 
 /// <summary>
-/// Handles dependency-based ordering of init expression execution.
-/// Based on topological sort of class dependencies (3 levels, no circular deps).
-/// See docs/InitExpression-DependencyAnalysis.md for analysis.
+/// Handles ordering of init expression execution.
+/// Uses a simple explicit list - run in order specified, with test classes last.
 /// </summary>
 public static class InitExpressionOrdering
 {
     /// <summary>
-    /// Returns the complete dependency-ordered list of class names for init expression execution.
-    /// Based on InitExpression-DependencyAnalysis.md topological sort (3 levels, no circular deps).
+    /// Returns the ordered list of init expression source strings.
+    /// New expressions not in this list run after these but before test classes.
+    /// </summary>
+    private static readonly List<string> KnownOrder = new()
+    {
+        // Core classes first
+        "Character initialize",
+        "Float initialize",
+        "SmallInteger initialize",
+        "BinaryChoiceView initialize",
+        "ClassOrganizer initialize",
+        "CompiledMethod initialize",
+        "Cursor initialize",
+        "Date initialize",
+        "Decompiler initialize",
+        "Explainer initialize",
+        "FileDirectory initialize",
+        "Form initialize",
+        "InputSensor initialize",
+        "InputState initialize",
+        "InstructionStream initialize",
+        "MessageNode initialize",
+        "Object initialize",
+        "Paragraph initialize",
+        "ParseNode initialize",
+        "ProcessorScheduler initialize",
+        "Project initialize",
+        "Scanner initialize",
+        "StringHolder initialize",
+        "Symbol initialize",
+        "SystemDictionary initialize",
+        "SystemTracer initialize",
+        "Text initialize",
+        "TextList initialize",
+        "WindowsFileDirectory initialize",
+        "WindowsFileSystem initialize",
+        "File initialize",
+        "BitEditor initialize",
+        "FormEditor initialize",
+        "Debugger initialize",
+        "LargePositiveInteger initialize",
+        "LargeNegativeInteger initialize",
+        "Delay initialize",
+        "ChangeListController initialize",
+        "InputSensor install",
+        "InputSensor initSensor",
+        "NotifierController initialize",
+        "ParagraphEditor initialize",
+        "ProjectController initialize",
+        "ScreenController initialize",
+        "StandardSystemController initialize",
+        "StringHolderController initialize",
+        "VariableNode initialize",
+        "FormMenuView initialize"
+    };
+
+    /// <summary>
+    /// Test classes that always run last, after all other init expressions.
+    /// </summary>
+    private static readonly List<string> TestClasses = new()
+    {
+        "FormDisplayTest initialize"
+    };
+
+    /// <summary>
+    /// Returns dependency order for backward compatibility.
     /// </summary>
     public static List<string> GetDependencyOrder()
     {
-        return new List<string>
+        var result = new List<string>();
+        foreach (var source in KnownOrder)
         {
-            // LEVEL 0: 80 classes with no dependencies (alphabetically sorted within level)
-            // ESSENTIAL CLASSES FIRST (required for basic VM functionality)
-            "Character class",        // ESSENTIAL: Required for CharacterTable (String>>at: primitive)
-            "Float class",            // ESSENTIAL: Required for Float constants (Pi, E, etc.)
-            "SmallInteger class",     // ESSENTIAL: Required for SmallInteger constants/utilities (moved to front)
-
-            // Other Level 0 classes
-            "Benchmark class",
-            "BinaryChoiceView class",
-            "BlockContextTest class",
-            "BrowserView class",
-            "Change class",
-            "ChangesView class",
-            "Class class",
-            "ClassHierarchyBrowserView class",
-            "ClassOrganizer class",
-            "CompiledMethod class",
-            "ControlManager class",
-            "Cursor class",
-            "Date class",
-            "DebuggerView class",
-            "Decompiler class",
-            "DigitBuffer class",
-            "DiskBrowserView class",
-            "DisplayScreen class",
-            "DisplayTextView class",
-            "Encoder class",
-            "Explainer class",
-            // File class moved to Level 1 - depends on WindowsFileDirectory
-            "FileDirectory class",
-            "FileList class",
-            "Form class",
-            "FormButtonView class",
-            "FormView class",
-            "InputSensor class",       // REQUIRED BEFORE Object: Object>>confirm: uses Sensor cursorPoint
-            "InputState class",
-            "Inspector class",
-            "InspectorView class",
-            "InstructionStream class",
-            "Lexicon class",
-            "ListController class",
-            "ListView class",
-            "LockedTextView class",
-            "LowSpaceView class",
-            "Magnitude class",
-            "MenuView class",
-            "MessageNode class",
-            "MethodNode class",
-            "MixedInspectorView class",
-            "NameSetInspectorView class",
-            "NoControllerView class",
-            "Notifier class",
-            "NotifierView class",
-            "Object class",
-            "OccupationView class",
-            "OrderedCollection class",
-            "Paragraph class",
-            "ParseNode class",
-            "Path class",
-            "Point class",
-            "ProcessorScheduler class",
-            "Project class",
-            "Rectangle class",
-            "Scanner class",
-            "SourceFileManager class",
-            "SplinesView class",
-            "StandardSystemView class",
-            "StringHolder class",
-            "StringHolderView class",
-            "Symbol class",
-            "SymbolAsStringTest class",
-            "SystemDictionary class",
-            "SystemTracer class",
-            "SystemView class",
-            "SystemWorkspace class",
-            "Text class",
-            "TextCollectorView class",
-            "TextEditor class",
-            "TextList class",
-            "TileableView class",
-            "UndefinedObject class",
-            "WindowsFileDirectory class",
-            "WindowsFileSystem class",
-            "WorkspaceView class",
-
-            // LEVEL 1: 7 classes that depend on Level 0
-            "File class",           // depends on: WindowsFileDirectory (calls WindowsFileDirectory default)
-            "BitEditor class",      // depends on: OrderedCollection, Point
-            "FormEditor class",     // depends on: TextConstants (DefaultLineGrid)
-            "Debugger class",       // depends on: NotifierView, Project
-            "FormMenuView class",   // depends on: DisplayScreen, File (uses Disk from FilePool)
-            "LargePositiveInteger class",  // depends on: DigitBuffer
-            "Spline class",         // depends on: Point
-
-            // LEVEL 2: 1 class that depends on Level 1
-            "LargeNegativeInteger class",  // depends on: LargePositiveInteger
-
-            // LEVEL 3: Classes that run last
-            "Delay class",                 // depends on: ProcessorScheduler
-
-            // LEVEL 4: Test classes that run after everything else
-            "FormDisplayTest class"        // depends on: FormMenuView (displays loaded Forms)
-        };
+            // Convert "Foo initialize" to "Foo class" format
+            var className = source.Replace(" initialize", " class")
+                                  .Replace(" install", " class")
+                                  .Replace(" initSensor", " class");
+            if (!result.Contains(className))
+                result.Add(className);
+        }
+        foreach (var source in TestClasses)
+        {
+            var className = source.Replace(" initialize", " class");
+            result.Add(className);
+        }
+        return result;
     }
 
     /// <summary>
-    /// Reorders init expression indices according to dependency order.
-    /// Maps class names from bundle to desired execution order, preserving any not in dependency list.
-    /// Within each dependency level, sorts by bytecode length (shortest first).
+    /// Reorders init expression indices according to explicit order.
     /// </summary>
     public static List<int> ReorderByDependencies(
         List<int> originalIndices,
@@ -133,107 +105,56 @@ public static class InitExpressionOrdering
         List<string> dependencyOrder)
     {
         var result = new List<int>();
-        var remainingIndices = new HashSet<int>(originalIndices);
+        var remaining = new HashSet<int>(originalIndices);
 
-        // Group classes by dependency level
-        // Since the dependency order list doesn't contain comment markers,
-        // we need to manually split based on known level sizes from the comments:
-        // LEVEL 0: 80 classes (indices 0-79)
-        // LEVEL 1: 7 classes (indices 80-86)
-        // LEVEL 2: 1 class (index 87)
-        // LEVEL 3: 1 class (index 88) - Delay
-        // LEVEL 4: 1 class (index 89) - FormDisplayTest (runs LAST, after remaining)
-        var mainLevels = new List<List<string>>
+        // Build source-to-index map
+        var sourceToIndex = new Dictionary<string, int>();
+        for (int i = 0; i < bundle.InitExpressions.Length; i++)
         {
-            dependencyOrder.Take(80).ToList(),      // Level 0
-            dependencyOrder.Skip(80).Take(7).ToList(), // Level 1
-            dependencyOrder.Skip(87).Take(1).ToList(), // Level 2
-            dependencyOrder.Skip(88).Take(1).ToList()  // Level 3
-        };
-
-        // Level 4 is special - runs AFTER all remaining expressions
-        var testClasses = dependencyOrder.Skip(89).ToList(); // Level 4
-
-        // Helper function to process a level
-        void ProcessLevel(List<string> levelClasses)
-        {
-            var levelIndices = new List<(int index, int bytecodeLength)>();
-
-            foreach (var className in levelClasses)
+            if (remaining.Contains(i))
             {
-                var bareClassName = className.Replace(" class", "");
-                var expectedSource = $"{bareClassName} initialize";
-
-                for (int i = 0; i < bundle.InitExpressions.Length; i++)
-                {
-                    if (!remainingIndices.Contains(i))
-                        continue;
-
-                    var initExpr = bundle.InitExpressions[i];
-                    if (initExpr.Source == expectedSource)
-                    {
-                        // Get bytecode length - handle both int[] and base64 string formats
-                        int bytecodeLength = 0;
-                        if (initExpr.Bytecodes is int[] intArray)
-                        {
-                            bytecodeLength = intArray.Length;
-                        }
-                        else if (initExpr.Bytecodes is string base64String)
-                        {
-                            bytecodeLength = Convert.FromBase64String(base64String).Length;
-                        }
-
-                        levelIndices.Add((i, bytecodeLength));
-                        remainingIndices.Remove(i);
-                        break;
-                    }
-                }
-            }
-
-            // Sort this level by bytecode length (shortest first)
-            var sortedLevel = levelIndices.OrderBy(x => x.bytecodeLength).ToList();
-            result.AddRange(sortedLevel.Select(x => x.index));
-        }
-
-        // Process Levels 0-3 first
-        foreach (var levelClasses in mainLevels)
-        {
-            ProcessLevel(levelClasses);
-        }
-
-        // Add any remaining indices that weren't in dependency order
-        // These run BEFORE test classes (Level 4)
-        if (remainingIndices.Count > 0)
-        {
-            // Save test class indices before adding remaining
-            var testClassIndices = new HashSet<int>();
-            foreach (var className in testClasses)
-            {
-                var bareClassName = className.Replace(" class", "");
-                var expectedSource = $"{bareClassName} initialize";
-                for (int i = 0; i < bundle.InitExpressions.Length; i++)
-                {
-                    if (remainingIndices.Contains(i) && bundle.InitExpressions[i].Source == expectedSource)
-                    {
-                        testClassIndices.Add(i);
-                        break;
-                    }
-                }
-            }
-
-            // Add non-test remaining indices
-            var nonTestRemaining = remainingIndices.Where(i => !testClassIndices.Contains(i)).OrderBy(i => i).ToList();
-            if (nonTestRemaining.Count > 0)
-            {
-                Console.WriteLine($"  ⚠️  {nonTestRemaining.Count} init expressions not in dependency order (appending before test classes)");
-                result.AddRange(nonTestRemaining);
-                foreach (var idx in nonTestRemaining)
-                    remainingIndices.Remove(idx);
+                sourceToIndex[bundle.InitExpressions[i].Source] = i;
             }
         }
 
-        // Finally, process Level 4 (test classes) - runs LAST
-        ProcessLevel(testClasses);
+        // 1. Add known expressions in order
+        foreach (var source in KnownOrder)
+        {
+            if (sourceToIndex.TryGetValue(source, out int idx) && remaining.Contains(idx))
+            {
+                result.Add(idx);
+                remaining.Remove(idx);
+            }
+        }
+
+        // 2. Add any NEW expressions (not in KnownOrder or TestClasses)
+        var testIndices = new HashSet<int>();
+        foreach (var source in TestClasses)
+        {
+            if (sourceToIndex.TryGetValue(source, out int idx))
+            {
+                testIndices.Add(idx);
+            }
+        }
+
+        var newExpressions = remaining.Where(i => !testIndices.Contains(i)).OrderBy(i => i).ToList();
+        if (newExpressions.Count > 0)
+        {
+            Console.WriteLine($"  ℹ️  {newExpressions.Count} new init expressions (running before test classes)");
+            result.AddRange(newExpressions);
+            foreach (var idx in newExpressions)
+                remaining.Remove(idx);
+        }
+
+        // 3. Add test classes LAST
+        foreach (var source in TestClasses)
+        {
+            if (sourceToIndex.TryGetValue(source, out int idx) && remaining.Contains(idx))
+            {
+                result.Add(idx);
+                remaining.Remove(idx);
+            }
+        }
 
         return result;
     }
