@@ -255,26 +255,7 @@ public class InitExpressionCompiler
                     string keySymbolText = _bundle.Symbols[literalValue.Association.KeyIndex];
                     var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
                     var keySymbolOOP = FindSymbol(keySymbolText);
-
-                    // DEBUG: Track association resolution
-                    Console.WriteLine($"[InitExpressionCompiler] Resolving association for '{keySymbolText}'");
-                    Console.WriteLine($"  keySymbolOOP: {keySymbolOOP} (isNil={keySymbolOOP == _heapManager.GetNil()})");
-
                     var assocOOP = FindAssociation(smalltalkOOP, keySymbolOOP);
-
-                    Console.WriteLine($"  assocOOP: {assocOOP} (isNil={assocOOP == _heapManager.GetNil()})");
-
-                    if (assocOOP != _heapManager.GetNil())
-                    {
-                        var valueOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-                        Console.WriteLine($"  valueOOP: {valueOOP} (isNil={valueOOP == _heapManager.GetNil()})");
-                        if (!valueOOP.IsSmallInteger && valueOOP != _heapManager.GetNil())
-                        {
-                            var valueClass = _heapManager.GetClassName(valueOOP);
-                            Console.WriteLine($"  value class: {valueClass ?? "unknown"}");
-                        }
-                    }
-
                     return assocOOP;
                 }
                 throw new InvalidOperationException("Association literal missing Association data");
@@ -345,9 +326,6 @@ public class InitExpressionCompiler
         int size = _heapManager.GetIndexedSize(systemDictOOP);
         string targetSymbol = ReadSymbolString(keySymbolOOP);
 
-        // DEBUG: Log search parameters
-        Console.WriteLine($"[FindAssociation] Searching for symbol '{targetSymbol}' (OOP={keySymbolOOP}) in SystemDictionary (size={size})");
-
         for (int i = 0; i < size; i++)
         {
             var assocOOP = _heapManager.GetIndexedOOP(systemDictOOP, i);
@@ -356,19 +334,12 @@ public class InitExpressionCompiler
 
             var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
 
-            // DEBUG: Compare both OOP and string to diagnose symbol mismatch
+            // Compare by string to handle symbol identity issues
             if (keyOOP != _heapManager.GetNil() && !keyOOP.IsSmallInteger)
             {
                 string keyString = ReadSymbolString(keyOOP);
                 if (keyString == targetSymbol)
                 {
-                    if (keyOOP != keySymbolOOP)
-                    {
-                        Console.WriteLine($"[FindAssociation] WARNING: Symbol '{targetSymbol}' found but OOP mismatch!");
-                        Console.WriteLine($"  Expected OOP: {keySymbolOOP}");
-                        Console.WriteLine($"  Actual OOP: {keyOOP}");
-                    }
-                    // Return association even if OOPs don't match (string match is sufficient)
                     return assocOOP;
                 }
             }
