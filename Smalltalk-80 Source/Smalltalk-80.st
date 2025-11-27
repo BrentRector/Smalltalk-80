@@ -42645,7 +42645,7 @@ initialize
 
 	"Test text display with larger font"
 	(Text string: 'Hello, world!' emphasis: 4) asDisplayText displayAt: 20@30.
-	(Text string: 'I said ''I''''ll be back'' long before that other guy did - Smalltalk-80' emphasis: 4) asDisplayText displayAt: 40@60.
+	(Text string: 'I said ''I''ll be back'' long before that other guy did - Smalltalk-80' emphasis: 4) asDisplayText displayAt: 40@60.
 
 	"FormDisplayTest initialize"! !
 
