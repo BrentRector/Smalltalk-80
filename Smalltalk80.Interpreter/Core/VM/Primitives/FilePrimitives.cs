@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 
@@ -11,13 +12,14 @@ public static class FileOperations
 {
     /// <summary>
     /// Manages open file handles for the interpreter session.
-    /// Maps Smalltalk integer handles to .NET FileStream objects.
+    /// Maps Smalltalk integer handles to .NET Stream objects (BufferedStream wrapping FileStream).
     /// </summary>
     private static class FileHandleManager
     {
-        private static readonly Dictionary<int, FileStream> _openFiles = [];
+        private static readonly Dictionary<int, Stream> _openFiles = [];
         private static int _nextHandle = 1;
         private static readonly object _lock = new();
+        private const int BufferSize = 4096;
 
         /// <summary>
         /// Opens a file and returns a handle.
@@ -62,9 +64,11 @@ public static class FileOperations
 
                     // Sanitize path for Windows - remove trailing periods which Windows doesn't accept
                     var sanitizedPath = path.TrimEnd('.');
-                    var stream = new FileStream(sanitizedPath, mode, access, share);
+                    var fileStream = new FileStream(sanitizedPath, mode, access, share);
+                    // Wrap in BufferedStream for efficient byte-by-byte reads (Smalltalk reads 1 byte at a time)
+                    var bufferedStream = new BufferedStream(fileStream, BufferSize);
                     int handle = _nextHandle++;
-                    _openFiles[handle] = stream;
+                    _openFiles[handle] = bufferedStream;
                     return handle;
                 }
                 catch
@@ -75,9 +79,9 @@ public static class FileOperations
         }
 
         /// <summary>
-        /// Gets the FileStream for a handle.
+        /// Gets the Stream for a handle.
         /// </summary>
-        public static FileStream? GetStream(int handle)
+        public static Stream? GetStream(int handle)
         {
             lock (_lock)
             {
@@ -169,6 +173,20 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("FileOpen", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
+        {
             int accessMode, shareMode, createMode;
             string? path;
 
@@ -255,6 +273,20 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("FileClose", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
+        {
             if (context.Arguments.Length != 1)
                 return PrimitiveResult.Fail(context.Metadata!);
 
@@ -278,6 +310,20 @@ public static class FileOperations
     public class FileRead : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("FileRead", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 3)
                 return PrimitiveResult.Fail(context.Metadata!);
@@ -652,6 +698,20 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("GetFileAttributes", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
+        {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
@@ -928,6 +988,20 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("FileExists", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
+        {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             var pathOOP = context.Arguments[0];
@@ -952,6 +1026,20 @@ public static class FileOperations
     public class GetFileSize : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                return ExecuteCore(context);
+            }
+            finally
+            {
+                sw.Stop();
+                FilePrimitiveDiagnostics.Record("GetFileSize", sw.ElapsedTicks);
+            }
+        }
+
+        private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1)
                 return PrimitiveResult.Fail(context.Metadata!);

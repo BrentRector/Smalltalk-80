@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.Utilities;
 using Smalltalk80.Interpreter.Engine;
@@ -311,6 +312,9 @@ public class SmalltalkInterpreterThread
         // Display cumulative GC statistics and reset for next phase
         var cumulativeStats = _context.HeapManager.GC.GetAndResetCumulativeStatistics();
         Console.WriteLine($"  {cumulativeStats.GetSummary()}");
+
+        // Print file primitive diagnostics report
+        FilePrimitiveDiagnostics.PrintReport();
 
         // PHASE 2: Execute Test expressions (GraphicsTest, etc.)
         if (phase2Indices.Count > 0)

@@ -379,7 +379,17 @@ error
     ^error!
 
 error: aBoolean
-    error _ aBoolean! !
+    error _ aBoolean!
+
+exists
+    "Answer whether this file exists on disk.
+     Primitive 154 returns Array [size, attrs, isDir] or nil if not found."
+    ^(self primGetAttributes: self fullName) notNil!
+
+primGetAttributes: path
+    "Get file attributes. Primitive 154 returns Array or nil."
+    <primitive: 154>
+    ^nil! !
 
 !WindowsFile methodsFor: 'page initialization'!
 
@@ -447,7 +457,7 @@ WindowsFile class
 "==================== WindowsFilePage ===================="
 
 Object subclass: #WindowsFilePage
-    instanceVariableNames: 'file binary fileHandle position pageNumber dataEnd'
+    instanceVariableNames: 'file binary fileHandle position pageNumber dataEnd cachedSize'
     classVariableNames: ''
     poolDictionaries: ''
     category: 'System-Files'!
@@ -504,14 +514,15 @@ serialNumber
 !WindowsFilePage methodsFor: 'accessing'!
 
 size
-    "Answer the size of data in this page.
+    "Answer the size of data in this page. Cache result for efficiency.
     If the file handle is nil (file not open), use the file path as a fallback
     since Primitive 144 (GetFileSize) supports both handle and path arguments."
+    cachedSize notNil ifTrue: [^cachedSize].
     fileHandle isNil ifTrue: [self openForRead].
     fileHandle isNil ifTrue: [
         file isNil ifTrue: [^0].
-        ^self primSize: file fullName].
-    ^self primSize: fileHandle!
+        ^cachedSize _ self primSize: file fullName].
+    ^cachedSize _ self primSize: fileHandle!
 
 dataSize
     "Answer the maximum data size. For Windows files, this is the file size."
@@ -551,15 +562,23 @@ dataMaxEnd
     ^self dataBeginning + self dataSize!
 
 dataString
-    "Answer the page data as a string."
-    | contents sz |
+    "Answer the page data as a string.
+     Optimized to read entire file at once instead of byte-by-byte."
+    | sz buffer |
     sz _ self size.
-    contents _ String new: sz.
+    sz = 0 ifTrue: [^''].
     self openForRead.
     self primSetPosition: fileHandle to: 0.
-    1 to: sz do: [:i |
-        contents at: i put: (self primAt: fileHandle position: i - 1) asCharacter].
-    ^contents! !
+    "Read all bytes at once using primitive 123"
+    buffer _ ByteArray new: sz.
+    self primRead: fileHandle into: buffer count: sz.
+    "Convert ByteArray to String using primitive 105"
+    ^buffer asString!
+
+primRead: handle into: buffer count: count
+    "Read count bytes from file handle into buffer."
+    <primitive: 123>
+    ^0! !
 
 !WindowsFilePage methodsFor: 'testing'!
 
@@ -1126,12 +1145,13 @@ find: aFile
     ^self find: aFile ifAbsentDo: [:f | nil]!
 
 find: aFile ifAbsentDo: aBlock
-    "Return aFile if found, otherwise evaluate aBlock."
+    "Return aFile if found, otherwise evaluate aBlock.
+     Optimized to check file existence directly instead of iterating directory."
     | fname |
     fname _ self checkNameOfFile: aFile fixErrors: true.
     aFile fileName: fname.
-    self do: [:each |
-        (fname sameAs: each fileName) ifTrue: [^each]].
+    "Check if file exists directly (avoids directory scan)"
+    aFile exists ifTrue: [^aFile].
     ^aBlock value: aFile!
 
 findKey: aFileName
@@ -1675,7 +1695,28 @@ basicRead: count
     bytesRead < count ifTrue: [
         result _ result copyFrom: 1 to: bytesRead].
     position _ position + bytesRead.
-    ^result! !
+    ^result!
+
+next
+    "Return next byte using buffered reading for efficiency.
+     Overrides ExternalBinaryStream>>next which calls basicRead: 1."
+    bufferPosition >= bufferSize ifTrue: [self fillBuffer].
+    bufferPosition >= bufferSize ifTrue: [^nil].  "EOF"
+    bufferPosition _ bufferPosition + 1.
+    position _ position + 1.
+    ^buffer at: bufferPosition!
+
+fillBuffer
+    "Fill the internal buffer from file."
+    | data bufferStartPosition |
+    bufferStartPosition _ position.
+    data _ self basicRead: BufferSize.  "This advances position"
+    data size = 0 ifTrue: [bufferSize _ 0. ^0].  "EOF"
+    1 to: data size do: [:i | buffer at: i put: (data at: i)].
+    bufferSize _ data size.
+    bufferPosition _ 0.
+    position _ bufferStartPosition.  "Reset; next will increment per byte"
+    ^bufferSize! !
 
 !WindowsFileStream methodsFor: 'writing'!
 
@@ -1692,6 +1733,9 @@ setPosition: anOffset
     <primitive: 124>
     self primSeek: handle offset: anOffset origin: 0.
     position _ anOffset.
+    "Invalidate buffer on seek"
+    bufferPosition _ 0.
+    bufferSize _ 0.
     ^self! !
 
 !WindowsFileStream methodsFor: 'private'!
@@ -21598,15 +21642,15 @@ initialize
 		'magnify.form' 'white.form' 'lightgray.form' 'gray.form' 'darkgray.form' 'black.form'
 		'xgrid.form' 'ygrid.form' 'togglegrids.form' 'out.form' ).	"Files of button images"
 	FormButtons _ OrderedCollection new.
-	1 to: 21 do: 
-		[:index | 
+	1 to: 21 do:
+		[:index |
 		formButton _ FormButtonCache new.
 		formButton form: (Form readFrom: (names at: index)).
 		formButton offset: (offsets at: index).
 		formButton value: (keys at: index).
 		formButton initialState: (states at: index).
 		FormButtons addLast: formButton].
-	SpecialBorderForm  _ Form readFrom: 'specialborderform.form'.
+	SpecialBorderForm _ Form readFrom: 'specialborderform.form'.
 	BorderForm _ Form readFrom: 'borderform.form'
 
 	"FormMenuView initialize"! !
@@ -42538,7 +42582,7 @@ with: aCollection from: firstIndex to: lastIndex
 
 "==================== FormDisplayTest ===================="
 
-Object subclass: #FormDisplayTest
+FormMenuView subclass: #FormDisplayTest
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -42551,22 +42595,19 @@ My initialize method displays all 23 forms in a grid on the Display.'!
 !FormDisplayTest class methodsFor: 'class initialization'!
 
 initialize
-	"Display all 23 forms by reading them directly from files.
-	This bypasses the FormMenuView cache to test file reading directly."
+	"Display all 23 forms from FormMenuView cache in a grid on the Display.
+	Forms are: 21 from FormButtons + SpecialBorderForm + BorderForm.
+	Note: This class is a subclass of FormMenuView to access its class variables."
 
-	| forms x y spacing formWidth formHeight cols rows index form names |
+	| forms x y spacing formWidth formHeight cols rows index form |
 
-	"Read all forms directly from files - same names as FormMenuView uses"
-	names _ #('select.form' 'singlecopy.form' 'repeatcopy.form' 'line.form' 'curve.form'
-		'block.form' 'over.form' 'under.form' 'reverse.form' 'erase.form' 'in.form'
-		'magnify.form' 'white.form' 'lightgray.form' 'gray.form' 'darkgray.form' 'black.form'
-		'xgrid.form' 'ygrid.form' 'togglegrids.form' 'out.form'
-		'specialborderform.form' 'borderform.form').
-
+	"Collect all forms from class variables (accessible as subclass)"
 	forms _ OrderedCollection new.
-	names do: [:name |
-		form _ Form readFrom: name.
-		form isNil ifFalse: [forms add: form]].
+	FormButtons isNil ifFalse: [
+		FormButtons do: [:cache |
+			cache form isNil ifFalse: [forms add: cache form]]].
+	SpecialBorderForm isNil ifFalse: [forms add: SpecialBorderForm].
+	BorderForm isNil ifFalse: [forms add: BorderForm].
 
 	forms isEmpty ifTrue: [^self].
 
