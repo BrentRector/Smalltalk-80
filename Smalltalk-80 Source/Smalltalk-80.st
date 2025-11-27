@@ -382,13 +382,12 @@ error: aBoolean
     error _ aBoolean!
 
 exists
-    "Answer whether this file exists on disk."
-    | attrs |
-    attrs _ self primGetAttributes: self fullName.
-    ^attrs notNil and: [(attrs at: #attributes ifAbsent: [16rFFFFFFFF]) ~= 16rFFFFFFFF]!
+    "Answer whether this file exists on disk.
+     Primitive 154 returns Array [size, attrs, isDir] or nil if not found."
+    ^(self primGetAttributes: self fullName) notNil!
 
 primGetAttributes: path
-    "Get file attributes. Primitive 154 returns a Dictionary or nil."
+    "Get file attributes. Primitive 154 returns Array or nil."
     <primitive: 154>
     ^nil! !
 
