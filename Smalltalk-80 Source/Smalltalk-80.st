@@ -42643,8 +42643,8 @@ initialize
 	"Force display refresh"
 	Display display.
 
-	"Test Transcript"
-	Transcript show: 'Hello, world!'; cr.
+	"Test text display"
+	'Hello, world!' displayAt: 10@10.
 
 	"FormDisplayTest initialize"! !
 
