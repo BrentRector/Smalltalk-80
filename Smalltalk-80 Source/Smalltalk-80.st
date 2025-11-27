@@ -21589,11 +21589,11 @@ initialize
 	states _
 		#(false false true false false false true false false false false false false
 		false false false true false false false false ).		"Initial states of buttons"
-	names _ 
-		#('select.form.' 'singlecopy.form.' 'repeatcopy.form.' 'line.form.' 'curve.form.'
-		'block.form' 'over.form.' 'under.form.' 'reverse.form.' 'erase.form.' 'in.form.'
-		'magnify.form.' 'white.form' 'lightgray.form' 'gray.form' 'darkgray.form' 'black.form'
-		'xgrid.form.' 'ygrid.form.' 'togglegrids.form.' 'out.form.' ).	"Files of button images"
+	names _
+		#('select.form' 'singlecopy.form' 'repeatcopy.form' 'line.form' 'curve.form'
+		'block.form' 'over.form' 'under.form' 'reverse.form' 'erase.form' 'in.form'
+		'magnify.form' 'white.form' 'lightgray.form' 'gray.form' 'darkgray.form' 'black.form'
+		'xgrid.form' 'ygrid.form' 'togglegrids.form' 'out.form' ).	"Files of button images"
 	FormButtons _ OrderedCollection new.
 	1 to: 21 do: 
 		[:index | 
@@ -42559,7 +42559,8 @@ initialize
 	"Get FormButtons - each is a FormButtonCache with a form"
 	buttons _ FormMenuView classPool at: #FormButtons ifAbsent: [nil].
 	buttons isNil ifFalse: [
-		buttons do: [:cache | forms add: cache form]].
+		buttons do: [:cache |
+			cache form isNil ifFalse: [forms add: cache form]]].
 
 	"Get SpecialBorderForm and BorderForm"
 	(FormMenuView classPool at: #SpecialBorderForm ifAbsent: [nil]) isNil ifFalse: [
@@ -42567,9 +42568,7 @@ initialize
 	(FormMenuView classPool at: #BorderForm ifAbsent: [nil]) isNil ifFalse: [
 		forms add: (FormMenuView classPool at: #BorderForm)].
 
-	forms isEmpty ifTrue: [
-		Transcript show: 'FormDisplayTest: No forms found'; cr.
-		^self].
+	forms isEmpty ifTrue: [^self].
 
 	"Calculate grid layout - 6 columns x 4 rows for 23 forms"
 	cols _ 6.
@@ -42594,10 +42593,6 @@ initialize
 
 	"Force display refresh"
 	Display display.
-
-	Transcript show: 'FormDisplayTest: Displayed '; show: forms size printString;
-		show: ' forms in '; show: cols printString; show: 'x';
-		show: rows printString; show: ' grid'; cr.
 
 	"FormDisplayTest initialize"! !
 
