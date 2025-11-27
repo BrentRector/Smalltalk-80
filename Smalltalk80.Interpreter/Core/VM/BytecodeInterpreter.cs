@@ -1254,13 +1254,8 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             // ByteIndexed (String/Symbol) - fall through to message send to handle Character conversion
         }
 
-        // Fast path for size (index 2)
-        if (selectorIndex == 2 && !receiverOOP.IsSmallInteger)
-        {
-            int size = heapManager.GetIndexedSize(receiverOOP);
-            context.Push(SmalltalkOOP.FromSmallInteger(size));
-            return true;
-        }
+        // NOTE: No fast path for size (index 2) - many classes override size
+        // (Dictionary returns tally, Set returns tally, OrderedCollection uses indices, etc.)
 
         // Fast path for value/value: on BlockContext
         if (selectorIndex == 9 || selectorIndex == 10) // value, value:
