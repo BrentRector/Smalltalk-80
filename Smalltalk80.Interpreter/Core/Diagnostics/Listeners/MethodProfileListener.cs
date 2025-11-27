@@ -138,7 +138,7 @@ public class MethodProfileListener : IDiagnosticListener
 
         Console.WriteLine("TOP METHODS BY TOTAL TIME (including callees):");
         Console.WriteLine("-".PadRight(100, '-'));
-        Console.WriteLine($"{"Method",-60} {"Total ms",>10} {"Self ms",>10} {"Calls",>10} {"Avg ms",>10}");
+        Console.WriteLine($"{"Method",-60} {"Total ms",10} {"Self ms",10} {"Calls",10} {"Avg ms",10}");
         Console.WriteLine("-".PadRight(100, '-'));
 
         foreach (var (methodKey, stats) in sortedByTotal)
@@ -150,7 +150,7 @@ public class MethodProfileListener : IDiagnosticListener
             if (totalMs < MinReportThresholdMs) continue;
 
             string displayName = methodKey.Length > 58 ? methodKey[..55] + "..." : methodKey;
-            Console.WriteLine($"{displayName,-60} {totalMs,>10:F2} {selfMs,>10:F2} {stats.CallCount,>10:N0} {avgMs,>10:F4}");
+            Console.WriteLine($"{displayName,-60} {totalMs,10:F2} {selfMs,10:F2} {stats.CallCount,10:N0} {avgMs,10:F4}");
         }
 
         Console.WriteLine();
@@ -163,7 +163,7 @@ public class MethodProfileListener : IDiagnosticListener
 
         Console.WriteLine("TOP METHODS BY SELF TIME (excluding callees):");
         Console.WriteLine("-".PadRight(100, '-'));
-        Console.WriteLine($"{"Method",-60} {"Self ms",>10} {"Total ms",>10} {"Calls",>10} {"% Self",>10}");
+        Console.WriteLine($"{"Method",-60} {"Self ms",10} {"Total ms",10} {"Calls",10} {"% Self",10}");
         Console.WriteLine("-".PadRight(100, '-'));
 
         foreach (var (methodKey, stats) in sortedBySelf)
@@ -175,7 +175,7 @@ public class MethodProfileListener : IDiagnosticListener
             if (selfMs < MinReportThresholdMs) continue;
 
             string displayName = methodKey.Length > 58 ? methodKey[..55] + "..." : methodKey;
-            Console.WriteLine($"{displayName,-60} {selfMs,>10:F2} {totalMs,>10:F2} {stats.CallCount,>10:N0} {selfPercent,>9:F1}%");
+            Console.WriteLine($"{displayName,-60} {selfMs,10:F2} {totalMs,10:F2} {stats.CallCount,10:N0} {selfPercent,9:F1}%");
         }
 
         Console.WriteLine("=".PadRight(100, '='));
