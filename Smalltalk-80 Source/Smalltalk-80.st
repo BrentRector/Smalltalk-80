@@ -1675,7 +1675,28 @@ basicRead: count
     bytesRead < count ifTrue: [
         result _ result copyFrom: 1 to: bytesRead].
     position _ position + bytesRead.
-    ^result! !
+    ^result!
+
+next
+    "Return next byte using buffered reading for efficiency.
+     Overrides ExternalBinaryStream>>next which calls basicRead: 1."
+    bufferPosition >= bufferSize ifTrue: [self fillBuffer].
+    bufferPosition >= bufferSize ifTrue: [^nil].  "EOF"
+    bufferPosition _ bufferPosition + 1.
+    position _ position + 1.
+    ^buffer at: bufferPosition!
+
+fillBuffer
+    "Fill the internal buffer from file."
+    | data bufferStartPosition |
+    bufferStartPosition _ position.
+    data _ self basicRead: BufferSize.  "This advances position"
+    data size = 0 ifTrue: [bufferSize _ 0. ^0].  "EOF"
+    1 to: data size do: [:i | buffer at: i put: (data at: i)].
+    bufferSize _ data size.
+    bufferPosition _ 0.
+    position _ bufferStartPosition.  "Reset; next will increment per byte"
+    ^bufferSize! !
 
 !WindowsFileStream methodsFor: 'writing'!
 
@@ -1692,6 +1713,9 @@ setPosition: anOffset
     <primitive: 124>
     self primSeek: handle offset: anOffset origin: 0.
     position _ anOffset.
+    "Invalidate buffer on seek"
+    bufferPosition _ 0.
+    bufferSize _ 0.
     ^self! !
 
 !WindowsFileStream methodsFor: 'private'!
