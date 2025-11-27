@@ -36,8 +36,11 @@ public class MethodTraceListener : IDiagnosticListener
                 break;
 
             case MethodExitEvent e:
-                // Note: CallDepth not available in exit event, would need tracking
-                Console.WriteLine($"<- {e.Selector} ({e.ElapsedInstructions} instructions)");
+                if (e.CallDepth <= _maxDepth)
+                {
+                    var indent = new string(' ', e.CallDepth * 2);
+                    Console.WriteLine($"{indent}<- {e.ReceiverClass}>>{e.Selector}");
+                }
                 break;
 
             case PrimitiveEvent e:

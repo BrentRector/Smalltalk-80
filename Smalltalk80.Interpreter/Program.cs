@@ -62,8 +62,8 @@ public static class Program
             // Create diagnostic hub for event-based logging
             var diagnostics = new DiagnosticHub();
 
-            // Register diagnostic listeners
-            RegisterDiagnosticListeners(diagnostics, diagnosticCategories);
+            // Register diagnostic listeners (returns profile listener if enabled)
+            var profileListener = RegisterDiagnosticListeners(diagnostics, diagnosticCategories);
 
             Console.WriteLine($"Loading cold start bundle: {coldStartFile}");
 
@@ -172,6 +172,9 @@ public static class Program
                 Console.WriteLine("Warning: Smalltalk thread did not shut down cleanly");
                 smalltalkThread.Interrupt();
             }
+
+            // Report profiling statistics if enabled
+            profileListener?.ReportStatistics();
 
             Console.WriteLine("Interpreter shutdown complete");
         }
@@ -472,9 +475,12 @@ public static class Program
 
     /// <summary>
     /// Registers diagnostic listeners based on command-line flags.
+    /// Returns the MethodProfileListener if profiling is enabled.
     /// </summary>
-    private static void RegisterDiagnosticListeners(DiagnosticHub diagnostics, string? diagnosticCategories)
+    private static MethodProfileListener? RegisterDiagnosticListeners(DiagnosticHub diagnostics, string? diagnosticCategories)
     {
+        MethodProfileListener? profileListener = null;
+
         // Always register cold start progress listener
         var progressListener = new ColdStartProgressListener();
         diagnostics.Register(progressListener, DiagnosticEventTypes.AllColdStart);
@@ -515,6 +521,12 @@ public static class Program
                         Console.WriteLine("Diagnostics: Bytecode trace listener enabled");
                         break;
 
+                    case "profile":
+                        profileListener = new MethodProfileListener();
+                        diagnostics.Register(profileListener, DiagnosticEventTypes.AllMethod);
+                        Console.WriteLine("Diagnostics: Method profiling enabled");
+                        break;
+
                     case "all":
                         diagnostics.Register(new ColdStartDetailListener(), DiagnosticEventTypes.AllColdStartDetail);
                         diagnostics.Register(new MethodTraceListener(), DiagnosticEventTypes.AllMethod);
@@ -530,6 +542,8 @@ public static class Program
             }
             Console.WriteLine();
         }
+
+        return profileListener;
     }
 
 }

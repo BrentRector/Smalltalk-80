@@ -113,8 +113,9 @@ public record MethodEntryEvent : DiagnosticEvent
 public record MethodExitEvent : DiagnosticEvent
 {
     public required string Selector { get; init; }
+    public required string ReceiverClass { get; init; }
     public required SmalltalkOOP ReturnValue { get; init; }
-    public required long ElapsedInstructions { get; init; }
+    public required int CallDepth { get; init; }
 }
 
 /// <summary>Bytecode instruction execution event.</summary>

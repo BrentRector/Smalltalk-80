@@ -516,22 +516,40 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Normal return (not NLR)
         senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
 
-        // if (_verboseDebugMode)
-        // {
-        //     Console.WriteLine($"[HandleReturn] Normal return from {_contextManager.ActiveContext} to {senderOOP}");
-        //     Console.WriteLine($"  Return value: {returnValue} (SmallInt={returnValue.IsSmallInteger})");
-        // }
+        // Emit MethodExitEvent for profiling/diagnostics
+        if (_diagnostics?.IsEnabled(DiagnosticEventTypes.MethodExit) == true)
+        {
+            // Get method info from the returning context
+            var returningMethodOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_METHOD_INDEX);
+            string? methodLocalId = GetLocalId(returningMethodOOP);
 
-        // DIAGNOSTIC: Track return values from hash/stringhash methods (disabled for quiet mode)
-        // int methodIndex2 = VMConstants.CONTEXT_METHOD_INDEX;
-        // var returningMethodOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, methodIndex2);
-        // string? methodLocalId = GetLocalId(returningMethodOOP);
-        // if (methodLocalId != null && (methodLocalId.Contains(">>hash") || methodLocalId.Contains(">>stringhash")))
-        // {
-        //     var className = returnValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(returnValue));
-        //     Console.WriteLine($"\n[RETURN from {methodLocalId}] value={returnValue}, class={className}, isSmallInt={returnValue.IsSmallInteger}");
-        // }
+            // Parse "ClassName>>selector" format
+            string className = "unknown";
+            string selector = "unknown";
+            if (methodLocalId != null)
+            {
+                int separatorIndex = methodLocalId.IndexOf(">>");
+                if (separatorIndex > 0)
+                {
+                    className = methodLocalId[..separatorIndex];
+                    selector = methodLocalId[(separatorIndex + 2)..];
+                }
+                else
+                {
+                    selector = methodLocalId;
+                }
+            }
 
+            _diagnostics.Emit(new MethodExitEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                InstructionCount = _tracer.InstructionCount,
+                Selector = selector,
+                ReceiverClass = className,
+                ReturnValue = returnValue,
+                CallDepth = _tracer.SelectorTraceDepth
+            });
+        }
 
         // Selector trace: log method return
         if (_tracer.SelectorTraceEnabled && _tracer.HasSelectorTraceEntries)
