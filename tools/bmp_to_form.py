@@ -8,7 +8,7 @@ Form file format (big-endian 16-bit words):
 - Word 2: height in pixels
 - Word 3: offsetX (signed, two's complement)
 - Word 4: offsetY (signed, two's complement)
-- Words 5+: bitmap data in column-major order
+- Words 5+: bitmap data in row-major order (all words of row 0, then row 1, etc.)
 """
 
 import struct
@@ -44,12 +44,12 @@ def bmp_to_form(bmp_path: Path, form_path: Path, offset_x: int = 0, offset_y: in
     # In Smalltalk Form: 1 = black, 0 = white
     pixels = img.load()
 
-    # Build bitmap in column-major order
-    # For each word-column, for each row, pack 16 pixels into a word
+    # Build bitmap in row-major order (Smalltalk Form standard)
+    # For each row, for each word-column, pack 16 pixels into a word
     bitmap_words = []
 
-    for col in range(word_cols):
-        for row in range(height):
+    for row in range(height):
+        for col in range(word_cols):
             word_val = 0
             for bit in range(16):
                 pixel_x = col * 16 + bit
@@ -75,7 +75,7 @@ def bmp_to_form(bmp_path: Path, form_path: Path, offset_x: int = 0, offset_y: in
         f.write(struct.pack('>H', file_offset_x))  # offsetX
         f.write(struct.pack('>H', file_offset_y))  # offsetY
 
-        # Bitmap data (column-major)
+        # Bitmap data (row-major)
         for word in bitmap_words:
             f.write(struct.pack('>H', word))
 
