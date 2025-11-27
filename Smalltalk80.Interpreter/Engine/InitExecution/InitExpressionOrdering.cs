@@ -61,6 +61,7 @@ public static class InitExpressionOrdering
             "StringHolderController initialize",
             "VariableNode initialize",
             "FormMenuView initialize",
+            "TextCollector initialize",
             "FormDisplayTest initialize"  // Must run last - depends on FormMenuView loading Forms
         };
     }

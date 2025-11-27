@@ -40127,10 +40127,18 @@ TextCollector class
 
 
 !TextCollector class methodsFor: 'system'!
-newTranscript: aTextCollector 
+newTranscript: aTextCollector
 	"Store aTextCollector as the value of the system global Transcript."
 	Smalltalk at: #Transcript put: aTextCollector.
 	^aTextCollector! !
+
+!TextCollector class methodsFor: 'class initialization'!
+initialize
+	"Create and install the system Transcript global.
+	Needed for cold start since classic Smalltalk relied on image persistence."
+	self newTranscript: self new! !
+
+TextCollector initialize!
 
 !TextCollector class methodsFor: 'examples'!
 example
