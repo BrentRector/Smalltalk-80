@@ -42643,8 +42643,8 @@ initialize
 	"Force display refresh"
 	Display display.
 
-	"Test text display with default font (emphasis 1)"
-	'Hello, world!' displayAt: 10@10.
+	"Test text display with larger font"
+	(Text string: 'Hello, world!' emphasis: 4) asDisplayText displayAt: 20@30.
 
 	"FormDisplayTest initialize"! !
 
