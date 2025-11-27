@@ -183,6 +183,15 @@ public static class InitExpressionOrdering
         // 3. Add test classes LAST
         result.AddRange(testClassIndices.OrderBy(i => i));
 
+        // Debug: Print last 5 items in result order
+        Console.WriteLine("  📋 Last 5 init expressions in order:");
+        var lastFive = result.Skip(Math.Max(0, result.Count - 5)).ToList();
+        foreach (var idx in lastFive)
+        {
+            var src = bundle.InitExpressions[idx].Source ?? "(null)";
+            Console.WriteLine($"      [{idx}] {src}");
+        }
+
         return result;
     }
 }
