@@ -201,8 +201,24 @@ public partial class VirtualMachine
     /// </summary>
     private CallOutcome SendMessage(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
     {
+        // Validate receiver is a valid OOP (SmallIntegers are always valid)
+        if (!receiverOOP.IsSmallInteger && !_heapManager.IsValidOOP(receiverOOP))
+        {
+            string? selectorName2 = GetSymbolName(selectorOOP);
+            throw new InvalidOperationException(
+                $"Invalid receiver OOP {receiverOOP.RawValue} when sending '{selectorName2 ?? "unknown"}'");
+        }
+
         // Look up the method in the receiver's class
         var classOOP = GetClass(receiverOOP);
+
+        // Validate the class OOP
+        if (!_heapManager.IsValidOOP(classOOP))
+        {
+            string? selectorName2 = GetSymbolName(selectorOOP);
+            throw new InvalidOperationException(
+                $"Invalid class OOP {classOOP.RawValue} for receiver OOP {receiverOOP.RawValue} when sending '{selectorName2 ?? "unknown"}'");
+        }
 
         // Get selector name once for all uses
         string? selectorName = GetSymbolName(selectorOOP);
