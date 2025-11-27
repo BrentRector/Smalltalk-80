@@ -246,7 +246,7 @@ named: aFileName mode: modeString
 !WindowsFile methodsFor: 'file operations'!
 
 openNamed: aFileName mode: modeString
-    <primitive: 121>
+    "Open the file with given name and mode. Sets all instance variables."
     fileHandle _ self primOpen: aFileName mode: modeString.
     fileName _ aFileName.
     position _ 0.

@@ -6,19 +6,36 @@
 
 ## Current Status
 
-**Previous Issue FIXED**: The `asFileStream:` method now exists in coldstart.json.
+**Root Cause Found and Fixed**: `WindowsFile>>openNamed:mode:` had `<primitive: 121>` which was WRONG.
 
-**New Issue**: `fileHandle` is nil when `asFileStream:` tries to call `self size`.
+### The Bug
+```smalltalk
+openNamed: aFileName mode: modeString
+    <primitive: 121>              "<-- BUG: when primitive succeeds, returns handle and skips instance var setup"
+    fileHandle _ self primOpen: aFileName mode: modeString.
+    fileName _ aFileName.         "<-- NEVER EXECUTED when primitive 121 succeeds"
+    ...
+```
+
+When primitive 121 succeeded:
+1. It returned the file handle integer (wrong return type - method should return `self`)
+2. The Smalltalk fallback code was skipped, so `fileName` was never set
+3. Later, `reopen` called `openNamed: fileName mode: 'r'` with nil fileName
+4. File open failed, `fileHandle` stayed nil, `size` failed
 
 ### Fix Applied
-Updated `WindowsFile>>asFileStream:` to defensively check and reopen if needed:
+Removed `<primitive: 121>` from `openNamed:mode:`. Only `primOpen:mode:` should use the primitive:
 
 ```smalltalk
-asFileStream: aStream
-    "Initialize aStream (typically a FileStream) to access the receiver.
-    This is called by FileStream>>on: to set up the stream."
-    fileHandle isNil ifTrue: [self reopen].
-    aStream position: 0 size: self size! !
+openNamed: aFileName mode: modeString
+    "Open the file with given name and mode. Sets all instance variables."
+    fileHandle _ self primOpen: aFileName mode: modeString.
+    fileName _ aFileName.
+    position _ 0.
+    readLimit _ self size.
+    writeLimit _ self size.
+    isBinary _ false.
+    ^self!
 ```
 
 **Action Required**: Regenerate coldstart.json to include this fix.
