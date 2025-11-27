@@ -154,75 +154,35 @@ public class SmalltalkInterpreterThread
             // FormMenuView initialize now enabled - file I/O primitives implemented
         };
 
-        // Build phase lists
+        // Build phase lists using explicit ordering from InitExpressionOrdering
         var phase1Indices = new List<int>();
         var skippedIndices = new List<(int index, string reason)>();
 
+        // Build source-to-index map for the bundle
+        var sourceToIndex = new Dictionary<string, int>();
         for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
         {
-            var expr = _context.Bundle.InitExpressions[i];
-            if (expr.Source == null) continue;
-
-            bool isEssential = essentialList.Contains(expr.Source);
-
-            // Skip if in skip list and not essential
-            if (!isEssential && skipList.Contains(expr.Source))
+            var source = _context.Bundle.InitExpressions[i].Source;
+            if (source != null)
             {
-                skippedIndices.Add((i, "Requires features not yet available"));
-                continue;
-            }
-
-            // Include initialize methods and test validation
-            // EXCEPT DisplayScreen initialize (runs last to draw halftone square)
-            // EXCEPT FormMenuView initialize (runs after DisplayScreen, needs file I/O)
-            // EXCEPT FormDisplayTest initialize (runs last, needs FormMenuView to have loaded Forms)
-            if ((expr.Source.EndsWith(" initialize") &&
-                 expr.Source != "DisplayScreen initialize" &&
-                 expr.Source != "FormMenuView initialize" &&
-                 expr.Source != "FormDisplayTest initialize") ||
-                expr.Source == "InputSensor install" ||
-                expr.Source == "InputSensor initSensor" ||
-                expr.Source.Contains("Test validate"))
-            {
-                phase1Indices.Add(i);
+                sourceToIndex[source] = i;
             }
         }
 
-        // Apply dependency ordering
-        var dependencyOrder = InitExpressionOrdering.GetDependencyOrder();
-        phase1Indices = InitExpressionOrdering.ReorderByDependencies(
-            phase1Indices, _context.Bundle, dependencyOrder);
-
-        // Add DisplayScreen initialize at the END (runs last to draw halftone square)
-        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
+        // Add init expressions in the explicit order defined in InitExpressionOrdering
+        foreach (var source in InitExpressionOrdering.GetExecutionOrder())
         {
-            var expr = _context.Bundle.InitExpressions[i];
-            if (expr.Source == "DisplayScreen initialize")
+            if (sourceToIndex.TryGetValue(source, out int idx))
             {
-                phase1Indices.Add(i);
-                break;
-            }
-        }
-
-        // Add FormMenuView initialize AFTER DisplayScreen (needs file I/O for .form files)
-        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
-        {
-            var expr = _context.Bundle.InitExpressions[i];
-            if (expr.Source == "FormMenuView initialize")
-            {
-                phase1Indices.Add(i);
-                break;
-            }
-        }
-
-        // Add FormDisplayTest initialize LAST (needs FormMenuView to have loaded Forms)
-        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
-        {
-            var expr = _context.Bundle.InitExpressions[i];
-            if (expr.Source == "FormDisplayTest initialize")
-            {
-                phase1Indices.Add(i);
-                break;
+                // Check skip list
+                if (skipList.Contains(source) && !essentialList.Contains(source))
+                {
+                    skippedIndices.Add((idx, "Requires features not yet available"));
+                }
+                else
+                {
+                    phase1Indices.Add(idx);
+                }
             }
         }
 
