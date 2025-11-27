@@ -561,15 +561,23 @@ dataMaxEnd
     ^self dataBeginning + self dataSize!
 
 dataString
-    "Answer the page data as a string."
-    | contents sz |
+    "Answer the page data as a string.
+     Optimized to read entire file at once instead of byte-by-byte."
+    | sz buffer |
     sz _ self size.
-    contents _ String new: sz.
+    sz = 0 ifTrue: [^''].
     self openForRead.
     self primSetPosition: fileHandle to: 0.
-    1 to: sz do: [:i |
-        contents at: i put: (self primAt: fileHandle position: i - 1) asCharacter].
-    ^contents! !
+    "Read all bytes at once using primitive 123"
+    buffer _ ByteArray new: sz.
+    self primRead: fileHandle into: buffer count: sz.
+    "Convert ByteArray to String using primitive 105"
+    ^buffer asString!
+
+primRead: handle into: buffer count: count
+    "Read count bytes from file handle into buffer."
+    <primitive: 123>
+    ^0! !
 
 !WindowsFilePage methodsFor: 'testing'!
 
