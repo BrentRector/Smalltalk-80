@@ -472,6 +472,7 @@ asFileStream
 asFileStream: aStream
     "Initialize aStream (typically a FileStream) to access the receiver.
     This is called by FileStream>>on: to set up the stream."
+    fileHandle isNil ifTrue: [self reopen].
     aStream position: 0 size: self size! !
 
 WindowsFile class

@@ -4,18 +4,24 @@
 **Branch**: `claude/fix-init-expression-order-014GHbhtroCoX3ogdkrXYFsU`
 **Status**: READY TO FIX - coldstart.json needs regeneration
 
-## Critical Finding
+## Current Status
 
-**The `asFileStream:` method IS in the source file but was NEVER compiled into coldstart.json.**
+**Previous Issue FIXED**: The `asFileStream:` method now exists in coldstart.json.
 
-### Evidence:
-1. `Smalltalk-80.st` line 472-475: Contains `WindowsFile>>asFileStream:` method
-2. Git commit `98a5ba0`: Added the method on Nov 26
-3. `coldstart.json`: Contains `WindowsFile>>asFileStream` (no colon) but NOT `asFileStream:` (with colon)
-4. No subsequent commit regenerated the coldstart.json after `98a5ba0`
+**New Issue**: `fileHandle` is nil when `asFileStream:` tries to call `self size`.
 
-### Root Cause
-The `asFileStream:` method was added to the Smalltalk source file but the coldstart.json was **never regenerated** to include the newly added method. The runtime error "Method not found: asFileStream:" is correct - the method literally doesn't exist in the compiled image.
+### Fix Applied
+Updated `WindowsFile>>asFileStream:` to defensively check and reopen if needed:
+
+```smalltalk
+asFileStream: aStream
+    "Initialize aStream (typically a FileStream) to access the receiver.
+    This is called by FileStream>>on: to set up the stream."
+    fileHandle isNil ifTrue: [self reopen].
+    aStream position: 0 size: self size! !
+```
+
+**Action Required**: Regenerate coldstart.json to include this fix.
 
 ---
 
@@ -77,11 +83,7 @@ asFileStream: aStream
 
 ---
 
-## After Regeneration: Potential Next Issue
-
-Once the coldstart.json is regenerated and includes `asFileStream:`, the **next** failure might be related to the `size` method calling `self size` when the file isn't open yet. If that happens:
-
-### WindowsFile Instance Variables
+## WindowsFile Instance Variables
 ```smalltalk
 Object subclass: #WindowsFile
     instanceVariableNames: 'fileName fileHandle fileMode'
@@ -92,17 +94,6 @@ Object subclass: #WindowsFile
 - **fileName** (index 0): String path to file
 - **fileHandle** (index 1): Integer handle from primOpen (nil if not open)
 - **fileMode** (index 2): Mode string ('r', 'w', 'a')
-
-### Potential Fix if size fails
-Update `WindowsFile>>asFileStream:` to ensure file is open first:
-
-```smalltalk
-asFileStream: aStream
-    "Initialize aStream (typically a FileStream) to access the receiver.
-    This is called by FileStream>>on: to set up the stream."
-    fileHandle isNil ifTrue: [self reopen].  "Ensure file is open"
-    aStream position: 0 size: self size! !
-```
 
 ---
 
