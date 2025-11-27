@@ -21598,8 +21598,8 @@ initialize
 		'magnify.form' 'white.form' 'lightgray.form' 'gray.form' 'darkgray.form' 'black.form'
 		'xgrid.form' 'ygrid.form' 'togglegrids.form' 'out.form' ).	"Files of button images"
 	FormButtons _ OrderedCollection new.
-	1 to: 21 do: 
-		[:index | 
+	1 to: 21 do:
+		[:index |
 		formButton _ FormButtonCache new.
 		formButton form: (Form readFrom: (names at: index)).
 		formButton offset: (offsets at: index).
@@ -21607,7 +21607,18 @@ initialize
 		formButton initialState: (states at: index).
 		FormButtons addLast: formButton].
 	SpecialBorderForm  _ Form readFrom: 'specialborderform.form'.
-	BorderForm _ Form readFrom: 'borderform.form'
+	BorderForm _ Form readFrom: 'borderform.form'.
+
+	"DEBUG: Draw marker at top-left corner to show FormButtons status
+	 White box with border = FormButtons not nil, has entries"
+	FormButtons isNil
+		ifTrue: [Display fill: (5@5 extent: 30@30) mask: Form black]
+		ifFalse: [
+			Display fill: (5@5 extent: 30@30) mask: Form white.
+			Display border: (5@5 extent: 30@30) width: 2.
+			"Draw count indicator - one small box per entry"
+			1 to: (FormButtons size min: 21) do: [:i |
+				Display fill: (40 + (i-1*8) @ 10 extent: 6@6) mask: Form black]]
 
 	"FormMenuView initialize"! !
 
