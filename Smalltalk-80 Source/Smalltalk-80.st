@@ -284,7 +284,7 @@ position
     ^position!
 
 position: anInteger
-    <primitive: 124>
+    "Set the file position to anInteger. Uses the primitive via primSetPosition:to:."
     self primSetPosition: fileHandle to: anInteger.
     position _ anInteger.
     ^self!

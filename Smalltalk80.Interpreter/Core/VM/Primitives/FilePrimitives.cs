@@ -416,26 +416,35 @@ public static class FileOperations
     /// <summary>
     /// Primitive 124: Seek in file (SetFilePointer equivalent).
     /// Receiver: WindowsFileReference or WindowsFileStream instance.
-    /// Arguments: handle (Integer), offset (Integer), origin (Integer: 0=Begin, 1=Current, 2=End).
+    /// Supports TWO calling conventions:
+    /// 1. 2 args: handle (Integer), offset (Integer) - origin defaults to 0 (Begin)
+    /// 2. 3 args: handle (Integer), offset (Integer), origin (Integer: 0=Begin, 1=Current, 2=End)
     /// Returns: Integer new position or -1 on failure.
     /// </summary>
     public class FileSeek : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 3) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Arguments.Length < 2 || context.Arguments.Length > 3)
+                return PrimitiveResult.Fail(context.Metadata!);
 
             var handleOOP = context.Arguments[0];
             var offsetOOP = context.Arguments[1];
-            var originOOP = context.Arguments[2];
 
             if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
             if (!offsetOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (!originOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            // Default origin to 0 (Begin) if not provided
+            int origin = 0;
+            if (context.Arguments.Length == 3)
+            {
+                var originOOP = context.Arguments[2];
+                if (!originOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+                origin = originOOP.AsSmallInteger();
+            }
 
             int handle = handleOOP.AsSmallInteger();
             int offset = offsetOOP.AsSmallInteger();
-            int origin = originOOP.AsSmallInteger();
 
             var stream = FileHandleManager.GetStream(handle);
             if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
