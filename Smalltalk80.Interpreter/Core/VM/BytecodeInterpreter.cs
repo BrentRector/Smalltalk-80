@@ -1182,6 +1182,25 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             }
         }
 
+        // Fast path for value/value: on BlockContext
+        if (selectorIndex == 9 || selectorIndex == 10) // value, value:
+        {
+            // Check if receiver is a BlockContext (not SmallInteger)
+            if (!receiverOOP.IsSmallInteger)
+            {
+                var receiverClassOOP = heapManager.GetClassOOP(receiverOOP);
+                if (receiverClassOOP == metadata.BlockContextClassOOP)
+                {
+                    // Fast path: activate block directly, skip message dispatch
+                    if (context.ActivateBlock(receiverOOP, args))
+                    {
+                        return false; // Context switched
+                    }
+                    // Arg count mismatch - fall through to message send for error handling
+                }
+            }
+        }
+
         // Fall back to message send using cached selector OOP
         return context.SendMessageAndContinue(receiverOOP, selectorOOP, args);
     }

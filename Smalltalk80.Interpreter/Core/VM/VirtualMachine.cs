@@ -1010,6 +1010,51 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     void IBytecodeContext.AddAssociationToClassPoolIfNeeded(SmalltalkOOP classOOP, SmalltalkOOP associationOOP)
         => AddAssociationToClassPoolIfNeeded(classOOP, associationOOP);
 
+    bool IBytecodeContext.ActivateBlock(SmalltalkOOP blockContextOOP, SmalltalkOOP[] args)
+    {
+        // Get block's expected argument count
+        var blockArgCountOOP = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
+        if (!blockArgCountOOP.IsSmallInteger) return false;
+
+        int blockArgCount = blockArgCountOOP.AsSmallInteger();
+
+        // Verify argument count matches
+        if (args.Length != blockArgCount) return false;
+
+        // Get argStartIndex from BlockContext
+        var argStartIndexOOP = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX);
+        int argStartIndex = argStartIndexOOP.AsSmallInteger();
+
+        // Get home MethodContext
+        var homeContext = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+
+        // Store arguments in home MethodContext temp frame
+        for (int i = 0; i < args.Length; i++)
+        {
+            _heapManager.SetIndexedOOP(homeContext, argStartIndex + i, args[i]);
+        }
+
+        // Get initialIP from blockContext
+        var initialIP = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+
+        // Set PC to initialIP
+        _heapManager.SetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_PC_INDEX, initialIP);
+
+        // Set stack pointer to argument count
+        _heapManager.SetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_STACKP_INDEX,
+            SmalltalkOOP.FromSmallInteger(args.Length));
+
+        // Set caller to current active context
+        _heapManager.SetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_CALLER_INDEX,
+            _contextManager.ActiveContext);
+
+        // Switch to the BlockContext
+        _contextManager.SetActiveContext(blockContextOOP);
+        _contextSwitchPending = true;
+
+        return true;
+    }
+
     /// <summary>
     /// Pushes a value onto the operand stack.
     /// Delegates to StackManager for implementation.
