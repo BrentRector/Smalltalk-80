@@ -42643,6 +42643,9 @@ initialize
 	"Force display refresh"
 	Display display.
 
+	"Test Transcript"
+	Transcript show: 'Hello, world!'; cr.
+
 	"FormDisplayTest initialize"! !
 
 FormDisplayTest class
