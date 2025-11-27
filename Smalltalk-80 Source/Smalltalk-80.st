@@ -42533,3 +42533,76 @@ with: aCollection from: firstIndex to: lastIndex
 
 	^self basicNew with: (aCollection copyFrom: firstIndex to: lastIndex)! !
 
+"==================== FormDisplayTest ===================="
+
+Object subclass: #FormDisplayTest
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Graphics-Tests'!
+
+FormDisplayTest comment:
+'I am a test class that displays all Forms loaded by FormMenuView initialize.
+My initialize method displays all 23 forms in a grid on the Display.'!
+
+!FormDisplayTest class methodsFor: 'class initialization'!
+
+initialize
+	"Display all 23 forms loaded by FormMenuView in a grid on the Display.
+	Forms are: 21 from FormButtons + SpecialBorderForm + BorderForm."
+
+	| forms x y spacing formWidth formHeight cols rows index form buttons |
+
+	"Collect all forms from FormMenuView class variables"
+	forms _ OrderedCollection new.
+
+	"Get FormButtons - each is a FormButtonCache with a form"
+	buttons _ FormMenuView classPool at: #FormButtons ifAbsent: [nil].
+	buttons isNil ifFalse: [
+		buttons do: [:cache | forms add: cache form]].
+
+	"Get SpecialBorderForm and BorderForm"
+	(FormMenuView classPool at: #SpecialBorderForm ifAbsent: [nil]) isNil ifFalse: [
+		forms add: (FormMenuView classPool at: #SpecialBorderForm)].
+	(FormMenuView classPool at: #BorderForm ifAbsent: [nil]) isNil ifFalse: [
+		forms add: (FormMenuView classPool at: #BorderForm)].
+
+	forms isEmpty ifTrue: [
+		Transcript show: 'FormDisplayTest: No forms found'; cr.
+		^self].
+
+	"Calculate grid layout - 6 columns x 4 rows for 23 forms"
+	cols _ 6.
+	rows _ 4.
+	formWidth _ 64.
+	formHeight _ 48.
+	spacing _ 20.
+
+	"Starting position - center the grid"
+	x _ (Display width - (cols * (formWidth + spacing))) // 2.
+	y _ (Display height - (rows * (formHeight + spacing))) // 2.
+
+	"Display each form in the grid"
+	index _ 1.
+	0 to: rows - 1 do: [:row |
+		0 to: cols - 1 do: [:col |
+			index <= forms size ifTrue: [
+				form _ forms at: index.
+				form displayOn: Display
+					at: (x + (col * (formWidth + spacing))) @ (y + (row * (formHeight + spacing))).
+				index _ index + 1]]].
+
+	"Force display refresh"
+	Display display.
+
+	Transcript show: 'FormDisplayTest: Displayed '; show: forms size printString;
+		show: ' forms in '; show: cols printString; show: 'x';
+		show: rows printString; show: ' grid'; cr.
+
+	"FormDisplayTest initialize"! !
+
+FormDisplayTest class
+	instanceVariableNames: ''!
+
+FormDisplayTest initialize!
+
