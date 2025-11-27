@@ -66,11 +66,11 @@ public static class InitExpressionOrdering
     };
 
     /// <summary>
-    /// Test classes that always run last, after all other init expressions.
+    /// Class name prefixes for test classes that always run last.
     /// </summary>
-    private static readonly List<string> TestClasses = new()
+    private static readonly List<string> TestClassPrefixes = new()
     {
-        "FormDisplayTest initialize"
+        "FormDisplayTest"
     };
 
     /// <summary>
@@ -88,12 +88,25 @@ public static class InitExpressionOrdering
             if (!result.Contains(className))
                 result.Add(className);
         }
-        foreach (var source in TestClasses)
+        foreach (var prefix in TestClassPrefixes)
         {
-            var className = source.Replace(" initialize", " class");
-            result.Add(className);
+            result.Add($"{prefix} class");
         }
         return result;
+    }
+
+    /// <summary>
+    /// Checks if an init expression source belongs to a test class.
+    /// </summary>
+    private static bool IsTestClass(string? source)
+    {
+        if (source == null) return false;
+        foreach (var prefix in TestClassPrefixes)
+        {
+            if (source.StartsWith(prefix, StringComparison.Ordinal))
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -106,8 +119,25 @@ public static class InitExpressionOrdering
     {
         var result = new List<int>();
         var remaining = new HashSet<int>(originalIndices);
+        var testClassIndices = new List<int>();
 
-        // Build source-to-index map
+        // First pass: identify test class indices and separate them
+        foreach (var idx in originalIndices)
+        {
+            var source = bundle.InitExpressions[idx].Source;
+            if (IsTestClass(source))
+            {
+                testClassIndices.Add(idx);
+            }
+        }
+
+        // Remove test classes from remaining - they run last
+        foreach (var idx in testClassIndices)
+        {
+            remaining.Remove(idx);
+        }
+
+        // Build source-to-index map (excluding test classes)
         var sourceToIndex = new Dictionary<string, int>();
         for (int i = 0; i < bundle.InitExpressions.Length; i++)
         {
@@ -131,34 +161,16 @@ public static class InitExpressionOrdering
             }
         }
 
-        // 2. Add any NEW expressions (not in KnownOrder or TestClasses)
-        var testIndices = new HashSet<int>();
-        foreach (var source in TestClasses)
+        // 2. Add any NEW expressions (not in KnownOrder, not test classes)
+        if (remaining.Count > 0)
         {
-            if (sourceToIndex.TryGetValue(source, out int idx))
-            {
-                testIndices.Add(idx);
-            }
-        }
-
-        var newExpressions = remaining.Where(i => !testIndices.Contains(i)).OrderBy(i => i).ToList();
-        if (newExpressions.Count > 0)
-        {
+            var newExpressions = remaining.OrderBy(i => i).ToList();
             Console.WriteLine($"  ℹ️  {newExpressions.Count} new init expressions (running before test classes)");
             result.AddRange(newExpressions);
-            foreach (var idx in newExpressions)
-                remaining.Remove(idx);
         }
 
-        // 3. Add test classes LAST
-        foreach (var source in TestClasses)
-        {
-            if (sourceToIndex.TryGetValue(source, out int idx) && remaining.Contains(idx))
-            {
-                result.Add(idx);
-                remaining.Remove(idx);
-            }
-        }
+        // 3. Add test classes LAST (in the order they appear in the bundle)
+        result.AddRange(testClassIndices.OrderBy(i => i));
 
         return result;
     }
