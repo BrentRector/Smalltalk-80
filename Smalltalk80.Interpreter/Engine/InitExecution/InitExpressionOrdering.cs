@@ -66,15 +66,6 @@ public static class InitExpressionOrdering
     };
 
     /// <summary>
-    /// Class name prefixes for classes that run right before test classes.
-    /// These may have init expressions that take a long time and are dependencies for tests.
-    /// </summary>
-    private static readonly List<string> PreTestClassPrefixes = new()
-    {
-        "FormMenuView"
-    };
-
-    /// <summary>
     /// Class name prefixes for test classes that always run last.
     /// </summary>
     private static readonly List<string> TestClassPrefixes = new()
@@ -105,20 +96,6 @@ public static class InitExpressionOrdering
     }
 
     /// <summary>
-    /// Checks if an init expression source belongs to a pre-test class.
-    /// </summary>
-    private static bool IsPreTestClass(string? source)
-    {
-        if (source == null) return false;
-        foreach (var prefix in PreTestClassPrefixes)
-        {
-            if (source.StartsWith(prefix, StringComparison.Ordinal))
-                return true;
-        }
-        return false;
-    }
-
-    /// <summary>
     /// Checks if an init expression source belongs to a test class.
     /// </summary>
     private static bool IsTestClass(string? source)
@@ -142,53 +119,47 @@ public static class InitExpressionOrdering
     {
         var result = new List<int>();
         var remaining = new HashSet<int>(originalIndices);
-        var preTestClassIndices = new List<int>();
         var testClassIndices = new List<int>();
 
-        // First pass: identify pre-test and test class indices and separate them
+        // First pass: identify test class indices and separate them
         foreach (var idx in originalIndices)
         {
             var source = bundle.InitExpressions[idx].Source;
             if (IsTestClass(source))
             {
                 testClassIndices.Add(idx);
-            }
-            else if (IsPreTestClass(source))
-            {
-                preTestClassIndices.Add(idx);
+                remaining.Remove(idx);
             }
         }
 
-        // Remove pre-test and test classes from remaining - they run at the end
-        foreach (var idx in preTestClassIndices)
-        {
-            remaining.Remove(idx);
-        }
-        foreach (var idx in testClassIndices)
-        {
-            remaining.Remove(idx);
-        }
-
-        // Build source-to-index map (excluding pre-test and test classes)
+        // Build source-to-index map (excluding test classes)
         var sourceToIndex = new Dictionary<string, int>();
-        for (int i = 0; i < bundle.InitExpressions.Length; i++)
+        foreach (var idx in remaining)
         {
-            if (remaining.Contains(i))
+            var source = bundle.InitExpressions[idx].Source;
+            if (source != null)
             {
-                var source = bundle.InitExpressions[i].Source;
-                if (source != null)
+                sourceToIndex[source] = idx;
+            }
+        }
+
+        // Debug: Check if FormMenuView is in the bundle
+        var hasFormMenuView = sourceToIndex.ContainsKey("FormMenuView initialize");
+        if (!hasFormMenuView)
+        {
+            // Try to find what FormMenuView's actual source looks like
+            foreach (var kvp in sourceToIndex)
+            {
+                if (kvp.Key.Contains("FormMenuView"))
                 {
-                    sourceToIndex[source] = i;
+                    Console.WriteLine($"  ⚠️  Found FormMenuView as: '{kvp.Key}'");
                 }
             }
         }
 
-        // 1. Add known expressions in order (excluding FormMenuView which is handled separately)
+        // 1. Add known expressions in order
         foreach (var source in KnownOrder)
         {
-            // Skip pre-test classes in KnownOrder - they're handled separately
-            if (IsPreTestClass(source)) continue;
-
             if (sourceToIndex.TryGetValue(source, out int idx) && remaining.Contains(idx))
             {
                 result.Add(idx);
@@ -196,18 +167,20 @@ public static class InitExpressionOrdering
             }
         }
 
-        // 2. Add any NEW expressions (not in KnownOrder, not pre-test, not test)
+        // 2. Add any NEW expressions (not in KnownOrder, not test classes)
         if (remaining.Count > 0)
         {
             var newExpressions = remaining.OrderBy(i => i).ToList();
-            Console.WriteLine($"  ℹ️  {newExpressions.Count} new init expressions (running before pre-test classes)");
+            Console.WriteLine($"  ℹ️  {newExpressions.Count} new init expressions (running before test classes):");
+            foreach (var idx in newExpressions)
+            {
+                var src = bundle.InitExpressions[idx].Source ?? "(null)";
+                Console.WriteLine($"      - {src}");
+            }
             result.AddRange(newExpressions);
         }
 
-        // 3. Add pre-test classes (like FormMenuView)
-        result.AddRange(preTestClassIndices.OrderBy(i => i));
-
-        // 4. Add test classes LAST
+        // 3. Add test classes LAST
         result.AddRange(testClassIndices.OrderBy(i => i));
 
         return result;
