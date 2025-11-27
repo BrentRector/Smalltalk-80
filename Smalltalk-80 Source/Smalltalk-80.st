@@ -21606,32 +21606,10 @@ initialize
 		formButton value: (keys at: index).
 		formButton initialState: (states at: index).
 		FormButtons addLast: formButton].
-	SpecialBorderForm  _ Form readFrom: 'specialborderform.form'.
-	BorderForm _ Form readFrom: 'borderform.form'.
-
-	"DEBUG: Draw marker at top-left corner to show FormButtons status
-	 White box with border = FormButtons not nil, has entries"
-	FormButtons isNil
-		ifTrue: [Display fill: (5@5 extent: 30@30) mask: Form black]
-		ifFalse: [
-			Display fill: (5@5 extent: 30@30) mask: Form white.
-			Display border: (5@5 extent: 30@30) width: 2.
-			"Draw count indicator - one small box per entry"
-			1 to: (FormButtons size min: 21) do: [:i |
-				Display fill: (40 + (i-1*8) @ 10 extent: 6@6) mask: Form black]]
+	SpecialBorderForm _ Form readFrom: 'specialborderform.form'.
+	BorderForm _ Form readFrom: 'borderform.form'
 
 	"FormMenuView initialize"! !
-
-!FormMenuView class methodsFor: 'accessing'!
-formButtons
-	"Answer the FormButtons class variable"
-	^FormButtons!
-getSpecialBorderForm
-	"Answer the SpecialBorderForm class variable"
-	^SpecialBorderForm!
-getBorderForm
-	"Answer the BorderForm class variable"
-	^BorderForm! !
 
 FormMenuView initialize!
 View subclass: #FormView
@@ -42573,80 +42551,39 @@ My initialize method displays all 23 forms in a grid on the Display.'!
 !FormDisplayTest class methodsFor: 'class initialization'!
 
 initialize
-	"Display forms in two grids: direct file reads on top, cache reads below."
+	"Display all 23 forms from FormMenuView cache in a grid on the Display.
+	Forms are: 21 from FormButtons + SpecialBorderForm + BorderForm.
+	Note: This class is a subclass of FormMenuView to access its class variables."
 
-	| directForms cacheForms x y spacing formWidth formHeight cols rows index form buttons names |
+	| forms x y spacing formWidth formHeight cols rows index form |
 
+	"Collect all forms from class variables (accessible as subclass)"
+	forms _ OrderedCollection new.
+	FormButtons isNil ifFalse: [
+		FormButtons do: [:cache |
+			cache form isNil ifFalse: [forms add: cache form]]].
+	SpecialBorderForm isNil ifFalse: [forms add: SpecialBorderForm].
+	BorderForm isNil ifFalse: [forms add: BorderForm].
+
+	forms isEmpty ifTrue: [^self].
+
+	"Calculate grid layout - 6 columns x 4 rows for 23 forms"
 	cols _ 6.
 	rows _ 4.
 	formWidth _ 64.
 	formHeight _ 48.
-	spacing _ 16.
+	spacing _ 20.
 
-	"=== PART 1: Direct file reads ==="
-	names _ #('select.form' 'singlecopy.form' 'repeatcopy.form' 'line.form' 'curve.form'
-		'block.form' 'over.form' 'under.form' 'reverse.form' 'erase.form' 'in.form'
-		'magnify.form' 'white.form' 'lightgray.form' 'gray.form' 'darkgray.form' 'black.form'
-		'xgrid.form' 'ygrid.form' 'togglegrids.form' 'out.form'
-		'specialborderform.form' 'borderform.form').
-
-	directForms _ OrderedCollection new.
-	names do: [:name |
-		form _ Form readFrom: name.
-		form isNil ifFalse: [directForms add: form]].
-
-	"Display direct-read forms at top"
+	"Starting position - center the grid"
 	x _ (Display width - (cols * (formWidth + spacing))) // 2.
-	y _ 20.
+	y _ (Display height - (rows * (formHeight + spacing))) // 2.
 
+	"Display each form in the grid"
 	index _ 1.
 	0 to: rows - 1 do: [:row |
 		0 to: cols - 1 do: [:col |
-			index <= directForms size ifTrue: [
-				form _ directForms at: index.
-				form displayOn: Display
-					at: (x + (col * (formWidth + spacing))) @ (y + (row * (formHeight + spacing))).
-				index _ index + 1]]].
-
-	"=== PART 2: Cache reads via class variable (subclass access) ==="
-	cacheForms _ OrderedCollection new.
-
-	"Access FormButtons directly (we're a subclass of FormMenuView)"
-	buttons _ FormButtons.
-
-	"DEBUG: Draw markers at left edge to show what we found"
-	y _ 20 + (rows * (formHeight + spacing)) + 10.
-	buttons isNil
-		ifTrue: [Display fill: (10@y extent: 20@20) mask: Form black]
-		ifFalse: [
-			Display fill: (10@y extent: 20@20) mask: Form white.
-			Display border: (10@y extent: 20@20) width: 1.
-			"Draw a small box for each entry in buttons"
-			index _ 0.
-			buttons do: [:cache |
-				cache form isNil
-					ifTrue: [Display fill: (35 + (index*12) @ y extent: 10@10) mask: Form black]
-					ifFalse: [
-						Display fill: (35 + (index*12) @ y extent: 10@10) mask: Form white.
-						Display border: (35 + (index*12) @ y extent: 10@10) width: 1].
-				index _ index + 1]].
-
-	buttons isNil ifFalse: [
-		buttons do: [:cache |
-			cache form isNil ifFalse: [cacheForms add: cache form]]].
-
-	"Access SpecialBorderForm and BorderForm directly"
-	SpecialBorderForm isNil ifFalse: [cacheForms add: SpecialBorderForm].
-	BorderForm isNil ifFalse: [cacheForms add: BorderForm].
-
-	"Display cache forms below direct forms"
-	y _ 20 + (rows * (formHeight + spacing)) + 40.
-
-	index _ 1.
-	0 to: rows - 1 do: [:row |
-		0 to: cols - 1 do: [:col |
-			index <= cacheForms size ifTrue: [
-				form _ cacheForms at: index.
+			index <= forms size ifTrue: [
+				form _ forms at: index.
 				form displayOn: Display
 					at: (x + (col * (formWidth + spacing))) @ (y + (row * (formHeight + spacing))).
 				index _ index + 1]]].
