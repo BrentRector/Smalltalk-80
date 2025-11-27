@@ -457,7 +457,7 @@ WindowsFile class
 "==================== WindowsFilePage ===================="
 
 Object subclass: #WindowsFilePage
-    instanceVariableNames: 'file binary fileHandle position pageNumber dataEnd'
+    instanceVariableNames: 'file binary fileHandle position pageNumber dataEnd cachedSize'
     classVariableNames: ''
     poolDictionaries: ''
     category: 'System-Files'!
@@ -514,14 +514,15 @@ serialNumber
 !WindowsFilePage methodsFor: 'accessing'!
 
 size
-    "Answer the size of data in this page.
+    "Answer the size of data in this page. Cache result for efficiency.
     If the file handle is nil (file not open), use the file path as a fallback
     since Primitive 144 (GetFileSize) supports both handle and path arguments."
+    cachedSize notNil ifTrue: [^cachedSize].
     fileHandle isNil ifTrue: [self openForRead].
     fileHandle isNil ifTrue: [
         file isNil ifTrue: [^0].
-        ^self primSize: file fullName].
-    ^self primSize: fileHandle!
+        ^cachedSize _ self primSize: file fullName].
+    ^cachedSize _ self primSize: fileHandle!
 
 dataSize
     "Answer the maximum data size. For Windows files, this is the file size."
