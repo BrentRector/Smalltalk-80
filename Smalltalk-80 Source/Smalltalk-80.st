@@ -504,9 +504,13 @@ serialNumber
 !WindowsFilePage methodsFor: 'accessing'!
 
 size
-    "Answer the size of data in this page."
+    "Answer the size of data in this page.
+    If the file handle is nil (file not open), use the file path as a fallback
+    since Primitive 144 (GetFileSize) supports both handle and path arguments."
     fileHandle isNil ifTrue: [self openForRead].
-    fileHandle isNil ifTrue: [^0].
+    fileHandle isNil ifTrue: [
+        file isNil ifTrue: [^0].
+        ^self primSize: file fullName].
     ^self primSize: fileHandle!
 
 dataSize
