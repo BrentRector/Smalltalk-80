@@ -21622,6 +21622,17 @@ initialize
 
 	"FormMenuView initialize"! !
 
+!FormMenuView class methodsFor: 'accessing'!
+formButtons
+	"Answer the FormButtons class variable"
+	^FormButtons!
+getSpecialBorderForm
+	"Answer the SpecialBorderForm class variable"
+	^SpecialBorderForm!
+getBorderForm
+	"Answer the BorderForm class variable"
+	^BorderForm! !
+
 FormMenuView initialize!
 View subclass: #FormView
 	instanceVariableNames: 'rule mask '
@@ -42597,11 +42608,11 @@ initialize
 					at: (x + (col * (formWidth + spacing))) @ (y + (row * (formHeight + spacing))).
 				index _ index + 1]]].
 
-	"=== PART 2: Cache reads ==="
+	"=== PART 2: Cache reads via accessor methods ==="
 	cacheForms _ OrderedCollection new.
 
-	"Get FormButtons from cache"
-	buttons _ FormMenuView classPool at: #FormButtons ifAbsent: [nil].
+	"Get FormButtons via accessor method (not classPool)"
+	buttons _ FormMenuView formButtons.
 
 	"DEBUG: Draw markers at left edge to show what we found
 	 Row of small boxes: black=buttons nil, white=buttons exists
@@ -42626,11 +42637,11 @@ initialize
 		buttons do: [:cache |
 			cache form isNil ifFalse: [cacheForms add: cache form]]].
 
-	"Get SpecialBorderForm and BorderForm from cache"
-	(FormMenuView classPool at: #SpecialBorderForm ifAbsent: [nil]) isNil ifFalse: [
-		cacheForms add: (FormMenuView classPool at: #SpecialBorderForm)].
-	(FormMenuView classPool at: #BorderForm ifAbsent: [nil]) isNil ifFalse: [
-		cacheForms add: (FormMenuView classPool at: #BorderForm)].
+	"Get SpecialBorderForm and BorderForm via accessor methods"
+	FormMenuView getSpecialBorderForm isNil ifFalse: [
+		cacheForms add: FormMenuView getSpecialBorderForm].
+	FormMenuView getBorderForm isNil ifFalse: [
+		cacheForms add: FormMenuView getBorderForm].
 
 	"Display cache forms below direct forms"
 	y _ 20 + (rows * (formHeight + spacing)) + 40.
