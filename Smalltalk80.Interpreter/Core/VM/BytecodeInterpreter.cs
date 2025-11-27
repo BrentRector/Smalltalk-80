@@ -1182,6 +1182,92 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             }
         }
 
+        // Fast path for at: (index 0) - indexed access
+        if (selectorIndex == 0 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
+        {
+            int index = args[0].AsSmallInteger();
+            int size = heapManager.GetIndexedSize(receiverOOP);
+            if (index >= 1 && index <= size)
+            {
+                var format = heapManager.GetObjectFormat(receiverOOP);
+                SmalltalkOOP value;
+                if (format == ObjectFormat.ByteIndexed)
+                {
+                    byte b = heapManager.GetIndexedByte(receiverOOP, index - 1);
+                    value = SmalltalkOOP.FromSmallInteger(b);
+                }
+                else if (format == ObjectFormat.WordIndexed)
+                {
+                    ushort w = heapManager.GetIndexedWord(receiverOOP, index - 1);
+                    value = SmalltalkOOP.FromSmallInteger(w);
+                }
+                else
+                {
+                    value = heapManager.GetIndexedOOP(receiverOOP, index - 1);
+                }
+                context.Push(value);
+                return true;
+            }
+            // Out of bounds - fall through to message send for error handling
+        }
+
+        // Fast path for at:put: (index 1) - indexed store
+        if (selectorIndex == 1 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
+        {
+            int index = args[0].AsSmallInteger();
+            var value = args[1];
+            int size = heapManager.GetIndexedSize(receiverOOP);
+            if (index >= 1 && index <= size)
+            {
+                var format = heapManager.GetObjectFormat(receiverOOP);
+                bool success = true;
+                if (format == ObjectFormat.ByteIndexed)
+                {
+                    if (value.IsSmallInteger)
+                    {
+                        int byteValue = value.AsSmallInteger();
+                        if (byteValue >= 0 && byteValue <= 255)
+                            heapManager.SetIndexedByte(receiverOOP, index - 1, (byte)byteValue);
+                        else
+                            success = false;
+                    }
+                    else
+                        success = false;
+                }
+                else if (format == ObjectFormat.WordIndexed)
+                {
+                    if (value.IsSmallInteger)
+                    {
+                        int wordValue = value.AsSmallInteger();
+                        if (wordValue >= 0 && wordValue <= 65535)
+                            heapManager.SetIndexedWord(receiverOOP, index - 1, (ushort)wordValue);
+                        else
+                            success = false;
+                    }
+                    else
+                        success = false;
+                }
+                else
+                {
+                    heapManager.SetIndexedOOP(receiverOOP, index - 1, value);
+                }
+                if (success)
+                {
+                    context.Push(value);
+                    return true;
+                }
+            }
+            // Out of bounds or type error - fall through to message send
+        }
+
+        // Fast path for size (index 2)
+        if (selectorIndex == 2 && !receiverOOP.IsSmallInteger)
+        {
+            int size = heapManager.GetIndexedSize(receiverOOP);
+            context.Push(SmalltalkOOP.FromSmallInteger(size));
+            return true;
+        }
+
         // Fast path for value/value: on BlockContext
         if (selectorIndex == 9 || selectorIndex == 10) // value, value:
         {
