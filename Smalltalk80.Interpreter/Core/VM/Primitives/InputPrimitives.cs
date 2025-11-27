@@ -13,14 +13,8 @@ public static class InputOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            // DEBUG: Log when this primitive is called - helps detect when file methods wrongly invoke it
-            Console.WriteLine($"[DEBUG Primitive 90 MousePoint] Called with {context.Arguments.Length} args, Receiver={context.Receiver}");
-
             if (context.Arguments.Length != 0)
-            {
-                Console.WriteLine($"[DEBUG Primitive 90] FAIL: Expected 0 args, got {context.Arguments.Length}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             // Default to origin (0,0) for headless mode
             int x = 0, y = 0;
@@ -34,10 +28,7 @@ public static class InputOperations
             // Get Point class OOP
             var pointClassOOP = context.RuntimeHeapAccess?.GetClass("Point");
             if (pointClassOOP == null || pointClassOOP == context.HeapManager.GetNil())
-            {
-                Console.WriteLine($"[DEBUG Primitive 90] FAIL: Point class not found");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             // Allocate Point instance with 2 instance variables (x, y)
             SmalltalkOOP pointOOP = context.HeapManager.AllocateInstanceOf(pointClassOOP.Value, 0);
@@ -46,7 +37,6 @@ public static class InputOperations
             context.HeapManager.SetInstanceVariable(pointOOP, 0, SmalltalkOOP.FromSmallInteger(x));
             context.HeapManager.SetInstanceVariable(pointOOP, 1, SmalltalkOOP.FromSmallInteger(y));
 
-            Console.WriteLine($"[DEBUG Primitive 90] SUCCESS: returning Point({x}@{y})");
             return PrimitiveResult.Ok(pointOOP);
         }
     }
@@ -56,33 +46,19 @@ public static class InputOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            // DEBUG: Log when this primitive is called - helps detect when file methods wrongly invoke it
-            Console.WriteLine($"[DEBUG Primitive 91 CursorLocPut] Called with {context.Arguments.Length} args, Receiver={context.Receiver}");
-
             if (context.Arguments.Length != 1)
-            {
-                Console.WriteLine($"[DEBUG Primitive 91] FAIL: Expected 1 arg, got {context.Arguments.Length}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             var point = context.Arguments[0];
-            Console.WriteLine($"[DEBUG Primitive 91] arg[0]={point}, IsSmallInt={point.IsSmallInteger}");
-
             if (point.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 91] FAIL: argument is SmallInteger (expected Point)");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             // Extract x and y coordinates from Point instance variables
             SmalltalkOOP xOOP = context.HeapManager.GetInstanceVariable(point, 0);
             SmalltalkOOP yOOP = context.HeapManager.GetInstanceVariable(point, 1);
 
             if (!xOOP.IsSmallInteger || !yOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 91] FAIL: x or y not SmallInteger");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             int x = xOOP.AsSmallInteger();
             int y = yOOP.AsSmallInteger();
@@ -93,7 +69,6 @@ public static class InputOperations
                 context.Platform.SetCursorPosition(x, y);
             }
 
-            Console.WriteLine($"[DEBUG Primitive 91] SUCCESS: cursor moved to ({x}, {y})");
             return PrimitiveResult.Ok(context.Receiver);
         }
     }

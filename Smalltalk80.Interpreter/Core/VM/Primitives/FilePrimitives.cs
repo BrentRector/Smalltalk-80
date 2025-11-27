@@ -255,29 +255,17 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            Console.WriteLine($"[DEBUG Primitive 122 FileClose] Arguments.Length={context.Arguments.Length}");
             if (context.Arguments.Length != 1)
-            {
-                Console.WriteLine($"[DEBUG Primitive 122] FAIL: Expected 1 arg, got {context.Arguments.Length}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             var handleOOP = context.Arguments[0];
-            Console.WriteLine($"[DEBUG Primitive 122] handleOOP={handleOOP}, IsSmallInt={handleOOP.IsSmallInteger}");
             if (!handleOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 122] FAIL: handle not SmallInteger");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             int handle = handleOOP.AsSmallInteger();
-            Console.WriteLine($"[DEBUG Primitive 122] Closing handle={handle}");
-            bool success = FileHandleManager.CloseFile(handle);
-            Console.WriteLine($"[DEBUG Primitive 122] CloseFile returned success={success}");
+            FileHandleManager.CloseFile(handle);
 
-            return success
-                ? PrimitiveResult.Ok(context.HeapManager.GetNil())
-                : PrimitiveResult.Ok(context.HeapManager.GetNil());
+            return PrimitiveResult.Ok(context.HeapManager.GetNil());
         }
     }
 
@@ -291,59 +279,36 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            Console.WriteLine($"[DEBUG Primitive 123 FileRead] Arguments.Length={context.Arguments.Length}");
             if (context.Arguments.Length != 3)
-            {
-                Console.WriteLine($"[DEBUG Primitive 123] FAIL: Expected 3 args, got {context.Arguments.Length}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             var handleOOP = context.Arguments[0];
             var bufferOOP = context.Arguments[1];
             var countOOP = context.Arguments[2];
 
-            Console.WriteLine($"[DEBUG Primitive 123] handleOOP={handleOOP}, IsSmallInt={handleOOP.IsSmallInteger}");
-            Console.WriteLine($"[DEBUG Primitive 123] bufferOOP={bufferOOP}, IsSmallInt={bufferOOP.IsSmallInteger}");
-            Console.WriteLine($"[DEBUG Primitive 123] countOOP={countOOP}, IsSmallInt={countOOP.IsSmallInteger}");
-
             if (!handleOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 123] FAIL: handle not SmallInteger");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
             if (bufferOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 123] FAIL: buffer is SmallInteger");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
             if (!countOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 123] FAIL: count not SmallInteger");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             int handle = handleOOP.AsSmallInteger();
             int count = countOOP.AsSmallInteger();
-            Console.WriteLine($"[DEBUG Primitive 123] handle={handle}, count={count}");
 
             var stream = FileHandleManager.GetStream(handle);
             if (stream == null)
-            {
-                Console.WriteLine($"[DEBUG Primitive 123] FAIL: stream is null for handle {handle}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             try
             {
                 // Get buffer size
                 int bufferSize = context.HeapManager.GetIndexedSize(bufferOOP);
-                Console.WriteLine($"[DEBUG Primitive 123] bufferSize={bufferSize}");
                 if (count > bufferSize) count = bufferSize;
 
                 // Read into temporary buffer
                 byte[] tempBuffer = new byte[count];
                 int bytesRead = stream.Read(tempBuffer, 0, count);
-                Console.WriteLine($"[DEBUG Primitive 123] bytesRead={bytesRead}");
 
                 // Copy to Smalltalk ByteArray
                 for (int i = 0; i < bytesRead; i++)
@@ -351,12 +316,10 @@ public static class FileOperations
                     context.HeapManager.SetIndexedByte(bufferOOP, i, tempBuffer[i]);
                 }
 
-                Console.WriteLine($"[DEBUG Primitive 123] SUCCESS: returning {bytesRead}");
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(bytesRead));
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"[DEBUG Primitive 123] EXCEPTION: {ex.Message}");
                 return PrimitiveResult.Fail(context.Metadata!);
             }
         }
@@ -990,57 +953,37 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            Console.WriteLine($"[DEBUG Primitive 144 GetFileSize] Arguments.Length={context.Arguments.Length}");
             if (context.Arguments.Length != 1)
-            {
-                Console.WriteLine($"[DEBUG Primitive 144] FAIL: Expected 1 arg, got {context.Arguments.Length}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             var arg = context.Arguments[0];
-            Console.WriteLine($"[DEBUG Primitive 144] arg={arg}, IsSmallInt={arg.IsSmallInteger}");
-
             long size;
 
             if (arg.IsSmallInteger)
             {
                 // Handle is an integer - get size from stream
                 int handle = arg.AsSmallInteger();
-                Console.WriteLine($"[DEBUG Primitive 144] Getting size for handle={handle}");
                 var stream = FileHandleManager.GetStream(handle);
                 if (stream == null)
-                {
-                    Console.WriteLine($"[DEBUG Primitive 144] FAIL: stream is null");
                     return PrimitiveResult.Fail(context.Metadata!);
-                }
                 size = stream.Length;
-                Console.WriteLine($"[DEBUG Primitive 144] stream.Length={size}");
             }
             else
             {
                 // Path is a string
                 string? path = ExtractString(context, arg);
-                Console.WriteLine($"[DEBUG Primitive 144] Getting size for path='{path}'");
                 if (path == null)
-                {
-                    Console.WriteLine($"[DEBUG Primitive 144] FAIL: path is null");
                     return PrimitiveResult.Fail(context.Metadata!);
-                }
 
                 try
                 {
                     var info = new FileInfo(path);
                     if (!info.Exists)
-                    {
-                        Console.WriteLine($"[DEBUG Primitive 144] FAIL: file does not exist");
                         return PrimitiveResult.Fail(context.Metadata!);
-                    }
                     size = info.Length;
-                    Console.WriteLine($"[DEBUG Primitive 144] file.Length={size}");
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Console.WriteLine($"[DEBUG Primitive 144] EXCEPTION: {ex.Message}");
                     return PrimitiveResult.Fail(context.Metadata!);
                 }
             }
@@ -1048,7 +991,6 @@ public static class FileOperations
             // Clamp to SmallInteger range
             if (size > 0x3FFFFFFF) size = 0x3FFFFFFF;
 
-            Console.WriteLine($"[DEBUG Primitive 144] SUCCESS: returning {size}");
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)size));
         }
     }
@@ -1063,35 +1005,21 @@ public static class FileOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            Console.WriteLine($"[DEBUG Primitive 145 GetFilePosition] Arguments.Length={context.Arguments.Length}");
             if (context.Arguments.Length != 1)
-            {
-                Console.WriteLine($"[DEBUG Primitive 145] FAIL: Expected 1 arg, got {context.Arguments.Length}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             var handleOOP = context.Arguments[0];
-            Console.WriteLine($"[DEBUG Primitive 145] handleOOP={handleOOP}, IsSmallInt={handleOOP.IsSmallInteger}");
             if (!handleOOP.IsSmallInteger)
-            {
-                Console.WriteLine($"[DEBUG Primitive 145] FAIL: handle not SmallInteger");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             int handle = handleOOP.AsSmallInteger();
-            Console.WriteLine($"[DEBUG Primitive 145] Getting position for handle={handle}");
             var stream = FileHandleManager.GetStream(handle);
             if (stream == null)
-            {
-                Console.WriteLine($"[DEBUG Primitive 145] FAIL: stream is null");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             long position = stream.Position;
-            Console.WriteLine($"[DEBUG Primitive 145] stream.Position={position}");
             if (position > 0x3FFFFFFF) position = 0x3FFFFFFF;
 
-            Console.WriteLine($"[DEBUG Primitive 145] SUCCESS: returning {position}");
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)position));
         }
     }
