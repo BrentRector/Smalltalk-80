@@ -72,6 +72,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     // Non-local return state is now managed by _nlrHandler
 
+    // Cached selector OOPs for fast-path conditional dispatch
+    private SmalltalkOOP _ifTrueSelectorOOP;
+    private SmalltalkOOP _ifFalseSelectorOOP;
+    private SmalltalkOOP _ifTrueIfFalseSelectorOOP;
+    private SmalltalkOOP _ifFalseIfTrueSelectorOOP;
+    private SmalltalkOOP _whileTrueSelectorOOP;
+    private SmalltalkOOP _whileFalseSelectorOOP;
+    private bool _conditionalSelectorsInitialized;
 
     // Blue Book architectural constants are defined in VMConstants.cs
     // All context field indices are now static constants shared across the VM
@@ -171,6 +179,15 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _bytecodeInterpreter.InitializeSelectorCaches(
             _selectorCache.ArithmeticSelectors!,
             _selectorCache.SpecialSelectors!);
+
+        // Initialize conditional selector OOPs for fast-path dispatch
+        _ifTrueSelectorOOP = _selectorCache.LookupSelector("ifTrue:");
+        _ifFalseSelectorOOP = _selectorCache.LookupSelector("ifFalse:");
+        _ifTrueIfFalseSelectorOOP = _selectorCache.LookupSelector("ifTrue:ifFalse:");
+        _ifFalseIfTrueSelectorOOP = _selectorCache.LookupSelector("ifFalse:ifTrue:");
+        _whileTrueSelectorOOP = _selectorCache.LookupSelector("whileTrue:");
+        _whileFalseSelectorOOP = _selectorCache.LookupSelector("whileFalse:");
+        _conditionalSelectorsInitialized = true;
     }
 
     /// <summary>
@@ -975,8 +992,96 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     // IMessageSender implementation
     bool IMessageSender.SendMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
     {
+        // Fast path for conditional dispatch on True/False
+        if (_conditionalSelectorsInitialized)
+        {
+            var trueOOP = _metadata.KnownObjects.True;
+            var falseOOP = _metadata.KnownObjects.False;
+
+            // ifTrue: - 1 arg
+            if (selectorOOP == _ifTrueSelectorOOP && args.Length == 1)
+            {
+                if (receiverOOP == trueOOP)
+                {
+                    // True>>ifTrue: aBlock → aBlock value
+                    return ActivateBlockForConditional(args[0]);
+                }
+                else if (receiverOOP == falseOOP)
+                {
+                    // False>>ifTrue: aBlock → nil
+                    _stackManager.Push(_metadata.KnownObjects.Nil);
+                    return true;
+                }
+            }
+            // ifFalse: - 1 arg
+            else if (selectorOOP == _ifFalseSelectorOOP && args.Length == 1)
+            {
+                if (receiverOOP == trueOOP)
+                {
+                    // True>>ifFalse: aBlock → nil
+                    _stackManager.Push(_metadata.KnownObjects.Nil);
+                    return true;
+                }
+                else if (receiverOOP == falseOOP)
+                {
+                    // False>>ifFalse: aBlock → aBlock value
+                    return ActivateBlockForConditional(args[0]);
+                }
+            }
+            // ifTrue:ifFalse: - 2 args
+            else if (selectorOOP == _ifTrueIfFalseSelectorOOP && args.Length == 2)
+            {
+                if (receiverOOP == trueOOP)
+                {
+                    // True>>ifTrue:ifFalse: → trueBlock value
+                    return ActivateBlockForConditional(args[0]);
+                }
+                else if (receiverOOP == falseOOP)
+                {
+                    // False>>ifTrue:ifFalse: → falseBlock value
+                    return ActivateBlockForConditional(args[1]);
+                }
+            }
+            // ifFalse:ifTrue: - 2 args
+            else if (selectorOOP == _ifFalseIfTrueSelectorOOP && args.Length == 2)
+            {
+                if (receiverOOP == trueOOP)
+                {
+                    // True>>ifFalse:ifTrue: → trueBlock value
+                    return ActivateBlockForConditional(args[1]);
+                }
+                else if (receiverOOP == falseOOP)
+                {
+                    // False>>ifFalse:ifTrue: → falseBlock value
+                    return ActivateBlockForConditional(args[0]);
+                }
+            }
+        }
+
         var outcome = SendMessage(receiverOOP, selectorOOP, args);
         return ConsumeCallOutcome(outcome);
+    }
+
+    /// <summary>
+    /// Activates a block for conditional dispatch (ifTrue:/ifFalse: fast path).
+    /// Returns false if block was activated (context switch), true otherwise.
+    /// </summary>
+    private bool ActivateBlockForConditional(SmalltalkOOP blockOOP)
+    {
+        // Check if it's actually a BlockContext
+        var blockClassOOP = _heapManager.GetClassOOP(blockOOP);
+        if (blockClassOOP == _metadata.BlockContextClassOOP)
+        {
+            // Use the existing ActivateBlock implementation
+            if (((IBytecodeContext)this).ActivateBlock(blockOOP, []))
+            {
+                return false; // Context switched
+            }
+        }
+        // Not a BlockContext or activation failed - push nil and continue
+        // (This handles edge cases like nil blocks)
+        _stackManager.Push(_metadata.KnownObjects.Nil);
+        return true;
     }
 
     bool IMessageSender.SendSuperMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)

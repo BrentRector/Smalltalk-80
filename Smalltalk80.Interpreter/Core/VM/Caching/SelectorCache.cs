@@ -186,4 +186,10 @@ public class SelectorCache
 
         throw new InvalidOperationException($"Symbol '{symbolName}' not found in USTable during selector cache initialization");
     }
+
+    /// <summary>
+    /// Looks up a selector symbol by name and returns its OOP.
+    /// Public wrapper for conditional selector cache initialization.
+    /// </summary>
+    public SmalltalkOOP LookupSelector(string selectorName) => LookupSymbolInHeap(selectorName);
 }
