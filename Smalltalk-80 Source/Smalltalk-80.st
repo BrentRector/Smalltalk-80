@@ -42551,25 +42551,22 @@ My initialize method displays all 23 forms in a grid on the Display.'!
 !FormDisplayTest class methodsFor: 'class initialization'!
 
 initialize
-	"Display all 23 forms loaded by FormMenuView in a grid on the Display.
-	Forms are: 21 from FormButtons + SpecialBorderForm + BorderForm."
+	"Display all 23 forms by reading them directly from files.
+	This bypasses the FormMenuView cache to test file reading directly."
 
-	| forms x y spacing formWidth formHeight cols rows index form buttons |
+	| forms x y spacing formWidth formHeight cols rows index form names |
 
-	"Collect all forms from FormMenuView class variables"
+	"Read all forms directly from files - same names as FormMenuView uses"
+	names _ #('select.form' 'singlecopy.form' 'repeatcopy.form' 'line.form' 'curve.form'
+		'block.form' 'over.form' 'under.form' 'reverse.form' 'erase.form' 'in.form'
+		'magnify.form' 'white.form' 'lightgray.form' 'gray.form' 'darkgray.form' 'black.form'
+		'xgrid.form' 'ygrid.form' 'togglegrids.form' 'out.form'
+		'specialborderform.form' 'borderform.form').
+
 	forms _ OrderedCollection new.
-
-	"Get FormButtons - each is a FormButtonCache with a form"
-	buttons _ FormMenuView classPool at: #FormButtons ifAbsent: [nil].
-	buttons isNil ifFalse: [
-		buttons do: [:cache |
-			cache form isNil ifFalse: [forms add: cache form]]].
-
-	"Get SpecialBorderForm and BorderForm"
-	(FormMenuView classPool at: #SpecialBorderForm ifAbsent: [nil]) isNil ifFalse: [
-		forms add: (FormMenuView classPool at: #SpecialBorderForm)].
-	(FormMenuView classPool at: #BorderForm ifAbsent: [nil]) isNil ifFalse: [
-		forms add: (FormMenuView classPool at: #BorderForm)].
+	names do: [:name |
+		form _ Form readFrom: name.
+		form isNil ifFalse: [forms add: form]].
 
 	forms isEmpty ifTrue: [^self].
 
