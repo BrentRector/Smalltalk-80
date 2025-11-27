@@ -274,6 +274,11 @@ size
     <primitive: 144>
     ^self primSize: fileHandle!
 
+dataSize
+    "Answer the size of the data portion. For WindowsFile, this is the same as size
+    (no header or page structure)."
+    ^self size!
+
 position
     <primitive: 145>
     ^position!
