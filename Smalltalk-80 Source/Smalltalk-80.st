@@ -42591,6 +42591,26 @@ initialize
 
 	"Get FormButtons from cache"
 	buttons _ FormMenuView classPool at: #FormButtons ifAbsent: [nil].
+
+	"DEBUG: Draw markers at left edge to show what we found
+	 Row of small boxes: black=buttons nil, white=buttons exists
+	 Then one box per entry: black=form nil, white=form exists"
+	y _ 20 + (rows * (formHeight + spacing)) + 10.
+	buttons isNil
+		ifTrue: [Display fill: (10@y extent: 20@20) mask: Form black]
+		ifFalse: [
+			Display fill: (10@y extent: 20@20) mask: Form white.
+			Display border: (10@y extent: 20@20) width: 1.
+			"Draw a small box for each entry in buttons"
+			index _ 0.
+			buttons do: [:cache |
+				cache form isNil
+					ifTrue: [Display fill: (35 + (index*12) @ y extent: 10@10) mask: Form black]
+					ifFalse: [
+						Display fill: (35 + (index*12) @ y extent: 10@10) mask: Form white.
+						Display border: (35 + (index*12) @ y extent: 10@10) width: 1].
+				index _ index + 1]].
+
 	buttons isNil ifFalse: [
 		buttons do: [:cache |
 			cache form isNil ifFalse: [cacheForms add: cache form]]].
