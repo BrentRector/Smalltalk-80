@@ -313,8 +313,8 @@ public class SmalltalkInterpreterThread
         var cumulativeStats = _context.HeapManager.GC.GetAndResetCumulativeStatistics();
         Console.WriteLine($"  {cumulativeStats.GetSummary()}");
 
-        // Print file primitive diagnostics report
-        FilePrimitiveDiagnostics.PrintReport();
+        // File primitive diagnostics (disabled - enable for performance debugging)
+        // FilePrimitiveDiagnostics.PrintReport();
 
         // PHASE 2: Execute Test expressions (GraphicsTest, etc.)
         if (phase2Indices.Count > 0)
