@@ -66,6 +66,15 @@ public static class InitExpressionOrdering
     };
 
     /// <summary>
+    /// Class name prefixes for classes that run right before test classes.
+    /// These may have init expressions that take a long time and are dependencies for tests.
+    /// </summary>
+    private static readonly List<string> PreTestClassPrefixes = new()
+    {
+        "FormMenuView"
+    };
+
+    /// <summary>
     /// Class name prefixes for test classes that always run last.
     /// </summary>
     private static readonly List<string> TestClassPrefixes = new()
@@ -96,6 +105,20 @@ public static class InitExpressionOrdering
     }
 
     /// <summary>
+    /// Checks if an init expression source belongs to a pre-test class.
+    /// </summary>
+    private static bool IsPreTestClass(string? source)
+    {
+        if (source == null) return false;
+        foreach (var prefix in PreTestClassPrefixes)
+        {
+            if (source.StartsWith(prefix, StringComparison.Ordinal))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Checks if an init expression source belongs to a test class.
     /// </summary>
     private static bool IsTestClass(string? source)
@@ -119,9 +142,10 @@ public static class InitExpressionOrdering
     {
         var result = new List<int>();
         var remaining = new HashSet<int>(originalIndices);
+        var preTestClassIndices = new List<int>();
         var testClassIndices = new List<int>();
 
-        // First pass: identify test class indices and separate them
+        // First pass: identify pre-test and test class indices and separate them
         foreach (var idx in originalIndices)
         {
             var source = bundle.InitExpressions[idx].Source;
@@ -129,15 +153,23 @@ public static class InitExpressionOrdering
             {
                 testClassIndices.Add(idx);
             }
+            else if (IsPreTestClass(source))
+            {
+                preTestClassIndices.Add(idx);
+            }
         }
 
-        // Remove test classes from remaining - they run last
+        // Remove pre-test and test classes from remaining - they run at the end
+        foreach (var idx in preTestClassIndices)
+        {
+            remaining.Remove(idx);
+        }
         foreach (var idx in testClassIndices)
         {
             remaining.Remove(idx);
         }
 
-        // Build source-to-index map (excluding test classes)
+        // Build source-to-index map (excluding pre-test and test classes)
         var sourceToIndex = new Dictionary<string, int>();
         for (int i = 0; i < bundle.InitExpressions.Length; i++)
         {
@@ -151,9 +183,12 @@ public static class InitExpressionOrdering
             }
         }
 
-        // 1. Add known expressions in order
+        // 1. Add known expressions in order (excluding FormMenuView which is handled separately)
         foreach (var source in KnownOrder)
         {
+            // Skip pre-test classes in KnownOrder - they're handled separately
+            if (IsPreTestClass(source)) continue;
+
             if (sourceToIndex.TryGetValue(source, out int idx) && remaining.Contains(idx))
             {
                 result.Add(idx);
@@ -161,15 +196,18 @@ public static class InitExpressionOrdering
             }
         }
 
-        // 2. Add any NEW expressions (not in KnownOrder, not test classes)
+        // 2. Add any NEW expressions (not in KnownOrder, not pre-test, not test)
         if (remaining.Count > 0)
         {
             var newExpressions = remaining.OrderBy(i => i).ToList();
-            Console.WriteLine($"  ℹ️  {newExpressions.Count} new init expressions (running before test classes)");
+            Console.WriteLine($"  ℹ️  {newExpressions.Count} new init expressions (running before pre-test classes)");
             result.AddRange(newExpressions);
         }
 
-        // 3. Add test classes LAST (in the order they appear in the bundle)
+        // 3. Add pre-test classes (like FormMenuView)
+        result.AddRange(preTestClassIndices.OrderBy(i => i));
+
+        // 4. Add test classes LAST
         result.AddRange(testClassIndices.OrderBy(i => i));
 
         return result;
