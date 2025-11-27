@@ -114,8 +114,11 @@ public static class InitExpressionOrdering
             // LEVEL 2: 1 class that depends on Level 1
             "LargeNegativeInteger class",  // depends on: LargePositiveInteger
 
-            // LEVEL 3: 1 class that runs last (for debugging)
-            "Delay class"                  // runs last for debugging
+            // LEVEL 3: Classes that run last
+            "Delay class",                 // depends on: ProcessorScheduler
+
+            // LEVEL 4: Test classes that run after everything else
+            "FormDisplayTest class"        // depends on: FormMenuView (displays loaded Forms)
         };
     }
 
@@ -136,15 +139,17 @@ public static class InitExpressionOrdering
         // Since the dependency order list doesn't contain comment markers,
         // we need to manually split based on known level sizes from the comments:
         // LEVEL 0: 80 classes (indices 0-79)
-        // LEVEL 1: 6 classes (indices 80-85)
-        // LEVEL 2: 1 class (index 86)
-        // LEVEL 3: 1 class (index 87) - runs last
+        // LEVEL 1: 7 classes (indices 80-86)
+        // LEVEL 2: 1 class (index 87)
+        // LEVEL 3: 1 class (index 88) - Delay
+        // LEVEL 4: 1 class (index 89) - FormDisplayTest (runs last)
         var levels = new List<List<string>>
         {
             dependencyOrder.Take(80).ToList(),      // Level 0
-            dependencyOrder.Skip(80).Take(6).ToList(), // Level 1
-            dependencyOrder.Skip(86).Take(1).ToList(), // Level 2
-            dependencyOrder.Skip(87).ToList()       // Level 3
+            dependencyOrder.Skip(80).Take(7).ToList(), // Level 1
+            dependencyOrder.Skip(87).Take(1).ToList(), // Level 2
+            dependencyOrder.Skip(88).Take(1).ToList(), // Level 3
+            dependencyOrder.Skip(89).ToList()       // Level 4
         };
 
         // Process each level
