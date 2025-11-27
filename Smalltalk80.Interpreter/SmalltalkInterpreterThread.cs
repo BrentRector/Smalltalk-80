@@ -175,9 +175,11 @@ public class SmalltalkInterpreterThread
             // Include initialize methods and test validation
             // EXCEPT DisplayScreen initialize (runs last to draw halftone square)
             // EXCEPT FormMenuView initialize (runs after DisplayScreen, needs file I/O)
+            // EXCEPT FormDisplayTest initialize (runs last, needs FormMenuView to have loaded Forms)
             if ((expr.Source.EndsWith(" initialize") &&
                  expr.Source != "DisplayScreen initialize" &&
-                 expr.Source != "FormMenuView initialize") ||
+                 expr.Source != "FormMenuView initialize" &&
+                 expr.Source != "FormDisplayTest initialize") ||
                 expr.Source == "InputSensor install" ||
                 expr.Source == "InputSensor initSensor" ||
                 expr.Source.Contains("Test validate"))
@@ -207,6 +209,17 @@ public class SmalltalkInterpreterThread
         {
             var expr = _context.Bundle.InitExpressions[i];
             if (expr.Source == "FormMenuView initialize")
+            {
+                phase1Indices.Add(i);
+                break;
+            }
+        }
+
+        // Add FormDisplayTest initialize LAST (needs FormMenuView to have loaded Forms)
+        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
+        {
+            var expr = _context.Bundle.InitExpressions[i];
+            if (expr.Source == "FormDisplayTest initialize")
             {
                 phase1Indices.Add(i);
                 break;
