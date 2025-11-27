@@ -314,7 +314,7 @@ next
     ^byte!
 
 nextByte
-    <primitive: 91>
+    "Read and return the next byte from the file."
     | byte |
     byte _ self primAt: fileHandle position: position.
     position _ position + 1.
@@ -346,7 +346,7 @@ nextPut: aByte
     ^aByte!
 
 nextPutByte: aByte
-    <primitive: 90>
+    "Write a byte to the file at the current position."
     self primAt: fileHandle position: position put: aByte.
     position _ position + 1.
     ^aByte!
@@ -407,11 +407,11 @@ primDelete: aFileName
     self primitiveFailed!
 
 primAt: handle position: pos
-    <primitive: 91>
+    <primitive: 132>
     self primitiveFailed!
 
 primAt: handle position: pos put: byte
-    <primitive: 90>
+    <primitive: 134>
     self primitiveFailed!
 
 primSize: handle

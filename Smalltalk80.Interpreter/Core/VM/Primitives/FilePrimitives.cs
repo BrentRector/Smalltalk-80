@@ -363,6 +363,85 @@ public static class FileOperations
     }
 
     /// <summary>
+    /// Primitive 132: Read a single byte from file at position.
+    /// Receiver: WindowsFile instance.
+    /// Arguments: handle (Integer), position (Integer).
+    /// Returns: Integer byte value (0-255), or -1 on EOF/error.
+    /// </summary>
+    public class FileReadByte : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+
+            var handleOOP = context.Arguments[0];
+            var positionOOP = context.Arguments[1];
+
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!positionOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            int handle = handleOOP.AsSmallInteger();
+            int position = positionOOP.AsSmallInteger();
+
+            var stream = FileHandleManager.GetStream(handle);
+            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
+
+            try
+            {
+                stream.Position = position;
+                int byteValue = stream.ReadByte();
+                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(byteValue));
+            }
+            catch
+            {
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Primitive 134: Write a single byte to file at position.
+    /// Receiver: WindowsFile instance.
+    /// Arguments: handle (Integer), position (Integer), byte (Integer 0-255).
+    /// Returns: the byte value written.
+    /// </summary>
+    public class FileWriteByte : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 3) return PrimitiveResult.Fail(context.Metadata!);
+
+            var handleOOP = context.Arguments[0];
+            var positionOOP = context.Arguments[1];
+            var byteOOP = context.Arguments[2];
+
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!positionOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!byteOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            int handle = handleOOP.AsSmallInteger();
+            int position = positionOOP.AsSmallInteger();
+            int byteValue = byteOOP.AsSmallInteger();
+
+            if (byteValue < 0 || byteValue > 255) return PrimitiveResult.Fail(context.Metadata!);
+
+            var stream = FileHandleManager.GetStream(handle);
+            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
+
+            try
+            {
+                stream.Position = position;
+                stream.WriteByte((byte)byteValue);
+                return PrimitiveResult.Ok(byteOOP);
+            }
+            catch
+            {
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+        }
+    }
+
+    /// <summary>
     /// Primitive 136: Write to file (WriteFile equivalent).
     /// Receiver: WindowsFileStream instance.
     /// Arguments: handle (Integer), buffer (ByteArray), count (Integer).
