@@ -476,9 +476,16 @@ asFileStream
 
 asFileStream: aStream
     "Initialize aStream (typically a FileStream) to access the receiver.
-    This is called by FileStream>>on: to set up the stream."
+    This is called by FileStream>>on: to set up the stream.
+    Read file contents into a String buffer and set up the stream directly,
+    avoiding the page-based read: mechanism which requires closed to be initialized."
+    | contents sz |
     fileHandle isNil ifTrue: [self reopen].
-    aStream position: 0 size: self size! !
+    sz _ self size.
+    self position: 0.
+    contents _ String new: sz.
+    1 to: sz do: [:i | contents at: i put: (self nextByte) asCharacter].
+    aStream on: contents from: 1 to: sz! !
 
 WindowsFile class
     instanceVariableNames: ''!
