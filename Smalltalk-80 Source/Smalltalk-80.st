@@ -301,6 +301,11 @@ binary
 
 text
     isBinary _ false.
+    ^self!
+
+file
+    "Answer the file associated with this page. For WindowsFile, this is self
+    since WindowsFile combines the file and page functionality."
     ^self! !
 
 !WindowsFile methodsFor: 'reading'!
