@@ -278,6 +278,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(121, new FileOperations.FileOpen());
         registry.Register(122, new FileOperations.FileClose());
         registry.Register(123, new FileOperations.FileRead());
+        registry.Register(132, new FileOperations.FileReadByte());
+        registry.Register(134, new FileOperations.FileWriteByte());
         registry.Register(124, new FileOperations.FileSeek());
         registry.Register(125, new FileOperations.FileDelete());
         registry.Register(126, new FileOperations.FileMove());

@@ -246,7 +246,7 @@ named: aFileName mode: modeString
 !WindowsFile methodsFor: 'file operations'!
 
 openNamed: aFileName mode: modeString
-    <primitive: 121>
+    "Open the file with given name and mode. Sets all instance variables."
     fileHandle _ self primOpen: aFileName mode: modeString.
     fileName _ aFileName.
     position _ 0.
@@ -274,12 +274,17 @@ size
     <primitive: 144>
     ^self primSize: fileHandle!
 
+dataSize
+    "Answer the size of the data portion. For WindowsFile, this is the same as size
+    (no header or page structure)."
+    ^self size!
+
 position
     <primitive: 145>
     ^position!
 
 position: anInteger
-    <primitive: 124>
+    "Set the file position to anInteger. Uses the primitive via primSetPosition:to:."
     self primSetPosition: fileHandle to: anInteger.
     position _ anInteger.
     ^self!
@@ -296,6 +301,11 @@ binary
 
 text
     isBinary _ false.
+    ^self!
+
+file
+    "Answer the file associated with this page. For WindowsFile, this is self
+    since WindowsFile combines the file and page functionality."
     ^self! !
 
 !WindowsFile methodsFor: 'reading'!
@@ -309,7 +319,7 @@ next
     ^byte!
 
 nextByte
-    <primitive: 91>
+    "Read and return the next byte from the file."
     | byte |
     byte _ self primAt: fileHandle position: position.
     position _ position + 1.
@@ -341,7 +351,7 @@ nextPut: aByte
     ^aByte!
 
 nextPutByte: aByte
-    <primitive: 90>
+    "Write a byte to the file at the current position."
     self primAt: fileHandle position: position put: aByte.
     position _ position + 1.
     ^aByte!
@@ -402,11 +412,11 @@ primDelete: aFileName
     self primitiveFailed!
 
 primAt: handle position: pos
-    <primitive: 91>
+    <primitive: 132>
     self primitiveFailed!
 
 primAt: handle position: pos put: byte
-    <primitive: 90>
+    <primitive: 134>
     self primitiveFailed!
 
 primSize: handle
@@ -471,8 +481,16 @@ asFileStream
 
 asFileStream: aStream
     "Initialize aStream (typically a FileStream) to access the receiver.
-    This is called by FileStream>>on: to set up the stream."
-    aStream position: 0 size: self size! !
+    This is called by FileStream>>on: to set up the stream.
+    Read file contents into a String buffer and set up the stream directly,
+    avoiding the page-based read: mechanism which requires closed to be initialized."
+    | contents sz |
+    fileHandle isNil ifTrue: [self reopen].
+    sz _ self size.
+    self position: 0.
+    contents _ String new: sz.
+    1 to: sz do: [:i | contents at: i put: (self nextByte) asCharacter].
+    aStream on: contents from: 1 to: sz! !
 
 WindowsFile class
     instanceVariableNames: ''!
