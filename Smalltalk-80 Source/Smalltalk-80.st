@@ -42560,7 +42560,7 @@ with: aCollection from: firstIndex to: lastIndex
 
 "==================== FormDisplayTest ===================="
 
-Object subclass: #FormDisplayTest
+FormMenuView subclass: #FormDisplayTest
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -42608,15 +42608,13 @@ initialize
 					at: (x + (col * (formWidth + spacing))) @ (y + (row * (formHeight + spacing))).
 				index _ index + 1]]].
 
-	"=== PART 2: Cache reads via accessor methods ==="
+	"=== PART 2: Cache reads via class variable (subclass access) ==="
 	cacheForms _ OrderedCollection new.
 
-	"Get FormButtons via accessor method (not classPool)"
-	buttons _ FormMenuView formButtons.
+	"Access FormButtons directly (we're a subclass of FormMenuView)"
+	buttons _ FormButtons.
 
-	"DEBUG: Draw markers at left edge to show what we found
-	 Row of small boxes: black=buttons nil, white=buttons exists
-	 Then one box per entry: black=form nil, white=form exists"
+	"DEBUG: Draw markers at left edge to show what we found"
 	y _ 20 + (rows * (formHeight + spacing)) + 10.
 	buttons isNil
 		ifTrue: [Display fill: (10@y extent: 20@20) mask: Form black]
@@ -42637,11 +42635,9 @@ initialize
 		buttons do: [:cache |
 			cache form isNil ifFalse: [cacheForms add: cache form]]].
 
-	"Get SpecialBorderForm and BorderForm via accessor methods"
-	FormMenuView getSpecialBorderForm isNil ifFalse: [
-		cacheForms add: FormMenuView getSpecialBorderForm].
-	FormMenuView getBorderForm isNil ifFalse: [
-		cacheForms add: FormMenuView getBorderForm].
+	"Access SpecialBorderForm and BorderForm directly"
+	SpecialBorderForm isNil ifFalse: [cacheForms add: SpecialBorderForm].
+	BorderForm isNil ifFalse: [cacheForms add: BorderForm].
 
 	"Display cache forms below direct forms"
 	y _ 20 + (rows * (formHeight + spacing)) + 40.
