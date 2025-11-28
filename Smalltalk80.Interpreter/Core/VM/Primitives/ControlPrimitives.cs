@@ -362,17 +362,20 @@ public static class ControlPrimitives
                 if (processOop == context.HeapManager.GetNil())
                     return PrimitiveResult.Fail(context.Metadata!);
 
-                if (!ResumeProcess(context, processOop))
-                    return PrimitiveResult.Fail(context.Metadata!);
-
-                // Check if woken process has higher priority - if so, preempt
+                // Check if woken process has higher priority - if so, preempt immediately
                 if (ShouldPreempt(context, processOop))
                 {
                     SmalltalkOOP activeProcessOop = GetActiveProcess(context);
-                    // Put current process back on its priority queue
+                    // Put current process on its priority queue (it will run later)
                     ResumeProcess(context, activeProcessOop);
-                    // Switch to the higher priority process
+                    // Switch directly to the higher priority process (don't add it to queue)
                     SwitchToProcess(context, activeProcessOop, processOop);
+                }
+                else
+                {
+                    // Woken process has same or lower priority - add to queue, it runs later
+                    if (!ResumeProcess(context, processOop))
+                        return PrimitiveResult.Fail(context.Metadata!);
                 }
             }
 
@@ -419,7 +422,12 @@ public static class ControlPrimitives
 
                 // Perform context switch to next runnable process
                 if (!SwitchToHighestPriorityProcess(context, activeProcessOop))
+                {
+                    // Context switch failed - undo the AddLastLink to leave state consistent
+                    RemoveProcessFromList(context, activeProcessOop, context.Receiver);
+                    context.SetFieldValue(activeProcessOop, "class:Process", "myList", context.HeapManager.GetNil());
                     return PrimitiveResult.Fail(context.Metadata!);
+                }
 
                 // Return receiver - execution continues in the NEW process's context
                 return PrimitiveResult.Ok(context.Receiver);
@@ -447,18 +455,20 @@ public static class ControlPrimitives
             if (myListOop != context.HeapManager.GetNil())
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            // Resume the process (add to priority queue)
-            if (!ResumeProcess(context, context.Receiver))
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            // Check if resumed process has higher priority - if so, preempt
+            // Check if resumed process has higher priority - if so, preempt immediately
             if (ShouldPreempt(context, context.Receiver))
             {
                 SmalltalkOOP activeProcessOop = GetActiveProcess(context);
-                // Put current process back on its priority queue
+                // Put current process on its priority queue (it will run later)
                 ResumeProcess(context, activeProcessOop);
-                // Switch to the higher priority process
+                // Switch directly to the higher priority process (don't add it to queue)
                 SwitchToProcess(context, activeProcessOop, context.Receiver);
+            }
+            else
+            {
+                // Resumed process has same or lower priority - add to queue, it runs later
+                if (!ResumeProcess(context, context.Receiver))
+                    return PrimitiveResult.Fail(context.Metadata!);
             }
 
             return PrimitiveResult.Ok(context.Receiver);
