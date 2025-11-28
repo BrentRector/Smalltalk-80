@@ -5436,7 +5436,13 @@ method
 
 	^home method!
 receiver
-	^home receiver! !
+	^home receiver!
+removeSelf
+	"Delegate to the home context, which may be another BlockContext
+	(for nested blocks) or a MethodContext. The chain of home references
+	automatically traverses nested blocks until reaching the MethodContext."
+
+	^home removeSelf! !
 
 !BlockContext methodsFor: 'temporaries'!
 tempAt: index 
