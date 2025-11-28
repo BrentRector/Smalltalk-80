@@ -545,11 +545,13 @@ public class SmalltalkInterpreterThread
             _vm!.MessageDispatcher,
             _vm!.ContextManager);
 
-        // Step 1: Processor hiddenBackgroundProcess
+        // Step 1: ProcessorScheduler hiddenBackgroundProcess
         // Creates an infinite loop process at priority 1 (SystemRockBottomPriority)
+        // Note: hiddenBackgroundProcess is a CLASS method on ProcessorScheduler,
+        // not an instance method on Processor (the singleton instance)
         Console.WriteLine("  Step 1: Creating background process...");
-        var processorOOP = LookupGlobal("Processor");
-        messageSender.SendUnary(processorOOP, "hiddenBackgroundProcess");
+        var processorSchedulerClassOOP = LookupGlobal("ProcessorScheduler");
+        messageSender.SendUnary(processorSchedulerClassOOP, "hiddenBackgroundProcess");
         Console.WriteLine("    ✓ Background process created at priority 1");
 
         // Step 2: ControlManager new → install as ScheduledControllers global
