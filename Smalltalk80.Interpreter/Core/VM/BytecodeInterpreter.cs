@@ -567,6 +567,22 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         byte subOp = bytecodes[ip++];
         heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
+        // DEBUG: Log extended bytecode execution for stack underflow diagnosis
+        int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
+        var spOOP = heapManager.GetInstanceVariable(context.ActiveContext, spIndex);
+        int sp = spOOP.AsSmallInteger();
+        var header = helpers.ParseMethodHeader(methodOOP);
+        int initialSP = header.NumArgs + header.NumTemps;
+        if (sp <= initialSP)
+        {
+            // About to pop from empty stack - print diagnostic
+            string? methodLocalId = context.GetLocalId(methodOOP);
+            Console.WriteLine($"[ExecuteExtendedBytecode] WARNING: Stack may underflow!");
+            Console.WriteLine($"  methodOOP={methodOOP}, localId={methodLocalId}");
+            Console.WriteLine($"  subOp=0x{subOp:X2}, ip={ip}, sp={sp}, initialSP={initialSP}");
+            Console.WriteLine($"  Bytecode dump (first 20): {string.Join(" ", bytecodes.Take(20).Select(b => $"0x{b:X2}"))}");
+        }
+
         // Check if this is a BlockContext - they retrieve receiver from home MethodContext
         var contextClassOOP = heapManager.GetClassOOP(context.ActiveContext);
         bool isBlockContext = contextClassOOP == metadata.BlockContextClassOOP;
