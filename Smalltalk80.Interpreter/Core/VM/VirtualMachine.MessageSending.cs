@@ -132,9 +132,6 @@ public partial class VirtualMachine
                 _tracer.TracePrimitiveAttempt(primitiveNumber, GetLocalId(methodInfo.MethodOOP) ?? "unknown");
             }
 
-            // Reset result-already-pushed flag before primitive execution
-            _primitiveResultAlreadyPushed = false;
-
             // Get current instruction pointer for primitives that need it
             int currentPC = ((IPrimitiveContext)this).GetInstructionPointer();
 
@@ -161,14 +158,6 @@ public partial class VirtualMachine
                 if (_tracer.ShouldTracePrimitive())
                 {
                     _tracer.TracePrimitiveSuccess(primitiveNumber);
-                }
-
-                // Check if primitive already pushed the result (process-switching primitives)
-                if (_primitiveResultAlreadyPushed)
-                {
-                    // Result already pushed onto correct stack - signal context switch
-                    _primitiveResultAlreadyPushed = false;
-                    return CallOutcome.ContextSwitch();
                 }
 
                 return CallOutcome.Normal(primitiveResult);
@@ -384,9 +373,6 @@ public partial class VirtualMachine
                 _tracer.ThrowIfInfiniteLoop();
             }
 
-            // Reset result-already-pushed flag before primitive execution
-            _primitiveResultAlreadyPushed = false;
-
             // Get current instruction pointer for primitives that need it
             int currentPC = ((IPrimitiveContext)this).GetInstructionPointer();
 
@@ -412,18 +398,11 @@ public partial class VirtualMachine
             if (_primitiveSuccess)
             {
                 // Check if primitive created a new context (e.g., block invocation via Primitive 207)
+                // This includes process-switching primitives that push result before switching
                 if (_contextSwitchedByPrimitive)
                 {
                     _contextSwitchedByPrimitive = false;
                     // Primitive created new context - signal context switch
-                    return CallOutcome.ContextSwitch();
-                }
-
-                // Check if primitive already pushed the result (process-switching primitives)
-                if (_primitiveResultAlreadyPushed)
-                {
-                    // Result already pushed onto correct stack - signal context switch
-                    _primitiveResultAlreadyPushed = false;
                     return CallOutcome.ContextSwitch();
                 }
 

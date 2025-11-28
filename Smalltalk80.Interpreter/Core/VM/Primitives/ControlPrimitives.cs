@@ -401,8 +401,9 @@ public static class ControlPrimitives
                     // Switch directly to the higher priority process (don't add it to queue)
                     SwitchToProcess(context, activeProcessOop, processOop);
 
-                    // Result already pushed - signal to VM not to push again
-                    return PrimitiveResult.OkAlreadyPushed(context.Receiver);
+                    // Result already pushed onto suspended process's stack
+                    // _contextSwitchedByPrimitive prevents double-push
+                    return PrimitiveResult.Ok(context.Receiver);
                 }
                 else
                 {
@@ -500,8 +501,9 @@ public static class ControlPrimitives
 
                 if (DebugProcessScheduling)
                     Console.WriteLine($"[Wait] SUCCESS - switched to another process");
-                // Result already pushed - signal to VM not to push again
-                return PrimitiveResult.OkAlreadyPushed(context.Receiver);
+                // Result already pushed onto suspended process's stack
+                // _contextSwitchedByPrimitive prevents double-push
+                return PrimitiveResult.Ok(context.Receiver);
             }
         }
     }
@@ -628,8 +630,9 @@ public static class ControlPrimitives
                 // Clear myList to indicate suspended (not on any list)
                 context.SetFieldValue(context.Receiver, className, "myList", context.HeapManager.GetNil());
 
-                // Result already pushed - signal to VM not to push again
-                return PrimitiveResult.OkAlreadyPushed(context.HeapManager.GetNil());
+                // Result already pushed onto suspended process's stack
+                // _contextSwitchedByPrimitive prevents double-push
+                return PrimitiveResult.Ok(context.HeapManager.GetNil());
             }
             else
             {

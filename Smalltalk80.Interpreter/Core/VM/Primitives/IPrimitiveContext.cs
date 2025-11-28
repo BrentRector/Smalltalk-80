@@ -28,14 +28,6 @@ public interface IPrimitiveContext
     /// </summary>
     bool PrimitiveSuccess { get; set; }
 
-    /// <summary>
-    /// Gets or sets whether the primitive already pushed its result onto the stack.
-    /// Used by process-switching primitives (wait, suspend, signal) that must push the result
-    /// onto the suspended process's stack BEFORE switching to another process.
-    /// When true, the VM skips pushing the primitive result.
-    /// </summary>
-    bool ResultAlreadyPushed { get; set; }
-
     // Graphics/Input support methods
 
     /// <summary>

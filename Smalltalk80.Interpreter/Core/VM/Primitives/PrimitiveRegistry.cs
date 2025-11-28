@@ -85,7 +85,6 @@ public class PrimitiveRegistry : IPrimitiveRegistry
 
             var result = primitive.Execute(execContext);
             ctx.PrimitiveSuccess = result.Success;
-            ctx.ResultAlreadyPushed = result.ResultAlreadyPushed;
 
             // Detect if primitive changed the active context and propagate to VM
             if (contextManager != null && activeContextBefore.HasValue)

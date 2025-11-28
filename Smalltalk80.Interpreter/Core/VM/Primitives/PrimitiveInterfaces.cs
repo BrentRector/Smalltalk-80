@@ -16,29 +16,14 @@ public readonly struct PrimitiveResult
     /// <summary>Gets the return value (valid only if Success is true).</summary>
     public SmalltalkOOP Value { get; }
 
-    /// <summary>
-    /// Gets whether the primitive already pushed the result onto the stack.
-    /// Used by process-switching primitives that must push the result onto the
-    /// suspended process's stack BEFORE switching to another process.
-    /// </summary>
-    public bool ResultAlreadyPushed { get; }
-
-    private PrimitiveResult(bool success, SmalltalkOOP value, bool resultAlreadyPushed = false)
+    private PrimitiveResult(bool success, SmalltalkOOP value)
     {
         Success = success;
         Value = value;
-        ResultAlreadyPushed = resultAlreadyPushed;
     }
 
     /// <summary>Creates a successful result with the given value.</summary>
-    public static PrimitiveResult Ok(SmalltalkOOP value) => new(true, value, false);
-
-    /// <summary>
-    /// Creates a successful result where the primitive already pushed the value onto the stack.
-    /// Used by process-switching primitives (wait, suspend, signal) that push the result
-    /// onto the suspended process's stack before switching contexts.
-    /// </summary>
-    public static PrimitiveResult OkAlreadyPushed(SmalltalkOOP value) => new(true, value, true);
+    public static PrimitiveResult Ok(SmalltalkOOP value) => new(true, value);
 
     /// <summary>
     /// Creates a failed result with nil value.
@@ -48,7 +33,7 @@ public readonly struct PrimitiveResult
     {
         if (metadata == null)
             throw new ArgumentNullException(nameof(metadata), "VMMetadata is required for primitive failures");
-        return new(false, metadata.KnownObjects.Nil, false);
+        return new(false, metadata.KnownObjects.Nil);
     }
 
     /// <summary>Creates a result from a boolean condition.</summary>
