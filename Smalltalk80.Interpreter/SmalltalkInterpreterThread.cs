@@ -46,6 +46,13 @@ public class SmalltalkInterpreterThread
             Console.WriteLine("[Smalltalk Thread] Creating virtual machine...");
             _vm = CreateVirtualMachine();
 
+            // STEP 1.5: Initialize ProcessorScheduler with high-priority bootstrap process
+            // This ensures all init expressions run at priority 8, preventing preemption
+            // when they fork processes (like Delay's timing process also at priority 8)
+            Console.WriteLine("[Smalltalk Thread] Initializing ProcessorScheduler for runtime...");
+            var schedulerInit = new ProcessSchedulerInitializer(_context.HeapManager, _context.VMMetadata);
+            schedulerInit.InitializeForRuntime();
+
             // STEP 2: Execute init expressions
             Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
             ExecuteInitExpressions();

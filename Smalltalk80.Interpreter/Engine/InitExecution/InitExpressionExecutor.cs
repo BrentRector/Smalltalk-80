@@ -146,7 +146,10 @@ public class InitExpressionExecutor
             SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
 
             // Step 4: Create Process with this context
-            SmalltalkOOP processOOP = CreateProcess(methodContextOOP, priority: 4);
+            // Priority 8 (TimingPriority) prevents preemption when init expressions
+            // fork processes at priority 8 (e.g., Delay's timing process).
+            // Since 8 > 8 is false, no preemption occurs.
+            SmalltalkOOP processOOP = CreateProcess(methodContextOOP, priority: 8);
 
             // Step 5: Execute via primitive 87 (resume)
             SmalltalkOOP resultOOP;

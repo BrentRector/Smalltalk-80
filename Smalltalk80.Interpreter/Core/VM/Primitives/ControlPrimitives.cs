@@ -412,6 +412,9 @@ public static class ControlPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
+            if (DebugProcessScheduling)
+                Console.WriteLine($"[Wait] Called with receiver={context.Receiver}");
+
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver must be a Semaphore
@@ -420,6 +423,9 @@ public static class ControlPrimitives
             string? className = context.GetClassNameForObject(context.Receiver);
             if (className == null) return PrimitiveResult.Fail(context.Metadata!);
 
+            if (DebugProcessScheduling)
+                Console.WriteLine($"[Wait] Semaphore class: {className}");
+
             // Get excessSignals field
             SmalltalkOOP excessSignalsOop = context.GetFieldValue(context.Receiver, className, "excessSignals");
 
@@ -427,9 +433,14 @@ public static class ControlPrimitives
 
             int excessCount = excessSignalsOop.AsSmallInteger();
 
+            if (DebugProcessScheduling)
+                Console.WriteLine($"[Wait] excessSignals={excessCount}");
+
             if (excessCount > 0)
             {
                 // Signal available - decrement and continue
+                if (DebugProcessScheduling)
+                    Console.WriteLine($"[Wait] Signal available, decrementing and continuing");
                 context.SetFieldValue(context.Receiver, className, "excessSignals", SmalltalkOOP.FromSmallInteger(excessCount - 1));
                 return PrimitiveResult.Ok(context.Receiver);
             }
@@ -438,21 +449,31 @@ public static class ControlPrimitives
                 // No signal available - must suspend active process and switch to another
                 SmalltalkOOP activeProcessOop = GetActiveProcess(context);
 
+                if (DebugProcessScheduling)
+                    Console.WriteLine($"[Wait] No signal, suspending active process {activeProcessOop}");
+
                 if (activeProcessOop == context.HeapManager.GetNil())
                     return PrimitiveResult.Fail(context.Metadata!);
 
                 // Add active process to semaphore's waiting list
                 AddLastLink(context, context.Receiver, className, activeProcessOop);
 
+                if (DebugProcessScheduling)
+                    Console.WriteLine($"[Wait] Added process to semaphore waiting list");
+
                 // Perform context switch to next runnable process
                 if (!SwitchToHighestPriorityProcess(context, activeProcessOop))
                 {
+                    if (DebugProcessScheduling)
+                        Console.WriteLine($"[Wait] SwitchToHighestPriorityProcess FAILED");
                     // Context switch failed - undo the AddLastLink to leave state consistent
                     RemoveProcessFromList(context, activeProcessOop, context.Receiver);
                     context.SetFieldValue(activeProcessOop, "class:Process", "myList", context.HeapManager.GetNil());
                     return PrimitiveResult.Fail(context.Metadata!);
                 }
 
+                if (DebugProcessScheduling)
+                    Console.WriteLine($"[Wait] SUCCESS - switched to another process");
                 // Return receiver - execution continues in the NEW process's context
                 return PrimitiveResult.Ok(context.Receiver);
             }
