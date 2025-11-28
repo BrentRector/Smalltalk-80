@@ -285,7 +285,7 @@ public class InitExpressionExecutor
             if (compiledMethodAlive || methodContextAlive)
             {
                 // Check if contexts are kept alive by forked processes (expected behavior)
-                bool keptAliveByForkedProcess = IsKeptAliveByForkedProcess(methodContextOOP, schedulerOOP);
+                bool keptAliveByForkedProcess = IsKeptAliveByForkedProcess(methodContextOOP, schedulerOOP, verbose);
 
                 if (keptAliveByForkedProcess)
                 {
@@ -346,23 +346,25 @@ public class InitExpressionExecutor
     /// Checks if a MethodContext is kept alive by a forked process in the ProcessorScheduler.
     /// This is expected behavior when init expressions fork background processes.
     /// </summary>
-    private bool IsKeptAliveByForkedProcess(SmalltalkOOP methodContextOOP, SmalltalkOOP schedulerOOP)
+    private bool IsKeptAliveByForkedProcess(SmalltalkOOP methodContextOOP, SmalltalkOOP schedulerOOP, bool verbose = false)
     {
         try
         {
             // Check 1: Processes in quiescentProcessLists (runnable processes)
-            if (CheckProcessListsForContext(schedulerOOP, methodContextOOP))
+            if (CheckProcessListsForContext(schedulerOOP, methodContextOOP, verbose))
                 return true;
 
             // Check 2: Processes blocked on known system semaphores
             // This handles cases like Delay TimerProcess blocked on TimingSemaphore
-            if (CheckBlockedProcessesForContext(methodContextOOP))
+            if (CheckBlockedProcessesForContext(methodContextOOP, verbose))
                 return true;
 
             return false;
         }
-        catch
+        catch (Exception ex)
         {
+            if (verbose)
+                Console.WriteLine($"    [DEBUG] IsKeptAliveByForkedProcess exception: {ex.Message}");
             // If any error occurs during checking, assume not kept alive by forked process
             return false;
         }
@@ -371,11 +373,14 @@ public class InitExpressionExecutor
     /// <summary>
     /// Checks if any process in the quiescentProcessLists keeps the context alive.
     /// </summary>
-    private bool CheckProcessListsForContext(SmalltalkOOP schedulerOOP, SmalltalkOOP methodContextOOP)
+    private bool CheckProcessListsForContext(SmalltalkOOP schedulerOOP, SmalltalkOOP methodContextOOP, bool verbose = false)
     {
         // Get process lists array from scheduler
         SmalltalkOOP processListsArrayOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
         int numPriorities = _heapManager.GetIndexedSize(processListsArrayOOP);
+
+        if (verbose)
+            Console.WriteLine($"    [DEBUG] Checking {numPriorities} priority queues");
 
         // Check each priority level
         for (int priorityIndex = 0; priorityIndex < numPriorities; priorityIndex++)
@@ -384,7 +389,7 @@ public class InitExpressionExecutor
             if (processListOOP == _metadata.KnownObjects.Nil)
                 continue;
 
-            if (CheckLinkedListForContext(processListOOP, methodContextOOP))
+            if (CheckLinkedListForContext(processListOOP, methodContextOOP, verbose, $"priority {priorityIndex + 1}"))
                 return true;
         }
 
@@ -394,46 +399,66 @@ public class InitExpressionExecutor
     /// <summary>
     /// Checks processes blocked on known system semaphores or stored in class variables.
     /// </summary>
-    private bool CheckBlockedProcessesForContext(SmalltalkOOP methodContextOOP)
+    private bool CheckBlockedProcessesForContext(SmalltalkOOP methodContextOOP, bool verbose = false)
     {
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
 
-        // Check Delay class - both TimerProcess directly and semaphore waiting lists
+        // Check Delay class's semaphore waiting lists
+        // Note: Delay's class variables are: AccessProtect, ActiveDelay, SuspendedDelays, TimingSemaphore
+        // There is NO TimerProcess variable - the process is created by forkAt: but not stored
         var delayClassOOP = LookupGlobal(smalltalkOOP, "Delay");
+        if (verbose)
+            Console.WriteLine($"    [DEBUG] Delay class lookup: {(delayClassOOP != _metadata.KnownObjects.Nil ? delayClassOOP.ToString() : "nil")}");
+
         if (delayClassOOP != _metadata.KnownObjects.Nil)
         {
-            // Direct check: Delay TimerProcess class variable holds the process itself
-            var timerProcessOOP = GetClassVariable(delayClassOOP, "TimerProcess");
-            if (timerProcessOOP != _metadata.KnownObjects.Nil)
-            {
-                if (ProcessKeepsContextAlive(timerProcessOOP, methodContextOOP))
-                    return true;
-            }
-
-            // Also check semaphore waiting lists
+            // Check TimingSemaphore waiting list - this is where the timer process waits
             var timingSemaphoreOOP = GetClassVariable(delayClassOOP, "TimingSemaphore");
+            if (verbose)
+                Console.WriteLine($"    [DEBUG] TimingSemaphore class var: {(timingSemaphoreOOP != _metadata.KnownObjects.Nil ? timingSemaphoreOOP.ToString() : "nil")}");
+
             if (timingSemaphoreOOP != _metadata.KnownObjects.Nil)
             {
-                if (CheckLinkedListForContext(timingSemaphoreOOP, methodContextOOP))
+                if (CheckLinkedListForContext(timingSemaphoreOOP, methodContextOOP, verbose, "TimingSemaphore"))
                     return true;
             }
 
+            // Also check AccessProtect mutex
             var accessProtectOOP = GetClassVariable(delayClassOOP, "AccessProtect");
+            if (verbose)
+                Console.WriteLine($"    [DEBUG] AccessProtect class var: {(accessProtectOOP != _metadata.KnownObjects.Nil ? accessProtectOOP.ToString() : "nil")}");
+
             if (accessProtectOOP != _metadata.KnownObjects.Nil)
             {
-                if (CheckLinkedListForContext(accessProtectOOP, methodContextOOP))
+                if (CheckLinkedListForContext(accessProtectOOP, methodContextOOP, verbose, "AccessProtect"))
                     return true;
             }
         }
 
-        // Check InputSensor class's EventSemaphore
-        var inputSensorClassOOP = LookupGlobal(smalltalkOOP, "InputSensor");
-        if (inputSensorClassOOP != _metadata.KnownObjects.Nil)
+        // Check InputState class's InputSemaphore
+        // Note: InputProcess and InputSemaphore are in InputState, not InputSensor!
+        var inputStateClassOOP = LookupGlobal(smalltalkOOP, "InputState");
+        if (verbose)
+            Console.WriteLine($"    [DEBUG] InputState class lookup: {(inputStateClassOOP != _metadata.KnownObjects.Nil ? inputStateClassOOP.ToString() : "nil")}");
+
+        if (inputStateClassOOP != _metadata.KnownObjects.Nil)
         {
-            var eventSemaphoreOOP = GetClassVariable(inputSensorClassOOP, "EventSemaphore");
-            if (eventSemaphoreOOP != _metadata.KnownObjects.Nil)
+            // Check InputProcess directly (stored in class variable)
+            var inputProcessOOP = GetClassVariable(inputStateClassOOP, "InputProcess");
+            if (verbose)
+                Console.WriteLine($"    [DEBUG] InputProcess class var: {(inputProcessOOP != _metadata.KnownObjects.Nil ? inputProcessOOP.ToString() : "nil")}");
+
+            if (inputProcessOOP != _metadata.KnownObjects.Nil)
             {
-                if (CheckLinkedListForContext(eventSemaphoreOOP, methodContextOOP))
+                if (ProcessKeepsContextAlive(inputProcessOOP, methodContextOOP, verbose))
+                    return true;
+            }
+
+            // Check InputSemaphore waiting list
+            var inputSemaphoreOOP = GetClassVariable(inputStateClassOOP, "InputSemaphore");
+            if (inputSemaphoreOOP != _metadata.KnownObjects.Nil)
+            {
+                if (CheckLinkedListForContext(inputSemaphoreOOP, methodContextOOP, verbose, "InputSemaphore"))
                     return true;
             }
         }
@@ -442,7 +467,8 @@ public class InitExpressionExecutor
     }
 
     /// <summary>
-    /// Gets a class variable value from a class's classPool.
+    /// Gets a class variable value from a class's classPool, traversing the superclass chain.
+    /// Class variables can be inherited from superclasses.
     /// </summary>
     private SmalltalkOOP GetClassVariable(SmalltalkOOP classOOP, string variableName)
     {
@@ -451,42 +477,54 @@ public class InitExpressionExecutor
             // Class instance variable layout:
             // 0: superclass, 1: methodDict, 2: format, 3: instanceVariables, 4: organization,
             // 5: subclasses, 6: name, 7: classPool, 8: sharedPools
+            const int SUPERCLASS_INDEX = 0;
             const int CLASS_POOL_INDEX = 7;
-            var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, CLASS_POOL_INDEX);
-
-            if (classPoolOOP == _metadata.KnownObjects.Nil)
-                return _metadata.KnownObjects.Nil;
-
-            // classPool is a Dictionary (Set of Associations)
-            int poolSize = _heapManager.GetIndexedSize(classPoolOOP);
 
             // Try symbol-based lookup first
             var symbolOOP = FindSymbol(variableName);
 
-            for (int i = 0; i < poolSize; i++)
+            // Traverse superclass chain looking for the class variable
+            var currentClassOOP = classOOP;
+            int depth = 0;
+            while (currentClassOOP != _metadata.KnownObjects.Nil && !currentClassOOP.IsSmallInteger && depth < 20)
             {
-                var assocOOP = _heapManager.GetIndexedOOP(classPoolOOP, i);
-                if (assocOOP == _heapManager.GetNil())
-                    continue;
+                var classPoolOOP = _heapManager.GetInstanceVariable(currentClassOOP, CLASS_POOL_INDEX);
 
-                // Association has key at instance variable 0
-                var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
-
-                // Try exact symbol match first
-                if (symbolOOP != _metadata.KnownObjects.Nil && keyOOP == symbolOOP)
+                if (classPoolOOP != _metadata.KnownObjects.Nil)
                 {
-                    return _heapManager.GetInstanceVariable(assocOOP, 1);
-                }
+                    // classPool is a Dictionary (Set of Associations)
+                    int poolSize = _heapManager.GetIndexedSize(classPoolOOP);
 
-                // Fall back to string content comparison
-                if (keyOOP != _metadata.KnownObjects.Nil && !keyOOP.IsSmallInteger)
-                {
-                    var keyString = ReadSymbolString(keyOOP);
-                    if (keyString == variableName)
+                    for (int i = 0; i < poolSize; i++)
                     {
-                        return _heapManager.GetInstanceVariable(assocOOP, 1);
+                        var assocOOP = _heapManager.GetIndexedOOP(classPoolOOP, i);
+                        if (assocOOP == _heapManager.GetNil())
+                            continue;
+
+                        // Association has key at instance variable 0
+                        var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
+
+                        // Try exact symbol match first
+                        if (symbolOOP != _metadata.KnownObjects.Nil && keyOOP == symbolOOP)
+                        {
+                            return _heapManager.GetInstanceVariable(assocOOP, 1);
+                        }
+
+                        // Fall back to string content comparison
+                        if (keyOOP != _metadata.KnownObjects.Nil && !keyOOP.IsSmallInteger)
+                        {
+                            var keyString = ReadSymbolString(keyOOP);
+                            if (keyString == variableName)
+                            {
+                                return _heapManager.GetInstanceVariable(assocOOP, 1);
+                            }
+                        }
                     }
                 }
+
+                // Move to superclass
+                currentClassOOP = _heapManager.GetInstanceVariable(currentClassOOP, SUPERCLASS_INDEX);
+                depth++;
             }
 
             return _metadata.KnownObjects.Nil;
@@ -501,12 +539,16 @@ public class InitExpressionExecutor
     /// Checks if any process in a linked list keeps the context alive.
     /// Works for both priority lists and semaphore waiting lists.
     /// </summary>
-    private bool CheckLinkedListForContext(SmalltalkOOP listOOP, SmalltalkOOP methodContextOOP)
+    private bool CheckLinkedListForContext(SmalltalkOOP listOOP, SmalltalkOOP methodContextOOP, bool verbose = false, string listName = "list")
     {
         // LinkedList/Semaphore has firstLink at index 0
         SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(listOOP, 0);
         if (firstLinkOOP == _metadata.KnownObjects.Nil)
+        {
+            if (verbose)
+                Console.WriteLine($"    [DEBUG] {listName} firstLink is nil (empty list)");
             return false;
+        }
 
         // Walk linked list of processes
         SmalltalkOOP currentProcessOOP = firstLinkOOP;
@@ -514,12 +556,19 @@ public class InitExpressionExecutor
         while (currentProcessOOP != _metadata.KnownObjects.Nil && processCount < 100)
         {
             processCount++;
-            if (ProcessKeepsContextAlive(currentProcessOOP, methodContextOOP))
+            if (ProcessKeepsContextAlive(currentProcessOOP, methodContextOOP, verbose))
+            {
+                if (verbose)
+                    Console.WriteLine($"    [DEBUG] {listName} process #{processCount} keeps context alive");
                 return true;
+            }
 
             // Move to next process
             currentProcessOOP = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_NEXTLINK_INDEX);
         }
+
+        if (verbose && processCount > 0)
+            Console.WriteLine($"    [DEBUG] {listName} checked {processCount} processes, none keep context alive");
 
         return false;
     }
@@ -527,64 +576,72 @@ public class InitExpressionExecutor
     /// <summary>
     /// Checks if a process's suspended context chain reaches the target context.
     /// </summary>
-    private bool ProcessKeepsContextAlive(SmalltalkOOP processOOP, SmalltalkOOP methodContextOOP)
+    private bool ProcessKeepsContextAlive(SmalltalkOOP processOOP, SmalltalkOOP methodContextOOP, bool verbose = false)
     {
         var procSuspendedCtx = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
 
-        // Check if suspended context is our MethodContext
-        if (procSuspendedCtx == methodContextOOP)
-            return true;
-
-        // Check if it's a BlockContext whose home or sender chain reaches our MethodContext
-        if (procSuspendedCtx != _metadata.KnownObjects.Nil && !procSuspendedCtx.IsSmallInteger)
+        if (verbose)
         {
-            var ctxClass = _heapManager.GetClassOOP(procSuspendedCtx);
-            var ctxClassName = _heapManager.GetClassName(ctxClass);
-
-            if (ctxClassName.Contains("BlockContext"))
-            {
-                // Check home pointer
-                var homeCtx = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                if (homeCtx == methodContextOOP)
-                    return true;
-
-                // Check home's sender chain
-                if (homeCtx != _metadata.KnownObjects.Nil && !homeCtx.IsSmallInteger)
-                {
-                    if (IsSenderChainReaches(homeCtx, methodContextOOP))
-                        return true;
-                }
-
-                // Check BlockContext's own sender chain
-                if (IsSenderChainReaches(procSuspendedCtx, methodContextOOP))
-                    return true;
-            }
-            else if (ctxClassName.Contains("MethodContext"))
-            {
-                // Check MethodContext's sender chain
-                if (IsSenderChainReaches(procSuspendedCtx, methodContextOOP))
-                    return true;
-            }
+            var procClass = _heapManager.GetClassOOP(processOOP);
+            var procClassName = _heapManager.GetClassName(procClass);
+            Console.WriteLine($"    [DEBUG] Checking process {processOOP} (class: {procClassName})");
+            Console.WriteLine($"    [DEBUG]   suspendedContext: {procSuspendedCtx}, target: {methodContextOOP}");
         }
 
-        return false;
+        // Use recursive context chain check
+        return ContextReachesTarget(procSuspendedCtx, methodContextOOP, verbose, 0);
     }
 
     /// <summary>
-    /// Checks if a context's sender chain reaches the target context.
+    /// Recursively checks if a context (or its home/sender chain) reaches the target.
+    /// Handles nested BlockContexts by traversing both home pointers and sender chains.
     /// </summary>
-    private bool IsSenderChainReaches(SmalltalkOOP contextOOP, SmalltalkOOP targetOOP)
+    private bool ContextReachesTarget(SmalltalkOOP contextOOP, SmalltalkOOP targetOOP, bool verbose, int depth)
     {
-        SmalltalkOOP currentSender = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_SENDER_INDEX);
-        int depth = 0;
+        if (depth > 30) return false; // Prevent infinite recursion
 
-        while (currentSender != _metadata.KnownObjects.Nil && !currentSender.IsSmallInteger && depth < 20)
+        if (contextOOP == _metadata.KnownObjects.Nil || contextOOP.IsSmallInteger)
+            return false;
+
+        // Direct match
+        if (contextOOP == targetOOP)
         {
-            if (currentSender == targetOOP)
+            if (verbose)
+                Console.WriteLine($"    [DEBUG]   {'|',depth * 2}Found target at depth {depth}!");
+            return true;
+        }
+
+        var ctxClass = _heapManager.GetClassOOP(contextOOP);
+        var ctxClassName = _heapManager.GetClassName(ctxClass);
+
+        if (verbose && depth == 0)
+            Console.WriteLine($"    [DEBUG]   Context class: {ctxClassName}");
+
+        if (ctxClassName.Contains("BlockContext"))
+        {
+            // For BlockContext: check home pointer recursively
+            var homeCtx = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+            if (verbose)
+                Console.WriteLine($"    [DEBUG]   {'|',depth * 2}BlockContext home: {homeCtx}");
+
+            // Recursively check if home reaches target
+            if (ContextReachesTarget(homeCtx, targetOOP, verbose, depth + 1))
                 return true;
 
-            currentSender = _heapManager.GetInstanceVariable(currentSender, VMConstants.CONTEXT_SENDER_INDEX);
-            depth++;
+            // Also check this BlockContext's sender chain
+            var sender = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_SENDER_INDEX);
+            if (ContextReachesTarget(sender, targetOOP, verbose, depth + 1))
+                return true;
+        }
+        else if (ctxClassName.Contains("MethodContext"))
+        {
+            // For MethodContext: check sender chain
+            var sender = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_SENDER_INDEX);
+            if (verbose)
+                Console.WriteLine($"    [DEBUG]   {'|',depth * 2}MethodContext sender: {sender}");
+
+            if (ContextReachesTarget(sender, targetOOP, verbose, depth + 1))
+                return true;
         }
 
         return false;
