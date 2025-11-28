@@ -662,14 +662,11 @@ public static class ControlPrimitives
     /// <summary>
     /// Checks if a process should preempt the currently active process.
     /// Returns true if the given process has higher priority than the active process.
-    /// Returns false if preemption is disabled (during init expression execution).
+    /// During init expressions, the bootstrap process runs at priority 9 (higher than any
+    /// user process), so no preemption will occur naturally.
     /// </summary>
     private static bool ShouldPreempt(PrimitiveExecutionContext context, SmalltalkOOP processOop)
     {
-        // Never preempt during init expressions - scheduler hasn't started yet
-        if (context.PreemptionDisabled)
-            return false;
-
         SmalltalkOOP activeProcessOop = GetActiveProcess(context);
         if (activeProcessOop == context.HeapManager.GetNil())
             return false;

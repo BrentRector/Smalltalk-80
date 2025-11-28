@@ -95,13 +95,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         set => _tracer.SelectorTraceEnabled = value;
     }
 
-    /// <summary>
-    /// Gets or sets whether preemptive process switching is disabled.
-    /// When true, Resume/Signal primitives add processes to queues without switching contexts.
-    /// Set this to true during init expression execution when the scheduler hasn't started.
-    /// </summary>
-    public bool PreemptionDisabled { get; set; } = false;
-
     /// <summary>Gets the message dispatcher for runtime message sending.</summary>
     public IMessageDispatcher MessageDispatcher => _messageDispatcher;
 

@@ -59,8 +59,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
-        VMMetadata? metadata = null,
-        bool preemptionDisabled = false)
+        VMMetadata? metadata = null)
     {
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
@@ -79,8 +78,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 instructionPointer: instructionPointer,
                 cacheManager: cacheManager,
                 messageSender: messageSender,
-                metadata: metadata,
-                preemptionDisabled: preemptionDisabled
+                metadata: metadata
             );
 
             var result = primitive.Execute(execContext);

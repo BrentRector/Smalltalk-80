@@ -38,8 +38,10 @@ public class ProcessSchedulerInitializer
         }
 
         // Create initial Process for runtime execution
-        // Priority 4 = UserSchedulingPriority (standard user code priority)
-        SmalltalkOOP initialProcessOOP = CreateInitialProcess(priority: 4);
+        // Priority 9 = higher than all standard Smalltalk priorities (1-8)
+        // This prevents preemption during init expressions since no process can have higher priority.
+        // After init expressions complete, the controller loop will create normal processes.
+        SmalltalkOOP initialProcessOOP = CreateInitialProcess(priority: 9);
 
         // Set as active process
         _heapManager.SetInstanceVariable(schedulerOOP,
@@ -48,7 +50,7 @@ public class ProcessSchedulerInitializer
 
         Console.WriteLine($"[ProcessScheduler] Initialized for runtime:");
         Console.WriteLine($"  Active process: {initialProcessOOP}");
-        Console.WriteLine($"  Priority: 4 (UserSchedulingPriority)");
+        Console.WriteLine($"  Priority: 9 (BootstrapPriority - higher than all standard priorities)");
 
         return initialProcessOOP;
     }

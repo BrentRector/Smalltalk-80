@@ -67,11 +67,6 @@ public class InitExpressionExecutor
         var results = new List<InitResult>();
         var totalStopwatch = Stopwatch.StartNew();
 
-        // Disable preemption during init expressions - scheduler hasn't started yet
-        // Process primitives will still create processes and add them to queues,
-        // they just won't do context switching until the controller loop starts
-        _vm.PreemptionDisabled = true;
-
         // Get init expression array from VMMetadata
         var initArrayOOP = _metadata.InitExpressionMethods;
         if (initArrayOOP == _heapManager.GetNil())
@@ -106,10 +101,6 @@ public class InitExpressionExecutor
         }
 
         totalStopwatch.Stop();
-
-        // Re-enable preemption now that init expressions are complete
-        // The controller loop will start the scheduler when ready
-        _vm.PreemptionDisabled = false;
 
         return new InitExecutionReport
         {

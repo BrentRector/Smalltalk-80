@@ -137,7 +137,7 @@ public partial class VirtualMachine
 
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
-                _contextManager, currentPC, this, this, _metadata, PreemptionDisabled);
+                _contextManager, currentPC, this, this, _metadata);
 
             // Emit diagnostic event for primitive execution in super send
             _diagnostics?.Emit(new PrimitiveEvent
@@ -378,7 +378,7 @@ public partial class VirtualMachine
             // Try to execute the primitive
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
-                _contextManager, currentPC, this, this, _metadata, PreemptionDisabled);
+                _contextManager, currentPC, this, this, _metadata);
 
             // Emit diagnostic event for primitive execution
             _diagnostics?.Emit(new PrimitiveEvent

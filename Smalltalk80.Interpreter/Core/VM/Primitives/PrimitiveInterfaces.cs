@@ -85,13 +85,6 @@ public readonly struct PrimitiveExecutionContext
     public VMMetadata? Metadata { get; }
 
     /// <summary>
-    /// Gets whether preemptive process switching is disabled.
-    /// When true, Resume/Signal primitives should only add processes to queues
-    /// without switching contexts. Used during init expression execution.
-    /// </summary>
-    public bool PreemptionDisabled { get; }
-
-    /// <summary>
     /// Creates a new primitive execution context.
     /// </summary>
     public PrimitiveExecutionContext(
@@ -106,8 +99,7 @@ public readonly struct PrimitiveExecutionContext
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
-        VMMetadata? metadata = null,
-        bool preemptionDisabled = false)
+        VMMetadata? metadata = null)
     {
         Receiver = receiver;
         Arguments = arguments;
@@ -121,7 +113,6 @@ public readonly struct PrimitiveExecutionContext
         CacheManager = cacheManager;
         MessageSender = messageSender;
         Metadata = metadata;
-        PreemptionDisabled = preemptionDisabled;
     }
 
     /// <summary>
@@ -334,8 +325,7 @@ public interface IPrimitiveRegistry
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
-        VMMetadata? metadata = null,
-        bool preemptionDisabled = false);
+        VMMetadata? metadata = null);
 
     /// <summary>
     /// Checks if a primitive is registered.
