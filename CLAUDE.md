@@ -21,7 +21,7 @@
 
 ## Migration Status
 
-**System Startup Migration** - Migrating from single-threaded cold start to full interactive system with fiber-based process scheduling.
+**System Startup Migration** - Migrating from single-threaded cold start to full interactive system with MVC and process scheduling.
 
 **Phase 1: Program Refactoring** ✅ **COMPLETE**
 - ✅ SmalltalkThreadContext class created
@@ -60,8 +60,10 @@
 
 **Key Lesson**: Display refresh architecture requires `InvalidateDisplayRegion()` after modifying Display bitmap. Without it, WinForms display shows stale cached data even though heap is correctly updated.
 
-**Phase 3: Fiber Infrastructure** 📋 **ON HOLD**
-- Fiber work postponed pending other priorities
+**Phase 3: MVC and Process Scheduling** 📋 **NEXT**
+- Controller event loop (ControlManager>>searchForActiveController)
+- Process scheduling via Smalltalk-level cooperative multitasking
+- Integration with InputSensor for mouse/keyboard events
 
 See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, and `docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md` for complete migration documentation.
 

@@ -13,16 +13,14 @@ using Smalltalk80.Interpreter.Shared.Types;
 namespace Smalltalk80.Interpreter;
 
 /// <summary>
-/// Manages the Smalltalk interpreter thread and (future) fiber scheduling.
+/// Manages the Smalltalk interpreter thread.
 /// This class encapsulates all Smalltalk execution logic that runs on a separate thread
 /// from the Windows UI thread.
 /// </summary>
 public class SmalltalkInterpreterThread
 {
     private readonly SmalltalkThreadContext _context;
-    //private FiberScheduler? _fiberScheduler;  // Future: for process scheduling
     private VirtualMachine? _vm;
-    // private bool _shutdownRequested;  // Future: for fiber event loop
 
     public SmalltalkInterpreterThread(SmalltalkThreadContext context)
     {
@@ -44,41 +42,24 @@ public class SmalltalkInterpreterThread
             Console.WriteLine("[Smalltalk Thread] Waiting for window to be displayed...");
             Thread.Sleep(1000);  // Wait 1 second for window to be fully shown
 
-            // STEP 1: Convert this thread to a Windows fiber (future enhancement)
-            // Console.WriteLine("[Smalltalk Thread] Converting to fiber...");
-            // ConvertThreadToFiber();
-
-            // STEP 2: Create VM
+            // STEP 1: Create VM
             Console.WriteLine("[Smalltalk Thread] Creating virtual machine...");
             _vm = CreateVirtualMachine();
 
-            // STEP 3: Create fiber scheduler (future enhancement)
-            // Console.WriteLine("[Smalltalk Thread] Creating fiber scheduler...");
-            // _fiberScheduler = new FiberScheduler(
-            //     _context.HeapManager,
-            //     _vm,
-            //     _context.EventQueue
-            // );
-            // _fiberScheduler.Initialize();
-
-            // STEP 4: Execute init expressions
+            // STEP 2: Execute init expressions
             Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
             ExecuteInitExpressions();
 
-            // STEP 5: Execute user expression if requested
+            // STEP 3: Execute user expression if requested
             if (_context.Config.ExecuteExpression != null)
             {
                 Console.WriteLine("[Smalltalk Thread] Executing user expression...");
                 ExecuteUserExpression();
             }
 
-            // STEP 6: Start controller loop (future enhancement)
+            // Future: STEP 4 - Start controller loop
             // Console.WriteLine("[Smalltalk Thread] Starting controller loop...");
             // StartControllerLoop();
-
-            // STEP 7: Run fibers forever (future enhancement)
-            // Console.WriteLine("[Smalltalk Thread] Entering fiber event loop...");
-            // RunFiberLoop();
 
             Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
         }
@@ -89,18 +70,6 @@ public class SmalltalkInterpreterThread
             Environment.Exit(1);
         }
     }
-
-    // Future: Convert thread to fiber for Smalltalk process scheduling
-    // private void ConvertThreadToFiber()
-    // {
-    //     var fiberPtr = NativeMethods.ConvertThreadToFiber(IntPtr.Zero);
-    //     if (fiberPtr == IntPtr.Zero)
-    //     {
-    //         var error = Marshal.GetLastWin32Error();
-    //         throw new InvalidOperationException(
-    //             $"Failed to convert thread to fiber. Error code: {error}");
-    //     }
-    // }
 
     private VirtualMachine CreateVirtualMachine()
     {
@@ -555,23 +524,5 @@ public class SmalltalkInterpreterThread
     //     // ScheduledControllers _ ControlManager new.
     //     // ScheduledControllers searchForActiveController.
     //     Console.WriteLine("  Controller loop start: NOT YET IMPLEMENTED");
-    // }
-
-    // Future: Run fiber event loop
-    // private void RunFiberLoop()
-    // {
-    //     // This never returns - fibers run forever
-    //     // The fiber scheduler manages all process switching
-    //     while (!_shutdownRequested)
-    //     {
-    //         // Fiber scheduling would happen here
-    //         Thread.Sleep(100);
-    //     }
-    // }
-
-    // Future: Request shutdown for fiber event loop
-    // public void RequestShutdown()
-    // {
-    //     _shutdownRequested = true;
     // }
 }
