@@ -589,44 +589,28 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Decrement context depth
         _contextManager.DecrementContextDepth();
 
-        // Check if we're returning to the initial context
-        if (senderOOP == _initialContextOOP)
-        {
-            // Execution complete - return to caller
-            Console.WriteLine($"[HandleReturn] Returning to initial context - sender={senderOOP}, initial={_initialContextOOP}");
-            _returnValue = returnValue;
-            _contextManager.SetActiveContext(_initialContextOOP);
-            _contextManager.AddContextToPool(returningContext);
-            return InterpreterStatus.Return;
-        }
-
-        // Handle nil sender - could be initial process completion OR forked process termination
+        // Handle nil sender - the top-level context is returning
+        // This could be initial process completion OR forked process termination
         if (senderOOP == _metadata.KnownObjects.Nil)
         {
             // Check if we're in the initial process or a forked process
             SmalltalkOOP currentProcess = GetActiveProcess();
 
-            // Debug: trace process termination
-            Console.WriteLine($"[HandleReturn] Nil sender - currentProcess={currentProcess}, initialProcess={_initialProcessOOP}");
-
             if (currentProcess == _initialProcessOOP)
             {
                 // Initial process completed - return to caller
-                Console.WriteLine($"[HandleReturn] Initial process completed, returning to C#");
                 _returnValue = returnValue;
-                _contextManager.SetActiveContext(_initialContextOOP);
+                _contextManager.SetActiveContext(_metadata.KnownObjects.Nil);
                 _contextManager.AddContextToPool(returningContext);
                 return InterpreterStatus.Return;
             }
 
             // Forked process terminated - switch to next runnable process
-            Console.WriteLine($"[HandleReturn] Forked process {currentProcess} terminated, switching to next process");
             _contextManager.AddContextToPool(returningContext);
 
             if (SwitchToNextRunnableProcess(currentProcess))
             {
                 // Successfully switched - continue execution in new process
-                Console.WriteLine($"[HandleReturn] Switched to new process, continuing");
                 return InterpreterStatus.Continue;
             }
 
