@@ -591,6 +591,26 @@ public static class ControlPrimitives
         if (newContext == context.HeapManager.GetNil())
             return false; // New process has no context to resume
 
+        // Check if this is an unactivated BlockContext (PC is nil)
+        // This happens when resuming a newly created process via [block] newProcess
+        SmalltalkOOP newContextPC = context.HeapManager.GetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_PC_INDEX);
+        if (newContextPC == context.HeapManager.GetNil())
+        {
+            // This is an unactivated BlockContext - need to activate it
+            // Set PC from startPC (where the block body begins)
+            SmalltalkOOP startPC = context.HeapManager.GetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+            if (startPC == context.HeapManager.GetNil() || !startPC.IsSmallInteger)
+                return false;
+
+            context.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_PC_INDEX, startPC);
+
+            // Initialize stack pointer to 0 (process blocks typically have no arguments)
+            context.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SmalltalkOOP.FromSmallInteger(0));
+
+            // Caller is nil for a new process (not being called from anywhere)
+            context.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, context.HeapManager.GetNil());
+        }
+
         // Update Processor's activeProcess
         context.HeapManager.SetInstanceVariable(schedulerOop, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, newProcessOop);
 
