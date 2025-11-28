@@ -153,4 +153,13 @@ public static class VMConstants
     // ProcessorScheduler instanceVariableNames: 'quiescentProcessLists activeProcess'
     public const int PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX = 0;
     public const int PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX = 1;
+
+    // LinkedList instanceVariableNames: 'firstLink lastLink'
+    // Note: LinkedList inherits from SequenceableCollection which has no instance vars
+    public const int LINKEDLIST_FIRSTLINK_INDEX = 0;
+    public const int LINKEDLIST_LASTLINK_INDEX = 1;
+
+    // Link instanceVariableNames: 'nextLink'
+    // Process, Semaphore signal queues, etc. inherit from Link
+    public const int LINK_NEXTLINK_INDEX = 0;
 }
