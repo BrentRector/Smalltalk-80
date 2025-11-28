@@ -69,6 +69,14 @@ public interface IPlatformBridge
     (int x, int y) GetMousePosition();
 
     /// <summary>
+    /// Gets the current mouse button state from host platform.
+    /// Returns a tuple of (red, yellow, blue) button states.
+    /// Red = left button, Yellow = middle button, Blue = right button.
+    /// </summary>
+    /// <returns>Tuple of (red, yellow, blue) button states.</returns>
+    (bool red, bool yellow, bool blue) GetMouseButtons();
+
+    /// <summary>
     /// Sets the cursor position on host platform.
     /// </summary>
     /// <param name="x">X coordinate.</param>

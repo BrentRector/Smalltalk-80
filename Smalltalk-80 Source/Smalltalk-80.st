@@ -22259,6 +22259,10 @@ primKbdPeek
 primLeftShiftDown
 	^CurrentInputState leftShiftDown!
 primMouseButtons
+	"Poll the mouse to find out button state. Return an Integer 0-7.
+	Primitive 199 polls directly from platform. Falls back to InputState if primitive fails."
+
+	<primitive: 199>
 	^CurrentInputState mouseButtons!
 primMousePt
 	"Poll the mouse to find out its position. Return a Point. Fail if event-driven 

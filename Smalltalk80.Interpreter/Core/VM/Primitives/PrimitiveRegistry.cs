@@ -285,6 +285,10 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(154, new FileOperations.GetFileAttributes());
         registry.Register(155, new FileOperations.FileExists());
 
+        // Extended input primitives (199)
+        // Primitive 199: mouseButtons - Poll current mouse button state (polling model)
+        registry.Register(199, new InputOperations.MouseButtons());
+
         return registry;
     }
 }
