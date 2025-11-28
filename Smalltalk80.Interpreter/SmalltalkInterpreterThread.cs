@@ -57,17 +57,20 @@ public class SmalltalkInterpreterThread
             Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
             ExecuteInitExpressions();
 
-            // STEP 3: Execute user expression if requested
+            // STEP 3: Execute user expression if requested (skips controller loop)
             if (_context.Config.ExecuteExpression != null)
             {
                 Console.WriteLine("[Smalltalk Thread] Executing user expression...");
                 ExecuteUserExpression();
+                Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
+                return;
             }
 
-            // Future: STEP 4 - Start controller loop
-            // Console.WriteLine("[Smalltalk Thread] Starting controller loop...");
-            // StartControllerLoop();
+            // STEP 4: Start MVC controller loop (runs forever)
+            Console.WriteLine("[Smalltalk Thread] Starting controller loop...");
+            StartControllerLoop();
 
+            // Note: We only reach here if the controller loop exits (unexpected)
             Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
         }
         catch (Exception ex)
@@ -523,13 +526,85 @@ public class SmalltalkInterpreterThread
         return _context.HeapManager.GetClassName(classOOP);
     }
 
-    // Future: Start Smalltalk controller loop
-    // private void StartControllerLoop()
-    // {
-    //     // TODO: Execute Smalltalk code:
-    //     // Processor hiddenBackgroundProcess.
-    //     // ScheduledControllers _ ControlManager new.
-    //     // ScheduledControllers searchForActiveController.
-    //     Console.WriteLine("  Controller loop start: NOT YET IMPLEMENTED");
-    // }
+    /// <summary>
+    /// Starts the Smalltalk MVC controller loop.
+    /// This implements the canonical Bluebook startup sequence:
+    /// 1. Processor hiddenBackgroundProcess  - Create background idle process
+    /// 2. ControlManager new → ScheduledControllers  - Create and install ControlManager
+    /// 3. ScheduledControllers searchForActiveController  - Start event loop (runs forever)
+    /// </summary>
+    private void StartControllerLoop()
+    {
+        Console.WriteLine("\n=== Starting MVC Controller Loop ===");
+
+        // Create MessageSender for runtime message sending
+        var messageSender = new MessageSender(
+            _context.HeapManager,
+            _vm!,
+            _context.VMMetadata,
+            _vm!.MessageDispatcher,
+            _vm!.ContextManager);
+
+        // Step 1: Processor hiddenBackgroundProcess
+        // Creates an infinite loop process at priority 1 (SystemRockBottomPriority)
+        Console.WriteLine("  Step 1: Creating background process...");
+        var processorOOP = LookupGlobal("Processor");
+        messageSender.SendUnary(processorOOP, "hiddenBackgroundProcess");
+        Console.WriteLine("    ✓ Background process created at priority 1");
+
+        // Step 2: ControlManager new → install as ScheduledControllers global
+        Console.WriteLine("  Step 2: Creating ControlManager...");
+        var controlManagerClassOOP = LookupGlobal("ControlManager");
+        var controlManagerOOP = messageSender.SendUnary(controlManagerClassOOP, "new");
+        Console.WriteLine($"    ✓ ControlManager created: {controlManagerOOP}");
+
+        // Install as Smalltalk global: Smalltalk at: #ScheduledControllers put: controlManager
+        var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
+        var scheduledControllersSymbol = FindSymbol("ScheduledControllers");
+        if (scheduledControllersSymbol == _context.HeapManager.GetNil())
+        {
+            // Symbol doesn't exist - need to create it
+            Console.WriteLine("    Creating #ScheduledControllers symbol...");
+            scheduledControllersSymbol = CreateSymbol("ScheduledControllers");
+        }
+        messageSender.SendKeyword(smalltalkOOP, "at:put:", scheduledControllersSymbol, controlManagerOOP);
+        Console.WriteLine("    ✓ ControlManager installed as ScheduledControllers global");
+
+        // Step 3: ScheduledControllers searchForActiveController
+        // This runs the main event loop - it will run FOREVER until the system exits
+        Console.WriteLine("  Step 3: Starting controller event loop...");
+        Console.WriteLine("    (This will run until the window is closed)");
+
+        // Look up the newly installed ScheduledControllers global
+        var scheduledControllersOOP = LookupGlobal("ScheduledControllers");
+        messageSender.SendUnary(scheduledControllersOOP, "searchForActiveController");
+
+        // Note: We should never reach here - searchForActiveController runs forever
+        Console.WriteLine("  Controller loop exited (unexpected)");
+    }
+
+    /// <summary>
+    /// Creates a new Symbol in the Smalltalk system.
+    /// </summary>
+    private SmalltalkOOP CreateSymbol(string symbolText)
+    {
+        // Get Symbol class
+        var symbolClassOOP = LookupGlobal("Symbol");
+
+        // Allocate Symbol object (byte-indexed)
+        var bytes = System.Text.Encoding.UTF8.GetBytes(symbolText);
+        var symbolOOP = _context.HeapManager.AllocateObject(
+            Shared.Types.ObjectFormat.ByteIndexed,
+            0,  // no instance variables for Symbol
+            bytes.Length);
+        _context.HeapManager.SetClassOOP(symbolOOP, symbolClassOOP);
+
+        // Copy bytes into the symbol
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            _context.HeapManager.SetIndexedByte(symbolOOP, i, bytes[i]);
+        }
+
+        return symbolOOP;
+    }
 }
