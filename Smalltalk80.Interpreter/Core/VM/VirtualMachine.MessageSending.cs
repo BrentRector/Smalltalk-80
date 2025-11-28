@@ -251,6 +251,18 @@ public partial class VirtualMachine
             }
         }
 
+        // SPECIAL CASE: BlockContext>>removeSelf forwards to home MethodContext
+        // In Blue Book, removeSelf is only defined on MethodContext. When thisContext
+        // returns a BlockContext (e.g., inside Process>>terminate's block), the message
+        // must be forwarded to the home MethodContext where the receiver is stored.
+        if (selectorName == "removeSelf" && classOOP == _metadata.BlockContextClassOOP)
+        {
+            // Get home MethodContext from BlockContext
+            var homeOOP = _heapManager.GetInstanceVariable(receiverOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+            // Forward the message to home MethodContext
+            return SendMessage(homeOOP, selectorOOP, args);
+        }
+
         // Debug: check for classId 0 on "comment:" send
         if (classOOP == _heapManager.GetNil())
         {

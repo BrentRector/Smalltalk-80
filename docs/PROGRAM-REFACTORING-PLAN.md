@@ -48,13 +48,11 @@
   ├─ 8. Create WinForms display window (with heap reference)
   ├─ 9. Create Smalltalk thread (NEW)
   │      └─ RunSmalltalkInterpreter() - SMALLTALK THREAD
-  │           ├─ Convert thread to fiber (NEW)
-  │           ├─ Create fiber scheduler (NEW)
   │           ├─ Create VM
   │           ├─ Execute init expressions
   │           ├─ Execute user expression (if requested)
   │           ├─ Start controller loop (NEW)
-  │           └─ Run fibers forever (NEW)
+  │           └─ Run interpreter loop forever (NEW)
   ├─ 10. Start Smalltalk thread
   ├─ 11. Show display window
   └─ 12. Run WinForms event loop (Application.Run)
@@ -110,12 +108,11 @@ using Smalltalk80.Interpreter.Platform.Windows;
 namespace Smalltalk80.Interpreter;
 
 /// <summary>
-/// Manages the Smalltalk interpreter thread and fiber scheduling.
+/// Manages the Smalltalk interpreter thread.
 /// </summary>
 public class SmalltalkInterpreterThread
 {
     private readonly SmalltalkThreadContext _context;
-    private FiberScheduler? _fiberScheduler;
     private VirtualMachine? _vm;
     private bool _shutdownRequested;
 
@@ -134,58 +131,34 @@ public class SmalltalkInterpreterThread
         {
             Console.WriteLine("\n[Smalltalk Thread] Starting...");
 
-            // STEP 1: Convert this thread to a Windows fiber
-            Console.WriteLine("[Smalltalk Thread] Converting to fiber...");
-            ConvertThreadToFiber();
-
-            // STEP 2: Create VM
+            // STEP 1: Create VM
             Console.WriteLine("[Smalltalk Thread] Creating virtual machine...");
             _vm = CreateVirtualMachine();
 
-            // STEP 3: Create fiber scheduler (will be used after init expressions)
-            Console.WriteLine("[Smalltalk Thread] Creating fiber scheduler...");
-            _fiberScheduler = new FiberScheduler(
-                _context.HeapManager,
-                _vm,
-                _context.EventQueue
-            );
-            _fiberScheduler.Initialize();
-
-            // STEP 4: Execute init expressions (runs in initial process, not yet using fibers)
+            // STEP 2: Execute init expressions
             Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
             ExecuteInitExpressions();
 
-            // STEP 5: Execute user expression if requested
+            // STEP 3: Execute user expression if requested
             if (_context.Config.ExecuteExpression != null)
             {
                 Console.WriteLine("[Smalltalk Thread] Executing user expression...");
                 ExecuteUserExpression();
             }
 
-            // STEP 6: Start controller loop and background processes
+            // STEP 4: Start controller loop and background processes
             Console.WriteLine("[Smalltalk Thread] Starting controller loop...");
             StartControllerLoop();
 
-            // STEP 7: Run fibers forever (never returns unless shutdown requested)
-            Console.WriteLine("[Smalltalk Thread] Entering fiber event loop...");
-            RunFiberLoop();
+            // STEP 5: Run interpreter loop forever (never returns unless shutdown requested)
+            Console.WriteLine("[Smalltalk Thread] Entering interpreter loop...");
+            RunInterpreterLoop();
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"\n[Smalltalk Thread] Fatal error: {ex.Message}");
             Console.Error.WriteLine($"Stack trace:\n{ex.StackTrace}");
             Environment.Exit(1);
-        }
-    }
-
-    private void ConvertThreadToFiber()
-    {
-        var fiberPtr = NativeMethods.ConvertThreadToFiber(IntPtr.Zero);
-        if (fiberPtr == IntPtr.Zero)
-        {
-            var error = Marshal.GetLastWin32Error();
-            throw new InvalidOperationException(
-                $"Failed to convert thread to fiber. Error code: {error}");
         }
     }
 
@@ -323,15 +296,16 @@ public class SmalltalkInterpreterThread
         Console.WriteLine("  Controller loop start: NOT YET IMPLEMENTED");
     }
 
-    private void RunFiberLoop()
+    private void RunInterpreterLoop()
     {
-        // This never returns - fibers run forever
-        // The fiber scheduler manages all process switching
+        // This never returns - runs the Smalltalk interpreter forever
+        // Process scheduling is handled by Smalltalk-level primitives (85-88)
 
         while (!_shutdownRequested)
         {
-            // In actual implementation, this would be handled by fiber switching
-            // For now, just sleep to prevent busy-wait
+            // The controller loop (searchForActiveController) runs in Smalltalk
+            // It yields via Processor yield, which triggers process switching
+            // through the Semaphore primitives
             Thread.Sleep(100);
         }
     }
@@ -676,10 +650,9 @@ public class SmalltalkEventQueue
 
 ### Phase 2: Smalltalk Thread ✅ COMPLETE
 - [x] Create `SmalltalkInterpreterThread.cs`
-- [x] Implement `Run()` method (fiber conversion commented out for Phase 3)
+- [x] Implement `Run()` method
 - [x] Implement `ExecuteInitExpressions()` (extracted from Program.cs)
 - [x] Implement `ExecuteUserExpression()` (extracted from Program.cs)
-- [⏸️] Add P/Invoke for `ConvertThreadToFiber` (deferred to Phase 3 - Fiber Infrastructure)
 
 ### Phase 3: Main Thread Refactoring ✅ COMPLETE
 - [x] Refactor `Program.cs Main()` to create Smalltalk thread
@@ -711,10 +684,9 @@ public class SmalltalkEventQueue
 4. **Cancellation:** Can add "Cancel" button to stop init expression execution
 
 ### Future Benefits
-1. **Fiber Integration:** Easy to add FiberScheduler once threads are separated
-2. **Multiple Processes:** Natural fit for Smalltalk process scheduling
-3. **Controller Loop:** Can run controller event loop on Smalltalk thread
-4. **Hot Reload:** Can restart Smalltalk thread without restarting UI
+1. **Multiple Processes:** Natural fit for Smalltalk process scheduling
+2. **Controller Loop:** Can run controller event loop on Smalltalk thread
+3. **Hot Reload:** Can restart Smalltalk thread without restarting UI
 
 ---
 
@@ -818,10 +790,6 @@ public class SmalltalkEventQueue
 
 **Planning Documents:**
 - `/home/user/Smalltalk-80/docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md`
-- Sections 2.5 (Window Creation Timing) and 2.6 (Display Bridge Architecture)
-
-**Windows API:**
-- `ConvertThreadToFiber`: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-convertthreadtofiber
 
 ---
 

@@ -1,147 +1,158 @@
-# Resume Prompt: FormMenuView .form File Loading
+# Resume Prompt: MVC Controller Loop and Compiler Optimization
 
-**Session Date**: 2025-11-27
-**Branch**: `claude/fix-init-expression-order-014GHbhtroCoX3ogdkrXYFsU`
-**Status**: READY TO FIX - coldstart.json needs regeneration
+**Session Date**: 2025-11-28
+**Branch**: `claude/smalltalk-mvc-processes-013RydArs54dc78quMu5GZic`
+**Status**: BLOCKED - Compiler optimization issue discovered
 
-## Current Status
+## Current Issue
 
-**Root Cause Found and Fixed**: `WindowsFile>>openNamed:mode:` had `<primitive: 121>` which was WRONG.
+### The Problem: `thisContext` Returns BlockContext Inside `ifTrue:` Blocks
 
-### The Bug
+When `Process>>terminate` executes:
 ```smalltalk
-openNamed: aFileName mode: modeString
-    <primitive: 121>              "<-- BUG: when primitive succeeds, returns handle and skips instance var setup"
-    fileHandle _ self primOpen: aFileName mode: modeString.
-    fileName _ aFileName.         "<-- NEVER EXECUTED when primitive 121 succeeds"
-    ...
+Processor activeProcess == self
+    ifTrue:
+        [thisContext sender == nil ifFalse: [thisContext sender release].
+        thisContext removeSelf suspend]
 ```
 
-When primitive 121 succeeded:
-1. It returned the file handle integer (wrong return type - method should return `self`)
-2. The Smalltalk fallback code was skipped, so `fileName` was never set
-3. Later, `reopen` called `openNamed: fileName mode: 'r'` with nil fileName
-4. File open failed, `fileHandle` stayed nil, `size` failed
+`thisContext` returns a **BlockContext** (not MethodContext), and `removeSelf` only exists on MethodContext.
 
-### Fix Applied
-Removed `<primitive: 121>` from `openNamed:mode:`. Only `primOpen:mode:` should use the primitive:
+### Root Cause: Compiler Optimization Disabled
 
-```smalltalk
-openNamed: aFileName mode: modeString
-    "Open the file with given name and mode. Sets all instance variables."
-    fileHandle _ self primOpen: aFileName mode: modeString.
-    fileName _ aFileName.
-    position _ 0.
-    readLimit _ self size.
-    writeLimit _ self size.
-    isBinary _ false.
-    ^self!
+**File**: `Smalltalk80.Compiler/BytecodeCompiler.cs` lines 1004-1018
+
+```csharp
+/// DISABLED (2025-10-07): Blue Book Smalltalk-80 does NOT inline conditionals!
+/// Control structures like ifTrue: and ifFalse: are ordinary message sends.
+private bool TryInlineConditional(...)
+{
+    return false;  // ALWAYS disabled
+}
 ```
 
-**Action Required**: Regenerate coldstart.json to include this fix.
+**This comment is WRONG!** Blue Book Chapter 28 explicitly states:
+> "The conditional jumps are used in the compiled form of messages to booleans (e.g., `ifTrue:` and `whileFalse:`)."
+
+Blue Book compiles `ifTrue:`/`ifFalse:` to conditional jump bytecodes - NO BlockContext is created. The block body executes inline in the MethodContext. Therefore `thisContext` returns MethodContext and `removeSelf` works.
+
+### Workaround Applied (Band-aid)
+
+**File**: `VirtualMachine.MessageSending.cs` lines 254-264
+
+```csharp
+// SPECIAL CASE: BlockContext>>removeSelf forwards to home MethodContext
+if (selectorName == "removeSelf" && classOOP == _metadata.BlockContextClassOOP)
+{
+    var homeOOP = _heapManager.GetInstanceVariable(receiverOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+    return SendMessage(homeOOP, selectorOOP, args);
+}
+```
+
+This forwards `removeSelf` from BlockContext to home MethodContext at runtime. It's a workaround, not a fix.
 
 ---
 
-## Immediate Fix Required
+## Proper Fix Required
 
-**Regenerate coldstart.json** to include the `asFileStream:` method:
+### Option 1: Enable Compiler Optimization (Recommended)
 
-```bash
-# Navigate to source directory
-cd "Smalltalk-80 Source"
+Re-enable `TryInlineConditional` in `BytecodeCompiler.cs` to generate:
+- Conditional jump bytecodes (152-159, 168-175)
+- Block body compiled inline
+- No `blockCopy:` bytecode
+- No BlockContext created
 
-# Compile Smalltalk source to generate new coldstart.json
-dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
+**Benefits**:
+- Blue Book compliance
+- Better performance
+- All classic Smalltalk-80 code works correctly
 
-# Copy to interpreter bin directory
-cp ../Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json \
-   ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/coldstart.json
+### Option 2: Additional VM Workarounds (Not Recommended)
 
-# Test
-cd ../Smalltalk80.Interpreter
-dotnet run
-```
-
----
-
-## What Was Completed Previously
-
-### 1. CharacterTable Implementation
-**Phase 3**: Creates CharacterTable Array with 256 canonical Character objects
-**Phase 5**: Installs CharacterTable as CLASS VARIABLE in Character's classPool (NOT a global)
-
-**Key Files**:
-- `Smalltalk80.Interpreter/Engine/LoaderPhases/Phase3_ObjectAllocation.cs` - `CreateCharacterTable()` method
-- `Smalltalk80.Interpreter/Engine/LoaderPhases/Phase5/SystemDictionaryInstaller.cs` - `InstallCharacterTableClassVariable()` following USTable pattern
-- `Smalltalk80.Interpreter/Core/VM/CharacterRegistry.cs` - Holds Character OOPs for Phase 4 literal resolution
-
-### 2. Removed Debug Spew
-- **Primitive 60 (Array at:)**: Removed debug output in `ObjectPrimitives.cs`
-- **Primitive 62 (size)**: Removed debug output in `ObjectPrimitives.cs`
-- **Primitive 146 (DirectoryList)**: Removed debug output in `FilePrimitives.cs`
-
-### 3. Fixed Primitive 121 (FileOpen)
-**Location**: `Smalltalk80.Interpreter/Core/VM/Primitives/FilePrimitives.cs`
-
-Updated primitive to detect calling convention:
-- **2 args**: (path, mode string like "r", "w", "a")
-- **4 args**: (path, accessMode, shareMode, createMode as integers)
-
-### 4. Added WindowsFile>>asFileStream: (IN SOURCE ONLY)
-**Added to Smalltalk-80.st** at line 472:
-```smalltalk
-asFileStream: aStream
-    "Initialize aStream (typically a FileStream) to access the receiver.
-    This is called by FileStream>>on: to set up the stream."
-    aStream position: 0 size: self size! !
-```
-
-**IMPORTANT**: This method exists in source but NOT in coldstart.json. The coldstart.json must be regenerated.
+Continue adding special cases in VM for messages that assume `thisContext` returns MethodContext. This is fragile and non-compliant.
 
 ---
 
-## WindowsFile Instance Variables
-```smalltalk
-Object subclass: #WindowsFile
-    instanceVariableNames: 'fileName fileHandle fileMode'
-    classVariableNames: ''
-    poolDictionaries: 'FilePool'
-    category: 'System-Files'
-```
-- **fileName** (index 0): String path to file
-- **fileHandle** (index 1): Integer handle from primOpen (nil if not open)
-- **fileMode** (index 2): Mode string ('r', 'w', 'a')
+## What Has Been Completed
+
+### Process Primitives (85-88) ✅
+- Primitive 85: Semaphore wait
+- Primitive 86: Semaphore signal
+- Primitive 87: Process resume
+- Primitive 88: Process suspend
+
+### MVC Startup Sequence ✅
+1. `Processor hiddenBackgroundProcess` - Creates idle process at priority 1
+2. `ControlManager new` - Creates controller manager
+3. `ScheduledControllers` global installed using canonical Association from AssociationRegistry
+
+### VM Changes ✅
+- `VirtualMachine.cs` - HandleReturn logic distinguishes initial process vs forked process termination
+- `VMConstants.cs` - Added LinkedList/Link constants for process queues
+- `SmalltalkInterpreterThread.cs` - `StartControllerLoop()` and `InstallScheduledControllersGlobal()` methods
 
 ---
 
-## Error Context (From FormMenuView initialize)
+## Key Files
 
-The call chain is:
-1. **FormMenuView class >> initialize** (init expression)
-2. **Form class >> fromFileNamed: fileName** - Creates WindowsFile, calls `asFileStream`
-3. **WindowsFile >> asFileStream** - Calls `self reopen`, then `FileStream on: self`
-4. **FileStream >> on: aPage** - Calls `aPage asFileStream: self` **<-- FAILS HERE**
-5. **WindowsFile >> asFileStream:** - Method not found (not in coldstart.json)
+### C# Interpreter
+- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` - HandleReturn, process switching
+- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.MessageSending.cs` - removeSelf workaround
+- `Smalltalk80.Interpreter/SmalltalkInterpreterThread.cs` - Controller loop startup
+
+### C# Compiler (needs fix)
+- `Smalltalk80.Compiler/BytecodeCompiler.cs` - `TryInlineConditional()` disabled
+
+### Smalltalk Source
+- `Process>>terminate` (line 32612) - Uses `thisContext removeSelf`
+- `MethodContext>>removeSelf` (line 26493) - Nils receiver, returns old value
+
+---
+
+## Blue Book References
+
+### Chapter 28: Formal Specification of the Interpreter
+
+**Conditional Jump Bytecodes** [Page 595]:
+```
+152-159  Pop and Jump On False (short form)
+168-171  Pop and Jump On True (long form)
+172-175  Pop and Jump On False (long form)
+```
+
+**Line 413**:
+> "The conditional jumps are used in the compiled form of messages to booleans (e.g., `ifTrue:` and `whileFalse:`)."
 
 ---
 
 ## Test Commands
 
 ```bash
-# Build
+# Build and run
 cd Smalltalk80.Interpreter
 dotnet build
-
-# Run interpreter
 dotnet run
 
-# Run with diagnostics
-dotnet run -- --diagnostics detail
-
-# Run BlockContext test suite
+# Run BlockContext regression test (MUST PASS after any compiler changes)
 dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
 # Expected: Returns 1191 (120 tests pass)
 ```
+
+---
+
+## Verification Test
+
+To check if optimization is working, this Smalltalk code:
+```smalltalk
+testMethod
+    true ifTrue: [^thisContext class name].
+    ^nil
+```
+
+Should return:
+- **With optimization (correct)**: `'MethodContext'`
+- **Without optimization (current)**: `'BlockContext'`
 
 ---
 

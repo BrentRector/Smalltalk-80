@@ -67,6 +67,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     // (CallOutcome, CallOutcomeKind, InterpreterStatus moved to Interpreter/ExecutionState.cs)
     private SmalltalkOOP _returnValue;  // Return value from execution
     private SmalltalkOOP _initialContextOOP;  // Starting context for this execution
+    private SmalltalkOOP _initialProcessOOP;  // Starting process for this execution (to detect forked process termination)
     private bool _contextSwitchPending;  // Signal that a context switch occurred (for trampoline)
     private bool _contextSwitchedByPrimitive;  // Primitive created new context (e.g., block invocation)
 
@@ -273,6 +274,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     {
         // Save initial context - we return when we get back to this context
         _initialContextOOP = _contextManager.ActiveContext;
+
+        // Save initial process - forked processes should switch, not exit to C#
+        _initialProcessOOP = GetActiveProcess();
 
         while (true)
         {
@@ -585,15 +589,35 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Decrement context depth
         _contextManager.DecrementContextDepth();
 
-        // Check if we're returning to the initial context
-        if (senderOOP == _initialContextOOP || senderOOP == _metadata.KnownObjects.Nil)
+        // Handle nil sender - the top-level context is returning
+        // This could be initial process completion OR forked process termination
+        if (senderOOP == _metadata.KnownObjects.Nil)
         {
-            // Execution complete - return to caller
-            _returnValue = returnValue;
-            _contextManager.SetActiveContext(_initialContextOOP);
+            // Check if we're in the initial process or a forked process
+            SmalltalkOOP currentProcess = GetActiveProcess();
+
+            if (currentProcess == _initialProcessOOP)
+            {
+                // Initial process completed - return to caller
+                _returnValue = returnValue;
+                _contextManager.SetActiveContext(_metadata.KnownObjects.Nil);
+                _contextManager.AddContextToPool(returningContext);
+                return InterpreterStatus.Return;
+            }
+
+            // Forked process terminated - switch to next runnable process
             _contextManager.AddContextToPool(returningContext);
-            // if (_verboseDebugMode)
-            //     Console.WriteLine($"[HandleReturn] Execution complete, returning to initial context");
+
+            if (SwitchToNextRunnableProcess(currentProcess))
+            {
+                // Successfully switched - continue execution in new process
+                return InterpreterStatus.Continue;
+            }
+
+            // No runnable process found (shouldn't happen if background process exists)
+            // Fall through to return - system idle
+            Console.WriteLine("[HandleReturn] WARNING: No runnable processes, returning to C#");
+            _returnValue = returnValue;
             return InterpreterStatus.Return;
         }
 
@@ -2151,14 +2175,159 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     {
         int size = _heapManager.GetIndexedSize(symbolOOP);
         var chars = new char[size];
-        
+
         for (int i = 0; i < size; i++)
         {
             byte b = _heapManager.GetIndexedByte(symbolOOP, i);
             chars[i] = (char)b;
         }
-        
+
         return new string(chars);
     }
 
+    #region Process Scheduling Support
+
+    /// <summary>
+    /// Gets the currently active process OOP from ProcessorScheduler.
+    /// </summary>
+    private SmalltalkOOP GetActiveProcess()
+    {
+        SmalltalkOOP schedulerOOP = _metadata.ProcessorScheduler;
+        if (schedulerOOP == _metadata.KnownObjects.Nil)
+            return _metadata.KnownObjects.Nil;
+
+        return _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+    }
+
+    /// <summary>
+    /// Switches execution to the next runnable process when the current process terminates.
+    /// Used by HandleReturn when a forked process completes its block.
+    /// Returns true if successfully switched, false if no runnable processes found.
+    /// </summary>
+    private bool SwitchToNextRunnableProcess(SmalltalkOOP terminatingProcess)
+    {
+        SmalltalkOOP schedulerOOP = _metadata.ProcessorScheduler;
+        if (schedulerOOP == _metadata.KnownObjects.Nil)
+            return false;
+
+        // Find highest priority runnable process
+        SmalltalkOOP nextProcess = FindHighestPriorityRunnableProcess(schedulerOOP);
+        if (nextProcess == _metadata.KnownObjects.Nil)
+            return false;
+
+        // Remove the process from its priority queue (it's about to become active)
+        SmalltalkOOP myListOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX);
+        if (myListOOP != _metadata.KnownObjects.Nil)
+        {
+            RemoveProcessFromList(nextProcess, myListOOP);
+            _heapManager.SetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
+        }
+
+        // Get the suspended context from the next process
+        SmalltalkOOP nextContext = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+        if (nextContext == _metadata.KnownObjects.Nil)
+            return false;
+
+        // Check if this is an unactivated BlockContext (PC is nil)
+        // This happens when resuming a newly created process via [block] newProcess
+        SmalltalkOOP nextContextPC = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_PC_INDEX);
+        if (nextContextPC == _metadata.KnownObjects.Nil)
+        {
+            // Activate the block context - set PC from startPC
+            SmalltalkOOP startPC = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+            if (startPC == _metadata.KnownObjects.Nil || !startPC.IsSmallInteger)
+                return false;
+
+            _heapManager.SetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_PC_INDEX, startPC);
+            _heapManager.SetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SmalltalkOOP.FromSmallInteger(0));
+            _heapManager.SetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, _metadata.KnownObjects.Nil);
+        }
+
+        // Update Processor's activeProcess
+        _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, nextProcess);
+
+        // Switch to the new context
+        _contextManager.SetActiveContext(nextContext);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Finds the highest priority process that is runnable (on a quiescentProcessList).
+    /// Searches from priority 8 down to priority 1.
+    /// </summary>
+    private SmalltalkOOP FindHighestPriorityRunnableProcess(SmalltalkOOP schedulerOOP)
+    {
+        SmalltalkOOP processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        if (processListsOOP == _metadata.KnownObjects.Nil)
+            return _metadata.KnownObjects.Nil;
+
+        // Search from highest priority (8) down to lowest (1)
+        // Array indices are 0-7 for priorities 1-8
+        for (int priority = 8; priority >= 1; priority--)
+        {
+            int index = priority - 1;
+            SmalltalkOOP priorityListOOP = _heapManager.GetIndexedOOP(processListsOOP, index);
+            if (priorityListOOP == _metadata.KnownObjects.Nil)
+                continue;
+
+            // Check if list has any processes (firstLink != nil)
+            SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+            if (firstLinkOOP != _metadata.KnownObjects.Nil)
+            {
+                return firstLinkOOP;
+            }
+        }
+
+        return _metadata.KnownObjects.Nil;
+    }
+
+    /// <summary>
+    /// Removes a process from a linked list (LinkedList structure).
+    /// </summary>
+    private void RemoveProcessFromList(SmalltalkOOP processOOP, SmalltalkOOP listOOP)
+    {
+        SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(listOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+        SmalltalkOOP lastLinkOOP = _heapManager.GetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
+
+        if (processOOP == firstLinkOOP)
+        {
+            // Process is first in list
+            SmalltalkOOP nextLinkOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX);
+            _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, nextLinkOOP);
+
+            if (processOOP == lastLinkOOP)
+            {
+                // Was also the last (only process in list)
+                _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, _metadata.KnownObjects.Nil);
+            }
+        }
+        else
+        {
+            // Process is not first - find predecessor
+            SmalltalkOOP prevLinkOOP = firstLinkOOP;
+            while (prevLinkOOP != _metadata.KnownObjects.Nil)
+            {
+                SmalltalkOOP nextLinkOOP = _heapManager.GetInstanceVariable(prevLinkOOP, VMConstants.LINK_NEXTLINK_INDEX);
+                if (nextLinkOOP == processOOP)
+                {
+                    // Found predecessor - relink
+                    SmalltalkOOP afterRemoved = _heapManager.GetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX);
+                    _heapManager.SetInstanceVariable(prevLinkOOP, VMConstants.LINK_NEXTLINK_INDEX, afterRemoved);
+
+                    if (processOOP == lastLinkOOP)
+                    {
+                        _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, prevLinkOOP);
+                    }
+                    break;
+                }
+                prevLinkOOP = nextLinkOOP;
+            }
+        }
+
+        // Clear the removed process's next link
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
+    }
+
+    #endregion
 }
