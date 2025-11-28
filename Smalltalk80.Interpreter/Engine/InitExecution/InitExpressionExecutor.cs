@@ -350,70 +350,14 @@ public class InitExpressionExecutor
     {
         try
         {
-            // Get process lists array from scheduler
-            SmalltalkOOP processListsArrayOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
-            int numPriorities = _heapManager.GetIndexedSize(processListsArrayOOP);
+            // Check 1: Processes in quiescentProcessLists (runnable processes)
+            if (CheckProcessListsForContext(schedulerOOP, methodContextOOP))
+                return true;
 
-            // Check each priority level
-            for (int priorityIndex = 0; priorityIndex < numPriorities; priorityIndex++)
-            {
-                SmalltalkOOP processListOOP = _heapManager.GetIndexedOOP(processListsArrayOOP, priorityIndex);
-                if (processListOOP == _metadata.KnownObjects.Nil)
-                    continue;
-
-                // Get first process in list
-                SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(processListOOP, 0);
-                if (firstLinkOOP == _metadata.KnownObjects.Nil)
-                    continue;
-
-                // Walk linked list of processes
-                SmalltalkOOP currentProcessOOP = firstLinkOOP;
-                int processCount = 0;
-                while (currentProcessOOP != _metadata.KnownObjects.Nil && processCount < 100)
-                {
-                    processCount++;
-                    var procSuspendedCtx = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-
-                    // Check if suspended context is our MethodContext
-                    if (procSuspendedCtx == methodContextOOP)
-                        return true;
-
-                    // Check if it's a BlockContext whose home or sender chain reaches our MethodContext
-                    if (procSuspendedCtx != _metadata.KnownObjects.Nil && !procSuspendedCtx.IsSmallInteger)
-                    {
-                        var ctxClass = _heapManager.GetClassOOP(procSuspendedCtx);
-                        var ctxClassName = _heapManager.GetClassName(ctxClass);
-
-                        if (ctxClassName.Contains("BlockContext"))
-                        {
-                            // Check home pointer
-                            var homeCtx = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                            if (homeCtx == methodContextOOP)
-                                return true;
-
-                            // Check home's sender chain
-                            if (homeCtx != _metadata.KnownObjects.Nil && !homeCtx.IsSmallInteger)
-                            {
-                                if (IsSenderChainReaches(homeCtx, methodContextOOP))
-                                    return true;
-                            }
-
-                            // Check BlockContext's own sender chain
-                            if (IsSenderChainReaches(procSuspendedCtx, methodContextOOP))
-                                return true;
-                        }
-                        else if (ctxClassName.Contains("MethodContext"))
-                        {
-                            // Check MethodContext's sender chain
-                            if (IsSenderChainReaches(procSuspendedCtx, methodContextOOP))
-                                return true;
-                        }
-                    }
-
-                    // Move to next process
-                    currentProcessOOP = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_NEXTLINK_INDEX);
-                }
-            }
+            // Check 2: Processes blocked on known system semaphores
+            // This handles cases like Delay TimerProcess blocked on TimingSemaphore
+            if (CheckBlockedProcessesForContext(methodContextOOP))
+                return true;
 
             return false;
         }
@@ -422,6 +366,188 @@ public class InitExpressionExecutor
             // If any error occurs during checking, assume not kept alive by forked process
             return false;
         }
+    }
+
+    /// <summary>
+    /// Checks if any process in the quiescentProcessLists keeps the context alive.
+    /// </summary>
+    private bool CheckProcessListsForContext(SmalltalkOOP schedulerOOP, SmalltalkOOP methodContextOOP)
+    {
+        // Get process lists array from scheduler
+        SmalltalkOOP processListsArrayOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        int numPriorities = _heapManager.GetIndexedSize(processListsArrayOOP);
+
+        // Check each priority level
+        for (int priorityIndex = 0; priorityIndex < numPriorities; priorityIndex++)
+        {
+            SmalltalkOOP processListOOP = _heapManager.GetIndexedOOP(processListsArrayOOP, priorityIndex);
+            if (processListOOP == _metadata.KnownObjects.Nil)
+                continue;
+
+            if (CheckLinkedListForContext(processListOOP, methodContextOOP))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Checks processes blocked on known system semaphores.
+    /// </summary>
+    private bool CheckBlockedProcessesForContext(SmalltalkOOP methodContextOOP)
+    {
+        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
+
+        // Check Delay class's TimingSemaphore (used by Delay initialize)
+        var delayClassOOP = LookupGlobal(smalltalkOOP, "Delay");
+        if (delayClassOOP != _metadata.KnownObjects.Nil)
+        {
+            var timingSemaphoreOOP = GetClassVariable(delayClassOOP, "TimingSemaphore");
+            if (timingSemaphoreOOP != _metadata.KnownObjects.Nil)
+            {
+                if (CheckLinkedListForContext(timingSemaphoreOOP, methodContextOOP))
+                    return true;
+            }
+
+            var accessProtectOOP = GetClassVariable(delayClassOOP, "AccessProtect");
+            if (accessProtectOOP != _metadata.KnownObjects.Nil)
+            {
+                if (CheckLinkedListForContext(accessProtectOOP, methodContextOOP))
+                    return true;
+            }
+        }
+
+        // Check InputSensor class's EventSemaphore
+        var inputSensorClassOOP = LookupGlobal(smalltalkOOP, "InputSensor");
+        if (inputSensorClassOOP != _metadata.KnownObjects.Nil)
+        {
+            var eventSemaphoreOOP = GetClassVariable(inputSensorClassOOP, "EventSemaphore");
+            if (eventSemaphoreOOP != _metadata.KnownObjects.Nil)
+            {
+                if (CheckLinkedListForContext(eventSemaphoreOOP, methodContextOOP))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Gets a class variable value from a class's classPool.
+    /// </summary>
+    private SmalltalkOOP GetClassVariable(SmalltalkOOP classOOP, string variableName)
+    {
+        try
+        {
+            // Class instance variable layout: superclass, methodDict, format, subclasses, instanceVariables, classPool, ...
+            // classPool is at index 5 (0-based)
+            const int CLASS_POOL_INDEX = 5;
+            var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, CLASS_POOL_INDEX);
+
+            if (classPoolOOP == _metadata.KnownObjects.Nil)
+                return _metadata.KnownObjects.Nil;
+
+            // classPool is a Dictionary (Set of Associations)
+            int poolSize = _heapManager.GetIndexedSize(classPoolOOP);
+            var symbolOOP = FindSymbol(variableName);
+
+            if (symbolOOP == _metadata.KnownObjects.Nil)
+                return _metadata.KnownObjects.Nil;
+
+            for (int i = 0; i < poolSize; i++)
+            {
+                var assocOOP = _heapManager.GetIndexedOOP(classPoolOOP, i);
+                if (assocOOP == _heapManager.GetNil())
+                    continue;
+
+                // Association has key at instance variable 0
+                var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
+                if (keyOOP == symbolOOP)
+                {
+                    // Return value at instance variable 1
+                    return _heapManager.GetInstanceVariable(assocOOP, 1);
+                }
+            }
+
+            return _metadata.KnownObjects.Nil;
+        }
+        catch
+        {
+            return _metadata.KnownObjects.Nil;
+        }
+    }
+
+    /// <summary>
+    /// Checks if any process in a linked list keeps the context alive.
+    /// Works for both priority lists and semaphore waiting lists.
+    /// </summary>
+    private bool CheckLinkedListForContext(SmalltalkOOP listOOP, SmalltalkOOP methodContextOOP)
+    {
+        // LinkedList/Semaphore has firstLink at index 0
+        SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(listOOP, 0);
+        if (firstLinkOOP == _metadata.KnownObjects.Nil)
+            return false;
+
+        // Walk linked list of processes
+        SmalltalkOOP currentProcessOOP = firstLinkOOP;
+        int processCount = 0;
+        while (currentProcessOOP != _metadata.KnownObjects.Nil && processCount < 100)
+        {
+            processCount++;
+            if (ProcessKeepsContextAlive(currentProcessOOP, methodContextOOP))
+                return true;
+
+            // Move to next process
+            currentProcessOOP = _heapManager.GetInstanceVariable(currentProcessOOP, VMConstants.PROCESS_NEXTLINK_INDEX);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Checks if a process's suspended context chain reaches the target context.
+    /// </summary>
+    private bool ProcessKeepsContextAlive(SmalltalkOOP processOOP, SmalltalkOOP methodContextOOP)
+    {
+        var procSuspendedCtx = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+
+        // Check if suspended context is our MethodContext
+        if (procSuspendedCtx == methodContextOOP)
+            return true;
+
+        // Check if it's a BlockContext whose home or sender chain reaches our MethodContext
+        if (procSuspendedCtx != _metadata.KnownObjects.Nil && !procSuspendedCtx.IsSmallInteger)
+        {
+            var ctxClass = _heapManager.GetClassOOP(procSuspendedCtx);
+            var ctxClassName = _heapManager.GetClassName(ctxClass);
+
+            if (ctxClassName.Contains("BlockContext"))
+            {
+                // Check home pointer
+                var homeCtx = _heapManager.GetInstanceVariable(procSuspendedCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                if (homeCtx == methodContextOOP)
+                    return true;
+
+                // Check home's sender chain
+                if (homeCtx != _metadata.KnownObjects.Nil && !homeCtx.IsSmallInteger)
+                {
+                    if (IsSenderChainReaches(homeCtx, methodContextOOP))
+                        return true;
+                }
+
+                // Check BlockContext's own sender chain
+                if (IsSenderChainReaches(procSuspendedCtx, methodContextOOP))
+                    return true;
+            }
+            else if (ctxClassName.Contains("MethodContext"))
+            {
+                // Check MethodContext's sender chain
+                if (IsSenderChainReaches(procSuspendedCtx, methodContextOOP))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
