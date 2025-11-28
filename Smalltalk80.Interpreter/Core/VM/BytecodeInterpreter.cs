@@ -1182,6 +1182,96 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             }
         }
 
+        // Fast path for at: (index 0) - indexed access
+        // NOTE: Skip ByteIndexed (Strings/Symbols) - they need to return Character objects, not SmallIntegers
+        if (selectorIndex == 0 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
+        {
+            var format = heapManager.GetObjectFormat(receiverOOP);
+            // Only apply fast path to non-ByteIndexed objects
+            if (format != ObjectFormat.ByteIndexed)
+            {
+                int index = args[0].AsSmallInteger();
+                int size = heapManager.GetIndexedSize(receiverOOP);
+                if (index >= 1 && index <= size)
+                {
+                    SmalltalkOOP value;
+                    if (format == ObjectFormat.WordIndexed)
+                    {
+                        ushort w = heapManager.GetIndexedWord(receiverOOP, index - 1);
+                        value = SmalltalkOOP.FromSmallInteger(w);
+                    }
+                    else
+                    {
+                        value = heapManager.GetIndexedOOP(receiverOOP, index - 1);
+                    }
+                    context.Push(value);
+                    return true;
+                }
+                // Out of bounds - fall through to message send for error handling
+            }
+            // ByteIndexed (String/Symbol) - fall through to message send to get Character objects
+        }
+
+        // Fast path for at:put: (index 1) - indexed store
+        // NOTE: Skip ByteIndexed (Strings/Symbols) - they expect Character arguments, not SmallIntegers
+        if (selectorIndex == 1 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
+        {
+            var format = heapManager.GetObjectFormat(receiverOOP);
+            // Only apply fast path to non-ByteIndexed objects
+            if (format != ObjectFormat.ByteIndexed)
+            {
+                int index = args[0].AsSmallInteger();
+                var value = args[1];
+                int size = heapManager.GetIndexedSize(receiverOOP);
+                if (index >= 1 && index <= size)
+                {
+                    bool success = true;
+                    if (format == ObjectFormat.WordIndexed)
+                    {
+                        if (value.IsSmallInteger)
+                        {
+                            int wordValue = value.AsSmallInteger();
+                            if (wordValue >= 0 && wordValue <= 65535)
+                                heapManager.SetIndexedWord(receiverOOP, index - 1, (ushort)wordValue);
+                            else
+                                success = false;
+                        }
+                        else
+                            success = false;
+                    }
+                    else
+                    {
+                        heapManager.SetIndexedOOP(receiverOOP, index - 1, value);
+                    }
+                    if (success)
+                    {
+                        context.Push(value);
+                        return true;
+                    }
+                }
+                // Out of bounds or type error - fall through to message send
+            }
+            // ByteIndexed (String/Symbol) - fall through to message send to handle Character conversion
+        }
+
+        // NOTE: No fast path for size (index 2) - many classes override size
+        // (Dictionary returns tally, Set returns tally, OrderedCollection uses indices, etc.)
+
+        // Fast path for value/value: on BlockContext
+        if (selectorIndex == 9 || selectorIndex == 10) // value, value:
+        {
+            // Check if receiver is a BlockContext (single OOP comparison)
+            if (heapManager.GetClassOOP(receiverOOP) == metadata.BlockContextClassOOP)
+            {
+                // Fast path: activate block directly, skip message dispatch
+                if (context.ActivateBlock(receiverOOP, args))
+                {
+                    return false; // Context switched
+                }
+                // Arg count mismatch - fall through to message send for error handling
+            }
+        }
+
         // Fall back to message send using cached selector OOP
         return context.SendMessageAndContinue(receiverOOP, selectorOOP, args);
     }

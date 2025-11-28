@@ -148,4 +148,13 @@ internal interface IBytecodeContext : IObjectMetadataAccessor, IStackOperations,
 
     /// <summary>Adds an Association to a class's classPool Dictionary if it doesn't already exist.</summary>
     void AddAssociationToClassPoolIfNeeded(SmalltalkOOP classOOP, SmalltalkOOP associationOOP);
+
+    /// <summary>
+    /// Activates a BlockContext for execution (fast path for value/value:).
+    /// Sets up the block's PC, stackp, caller and switches to it.
+    /// </summary>
+    /// <param name="blockContextOOP">The BlockContext to activate.</param>
+    /// <param name="args">Arguments to pass to the block.</param>
+    /// <returns>True if activation succeeded, false if argument count mismatch.</returns>
+    bool ActivateBlock(SmalltalkOOP blockContextOOP, SmalltalkOOP[] args);
 }

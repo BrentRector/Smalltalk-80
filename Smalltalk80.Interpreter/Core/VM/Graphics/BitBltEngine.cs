@@ -73,9 +73,11 @@ public static class BitBltEngine
         int clippedHeight = clipBottom - clipTop;
 
         // Calculate strides (bytes per row)
-        int destStride = (destWidth + 7) / 8;
-        int sourceStride = (sourceWidth + 7) / 8;
-        int halftoneStride = halftoneWidth > 0 ? (halftoneWidth + 7) / 8 : 0;
+        // Smalltalk-80 Forms use 16-bit word alignment: raster = (width + 15) / 16 words
+        // Stride in bytes = raster * 2
+        int destStride = ((destWidth + 15) / 16) * 2;
+        int sourceStride = ((sourceWidth + 15) / 16) * 2;
+        int halftoneStride = halftoneWidth > 0 ? ((halftoneWidth + 15) / 16) * 2 : 0;
 
         // Detect nil/empty source FIRST (fill operation)
         bool isNilSource = (sourceWidth == 0 || sourceHeight == 0 || sourceBits.Length == 0);

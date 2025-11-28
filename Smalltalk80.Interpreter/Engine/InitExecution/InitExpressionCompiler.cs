@@ -255,7 +255,8 @@ public class InitExpressionCompiler
                     string keySymbolText = _bundle.Symbols[literalValue.Association.KeyIndex];
                     var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
                     var keySymbolOOP = FindSymbol(keySymbolText);
-                    return FindAssociation(smalltalkOOP, keySymbolOOP);
+                    var assocOOP = FindAssociation(smalltalkOOP, keySymbolOOP);
+                    return assocOOP;
                 }
                 throw new InvalidOperationException("Association literal missing Association data");
 
@@ -323,6 +324,7 @@ public class InitExpressionCompiler
     private SmalltalkOOP FindAssociation(SmalltalkOOP systemDictOOP, SmalltalkOOP keySymbolOOP)
     {
         int size = _heapManager.GetIndexedSize(systemDictOOP);
+        string targetSymbol = ReadSymbolString(keySymbolOOP);
 
         for (int i = 0; i < size; i++)
         {
@@ -331,6 +333,17 @@ public class InitExpressionCompiler
                 continue;
 
             var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+
+            // Compare by string to handle symbol identity issues
+            if (keyOOP != _heapManager.GetNil() && !keyOOP.IsSmallInteger)
+            {
+                string keyString = ReadSymbolString(keyOOP);
+                if (keyString == targetSymbol)
+                {
+                    return assocOOP;
+                }
+            }
+
             if (keyOOP == keySymbolOOP)
             {
                 return assocOOP;

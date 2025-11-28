@@ -1562,7 +1562,8 @@ namespace Smalltalk80.Compiler
             else if (literal.stringConst() != null)
             {
                 var text = literal.stringConst().GetText();
-                var str = text.Substring(1, text.Length - 2); // Remove quotes
+                // Remove surrounding quotes and unescape doubled quotes ('' -> ')
+                var str = text.Substring(1, text.Length - 2).Replace("''", "'");
                 emitter.PushLiteralConstant(str);
             }
             else if (literal.symbolConst() != null)

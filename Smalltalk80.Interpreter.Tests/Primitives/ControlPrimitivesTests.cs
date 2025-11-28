@@ -898,12 +898,12 @@ public class ControlPrimitivesTests : PrimitiveTestBase
 
     #endregion
 
-    #region Primitive 84: PerformWith - 4 tests
+    #region Primitive 84: PerformWithArguments - 4 tests
 
     [Fact]
-    public void PerformWith_ValidSelectorAndArg_SendsMessage()
+    public void PerformWithArguments_ValidSelectorAndArg_SendsMessage()
     {
-        var primitive = new ControlPrimitives.PerformWith();
+        var primitive = new ControlPrimitives.PerformWithArguments();
         var mockHeap = CreateMockHeapManager();
         var mockSender = new Mock<IPrimitiveMessageSender>();
 
@@ -927,9 +927,9 @@ public class ControlPrimitivesTests : PrimitiveTestBase
     }
 
     [Fact]
-    public void PerformWith_SmallIntegerSelector_Fails()
+    public void PerformWithArguments_SmallIntegerSelector_Fails()
     {
-        var primitive = new ControlPrimitives.PerformWith();
+        var primitive = new ControlPrimitives.PerformWithArguments();
         var heapManager = CreateMockHeapManager().Object;
 
         var context = CreateContext(
@@ -943,9 +943,9 @@ public class ControlPrimitivesTests : PrimitiveTestBase
     }
 
     [Fact]
-    public void PerformWith_WrongArgumentCount_Fails()
+    public void PerformWithArguments_WrongArgumentCount_Fails()
     {
-        var primitive = new ControlPrimitives.PerformWith();
+        var primitive = new ControlPrimitives.PerformWithArguments();
         var heapManager = CreateMockHeapManager().Object;
 
         var context = CreateContext(
@@ -959,9 +959,9 @@ public class ControlPrimitivesTests : PrimitiveTestBase
     }
 
     [Fact]
-    public void PerformWith_NoMessageSender_Fails()
+    public void PerformWithArguments_NoMessageSender_Fails()
     {
-        var primitive = new ControlPrimitives.PerformWith();
+        var primitive = new ControlPrimitives.PerformWithArguments();
         var heapManager = CreateMockHeapManager().Object;
 
         var context = CreateContext(

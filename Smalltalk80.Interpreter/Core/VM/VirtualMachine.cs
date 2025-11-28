@@ -72,6 +72,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     // Non-local return state is now managed by _nlrHandler
 
+    // Cached selector OOPs for fast-path conditional dispatch
+    private SmalltalkOOP _ifTrueSelectorOOP;
+    private SmalltalkOOP _ifFalseSelectorOOP;
+    private SmalltalkOOP _ifTrueIfFalseSelectorOOP;
+    private SmalltalkOOP _ifFalseIfTrueSelectorOOP;
+    private SmalltalkOOP _whileTrueSelectorOOP;
+    private SmalltalkOOP _whileFalseSelectorOOP;
+    private bool _conditionalSelectorsInitialized;
 
     // Blue Book architectural constants are defined in VMConstants.cs
     // All context field indices are now static constants shared across the VM
@@ -171,6 +179,15 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _bytecodeInterpreter.InitializeSelectorCaches(
             _selectorCache.ArithmeticSelectors!,
             _selectorCache.SpecialSelectors!);
+
+        // Initialize conditional selector OOPs for fast-path dispatch
+        _ifTrueSelectorOOP = _selectorCache.LookupSelector("ifTrue:");
+        _ifFalseSelectorOOP = _selectorCache.LookupSelector("ifFalse:");
+        _ifTrueIfFalseSelectorOOP = _selectorCache.LookupSelector("ifTrue:ifFalse:");
+        _ifFalseIfTrueSelectorOOP = _selectorCache.LookupSelector("ifFalse:ifTrue:");
+        _whileTrueSelectorOOP = _selectorCache.LookupSelector("whileTrue:");
+        _whileFalseSelectorOOP = _selectorCache.LookupSelector("whileFalse:");
+        _conditionalSelectorsInitialized = true;
     }
 
     /// <summary>
@@ -516,22 +533,40 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Normal return (not NLR)
         senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
 
-        // if (_verboseDebugMode)
-        // {
-        //     Console.WriteLine($"[HandleReturn] Normal return from {_contextManager.ActiveContext} to {senderOOP}");
-        //     Console.WriteLine($"  Return value: {returnValue} (SmallInt={returnValue.IsSmallInteger})");
-        // }
+        // Emit MethodExitEvent for profiling/diagnostics
+        if (_diagnostics?.IsEnabled(DiagnosticEventTypes.MethodExit) == true)
+        {
+            // Get method info from the returning context
+            var returningMethodOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, VMConstants.CONTEXT_METHOD_INDEX);
+            string? methodLocalId = GetLocalId(returningMethodOOP);
 
-        // DIAGNOSTIC: Track return values from hash/stringhash methods (disabled for quiet mode)
-        // int methodIndex2 = VMConstants.CONTEXT_METHOD_INDEX;
-        // var returningMethodOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, methodIndex2);
-        // string? methodLocalId = GetLocalId(returningMethodOOP);
-        // if (methodLocalId != null && (methodLocalId.Contains(">>hash") || methodLocalId.Contains(">>stringhash")))
-        // {
-        //     var className = returnValue.IsSmallInteger ? "SmallInteger" : GetClassName(GetClass(returnValue));
-        //     Console.WriteLine($"\n[RETURN from {methodLocalId}] value={returnValue}, class={className}, isSmallInt={returnValue.IsSmallInteger}");
-        // }
+            // Parse "ClassName>>selector" format
+            string className = "unknown";
+            string selector = "unknown";
+            if (methodLocalId != null)
+            {
+                int separatorIndex = methodLocalId.IndexOf(">>");
+                if (separatorIndex > 0)
+                {
+                    className = methodLocalId[..separatorIndex];
+                    selector = methodLocalId[(separatorIndex + 2)..];
+                }
+                else
+                {
+                    selector = methodLocalId;
+                }
+            }
 
+            _diagnostics.Emit(new MethodExitEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                InstructionCount = _tracer.InstructionCount,
+                Selector = selector,
+                ReceiverClass = className,
+                ReturnValue = returnValue,
+                CallDepth = _tracer.SelectorTraceDepth
+            });
+        }
 
         // Selector trace: log method return
         if (_tracer.SelectorTraceEnabled && _tracer.HasSelectorTraceEntries)
@@ -957,8 +992,96 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     // IMessageSender implementation
     bool IMessageSender.SendMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
     {
+        // Fast path for conditional dispatch on True/False
+        if (_conditionalSelectorsInitialized)
+        {
+            var trueOOP = _metadata.KnownObjects.True;
+            var falseOOP = _metadata.KnownObjects.False;
+
+            // ifTrue: - 1 arg
+            if (selectorOOP == _ifTrueSelectorOOP && args.Length == 1)
+            {
+                if (receiverOOP == trueOOP)
+                {
+                    // True>>ifTrue: aBlock → aBlock value
+                    return ActivateBlockForConditional(args[0]);
+                }
+                else if (receiverOOP == falseOOP)
+                {
+                    // False>>ifTrue: aBlock → nil
+                    _stackManager.Push(_metadata.KnownObjects.Nil);
+                    return true;
+                }
+            }
+            // ifFalse: - 1 arg
+            else if (selectorOOP == _ifFalseSelectorOOP && args.Length == 1)
+            {
+                if (receiverOOP == trueOOP)
+                {
+                    // True>>ifFalse: aBlock → nil
+                    _stackManager.Push(_metadata.KnownObjects.Nil);
+                    return true;
+                }
+                else if (receiverOOP == falseOOP)
+                {
+                    // False>>ifFalse: aBlock → aBlock value
+                    return ActivateBlockForConditional(args[0]);
+                }
+            }
+            // ifTrue:ifFalse: - 2 args
+            else if (selectorOOP == _ifTrueIfFalseSelectorOOP && args.Length == 2)
+            {
+                if (receiverOOP == trueOOP)
+                {
+                    // True>>ifTrue:ifFalse: → trueBlock value
+                    return ActivateBlockForConditional(args[0]);
+                }
+                else if (receiverOOP == falseOOP)
+                {
+                    // False>>ifTrue:ifFalse: → falseBlock value
+                    return ActivateBlockForConditional(args[1]);
+                }
+            }
+            // ifFalse:ifTrue: - 2 args
+            else if (selectorOOP == _ifFalseIfTrueSelectorOOP && args.Length == 2)
+            {
+                if (receiverOOP == trueOOP)
+                {
+                    // True>>ifFalse:ifTrue: → trueBlock value
+                    return ActivateBlockForConditional(args[1]);
+                }
+                else if (receiverOOP == falseOOP)
+                {
+                    // False>>ifFalse:ifTrue: → falseBlock value
+                    return ActivateBlockForConditional(args[0]);
+                }
+            }
+        }
+
         var outcome = SendMessage(receiverOOP, selectorOOP, args);
         return ConsumeCallOutcome(outcome);
+    }
+
+    /// <summary>
+    /// Activates a block for conditional dispatch (ifTrue:/ifFalse: fast path).
+    /// Returns false if block was activated (context switch), true otherwise.
+    /// </summary>
+    private bool ActivateBlockForConditional(SmalltalkOOP blockOOP)
+    {
+        // Check if it's actually a BlockContext
+        var blockClassOOP = _heapManager.GetClassOOP(blockOOP);
+        if (blockClassOOP == _metadata.BlockContextClassOOP)
+        {
+            // Use the existing ActivateBlock implementation
+            if (((IBytecodeContext)this).ActivateBlock(blockOOP, []))
+            {
+                return false; // Context switched
+            }
+        }
+        // Not a BlockContext or activation failed - push nil and continue
+        // (This handles edge cases like nil blocks)
+        _stackManager.Push(_metadata.KnownObjects.Nil);
+        return true;
     }
 
     bool IMessageSender.SendSuperMessageAndContinue(SmalltalkOOP receiverOOP, SmalltalkOOP selectorOOP, SmalltalkOOP[] args)
@@ -991,6 +1114,51 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     void IBytecodeContext.AddAssociationToClassPoolIfNeeded(SmalltalkOOP classOOP, SmalltalkOOP associationOOP)
         => AddAssociationToClassPoolIfNeeded(classOOP, associationOOP);
+
+    bool IBytecodeContext.ActivateBlock(SmalltalkOOP blockContextOOP, SmalltalkOOP[] args)
+    {
+        // Get block's expected argument count
+        var blockArgCountOOP = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
+        if (!blockArgCountOOP.IsSmallInteger) return false;
+
+        int blockArgCount = blockArgCountOOP.AsSmallInteger();
+
+        // Verify argument count matches
+        if (args.Length != blockArgCount) return false;
+
+        // Get argStartIndex from BlockContext
+        var argStartIndexOOP = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX);
+        int argStartIndex = argStartIndexOOP.AsSmallInteger();
+
+        // Get home MethodContext
+        var homeContext = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+
+        // Store arguments in home MethodContext temp frame
+        for (int i = 0; i < args.Length; i++)
+        {
+            _heapManager.SetIndexedOOP(homeContext, argStartIndex + i, args[i]);
+        }
+
+        // Get initialIP from blockContext
+        var initialIP = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+
+        // Set PC to initialIP
+        _heapManager.SetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_PC_INDEX, initialIP);
+
+        // Set stack pointer to argument count
+        _heapManager.SetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_STACKP_INDEX,
+            SmalltalkOOP.FromSmallInteger(args.Length));
+
+        // Set caller to current active context
+        _heapManager.SetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_CALLER_INDEX,
+            _contextManager.ActiveContext);
+
+        // Switch to the BlockContext
+        _contextManager.SetActiveContext(blockContextOOP);
+        _contextSwitchPending = true;
+
+        return true;
+    }
 
     /// <summary>
     /// Pushes a value onto the operand stack.

@@ -24,6 +24,14 @@ internal class MessageDispatcher(
 
         while (currentClassOOP != metadata.KnownObjects.Nil && depth < maxDepth)
         {
+            // Validate the class OOP before trying to get its name
+            if (!heapManager.IsValidOOP(currentClassOOP))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid class OOP {currentClassOOP.RawValue} encountered at depth {depth} during lookup of '{selectorName}' " +
+                    $"(starting from class OOP {classOOP.RawValue})");
+            }
+
             string currentClassName = helpers.GetClassName(currentClassOOP);
 
             // Get the method dictionary from the class
@@ -90,6 +98,15 @@ internal class MessageDispatcher(
 
             // Not found, try superclass
             var nextSuperclassOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
+
+            // Validate superclass OOP before following it
+            if (nextSuperclassOOP != metadata.KnownObjects.Nil && !heapManager.IsValidOOP(nextSuperclassOOP))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid superclass OOP {nextSuperclassOOP.RawValue} found in class {currentClassName} (OOP {currentClassOOP.RawValue}) " +
+                    $"at depth {depth} during lookup of '{selectorName}'");
+            }
+
             currentClassOOP = nextSuperclassOOP;
             depth++;
         }

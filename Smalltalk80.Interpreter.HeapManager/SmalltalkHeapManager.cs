@@ -99,11 +99,12 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         // Get ObjectTable index
         int tableIndex = _tableManager.AllocateObjectTableIndex();
 
-        // CRITICAL: Initialize all OOP slots to nil (Blue Book requirement)
+        // CRITICAL: Initialize ALL OOP slots to nil (Blue Book requirement)
+        // This includes slot 0 (class pointer) which will be set later.
         // Skip initialization for the first allocation (Nil itself)
         if (tableIndex > 0 && managedStorage is SmalltalkOOP[] oopArray)
         {
-            for (int i = 1; i < oopArray.Length; i++) // Skip slot 0 (class pointer)
+            for (int i = 0; i < oopArray.Length; i++)
             {
                 oopArray[i] = _nilOOP;
             }
