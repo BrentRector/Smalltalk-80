@@ -439,9 +439,10 @@ public class InitExpressionExecutor
     {
         try
         {
-            // Class instance variable layout: superclass, methodDict, format, subclasses, instanceVariables, classPool, ...
-            // classPool is at index 5 (0-based)
-            const int CLASS_POOL_INDEX = 5;
+            // Class instance variable layout:
+            // 0: superclass, 1: methodDict, 2: format, 3: instanceVariables, 4: organization,
+            // 5: subclasses, 6: name, 7: classPool, 8: sharedPools
+            const int CLASS_POOL_INDEX = 7;
             var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, CLASS_POOL_INDEX);
 
             if (classPoolOOP == _metadata.KnownObjects.Nil)
