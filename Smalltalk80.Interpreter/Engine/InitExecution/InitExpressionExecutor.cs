@@ -392,16 +392,25 @@ public class InitExpressionExecutor
     }
 
     /// <summary>
-    /// Checks processes blocked on known system semaphores.
+    /// Checks processes blocked on known system semaphores or stored in class variables.
     /// </summary>
     private bool CheckBlockedProcessesForContext(SmalltalkOOP methodContextOOP)
     {
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
 
-        // Check Delay class's TimingSemaphore (used by Delay initialize)
+        // Check Delay class - both TimerProcess directly and semaphore waiting lists
         var delayClassOOP = LookupGlobal(smalltalkOOP, "Delay");
         if (delayClassOOP != _metadata.KnownObjects.Nil)
         {
+            // Direct check: Delay TimerProcess class variable holds the process itself
+            var timerProcessOOP = GetClassVariable(delayClassOOP, "TimerProcess");
+            if (timerProcessOOP != _metadata.KnownObjects.Nil)
+            {
+                if (ProcessKeepsContextAlive(timerProcessOOP, methodContextOOP))
+                    return true;
+            }
+
+            // Also check semaphore waiting lists
             var timingSemaphoreOOP = GetClassVariable(delayClassOOP, "TimingSemaphore");
             if (timingSemaphoreOOP != _metadata.KnownObjects.Nil)
             {
@@ -450,10 +459,9 @@ public class InitExpressionExecutor
 
             // classPool is a Dictionary (Set of Associations)
             int poolSize = _heapManager.GetIndexedSize(classPoolOOP);
-            var symbolOOP = FindSymbol(variableName);
 
-            if (symbolOOP == _metadata.KnownObjects.Nil)
-                return _metadata.KnownObjects.Nil;
+            // Try symbol-based lookup first
+            var symbolOOP = FindSymbol(variableName);
 
             for (int i = 0; i < poolSize; i++)
             {
@@ -463,10 +471,21 @@ public class InitExpressionExecutor
 
                 // Association has key at instance variable 0
                 var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
-                if (keyOOP == symbolOOP)
+
+                // Try exact symbol match first
+                if (symbolOOP != _metadata.KnownObjects.Nil && keyOOP == symbolOOP)
                 {
-                    // Return value at instance variable 1
                     return _heapManager.GetInstanceVariable(assocOOP, 1);
+                }
+
+                // Fall back to string content comparison
+                if (keyOOP != _metadata.KnownObjects.Nil && !keyOOP.IsSmallInteger)
+                {
+                    var keyString = ReadSymbolString(keyOOP);
+                    if (keyString == variableName)
+                    {
+                        return _heapManager.GetInstanceVariable(assocOOP, 1);
+                    }
                 }
             }
 
