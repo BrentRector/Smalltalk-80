@@ -607,7 +607,7 @@ public class InitExpressionExecutor
         if (contextOOP == targetOOP)
         {
             if (verbose)
-                Console.WriteLine($"    [DEBUG]   {'|',depth * 2}Found target at depth {depth}!");
+                Console.WriteLine($"    [DEBUG]   {new string(' ', depth * 2)}Found target at depth {depth}!");
             return true;
         }
 
@@ -622,7 +622,7 @@ public class InitExpressionExecutor
             // For BlockContext: check home pointer recursively
             var homeCtx = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
             if (verbose)
-                Console.WriteLine($"    [DEBUG]   {'|',depth * 2}BlockContext home: {homeCtx}");
+                Console.WriteLine($"    [DEBUG]   {new string(' ', depth * 2)}BlockContext home: {homeCtx}");
 
             // Recursively check if home reaches target
             if (ContextReachesTarget(homeCtx, targetOOP, verbose, depth + 1))
@@ -638,7 +638,7 @@ public class InitExpressionExecutor
             // For MethodContext: check sender chain
             var sender = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_SENDER_INDEX);
             if (verbose)
-                Console.WriteLine($"    [DEBUG]   {'|',depth * 2}MethodContext sender: {sender}");
+                Console.WriteLine($"    [DEBUG]   {new string(' ', depth * 2)}MethodContext sender: {sender}");
 
             if (ContextReachesTarget(sender, targetOOP, verbose, depth + 1))
                 return true;
