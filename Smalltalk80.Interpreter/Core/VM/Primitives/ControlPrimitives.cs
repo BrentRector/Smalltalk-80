@@ -364,6 +364,16 @@ public static class ControlPrimitives
 
                 if (!ResumeProcess(context, processOop))
                     return PrimitiveResult.Fail(context.Metadata!);
+
+                // Check if woken process has higher priority - if so, preempt
+                if (ShouldPreempt(context, processOop))
+                {
+                    SmalltalkOOP activeProcessOop = GetActiveProcess(context);
+                    // Put current process back on its priority queue
+                    ResumeProcess(context, activeProcessOop);
+                    // Switch to the higher priority process
+                    SwitchToProcess(context, activeProcessOop, processOop);
+                }
             }
 
             return PrimitiveResult.Ok(context.Receiver);
@@ -398,7 +408,7 @@ public static class ControlPrimitives
             }
             else
             {
-                // No signal available - suspend active process
+                // No signal available - must suspend active process and switch to another
                 SmalltalkOOP activeProcessOop = GetActiveProcess(context);
 
                 if (activeProcessOop == context.HeapManager.GetNil())
@@ -407,8 +417,12 @@ public static class ControlPrimitives
                 // Add active process to semaphore's waiting list
                 AddLastLink(context, context.Receiver, className, activeProcessOop);
 
-                // Actual suspension requires context switch - fail to let Smalltalk handle it
-                return PrimitiveResult.Fail(context.Metadata!);
+                // Perform context switch to next runnable process
+                if (!SwitchToHighestPriorityProcess(context, activeProcessOop))
+                    return PrimitiveResult.Fail(context.Metadata!);
+
+                // Return receiver - execution continues in the NEW process's context
+                return PrimitiveResult.Ok(context.Receiver);
             }
         }
     }
@@ -433,9 +447,19 @@ public static class ControlPrimitives
             if (myListOop != context.HeapManager.GetNil())
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            // Resume the process
+            // Resume the process (add to priority queue)
             if (!ResumeProcess(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
+
+            // Check if resumed process has higher priority - if so, preempt
+            if (ShouldPreempt(context, context.Receiver))
+            {
+                SmalltalkOOP activeProcessOop = GetActiveProcess(context);
+                // Put current process back on its priority queue
+                ResumeProcess(context, activeProcessOop);
+                // Switch to the higher priority process
+                SwitchToProcess(context, activeProcessOop, context.Receiver);
+            }
 
             return PrimitiveResult.Ok(context.Receiver);
         }
@@ -458,8 +482,17 @@ public static class ControlPrimitives
 
             if (context.Receiver == activeProcessOop)
             {
-                // Suspending active process requires context switch - fail
-                return PrimitiveResult.Fail(context.Metadata!);
+                // Suspending active process - need to context switch
+                // The active process is NOT on a quiescentProcessList (it's running)
+                // Just save its context and switch to next runnable process
+                if (!SwitchToHighestPriorityProcess(context, activeProcessOop))
+                    return PrimitiveResult.Fail(context.Metadata!);
+
+                // Clear myList to indicate suspended (not on any list)
+                context.SetFieldValue(context.Receiver, className, "myList", context.HeapManager.GetNil());
+
+                // Return nil as the suspended context - execution continues in NEW process
+                return PrimitiveResult.Ok(context.HeapManager.GetNil());
             }
             else
             {
@@ -500,6 +533,125 @@ public static class ControlPrimitives
     }
 
     #region Helper Methods
+
+    /// <summary>
+    /// Switches from the current active process to the highest priority runnable process.
+    /// Used by wait and suspend primitives.
+    /// </summary>
+    private static bool SwitchToHighestPriorityProcess(PrimitiveExecutionContext context, SmalltalkOOP currentProcessOop)
+    {
+        // Find the highest priority runnable process
+        SmalltalkOOP nextProcessOop = FindHighestPriorityProcess(context);
+
+        if (nextProcessOop == context.HeapManager.GetNil())
+            return false; // No runnable process - shouldn't happen if background process exists
+
+        // Remove the next process from its priority queue
+        SmalltalkOOP myListOop = context.HeapManager.GetInstanceVariable(nextProcessOop, VMConstants.PROCESS_MYLIST_INDEX);
+        if (myListOop != context.HeapManager.GetNil())
+        {
+            RemoveProcessFromList(context, nextProcessOop, myListOop);
+            context.HeapManager.SetInstanceVariable(nextProcessOop, VMConstants.PROCESS_MYLIST_INDEX, context.HeapManager.GetNil());
+        }
+
+        // Perform the context switch
+        return SwitchToProcess(context, currentProcessOop, nextProcessOop);
+    }
+
+    /// <summary>
+    /// Performs the actual context switch from one process to another.
+    /// Saves the current context to the old process and restores context from the new process.
+    /// </summary>
+    private static bool SwitchToProcess(PrimitiveExecutionContext context, SmalltalkOOP oldProcessOop, SmalltalkOOP newProcessOop)
+    {
+        if (context.Metadata == null)
+            return false;
+
+        SmalltalkOOP schedulerOop = context.Metadata.ProcessorScheduler;
+        if (schedulerOop == context.HeapManager.GetNil())
+            return false;
+
+        // Save current active context to old process's suspendedContext
+        SmalltalkOOP currentContext = context.GetActiveContext();
+        context.HeapManager.SetInstanceVariable(oldProcessOop, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, currentContext);
+
+        // Get new process's suspended context
+        SmalltalkOOP newContext = context.HeapManager.GetInstanceVariable(newProcessOop, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+
+        if (newContext == context.HeapManager.GetNil())
+            return false; // New process has no context to resume
+
+        // Update Processor's activeProcess
+        context.HeapManager.SetInstanceVariable(schedulerOop, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, newProcessOop);
+
+        // Switch to new context - this is the critical context switch!
+        context.SetActiveContext(newContext);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Finds the highest priority process that is runnable (on a quiescentProcessList).
+    /// Searches from priority 8 down to priority 1.
+    /// </summary>
+    private static SmalltalkOOP FindHighestPriorityProcess(PrimitiveExecutionContext context)
+    {
+        if (context.Metadata == null)
+            return context.HeapManager.GetNil();
+
+        SmalltalkOOP schedulerOop = context.Metadata.ProcessorScheduler;
+        if (schedulerOop == context.HeapManager.GetNil())
+            return context.HeapManager.GetNil();
+
+        SmalltalkOOP processListsOop = context.HeapManager.GetInstanceVariable(schedulerOop, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        if (processListsOop == context.HeapManager.GetNil())
+            return context.HeapManager.GetNil();
+
+        // Search from highest priority (8) down to lowest (1)
+        // Array indices are 0-7 for priorities 1-8
+        for (int priority = 8; priority >= 1; priority--)
+        {
+            int index = priority - 1;
+            SmalltalkOOP priorityListOop = context.HeapManager.GetIndexedOOP(processListsOop, index);
+
+            if (priorityListOop == context.HeapManager.GetNil())
+                continue;
+
+            // Check if this priority list has any processes
+            SmalltalkOOP firstLinkOop = context.GetFieldValue(priorityListOop, "class:LinkedList", "firstLink");
+
+            if (firstLinkOop != context.HeapManager.GetNil())
+            {
+                return firstLinkOop; // Return first process at this priority
+            }
+        }
+
+        return context.HeapManager.GetNil(); // No runnable processes found
+    }
+
+    /// <summary>
+    /// Checks if a process should preempt the currently active process.
+    /// Returns true if the given process has higher priority than the active process.
+    /// </summary>
+    private static bool ShouldPreempt(PrimitiveExecutionContext context, SmalltalkOOP processOop)
+    {
+        SmalltalkOOP activeProcessOop = GetActiveProcess(context);
+        if (activeProcessOop == context.HeapManager.GetNil())
+            return false;
+
+        // Get priorities
+        SmalltalkOOP processPriorityOop = context.HeapManager.GetInstanceVariable(processOop, VMConstants.PROCESS_PRIORITY_INDEX);
+        SmalltalkOOP activePriorityOop = context.HeapManager.GetInstanceVariable(activeProcessOop, VMConstants.PROCESS_PRIORITY_INDEX);
+
+        if (!processPriorityOop.IsSmallInteger || !activePriorityOop.IsSmallInteger)
+            return false;
+
+        int processPriority = processPriorityOop.AsSmallInteger();
+        int activePriority = activePriorityOop.AsSmallInteger();
+
+        // Preempt if new process has STRICTLY higher priority
+        return processPriority > activePriority;
+    }
 
     private static SmalltalkOOP GetActiveProcess(PrimitiveExecutionContext context)
     {
