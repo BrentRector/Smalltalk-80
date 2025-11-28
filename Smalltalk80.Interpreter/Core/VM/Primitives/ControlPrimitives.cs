@@ -386,10 +386,23 @@ public static class ControlPrimitives
                     if (DebugProcessScheduling)
                         Console.WriteLine($"[Signal] Preempting to woken process");
                     SmalltalkOOP activeProcessOop = GetActiveProcess(context);
+
+                    // CRITICAL: Push signal result onto signaling process's stack BEFORE switching
+                    // The woken process already has its wait result on its stack from when it was suspended
+                    if (context.StackManager != null)
+                    {
+                        context.StackManager.Push(context.Receiver);
+                        if (DebugProcessScheduling)
+                            Console.WriteLine($"[Signal] Pushed receiver onto signaling process stack before preempt");
+                    }
+
                     // Put current process on its priority queue (it will run later)
                     ResumeProcess(context, activeProcessOop);
                     // Switch directly to the higher priority process (don't add it to queue)
                     SwitchToProcess(context, activeProcessOop, processOop);
+
+                    // Result already pushed - signal to VM not to push again
+                    return PrimitiveResult.OkAlreadyPushed(context.Receiver);
                 }
                 else
                 {
@@ -398,6 +411,7 @@ public static class ControlPrimitives
                     // Woken process has same or lower priority - add to queue, it runs later
                     if (!ResumeProcess(context, processOop))
                         return PrimitiveResult.Fail(context.Metadata!);
+                    // No preemption - result will be pushed normally onto signaling process's stack
                 }
             }
 
@@ -455,6 +469,16 @@ public static class ControlPrimitives
                 if (activeProcessOop == context.HeapManager.GetNil())
                     return PrimitiveResult.Fail(context.Metadata!);
 
+                // CRITICAL: Push result onto the suspending process's stack BEFORE switching
+                // When this process resumes later, execution continues after the wait call
+                // and expects the result (receiver) to be on the stack
+                if (context.StackManager != null)
+                {
+                    context.StackManager.Push(context.Receiver);
+                    if (DebugProcessScheduling)
+                        Console.WriteLine($"[Wait] Pushed receiver onto suspending process stack");
+                }
+
                 // Add active process to semaphore's waiting list
                 AddLastLink(context, context.Receiver, className, activeProcessOop);
 
@@ -466,7 +490,9 @@ public static class ControlPrimitives
                 {
                     if (DebugProcessScheduling)
                         Console.WriteLine($"[Wait] SwitchToHighestPriorityProcess FAILED");
-                    // Context switch failed - undo the AddLastLink to leave state consistent
+                    // Context switch failed - undo everything to leave state consistent
+                    if (context.StackManager != null)
+                        context.StackManager.Pop(); // Undo the push
                     RemoveProcessFromList(context, activeProcessOop, context.Receiver);
                     context.SetFieldValue(activeProcessOop, "class:Process", "myList", context.HeapManager.GetNil());
                     return PrimitiveResult.Fail(context.Metadata!);
@@ -474,8 +500,8 @@ public static class ControlPrimitives
 
                 if (DebugProcessScheduling)
                     Console.WriteLine($"[Wait] SUCCESS - switched to another process");
-                // Return receiver - execution continues in the NEW process's context
-                return PrimitiveResult.Ok(context.Receiver);
+                // Result already pushed - signal to VM not to push again
+                return PrimitiveResult.OkAlreadyPushed(context.Receiver);
             }
         }
     }
@@ -583,14 +609,27 @@ public static class ControlPrimitives
                 // Suspending active process - need to context switch
                 // The active process is NOT on a quiescentProcessList (it's running)
                 // Just save its context and switch to next runnable process
+
+                // CRITICAL: Push result (nil) onto the suspending process's stack BEFORE switching
+                // When/if this process resumes later, execution continues after the suspend call
+                if (context.StackManager != null)
+                {
+                    context.StackManager.Push(context.HeapManager.GetNil());
+                }
+
                 if (!SwitchToHighestPriorityProcess(context, activeProcessOop))
+                {
+                    // Context switch failed - undo the push
+                    if (context.StackManager != null)
+                        context.StackManager.Pop();
                     return PrimitiveResult.Fail(context.Metadata!);
+                }
 
                 // Clear myList to indicate suspended (not on any list)
                 context.SetFieldValue(context.Receiver, className, "myList", context.HeapManager.GetNil());
 
-                // Return nil as the suspended context - execution continues in NEW process
-                return PrimitiveResult.Ok(context.HeapManager.GetNil());
+                // Result already pushed - signal to VM not to push again
+                return PrimitiveResult.OkAlreadyPushed(context.HeapManager.GetNil());
             }
             else
             {

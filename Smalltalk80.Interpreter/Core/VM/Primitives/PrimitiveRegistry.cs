@@ -59,7 +59,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
-        VMMetadata? metadata = null)
+        VMMetadata? metadata = null,
+        IStackManager? stackManager = null)
     {
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
@@ -71,10 +72,11 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 receiver,
                 args,
                 ctx.HeapManager,
+                stackManager: stackManager,
+                contextManager: contextManager,
+                layoutResolver: layoutResolver,
                 platform: ctx.PlatformBridge,
                 runtimeHeapAccess: runtimeHeapAccess,
-                layoutResolver: layoutResolver,
-                contextManager: contextManager,
                 instructionPointer: instructionPointer,
                 cacheManager: cacheManager,
                 messageSender: messageSender,
@@ -83,6 +85,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
 
             var result = primitive.Execute(execContext);
             ctx.PrimitiveSuccess = result.Success;
+            ctx.ResultAlreadyPushed = result.ResultAlreadyPushed;
 
             // Detect if primitive changed the active context and propagate to VM
             if (contextManager != null && activeContextBefore.HasValue)

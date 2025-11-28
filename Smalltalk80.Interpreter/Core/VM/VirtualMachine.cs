@@ -57,6 +57,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     // Primitive success flag (Blue Book specification)
     private bool _primitiveSuccess;
 
+    // Primitive result already pushed flag (for process-switching primitives)
+    private bool _primitiveResultAlreadyPushed;
+
     /// <summary>Gets the total number of instructions executed by this VM instance.</summary>
     public long InstructionCount => _tracer.InstructionCount;
 
@@ -1346,6 +1349,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     IPlatformBridge? IPrimitiveContext.PlatformBridge => _platformBridge;
     bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
+    bool IPrimitiveContext.ResultAlreadyPushed { get => _primitiveResultAlreadyPushed; set => _primitiveResultAlreadyPushed = value; }
 
     SmalltalkOOP IPrimitiveContext.GetFieldValue(SmalltalkOOP oop, string className, string fieldName)
     {

@@ -132,12 +132,15 @@ public partial class VirtualMachine
                 _tracer.TracePrimitiveAttempt(primitiveNumber, GetLocalId(methodInfo.MethodOOP) ?? "unknown");
             }
 
+            // Reset result-already-pushed flag before primitive execution
+            _primitiveResultAlreadyPushed = false;
+
             // Get current instruction pointer for primitives that need it
             int currentPC = ((IPrimitiveContext)this).GetInstructionPointer();
 
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
-                _contextManager, currentPC, this, this, _metadata);
+                _contextManager, currentPC, this, this, _metadata, _stackManager);
 
             // Emit diagnostic event for primitive execution in super send
             _diagnostics?.Emit(new PrimitiveEvent
@@ -159,6 +162,15 @@ public partial class VirtualMachine
                 {
                     _tracer.TracePrimitiveSuccess(primitiveNumber);
                 }
+
+                // Check if primitive already pushed the result (process-switching primitives)
+                if (_primitiveResultAlreadyPushed)
+                {
+                    // Result already pushed onto correct stack - signal context switch
+                    _primitiveResultAlreadyPushed = false;
+                    return CallOutcome.ContextSwitch();
+                }
+
                 return CallOutcome.Normal(primitiveResult);
             }
             else if (_tracer.ShouldTracePrimitiveFailure())
@@ -372,13 +384,16 @@ public partial class VirtualMachine
                 _tracer.ThrowIfInfiniteLoop();
             }
 
+            // Reset result-already-pushed flag before primitive execution
+            _primitiveResultAlreadyPushed = false;
+
             // Get current instruction pointer for primitives that need it
             int currentPC = ((IPrimitiveContext)this).GetInstructionPointer();
 
             // Try to execute the primitive
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
-                _contextManager, currentPC, this, this, _metadata);
+                _contextManager, currentPC, this, this, _metadata, _stackManager);
 
             // Emit diagnostic event for primitive execution
             _diagnostics?.Emit(new PrimitiveEvent
@@ -401,6 +416,14 @@ public partial class VirtualMachine
                 {
                     _contextSwitchedByPrimitive = false;
                     // Primitive created new context - signal context switch
+                    return CallOutcome.ContextSwitch();
+                }
+
+                // Check if primitive already pushed the result (process-switching primitives)
+                if (_primitiveResultAlreadyPushed)
+                {
+                    // Result already pushed onto correct stack - signal context switch
+                    _primitiveResultAlreadyPushed = false;
                     return CallOutcome.ContextSwitch();
                 }
 
