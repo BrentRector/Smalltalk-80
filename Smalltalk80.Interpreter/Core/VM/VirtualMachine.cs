@@ -92,6 +92,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     public bool VerboseDebug { get; set; } = false;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
+    /// <summary>
+    /// Cancellation token that signals when the VM should shut down.
+    /// Checked periodically in the interpreter loop.
+    /// </summary>
+    public CancellationToken ShutdownToken { get; set; } = CancellationToken.None;
+
     // Public property to enable bytecode tracing from outside
     public bool EnableBytecodeTracing
     {
@@ -281,8 +287,22 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Save initial process - forked processes should switch, not exit to C#
         _initialProcessOOP = GetActiveProcess();
 
+        // Counter for periodic shutdown checks (every N bytecodes)
+        int shutdownCheckCounter = 0;
+        const int ShutdownCheckInterval = 1000;
+
         while (true)
         {
+            // Periodic shutdown check (not every bytecode for performance)
+            if (++shutdownCheckCounter >= ShutdownCheckInterval)
+            {
+                shutdownCheckCounter = 0;
+                if (ShutdownToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
+                }
+            }
+
             // Execute bytecodes in current context
             InterpreterStatus status = ExecuteBytecodeStep();
 

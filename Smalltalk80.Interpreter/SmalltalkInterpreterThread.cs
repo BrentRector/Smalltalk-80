@@ -73,6 +73,11 @@ public class SmalltalkInterpreterThread
             // Note: We only reach here if the controller loop exits (unexpected)
             Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
         }
+        catch (OperationCanceledException)
+        {
+            // Clean shutdown requested - this is expected when window closes
+            Console.WriteLine("\n[Smalltalk Thread] Shutdown signal received");
+        }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"\n[Smalltalk Thread] Fatal error: {ex.Message}");
@@ -92,6 +97,7 @@ public class SmalltalkInterpreterThread
         );
 
         vm.VerboseDebug = _context.Config.VerboseDebug;
+        vm.ShutdownToken = _context.ShutdownToken;  // Wire up shutdown signal
         vm.InitializeSelectorCaches();
 
         return vm;

@@ -55,4 +55,15 @@ public class SmalltalkThreadContext
     /// Command-line configuration options.
     /// </summary>
     public required CommandLineConfig Config { get; init; }
+
+    /// <summary>
+    /// Cancellation token source for signaling shutdown to the Smalltalk thread.
+    /// The main thread signals this when the window closes.
+    /// </summary>
+    public CancellationTokenSource ShutdownTokenSource { get; } = new();
+
+    /// <summary>
+    /// Cancellation token that the Smalltalk thread checks to know when to stop.
+    /// </summary>
+    public CancellationToken ShutdownToken => ShutdownTokenSource.Token;
 }
