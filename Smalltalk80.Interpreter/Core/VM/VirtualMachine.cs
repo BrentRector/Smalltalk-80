@@ -593,11 +593,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         if (senderOOP == _initialContextOOP)
         {
             // Execution complete - return to caller
+            Console.WriteLine($"[HandleReturn] Returning to initial context - sender={senderOOP}, initial={_initialContextOOP}");
             _returnValue = returnValue;
             _contextManager.SetActiveContext(_initialContextOOP);
             _contextManager.AddContextToPool(returningContext);
-            // if (_verboseDebugMode)
-            //     Console.WriteLine($"[HandleReturn] Execution complete, returning to initial context");
             return InterpreterStatus.Return;
         }
 
