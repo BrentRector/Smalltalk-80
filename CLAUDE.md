@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-26
+**Last Updated**: 2025-11-28
 
 ## Project Status
 
@@ -8,12 +8,18 @@
 
 - **Build**: 0 errors, 0 warnings
 - **Cold Start**: Phases 1-6 all succeed
-- **Init Expressions**: 47/48 succeed (98% success rate)
+- **Init Expressions**: 50/51 succeed (98% success rate) - includes process scheduling
 - **Comment Expressions**: ✅ **234/234 succeed** (100% success rate)
 - **BlockContext Tests**: ✅ **120/120 tests PASS** (returns 1191)
 - **VM Core**: Fully functional, verified operational
+- **Process Primitives**: ✅ **85-88 working** (suspend, resume, terminate, yield)
 
 ## Known Issues
+
+**🔴 CRITICAL: Control Structure Optimization Disabled**
+The C# compiler has `ifTrue:`/`ifFalse:` optimization **incorrectly disabled**. Blue Book Chapter 28 confirms these SHOULD be optimized to conditional jumps (no BlockContext created). Current behavior creates BlockContexts, causing `thisContext` to return BlockContext instead of MethodContext. This breaks `Process>>terminate` which calls `thisContext removeSelf` - `removeSelf` only exists on MethodContext.
+
+**Workaround Applied**: VM-level fix in `VirtualMachine.MessageSending.cs` forwards `removeSelf` from BlockContext to home MethodContext. This is a band-aid - proper fix requires enabling compiler optimization.
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 
@@ -60,10 +66,21 @@
 
 **Key Lesson**: Display refresh architecture requires `InvalidateDisplayRegion()` after modifying Display bitmap. Without it, WinForms display shows stale cached data even though heap is correctly updated.
 
-**Phase 3: MVC and Process Scheduling** 📋 **NEXT**
-- Controller event loop (ControlManager>>searchForActiveController)
-- Process scheduling via Smalltalk-level cooperative multitasking
-- Integration with InputSensor for mouse/keyboard events
+**Phase 3: MVC and Process Scheduling** 🔄 **IN PROGRESS**
+- ✅ Process primitives 85-88 implemented and working
+- ✅ `Processor hiddenBackgroundProcess` creates idle process at priority 1
+- ✅ `ControlManager new` creates controller manager
+- ✅ `ScheduledControllers` global installed using canonical Association
+- ✅ VM-level fix for `removeSelf` on BlockContext (workaround)
+- 🔴 **BLOCKED**: `ifTrue:`/`ifFalse:` compiler optimization disabled - see Known Issues
+- ⏳ Controller event loop (`searchForActiveController`) - testing in progress
+- ⏳ Integration with InputSensor for mouse/keyboard events
+
+**Key Files Modified**:
+- `VirtualMachine.cs` - HandleReturn logic for process termination
+- `VirtualMachine.MessageSending.cs` - removeSelf forwarding for BlockContext
+- `VMConstants.cs` - LinkedList/Link constants for process queues
+- `SmalltalkInterpreterThread.cs` - StartControllerLoop, InstallScheduledControllersGlobal
 
 See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, and `docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md` for complete migration documentation.
 
