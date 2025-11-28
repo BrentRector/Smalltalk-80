@@ -535,9 +535,10 @@ public class SmalltalkInterpreterThread
     /// <summary>
     /// Starts the Smalltalk MVC controller loop.
     /// This implements the canonical Bluebook startup sequence:
-    /// 1. Processor hiddenBackgroundProcess  - Create background idle process
+    /// 1. Processor hiddenBackgroundProcess  - Create background idle process at priority 1
     /// 2. ControlManager new → ScheduledControllers  - Create and install ControlManager
-    /// 3. ScheduledControllers searchForActiveController  - Start event loop (runs forever)
+    /// 3. Lower bootstrap process priority from 8 to 4  - Allow InputSensor etc. to run
+    /// 4. ScheduledControllers searchForActiveController  - Start event loop (runs forever)
     /// </summary>
     private void StartControllerLoop()
     {
@@ -573,9 +574,20 @@ public class SmalltalkInterpreterThread
         InstallScheduledControllersGlobal(controlManagerOOP);
         Console.WriteLine("    ✓ ControlManager installed as ScheduledControllers global");
 
-        // Step 3: ScheduledControllers searchForActiveController
+        // Step 3: Lower bootstrap process priority from 8 to 4 (UserSchedulingPriority)
+        // This is CRITICAL: searchForActiveController loops with Processor yield, which only
+        // yields to same-or-higher priority processes. At priority 8, InputSensor (pri 6-7)
+        // and other system processes never get CPU time, so cursorPoint is never updated
+        // and isControlWanted always returns false.
+        Console.WriteLine("  Step 3: Lowering bootstrap process priority to 4...");
+        var processorOOP = LookupGlobal("Processor");
+        var activeProcessOOP = messageSender.SendUnary(processorOOP, "activeProcess");
+        messageSender.SendKeyword(activeProcessOOP, "priority:", SmalltalkOOP.FromSmallInteger(4));
+        Console.WriteLine("    ✓ Bootstrap process now at UserSchedulingPriority (4)");
+
+        // Step 4: ScheduledControllers searchForActiveController
         // This runs the main event loop - it will run FOREVER until the system exits
-        Console.WriteLine("  Step 3: Starting controller event loop...");
+        Console.WriteLine("  Step 4: Starting controller event loop...");
         Console.WriteLine("    (This will run until the window is closed)");
 
         // Use controlManagerOOP directly - we already have it from step 2
