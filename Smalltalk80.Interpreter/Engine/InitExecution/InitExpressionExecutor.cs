@@ -212,6 +212,9 @@ public class InitExpressionExecutor
         var effectiveTimeout = timeoutMs ?? _defaultTimeoutMs;
         var stopwatch = Stopwatch.StartNew();
 
+        // Disable debug output for forked process detection
+        bool debugForkedProcessDetection = false;
+
         if (verbose)
             Console.Write($"  {expr.Source}... ");
 
@@ -288,7 +291,7 @@ public class InitExpressionExecutor
             if (compiledMethodAlive || methodContextAlive)
             {
                 // Check if contexts are kept alive by forked processes (expected behavior)
-                bool keptAliveByForkedProcess = IsKeptAliveByForkedProcess(methodContextOOP, schedulerOOP, verbose);
+                bool keptAliveByForkedProcess = IsKeptAliveByForkedProcess(methodContextOOP, schedulerOOP, debugForkedProcessDetection);
 
                 if (keptAliveByForkedProcess)
                 {
