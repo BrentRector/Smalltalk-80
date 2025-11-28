@@ -560,16 +560,11 @@ public class SmalltalkInterpreterThread
         var controlManagerOOP = messageSender.SendUnary(controlManagerClassOOP, "new");
         Console.WriteLine($"    ✓ ControlManager created: {controlManagerOOP}");
 
-        // Install as Smalltalk global: Smalltalk at: #ScheduledControllers put: controlManager
-        var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
-        var scheduledControllersSymbol = FindSymbol("ScheduledControllers");
-        if (scheduledControllersSymbol == _context.HeapManager.GetNil())
-        {
-            // Symbol doesn't exist - need to create it
-            Console.WriteLine("    Creating #ScheduledControllers symbol...");
-            scheduledControllersSymbol = CreateSymbol("ScheduledControllers");
-        }
-        messageSender.SendKeyword(smalltalkOOP, "at:put:", scheduledControllersSymbol, controlManagerOOP);
+        // Install as Smalltalk global using canonical Association from cold start
+        // The Association for ScheduledControllers was created during method compilation
+        // (since 23 methods reference it) and is in AssociationRegistry and Undeclared.
+        Console.WriteLine("    Installing ScheduledControllers global...");
+        InstallScheduledControllersGlobal(controlManagerOOP);
         Console.WriteLine("    ✓ ControlManager installed as ScheduledControllers global");
 
         // Step 3: ScheduledControllers searchForActiveController
@@ -577,36 +572,223 @@ public class SmalltalkInterpreterThread
         Console.WriteLine("  Step 3: Starting controller event loop...");
         Console.WriteLine("    (This will run until the window is closed)");
 
-        // Look up the newly installed ScheduledControllers global
-        var scheduledControllersOOP = LookupGlobal("ScheduledControllers");
-        messageSender.SendUnary(scheduledControllersOOP, "searchForActiveController");
+        // Use controlManagerOOP directly - we already have it from step 2
+        messageSender.SendUnary(controlManagerOOP, "searchForActiveController");
 
         // Note: We should never reach here - searchForActiveController runs forever
         Console.WriteLine("  Controller loop exited (unexpected)");
     }
 
     /// <summary>
-    /// Creates a new Symbol in the Smalltalk system.
+    /// Installs ScheduledControllers global using the canonical Association from cold start.
+    /// This follows the same pattern as SystemDictionaryInstaller:
+    /// 1. Get canonical Association from AssociationRegistry
+    /// 2. Set its value to the ControlManager instance
+    /// 3. Install in SystemDictionary using hash-based insertion
     /// </summary>
-    private SmalltalkOOP CreateSymbol(string symbolText)
+    private void InstallScheduledControllersGlobal(SmalltalkOOP controlManagerOOP)
     {
-        // Get Symbol class
-        var symbolClassOOP = LookupGlobal("Symbol");
+        const string globalName = "ScheduledControllers";
+        var heap = _context.HeapManager;
 
-        // Allocate Symbol object (byte-indexed)
-        var bytes = System.Text.Encoding.UTF8.GetBytes(symbolText);
-        var symbolOOP = _context.HeapManager.AllocateObject(
-            Shared.Types.ObjectFormat.ByteIndexed,
-            0,  // no instance variables for Symbol
-            bytes.Length);
-        _context.HeapManager.SetClassOOP(symbolOOP, symbolClassOOP);
-
-        // Copy bytes into the symbol
-        for (int i = 0; i < bytes.Length; i++)
+        // Get canonical Association from AssociationRegistry (created during method compilation)
+        var allAssociations = AssociationRegistry.GetAll();
+        if (!allAssociations.TryGetValue(globalName, out var associationOOP))
         {
-            _context.HeapManager.SetIndexedByte(symbolOOP, i, bytes[i]);
+            throw new InvalidOperationException(
+                $"Canonical Association for '{globalName}' not found in AssociationRegistry. " +
+                "This symbol should have been registered during method compilation.");
         }
 
-        return symbolOOP;
+        Console.WriteLine($"      Found canonical Association: {associationOOP}");
+
+        // Set the Association's value to the ControlManager instance
+        heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, controlManagerOOP);
+
+        // Get the key symbol from the Association for hash calculation
+        var keySymbolOOP = heap.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+
+        // Install in SystemDictionary using hash-based insertion
+        var systemDictOOP = _context.VMMetadata.KnownObjects.Smalltalk;
+        InstallAssociationInDictionary(systemDictOOP, associationOOP, keySymbolOOP, globalName);
+
+        // Remove from Undeclared dictionary (proper migration)
+        if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
+        {
+            RemoveFromDictionary(undeclaredOOP, keySymbolOOP, globalName);
+        }
+    }
+
+    /// <summary>
+    /// Installs an Association in a dictionary using hash-based slot finding.
+    /// Runtime version of DictionaryOperations.InstallAssociation.
+    /// </summary>
+    private void InstallAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP,
+        SmalltalkOOP keySymbolOOP, string keyName)
+    {
+        var heap = _context.HeapManager;
+        int dictSize = heap.GetIndexedSize(dictionaryOOP);
+        var nilOOP = heap.GetNil();
+
+        // Use identity hash (oop >> 1) for symbol lookup
+        int hash = IdentityHashUtility.ComputeIdentityHash(keySymbolOOP);
+        int location = (hash % dictSize + dictSize) % dictSize;
+
+        // Probe for nil slot or matching key (linear probing)
+        int startLocation = location;
+        bool incrementTally = true;
+
+        while (true)
+        {
+            var probe = heap.GetIndexedOOP(dictionaryOOP, location);
+
+            if (probe == nilOOP)
+            {
+                // Found empty slot - install association
+                heap.SetIndexedOOP(dictionaryOOP, location, associationOOP);
+
+                // Increment tally
+                if (incrementTally)
+                {
+                    var currentTallyOOP = heap.GetInstanceVariable(dictionaryOOP, 0);
+                    if (currentTallyOOP.IsSmallInteger)
+                    {
+                        int newTally = currentTallyOOP.AsSmallInteger() + 1;
+                        heap.SetInstanceVariable(dictionaryOOP, 0, SmalltalkOOP.FromSmallInteger(newTally));
+                    }
+                }
+
+                Console.WriteLine($"      Installed at slot {location} (hash={hash})");
+                return;
+            }
+
+            // Check if Association with same key already exists
+            var probeKeyOOP = heap.GetInstanceVariable(probe, 0);
+            if (probeKeyOOP == keySymbolOOP)
+            {
+                // Replace existing
+                heap.SetIndexedOOP(dictionaryOOP, location, associationOOP);
+                Console.WriteLine($"      Replaced at slot {location}");
+                return;
+            }
+
+            // Linear probe
+            location = (location + 1) % dictSize;
+
+            if (location == startLocation)
+            {
+                throw new InvalidOperationException(
+                    $"Dictionary is full - cannot install '{keyName}' association");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes an Association from a dictionary (for Undeclared cleanup).
+    /// Runtime version of DictionaryOperations.RemoveAssociation.
+    /// </summary>
+    private void RemoveFromDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbolOOP, string keyName)
+    {
+        var heap = _context.HeapManager;
+        var nilOOP = heap.GetNil();
+        int dictSize = heap.GetIndexedSize(dictionaryOOP);
+
+        int hash = IdentityHashUtility.ComputeIdentityHash(keySymbolOOP);
+        int location = (hash % dictSize + dictSize) % dictSize;
+        int startLocation = location;
+
+        while (true)
+        {
+            var probe = heap.GetIndexedOOP(dictionaryOOP, location);
+
+            if (probe == nilOOP)
+            {
+                // Not found
+                return;
+            }
+
+            var probeKeyOOP = heap.GetInstanceVariable(probe, 0);
+            if (probeKeyOOP == keySymbolOOP)
+            {
+                // Found - remove
+                heap.SetIndexedOOP(dictionaryOOP, location, nilOOP);
+
+                // Decrement tally
+                var tallyOOP = heap.GetInstanceVariable(dictionaryOOP, 0);
+                if (tallyOOP.IsSmallInteger)
+                {
+                    int tally = tallyOOP.AsSmallInteger();
+                    heap.SetInstanceVariable(dictionaryOOP, 0, SmalltalkOOP.FromSmallInteger(tally - 1));
+                }
+
+                // Fix probe chain
+                FixCollisionsFrom(dictionaryOOP, location);
+                Console.WriteLine($"      Removed from Undeclared at slot {location}");
+                return;
+            }
+
+            location = (location + 1) % dictSize;
+
+            if (location == startLocation)
+            {
+                return; // Not found after full scan
+            }
+        }
+    }
+
+    /// <summary>
+    /// Repairs the linear probing chain after removing an entry.
+    /// Runtime version of DictionaryOperations.FixCollisionsFrom.
+    /// </summary>
+    private void FixCollisionsFrom(SmalltalkOOP dictionaryOOP, int startIndex)
+    {
+        var heap = _context.HeapManager;
+        var nilOOP = heap.GetNil();
+        int dictSize = heap.GetIndexedSize(dictionaryOOP);
+        int oldIndex = startIndex;
+
+        while (true)
+        {
+            oldIndex = (oldIndex + 1) % dictSize;
+            var nextObject = heap.GetIndexedOOP(dictionaryOOP, oldIndex);
+
+            if (nextObject == nilOOP)
+                break;
+
+            // Find where this Association SHOULD be
+            var keyOOP = heap.GetInstanceVariable(nextObject, 0);
+            int hash = IdentityHashUtility.ComputeIdentityHash(keyOOP);
+            int nextIndex = (hash % dictSize + dictSize) % dictSize;
+
+            // Linear probe to find correct slot
+            int probeCount = 0;
+            while (true)
+            {
+                var probe = heap.GetIndexedOOP(dictionaryOOP, nextIndex);
+
+                if (probe == nilOOP || probe == nextObject)
+                    break;
+
+                var probeKeyOOP = heap.GetInstanceVariable(probe, 0);
+                if (probeKeyOOP == keyOOP)
+                    break;
+
+                nextIndex = (nextIndex + 1) % dictSize;
+                probeCount++;
+
+                if (probeCount >= dictSize)
+                {
+                    throw new InvalidOperationException(
+                        "FixCollisionsFrom: Cannot find slot for Association during rehash");
+                }
+            }
+
+            // Move if displaced
+            if (nextIndex != oldIndex)
+            {
+                heap.SetIndexedOOP(dictionaryOOP, nextIndex, nextObject);
+                heap.SetIndexedOOP(dictionaryOOP, oldIndex, nilOOP);
+            }
+        }
     }
 }
