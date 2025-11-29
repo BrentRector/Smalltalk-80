@@ -9,8 +9,11 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// </summary>
 public static class ControlPrimitives
 {
-    // Debug flag for process scheduling primitives
+    // Debug flag for verbose process scheduling primitives (very noisy)
     private static readonly bool DebugProcessScheduling = false;
+
+    // Debug flag for priority queue add/remove operations only (concise)
+    private static readonly bool DebugPriorityQueues = true;
     /// <summary>Primitive 80: blockCopy: - Creates a new BlockContext</summary>
     public class BlockCopy : IPrimitive
     {
@@ -690,6 +693,13 @@ public static class ControlPrimitives
         SmalltalkOOP myListOop = context.HeapManager.GetInstanceVariable(nextProcessOop, VMConstants.PROCESS_MYLIST_INDEX);
         if (myListOop != context.HeapManager.GetNil())
         {
+            // Get process priority for logging
+            SmalltalkOOP priorityOop = context.HeapManager.GetInstanceVariable(nextProcessOop, VMConstants.PROCESS_PRIORITY_INDEX);
+            int priority = priorityOop.IsSmallInteger ? priorityOop.AsSmallInteger() : -1;
+
+            if (DebugPriorityQueues)
+                Console.WriteLine($"[PQ-] REMOVE process={nextProcessOop} from priority={priority} (activating)");
+
             RemoveProcessFromList(context, nextProcessOop, myListOop);
             context.HeapManager.SetInstanceVariable(nextProcessOop, VMConstants.PROCESS_MYLIST_INDEX, context.HeapManager.GetNil());
         }
@@ -1002,14 +1012,9 @@ public static class ControlPrimitives
 
         AddLastLink(context, priorityListOop, "class:LinkedList", processOop);
 
-        // Verify the process was added
-        if (DebugProcessScheduling)
-        {
-            SmalltalkOOP myList = context.GetFieldValue(processOop, "class:Process", "myList");
-            SmalltalkOOP firstLink = context.GetFieldValue(priorityListOop, "class:LinkedList", "firstLink");
-            SmalltalkOOP lastLink = context.GetFieldValue(priorityListOop, "class:LinkedList", "lastLink");
-            Console.WriteLine($"[ResumeProcess] After AddLastLink: myList={myList}, firstLink={firstLink}, lastLink={lastLink}");
-        }
+        // Log priority queue add operation
+        if (DebugPriorityQueues)
+            Console.WriteLine($"[PQ+] ADD process={processOop} to priority={priority}");
 
         return true;
     }

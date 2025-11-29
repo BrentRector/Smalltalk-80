@@ -2246,6 +2246,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         SmalltalkOOP myListOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX);
         if (myListOOP != _metadata.KnownObjects.Nil)
         {
+            // Get process priority for logging
+            var priorityOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_PRIORITY_INDEX);
+            int priority = priorityOOP.IsSmallInteger ? priorityOOP.AsSmallInteger() : -1;
+            Console.WriteLine($"[PQ-] REMOVE process={nextProcess} from priority={priority} (activating after termination)");
+
             RemoveProcessFromList(nextProcess, myListOOP);
             _heapManager.SetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
         }
