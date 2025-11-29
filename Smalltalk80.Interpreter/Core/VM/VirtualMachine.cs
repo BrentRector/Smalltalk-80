@@ -616,24 +616,15 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // Check if we're in the initial process or a forked process
             SmalltalkOOP currentProcess = GetActiveProcess();
 
-            // Get priority of terminating process for diagnostics
-            var processPriorityOOP = _heapManager.GetInstanceVariable(currentProcess, VMConstants.PROCESS_PRIORITY_INDEX);
-            int processPriority = processPriorityOOP.IsSmallInteger ? processPriorityOOP.AsSmallInteger() : -1;
-
-            Console.WriteLine($"[HandleReturn] Nil sender detected");
-            Console.WriteLine($"[HandleReturn] currentProcess={currentProcess} (priority={processPriority}), initialProcess={_initialProcessOOP}");
-
             if (currentProcess == _initialProcessOOP)
             {
                 // Initial process completed - return to caller
-                Console.WriteLine($"[HandleReturn] Initial process completed, returning to C#");
                 _returnValue = returnValue;
                 _contextManager.SetActiveContext(_metadata.KnownObjects.Nil);
                 _contextManager.AddContextToPool(returningContext);
                 return InterpreterStatus.Return;
             }
 
-            Console.WriteLine($"[HandleReturn] Forked process terminated, switching to next runnable");
             // Forked process terminated - switch to next runnable process
             _contextManager.AddContextToPool(returningContext);
 
@@ -643,9 +634,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 return InterpreterStatus.Continue;
             }
 
-            // No runnable process found (shouldn't happen if background process exists)
-            // Fall through to return - system idle
-            Console.WriteLine("[HandleReturn] WARNING: No runnable processes, returning to C#");
+            // No runnable process found - this is the error condition we need to debug
+            var processPriorityOOP = _heapManager.GetInstanceVariable(currentProcess, VMConstants.PROCESS_PRIORITY_INDEX);
+            int processPriority = processPriorityOOP.IsSmallInteger ? processPriorityOOP.AsSmallInteger() : -1;
+            Console.WriteLine($"[HandleReturn] ERROR: No runnable processes found!");
+            Console.WriteLine($"  Terminating process: {currentProcess} (priority={processPriority})");
             _returnValue = returnValue;
             return InterpreterStatus.Return;
         }
@@ -2235,29 +2228,19 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// </summary>
     private bool SwitchToNextRunnableProcess(SmalltalkOOP terminatingProcess)
     {
-        Console.WriteLine($"[SwitchToNextRunnableProcess] Called with terminatingProcess={terminatingProcess}");
-
         SmalltalkOOP schedulerOOP = _metadata.ProcessorScheduler;
         if (schedulerOOP == _metadata.KnownObjects.Nil)
-        {
-            Console.WriteLine($"[SwitchToNextRunnableProcess] ProcessorScheduler is nil");
             return false;
-        }
-
-        // Diagnostic: Show what process is currently active before switching
-        SmalltalkOOP currentActive = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
-        Console.WriteLine($"[SwitchToNextRunnableProcess] Current activeProcess={currentActive}");
 
         // Find highest priority runnable process
         SmalltalkOOP nextProcess = FindHighestPriorityRunnableProcess(schedulerOOP);
         if (nextProcess == _metadata.KnownObjects.Nil)
         {
-            Console.WriteLine($"[SwitchToNextRunnableProcess] No runnable process found, dumping queues:");
+            // This is the error condition - dump queues for debugging
+            Console.WriteLine($"[SwitchToNextRunnableProcess] No runnable process found!");
             DumpProcessQueues(schedulerOOP);
             return false;
         }
-
-        Console.WriteLine($"[SwitchToNextRunnableProcess] Found next process={nextProcess} (removing from queue and activating)");
 
         // Remove the process from its priority queue (it's about to become active)
         SmalltalkOOP myListOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX);
