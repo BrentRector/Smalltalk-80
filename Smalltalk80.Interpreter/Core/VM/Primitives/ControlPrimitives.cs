@@ -10,7 +10,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 public static class ControlPrimitives
 {
     // Debug flag for process scheduling primitives
-    private static readonly bool DebugProcessScheduling = false;
+    private static readonly bool DebugProcessScheduling = true;
     /// <summary>Primitive 80: blockCopy: - Creates a new BlockContext</summary>
     public class BlockCopy : IPrimitive
     {
