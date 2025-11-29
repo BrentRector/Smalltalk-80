@@ -570,7 +570,29 @@ public class SmalltalkInterpreterThread
         if (firstLinkOOP == nilOOP)
             Console.WriteLine("    WARNING: Background process NOT on priority 1 queue!");
         else
+        {
             Console.WriteLine($"    Background process on queue: {firstLinkOOP}");
+            // Debug: Check the process's suspendedContext at creation time
+            var suspCtx = _context.HeapManager.GetInstanceVariable(firstLinkOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+            Console.WriteLine($"    SuspendedContext: {suspCtx}");
+            var ctxClass = _context.HeapManager.GetClassName(suspCtx);
+            Console.WriteLine($"    Context class: {ctxClass}");
+            if (ctxClass == "BlockContext")
+            {
+                var homeCtx = _context.HeapManager.GetInstanceVariable(suspCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                var startPC = _context.HeapManager.GetInstanceVariable(suspCtx, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+                Console.WriteLine($"    Home context: {homeCtx}, startPC: {startPC}");
+                var homeMethod = _context.HeapManager.GetInstanceVariable(homeCtx, VMConstants.CONTEXT_METHOD_INDEX);
+                Console.WriteLine($"    Home method: {homeMethod}");
+                // Get bytecodes length
+                var methodIndexedSize = _context.HeapManager.GetIndexedSize(homeMethod);
+                var bytecodeArrayOOP = _context.HeapManager.GetIndexedOOP(homeMethod, methodIndexedSize - 1);
+                var bcLength = _context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
+                Console.WriteLine($"    Bytecodes length: {bcLength}, startPC: {(startPC.IsSmallInteger ? startPC.AsSmallInteger() : -1)}");
+                if (startPC.IsSmallInteger && startPC.AsSmallInteger() >= bcLength)
+                    Console.WriteLine($"    *** WARNING: startPC ({startPC.AsSmallInteger()}) >= bytecodes length ({bcLength})! ***");
+            }
+        }
 
         // Step 2: ControlManager new → install as ScheduledControllers global
         Console.WriteLine("  Step 2: Creating ControlManager...");
