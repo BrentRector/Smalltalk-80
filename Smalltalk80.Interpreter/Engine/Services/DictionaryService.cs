@@ -42,15 +42,14 @@ public class DictionaryService
 
     /// <summary>
     /// Computes the 0-indexed hash slot for a key in a dictionary of given size.
-    /// Matches Smalltalk's `key asOop \\ length` (converted from 1-indexed to 0-indexed).
+    /// Delegates to IdentityHashUtility for the canonical implementation.
     /// </summary>
     /// <param name="keyOOP">The key OOP to hash.</param>
     /// <param name="dictionarySize">The size of the dictionary's indexed storage.</param>
     /// <returns>The 0-indexed slot position.</returns>
     public int ComputeHashIndex(SmalltalkOOP keyOOP, int dictionarySize)
     {
-        int hash = GetSymbolHash(keyOOP);
-        return (hash % dictionarySize + dictionarySize) % dictionarySize;
+        return IdentityHashUtility.ComputeHashIndex(keyOOP, dictionarySize);
     }
 
     /// <summary>

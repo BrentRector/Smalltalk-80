@@ -27,8 +27,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
         var keySymbolOOP = context.Allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup (Dictionary>>findKeyOrNil:)
-        int hash = GetSymbolHash(keySymbolOOP);
-        int location = (hash % dictSize + dictSize) % dictSize;
+        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
 
         // Probe for nil slot or matching key (linear probing)
         int pass = 1;
@@ -106,8 +105,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
         var nilOOP = context.HeapManager.GetNil();
         int dictSize = context.Allocator.GetIndexedSize(dictionaryOOP);
 
-        int hash = GetSymbolHash(keySymbolOOP);
-        int location = (hash % dictSize + dictSize) % dictSize;
+        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
 
         int pass = 1;
         int startLocation = location;
@@ -182,8 +180,7 @@ public class DictionaryOperations(Phase5Context context) : IDictionaryOperations
 
             // Find where this Association SHOULD be
             var keyOOP = context.Allocator.GetInstanceVariable(nextObject, 0);
-            int hash = GetSymbolHash(keyOOP);
-            int nextIndex = (hash % dictSize + dictSize) % dictSize;
+            int nextIndex = IdentityHashUtility.ComputeHashIndex(keyOOP, dictSize);
 
             // Linear probe to find correct slot
             int probeCount = 0;

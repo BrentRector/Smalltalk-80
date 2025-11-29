@@ -703,9 +703,8 @@ public class SmalltalkInterpreterThread
         int dictSize = heap.GetIndexedSize(dictionaryOOP);
         var nilOOP = heap.GetNil();
 
-        // Use identity hash (oop >> 1) for symbol lookup
-        int hash = IdentityHashUtility.ComputeIdentityHash(keySymbolOOP);
-        int location = (hash % dictSize + dictSize) % dictSize;
+        // Use identity hash for symbol lookup
+        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
 
         // Probe for nil slot or matching key (linear probing)
         int startLocation = location;
@@ -766,8 +765,7 @@ public class SmalltalkInterpreterThread
         var nilOOP = heap.GetNil();
         int dictSize = heap.GetIndexedSize(dictionaryOOP);
 
-        int hash = IdentityHashUtility.ComputeIdentityHash(keySymbolOOP);
-        int location = (hash % dictSize + dictSize) % dictSize;
+        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
         int startLocation = location;
 
         while (true)
@@ -830,8 +828,7 @@ public class SmalltalkInterpreterThread
 
             // Find where this Association SHOULD be
             var keyOOP = heap.GetInstanceVariable(nextObject, 0);
-            int hash = IdentityHashUtility.ComputeIdentityHash(keyOOP);
-            int nextIndex = (hash % dictSize + dictSize) % dictSize;
+            int nextIndex = IdentityHashUtility.ComputeHashIndex(keyOOP, dictSize);
 
             // Linear probe to find correct slot
             int probeCount = 0;
