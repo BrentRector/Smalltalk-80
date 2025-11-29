@@ -43,13 +43,23 @@ public static class ControlPrimitives
             // Get BlockContext class from VM metadata
             SmalltalkOOP blockContextClassOOP = context.GetBlockContextClassOOP();
 
-            return CreateBlockContext(
+            var result = CreateBlockContext(
                 context.HeapManager,
                 activeContext,
                 blockContextClassOOP,
                 blockArgumentCount,
                 argStartIndexOOP,
                 context.InstructionPointer);
+
+            // CRITICAL: Mark the home context as having created a block.
+            // This prevents the home MethodContext from being pooled.
+            if (result.Success && context.ContextManager != null)
+            {
+                var homeContextOOP = context.HeapManager.GetInstanceVariable(result.Value, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                context.ContextManager.MarkContextCreatedBlock(homeContextOOP);
+            }
+
+            return result;
         }
 
         /// <summary>

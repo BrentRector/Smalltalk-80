@@ -1140,8 +1140,15 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 throw new InvalidOperationException("blockCopy: primitive failed unexpectedly");
             }
 
+            // CRITICAL: Mark the home context as having created a block.
+            // This prevents the home MethodContext from being pooled, since the block
+            // may outlive the method activation and still reference it via 'home'.
+            var blockContextOOP = result.Value;
+            var homeContextOOP = heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+            context.MarkContextCreatedBlock(homeContextOOP);
+
             // Push the new BlockContext onto the stack
-            context.Push(result.Value);
+            context.Push(blockContextOOP);
             return true;
         }
 

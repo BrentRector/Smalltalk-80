@@ -1258,6 +1258,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         return true;
     }
 
+    void IBytecodeContext.MarkContextCreatedBlock(SmalltalkOOP homeContextOOP)
+        => _contextManager.MarkContextCreatedBlock(homeContextOOP);
+
     /// <summary>
     /// Pushes a value onto the operand stack.
     /// Delegates to StackManager for implementation.
