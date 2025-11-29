@@ -93,7 +93,7 @@ public class Phase4_MethodCompilation : IPhase
         var fieldValueService = new FieldValueService(bundle, _symbolService);
         var dictionaryService = new DictionaryService(allocator, bundle);
         _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId, _symbolService, fieldValueService, dictionaryService);
-        _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, _symbolService, diagnostics);
+        _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, _symbolService, dictionaryService, diagnostics);
     }
 
     /// <summary>

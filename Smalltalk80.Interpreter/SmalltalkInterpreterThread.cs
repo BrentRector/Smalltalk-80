@@ -703,9 +703,8 @@ public class SmalltalkInterpreterThread
         int dictSize = heap.GetIndexedSize(dictionaryOOP);
         var nilOOP = heap.GetNil();
 
-        // Use identity hash (oop >> 1) for symbol lookup
-        int hash = IdentityHashUtility.ComputeIdentityHash(keySymbolOOP);
-        int location = (hash % dictSize + dictSize) % dictSize;
+        // Use identity hash for symbol lookup
+        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
 
         // Probe for nil slot or matching key (linear probing)
         int startLocation = location;
@@ -723,15 +722,15 @@ public class SmalltalkInterpreterThread
                 // Increment tally
                 if (incrementTally)
                 {
-                    var currentTallyOOP = heap.GetInstanceVariable(dictionaryOOP, 0);
+                    var currentTallyOOP = heap.GetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX);
                     if (currentTallyOOP.IsSmallInteger)
                     {
                         int newTally = currentTallyOOP.AsSmallInteger() + 1;
-                        heap.SetInstanceVariable(dictionaryOOP, 0, SmalltalkOOP.FromSmallInteger(newTally));
+                        heap.SetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(newTally));
                     }
                 }
 
-                Console.WriteLine($"      Installed at slot {location} (hash={hash})");
+                Console.WriteLine($"      Installed at slot {location} (hash={startLocation})");
                 return;
             }
 
@@ -766,8 +765,7 @@ public class SmalltalkInterpreterThread
         var nilOOP = heap.GetNil();
         int dictSize = heap.GetIndexedSize(dictionaryOOP);
 
-        int hash = IdentityHashUtility.ComputeIdentityHash(keySymbolOOP);
-        int location = (hash % dictSize + dictSize) % dictSize;
+        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
         int startLocation = location;
 
         while (true)
@@ -787,11 +785,11 @@ public class SmalltalkInterpreterThread
                 heap.SetIndexedOOP(dictionaryOOP, location, nilOOP);
 
                 // Decrement tally
-                var tallyOOP = heap.GetInstanceVariable(dictionaryOOP, 0);
+                var tallyOOP = heap.GetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX);
                 if (tallyOOP.IsSmallInteger)
                 {
                     int tally = tallyOOP.AsSmallInteger();
-                    heap.SetInstanceVariable(dictionaryOOP, 0, SmalltalkOOP.FromSmallInteger(tally - 1));
+                    heap.SetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(tally - 1));
                 }
 
                 // Fix probe chain
@@ -830,8 +828,7 @@ public class SmalltalkInterpreterThread
 
             // Find where this Association SHOULD be
             var keyOOP = heap.GetInstanceVariable(nextObject, 0);
-            int hash = IdentityHashUtility.ComputeIdentityHash(keyOOP);
-            int nextIndex = (hash % dictSize + dictSize) % dictSize;
+            int nextIndex = IdentityHashUtility.ComputeHashIndex(keyOOP, dictSize);
 
             // Linear probe to find correct slot
             int probeCount = 0;

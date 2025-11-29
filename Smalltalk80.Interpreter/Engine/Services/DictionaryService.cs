@@ -41,6 +41,18 @@ public class DictionaryService
     }
 
     /// <summary>
+    /// Computes the 0-indexed hash slot for a key in a dictionary of given size.
+    /// Delegates to IdentityHashUtility for the canonical implementation.
+    /// </summary>
+    /// <param name="keyOOP">The key OOP to hash.</param>
+    /// <param name="dictionarySize">The size of the dictionary's indexed storage.</param>
+    /// <returns>The 0-indexed slot position.</returns>
+    public int ComputeHashIndex(SmalltalkOOP keyOOP, int dictionarySize)
+    {
+        return IdentityHashUtility.ComputeHashIndex(keyOOP, dictionarySize);
+    }
+
+    /// <summary>
     /// Allocates an Association object (key-value pair) using ObjectGraphAllocator.
     /// </summary>
     /// <param name="keyOOP">The symbol key for the Association.</param>
@@ -128,8 +140,7 @@ public class DictionaryService
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup (same algorithm as Dictionary>>findKeyOrNil:)
-        int hash = GetSymbolHash(keySymbolOOP);
-        int location = (hash % systemDictSize + systemDictSize) % systemDictSize;
+        int location = ComputeHashIndex(keySymbolOOP, systemDictSize);
 
         // Linear probing
         int pass = 1;
@@ -169,6 +180,87 @@ public class DictionaryService
     }
 
     /// <summary>
+    /// Installs a key-value pair in an IdentityDictionary using hash-based slot finding.
+    /// IdentityDictionary structure: [0] = tally (inherited from Set), [1] = valueArray, indexed fields = keys.
+    /// Uses same algorithm as IdentityDictionary>>findKeyOrNil: so runtime lookups work!
+    /// </summary>
+    /// <param name="dictionaryOOP">The IdentityDictionary to install into.</param>
+    /// <param name="keyOOP">The key OOP (stored directly in indexed slots).</param>
+    /// <param name="valueOOP">The value OOP (stored in parallel valueArray).</param>
+    /// <param name="name">The key name for diagnostics.</param>
+    /// <exception cref="InvalidOperationException">Thrown when dictionary is full or has invalid structure.</exception>
+    public void InstallInIdentityDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keyOOP, SmalltalkOOP valueOOP, string name)
+    {
+        // IdentityDictionary: tally (slot 0, inherited from Set), valueArray (slot 1), indexed fields = keys
+        var tallyOOP = _allocator.GetInstanceVariable(dictionaryOOP, VMConstants.IDENTITY_DICTIONARY_TALLY_INDEX);
+        var valuesArrayOOP = _allocator.GetInstanceVariable(dictionaryOOP, VMConstants.IDENTITY_DICTIONARY_VALUE_ARRAY_INDEX);
+        SmalltalkOOP nilOOP = _allocator.GetNil();
+
+        if (valuesArrayOOP == nilOOP)
+        {
+            throw new InvalidOperationException($"IdentityDictionary has nil valueArray - cannot install {name}");
+        }
+
+        int dictionarySize = _allocator.GetIndexedSize(dictionaryOOP);
+        int valuesArraySize = _allocator.GetIndexedSize(valuesArrayOOP);
+
+        if (dictionarySize != valuesArraySize)
+        {
+            throw new InvalidOperationException($"IdentityDictionary has mismatched sizes: keys={dictionarySize}, values={valuesArraySize}");
+        }
+
+        // Hash using identity hash: index = key asOop \\ length (0-indexed in C#)
+        int hashIndex = ComputeHashIndex(keyOOP, dictionarySize);
+
+        // Linear probe from hash position to find empty slot or matching key
+        int targetIndex = -1;
+        int probeCount = 0;
+        int index = hashIndex;
+
+        while (probeCount < dictionarySize)
+        {
+            var existingKeyOOP = _allocator.GetIndexedOOP(dictionaryOOP, index);
+
+            if (existingKeyOOP == nilOOP)
+            {
+                // Empty slot found
+                targetIndex = index;
+                break;
+            }
+            else if (existingKeyOOP == keyOOP)
+            {
+                // Existing entry for this key - replace it
+                targetIndex = index;
+                break;
+            }
+
+            // Linear probe: move to next slot, wrap around
+            index = (index + 1) % dictionarySize;
+            probeCount++;
+        }
+
+        if (targetIndex == -1)
+        {
+            throw new InvalidOperationException($"IdentityDictionary is full - cannot install {name} after {probeCount} probes");
+        }
+
+        // Check if this is a new entry (for tally update)
+        var existingKeyAtTarget = _allocator.GetIndexedOOP(dictionaryOOP, targetIndex);
+        bool isNewEntry = existingKeyAtTarget == nilOOP;
+
+        // Install key and value
+        _allocator.SetIndexedOOP(dictionaryOOP, targetIndex, keyOOP);
+        _allocator.SetIndexedOOP(valuesArrayOOP, targetIndex, valueOOP);
+
+        // Update tally if we used a new slot
+        if (isNewEntry)
+        {
+            int currentTally = tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger() : 0;
+            _allocator.SetInstanceVariable(dictionaryOOP, VMConstants.IDENTITY_DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(currentTally + 1));
+        }
+    }
+
+    /// <summary>
     /// Installs an Association in any Dictionary object.
     /// Uses hash-based lookup to match Dictionary>>findKeyOrNil: algorithm.
     /// </summary>
@@ -184,8 +276,7 @@ public class DictionaryService
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup
-        int hash = GetSymbolHash(keySymbolOOP);
-        int location = (hash % dictSize + dictSize) % dictSize;
+        int location = ComputeHashIndex(keySymbolOOP, dictSize);
 
         // Linear probing
         int pass = 1;

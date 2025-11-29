@@ -614,8 +614,8 @@ public class Phase6_ValidationAndGC : IPhase
                 continue;
             }
 
-            // Get tally (instance variable 1) and capacity (indexed size)
-            var tallyOOP = _allocator.GetInstanceVariable(methodDictOOP, 1);
+            // Get tally and capacity (indexed size)
+            var tallyOOP = _allocator.GetInstanceVariable(methodDictOOP, VMConstants.METHOD_DICTIONARY_TALLY_INDEX);
             int tally = tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger() : 0;
             int capacity = _allocator.GetIndexedSize(methodDictOOP);
 

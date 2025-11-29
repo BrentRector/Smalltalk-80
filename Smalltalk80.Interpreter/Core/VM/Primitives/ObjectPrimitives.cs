@@ -10,12 +10,28 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 public static class SimpleObjectPrimitives
 {
     /// <summary>Primitive 62: Object size - returns number of indexed elements</summary>
+    /// <remarks>
+    /// Special handling for CompiledMethod: In Blue Book, CompiledMethod>>size returns the
+    /// number of bytecodes (not header/literals count). Our C# implementation stores bytecodes
+    /// in a separate ByteArray, so we return that array's size for CompiledMethod.
+    /// </remarks>
     public class Size : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            // Special handling for CompiledMethod: size returns bytecode count
+            var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+            if (classOOP == context.Metadata!.CompiledMethodClassOOP)
+            {
+                // CompiledMethod stores bytecodes in a hidden ByteArray at the last indexed slot
+                int cmIndexedSize = context.HeapManager.GetIndexedSize(context.Receiver);
+                var bytecodeArrayOOP = context.HeapManager.GetIndexedOOP(context.Receiver, cmIndexedSize - 1);
+                int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
+                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(bytecodeCount));
+            }
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(size));
@@ -96,6 +112,11 @@ public static class SimpleObjectPrimitives
     }
 
     /// <summary>Primitive 60: Array at: - get indexed element</summary>
+    /// <remarks>
+    /// Special handling for CompiledMethod: In Blue Book, CompiledMethod>>at: accesses BYTECODES,
+    /// not header/literals (those use objectAt:). Our C# implementation stores bytecodes in a
+    /// separate ByteArray, so we redirect at: to that hidden ByteArray.
+    /// </remarks>
     public class At : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -105,14 +126,34 @@ public static class SimpleObjectPrimitives
             if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
+
+            // Special handling for CompiledMethod: at: accesses bytecodes only
+            var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+            if (classOOP == context.Metadata!.CompiledMethodClassOOP)
+            {
+                // CompiledMethod stores bytecodes in a hidden ByteArray at the last indexed slot
+                // at: 1 returns first bytecode, at: N returns last bytecode
+                int cmIndexedSize = context.HeapManager.GetIndexedSize(context.Receiver);
+                var bytecodeArrayOOP = context.HeapManager.GetIndexedOOP(context.Receiver, cmIndexedSize - 1);
+                int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
+
+                if (index < 1 || index > bytecodeCount)
+                {
+                    Console.WriteLine($"[Primitive 60 FAIL] CompiledMethod at: {index} failed - bytecodeCount={bytecodeCount}");
+                    return PrimitiveResult.Fail(context.Metadata!);
+                }
+
+                byte b = context.HeapManager.GetIndexedByte(bytecodeArrayOOP, index - 1);
+                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(b));
+            }
+
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
 
             // Smalltalk indices are 1-based
             if (index < 1 || index > size)
             {
                 // DIAGNOSTIC: Print details when basicAt: fails
-                var className = context.HeapManager.GetClassOOP(context.Receiver);
-                Console.WriteLine($"[Primitive 60 FAIL] basicAt: {index} failed - receiver={context.Receiver}, size={size}, class={className}");
+                Console.WriteLine($"[Primitive 60 FAIL] basicAt: {index} failed - receiver={context.Receiver}, size={size}, class={classOOP}");
                 return PrimitiveResult.Fail(context.Metadata!);
             }
 
@@ -139,6 +180,11 @@ public static class SimpleObjectPrimitives
     }
 
     /// <summary>Primitive 61: Array at:put: - set indexed element</summary>
+    /// <remarks>
+    /// Special handling for CompiledMethod: In Blue Book, CompiledMethod>>at:put: sets BYTECODES,
+    /// not header/literals (those use objectAt:put:). Our C# implementation stores bytecodes in a
+    /// separate ByteArray, so we redirect at:put: to that hidden ByteArray.
+    /// </remarks>
     public class AtPut : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -149,6 +195,27 @@ public static class SimpleObjectPrimitives
 
             int index = context.Arguments[0].AsSmallInteger();
             var value = context.Arguments[1];
+
+            // Special handling for CompiledMethod: at:put: sets bytecodes only
+            var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+            if (classOOP == context.Metadata!.CompiledMethodClassOOP)
+            {
+                // CompiledMethod stores bytecodes in a hidden ByteArray at the last indexed slot
+                int cmIndexedSize = context.HeapManager.GetIndexedSize(context.Receiver);
+                var bytecodeArrayOOP = context.HeapManager.GetIndexedOOP(context.Receiver, cmIndexedSize - 1);
+                int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
+
+                if (index < 1 || index > bytecodeCount)
+                    return PrimitiveResult.Fail(context.Metadata!);
+
+                if (!value.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+                int byteValue = value.AsSmallInteger();
+                if (byteValue < 0 || byteValue > 255) return PrimitiveResult.Fail(context.Metadata!);
+
+                context.HeapManager.SetIndexedByte(bytecodeArrayOOP, index - 1, (byte)byteValue);
+                return PrimitiveResult.Ok(value);
+            }
+
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
 
             // Smalltalk indices are 1-based

@@ -2203,13 +2203,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         int arraySize = _heapManager.GetIndexedSize(dictionaryOOP);
         if (arraySize == 0) return _metadata.KnownObjects.Nil;
 
-        // Compute hash using identity hash (Primitive 75 semantics: OOP >> 1)
-        int hash = keySymbol.IsSmallInteger
-            ? keySymbol.AsSmallInteger() & 0x3FFFFFFF
-            : keySymbol.ToObjectTableIndex();
-
-        // Find starting slot (matching Smalltalk's findKeyOrNil:)
-        int startIndex = ((hash % arraySize) + arraySize) % arraySize;
+        // Find starting slot (matching Smalltalk's Dictionary>>findKeyOrNil:)
+        int startIndex = IdentityHashUtility.ComputeDictionaryHashIndex(keySymbol, arraySize);
         int index = startIndex;
 
         // Linear probe until we find the key or hit nil

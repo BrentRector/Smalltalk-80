@@ -18,18 +18,21 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 /// <param name="allocator">The object graph allocator for creating objects.</param>
 /// <param name="localIdToObjectId">Mapping from local IDs to allocated object OOPs.</param>
 /// <param name="symbolService">The symbol service for symbol lookups.</param>
+/// <param name="dictionaryService">The dictionary service for hash-based dictionary operations.</param>
 /// <param name="diagnostics">Optional diagnostic hub for logging.</param>
 internal class MethodDictionaryInstaller(
     ColdStartBundle bundle,
     ObjectGraphAllocator allocator,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
     SymbolService symbolService,
+    DictionaryService dictionaryService,
     IDiagnosticHub? diagnostics = null)
 {
     private readonly ColdStartBundle _bundle = bundle;
     private readonly ObjectGraphAllocator _allocator = allocator;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = localIdToObjectId;
     private readonly SymbolService _symbolService = symbolService;
+    private readonly DictionaryService _dictionaryService = dictionaryService;
     private readonly IDiagnosticHub? _diagnostics = diagnostics;
 
     /// <summary>
@@ -73,7 +76,7 @@ internal class MethodDictionaryInstaller(
 
     /// <summary>
     /// Allocates a MethodDictionary object with the specified capacity.
-    /// MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
+    /// MethodDictionary (IdentityDictionary): [0] = tally (inherited from Set), [1] = valueArray, indexed fields = keys
     /// </summary>
     /// <param name="capacity">The number of slots for keys in the dictionary.</param>
     /// <returns>The allocated MethodDictionary OOP.</returns>
@@ -91,14 +94,14 @@ internal class MethodDictionaryInstaller(
         var methodDictClassOOP = GlobalRegistry.LookupClassOOP("MethodDictionary");
         var methodDictOOP = _allocator.AllocateArray(methodDictClassOOP, capacity);
 
+        // Set tally to 0 (no methods installed yet)
+        var tallyOOP = SmalltalkOOP.FromSmallInteger(0);
+        _allocator.SetInstanceVariable(methodDictOOP, VMConstants.METHOD_DICTIONARY_TALLY_INDEX, tallyOOP);
+
         // Allocate valueArray (Array of CompiledMethod)
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         var valuesArrayOOP = _allocator.AllocateArray(arrayClassOOP, capacity);
-        _allocator.SetInstanceVariable(methodDictOOP, 0, valuesArrayOOP);
-
-        // Set tally to 0 (no methods installed yet)
-        var tallyOOP = SmalltalkOOP.FromSmallInteger(0);
-        _allocator.SetInstanceVariable(methodDictOOP, 1, tallyOOP);
+        _allocator.SetInstanceVariable(methodDictOOP, VMConstants.METHOD_DICTIONARY_VALUE_ARRAY_INDEX, valuesArrayOOP);
 
         // Initialize all indexed fields (keys) to nil
         var nilOOP = _allocator.GetNil();
@@ -199,71 +202,14 @@ internal class MethodDictionaryInstaller(
 
     /// <summary>
     /// Installs a method into a method dictionary using IdentityDictionary structure.
-    /// MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
+    /// Delegates to DictionaryService for hash-based placement.
     /// </summary>
     /// <param name="methodDictOOP">The method dictionary to install into.</param>
     /// <param name="selectorSymbolOOP">The selector symbol OOP.</param>
     /// <param name="methodOOP">The compiled method OOP to install.</param>
-    /// <exception cref="InvalidOperationException">Thrown when dictionary is full or has invalid structure.</exception>
     public void InstallMethodInDictionary(SmalltalkOOP methodDictOOP, SmalltalkOOP selectorSymbolOOP, SmalltalkOOP methodOOP)
     {
-        // MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
-        var valuesArrayOOP = _allocator.GetInstanceVariable(methodDictOOP, 0);
-        var tallyOOP = _allocator.GetInstanceVariable(methodDictOOP, 1);
-
-        if (valuesArrayOOP == _allocator.GetNil())
-        {
-            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has nil valueArray");
-        }
-
-        int dictionarySize = _allocator.GetIndexedSize(methodDictOOP);
-        int valuesArraySize = _allocator.GetIndexedSize(valuesArrayOOP);
-
-        if (dictionarySize != valuesArraySize)
-        {
-            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has mismatched sizes: keys={dictionarySize}, values={valuesArraySize}");
-        }
-
-        // Find an empty slot or existing entry for this selector
-        int targetIndex = -1;
-        for (int i = 0; i < dictionarySize; i++)
-        {
-            var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
-
-            if (keyOOP == _allocator.GetNil())
-            {
-                // Empty slot found
-                targetIndex = i;
-                break;
-            }
-            else if (keyOOP == selectorSymbolOOP)
-            {
-                // Existing entry for this selector - replace it
-                targetIndex = i;
-                break;
-            }
-        }
-
-        if (targetIndex == -1)
-        {
-            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} is full - no empty slots available");
-        }
-
-        // Check if this is a new entry (for tally update)
-        var existingKeyOOP = _allocator.GetIndexedOOP(methodDictOOP, targetIndex);
-        bool isNewEntry = existingKeyOOP == _allocator.GetNil();
-
-        // Install the method
-        _allocator.SetIndexedOOP(methodDictOOP, targetIndex, selectorSymbolOOP);
-        _allocator.SetIndexedOOP(valuesArrayOOP, targetIndex, methodOOP);
-
-        // Update tally if we used a new slot
-        if (isNewEntry)
-        {
-            int currentTally = tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger() : 0;
-            var newTallyOOP = SmalltalkOOP.FromSmallInteger(currentTally + 1);
-            _allocator.SetInstanceVariable(methodDictOOP, 1, newTallyOOP);
-        }
+        _dictionaryService.InstallInIdentityDictionary(methodDictOOP, selectorSymbolOOP, methodOOP, selectorSymbolOOP.ToString());
     }
 
     /// <summary>

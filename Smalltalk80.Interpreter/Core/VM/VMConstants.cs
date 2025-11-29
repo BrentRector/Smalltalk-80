@@ -117,6 +117,23 @@ public static class VMConstants
     public const int DICTIONARY_TALLY_INDEX = 0;    // Same as SET_TALLY_INDEX (inherited from Set)
 
     // ========================================================================
+    // IdentityDictionary field indices
+    // ========================================================================
+    // IdentityDictionary inherits from Dictionary which inherits from Set
+    // IdentityDictionary adds: 'valueArray'
+    // Complete layout:
+    //   Instance variable 0: tally (from Set)
+    //   Instance variable 1: valueArray (IdentityDictionary field) - Array of values
+    // Keys are stored in the indexed slots (PointerIndexed), values in parallel valueArray
+
+    public const int IDENTITY_DICTIONARY_TALLY_INDEX = 0;       // SmallInteger count (inherited from Set)
+    public const int IDENTITY_DICTIONARY_VALUE_ARRAY_INDEX = 1; // Array of values
+
+    // MethodDictionary inherits from IdentityDictionary with no additional instance variables
+    public const int METHOD_DICTIONARY_TALLY_INDEX = 0;         // SmallInteger count (inherited from Set)
+    public const int METHOD_DICTIONARY_VALUE_ARRAY_INDEX = 1;   // Array of CompiledMethods
+
+    // ========================================================================
     // Metaclass field indices
     // ========================================================================
     // Metaclass inherits from: Behavior → ClassDescription → Class
