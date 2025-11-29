@@ -2228,12 +2228,19 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     {
         SmalltalkOOP schedulerOOP = _metadata.ProcessorScheduler;
         if (schedulerOOP == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine($"[SwitchToNextRunnableProcess] ProcessorScheduler is nil");
             return false;
+        }
 
         // Find highest priority runnable process
         SmalltalkOOP nextProcess = FindHighestPriorityRunnableProcess(schedulerOOP);
         if (nextProcess == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine($"[SwitchToNextRunnableProcess] No runnable process found, dumping queues:");
+            DumpProcessQueues(schedulerOOP);
             return false;
+        }
 
         // Remove the process from its priority queue (it's about to become active)
         SmalltalkOOP myListOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX);
@@ -2300,6 +2307,60 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         return _metadata.KnownObjects.Nil;
+    }
+
+    /// <summary>
+    /// Diagnostic method to dump the contents of all process queues.
+    /// </summary>
+    private void DumpProcessQueues(SmalltalkOOP schedulerOOP)
+    {
+        SmalltalkOOP processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        if (processListsOOP == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine("  quiescentProcessLists is nil!");
+            return;
+        }
+
+        int arraySize = _heapManager.GetIndexedSize(processListsOOP);
+        Console.WriteLine($"  quiescentProcessLists array size: {arraySize}");
+
+        for (int priority = 1; priority <= 8; priority++)
+        {
+            int index = priority - 1;
+            if (index >= arraySize)
+            {
+                Console.WriteLine($"  Priority {priority}: index out of bounds");
+                continue;
+            }
+
+            SmalltalkOOP priorityListOOP = _heapManager.GetIndexedOOP(processListsOOP, index);
+            if (priorityListOOP == _metadata.KnownObjects.Nil)
+            {
+                Console.WriteLine($"  Priority {priority}: LinkedList is nil");
+                continue;
+            }
+
+            SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+            SmalltalkOOP lastLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
+
+            if (firstLinkOOP == _metadata.KnownObjects.Nil)
+            {
+                Console.WriteLine($"  Priority {priority}: empty (firstLink=nil)");
+            }
+            else
+            {
+                // Count processes in the list
+                int count = 0;
+                SmalltalkOOP current = firstLinkOOP;
+                while (current != _metadata.KnownObjects.Nil && count < 100)
+                {
+                    count++;
+                    SmalltalkOOP suspCtx = _heapManager.GetInstanceVariable(current, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+                    Console.WriteLine($"  Priority {priority}: Process {current} (suspendedContext={suspCtx})");
+                    current = _heapManager.GetInstanceVariable(current, VMConstants.LINK_NEXTLINK_INDEX);
+                }
+            }
+        }
     }
 
     /// <summary>
