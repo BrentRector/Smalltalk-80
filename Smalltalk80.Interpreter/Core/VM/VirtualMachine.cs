@@ -653,11 +653,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                     Console.WriteLine($"  Block home: {homeOOP}, startPC: {startPCOOP}");
                     // Also show the home context's method selector
                     var homeMethodOOP = _heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
-                    var literalCount = _heapManager.GetLiteralCount(homeMethodOOP);
+                    var literalCount = GetLiteralCount(homeMethodOOP);
                     if (literalCount > 0)
                     {
-                        var selectorOOP = _heapManager.GetLiteral(homeMethodOOP, 0);
-                        var selectorName = _heapManager.GetSymbolName(selectorOOP);
+                        var selectorOOP = GetMethodLiteral(homeMethodOOP, 0);
+                        var selectorName = GetSymbolName(selectorOOP);
                         Console.WriteLine($"  Home method selector: {selectorName}");
                     }
                 }
