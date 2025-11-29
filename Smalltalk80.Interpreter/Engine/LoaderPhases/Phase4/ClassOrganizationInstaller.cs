@@ -60,6 +60,20 @@ internal class ClassOrganizationInstaller(
             string category = method.Category ?? "as yet unclassified";
             string selector = _bundle.Symbols[method.SelectorIndex];
 
+            // Validate selector is in symbol table - skip methods with invalid selectors
+            if (!_symbolService.TryGetSymbolOOP(selector, out _))
+            {
+                _diagnostics?.Emit(new DiagnosticMessageEvent
+                {
+                    Severity = MessageSeverity.Warning,
+                    Category = "Phase4",
+                    Message = $"Skipping method with invalid selector '{selector}' in class {classLocalId}",
+                    Timestamp = Stopwatch.GetTimestamp(),
+                    InstructionCount = 0
+                });
+                continue;
+            }
+
             if (!methodsByClass.TryGetValue(classLocalId, out var categories))
             {
                 categories = new Dictionary<string, List<string>>();
@@ -177,8 +191,16 @@ internal class ClassOrganizationInstaller(
         var elementArrayOOP = _allocator.AllocateArray(arrayClassOOP, allSelectors.Count);
         for (int i = 0; i < allSelectors.Count; i++)
         {
-            var symbolOOP = _symbolService.GetSymbolOOP(allSelectors[i]);
-            _allocator.SetIndexedOOP(elementArrayOOP, i, symbolOOP);
+            // Use defensive lookup - selectors should have been validated, but be safe
+            if (_symbolService.TryGetSymbolOOP(allSelectors[i], out var symbolOOP))
+            {
+                _allocator.SetIndexedOOP(elementArrayOOP, i, symbolOOP);
+            }
+            else
+            {
+                // Selector not in symbol table - use nil (shouldn't happen after validation)
+                _allocator.SetIndexedOOP(elementArrayOOP, i, _allocator.GetNil());
+            }
         }
         _allocator.SetInstanceVariable(organizerOOP, CLASSORGANIZER_ELEMENTARRAY_INDEX, elementArrayOOP);
 
