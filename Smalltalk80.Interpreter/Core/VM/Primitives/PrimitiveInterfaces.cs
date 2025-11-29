@@ -132,7 +132,16 @@ public readonly struct PrimitiveExecutionContext
         if (fieldIndex < 0)
             throw new InvalidOperationException($"Field '{fieldName}' not found in class '{className}'");
 
-        return HeapManager.GetInstanceVariable(oop, fieldIndex);
+        var result = HeapManager.GetInstanceVariable(oop, fieldIndex);
+
+        // Debug for LinkedList fields
+        if (fieldName == "firstLink" || fieldName == "lastLink")
+        {
+            var actualClassName = HeapManager.GetClassName(classOOP);
+            Console.WriteLine($"[GetFieldValue] oop={oop} {actualClassName}.{fieldName} at index {fieldIndex} => {result}");
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -151,6 +160,13 @@ public readonly struct PrimitiveExecutionContext
         int fieldIndex = RuntimeHeapAccess.GetFieldIndex(classOOP, fieldName);
         if (fieldIndex < 0)
             throw new InvalidOperationException($"Field '{fieldName}' not found in class '{className}'");
+
+        // Debug for LinkedList fields
+        if (fieldName == "firstLink" || fieldName == "lastLink")
+        {
+            var actualClassName = HeapManager.GetClassName(classOOP);
+            Console.WriteLine($"[SetFieldValue] oop={oop} {actualClassName}.{fieldName} at index {fieldIndex} <= {value}");
+        }
 
         HeapManager.SetInstanceVariable(oop, fieldIndex, value);
     }
