@@ -587,7 +587,7 @@ public class SmalltalkInterpreterThread
         // and other system processes never get CPU time, so cursorPoint is never updated
         // and isControlWanted always returns false.
         Console.WriteLine("  Step 3: Lowering bootstrap process priority to 4...");
-        var processorOOP = LookupGlobal("Processor");
+        // processorOOP already declared above for diagnostic
         var activeProcessOOP = messageSender.SendUnary(processorOOP, "activeProcess");
         messageSender.SendKeyword(activeProcessOOP, "priority:", SmalltalkOOP.FromSmallInteger(4));
         Console.WriteLine("    ✓ Bootstrap process now at UserSchedulingPriority (4)");
