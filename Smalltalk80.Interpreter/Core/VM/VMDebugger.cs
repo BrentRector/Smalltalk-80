@@ -38,7 +38,34 @@ internal sealed class VMDebugger(
 
             try
             {
-                var methodOOP = heapManager.GetInstanceVariable(currentOOP, methodIndex);
+                // Check if this is a BlockContext - they store nargs at index 3, not method
+                // For BlockContext, we need to traverse to home MethodContext to get the method
+                var currentClassOOP = heapManager.GetClassOOP(currentOOP);
+                bool isBlockContext = (currentClassOOP == metadata.BlockContextClassOOP);
+
+                SmalltalkOOP methodOOP;
+                if (isBlockContext)
+                {
+                    // BlockContext: traverse home chain to find MethodContext
+                    var homeOOP = currentOOP;
+                    int traverseCount = 0;
+                    while (traverseCount < 100) // Safety limit
+                    {
+                        homeOOP = heapManager.GetInstanceVariable(homeOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                        var homeClassOOP = heapManager.GetClassOOP(homeOOP);
+                        if (homeClassOOP != metadata.BlockContextClassOOP)
+                        {
+                            // Found the MethodContext
+                            break;
+                        }
+                        traverseCount++;
+                    }
+                    methodOOP = heapManager.GetInstanceVariable(homeOOP, methodIndex);
+                }
+                else
+                {
+                    methodOOP = heapManager.GetInstanceVariable(currentOOP, methodIndex);
+                }
 
                 // Get selector from method's literal[0] (stored at indexed slot 1 in our format)
                 // indexed slot 0 = header, indexed slot 1 = literal[0] (selector)

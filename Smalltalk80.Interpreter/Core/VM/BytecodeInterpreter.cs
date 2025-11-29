@@ -576,9 +576,11 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
         if (isBlockContext)
         {
-            // BlockContext: receiver from home MethodContext (instance variable 5 in BlockContext is HOME, not receiver!)
-            var homeOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-            receiverOOP = heapManager.GetInstanceVariable(homeOOP, receiverIndex);
+            // BlockContext: receiver from home MethodContext
+            // CRITICAL: Must use FindMethodContext() to traverse the entire home chain for nested blocks
+            // Just reading one level up would fail for nested blocks where home could be another BlockContext
+            var methodContextOOP = context.FindMethodContext(context.ActiveContext);
+            receiverOOP = heapManager.GetInstanceVariable(methodContextOOP, receiverIndex);
         }
         else
         {
