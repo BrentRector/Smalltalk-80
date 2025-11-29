@@ -730,7 +730,7 @@ public class SmalltalkInterpreterThread
                     }
                 }
 
-                Console.WriteLine($"      Installed at slot {location} (hash={hash})");
+                Console.WriteLine($"      Installed at slot {location} (hash={startLocation})");
                 return;
             }
 
