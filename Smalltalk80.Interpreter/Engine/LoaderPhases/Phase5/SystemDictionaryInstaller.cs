@@ -163,15 +163,16 @@ public class SystemDictionaryInstaller(
             return;
         }
 
-        // Create a new StringHolder instance
+        // Create a new StringHolder instance using heap-based allocation
         // StringHolder has instance variables: contents, isLocked
-        var stringHolderInstance = context.Allocator.AllocateInstance(stringHolderClassOOP);
+        var stringHolderInstance = context.HeapManager.AllocateInstanceOf(stringHolderClassOOP, 0);
 
         // Initialize the instance: contents = '', isLocked = false
-        var emptyString = context.Allocator.AllocateString("");
-        var falseOOP = context.HeapManager.GetFalse();
-        context.Allocator.SetInstanceVariable(stringHolderInstance, 0, emptyString); // contents
-        context.Allocator.SetInstanceVariable(stringHolderInstance, 1, falseOOP);    // isLocked
+        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+        var emptyString = context.Allocator.AllocateString(stringClassOOP, "");
+        var falseOOP = GlobalRegistry.FalseOOP;
+        context.HeapManager.SetInstanceVariable(stringHolderInstance, 0, emptyString); // contents
+        context.HeapManager.SetInstanceVariable(stringHolderInstance, 1, falseOOP);    // isLocked
 
         // Create Association for Workspace and set its value
         var associationOOP = associationManager.GetOrCreateCanonical("Workspace");
