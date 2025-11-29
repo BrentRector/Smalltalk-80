@@ -589,7 +589,7 @@ public class SmalltalkInterpreterThread
                 if (methodIndexedSize >= 2)
                 {
                     var selectorOOP = _context.HeapManager.GetIndexedOOP(homeMethod, 1);
-                    var selectorName = _context.HeapManager.GetSymbolName(selectorOOP);
+                    var selectorName = ExtractSymbolString(selectorOOP);
                     Console.WriteLine($"    Home method selector: {selectorName}");
                 }
                 // Get bytecodes length
