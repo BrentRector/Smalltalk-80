@@ -626,6 +626,25 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             }
 
             // Forked process terminated - switch to next runnable process
+            // Debug: Log which process/context is terminating
+            var termPriorityOOP = _heapManager.GetInstanceVariable(currentProcess, VMConstants.PROCESS_PRIORITY_INDEX);
+            int termPriority = termPriorityOOP.IsSmallInteger ? termPriorityOOP.AsSmallInteger() : -1;
+            if (termPriority == 1)
+            {
+                Console.WriteLine($"[PROCESS TERMINATING] Priority 1 (background) process={currentProcess}");
+                Console.WriteLine($"  Returning context: {returningContext}");
+                Console.WriteLine($"  Return value: {(returnValue.IsSmallInteger ? returnValue.AsSmallInteger().ToString() : returnValue.ToString())}");
+                // Show context details
+                var ctxClassOOP = _heapManager.GetClassOOP(returningContext);
+                var ctxClassName = _heapManager.GetClassName(returningContext);
+                Console.WriteLine($"  Context class: {ctxClassName}");
+                if (ctxClassName == "BlockContext")
+                {
+                    var homeOOP = _heapManager.GetInstanceVariable(returningContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                    var startPCOOP = _heapManager.GetInstanceVariable(returningContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+                    Console.WriteLine($"  Block home: {homeOOP}, startPC: {startPCOOP}");
+                }
+            }
             _contextManager.AddContextToPool(returningContext);
 
             if (SwitchToNextRunnableProcess(currentProcess))
@@ -2261,6 +2280,33 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         if (nextContext == _metadata.KnownObjects.Nil)
             return false;
 
+        // Debug: Log when activating priority 1 process
+        var activatingPriorityOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_PRIORITY_INDEX);
+        int activatingPriority = activatingPriorityOOP.IsSmallInteger ? activatingPriorityOOP.AsSmallInteger() : -1;
+        if (activatingPriority == 1)
+        {
+            Console.WriteLine($"[ACTIVATING PROCESS] Priority 1 (background) process={nextProcess}");
+            Console.WriteLine($"  Suspended context: {nextContext}");
+            var ctxClassName = _heapManager.GetClassName(nextContext);
+            Console.WriteLine($"  Context class: {ctxClassName}");
+            var pcOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_PC_INDEX);
+            var startPCOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+            var callerOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX);
+            Console.WriteLine($"  PC: {pcOOP}, startPC: {startPCOOP}, caller: {callerOOP}");
+            if (ctxClassName == "BlockContext")
+            {
+                var homeOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                Console.WriteLine($"  Home context: {homeOOP}");
+                var homeClassName = _heapManager.GetClassName(homeOOP);
+                Console.WriteLine($"  Home class: {homeClassName}");
+                if (homeClassName == "MethodContext")
+                {
+                    var methodOOP = _heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
+                    Console.WriteLine($"  Method: {methodOOP}");
+                }
+            }
+        }
+
         // Check if this is an unactivated BlockContext (PC is nil)
         // This happens when resuming a newly created process via [block] newProcess
         SmalltalkOOP nextContextPC = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_PC_INDEX);
@@ -2270,6 +2316,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             SmalltalkOOP startPC = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
             if (startPC == _metadata.KnownObjects.Nil || !startPC.IsSmallInteger)
                 return false;
+
+            if (activatingPriority == 1)
+                Console.WriteLine($"  Activating block: setting PC={startPC.AsSmallInteger()}, stackp=0, caller=nil");
 
             _heapManager.SetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_PC_INDEX, startPC);
             _heapManager.SetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SmalltalkOOP.FromSmallInteger(0));
