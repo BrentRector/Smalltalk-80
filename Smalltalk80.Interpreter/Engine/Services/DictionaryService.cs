@@ -41,6 +41,19 @@ public class DictionaryService
     }
 
     /// <summary>
+    /// Computes the 0-indexed hash slot for a key in a dictionary of given size.
+    /// Matches Smalltalk's `key asOop \\ length` (converted from 1-indexed to 0-indexed).
+    /// </summary>
+    /// <param name="keyOOP">The key OOP to hash.</param>
+    /// <param name="dictionarySize">The size of the dictionary's indexed storage.</param>
+    /// <returns>The 0-indexed slot position.</returns>
+    public int ComputeHashIndex(SmalltalkOOP keyOOP, int dictionarySize)
+    {
+        int hash = GetSymbolHash(keyOOP);
+        return (hash % dictionarySize + dictionarySize) % dictionarySize;
+    }
+
+    /// <summary>
     /// Allocates an Association object (key-value pair) using ObjectGraphAllocator.
     /// </summary>
     /// <param name="keyOOP">The symbol key for the Association.</param>
@@ -128,8 +141,7 @@ public class DictionaryService
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup (same algorithm as Dictionary>>findKeyOrNil:)
-        int hash = GetSymbolHash(keySymbolOOP);
-        int location = (hash % systemDictSize + systemDictSize) % systemDictSize;
+        int location = ComputeHashIndex(keySymbolOOP, systemDictSize);
 
         // Linear probing
         int pass = 1;
@@ -199,9 +211,7 @@ public class DictionaryService
         }
 
         // Hash using identity hash: index = key asOop \\ length (0-indexed in C#)
-        // Blue Book: asOop returns "half of the receiver's object pointer" = object table index
-        int hash = GetSymbolHash(keyOOP);
-        int hashIndex = (hash % dictionarySize + dictionarySize) % dictionarySize;
+        int hashIndex = ComputeHashIndex(keyOOP, dictionarySize);
 
         // Linear probe from hash position to find empty slot or matching key
         int targetIndex = -1;
@@ -267,8 +277,7 @@ public class DictionaryService
         var keySymbolOOP = _allocator.GetInstanceVariable(associationOOP, 0);
 
         // Use hash-based lookup
-        int hash = GetSymbolHash(keySymbolOOP);
-        int location = (hash % dictSize + dictSize) % dictSize;
+        int location = ComputeHashIndex(keySymbolOOP, dictSize);
 
         // Linear probing
         int pass = 1;
