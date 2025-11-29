@@ -55,6 +55,11 @@ public sealed record MethodDescriptor
     [JsonPropertyName("notes")]
     public string? Notes { get; init; }
     /// <summary>
+    /// Optional method category for browser display (e.g., "accessing", "initialize-release").
+    /// </summary>
+    [JsonPropertyName("category")]
+    public string? Category { get; init; }
+    /// <summary>
     /// Optional ordered argument names for debugging.
     /// </summary>
     [JsonPropertyName("argNames")]
