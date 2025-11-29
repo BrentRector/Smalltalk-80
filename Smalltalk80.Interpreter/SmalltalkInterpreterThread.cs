@@ -585,9 +585,14 @@ public class SmalltalkInterpreterThread
         messageSender.SendKeyword(activeProcessOOP, "priority:", SmalltalkOOP.FromSmallInteger(4));
         Console.WriteLine("    ✓ Bootstrap process now at UserSchedulingPriority (4)");
 
-        // Step 4: ScheduledControllers searchForActiveController
+        // Step 4: Restore display (paints gray background and all scheduled views)
+        Console.WriteLine("  Step 4: Restoring display...");
+        messageSender.SendUnary(controlManagerOOP, "restore");
+        Console.WriteLine("    ✓ Display restored (gray background painted)");
+
+        // Step 5: ScheduledControllers searchForActiveController
         // This runs the main event loop - it will run FOREVER until the system exits
-        Console.WriteLine("  Step 4: Starting controller event loop...");
+        Console.WriteLine("  Step 5: Starting controller event loop...");
         Console.WriteLine("    (This will run until the window is closed)");
 
         // Use controlManagerOOP directly - we already have it from step 2
