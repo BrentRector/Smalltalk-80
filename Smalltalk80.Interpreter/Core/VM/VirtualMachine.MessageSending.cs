@@ -175,12 +175,11 @@ public partial class VirtualMachine
             var currentMethod = GetCurrentMethodLocalId();
             _tracer.TraceSendEntry(recvClass, selectorName ?? "unknown", currentMethod);
 
-            // Special alert for error: sends
+            // Log error: sends during tracing
             if (selectorName == "error:")
             {
                 Console.WriteLine($"  *** ERROR BEING RAISED ***");
-                // Halt on first error to enable debugging
-                throw new InvalidOperationException($"Smalltalk error: message sent to {recvClass}>>error:");
+                // Let Smalltalk's error handling proceed - Object>>error: will open NotifierView
             }
         }
 
@@ -293,7 +292,7 @@ public partial class VirtualMachine
         string recvClassName = GetClassName(classOOP) ?? "?";
         _tracer.RecordMethodCall(recvClassName, selectorName ?? "?");
 
-        // ALWAYS catch error: sends to halt on first error for debugging
+        // Log error: sends but let Smalltalk handle them gracefully via NotifierView
         if (selectorName == "error:")
         {
             Console.WriteLine($"\n*** SMALLTALK ERROR BEING RAISED ***");
@@ -301,7 +300,7 @@ public partial class VirtualMachine
             Console.WriteLine($"  Instruction count: {_tracer.InstructionCount}");
             Console.WriteLine("\nSmalltalk Context Chain:");
             _debugger.DumpSenderChain(_contextManager.ActiveContext, 20);
-            throw new InvalidOperationException($"Smalltalk error: message sent to {recvClassName}>>error:");
+            // Let Smalltalk's error handling proceed - Object>>error: will open NotifierView
         }
 
         // DIAGNOSTIC: Catch notify:at: to see parsing errors before GUI is accessed
