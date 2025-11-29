@@ -561,6 +561,13 @@ public class SmalltalkInterpreterThread
         messageSender.SendUnary(processorSchedulerClassOOP, "hiddenBackgroundProcess");
         Console.WriteLine("    ✓ Background process created at priority 1");
 
+        // DIAGNOSTIC: Verify background process is on the queue
+        var processorOOP = LookupGlobal("Processor");
+        var quiescentListsOOP = _context.HeapManager.GetInstanceVariable(processorOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        var priority1ListOOP = _context.HeapManager.GetIndexedOOP(quiescentListsOOP, 0); // priority 1 is index 0
+        var firstLinkOOP = _context.HeapManager.GetInstanceVariable(priority1ListOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+        Console.WriteLine($"    [DIAGNOSTIC] Priority 1 queue firstLink={firstLinkOOP} (should not be nil)");
+
         // Step 2: ControlManager new → install as ScheduledControllers global
         Console.WriteLine("  Step 2: Creating ControlManager...");
         var controlManagerClassOOP = LookupGlobal("ControlManager");
