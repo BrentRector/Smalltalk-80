@@ -633,7 +633,15 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             {
                 Console.WriteLine($"[PROCESS TERMINATING] Priority 1 (background) process={currentProcess}");
                 Console.WriteLine($"  Returning context: {returningContext}");
-                Console.WriteLine($"  Return value: {(returnValue.IsSmallInteger ? returnValue.AsSmallInteger().ToString() : returnValue.ToString())}");
+                string returnValueStr;
+                if (returnValue.IsSmallInteger)
+                    returnValueStr = $"SmallInteger({returnValue.AsSmallInteger()})";
+                else
+                {
+                    var rvClassName = _heapManager.GetClassName(returnValue);
+                    returnValueStr = $"{returnValue} (class: {rvClassName})";
+                }
+                Console.WriteLine($"  Return value: {returnValueStr}");
                 // Show context details
                 var ctxClassOOP = _heapManager.GetClassOOP(returningContext);
                 var ctxClassName = _heapManager.GetClassName(returningContext);
@@ -643,6 +651,15 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                     var homeOOP = _heapManager.GetInstanceVariable(returningContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
                     var startPCOOP = _heapManager.GetInstanceVariable(returningContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
                     Console.WriteLine($"  Block home: {homeOOP}, startPC: {startPCOOP}");
+                    // Also show the home context's method selector
+                    var homeMethodOOP = _heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
+                    var literalCount = _heapManager.GetLiteralCount(homeMethodOOP);
+                    if (literalCount > 0)
+                    {
+                        var selectorOOP = _heapManager.GetLiteral(homeMethodOOP, 0);
+                        var selectorName = _heapManager.GetSymbolName(selectorOOP);
+                        Console.WriteLine($"  Home method selector: {selectorName}");
+                    }
                 }
             }
             _contextManager.AddContextToPool(returningContext);
