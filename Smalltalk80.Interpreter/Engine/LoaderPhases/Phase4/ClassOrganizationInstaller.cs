@@ -136,9 +136,10 @@ internal class ClassOrganizationInstaller(
             categoryStops.Add(currentStop);
         }
 
-        // Allocate ClassOrganizer object
+        // Allocate ClassOrganizer object (4 fixed instance variables, no indexed slots)
         var classOrganizerClassOOP = GlobalRegistry.LookupClassOOP("ClassOrganizer");
-        var organizerOOP = _allocator.AllocateInstanceOf(classOrganizerClassOOP, 0);
+        var organizerOOP = _allocator.AllocateFixedObject("ClassOrganizer");
+        _allocator.SetClassOOP(organizerOOP, classOrganizerClassOOP);
 
         // Field [0]: globalComment - nil
         _allocator.SetInstanceVariable(organizerOOP, CLASSORGANIZER_GLOBALCOMMENT_INDEX, _allocator.GetNil());
