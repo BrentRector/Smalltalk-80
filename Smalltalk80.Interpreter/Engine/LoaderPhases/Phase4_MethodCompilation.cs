@@ -441,13 +441,16 @@ public class Phase4_MethodCompilation : IPhase
         }
 
         // Use AllocateCompiledMethod which handles all the setup including homeClass fixed slot
+        // Pass source position for Blue Book source retrieval (if available)
         var resultOOP = _allocator.AllocateCompiledMethod(
             compiledMethodClassOOP,
             byteArrayClassOOP,
             homeClassOOP,
             method.Header.Word,
             literalOOPs,
-            bytecodes);
+            bytecodes,
+            method.FileIndex,
+            method.SourcePosition);
 
         return resultOOP;
     }

@@ -45,10 +45,16 @@ public sealed record MethodDescriptor
     [JsonPropertyName("source")]
     public string? Source { get; init; }
     /// <summary>
-    /// Optional index into the source files array.
+    /// Optional index into the source files array (1 = .sources, 2 = .changes).
     /// </summary>
     [JsonPropertyName("fileIndex")]
     public int? FileIndex { get; init; }
+    /// <summary>
+    /// Optional byte position in the source file for this method's source code.
+    /// Used with FileIndex to retrieve source via CompiledMethod>>getSource.
+    /// </summary>
+    [JsonPropertyName("sourcePosition")]
+    public int? SourcePosition { get; init; }
     /// <summary>
     /// Optional notes about this method.
     /// </summary>

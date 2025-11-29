@@ -116,6 +116,19 @@ public static class FileOperations
     }
 
     /// <summary>
+    /// Opens a file and returns a handle. Public wrapper for cold start use.
+    /// </summary>
+    /// <param name="path">File path.</param>
+    /// <param name="accessMode">1=Read, 2=Write, 3=ReadWrite.</param>
+    /// <param name="shareMode">0=None, 1=Read, 2=Write, 3=ReadWrite.</param>
+    /// <param name="createMode">1=CreateNew, 2=Create, 3=Open, 4=OpenOrCreate, 5=Truncate.</param>
+    /// <returns>Handle or -1 on error.</returns>
+    public static int OpenFileHandle(string path, int accessMode = 1, int shareMode = 1, int createMode = 3)
+    {
+        return FileHandleManager.OpenFile(path, accessMode, shareMode, createMode);
+    }
+
+    /// <summary>
     /// Primitive 120: Parse a Windows path string.
     /// Receiver: WindowsPathName class or instance.
     /// Argument: String path to parse.

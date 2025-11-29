@@ -581,6 +581,33 @@ public class ObjectGraphAllocator
     }
 
     /// <summary>
+    /// Allocates a CompiledMethod with source position encoding for Blue Book source retrieval.
+    /// When fileIndex and sourcePosition are provided, appends 3 bytes to bytecodes
+    /// encoding the source location per Blue Book format.
+    /// </summary>
+    public SmalltalkOOP AllocateCompiledMethod(
+        SmalltalkOOP compiledMethodClassOOP,
+        SmalltalkOOP byteArrayClassOOP,
+        SmalltalkOOP homeClassOOP,
+        int headerWord,
+        SmalltalkOOP[] literalOOPs,
+        byte[] bytecodes,
+        int? fileIndex,
+        int? sourcePosition)
+    {
+        return CompiledMethodHelpers.AllocateCompiledMethodInternal(
+            _heapManager,
+            compiledMethodClassOOP,
+            byteArrayClassOOP,
+            homeClassOOP,
+            headerWord,
+            literalOOPs,
+            bytecodes,
+            fileIndex,
+            sourcePosition);
+    }
+
+    /// <summary>
     /// Gets the class name of an object for debugging/validation purposes.
     /// </summary>
     public string GetClassName(SmalltalkOOP objectOOP)

@@ -140,6 +140,16 @@ file sealed class Program
 
             File.WriteAllText(outputFile, json);
 
+            // Write the .sources file alongside the JSON
+            string sourcesFileContent = generator.GetSourcesFileContent();
+            if (!string.IsNullOrEmpty(sourcesFileContent))
+            {
+                string sourcesFile = Path.Combine(outputDir ?? ".", "Smalltalk-80.sources");
+                File.WriteAllText(sourcesFile, sourcesFileContent, System.Text.Encoding.UTF8);
+                Console.WriteLine($"Generated sources file: {sourcesFile}");
+                Console.WriteLine($"  Size: {sourcesFileContent.Length:N0} bytes");
+            }
+
             Console.WriteLine();
             Console.WriteLine($"Successfully generated: {outputFile}");
             var stats = generator.GetStatistics();
