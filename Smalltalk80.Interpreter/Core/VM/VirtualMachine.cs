@@ -616,15 +616,20 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // Check if we're in the initial process or a forked process
             SmalltalkOOP currentProcess = GetActiveProcess();
 
+            Console.WriteLine($"[HandleReturn] Nil sender detected");
+            Console.WriteLine($"[HandleReturn] currentProcess={currentProcess}, initialProcess={_initialProcessOOP}");
+
             if (currentProcess == _initialProcessOOP)
             {
                 // Initial process completed - return to caller
+                Console.WriteLine($"[HandleReturn] Initial process completed, returning to C#");
                 _returnValue = returnValue;
                 _contextManager.SetActiveContext(_metadata.KnownObjects.Nil);
                 _contextManager.AddContextToPool(returningContext);
                 return InterpreterStatus.Return;
             }
 
+            Console.WriteLine($"[HandleReturn] Forked process terminated, switching to next runnable");
             // Forked process terminated - switch to next runnable process
             _contextManager.AddContextToPool(returningContext);
 
