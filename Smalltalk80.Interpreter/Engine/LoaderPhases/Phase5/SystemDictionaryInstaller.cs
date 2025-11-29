@@ -5,6 +5,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
+using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 
@@ -367,10 +368,11 @@ public class SystemDictionaryInstaller(
         }
 
         // Build elementArray (Array of Symbols)
+        var symbolService = new SymbolService(context.Bundle);
         var elementArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, allClassNames.Count);
         for (int i = 0; i < allClassNames.Count; i++)
         {
-            var symbolOOP = context.Allocator.InternSymbol(allClassNames[i]);
+            var symbolOOP = symbolService.GetSymbolOOP(allClassNames[i]);
             context.Allocator.SetIndexedOOP(elementArrayOOP, i, symbolOOP);
         }
 
