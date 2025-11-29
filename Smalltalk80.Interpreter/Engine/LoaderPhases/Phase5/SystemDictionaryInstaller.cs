@@ -344,14 +344,24 @@ public class SystemDictionaryInstaller(
         // Sort categories alphabetically for consistent ordering
         var sortedCategories = categoryToClasses.Keys.OrderBy(c => c).ToList();
 
-        // Build categoryArray (Array of Strings)
-        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+        // Build categoryArray (Array of Symbols - per Blue Book, categories are Symbols)
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var symbolService = new SymbolService(context.Bundle);
         var categoryArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, sortedCategories.Count);
         for (int i = 0; i < sortedCategories.Count; i++)
         {
-            var categoryStringOOP = context.Allocator.AllocateString(stringClassOOP, sortedCategories[i]);
-            context.Allocator.SetIndexedOOP(categoryArrayOOP, i, categoryStringOOP);
+            // Try to get existing symbol, or use a String if symbol not in table
+            if (symbolService.TryGetSymbolOOP(sortedCategories[i], out var categorySymbolOOP))
+            {
+                context.Allocator.SetIndexedOOP(categoryArrayOOP, i, categorySymbolOOP);
+            }
+            else
+            {
+                // Category name not in symbol table - allocate as String (fallback)
+                var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+                var categoryStringOOP = context.Allocator.AllocateString(stringClassOOP, sortedCategories[i]);
+                context.Allocator.SetIndexedOOP(categoryArrayOOP, i, categoryStringOOP);
+            }
         }
 
         // Build elementArray (Array of Symbols - class names) and categoryStops
@@ -368,7 +378,6 @@ public class SystemDictionaryInstaller(
         }
 
         // Build elementArray (Array of Symbols)
-        var symbolService = new SymbolService(context.Bundle);
         var elementArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, allClassNames.Count);
         for (int i = 0; i < allClassNames.Count; i++)
         {
