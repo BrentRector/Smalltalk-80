@@ -44,6 +44,9 @@ public class SystemDictionaryInstaller(
             InstallProcessorGlobal(processorSchedulerOOP);
         }
 
+        // Install SystemOrganization -> SystemOrganizer instance
+        InstallSystemOrganizationGlobal();
+
         // Install all classes as global variables
         foreach (var cls in context.Bundle.Classes)
         {
@@ -302,6 +305,95 @@ public class SystemDictionaryInstaller(
         var associationOOP = associationManager.GetOrCreateCanonical("Processor");
         context.Allocator.SetInstanceVariable(associationOOP, 1, processorSchedulerOOP);
         InstallInSystemDictionary(associationOOP, "Processor");
+    }
+
+    private void InstallSystemOrganizationGlobal()
+    {
+        // SystemOrganization is a SystemOrganizer instance that organizes classes by category
+        // SystemOrganizer inherits from ClassOrganizer which has instance variables:
+        //   [0] globalComment  - RemoteString (nil during cold start)
+        //   [1] categoryArray  - Array of String category names
+        //   [2] categoryStops  - Array of Integer (cumulative stop indices)
+        //   [3] elementArray   - Array of Symbol (class names)
+
+        var nilOOP = context.HeapManager.GetNil();
+        var systemOrganizerClassOOP = GlobalRegistry.LookupClassOOP("SystemOrganizer");
+        if (systemOrganizerClassOOP == nilOOP)
+        {
+            // SystemOrganizer class not found - cannot create SystemOrganization
+            return;
+        }
+
+        // Collect all non-metaclass class names and group by category
+        var categoryToClasses = new Dictionary<string, List<string>>();
+        foreach (var cls in context.Bundle.Classes)
+        {
+            if (cls.IsMetaclass) continue;
+
+            string className = context.Bundle.Symbols[cls.NameIndex];
+            string category = string.IsNullOrEmpty(cls.Category) ? "as yet unclassified" : cls.Category;
+
+            if (!categoryToClasses.ContainsKey(category))
+            {
+                categoryToClasses[category] = new List<string>();
+            }
+            categoryToClasses[category].Add(className);
+        }
+
+        // Sort categories alphabetically for consistent ordering
+        var sortedCategories = categoryToClasses.Keys.OrderBy(c => c).ToList();
+
+        // Build categoryArray (Array of Strings)
+        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var categoryArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, sortedCategories.Count);
+        for (int i = 0; i < sortedCategories.Count; i++)
+        {
+            var categoryStringOOP = context.Allocator.AllocateString(stringClassOOP, sortedCategories[i]);
+            context.Allocator.SetIndexedOOP(categoryArrayOOP, i, categoryStringOOP);
+        }
+
+        // Build elementArray (Array of Symbols - class names) and categoryStops
+        var allClassNames = new List<string>();
+        var stops = new List<int>();
+        int runningTotal = 0;
+
+        foreach (var category in sortedCategories)
+        {
+            var classesInCategory = categoryToClasses[category].OrderBy(c => c).ToList();
+            allClassNames.AddRange(classesInCategory);
+            runningTotal += classesInCategory.Count;
+            stops.Add(runningTotal);
+        }
+
+        // Build elementArray (Array of Symbols)
+        var elementArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, allClassNames.Count);
+        for (int i = 0; i < allClassNames.Count; i++)
+        {
+            var symbolOOP = context.Allocator.InternSymbol(allClassNames[i]);
+            context.Allocator.SetIndexedOOP(elementArrayOOP, i, symbolOOP);
+        }
+
+        // Build categoryStops (Array of SmallIntegers)
+        var categoryStopsOOP = context.Allocator.AllocateArray(arrayClassOOP, stops.Count);
+        for (int i = 0; i < stops.Count; i++)
+        {
+            context.Allocator.SetIndexedOOP(categoryStopsOOP, i, SmalltalkOOP.FromSmallInteger(stops[i]));
+        }
+
+        // Allocate SystemOrganizer instance (4 named instance variables, no indexed slots)
+        var systemOrganizerOOP = context.HeapManager.AllocateInstanceOf(systemOrganizerClassOOP, 0);
+
+        // Set instance variables
+        context.HeapManager.SetInstanceVariable(systemOrganizerOOP, 0, nilOOP);              // globalComment
+        context.HeapManager.SetInstanceVariable(systemOrganizerOOP, 1, categoryArrayOOP);   // categoryArray
+        context.HeapManager.SetInstanceVariable(systemOrganizerOOP, 2, categoryStopsOOP);   // categoryStops
+        context.HeapManager.SetInstanceVariable(systemOrganizerOOP, 3, elementArrayOOP);    // elementArray
+
+        // Install as SystemOrganization global
+        var associationOOP = associationManager.GetOrCreateCanonical("SystemOrganization");
+        context.Allocator.SetInstanceVariable(associationOOP, 1, systemOrganizerOOP);
+        InstallInSystemDictionary(associationOOP, "SystemOrganization");
     }
 
     private void InstallClassGlobal(string className, SmalltalkOOP classOOP)
