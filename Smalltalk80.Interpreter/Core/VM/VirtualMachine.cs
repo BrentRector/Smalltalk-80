@@ -652,13 +652,26 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                     var startPCOOP = _heapManager.GetInstanceVariable(returningContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
                     Console.WriteLine($"  Block home: {homeOOP}, startPC: {startPCOOP}");
                     // Also show the home context's method selector
+                    // Note: Literal 0 (selector) is at indexed slot 1 (slot 0 is header)
                     var homeMethodOOP = _heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
                     var literalCount = GetLiteralCount(homeMethodOOP);
                     if (literalCount > 0)
                     {
-                        var selectorOOP = GetMethodLiteral(homeMethodOOP, 0);
+                        var selectorOOP = GetMethodLiteral(homeMethodOOP, 1); // slot 1 = literal 0 = selector
                         var selectorName = GetSymbolName(selectorOOP);
                         Console.WriteLine($"  Home method selector: {selectorName}");
+                    }
+                    // Dump bytecodes around startPC to see what's executing
+                    int startPC = startPCOOP.IsSmallInteger ? startPCOOP.AsSmallInteger() : -1;
+                    if (startPC >= 0)
+                    {
+                        var bytecodes = GetMethodBytecodes(homeMethodOOP);
+                        Console.Write($"  Bytecodes at PC={startPC}: ");
+                        for (int i = startPC; i < Math.Min(startPC + 10, bytecodes.Length); i++)
+                        {
+                            Console.Write($"{bytecodes[i]} ");
+                        }
+                        Console.WriteLine();
                     }
                 }
             }
