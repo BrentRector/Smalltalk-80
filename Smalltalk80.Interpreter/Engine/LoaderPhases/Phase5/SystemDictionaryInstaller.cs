@@ -57,6 +57,20 @@ public class SystemDictionaryInstaller(
                 InstallClassGlobal(className, classOOP);
             }
         }
+
+        // Install SourceFiles as nil to enable decompiler fallback
+        // In traditional Smalltalk-80, SourceFiles is an Array of FileStreams for .sources and .changes
+        // Since we store source in JSON, we set this to nil so CompiledMethod>>getSource returns nil
+        // and the decompiler is used as fallback for displaying method source in the Browser
+        InstallSourceFilesAsNil();
+    }
+
+    private void InstallSourceFilesAsNil()
+    {
+        var nilOOP = context.HeapManager.GetNil();
+        var associationOOP = associationManager.GetOrCreateCanonical("SourceFiles");
+        context.Allocator.SetInstanceVariable(associationOOP, 1, nilOOP);
+        InstallInSystemDictionary(associationOOP, "SourceFiles");
     }
 
     private void InstallSmalltalkGlobal()
