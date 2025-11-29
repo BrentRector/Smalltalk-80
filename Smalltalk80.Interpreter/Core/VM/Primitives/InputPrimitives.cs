@@ -152,4 +152,41 @@ public static class InputOperations
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(inputWord));
         }
     }
+
+    /// <summary>Primitive 199: mouseButtons - Poll current mouse button state</summary>
+    /// <remarks>
+    /// Custom primitive to support polling-based input model.
+    /// Returns button state as an integer (bits 0-2: red, yellow, blue).
+    /// This allows InputSensor>>primMouseButtons to poll directly without
+    /// waiting for the InputProcess to process events via InputSemaphore.
+    /// </remarks>
+    public class MouseButtons : IPrimitive
+    {
+        private static bool _lastYellow = false;  // Track for change detection
+
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+
+            int buttons = 0;
+
+            // Query platform bridge for native button state
+            if (context.Platform != null)
+            {
+                var (red, yellow, blue) = context.Platform.GetMouseButtons();
+                if (red) buttons |= 1;      // Bit 0 = red/left
+                if (yellow) buttons |= 2;   // Bit 1 = yellow/middle
+                if (blue) buttons |= 4;     // Bit 2 = blue/right
+
+                // Log when yellow button state changes
+                if (yellow != _lastYellow)
+                {
+                    Console.WriteLine($"[MouseButtons] Yellow button: {_lastYellow} -> {yellow}");
+                    _lastYellow = yellow;
+                }
+            }
+
+            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(buttons));
+        }
+    }
 }

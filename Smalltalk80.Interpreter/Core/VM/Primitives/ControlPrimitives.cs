@@ -9,8 +9,11 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// </summary>
 public static class ControlPrimitives
 {
-    // Debug flag for process scheduling primitives
+    // Debug flag for verbose process scheduling primitives (very noisy)
     private static readonly bool DebugProcessScheduling = false;
+
+    // Debug flag for priority queue add/remove operations only (concise)
+    private static readonly bool DebugPriorityQueues = true;
     /// <summary>Primitive 80: blockCopy: - Creates a new BlockContext</summary>
     public class BlockCopy : IPrimitive
     {
@@ -386,10 +389,24 @@ public static class ControlPrimitives
                     if (DebugProcessScheduling)
                         Console.WriteLine($"[Signal] Preempting to woken process");
                     SmalltalkOOP activeProcessOop = GetActiveProcess(context);
+
+                    // CRITICAL: Push signal result onto signaling process's stack BEFORE switching
+                    // The woken process already has its wait result on its stack from when it was suspended
+                    if (context.StackManager != null)
+                    {
+                        context.StackManager.Push(context.Receiver);
+                        if (DebugProcessScheduling)
+                            Console.WriteLine($"[Signal] Pushed receiver onto signaling process stack before preempt");
+                    }
+
                     // Put current process on its priority queue (it will run later)
                     ResumeProcess(context, activeProcessOop);
                     // Switch directly to the higher priority process (don't add it to queue)
                     SwitchToProcess(context, activeProcessOop, processOop);
+
+                    // Result already pushed onto suspended process's stack
+                    // _contextSwitchedByPrimitive prevents double-push
+                    return PrimitiveResult.Ok(context.Receiver);
                 }
                 else
                 {
@@ -398,6 +415,7 @@ public static class ControlPrimitives
                     // Woken process has same or lower priority - add to queue, it runs later
                     if (!ResumeProcess(context, processOop))
                         return PrimitiveResult.Fail(context.Metadata!);
+                    // No preemption - result will be pushed normally onto signaling process's stack
                 }
             }
 
@@ -455,6 +473,16 @@ public static class ControlPrimitives
                 if (activeProcessOop == context.HeapManager.GetNil())
                     return PrimitiveResult.Fail(context.Metadata!);
 
+                // CRITICAL: Push result onto the suspending process's stack BEFORE switching
+                // When this process resumes later, execution continues after the wait call
+                // and expects the result (receiver) to be on the stack
+                if (context.StackManager != null)
+                {
+                    context.StackManager.Push(context.Receiver);
+                    if (DebugProcessScheduling)
+                        Console.WriteLine($"[Wait] Pushed receiver onto suspending process stack");
+                }
+
                 // Add active process to semaphore's waiting list
                 AddLastLink(context, context.Receiver, className, activeProcessOop);
 
@@ -466,7 +494,9 @@ public static class ControlPrimitives
                 {
                     if (DebugProcessScheduling)
                         Console.WriteLine($"[Wait] SwitchToHighestPriorityProcess FAILED");
-                    // Context switch failed - undo the AddLastLink to leave state consistent
+                    // Context switch failed - undo everything to leave state consistent
+                    if (context.StackManager != null)
+                        context.StackManager.Pop(); // Undo the push
                     RemoveProcessFromList(context, activeProcessOop, context.Receiver);
                     context.SetFieldValue(activeProcessOop, "class:Process", "myList", context.HeapManager.GetNil());
                     return PrimitiveResult.Fail(context.Metadata!);
@@ -474,7 +504,8 @@ public static class ControlPrimitives
 
                 if (DebugProcessScheduling)
                     Console.WriteLine($"[Wait] SUCCESS - switched to another process");
-                // Return receiver - execution continues in the NEW process's context
+                // Result already pushed onto suspended process's stack
+                // _contextSwitchedByPrimitive prevents double-push
                 return PrimitiveResult.Ok(context.Receiver);
             }
         }
@@ -583,13 +614,27 @@ public static class ControlPrimitives
                 // Suspending active process - need to context switch
                 // The active process is NOT on a quiescentProcessList (it's running)
                 // Just save its context and switch to next runnable process
+
+                // CRITICAL: Push result (nil) onto the suspending process's stack BEFORE switching
+                // When/if this process resumes later, execution continues after the suspend call
+                if (context.StackManager != null)
+                {
+                    context.StackManager.Push(context.HeapManager.GetNil());
+                }
+
                 if (!SwitchToHighestPriorityProcess(context, activeProcessOop))
+                {
+                    // Context switch failed - undo the push
+                    if (context.StackManager != null)
+                        context.StackManager.Pop();
                     return PrimitiveResult.Fail(context.Metadata!);
+                }
 
                 // Clear myList to indicate suspended (not on any list)
                 context.SetFieldValue(context.Receiver, className, "myList", context.HeapManager.GetNil());
 
-                // Return nil as the suspended context - execution continues in NEW process
+                // Result already pushed onto suspended process's stack
+                // _contextSwitchedByPrimitive prevents double-push
                 return PrimitiveResult.Ok(context.HeapManager.GetNil());
             }
             else
@@ -648,6 +693,13 @@ public static class ControlPrimitives
         SmalltalkOOP myListOop = context.HeapManager.GetInstanceVariable(nextProcessOop, VMConstants.PROCESS_MYLIST_INDEX);
         if (myListOop != context.HeapManager.GetNil())
         {
+            // Get process priority for logging
+            SmalltalkOOP priorityOop = context.HeapManager.GetInstanceVariable(nextProcessOop, VMConstants.PROCESS_PRIORITY_INDEX);
+            int priority = priorityOop.IsSmallInteger ? priorityOop.AsSmallInteger() : -1;
+
+            if (DebugPriorityQueues && priority == 1)
+                Console.WriteLine($"[PQ-] REMOVE process={nextProcessOop} from priority={priority} (activating)");
+
             RemoveProcessFromList(context, nextProcessOop, myListOop);
             context.HeapManager.SetInstanceVariable(nextProcessOop, VMConstants.PROCESS_MYLIST_INDEX, context.HeapManager.GetNil());
         }
@@ -960,14 +1012,9 @@ public static class ControlPrimitives
 
         AddLastLink(context, priorityListOop, "class:LinkedList", processOop);
 
-        // Verify the process was added
-        if (DebugProcessScheduling)
-        {
-            SmalltalkOOP myList = context.GetFieldValue(processOop, "class:Process", "myList");
-            SmalltalkOOP firstLink = context.GetFieldValue(priorityListOop, "class:LinkedList", "firstLink");
-            SmalltalkOOP lastLink = context.GetFieldValue(priorityListOop, "class:LinkedList", "lastLink");
-            Console.WriteLine($"[ResumeProcess] After AddLastLink: myList={myList}, firstLink={firstLink}, lastLink={lastLink}");
-        }
+        // Log priority queue add operation (only priority 1 - background process)
+        if (DebugPriorityQueues && priority == 1)
+            Console.WriteLine($"[PQ+] ADD process={processOop} to priority={priority}");
 
         return true;
     }

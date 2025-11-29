@@ -59,7 +59,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
-        VMMetadata? metadata = null)
+        VMMetadata? metadata = null,
+        IStackManager? stackManager = null)
     {
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
@@ -71,10 +72,11 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 receiver,
                 args,
                 ctx.HeapManager,
+                stackManager: stackManager,
+                contextManager: contextManager,
+                layoutResolver: layoutResolver,
                 platform: ctx.PlatformBridge,
                 runtimeHeapAccess: runtimeHeapAccess,
-                layoutResolver: layoutResolver,
-                contextManager: contextManager,
                 instructionPointer: instructionPointer,
                 cacheManager: cacheManager,
                 messageSender: messageSender,
@@ -282,6 +284,10 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(153, new FileOperations.WriteStringToFile());
         registry.Register(154, new FileOperations.GetFileAttributes());
         registry.Register(155, new FileOperations.FileExists());
+
+        // Extended input primitives (199)
+        // Primitive 199: mouseButtons - Poll current mouse button state (polling model)
+        registry.Register(199, new InputOperations.MouseButtons());
 
         return registry;
     }

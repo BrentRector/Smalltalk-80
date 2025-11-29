@@ -16,10 +16,10 @@
 
 ## Known Issues
 
-**🔴 CRITICAL: Control Structure Optimization Disabled**
-The C# compiler has `ifTrue:`/`ifFalse:` optimization **incorrectly disabled**. Blue Book Chapter 28 confirms these SHOULD be optimized to conditional jumps (no BlockContext created). Current behavior creates BlockContexts, causing `thisContext` to return BlockContext instead of MethodContext. This breaks `Process>>terminate` which calls `thisContext removeSelf` - `removeSelf` only exists on MethodContext.
+**🟡 Control Structure Optimization Disabled**
+The C# compiler has `ifTrue:`/`ifFalse:` optimization **incorrectly disabled**. Blue Book Chapter 28 confirms these SHOULD be optimized to conditional jumps (no BlockContext created). Current behavior creates BlockContexts, causing `thisContext` to return BlockContext instead of MethodContext.
 
-**Workaround Applied**: VM-level fix in `VirtualMachine.MessageSending.cs` forwards `removeSelf` from BlockContext to home MethodContext. This is a band-aid - proper fix requires enabling compiler optimization.
+**Fix Applied**: Added `BlockContext>>removeSelf` method that delegates to `home removeSelf`. This follows the existing BlockContext pattern (like `receiver` and `method`) and automatically handles nested blocks via the chain of `home` references. The proper long-term fix still requires enabling compiler optimization.
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 
@@ -71,14 +71,13 @@ The C# compiler has `ifTrue:`/`ifFalse:` optimization **incorrectly disabled**. 
 - ✅ `Processor hiddenBackgroundProcess` creates idle process at priority 1
 - ✅ `ControlManager new` creates controller manager
 - ✅ `ScheduledControllers` global installed using canonical Association
-- ✅ VM-level fix for `removeSelf` on BlockContext (workaround)
-- 🔴 **BLOCKED**: `ifTrue:`/`ifFalse:` compiler optimization disabled - see Known Issues
+- ✅ `BlockContext>>removeSelf` delegates to home MethodContext (Smalltalk-level fix)
 - ⏳ Controller event loop (`searchForActiveController`) - testing in progress
 - ⏳ Integration with InputSensor for mouse/keyboard events
 
 **Key Files Modified**:
 - `VirtualMachine.cs` - HandleReturn logic for process termination
-- `VirtualMachine.MessageSending.cs` - removeSelf forwarding for BlockContext
+- `Smalltalk-80.st` - Added `BlockContext>>removeSelf` for process termination support
 - `VMConstants.cs` - LinkedList/Link constants for process queues
 - `SmalltalkInterpreterThread.cs` - StartControllerLoop, InstallScheduledControllersGlobal
 

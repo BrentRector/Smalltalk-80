@@ -164,6 +164,7 @@ public static class Program
 
             // When window closes, signal Smalltalk thread to shutdown
             Console.WriteLine("\n=== Shutting Down ===");
+            threadContext.ShutdownTokenSource.Cancel();  // Signal VM to stop
 
             // Wait for Smalltalk thread to finish (with timeout)
             if (!smalltalkThread.Join(TimeSpan.FromSeconds(5)))

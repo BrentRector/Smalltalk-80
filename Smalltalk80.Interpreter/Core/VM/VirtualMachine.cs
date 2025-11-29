@@ -89,6 +89,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     public bool VerboseDebug { get; set; } = false;
     private readonly Dictionary<SmalltalkOOP, string> _methodSources = new();
 
+    /// <summary>
+    /// Cancellation token that signals when the VM should shut down.
+    /// Checked periodically in the interpreter loop.
+    /// </summary>
+    public CancellationToken ShutdownToken { get; set; } = CancellationToken.None;
+
     // Public property to enable bytecode tracing from outside
     public bool EnableBytecodeTracing
     {
@@ -278,8 +284,22 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Save initial process - forked processes should switch, not exit to C#
         _initialProcessOOP = GetActiveProcess();
 
+        // Counter for periodic shutdown checks (every N bytecodes)
+        int shutdownCheckCounter = 0;
+        const int ShutdownCheckInterval = 1000;
+
         while (true)
         {
+            // Periodic shutdown check (not every bytecode for performance)
+            if (++shutdownCheckCounter >= ShutdownCheckInterval)
+            {
+                shutdownCheckCounter = 0;
+                if (ShutdownToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
+                }
+            }
+
             // Execute bytecodes in current context
             InterpreterStatus status = ExecuteBytecodeStep();
 
@@ -606,6 +626,58 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             }
 
             // Forked process terminated - switch to next runnable process
+            // Debug: Log which process/context is terminating
+            var termPriorityOOP = _heapManager.GetInstanceVariable(currentProcess, VMConstants.PROCESS_PRIORITY_INDEX);
+            int termPriority = termPriorityOOP.IsSmallInteger ? termPriorityOOP.AsSmallInteger() : -1;
+            if (termPriority == 1)
+            {
+                Console.WriteLine($"[PROCESS TERMINATING] Priority 1 (background) process={currentProcess}");
+                Console.WriteLine($"  Returning context: {returningContext}");
+                string returnValueStr;
+                if (returnValue.IsSmallInteger)
+                    returnValueStr = $"SmallInteger({returnValue.AsSmallInteger()})";
+                else
+                {
+                    var rvClassName = _heapManager.GetClassName(returnValue);
+                    returnValueStr = $"{returnValue} (class: {rvClassName})";
+                }
+                Console.WriteLine($"  Return value: {returnValueStr}");
+                // Show context details
+                var ctxClassOOP = _heapManager.GetClassOOP(returningContext);
+                var ctxClassName = _heapManager.GetClassName(returningContext);
+                Console.WriteLine($"  Context class: {ctxClassName}");
+                if (ctxClassName == "BlockContext")
+                {
+                    var homeOOP = _heapManager.GetInstanceVariable(returningContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                    var startPCOOP = _heapManager.GetInstanceVariable(returningContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+                    Console.WriteLine($"  Block home: {homeOOP}, startPC: {startPCOOP}");
+                    // Also show the home context's method selector
+                    // Note: Literal 0 (selector) is at indexed slot 1 (slot 0 is header)
+                    var homeMethodOOP = _heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
+                    var literalCount = GetLiteralCount(homeMethodOOP);
+                    if (literalCount > 0)
+                    {
+                        var selectorOOP = GetMethodLiteral(homeMethodOOP, 1); // slot 1 = literal 0 = selector
+                        var selectorName = GetSymbolName(selectorOOP);
+                        Console.WriteLine($"  Home method selector: {selectorName}");
+                    }
+                    // Dump bytecodes to see what's executing
+                    int startPC = startPCOOP.IsSmallInteger ? startPCOOP.AsSmallInteger() : -1;
+                    var bytecodes = GetMethodBytecodes(homeMethodOOP);
+                    Console.WriteLine($"  Bytecodes: length={bytecodes.Length}, startPC={startPC}");
+                    if (bytecodes.Length > 0)
+                    {
+                        Console.Write($"  All bytecodes: ");
+                        for (int i = 0; i < Math.Min(30, bytecodes.Length); i++)
+                        {
+                            if (i == startPC) Console.Write("[");
+                            Console.Write($"{bytecodes[i]} ");
+                            if (i == startPC) Console.Write("] ");
+                        }
+                        Console.WriteLine(bytecodes.Length > 30 ? "..." : "");
+                    }
+                }
+            }
             _contextManager.AddContextToPool(returningContext);
 
             if (SwitchToNextRunnableProcess(currentProcess))
@@ -614,9 +686,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 return InterpreterStatus.Continue;
             }
 
-            // No runnable process found (shouldn't happen if background process exists)
-            // Fall through to return - system idle
-            Console.WriteLine("[HandleReturn] WARNING: No runnable processes, returning to C#");
+            // No runnable process found - this is the error condition we need to debug
+            var processPriorityOOP = _heapManager.GetInstanceVariable(currentProcess, VMConstants.PROCESS_PRIORITY_INDEX);
+            int processPriority = processPriorityOOP.IsSmallInteger ? processPriorityOOP.AsSmallInteger() : -1;
+            Console.WriteLine($"[HandleReturn] ERROR: No runnable processes found!");
+            Console.WriteLine($"  Terminating process: {currentProcess} (priority={processPriority})");
             _returnValue = returnValue;
             return InterpreterStatus.Return;
         }
@@ -2213,12 +2287,23 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Find highest priority runnable process
         SmalltalkOOP nextProcess = FindHighestPriorityRunnableProcess(schedulerOOP);
         if (nextProcess == _metadata.KnownObjects.Nil)
+        {
+            // This is the error condition - dump queues for debugging
+            Console.WriteLine($"[SwitchToNextRunnableProcess] No runnable process found!");
+            DumpProcessQueues(schedulerOOP);
             return false;
+        }
 
         // Remove the process from its priority queue (it's about to become active)
         SmalltalkOOP myListOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX);
         if (myListOOP != _metadata.KnownObjects.Nil)
         {
+            // Get process priority for logging (only log priority 1 - background process)
+            var priorityOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_PRIORITY_INDEX);
+            int priority = priorityOOP.IsSmallInteger ? priorityOOP.AsSmallInteger() : -1;
+            if (priority == 1)
+                Console.WriteLine($"[PQ-] REMOVE process={nextProcess} from priority={priority} (activating after termination)");
+
             RemoveProcessFromList(nextProcess, myListOOP);
             _heapManager.SetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
         }
@@ -2227,6 +2312,33 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         SmalltalkOOP nextContext = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
         if (nextContext == _metadata.KnownObjects.Nil)
             return false;
+
+        // Debug: Log when activating priority 1 process
+        var activatingPriorityOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_PRIORITY_INDEX);
+        int activatingPriority = activatingPriorityOOP.IsSmallInteger ? activatingPriorityOOP.AsSmallInteger() : -1;
+        if (activatingPriority == 1)
+        {
+            Console.WriteLine($"[ACTIVATING PROCESS] Priority 1 (background) process={nextProcess}");
+            Console.WriteLine($"  Suspended context: {nextContext}");
+            var ctxClassName = _heapManager.GetClassName(nextContext);
+            Console.WriteLine($"  Context class: {ctxClassName}");
+            var pcOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_PC_INDEX);
+            var startPCOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+            var callerOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX);
+            Console.WriteLine($"  PC: {pcOOP}, startPC: {startPCOOP}, caller: {callerOOP}");
+            if (ctxClassName == "BlockContext")
+            {
+                var homeOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                Console.WriteLine($"  Home context: {homeOOP}");
+                var homeClassName = _heapManager.GetClassName(homeOOP);
+                Console.WriteLine($"  Home class: {homeClassName}");
+                if (homeClassName == "MethodContext")
+                {
+                    var methodOOP = _heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
+                    Console.WriteLine($"  Method: {methodOOP}");
+                }
+            }
+        }
 
         // Check if this is an unactivated BlockContext (PC is nil)
         // This happens when resuming a newly created process via [block] newProcess
@@ -2237,6 +2349,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             SmalltalkOOP startPC = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
             if (startPC == _metadata.KnownObjects.Nil || !startPC.IsSmallInteger)
                 return false;
+
+            if (activatingPriority == 1)
+                Console.WriteLine($"  Activating block: setting PC={startPC.AsSmallInteger()}, stackp=0, caller=nil");
 
             _heapManager.SetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_PC_INDEX, startPC);
             _heapManager.SetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SmalltalkOOP.FromSmallInteger(0));
@@ -2280,6 +2395,60 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         return _metadata.KnownObjects.Nil;
+    }
+
+    /// <summary>
+    /// Diagnostic method to dump the contents of all process queues.
+    /// </summary>
+    private void DumpProcessQueues(SmalltalkOOP schedulerOOP)
+    {
+        SmalltalkOOP processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        if (processListsOOP == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine("  quiescentProcessLists is nil!");
+            return;
+        }
+
+        int arraySize = _heapManager.GetIndexedSize(processListsOOP);
+        Console.WriteLine($"  quiescentProcessLists array size: {arraySize}");
+
+        for (int priority = 1; priority <= 8; priority++)
+        {
+            int index = priority - 1;
+            if (index >= arraySize)
+            {
+                Console.WriteLine($"  Priority {priority}: index out of bounds");
+                continue;
+            }
+
+            SmalltalkOOP priorityListOOP = _heapManager.GetIndexedOOP(processListsOOP, index);
+            if (priorityListOOP == _metadata.KnownObjects.Nil)
+            {
+                Console.WriteLine($"  Priority {priority}: LinkedList is nil");
+                continue;
+            }
+
+            SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+            SmalltalkOOP lastLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
+
+            if (firstLinkOOP == _metadata.KnownObjects.Nil)
+            {
+                Console.WriteLine($"  Priority {priority}: empty (firstLink=nil)");
+            }
+            else
+            {
+                // Count processes in the list
+                int count = 0;
+                SmalltalkOOP current = firstLinkOOP;
+                while (current != _metadata.KnownObjects.Nil && count < 100)
+                {
+                    count++;
+                    SmalltalkOOP suspCtx = _heapManager.GetInstanceVariable(current, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+                    Console.WriteLine($"  Priority {priority}: Process {current} (suspendedContext={suspCtx})");
+                    current = _heapManager.GetInstanceVariable(current, VMConstants.LINK_NEXTLINK_INDEX);
+                }
+            }
+        }
     }
 
     /// <summary>

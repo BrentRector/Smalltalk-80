@@ -295,14 +295,18 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     private void EnqueueMouseEvent(MouseEventArgs e)
     {
+        // Use Control.MouseButtons to get CURRENT button state (not event-triggered button)
+        // This correctly reports which buttons are currently held down
+        var currentButtons = Control.MouseButtons;
+
         _eventQueue.Enqueue(new SmalltalkEvent
         {
             Type = SmalltalkEventType.Mouse,
             X = e.X,
             Y = e.Y,
-            RedButton = e.Button.HasFlag(MouseButtons.Left),
-            YellowButton = e.Button.HasFlag(MouseButtons.Middle),
-            BlueButton = e.Button.HasFlag(MouseButtons.Right),
+            RedButton = currentButtons.HasFlag(MouseButtons.Left),
+            YellowButton = currentButtons.HasFlag(MouseButtons.Middle),
+            BlueButton = currentButtons.HasFlag(MouseButtons.Right),
             Milliseconds = Environment.TickCount64
         });
     }
@@ -318,13 +322,21 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
             Type = SmalltalkEventType.Keyboard,
             Character = (char)e.KeyValue,
             KeyCode = e.KeyValue,
+            IsKeyDown = true,
             Milliseconds = Environment.TickCount64
         });
     }
 
     private void OnKeyUp(object? sender, KeyEventArgs e)
     {
-        // Smalltalk typically only needs key down events
+        _eventQueue.Enqueue(new SmalltalkEvent
+        {
+            Type = SmalltalkEventType.Keyboard,
+            Character = (char)e.KeyValue,
+            KeyCode = e.KeyValue,
+            IsKeyDown = false,
+            Milliseconds = Environment.TickCount64
+        });
     }
 
     // ============================================================================
@@ -408,6 +420,11 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         return _eventQueue.GetMousePosition();
     }
 
+    public (bool red, bool yellow, bool blue) GetMouseButtons()
+    {
+        return _eventQueue.GetMouseButtons();
+    }
+
     public void SetCursorPosition(int x, int y)
     {
         if (InvokeRequired)
@@ -422,34 +439,11 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public int GetInputWord()
     {
-        // Dequeue event from queue and pack into Smalltalk input word format
-        if (_eventQueue.TryDequeue(out var evt))
-        {
-            if (evt == null)
-                return 0;
-
-            // Smalltalk input word format:
-            // Bits 0-7: Character code (or 0 for mouse events)
-            // Bits 8-10: Mouse button state (red=bit 0, yellow=bit 1, blue=bit 2)
-            // Bits 11-31: Reserved
-
-            int buttonBits = 0;
-            if (evt.RedButton) buttonBits |= 0x1;
-            if (evt.YellowButton) buttonBits |= 0x2;
-            if (evt.BlueButton) buttonBits |= 0x4;
-
-            if (evt.Type == SmalltalkEventType.Keyboard)
-            {
-                return (evt.Character & 0xFF) | (buttonBits << 8);
-            }
-            else
-            {
-                // Mouse event - no character
-                return buttonBits << 8;
-            }
-        }
-
-        return 0;
+        // Delegate to the event queue which properly formats input words
+        // Smalltalk-80 input word format:
+        // - Bits 0-11: parameter value
+        // - Bits 12-15: event type (1=mouseX, 2=mouseY, 3=keyDown, 4=keyUp)
+        return _eventQueue.GetNextInputWord();
     }
 
     public void SetSampleInterval(int intervalMs)

@@ -73,6 +73,11 @@ public class SmalltalkInterpreterThread
             // Note: We only reach here if the controller loop exits (unexpected)
             Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
         }
+        catch (OperationCanceledException)
+        {
+            // Clean shutdown requested - this is expected when window closes
+            Console.WriteLine("\n[Smalltalk Thread] Shutdown signal received");
+        }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"\n[Smalltalk Thread] Fatal error: {ex.Message}");
@@ -92,6 +97,7 @@ public class SmalltalkInterpreterThread
         );
 
         vm.VerboseDebug = _context.Config.VerboseDebug;
+        vm.ShutdownToken = _context.ShutdownToken;  // Wire up shutdown signal
         vm.InitializeSelectorCaches();
 
         return vm;
@@ -529,9 +535,10 @@ public class SmalltalkInterpreterThread
     /// <summary>
     /// Starts the Smalltalk MVC controller loop.
     /// This implements the canonical Bluebook startup sequence:
-    /// 1. Processor hiddenBackgroundProcess  - Create background idle process
+    /// 1. Processor hiddenBackgroundProcess  - Create background idle process at priority 1
     /// 2. ControlManager new → ScheduledControllers  - Create and install ControlManager
-    /// 3. ScheduledControllers searchForActiveController  - Start event loop (runs forever)
+    /// 3. Lower bootstrap process priority from 8 to 4  - Allow InputSensor etc. to run
+    /// 4. ScheduledControllers searchForActiveController  - Start event loop (runs forever)
     /// </summary>
     private void StartControllerLoop()
     {
@@ -554,6 +561,54 @@ public class SmalltalkInterpreterThread
         messageSender.SendUnary(processorSchedulerClassOOP, "hiddenBackgroundProcess");
         Console.WriteLine("    ✓ Background process created at priority 1");
 
+        // Verify background process is on the queue
+        var processorOOP = LookupGlobal("Processor");
+        var quiescentListsOOP = _context.HeapManager.GetInstanceVariable(processorOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        var priority1ListOOP = _context.HeapManager.GetIndexedOOP(quiescentListsOOP, 0); // priority 1 is index 0
+        var firstLinkOOP = _context.HeapManager.GetInstanceVariable(priority1ListOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+        var nilOOP = _context.HeapManager.GetNil();
+        if (firstLinkOOP == nilOOP)
+            Console.WriteLine("    WARNING: Background process NOT on priority 1 queue!");
+        else
+        {
+            Console.WriteLine($"    Background process on queue: {firstLinkOOP}");
+            // Debug: Check the process's suspendedContext at creation time
+            var suspCtx = _context.HeapManager.GetInstanceVariable(firstLinkOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+            Console.WriteLine($"    SuspendedContext: {suspCtx}");
+            var ctxClass = _context.HeapManager.GetClassName(suspCtx);
+            Console.WriteLine($"    Context class: {ctxClass}");
+            if (ctxClass == "BlockContext")
+            {
+                var homeCtx = _context.HeapManager.GetInstanceVariable(suspCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                var startPC = _context.HeapManager.GetInstanceVariable(suspCtx, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+                Console.WriteLine($"    Home context: {homeCtx}, startPC: {startPC}");
+                var homeMethod = _context.HeapManager.GetInstanceVariable(homeCtx, VMConstants.CONTEXT_METHOD_INDEX);
+                Console.WriteLine($"    Home method: {homeMethod}");
+                // Get method selector (literal 0 is at indexed slot 1, slot 0 is header)
+                var methodIndexedSize = _context.HeapManager.GetIndexedSize(homeMethod);
+                if (methodIndexedSize >= 2)
+                {
+                    var selectorOOP = _context.HeapManager.GetIndexedOOP(homeMethod, 1);
+                    var selectorName = _context.HeapManager.GetSymbolName(selectorOOP);
+                    Console.WriteLine($"    Home method selector: {selectorName}");
+                }
+                // Get bytecodes length
+                var bytecodeArrayOOP = _context.HeapManager.GetIndexedOOP(homeMethod, methodIndexedSize - 1);
+                var bcLength = _context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
+                Console.WriteLine($"    Bytecodes length: {bcLength}, startPC: {(startPC.IsSmallInteger ? startPC.AsSmallInteger() : -1)}");
+                if (startPC.IsSmallInteger && startPC.AsSmallInteger() >= bcLength)
+                    Console.WriteLine($"    *** WARNING: startPC ({startPC.AsSmallInteger()}) >= bytecodes length ({bcLength})! ***");
+                // Also dump actual bytecodes
+                Console.Write($"    Bytecodes: ");
+                for (int i = 0; i < Math.Min(bcLength, 20); i++)
+                {
+                    var b = _context.HeapManager.GetIndexedByte(bytecodeArrayOOP, i);
+                    Console.Write($"{b} ");
+                }
+                Console.WriteLine();
+            }
+        }
+
         // Step 2: ControlManager new → install as ScheduledControllers global
         Console.WriteLine("  Step 2: Creating ControlManager...");
         var controlManagerClassOOP = LookupGlobal("ControlManager");
@@ -567,9 +622,25 @@ public class SmalltalkInterpreterThread
         InstallScheduledControllersGlobal(controlManagerOOP);
         Console.WriteLine("    ✓ ControlManager installed as ScheduledControllers global");
 
-        // Step 3: ScheduledControllers searchForActiveController
+        // Step 3: Lower bootstrap process priority from 8 to 4 (UserSchedulingPriority)
+        // This is CRITICAL: searchForActiveController loops with Processor yield, which only
+        // yields to same-or-higher priority processes. At priority 8, InputSensor (pri 6-7)
+        // and other system processes never get CPU time, so cursorPoint is never updated
+        // and isControlWanted always returns false.
+        Console.WriteLine("  Step 3: Lowering bootstrap process priority to 4...");
+        // processorOOP already declared above for diagnostic
+        var activeProcessOOP = messageSender.SendUnary(processorOOP, "activeProcess");
+        messageSender.SendKeyword(activeProcessOOP, "priority:", SmalltalkOOP.FromSmallInteger(4));
+        Console.WriteLine("    ✓ Bootstrap process now at UserSchedulingPriority (4)");
+
+        // Step 4: Restore display (paints gray background and all scheduled views)
+        Console.WriteLine("  Step 4: Restoring display...");
+        messageSender.SendUnary(controlManagerOOP, "restore");
+        Console.WriteLine("    ✓ Display restored (gray background painted)");
+
+        // Step 5: ScheduledControllers searchForActiveController
         // This runs the main event loop - it will run FOREVER until the system exits
-        Console.WriteLine("  Step 3: Starting controller event loop...");
+        Console.WriteLine("  Step 5: Starting controller event loop...");
         Console.WriteLine("    (This will run until the window is closed)");
 
         // Use controlManagerOOP directly - we already have it from step 2

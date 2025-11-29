@@ -911,15 +911,15 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
             case 0x13: // DUP - Duplicate top of stack
                 {
-                    int spIndex = VMConstants.CONTEXT_STACKP_INDEX;
-                    var spOOP = heapManager.GetInstanceVariable(context.ActiveContext, spIndex);
-                    int sp = spOOP.AsSmallInteger();
-                    if (sp <= 0)
+                    int dupSpIndex = VMConstants.CONTEXT_STACKP_INDEX;
+                    var dupSpOOP = heapManager.GetInstanceVariable(context.ActiveContext, dupSpIndex);
+                    int dupSp = dupSpOOP.AsSmallInteger();
+                    if (dupSp <= 0)
                     {
                         throw new InvalidOperationException("Stack underflow on DUP");
                     }
 
-                    var valueOOP = heapManager.GetIndexedOOP(context.ActiveContext, sp - 1);
+                    var valueOOP = heapManager.GetIndexedOOP(context.ActiveContext, dupSp - 1);
                     context.Push(valueOOP);
                     return true;
                 }

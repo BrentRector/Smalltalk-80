@@ -20,6 +20,9 @@ public class TestPlatformBridge : IPlatformBridge
     private readonly Func<SmalltalkOOP, Memory<byte>> _getByteArray;
     private int _mouseX = 0;
     private int _mouseY = 0;
+    private bool _redButton = false;
+    private bool _yellowButton = false;
+    private bool _blueButton = false;
     private string _clipboardText = "";
     private readonly Queue<int> _inputEvents = new();
 
@@ -165,6 +168,12 @@ public class TestPlatformBridge : IPlatformBridge
         return (_mouseX, _mouseY);
     }
 
+    public (bool red, bool yellow, bool blue) GetMouseButtons()
+    {
+        // Return simulated mouse button states
+        return (_redButton, _yellowButton, _blueButton);
+    }
+
     public void SetCursorPosition(int x, int y)
     {
         // Store simulated cursor position
@@ -281,6 +290,16 @@ public class TestPlatformBridge : IPlatformBridge
     {
         _mouseX = x;
         _mouseY = y;
+    }
+
+    /// <summary>
+    /// Test helper: Sets the simulated mouse button states.
+    /// </summary>
+    public void SetMouseButtonsTest(bool red, bool yellow, bool blue)
+    {
+        _redButton = red;
+        _yellowButton = yellow;
+        _blueButton = blue;
     }
 
     /// <summary>

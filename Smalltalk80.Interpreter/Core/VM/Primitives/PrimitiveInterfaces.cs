@@ -132,7 +132,8 @@ public readonly struct PrimitiveExecutionContext
         if (fieldIndex < 0)
             throw new InvalidOperationException($"Field '{fieldName}' not found in class '{className}'");
 
-        return HeapManager.GetInstanceVariable(oop, fieldIndex);
+        var result = HeapManager.GetInstanceVariable(oop, fieldIndex);
+        return result;
     }
 
     /// <summary>
@@ -325,7 +326,8 @@ public interface IPrimitiveRegistry
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
-        VMMetadata? metadata = null);
+        VMMetadata? metadata = null,
+        IStackManager? stackManager = null);
 
     /// <summary>
     /// Checks if a primitive is registered.

@@ -137,7 +137,7 @@ public partial class VirtualMachine
 
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
-                _contextManager, currentPC, this, this, _metadata);
+                _contextManager, currentPC, this, this, _metadata, _stackManager);
 
             // Emit diagnostic event for primitive execution in super send
             _diagnostics?.Emit(new PrimitiveEvent
@@ -159,6 +159,7 @@ public partial class VirtualMachine
                 {
                     _tracer.TracePrimitiveSuccess(primitiveNumber);
                 }
+
                 return CallOutcome.Normal(primitiveResult);
             }
             else if (_tracer.ShouldTracePrimitiveFailure())
@@ -249,18 +250,6 @@ public partial class VirtualMachine
                 // Execute the block with proper BlockContext wrapping
                 return CallOutcome.Normal(InvokeBlock(receiverOOP, args));
             }
-        }
-
-        // SPECIAL CASE: BlockContext>>removeSelf forwards to home MethodContext
-        // In Blue Book, removeSelf is only defined on MethodContext. When thisContext
-        // returns a BlockContext (e.g., inside Process>>terminate's block), the message
-        // must be forwarded to the home MethodContext where the receiver is stored.
-        if (selectorName == "removeSelf" && classOOP == _metadata.BlockContextClassOOP)
-        {
-            // Get home MethodContext from BlockContext
-            var homeOOP = _heapManager.GetInstanceVariable(receiverOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-            // Forward the message to home MethodContext
-            return SendMessage(homeOOP, selectorOOP, args);
         }
 
         // Debug: check for classId 0 on "comment:" send
@@ -390,7 +379,7 @@ public partial class VirtualMachine
             // Try to execute the primitive
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
                 primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
-                _contextManager, currentPC, this, this, _metadata);
+                _contextManager, currentPC, this, this, _metadata, _stackManager);
 
             // Emit diagnostic event for primitive execution
             _diagnostics?.Emit(new PrimitiveEvent
@@ -409,6 +398,7 @@ public partial class VirtualMachine
             if (_primitiveSuccess)
             {
                 // Check if primitive created a new context (e.g., block invocation via Primitive 207)
+                // This includes process-switching primitives that push result before switching
                 if (_contextSwitchedByPrimitive)
                 {
                     _contextSwitchedByPrimitive = false;
