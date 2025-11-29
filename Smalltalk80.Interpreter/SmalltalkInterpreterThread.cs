@@ -584,13 +584,28 @@ public class SmalltalkInterpreterThread
                 Console.WriteLine($"    Home context: {homeCtx}, startPC: {startPC}");
                 var homeMethod = _context.HeapManager.GetInstanceVariable(homeCtx, VMConstants.CONTEXT_METHOD_INDEX);
                 Console.WriteLine($"    Home method: {homeMethod}");
-                // Get bytecodes length
+                // Get method selector (literal 0 is at indexed slot 1, slot 0 is header)
                 var methodIndexedSize = _context.HeapManager.GetIndexedSize(homeMethod);
+                if (methodIndexedSize >= 2)
+                {
+                    var selectorOOP = _context.HeapManager.GetIndexedOOP(homeMethod, 1);
+                    var selectorName = _context.HeapManager.GetSymbolName(selectorOOP);
+                    Console.WriteLine($"    Home method selector: {selectorName}");
+                }
+                // Get bytecodes length
                 var bytecodeArrayOOP = _context.HeapManager.GetIndexedOOP(homeMethod, methodIndexedSize - 1);
                 var bcLength = _context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
                 Console.WriteLine($"    Bytecodes length: {bcLength}, startPC: {(startPC.IsSmallInteger ? startPC.AsSmallInteger() : -1)}");
                 if (startPC.IsSmallInteger && startPC.AsSmallInteger() >= bcLength)
                     Console.WriteLine($"    *** WARNING: startPC ({startPC.AsSmallInteger()}) >= bytecodes length ({bcLength})! ***");
+                // Also dump actual bytecodes
+                Console.Write($"    Bytecodes: ");
+                for (int i = 0; i < Math.Min(bcLength, 20); i++)
+                {
+                    var b = _context.HeapManager.GetIndexedByte(bytecodeArrayOOP, i);
+                    Console.Write($"{b} ");
+                }
+                Console.WriteLine();
             }
         }
 
