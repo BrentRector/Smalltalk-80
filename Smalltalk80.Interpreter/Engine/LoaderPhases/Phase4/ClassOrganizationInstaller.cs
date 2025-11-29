@@ -144,13 +144,24 @@ internal class ClassOrganizationInstaller(
         // Field [0]: globalComment - nil
         _allocator.SetInstanceVariable(organizerOOP, CLASSORGANIZER_GLOBALCOMMENT_INDEX, _allocator.GetNil());
 
-        // Field [1]: categoryArray - Array of category name Symbols
+        // Field [1]: categoryArray - Array of category names (Symbols or Strings)
+        // Per Smalltalk-80 source: categoryArray is <Array of: String>
+        // Use Symbol if available, fall back to String if not in symbol table
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
         var categoryArrayOOP = _allocator.AllocateArray(arrayClassOOP, categoryNames.Count);
         for (int i = 0; i < categoryNames.Count; i++)
         {
-            var symbolOOP = _symbolService.GetSymbolOOP(categoryNames[i]);
-            _allocator.SetIndexedOOP(categoryArrayOOP, i, symbolOOP);
+            if (_symbolService.TryGetSymbolOOP(categoryNames[i], out var symbolOOP))
+            {
+                _allocator.SetIndexedOOP(categoryArrayOOP, i, symbolOOP);
+            }
+            else
+            {
+                // Category name not in symbol table - allocate as String
+                var categoryStringOOP = _allocator.AllocateString(stringClassOOP, categoryNames[i]);
+                _allocator.SetIndexedOOP(categoryArrayOOP, i, categoryStringOOP);
+            }
         }
         _allocator.SetInstanceVariable(organizerOOP, CLASSORGANIZER_CATEGORYARRAY_INDEX, categoryArrayOOP);
 
