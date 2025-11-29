@@ -60,89 +60,21 @@ public class SystemDictionaryInstaller(
             }
         }
 
-        // Install SourceFiles - Array of FileStreams for .sources and .changes
-        // SourceFiles at: 1 = FileStream on .sources file (original source)
-        // SourceFiles at: 2 = FileStream on .changes file (modifications) - nil for now
-        InstallSourceFilesGlobal();
+        // Install SourceFiles as nil to enable decompiler fallback
+        // In traditional Smalltalk-80, SourceFiles is an Array of FileStreams for .sources and .changes
+        // Since we store source in JSON, we set this to nil so CompiledMethod>>getSource returns nil
+        // and the decompiler is used as fallback for displaying method source in the Browser
+        // NOTE: Setting to nil also prevents init expressions from crashing when trying to write
+        // class comments to file 2 (.changes file)
+        InstallSourceFilesAsNil();
     }
 
-    private void InstallSourceFilesGlobal()
+    private void InstallSourceFilesAsNil()
     {
         var nilOOP = context.HeapManager.GetNil();
-        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-
-        // Create Array(2) for SourceFiles
-        var sourceFilesArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, 2);
-
-        // Try to create a FileStream for the .sources file
-        var sourceFileStreamOOP = CreateSourceFileStream();
-
-        // Set SourceFiles at: 1 to the .sources FileStream (or nil if creation failed)
-        context.Allocator.SetIndexedOOP(sourceFilesArrayOOP, 0, sourceFileStreamOOP);
-        // Set SourceFiles at: 2 to nil (no .changes file)
-        context.Allocator.SetIndexedOOP(sourceFilesArrayOOP, 1, nilOOP);
-
         var associationOOP = associationManager.GetOrCreateCanonical("SourceFiles");
-        context.Allocator.SetInstanceVariable(associationOOP, 1, sourceFilesArrayOOP);
+        context.Allocator.SetInstanceVariable(associationOOP, 1, nilOOP);
         InstallInSystemDictionary(associationOOP, "SourceFiles");
-    }
-
-    private SmalltalkOOP CreateSourceFileStream()
-    {
-        var nilOOP = context.HeapManager.GetNil();
-
-        // Check if WindowsFileReference class exists
-        var fileRefClassOOP = GlobalRegistry.LookupClassOOP("WindowsFileReference");
-        if (fileRefClassOOP == nilOOP)
-        {
-            // Fallback: no WindowsFileReference class available
-            return nilOOP;
-        }
-
-        // Get the path to the .sources file (same directory as the executable)
-        string sourcesPath = Path.Combine(AppContext.BaseDirectory, "Smalltalk-80.sources");
-        if (!File.Exists(sourcesPath))
-        {
-            // .sources file doesn't exist yet - return nil
-            // Will be created when compiler regenerates the bundle
-            return nilOOP;
-        }
-
-        // Allocate WindowsFileReference instance
-        // WindowsFileReference has instance variables: [inherited from FileReference: pathName] [handle]
-        // FileReference inherits from Object with 1 instance variable: pathName
-        var fileRefOOP = context.HeapManager.AllocateInstanceOf(fileRefClassOOP, 0);
-
-        // Set pathName instance variable (index 0)
-        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
-        var pathStringOOP = context.Allocator.AllocateString(stringClassOOP, sourcesPath);
-        context.HeapManager.SetInstanceVariable(fileRefOOP, 0, pathStringOOP);
-
-        // Set handle to -1 initially (closed state)
-        context.HeapManager.SetInstanceVariable(fileRefOOP, 1, SmalltalkOOP.FromSmallInteger(-1));
-
-        // Open the file for reading using primitive 121
-        // We'll do this at C# level since we're in cold start
-        try
-        {
-            var handle = OpenFileForReading(sourcesPath);
-            if (handle >= 0)
-            {
-                context.HeapManager.SetInstanceVariable(fileRefOOP, 1, SmalltalkOOP.FromSmallInteger(handle));
-            }
-        }
-        catch
-        {
-            // File open failed - return the object anyway, handle stays -1
-        }
-
-        return fileRefOOP;
-    }
-
-    private int OpenFileForReading(string path)
-    {
-        // Use FileOperations to open file for reading (accessMode=1=Read, shareMode=1=ShareRead, createMode=3=Open)
-        return FileOperations.OpenFileHandle(path, 1, 1, 3);
     }
 
     private void InstallSmalltalkGlobal()
