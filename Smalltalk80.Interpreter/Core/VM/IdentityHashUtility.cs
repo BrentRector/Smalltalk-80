@@ -38,8 +38,11 @@ public static class IdentityHashUtility
 
     /// <summary>
     /// Computes the 0-indexed hash slot for a key in an IdentityDictionary of given size.
-    /// Matches Smalltalk's `key asOop \\ length` (converted from 1-indexed to 0-indexed).
+    /// Matches Smalltalk's `(key asOop \\ length + 1) - 1` for 0-indexed heap access.
     /// Use this for IdentityDictionary and MethodDictionary lookups.
+    ///
+    /// Note: Smalltalk computes 1-indexed position, then basicAt: converts to 0-indexed.
+    /// C# code computes 0-indexed directly for use with GetIndexedOOP/SetIndexedOOP.
     ///
     /// This is the canonical hash index computation used by:
     /// - Cold start dictionary installation (Phase 3, 4, 5)
@@ -47,7 +50,7 @@ public static class IdentityHashUtility
     /// </summary>
     /// <param name="keyOOP">The key OOP to hash (must be object pointer, not SmallInteger).</param>
     /// <param name="dictionarySize">The size of the dictionary's indexed storage.</param>
-    /// <returns>The 0-indexed slot position.</returns>
+    /// <returns>The 0-indexed slot position (0 to dictionarySize-1).</returns>
     public static int ComputeHashIndex(SmalltalkOOP keyOOP, int dictionarySize)
     {
         int hash = ComputeIdentityHash(keyOOP);
@@ -56,12 +59,12 @@ public static class IdentityHashUtility
 
     /// <summary>
     /// Computes the 0-indexed hash slot for a key in a regular Dictionary of given size.
-    /// Matches Smalltalk's `key hash \\ length` (converted from 1-indexed to 0-indexed).
+    /// Matches Smalltalk's `(key hash \\ length + 1) - 1` for 0-indexed heap access.
     /// Use this for Dictionary lookups where keys might be SmallIntegers.
     /// </summary>
     /// <param name="keyOOP">The key OOP to hash (can be SmallInteger or object pointer).</param>
     /// <param name="dictionarySize">The size of the dictionary's indexed storage.</param>
-    /// <returns>The 0-indexed slot position.</returns>
+    /// <returns>The 0-indexed slot position (0 to dictionarySize-1).</returns>
     public static int ComputeDictionaryHashIndex(SmalltalkOOP keyOOP, int dictionarySize)
     {
         // For SmallIntegers: hash returns self (masked to ensure positive)

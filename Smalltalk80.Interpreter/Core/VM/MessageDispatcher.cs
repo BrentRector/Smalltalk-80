@@ -52,7 +52,7 @@ internal class MessageDispatcher(
             }
 
             // Get values array from method dictionary
-            var valuesArrayOOP = heapManager.GetInstanceVariable(methodDictOOP, 0);
+            var valuesArrayOOP = heapManager.GetInstanceVariable(methodDictOOP, VMConstants.METHOD_DICTIONARY_VALUE_ARRAY_INDEX);
             if (valuesArrayOOP == metadata.KnownObjects.Nil)
             {
                 var superclassOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
@@ -75,7 +75,7 @@ internal class MessageDispatcher(
             {
                 var valuesArrayClass = helpers.GetClassName(helpers.GetClass(valuesArrayOOP));
                 throw new InvalidOperationException(
-                    $"MethodDictionary slot[0] (valuesArray) contains {valuesArrayFormat} object (class={valuesArrayClass}) instead of PointerIndexed Array");
+                    $"MethodDictionary slot[1] (valuesArray) contains {valuesArrayFormat} object (class={valuesArrayClass}) instead of PointerIndexed Array");
             }
 
             // Search for selector in method dictionary

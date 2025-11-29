@@ -181,7 +181,7 @@ public class DictionaryService
 
     /// <summary>
     /// Installs a key-value pair in an IdentityDictionary using hash-based slot finding.
-    /// IdentityDictionary structure: [0] = valueArray, [1] = tally, indexed fields = keys.
+    /// IdentityDictionary structure: [0] = tally (inherited from Set), [1] = valueArray, indexed fields = keys.
     /// Uses same algorithm as IdentityDictionary>>findKeyOrNil: so runtime lookups work!
     /// </summary>
     /// <param name="dictionaryOOP">The IdentityDictionary to install into.</param>
@@ -191,9 +191,9 @@ public class DictionaryService
     /// <exception cref="InvalidOperationException">Thrown when dictionary is full or has invalid structure.</exception>
     public void InstallInIdentityDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keyOOP, SmalltalkOOP valueOOP, string name)
     {
-        // IdentityDictionary: [0] = valueArray, [1] = tally, indexed fields = keys
-        var valuesArrayOOP = _allocator.GetInstanceVariable(dictionaryOOP, 0);
-        var tallyOOP = _allocator.GetInstanceVariable(dictionaryOOP, 1);
+        // IdentityDictionary: tally (slot 0, inherited from Set), valueArray (slot 1), indexed fields = keys
+        var tallyOOP = _allocator.GetInstanceVariable(dictionaryOOP, VMConstants.IDENTITY_DICTIONARY_TALLY_INDEX);
+        var valuesArrayOOP = _allocator.GetInstanceVariable(dictionaryOOP, VMConstants.IDENTITY_DICTIONARY_VALUE_ARRAY_INDEX);
         SmalltalkOOP nilOOP = _allocator.GetNil();
 
         if (valuesArrayOOP == nilOOP)
@@ -256,7 +256,7 @@ public class DictionaryService
         if (isNewEntry)
         {
             int currentTally = tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger() : 0;
-            _allocator.SetInstanceVariable(dictionaryOOP, 1, SmalltalkOOP.FromSmallInteger(currentTally + 1));
+            _allocator.SetInstanceVariable(dictionaryOOP, VMConstants.IDENTITY_DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(currentTally + 1));
         }
     }
 

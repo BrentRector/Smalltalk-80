@@ -722,11 +722,11 @@ public class SmalltalkInterpreterThread
                 // Increment tally
                 if (incrementTally)
                 {
-                    var currentTallyOOP = heap.GetInstanceVariable(dictionaryOOP, 0);
+                    var currentTallyOOP = heap.GetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX);
                     if (currentTallyOOP.IsSmallInteger)
                     {
                         int newTally = currentTallyOOP.AsSmallInteger() + 1;
-                        heap.SetInstanceVariable(dictionaryOOP, 0, SmalltalkOOP.FromSmallInteger(newTally));
+                        heap.SetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(newTally));
                     }
                 }
 
@@ -785,11 +785,11 @@ public class SmalltalkInterpreterThread
                 heap.SetIndexedOOP(dictionaryOOP, location, nilOOP);
 
                 // Decrement tally
-                var tallyOOP = heap.GetInstanceVariable(dictionaryOOP, 0);
+                var tallyOOP = heap.GetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX);
                 if (tallyOOP.IsSmallInteger)
                 {
                     int tally = tallyOOP.AsSmallInteger();
-                    heap.SetInstanceVariable(dictionaryOOP, 0, SmalltalkOOP.FromSmallInteger(tally - 1));
+                    heap.SetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(tally - 1));
                 }
 
                 // Fix probe chain

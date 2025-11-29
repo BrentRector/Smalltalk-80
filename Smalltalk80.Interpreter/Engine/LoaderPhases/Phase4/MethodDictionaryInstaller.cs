@@ -76,7 +76,7 @@ internal class MethodDictionaryInstaller(
 
     /// <summary>
     /// Allocates a MethodDictionary object with the specified capacity.
-    /// MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
+    /// MethodDictionary (IdentityDictionary): [0] = tally (inherited from Set), [1] = valueArray, indexed fields = keys
     /// </summary>
     /// <param name="capacity">The number of slots for keys in the dictionary.</param>
     /// <returns>The allocated MethodDictionary OOP.</returns>
@@ -94,14 +94,14 @@ internal class MethodDictionaryInstaller(
         var methodDictClassOOP = GlobalRegistry.LookupClassOOP("MethodDictionary");
         var methodDictOOP = _allocator.AllocateArray(methodDictClassOOP, capacity);
 
+        // Set tally to 0 (no methods installed yet)
+        var tallyOOP = SmalltalkOOP.FromSmallInteger(0);
+        _allocator.SetInstanceVariable(methodDictOOP, VMConstants.METHOD_DICTIONARY_TALLY_INDEX, tallyOOP);
+
         // Allocate valueArray (Array of CompiledMethod)
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         var valuesArrayOOP = _allocator.AllocateArray(arrayClassOOP, capacity);
-        _allocator.SetInstanceVariable(methodDictOOP, 0, valuesArrayOOP);
-
-        // Set tally to 0 (no methods installed yet)
-        var tallyOOP = SmalltalkOOP.FromSmallInteger(0);
-        _allocator.SetInstanceVariable(methodDictOOP, 1, tallyOOP);
+        _allocator.SetInstanceVariable(methodDictOOP, VMConstants.METHOD_DICTIONARY_VALUE_ARRAY_INDEX, valuesArrayOOP);
 
         // Initialize all indexed fields (keys) to nil
         var nilOOP = _allocator.GetNil();
