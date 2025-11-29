@@ -807,6 +807,17 @@ namespace Smalltalk80.Compiler
             if (unaryExpr == null)
                 return;
 
+            // Check if there are unary messages - if so, they "consume" the super flag
+            // For "super isControlActive & ..." the super send is for isControlActive,
+            // and & is sent to the Boolean result, not to super.
+            var unaryMessages = unaryExpr.unaryMessage();
+            bool hasUnaryMessages = unaryMessages != null && unaryMessages.Length > 0;
+
+            // Binary messages are only super sends if:
+            // 1. The receiver is super, AND
+            // 2. There are NO unary messages (so the binary message is directly on super)
+            bool binaryReceiverIsSuper = receiverIsSuper && !hasUnaryMessages;
+
             // Compile first unary expression (the receiver)
             CompileUnaryExpr(unaryExpr, receiverIsSuper);
 
@@ -828,7 +839,7 @@ namespace Smalltalk80.Compiler
                     // This is critical because super sends always need the selector in the literal frame
                     // (they can't use special bytecodes), and argument literal indices depend on
                     // selectors.Count being accurate.
-                    if (i == 0 && receiverIsSuper)
+                    if (i == 0 && binaryReceiverIsSuper)
                     {
                         emitter.AddLiteral(new Symbol(selector));
                     }
@@ -841,7 +852,7 @@ namespace Smalltalk80.Compiler
                     }
 
                     // Emit the send
-                    if (i == 0 && receiverIsSuper)
+                    if (i == 0 && binaryReceiverIsSuper)
                     {
                         emitter.EmitSuperSend(selector, 1);
                     }
