@@ -31,6 +31,10 @@ public class SystemDictionaryInstaller(
         // Initialize SingleCharSymbols class variable
         InitializeSingleCharSymbols();
 
+        // Initialize Workspace class variable in StringHolder
+        // (StringHolder class>>initialize method body is commented out in original source)
+        InitializeWorkspaceClassVariable();
+
         // Log pool dictionaries that will be created by init expressions
         InitializeAllPoolDictionaries();
 
@@ -137,6 +141,43 @@ public class SystemDictionaryInstaller(
         context.Allocator.SetInstanceVariable(associationOOP, 1, arrayOOP);
 
         InstallInClassPool(classPoolOOP, associationOOP, "SingleCharSymbols");
+    }
+
+    private void InitializeWorkspaceClassVariable()
+    {
+        // Workspace is a CLASS VARIABLE of StringHolder
+        // The original StringHolder class>>initialize method body is a comment,
+        // so we need to initialize it here during cold start
+        var stringHolderClassOOP = GlobalRegistry.LookupClassOOP("StringHolder");
+        if (stringHolderClassOOP == context.HeapManager.GetNil())
+        {
+            // StringHolder class not found - skip initialization
+            // This is not an error; the class may not be loaded yet
+            return;
+        }
+
+        var classPoolOOP = context.Allocator.GetInstanceVariable(stringHolderClassOOP, 7);
+        if (classPoolOOP == context.HeapManager.GetNil())
+        {
+            // No classPool means no class variables to initialize
+            return;
+        }
+
+        // Create a new StringHolder instance
+        // StringHolder has instance variables: contents, isLocked
+        var stringHolderInstance = context.Allocator.AllocateInstance(stringHolderClassOOP);
+
+        // Initialize the instance: contents = '', isLocked = false
+        var emptyString = context.Allocator.AllocateString("");
+        var falseOOP = context.HeapManager.GetFalse();
+        context.Allocator.SetInstanceVariable(stringHolderInstance, 0, emptyString); // contents
+        context.Allocator.SetInstanceVariable(stringHolderInstance, 1, falseOOP);    // isLocked
+
+        // Create Association for Workspace and set its value
+        var associationOOP = associationManager.GetOrCreateCanonical("Workspace");
+        context.Allocator.SetInstanceVariable(associationOOP, 1, stringHolderInstance);
+
+        InstallInClassPool(classPoolOOP, associationOOP, "Workspace");
     }
 
     private void InitializeAllPoolDictionaries()
