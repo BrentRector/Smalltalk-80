@@ -661,17 +661,20 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                         var selectorName = GetSymbolName(selectorOOP);
                         Console.WriteLine($"  Home method selector: {selectorName}");
                     }
-                    // Dump bytecodes around startPC to see what's executing
+                    // Dump bytecodes to see what's executing
                     int startPC = startPCOOP.IsSmallInteger ? startPCOOP.AsSmallInteger() : -1;
-                    if (startPC >= 0)
+                    var bytecodes = GetMethodBytecodes(homeMethodOOP);
+                    Console.WriteLine($"  Bytecodes: length={bytecodes.Length}, startPC={startPC}");
+                    if (bytecodes.Length > 0)
                     {
-                        var bytecodes = GetMethodBytecodes(homeMethodOOP);
-                        Console.Write($"  Bytecodes at PC={startPC}: ");
-                        for (int i = startPC; i < Math.Min(startPC + 10, bytecodes.Length); i++)
+                        Console.Write($"  All bytecodes: ");
+                        for (int i = 0; i < Math.Min(30, bytecodes.Length); i++)
                         {
+                            if (i == startPC) Console.Write("[");
                             Console.Write($"{bytecodes[i]} ");
+                            if (i == startPC) Console.Write("] ");
                         }
-                        Console.WriteLine();
+                        Console.WriteLine(bytecodes.Length > 30 ? "..." : "");
                     }
                 }
             }
