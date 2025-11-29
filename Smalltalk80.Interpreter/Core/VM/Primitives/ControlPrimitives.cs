@@ -697,7 +697,7 @@ public static class ControlPrimitives
             SmalltalkOOP priorityOop = context.HeapManager.GetInstanceVariable(nextProcessOop, VMConstants.PROCESS_PRIORITY_INDEX);
             int priority = priorityOop.IsSmallInteger ? priorityOop.AsSmallInteger() : -1;
 
-            if (DebugPriorityQueues)
+            if (DebugPriorityQueues && priority == 1)
                 Console.WriteLine($"[PQ-] REMOVE process={nextProcessOop} from priority={priority} (activating)");
 
             RemoveProcessFromList(context, nextProcessOop, myListOop);
@@ -1012,8 +1012,8 @@ public static class ControlPrimitives
 
         AddLastLink(context, priorityListOop, "class:LinkedList", processOop);
 
-        // Log priority queue add operation
-        if (DebugPriorityQueues)
+        // Log priority queue add operation (only priority 1 - background process)
+        if (DebugPriorityQueues && priority == 1)
             Console.WriteLine($"[PQ+] ADD process={processOop} to priority={priority}");
 
         return true;
