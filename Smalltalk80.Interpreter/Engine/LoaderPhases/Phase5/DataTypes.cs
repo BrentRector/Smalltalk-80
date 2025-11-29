@@ -30,5 +30,6 @@ public record Phase5Context(
     Dictionary<string, SmalltalkOOP> LocalIdToObjectId,
     HashSet<(SmalltalkOOP oop, int slot)> InitializedFields,
     ColdstartReport Report,
-    IDiagnosticHub? Diagnostics
+    IDiagnosticHub? Diagnostics,
+    string? BundlePath = null
 );

@@ -185,7 +185,7 @@ public class ColdStartOrchestrator : IColdStartLoader
 
         // Phase 5: Globals + Patches
         // Populates USTable, installs globals, applies patches
-        var phase5 = new Phase5Orchestrator(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics);
+        var phase5 = new Phase5Orchestrator(_bundle, _allocator, _heapManager, LayoutResolver, _localIdToObjectId, _initializedFields, _report, _diagnostics, _bundlePath);
         _phases.Add(phase5);
         RunPhase(phase5.Name, () =>
         {

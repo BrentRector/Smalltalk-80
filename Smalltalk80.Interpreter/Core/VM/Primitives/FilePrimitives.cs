@@ -129,6 +129,16 @@ public static class FileOperations
     }
 
     /// <summary>
+    /// Closes a file handle. Public wrapper for cold start use.
+    /// </summary>
+    /// <param name="handle">The file handle to close.</param>
+    /// <returns>True if closed successfully.</returns>
+    public static bool CloseFileHandle(int handle)
+    {
+        return FileHandleManager.CloseFile(handle);
+    }
+
+    /// <summary>
     /// Primitive 120: Parse a Windows path string.
     /// Receiver: WindowsPathName class or instance.
     /// Argument: String path to parse.

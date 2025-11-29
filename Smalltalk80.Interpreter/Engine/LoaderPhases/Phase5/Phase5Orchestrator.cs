@@ -35,7 +35,8 @@ public class Phase5Orchestrator : IPhase
         Dictionary<string, SmalltalkOOP> localIdToObjectId,
         HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
         ColdstartReport report,
-        IDiagnosticHub? diagnostics = null)
+        IDiagnosticHub? diagnostics = null,
+        string? bundlePath = null)
     {
         _context = new Phase5Context(
             bundle,
@@ -45,7 +46,8 @@ public class Phase5Orchestrator : IPhase
             localIdToObjectId,
             initializedFields,
             report,
-            diagnostics);
+            diagnostics,
+            bundlePath);
 
         // Create shared services
         var fieldValueResolver = new FieldValueResolver(_context);
