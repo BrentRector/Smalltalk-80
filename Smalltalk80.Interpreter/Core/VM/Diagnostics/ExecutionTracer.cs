@@ -12,8 +12,21 @@ public class ExecutionTracer
     // IMPORTANT: This counter MUST be reset before each init expression to prevent accumulation.
     // Without reset: 40 expressions × 10K each = 400K accumulated before #41 even starts!
 
+    // Flag to disable infinite loop detection (for interactive event loops that run forever)
+    private bool _infiniteLoopDetectionEnabled = true;
+
     /// <summary>Static flag to suppress verbose infinite loop output.</summary>
     public static bool SuppressInfiniteLoopTrace { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets whether infinite loop detection is enabled.
+    /// Disable this for interactive event loops that intentionally run forever.
+    /// </summary>
+    public bool InfiniteLoopDetectionEnabled
+    {
+        get => _infiniteLoopDetectionEnabled;
+        set => _infiniteLoopDetectionEnabled = value;
+    }
 
     // Circular buffer for recent method calls (for debugging infinite loops)
     private readonly string[] _recentCalls = new string[100];
@@ -78,11 +91,12 @@ public class ExecutionTracer
     /// <summary>
     /// Increments instruction count and returns true if execution should continue.
     /// Returns false if max instructions exceeded (infinite loop detected).
+    /// Always returns true if infinite loop detection is disabled.
     /// </summary>
     public bool IncrementInstructionCount()
     {
         _instructionCount++;
-        return _instructionCount < MAX_INSTRUCTIONS;
+        return !_infiniteLoopDetectionEnabled || _instructionCount < MAX_INSTRUCTIONS;
     }
 
     /// <summary>

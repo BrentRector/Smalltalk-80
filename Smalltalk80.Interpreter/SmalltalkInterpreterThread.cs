@@ -643,6 +643,9 @@ public class SmalltalkInterpreterThread
         Console.WriteLine("  Step 5: Starting controller event loop...");
         Console.WriteLine("    (This will run until the window is closed)");
 
+        // Disable infinite loop detection - the event loop intentionally runs forever
+        _vm!.InfiniteLoopDetectionEnabled = false;
+
         // Use controlManagerOOP directly - we already have it from step 2
         messageSender.SendUnary(controlManagerOOP, "searchForActiveController");
 
