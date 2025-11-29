@@ -244,40 +244,39 @@ public class SmalltalkInterpreterThread
             }
         }
 
-        // Comment expressions disabled - uncomment to enable
         // Execute comment expressions (ClassName comment: 'text') - show abbreviated progress
-        // if (commentIndices.Count > 0)
-        // {
-        //     Console.WriteLine($"\n--- Comment expressions ({commentIndices.Count} total) ---");
-        //     int commentSucceeded = 0;
-        //     int commentFailed = 0;
-        //     long totalCommentTimeMs = 0;
-        //     foreach (int index in commentIndices)
-        //     {
-        //         var expr = _context.Bundle.InitExpressions[index];
-        //
-        //         // Extract class name from "ClassName comment: 'text'"
-        //         var className = expr.Source?.Split(' ')[0] ?? "Unknown";
-        //         Console.Write($"  {className} comment: ... ");
-        //
-        //         var result = executor.ExecuteInitExpressionOnDemand(expr, compiler, verbose: false);
-        //         totalCommentTimeMs += result.ElapsedMilliseconds;
-        //
-        //         if (result.Status == InitStatus.Success)
-        //         {
-        //             Console.WriteLine($"✓ {result.ElapsedMilliseconds}ms");
-        //             commentSucceeded++;
-        //             succeeded++;
-        //         }
-        //         else
-        //         {
-        //             Console.WriteLine($"❌ {result.ElapsedMilliseconds}ms");
-        //             commentFailed++;
-        //             failed++;
-        //         }
-        //     }
-        //     Console.WriteLine($"  Comment expressions: {commentSucceeded}/{commentIndices.Count} succeeded in {totalCommentTimeMs / 1000.0:F1}s total");
-        // }
+        if (commentIndices.Count > 0)
+        {
+            Console.WriteLine($"\n--- Comment expressions ({commentIndices.Count} total) ---");
+            int commentSucceeded = 0;
+            int commentFailed = 0;
+            long totalCommentTimeMs = 0;
+            foreach (int index in commentIndices)
+            {
+                var expr = _context.Bundle.InitExpressions[index];
+
+                // Extract class name from "ClassName comment: 'text'"
+                var className = expr.Source?.Split(' ')[0] ?? "Unknown";
+                Console.Write($"  {className} comment: ... ");
+
+                var result = executor.ExecuteInitExpressionOnDemand(expr, compiler, verbose: false);
+                totalCommentTimeMs += result.ElapsedMilliseconds;
+
+                if (result.Status == InitStatus.Success)
+                {
+                    Console.WriteLine($"✓ {result.ElapsedMilliseconds}ms");
+                    commentSucceeded++;
+                    succeeded++;
+                }
+                else
+                {
+                    Console.WriteLine($"❌ {result.ElapsedMilliseconds}ms");
+                    commentFailed++;
+                    failed++;
+                }
+            }
+            Console.WriteLine($"  Comment expressions: {commentSucceeded}/{commentIndices.Count} succeeded in {totalCommentTimeMs / 1000.0:F1}s total");
+        }
 
         // Run GC after all initialization to show stats
         Console.WriteLine($"\n=== Running GC after all initialization ===");
@@ -589,7 +588,7 @@ public class SmalltalkInterpreterThread
                 if (methodIndexedSize >= 2)
                 {
                     var selectorOOP = _context.HeapManager.GetIndexedOOP(homeMethod, 1);
-                    var selectorName = _context.HeapManager.GetSymbolName(selectorOOP);
+                    var selectorName = ExtractSymbolString(selectorOOP);
                     Console.WriteLine($"    Home method selector: {selectorName}");
                 }
                 // Get bytecodes length
@@ -642,6 +641,9 @@ public class SmalltalkInterpreterThread
         // This runs the main event loop - it will run FOREVER until the system exits
         Console.WriteLine("  Step 5: Starting controller event loop...");
         Console.WriteLine("    (This will run until the window is closed)");
+
+        // Disable infinite loop detection - the event loop intentionally runs forever
+        _vm!.InfiniteLoopDetectionEnabled = false;
 
         // Use controlManagerOOP directly - we already have it from step 2
         messageSender.SendUnary(controlManagerOOP, "searchForActiveController");

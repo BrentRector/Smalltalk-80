@@ -576,9 +576,11 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
         if (isBlockContext)
         {
-            // BlockContext: receiver from home MethodContext (instance variable 5 in BlockContext is HOME, not receiver!)
-            var homeOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-            receiverOOP = heapManager.GetInstanceVariable(homeOOP, receiverIndex);
+            // BlockContext: receiver from home MethodContext
+            // CRITICAL: Must use FindMethodContext() to traverse the entire home chain for nested blocks
+            // Just reading one level up would fail for nested blocks where home could be another BlockContext
+            var methodContextOOP = context.FindMethodContext(context.ActiveContext);
+            receiverOOP = heapManager.GetInstanceVariable(methodContextOOP, receiverIndex);
         }
         else
         {
@@ -1140,8 +1142,15 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 throw new InvalidOperationException("blockCopy: primitive failed unexpectedly");
             }
 
+            // CRITICAL: Mark the home context as having created a block.
+            // This prevents the home MethodContext from being pooled, since the block
+            // may outlive the method activation and still reference it via 'home'.
+            var blockContextOOP = result.Value;
+            var homeContextOOP = heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+            context.MarkContextCreatedBlock(homeContextOOP);
+
             // Push the new BlockContext onto the stack
-            context.Push(result.Value);
+            context.Push(blockContextOOP);
             return true;
         }
 

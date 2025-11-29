@@ -5,6 +5,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
+using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 
@@ -31,6 +32,10 @@ public class SystemDictionaryInstaller(
         // Initialize SingleCharSymbols class variable
         InitializeSingleCharSymbols();
 
+        // Initialize Workspace class variable in StringHolder
+        // (StringHolder class>>initialize method body is commented out in original source)
+        InitializeWorkspaceClassVariable();
+
         // Log pool dictionaries that will be created by init expressions
         InitializeAllPoolDictionaries();
 
@@ -39,6 +44,9 @@ public class SystemDictionaryInstaller(
         {
             InstallProcessorGlobal(processorSchedulerOOP);
         }
+
+        // Install SystemOrganization -> SystemOrganizer instance
+        InstallSystemOrganizationGlobal();
 
         // Install all classes as global variables
         foreach (var cls in context.Bundle.Classes)
@@ -49,6 +57,20 @@ public class SystemDictionaryInstaller(
                 InstallClassGlobal(className, classOOP);
             }
         }
+
+        // Install SourceFiles as nil to enable decompiler fallback
+        // In traditional Smalltalk-80, SourceFiles is an Array of FileStreams for .sources and .changes
+        // Since we store source in JSON, we set this to nil so CompiledMethod>>getSource returns nil
+        // and the decompiler is used as fallback for displaying method source in the Browser
+        InstallSourceFilesAsNil();
+    }
+
+    private void InstallSourceFilesAsNil()
+    {
+        var nilOOP = context.HeapManager.GetNil();
+        var associationOOP = associationManager.GetOrCreateCanonical("SourceFiles");
+        context.Allocator.SetInstanceVariable(associationOOP, 1, nilOOP);
+        InstallInSystemDictionary(associationOOP, "SourceFiles");
     }
 
     private void InstallSmalltalkGlobal()
@@ -137,6 +159,44 @@ public class SystemDictionaryInstaller(
         context.Allocator.SetInstanceVariable(associationOOP, 1, arrayOOP);
 
         InstallInClassPool(classPoolOOP, associationOOP, "SingleCharSymbols");
+    }
+
+    private void InitializeWorkspaceClassVariable()
+    {
+        // Workspace is a CLASS VARIABLE of StringHolder
+        // The original StringHolder class>>initialize method body is a comment,
+        // so we need to initialize it here during cold start
+        var stringHolderClassOOP = GlobalRegistry.LookupClassOOP("StringHolder");
+        if (stringHolderClassOOP == context.HeapManager.GetNil())
+        {
+            // StringHolder class not found - skip initialization
+            // This is not an error; the class may not be loaded yet
+            return;
+        }
+
+        var classPoolOOP = context.Allocator.GetInstanceVariable(stringHolderClassOOP, 7);
+        if (classPoolOOP == context.HeapManager.GetNil())
+        {
+            // No classPool means no class variables to initialize
+            return;
+        }
+
+        // Create a new StringHolder instance using heap-based allocation
+        // StringHolder has instance variables: contents, isLocked
+        var stringHolderInstance = context.HeapManager.AllocateInstanceOf(stringHolderClassOOP, 0);
+
+        // Initialize the instance: contents = '', isLocked = false
+        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+        var emptyString = context.Allocator.AllocateString(stringClassOOP, "");
+        var falseOOP = GlobalRegistry.FalseOOP;
+        context.HeapManager.SetInstanceVariable(stringHolderInstance, 0, emptyString); // contents
+        context.HeapManager.SetInstanceVariable(stringHolderInstance, 1, falseOOP);    // isLocked
+
+        // Create Association for Workspace and set its value
+        var associationOOP = associationManager.GetOrCreateCanonical("Workspace");
+        context.Allocator.SetInstanceVariable(associationOOP, 1, stringHolderInstance);
+
+        InstallInClassPool(classPoolOOP, associationOOP, "Workspace");
     }
 
     private void InitializeAllPoolDictionaries()
@@ -260,6 +320,105 @@ public class SystemDictionaryInstaller(
         var associationOOP = associationManager.GetOrCreateCanonical("Processor");
         context.Allocator.SetInstanceVariable(associationOOP, 1, processorSchedulerOOP);
         InstallInSystemDictionary(associationOOP, "Processor");
+    }
+
+    private void InstallSystemOrganizationGlobal()
+    {
+        // SystemOrganization is a SystemOrganizer instance that organizes classes by category
+        // SystemOrganizer inherits from ClassOrganizer which has instance variables:
+        //   [0] globalComment  - RemoteString (nil during cold start)
+        //   [1] categoryArray  - Array of String category names
+        //   [2] categoryStops  - Array of Integer (cumulative stop indices)
+        //   [3] elementArray   - Array of Symbol (class names)
+
+        var nilOOP = context.HeapManager.GetNil();
+        var systemOrganizerClassOOP = GlobalRegistry.LookupClassOOP("SystemOrganizer");
+        if (systemOrganizerClassOOP == nilOOP)
+        {
+            // SystemOrganizer class not found - cannot create SystemOrganization
+            return;
+        }
+
+        // Collect all non-metaclass class names and group by category
+        var categoryToClasses = new Dictionary<string, List<string>>();
+        foreach (var cls in context.Bundle.Classes)
+        {
+            if (cls.IsMetaclass) continue;
+
+            string className = context.Bundle.Symbols[cls.NameIndex];
+            string category = string.IsNullOrEmpty(cls.Category) ? "as yet unclassified" : cls.Category;
+
+            if (!categoryToClasses.ContainsKey(category))
+            {
+                categoryToClasses[category] = new List<string>();
+            }
+            categoryToClasses[category].Add(className);
+        }
+
+        // Sort categories alphabetically for consistent ordering
+        var sortedCategories = categoryToClasses.Keys.OrderBy(c => c).ToList();
+
+        // Build categoryArray (Array of Symbols - per Blue Book, categories are Symbols)
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var symbolService = new SymbolService(context.Bundle);
+        var categoryArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, sortedCategories.Count);
+        for (int i = 0; i < sortedCategories.Count; i++)
+        {
+            // Try to get existing symbol, or use a String if symbol not in table
+            if (symbolService.TryGetSymbolOOP(sortedCategories[i], out var categorySymbolOOP))
+            {
+                context.Allocator.SetIndexedOOP(categoryArrayOOP, i, categorySymbolOOP);
+            }
+            else
+            {
+                // Category name not in symbol table - allocate as String (fallback)
+                var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+                var categoryStringOOP = context.Allocator.AllocateString(stringClassOOP, sortedCategories[i]);
+                context.Allocator.SetIndexedOOP(categoryArrayOOP, i, categoryStringOOP);
+            }
+        }
+
+        // Build elementArray (Array of Symbols - class names) and categoryStops
+        var allClassNames = new List<string>();
+        var stops = new List<int>();
+        int runningTotal = 0;
+
+        foreach (var category in sortedCategories)
+        {
+            var classesInCategory = categoryToClasses[category].OrderBy(c => c).ToList();
+            allClassNames.AddRange(classesInCategory);
+            runningTotal += classesInCategory.Count;
+            stops.Add(runningTotal);
+        }
+
+        // Build elementArray (Array of Symbols)
+        var elementArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, allClassNames.Count);
+        for (int i = 0; i < allClassNames.Count; i++)
+        {
+            var symbolOOP = symbolService.GetSymbolOOP(allClassNames[i]);
+            context.Allocator.SetIndexedOOP(elementArrayOOP, i, symbolOOP);
+        }
+
+        // Build categoryStops (Array of SmallIntegers)
+        var categoryStopsOOP = context.Allocator.AllocateArray(arrayClassOOP, stops.Count);
+        for (int i = 0; i < stops.Count; i++)
+        {
+            context.Allocator.SetIndexedOOP(categoryStopsOOP, i, SmalltalkOOP.FromSmallInteger(stops[i]));
+        }
+
+        // Allocate SystemOrganizer instance (4 named instance variables, no indexed slots)
+        var systemOrganizerOOP = context.HeapManager.AllocateInstanceOf(systemOrganizerClassOOP, 0);
+
+        // Set instance variables
+        context.HeapManager.SetInstanceVariable(systemOrganizerOOP, 0, nilOOP);              // globalComment
+        context.HeapManager.SetInstanceVariable(systemOrganizerOOP, 1, categoryArrayOOP);   // categoryArray
+        context.HeapManager.SetInstanceVariable(systemOrganizerOOP, 2, categoryStopsOOP);   // categoryStops
+        context.HeapManager.SetInstanceVariable(systemOrganizerOOP, 3, elementArrayOOP);    // elementArray
+
+        // Install as SystemOrganization global
+        var associationOOP = associationManager.GetOrCreateCanonical("SystemOrganization");
+        context.Allocator.SetInstanceVariable(associationOOP, 1, systemOrganizerOOP);
+        InstallInSystemDictionary(associationOOP, "SystemOrganization");
     }
 
     private void InstallClassGlobal(string className, SmalltalkOOP classOOP)

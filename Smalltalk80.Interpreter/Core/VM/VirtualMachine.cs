@@ -219,6 +219,16 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     public void DisableSelectorTrace() => _tracer.StopSelectorTrace();
 
     /// <summary>
+    /// Gets or sets whether infinite loop detection is enabled.
+    /// Disable this for interactive event loops that intentionally run forever.
+    /// </summary>
+    public bool InfiniteLoopDetectionEnabled
+    {
+        get => _tracer.InfiniteLoopDetectionEnabled;
+        set => _tracer.InfiniteLoopDetectionEnabled = value;
+    }
+
+    /// <summary>
     /// Prints a trace message with proper indentation based on call depth.
     /// </summary>
     private void TraceMessage(string message)
@@ -1257,6 +1267,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         return true;
     }
+
+    void IBytecodeContext.MarkContextCreatedBlock(SmalltalkOOP homeContextOOP)
+        => _contextManager.MarkContextCreatedBlock(homeContextOOP);
 
     /// <summary>
     /// Pushes a value onto the operand stack.

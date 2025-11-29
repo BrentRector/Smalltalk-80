@@ -157,4 +157,11 @@ internal interface IBytecodeContext : IObjectMetadataAccessor, IStackOperations,
     /// <param name="args">Arguments to pass to the block.</param>
     /// <returns>True if activation succeeded, false if argument count mismatch.</returns>
     bool ActivateBlock(SmalltalkOOP blockContextOOP, SmalltalkOOP[] args);
+
+    /// <summary>
+    /// Marks a MethodContext as having created one or more BlockContexts.
+    /// Such contexts cannot be pooled because their blocks may outlive them.
+    /// </summary>
+    /// <param name="homeContextOOP">The home MethodContext that created a block.</param>
+    void MarkContextCreatedBlock(SmalltalkOOP homeContextOOP);
 }

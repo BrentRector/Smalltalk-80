@@ -142,6 +142,13 @@ public class Phase4_MethodCompilation : IPhase
         // STEP 4: INSTALL METHODS INTO DICTIONARIES (from Phase9)
         // ====================================================================
         _dictionaryInstaller.InstallMethodsIntoDictionaries();
+
+        // ====================================================================
+        // STEP 5: CREATE CLASS ORGANIZATIONS (for Browser display)
+        // ====================================================================
+        var organizationInstaller = new ClassOrganizationInstaller(
+            _bundle, _allocator, _localIdToObjectId, _symbolService, _diagnostics);
+        organizationInstaller.InstallOrganizations();
     }
 
     // ====================================================================

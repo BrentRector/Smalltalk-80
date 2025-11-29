@@ -187,12 +187,16 @@ namespace Smalltalk80.Compiler.AST
                                 }
                             }
                             break;
-                        case "category:":
-                            if (spec.stringConst() != null)
-                            {
-                                classNode.Category = StripQuotes(spec.stringConst().STRING().GetText());
-                            }
-                            break;
+                    }
+                }
+
+                // Handle categoryDecl (separate from classSlotSpec in the grammar)
+                if (classBody.categoryDecl() != null)
+                {
+                    var categoryDecl = classBody.categoryDecl();
+                    if (categoryDecl.stringConst() != null)
+                    {
+                        classNode.Category = StripQuotes(categoryDecl.stringConst().STRING().GetText());
                     }
                 }
             }

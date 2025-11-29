@@ -73,4 +73,12 @@ public interface IContextManager
     /// Must be called after construction to enable pool clearing before GC.
     /// </summary>
     void Initialize();
+
+    /// <summary>
+    /// Marks a context as having created one or more BlockContexts.
+    /// Such contexts cannot be pooled because their blocks may outlive them
+    /// and still reference them via the 'home' field.
+    /// </summary>
+    /// <param name="contextOOP">The MethodContext that created a block.</param>
+    void MarkContextCreatedBlock(SmalltalkOOP contextOOP);
 }

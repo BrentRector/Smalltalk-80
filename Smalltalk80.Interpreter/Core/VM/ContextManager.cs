@@ -39,6 +39,12 @@ internal class ContextManager(
     private long _poolMisses = 0;
     private long _poolEvictions = 0;  // Contexts discarded due to pool full
 
+    // Track contexts that have created blocks - these cannot be pooled because
+    // the blocks may outlive the method activation and still reference the context
+    // via their 'home' field.
+    private readonly HashSet<SmalltalkOOP> _contextsWithBlocks = [];
+    private long _blockedFromPooling = 0;  // Contexts skipped due to having blocks
+
     /// <inheritdoc />
     public SmalltalkOOP ActiveContext => _activeContextOOP;
 
@@ -213,6 +219,15 @@ internal class ContextManager(
     }
 
     /// <inheritdoc />
+    public void MarkContextCreatedBlock(SmalltalkOOP contextOOP)
+    {
+        // Mark this context as having created at least one block.
+        // This prevents pooling since the block may outlive this activation
+        // and still reference the context via its 'home' field.
+        _contextsWithBlocks.Add(contextOOP);
+    }
+
+    /// <inheritdoc />
     public void AddContextToPool(SmalltalkOOP contextOOP)
     {
         // NEVER pool the active context
@@ -224,6 +239,15 @@ internal class ContextManager(
         // NEVER pool a context that's in the active context's sender chain
         if (IsInSenderChain(contextOOP, _activeContextOOP))
         {
+            return;
+        }
+
+        // NEVER pool a context that has created blocks - the blocks may
+        // still reference this context via their 'home' field
+        if (_contextsWithBlocks.Contains(contextOOP))
+        {
+            _contextsWithBlocks.Remove(contextOOP);  // Clean up tracking
+            _blockedFromPooling++;
             return;
         }
 
@@ -316,7 +340,7 @@ internal class ContextManager(
     /// This prevents use-after-free bugs where GC collects pooled contexts
     /// and heap reallocates the OOP to a different object type.
     /// Pools naturally rebuild as methods return after GC.
-    /// Also resets pool statistics for next cycle.
+    /// Also resets pool statistics and block tracking for next cycle.
     /// </summary>
     private void ClearAllPools()
     {
@@ -325,9 +349,14 @@ internal class ContextManager(
             pool.Clear();
         }
 
+        // Clear block tracking - contexts referenced by live blocks will be
+        // re-marked when those blocks are evaluated
+        _contextsWithBlocks.Clear();
+
         // Reset statistics for next cycle
         _poolHits = 0;
         _poolMisses = 0;
         _poolEvictions = 0;
+        _blockedFromPooling = 0;
     }
 }
