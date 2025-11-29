@@ -18,18 +18,21 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 /// <param name="allocator">The object graph allocator for creating objects.</param>
 /// <param name="localIdToObjectId">Mapping from local IDs to allocated object OOPs.</param>
 /// <param name="symbolService">The symbol service for symbol lookups.</param>
+/// <param name="dictionaryService">The dictionary service for hash-based dictionary operations.</param>
 /// <param name="diagnostics">Optional diagnostic hub for logging.</param>
 internal class MethodDictionaryInstaller(
     ColdStartBundle bundle,
     ObjectGraphAllocator allocator,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
     SymbolService symbolService,
+    DictionaryService dictionaryService,
     IDiagnosticHub? diagnostics = null)
 {
     private readonly ColdStartBundle _bundle = bundle;
     private readonly ObjectGraphAllocator _allocator = allocator;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = localIdToObjectId;
     private readonly SymbolService _symbolService = symbolService;
+    private readonly DictionaryService _dictionaryService = dictionaryService;
     private readonly IDiagnosticHub? _diagnostics = diagnostics;
 
     /// <summary>
@@ -199,87 +202,14 @@ internal class MethodDictionaryInstaller(
 
     /// <summary>
     /// Installs a method into a method dictionary using IdentityDictionary structure.
-    /// MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
-    ///
-    /// IMPORTANT: Uses hash-based placement matching IdentityDictionary>>findKeyOrNil:
-    ///   index = key asOop \\ length + 1  (Smalltalk is 1-indexed)
-    /// In C# with 0-based indexing: index = pointer % length
+    /// Delegates to DictionaryService for hash-based placement.
     /// </summary>
     /// <param name="methodDictOOP">The method dictionary to install into.</param>
     /// <param name="selectorSymbolOOP">The selector symbol OOP.</param>
     /// <param name="methodOOP">The compiled method OOP to install.</param>
-    /// <exception cref="InvalidOperationException">Thrown when dictionary is full or has invalid structure.</exception>
     public void InstallMethodInDictionary(SmalltalkOOP methodDictOOP, SmalltalkOOP selectorSymbolOOP, SmalltalkOOP methodOOP)
     {
-        // MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
-        var valuesArrayOOP = _allocator.GetInstanceVariable(methodDictOOP, 0);
-        var tallyOOP = _allocator.GetInstanceVariable(methodDictOOP, 1);
-
-        if (valuesArrayOOP == _allocator.GetNil())
-        {
-            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has nil valueArray");
-        }
-
-        int dictionarySize = _allocator.GetIndexedSize(methodDictOOP);
-        int valuesArraySize = _allocator.GetIndexedSize(valuesArrayOOP);
-
-        if (dictionarySize != valuesArraySize)
-        {
-            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has mismatched sizes: keys={dictionarySize}, values={valuesArraySize}");
-        }
-
-        // CRITICAL FIX: Use hash-based placement matching IdentityDictionary>>findKeyOrNil:
-        // Smalltalk: index _ key asOop \\ length + 1.  (1-indexed)
-        // C#: index = pointer % length  (0-indexed)
-        int hashIndex = (int)((uint)selectorSymbolOOP.Pointer % (uint)dictionarySize);
-
-        // Linear probe from hash position to find empty slot or matching key
-        int targetIndex = -1;
-        int probeCount = 0;
-        int index = hashIndex;
-
-        while (probeCount < dictionarySize)
-        {
-            var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, index);
-
-            if (keyOOP == _allocator.GetNil())
-            {
-                // Empty slot found
-                targetIndex = index;
-                break;
-            }
-            else if (keyOOP == selectorSymbolOOP)
-            {
-                // Existing entry for this selector - replace it
-                targetIndex = index;
-                break;
-            }
-
-            // Linear probe: move to next slot, wrap around
-            index = (index + 1) % dictionarySize;
-            probeCount++;
-        }
-
-        if (targetIndex == -1)
-        {
-            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} is full - no empty slots available after {probeCount} probes");
-        }
-
-        // Check if this is a new entry (for tally update)
-        var existingKeyOOP = _allocator.GetIndexedOOP(methodDictOOP, targetIndex);
-        bool isNewEntry = existingKeyOOP == _allocator.GetNil();
-
-        // Install the method
-        _allocator.SetIndexedOOP(methodDictOOP, targetIndex, selectorSymbolOOP);
-        _allocator.SetIndexedOOP(valuesArrayOOP, targetIndex, methodOOP);
-
-        // Update tally if we used a new slot
-        if (isNewEntry)
-        {
-            int currentTally = tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger() : 0;
-            var newTallyOOP = SmalltalkOOP.FromSmallInteger(currentTally + 1);
-            _allocator.SetInstanceVariable(methodDictOOP, 1, newTallyOOP);
-        }
+        _dictionaryService.InstallInIdentityDictionary(methodDictOOP, selectorSymbolOOP, methodOOP, selectorSymbolOOP.ToString());
     }
 
     /// <summary>
