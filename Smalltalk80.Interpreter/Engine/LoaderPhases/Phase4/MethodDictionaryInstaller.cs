@@ -200,6 +200,10 @@ internal class MethodDictionaryInstaller(
     /// <summary>
     /// Installs a method into a method dictionary using IdentityDictionary structure.
     /// MethodDictionary (IdentityDictionary): [0] = valueArray, [1] = tally, indexed fields = keys
+    ///
+    /// IMPORTANT: Uses hash-based placement matching IdentityDictionary>>findKeyOrNil:
+    ///   index = key asOop \\ length + 1  (Smalltalk is 1-indexed)
+    /// In C# with 0-based indexing: index = pointer % length
     /// </summary>
     /// <param name="methodDictOOP">The method dictionary to install into.</param>
     /// <param name="selectorSymbolOOP">The selector symbol OOP.</param>
@@ -224,29 +228,41 @@ internal class MethodDictionaryInstaller(
             throw new InvalidOperationException($"MethodDictionary {methodDictOOP} has mismatched sizes: keys={dictionarySize}, values={valuesArraySize}");
         }
 
-        // Find an empty slot or existing entry for this selector
+        // CRITICAL FIX: Use hash-based placement matching IdentityDictionary>>findKeyOrNil:
+        // Smalltalk: index _ key asOop \\ length + 1.  (1-indexed)
+        // C#: index = pointer % length  (0-indexed)
+        int hashIndex = (int)((uint)selectorSymbolOOP.Pointer % (uint)dictionarySize);
+
+        // Linear probe from hash position to find empty slot or matching key
         int targetIndex = -1;
-        for (int i = 0; i < dictionarySize; i++)
+        int probeCount = 0;
+        int index = hashIndex;
+
+        while (probeCount < dictionarySize)
         {
-            var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, i);
+            var keyOOP = _allocator.GetIndexedOOP(methodDictOOP, index);
 
             if (keyOOP == _allocator.GetNil())
             {
                 // Empty slot found
-                targetIndex = i;
+                targetIndex = index;
                 break;
             }
             else if (keyOOP == selectorSymbolOOP)
             {
                 // Existing entry for this selector - replace it
-                targetIndex = i;
+                targetIndex = index;
                 break;
             }
+
+            // Linear probe: move to next slot, wrap around
+            index = (index + 1) % dictionarySize;
+            probeCount++;
         }
 
         if (targetIndex == -1)
         {
-            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} is full - no empty slots available");
+            throw new InvalidOperationException($"MethodDictionary {methodDictOOP} is full - no empty slots available after {probeCount} probes");
         }
 
         // Check if this is a new entry (for tally update)
