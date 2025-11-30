@@ -105,7 +105,7 @@ See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, an
 
 ## Running the Interpreter
 
-**Default Behavior**: The interpreter automatically loads `coldstart.json` from the same directory as the executable when no `--coldstart` parameter is provided.
+**Default Behavior**: The interpreter automatically loads `coldstart.json` from the `Data` subfolder relative to the executable when no `--coldstart` parameter is provided.
 
 ### Standard Execution
 
@@ -114,7 +114,7 @@ cd Smalltalk80.Interpreter
 dotnet run
 ```
 
-Executes cold start phases 1-6 and init expressions from `coldstart.json` in the executable directory.
+Executes cold start phases 1-6 and init expressions from `Data/coldstart.json` in the executable directory.
 
 ### With Diagnostics
 
@@ -186,17 +186,17 @@ Changes to the Smalltalk source (including adding init expressions like `Display
 # Navigate to source directory
 cd "Smalltalk-80 Source"
 
-# Compile Smalltalk source to generate new coldstart.json
+# Compile Smalltalk source to generate new coldstart.json (outputs to Data subfolder by default)
 dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
 
-# Copy to interpreter bin directory (Windows)
-copy ..\Smalltalk80.Compiler\bin\Debug\net9.0\coldstart.json ..\Smalltalk80.Interpreter\bin\Debug\net9.0-windows\coldstart.json
+# Copy Data folder contents to interpreter bin directory (Windows)
+copy ..\Smalltalk80.Compiler\bin\Debug\net9.0\Data\* ..\Smalltalk80.Interpreter\bin\Debug\net9.0-windows\Data\
 
-# Copy to interpreter bin directory (Linux/Mac)
-cp ../Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/coldstart.json
+# Copy Data folder contents to interpreter bin directory (Linux/Mac)
+cp -r ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/* ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
 ```
 
-**Important**: The `coldstart.json` file in the Interpreter's bin directory is now tracked in git to ensure init expressions are always in sync with the source code.
+**Important**: The `Data` folder contents in the Interpreter's bin directory are now tracked in git to ensure init expressions are always in sync with the source code.
 
 ### 🔴 MANDATORY: BlockContext Regression Test
 
@@ -204,7 +204,7 @@ cp ../Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json ../Smalltalk80.Interp
 
 ```bash
 cd Smalltalk80.Interpreter
-dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
+dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_with_runner.json
 ```
 
 **Expected**: Returns `1191` (120 tests pass)
@@ -215,7 +215,7 @@ dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
 cd "Smalltalk-80 Source"
 cat Smalltalk-80.st Tests/BlockContextTest.st Tests/BlockContextTestRunner.st > Smalltalk-80-with-runner.st
 dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80-with-runner.st"
-cp ../bin/Debug/net9.0/coldstart.json ../bin/Debug/net9.0/coldstart_with_runner.json
+cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/coldstart.json ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_with_runner.json
 ```
 
 ### Critical Files Requiring Test

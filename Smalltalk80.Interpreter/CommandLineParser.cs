@@ -80,11 +80,11 @@ public static class CommandLineParser
             }
         }
 
-        // Default: coldstart.json in the same directory as the executable
+        // Default: coldstart.json in the Data subfolder relative to the executable
         if (coldStartFile == null)
         {
             string exeDir = AppDomain.CurrentDomain.BaseDirectory;
-            coldStartFile = Path.Combine(exeDir, "coldstart.json");
+            coldStartFile = Path.Combine(exeDir, "Data", "coldstart.json");
         }
 
         return new CommandLineConfig
@@ -107,7 +107,7 @@ public static class CommandLineParser
         Console.Error.WriteLine("\nUsage: Smalltalk80.Interpreter [options]");
         Console.Error.WriteLine("Options:");
         Console.Error.WriteLine("  --coldstart <file>     Specify the cold start bundle file to load");
-        Console.Error.WriteLine("                         (default: coldstart.json in executable directory)");
+        Console.Error.WriteLine("                         (default: Data/coldstart.json in executable directory)");
         Console.Error.WriteLine("  --dump-class <name>    Dump comprehensive information about a class");
         Console.Error.WriteLine("                         after cold start completes");
         Console.Error.WriteLine("  --test-filter <pattern> Run only init expressions matching pattern");
