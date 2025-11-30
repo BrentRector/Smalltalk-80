@@ -60,8 +60,8 @@ file sealed class Program
             }
         }
 
-        // Default output: coldstart.json in the executable's output directory
-        outputFile ??= Path.Combine(AppContext.BaseDirectory, "coldstart.json");
+        // Default output: coldstart.json in the Data subfolder of the executable's output directory
+        outputFile ??= Path.Combine(AppContext.BaseDirectory, "Data", "coldstart.json");
 
         // Verify all input files exist
         foreach (var inputFile in inputFiles)
@@ -74,7 +74,7 @@ file sealed class Program
                 Console.Error.WriteLine("  Compiles Smalltalk file-out format to JSON cold-start image.");
                 Console.Error.WriteLine("  Supports multiple input .st files (merged into single bundle).");
                 Console.Error.WriteLine($"  Default input:  {defaultInputFile}");
-                Console.Error.WriteLine($"  Default output: coldstart.json in executable directory");
+                Console.Error.WriteLine($"  Default output: Data/coldstart.json in executable directory");
                 return 1;
             }
         }
@@ -149,6 +149,11 @@ file sealed class Program
                 Console.WriteLine($"Generated sources file: {sourcesFile}");
                 Console.WriteLine($"  Size: {sourcesFileContent.Length:N0} bytes");
             }
+
+            // Create empty .changes file (index 2) for runtime modifications
+            string changesFile = Path.Combine(outputDir ?? ".", "Smalltalk-80.changes");
+            File.WriteAllText(changesFile, "", System.Text.Encoding.UTF8);
+            Console.WriteLine($"Generated changes file: {changesFile} (empty)");
 
             Console.WriteLine();
             Console.WriteLine($"Successfully generated: {outputFile}");

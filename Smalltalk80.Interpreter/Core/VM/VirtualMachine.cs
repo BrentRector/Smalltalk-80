@@ -1234,26 +1234,20 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Verify argument count matches
         if (args.Length != blockArgCount) return false;
 
-        // Get argStartIndex from BlockContext
-        var argStartIndexOOP = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX);
-        int argStartIndex = argStartIndexOOP.AsSmallInteger();
-
-        // Get home MethodContext
-        var homeContext = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-
-        // Store arguments in home MethodContext temp frame
-        for (int i = 0; i < args.Length; i++)
-        {
-            _heapManager.SetIndexedOOP(homeContext, argStartIndex + i, args[i]);
-        }
-
         // Get initialIP from blockContext
         var initialIP = _heapManager.GetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
 
         // Set PC to initialIP
         _heapManager.SetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_PC_INDEX, initialIP);
 
-        // Set stack pointer to argument count
+        // BLUE BOOK: Push arguments onto BlockContext's stack (in order)
+        // The block's first bytecodes (POP_STORE_TEMP) will pop them into correct temp slots
+        for (int i = 0; i < args.Length; i++)
+        {
+            _heapManager.SetIndexedOOP(blockContextOOP, i, args[i]);
+        }
+
+        // Set stack pointer to argument count (points to next free slot after arguments)
         _heapManager.SetInstanceVariable(blockContextOOP, VMConstants.BLOCKCONTEXT_STACKP_INDEX,
             SmalltalkOOP.FromSmallInteger(args.Length));
 

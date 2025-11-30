@@ -15,27 +15,25 @@ public static class ControlPrimitives
     // Debug flag for priority queue add/remove operations only (concise)
     private static readonly bool DebugPriorityQueues = true;
     /// <summary>Primitive 80: blockCopy: - Creates a new BlockContext</summary>
+    /// <remarks>
+    /// BLUE BOOK COMPLIANT: Only accepts block argument count.
+    /// Block arguments are stored via STORE_TEMP bytecodes at block body start.
+    /// </remarks>
     public class BlockCopy : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            // VM EXTENSION: Accept two arguments (nargs, argStartIndex)
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            // Blue Book: Accept one argument (nargs)
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
 
             // args[0]: Block argument count (SmallInteger)
             if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            // args[1]: argStartIndex in unified temp frame (SmallInteger)
-            if (!context.Arguments[1].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-
             SmalltalkOOP blockArgumentCount = context.Arguments[0];
             int argCount = blockArgumentCount.AsSmallInteger();
 
-            SmalltalkOOP argStartIndexOOP = context.Arguments[1];
-            int argStartIndex = argStartIndexOOP.AsSmallInteger();
-
             // Argument count must be non-negative
-            if (argCount < 0 || argStartIndex < 0) return PrimitiveResult.Fail(context.Metadata!);
+            if (argCount < 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get active context (receiver of blockCopy: bytecode)
             SmalltalkOOP activeContext = context.Receiver;
@@ -48,7 +46,6 @@ public static class ControlPrimitives
                 activeContext,
                 blockContextClassOOP,
                 blockArgumentCount,
-                argStartIndexOOP,
                 context.InstructionPointer);
 
             // CRITICAL: Mark the home context as having created a block.
@@ -70,7 +67,6 @@ public static class ControlPrimitives
         /// <param name="activeContext">The current active context (receiver)</param>
         /// <param name="blockContextClassOOP">BlockContext class OOP</param>
         /// <param name="blockArgumentCount">Number of block arguments (SmallInteger)</param>
-        /// <param name="argStartIndexOOP">Start index in unified temp frame (SmallInteger)</param>
         /// <param name="currentPC">Current instruction pointer</param>
         /// <returns>PrimitiveResult with newly created BlockContext OOP</returns>
         public static PrimitiveResult CreateBlockContext(
@@ -78,7 +74,6 @@ public static class ControlPrimitives
             SmalltalkOOP activeContext,
             SmalltalkOOP blockContextClassOOP,
             SmalltalkOOP blockArgumentCount,
-            SmalltalkOOP argStartIndexOOP,
             int currentPC)
         {
             // Determine home context for lexical scoping
@@ -107,20 +102,24 @@ public static class ControlPrimitives
             int indexedSize = 32;
             SmalltalkOOP newBlockContext = heapManager.AllocateInstanceOf(blockContextClassOOP, indexedSize);
 
-            // Initialize BlockContext fields
+            // Initialize BlockContext fields (Blue Book standard fields only)
             heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, heapManager.GetNil());
             heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_PC_INDEX, heapManager.GetNil());
             heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, heapManager.GetNil());
             heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_NARGS_INDEX, blockArgumentCount);
             heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, startPC);
             heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContext);
-            heapManager.SetInstanceVariable(newBlockContext, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, argStartIndexOOP);
 
             return PrimitiveResult.Ok(newBlockContext);
         }
     }
 
     /// <summary>Primitive 81: value* - Activates a BlockContext with 0-3 direct arguments</summary>
+    /// <remarks>
+    /// BLUE BOOK COMPLIANT: Arguments are pushed onto the BlockContext's stack.
+    /// The block's first bytecodes (POP_STORE_TEMP) will pop them into the correct temp slots.
+    /// This correctly handles non-contiguous slot mappings when block args have same names as method temps.
+    /// </remarks>
     public class Value : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -144,26 +143,21 @@ public static class ControlPrimitives
             // Verify argument count matches
             if (argumentCount != blockArgumentCount) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Get argStartIndex from BlockContext extension field
-            SmalltalkOOP argStartIndexOOP = context.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_ARG_START_INDEX);
-            int argStartIndex = argStartIndexOOP.AsSmallInteger();
-
-            // Get home MethodContext
-            SmalltalkOOP homeContext = context.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-
-            // Store arguments in home MethodContext temp frame
-            for (int i = 0; i < argumentCount; i++)
-            {
-                context.HeapManager.SetIndexedOOP(homeContext, argStartIndex + i, context.Arguments[i]);
-            }
-
             // Get initialIP from blockContext
             SmalltalkOOP initialIP = context.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
 
             // Set PC to initialIP
             context.HeapManager.SetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_PC_INDEX, initialIP);
 
-            // Set stack pointer to argument count
+            // BLUE BOOK: Push arguments onto BlockContext's stack (in order)
+            // The block's first bytecodes (POP_STORE_TEMP) will pop them into correct temp slots
+            // Stack grows from index 0 upward, stackp points to next free slot
+            for (int i = 0; i < argumentCount; i++)
+            {
+                context.HeapManager.SetIndexedOOP(blockContext, i, context.Arguments[i]);
+            }
+
+            // Set stack pointer to argument count (points to next free slot after arguments)
             SmalltalkOOP stackPointerValue = SmalltalkOOP.FromSmallInteger(argumentCount);
             context.HeapManager.SetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, stackPointerValue);
 
@@ -179,6 +173,10 @@ public static class ControlPrimitives
     }
 
     /// <summary>Primitive 82: valueWithArguments: - Activates a BlockContext with an Array of arguments</summary>
+    /// <remarks>
+    /// BLUE BOOK COMPLIANT: Arguments are pushed onto the BlockContext's stack.
+    /// The block's first bytecodes (POP_STORE_TEMP) will pop them into the correct temp slots.
+    /// </remarks>
     public class ValueWithArguments : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -208,25 +206,19 @@ public static class ControlPrimitives
             int arraySize = context.HeapManager.GetIndexedSize(arrayArg);
             if (arraySize != blockArgumentCount) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Get argStartIndex from BlockContext extension field
-            SmalltalkOOP argStartIndexOOP = context.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_ARG_START_INDEX);
-            int argStartIndex = argStartIndexOOP.AsSmallInteger();
-
-            // Get home MethodContext
-            SmalltalkOOP homeContext = context.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-
-            // Extract arguments from Array and store in home MethodContext
-            for (int i = 0; i < arraySize; i++)
-            {
-                var argOOP = context.HeapManager.GetIndexedOOP(arrayArg, i);
-                context.HeapManager.SetIndexedOOP(homeContext, argStartIndex + i, argOOP);
-            }
-
             // Get initialIP from blockContext
             SmalltalkOOP initialIP = context.HeapManager.GetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
 
             // Set PC to initialIP
             context.HeapManager.SetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_PC_INDEX, initialIP);
+
+            // BLUE BOOK: Push arguments onto BlockContext's stack (in order)
+            // The block's first bytecodes (POP_STORE_TEMP) will pop them into correct temp slots
+            for (int i = 0; i < arraySize; i++)
+            {
+                var argOOP = context.HeapManager.GetIndexedOOP(arrayArg, i);
+                context.HeapManager.SetIndexedOOP(blockContext, i, argOOP);
+            }
 
             // Set stack pointer to argument count
             SmalltalkOOP stackPointerValue = SmalltalkOOP.FromSmallInteger(arraySize);

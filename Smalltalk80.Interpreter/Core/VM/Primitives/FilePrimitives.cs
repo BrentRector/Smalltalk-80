@@ -17,6 +17,7 @@ public static class FileOperations
     private static class FileHandleManager
     {
         private static readonly Dictionary<int, Stream> _openFiles = [];
+        private static readonly Dictionary<int, int> _bomOffsets = []; // Track BOM offset per handle
         private static int _nextHandle = 1;
         private static readonly object _lock = new();
         private const int BufferSize = 4096;
@@ -69,6 +70,31 @@ public static class FileOperations
                     var bufferedStream = new BufferedStream(fileStream, BufferSize);
                     int handle = _nextHandle++;
                     _openFiles[handle] = bufferedStream;
+
+                    // Detect UTF-8 BOM (EF BB BF) at start of file
+                    // If present, store offset of 3 so seeks to position N go to N+3
+                    // This ensures source positions in CompiledMethods work correctly
+                    int bomOffset = 0;
+                    if (fileStream.Length >= 3 && access != FileAccess.Write)
+                    {
+                        byte[] bom = new byte[3];
+                        int bytesRead = 0;
+                        while (bytesRead < 3)
+                        {
+                            int read = bufferedStream.Read(bom, bytesRead, 3 - bytesRead);
+                            if (read == 0) break; // EOF
+                            bytesRead += read;
+                        }
+                        if (bytesRead == 3 && bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF)
+                        {
+                            bomOffset = 3;
+                            Console.WriteLine($"[FileHandleManager] Detected UTF-8 BOM in {path}, offset={bomOffset}");
+                        }
+                        // Reset position to start
+                        bufferedStream.Position = 0;
+                    }
+                    _bomOffsets[handle] = bomOffset;
+
                     return handle;
                 }
                 catch
@@ -100,9 +126,22 @@ public static class FileOperations
                 {
                     stream.Close();
                     _openFiles.Remove(handle);
+                    _bomOffsets.Remove(handle);
                     return true;
                 }
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Gets the BOM offset for a handle (3 if UTF-8 BOM detected, 0 otherwise).
+        /// Used to adjust seek positions so source file positions work correctly.
+        /// </summary>
+        public static int GetBomOffset(int handle)
+        {
+            lock (_lock)
+            {
+                return _bomOffsets.TryGetValue(handle, out var offset) ? offset : 0;
             }
         }
 
@@ -402,9 +441,15 @@ public static class FileOperations
     /// </summary>
     public class FileReadByte : IPrimitive
     {
+        private static bool _firstCall = true;
+
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Arguments.Length != 2)
+            {
+                // Don't log this - happens every time next is called (expected fallback)
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var handleOOP = context.Arguments[0];
             var positionOOP = context.Arguments[1];
@@ -416,16 +461,31 @@ public static class FileOperations
             int position = positionOOP.AsSmallInteger();
 
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (stream == null)
+            {
+                Console.WriteLine($"[Primitive 132] FAIL: stream not found for handle={handle}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             try
             {
-                stream.Position = position;
+                // Apply BOM offset so source positions in CompiledMethods work correctly
+                int actualPosition = position + FileHandleManager.GetBomOffset(handle);
+                stream.Position = actualPosition;
                 int byteValue = stream.ReadByte();
+
+                // Log first successful read to confirm file access is working
+                if (_firstCall)
+                {
+                    Console.WriteLine($"[Primitive 132] First read OK: handle={handle}, position={position}, actualPosition={actualPosition}, byte={byteValue}");
+                    _firstCall = false;
+                }
+
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(byteValue));
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[Primitive 132] EXCEPTION: handle={handle}, position={position}, error={ex.Message}");
                 return PrimitiveResult.Fail(context.Metadata!);
             }
         }
@@ -462,7 +522,9 @@ public static class FileOperations
 
             try
             {
-                stream.Position = position;
+                // Apply BOM offset for consistency with read operations
+                int actualPosition = position + FileHandleManager.GetBomOffset(handle);
+                stream.Position = actualPosition;
                 stream.WriteByte((byte)byteValue);
                 return PrimitiveResult.Ok(byteOOP);
             }
@@ -537,13 +599,24 @@ public static class FileOperations
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length < 2 || context.Arguments.Length > 3)
+            {
+                Console.WriteLine($"[Primitive 124] FAIL: wrong argument count {context.Arguments.Length}");
                 return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var handleOOP = context.Arguments[0];
             var offsetOOP = context.Arguments[1];
 
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (!offsetOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!handleOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[Primitive 124] FAIL: handle not SmallInteger: {handleOOP}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (!offsetOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[Primitive 124] FAIL: offset not SmallInteger: {offsetOOP}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             // Default origin to 0 (Begin) if not provided
             int origin = 0;
@@ -558,7 +631,11 @@ public static class FileOperations
             int offset = offsetOOP.AsSmallInteger();
 
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (stream == null)
+            {
+                Console.WriteLine($"[Primitive 124] FAIL: stream not found for handle={handle}. OpenFileCount={FileHandleManager.OpenFileCount}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             try
             {
@@ -570,15 +647,29 @@ public static class FileOperations
                     _ => SeekOrigin.Begin
                 };
 
-                long newPosition = stream.Seek(offset, seekOrigin);
+                // Apply BOM offset for seeks from beginning
+                // This ensures source positions in CompiledMethods (which don't account for BOM) work correctly
+                int actualOffset = offset;
+                if (seekOrigin == SeekOrigin.Begin)
+                {
+                    int bomOffset = FileHandleManager.GetBomOffset(handle);
+                    if (bomOffset > 0)
+                    {
+                        actualOffset = offset + bomOffset;
+                    }
+                }
+
+                long newPosition = stream.Seek(actualOffset, seekOrigin);
 
                 // Clamp to SmallInteger range
                 if (newPosition > 0x3FFFFFFF) newPosition = 0x3FFFFFFF;
 
+                Console.WriteLine($"[Primitive 124] OK: handle={handle}, offset={offset}, newPosition={newPosition}");
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)newPosition));
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[Primitive 124] EXCEPTION: handle={handle}, offset={offset}, error={ex.Message}");
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(-1));
             }
         }
@@ -1064,39 +1155,66 @@ public static class FileOperations
 
         private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            var arg = context.Arguments[0];
             long size;
 
-            if (arg.IsSmallInteger)
+            if (context.Arguments.Length == 0)
             {
-                // Handle is an integer - get size from stream
-                int handle = arg.AsSmallInteger();
+                // No arguments: get handle from receiver's instance variable slot 1
+                // WindowsFileReference layout: slot 0 = pathName, slot 1 = handle, slot 2 = position
+                var receiverOOP = context.Receiver;
+                var handleOOP = context.HeapManager.GetInstanceVariable(receiverOOP, 1);
+                if (!handleOOP.IsSmallInteger)
+                {
+                    Console.WriteLine($"[Primitive 144] FAIL: handle is not SmallInteger. handleOOP={handleOOP}, receiver={receiverOOP}");
+                    return PrimitiveResult.Fail(context.Metadata!);
+                }
+
+                int handle = handleOOP.AsSmallInteger();
                 var stream = FileHandleManager.GetStream(handle);
                 if (stream == null)
+                {
+                    Console.WriteLine($"[Primitive 144] FAIL: stream not found for handle={handle}. OpenFileCount={FileHandleManager.OpenFileCount}");
                     return PrimitiveResult.Fail(context.Metadata!);
+                }
                 size = stream.Length;
+                Console.WriteLine($"[Primitive 144] OK: handle={handle}, size={size}");
+            }
+            else if (context.Arguments.Length == 1)
+            {
+                var arg = context.Arguments[0];
+
+                if (arg.IsSmallInteger)
+                {
+                    // Handle is an integer - get size from stream
+                    int handle = arg.AsSmallInteger();
+                    var stream = FileHandleManager.GetStream(handle);
+                    if (stream == null)
+                        return PrimitiveResult.Fail(context.Metadata!);
+                    size = stream.Length;
+                }
+                else
+                {
+                    // Path is a string
+                    string? path = ExtractString(context, arg);
+                    if (path == null)
+                        return PrimitiveResult.Fail(context.Metadata!);
+
+                    try
+                    {
+                        var info = new FileInfo(path);
+                        if (!info.Exists)
+                            return PrimitiveResult.Fail(context.Metadata!);
+                        size = info.Length;
+                    }
+                    catch
+                    {
+                        return PrimitiveResult.Fail(context.Metadata!);
+                    }
+                }
             }
             else
             {
-                // Path is a string
-                string? path = ExtractString(context, arg);
-                if (path == null)
-                    return PrimitiveResult.Fail(context.Metadata!);
-
-                try
-                {
-                    var info = new FileInfo(path);
-                    if (!info.Exists)
-                        return PrimitiveResult.Fail(context.Metadata!);
-                    size = info.Length;
-                }
-                catch
-                {
-                    return PrimitiveResult.Fail(context.Metadata!);
-                }
+                return PrimitiveResult.Fail(context.Metadata!);
             }
 
             // Clamp to SmallInteger range

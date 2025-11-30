@@ -39,25 +39,20 @@ cd "d:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter"
 dotnet run -- --coldstart ..\bin\Debug\net9.0\coldstart_with_tests.json --skip-init-expressions --execute "BlockContextTest testAllCombinations"
 ```
 
-**Expected Debug Output** (from updated code):
-```
-[Primitive 80 BlockCopy] argCount=1, argStartIndex=<some number>
-```
-
-**NOT** (old code):
-```
-[Primitive 80 BlockCopy] args[0]=SmallInteger(1) (raw=0x0003), argCount=1
-```
+**Expected Output**: Tests should complete successfully. Block argument handling is now Blue Book compliant:
+- Primitive 80 takes 1 argument (nargs only, no argStartIndex)
+- Primitive 81 pushes args to BlockContext stack
+- Block body bytecodes store args to correct temp slots
 
 ## What Went Wrong
 
-The issue is that when you ran the compiler to regenerate the bundle, it was using the OLD compiled DLL that didn't have the updated code to push 2 arguments.
+If tests fail or you see unexpected behavior, the issue may be that the compiler is using the OLD compiled DLL that doesn't have your updated code.
 
-Running `dotnet run` on the Compiler project will use the COMPILED DLL from `bin/Debug/net9.0/`, not directly compile from source each time. If you made changes to BytecodeCompiler.cs but didn't rebuild the Compiler project with `dotnet build`, those changes never made it into the DLL.
+Running `dotnet run` on the Compiler project uses the COMPILED DLL from `bin/Debug/net9.0/`, not directly compiled from source each time. If you made changes to BytecodeCompiler.cs but didn't rebuild the Compiler project with `dotnet build`, those changes never made it into the DLL.
 
 ## Troubleshooting
 
-If after Step 2 you still see the OLD debug output format, it means:
+If after Step 2 you still see unexpected behavior or tests fail, it means:
 - The Compiler project wasn't rebuilt properly
 - Check the timestamp on `Smalltalk80.Compiler\bin\Debug\net9.0\Smalltalk80.Compiler.dll`
 - It should be AFTER your code changes

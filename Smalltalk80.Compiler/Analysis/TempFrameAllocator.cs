@@ -63,6 +63,10 @@ public class TempFrameAllocator
     /// <summary>
     /// Enters block scope and allocates slots for block args AND temps.
     /// UNIFIED TEMP FRAME: Block arguments NOW allocated in MethodContext!
+    ///
+    /// BLUE BOOK SEMANTICS: If a block parameter has the same name as an outer temp,
+    /// they share the same slot. This allows patterns like RunArray>>copyFrom:to:
+    /// where setRunOffsetAndValue: stores values into method temps via block params.
     /// </summary>
     public void EnterBlockScope(List<string> argNames, List<string> tempNames, bool isNested)
     {
@@ -76,15 +80,29 @@ public class TempFrameAllocator
         // CRITICAL CHANGE: Allocate block ARGUMENTS in unified frame
         // Previously this was skipped - arguments were stored in BlockContext
         // Now ALL variables go in MethodContext temp frame
+        //
+        // BLUE BOOK: If block arg name matches existing outer temp, REUSE that slot!
+        // This implements Blue Book block parameter semantics where [:foo | ...] shares
+        // storage with an outer temp named 'foo'.
         foreach (var argName in argNames)
         {
-            int slot = _nextSlot++;
-            _allocatedSlots[argName] = slot;
-            scope.AllocatedSlots.Add(slot);
-            _highestSlotIndex = Math.Max(_highestSlotIndex, slot);
+            if (_allocatedSlots.TryGetValue(argName, out int existingSlot))
+            {
+                // Reuse existing slot - Blue Book semantics for shared block params
+                scope.AllocatedSlots.Add(existingSlot);
+                // Don't update _allocatedSlots - it already points to the right slot
+            }
+            else
+            {
+                // New variable - allocate fresh slot
+                int slot = _nextSlot++;
+                _allocatedSlots[argName] = slot;
+                scope.AllocatedSlots.Add(slot);
+                _highestSlotIndex = Math.Max(_highestSlotIndex, slot);
+            }
         }
 
-        // Allocate block temps (same as before)
+        // Allocate block temps (same as before - temps don't share with outer scope)
         foreach (var tempName in tempNames)
         {
             int slot = _nextSlot++;
@@ -96,24 +114,8 @@ public class TempFrameAllocator
         _maxSimultaneous = Math.Max(_maxSimultaneous, _nextSlot);
     }
 
-    /// <summary>
-    /// Gets the starting index where current block's arguments are allocated.
-    /// Returns -1 if not in block scope or no arguments.
-    /// Used by BytecodeCompiler to pass argStartIndex to Primitive 80.
-    /// </summary>
-    public int GetCurrentBlockArgStartIndex()
-    {
-        if (_scopeStack.Count == 0)
-            return -1;
-
-        var currentScope = _scopeStack.Peek();
-
-        if (currentScope.AllocatedSlots.Count == 0)
-            return -1;
-
-        // First slot allocated in this scope = first block argument
-        return currentScope.AllocatedSlots.Min();
-    }
+    // Note: GetCurrentBlockArgStartIndex() removed - block args now handled via STORE_TEMP bytecodes
+    // (Blue Book compliant: Primitive 81 pushes args to stack, block bytecodes store to correct slots)
 
     /// <summary>
     /// Exits the current scope.

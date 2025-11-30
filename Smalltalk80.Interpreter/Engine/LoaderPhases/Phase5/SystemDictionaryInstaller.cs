@@ -123,8 +123,12 @@ public class SystemDictionaryInstaller(
         int sourcesHandle = FileOperations.OpenFileHandle(sourcesPath, 1, 1, 3); // Read-only
         int changesHandle = FileOperations.OpenFileHandle(changesPath, 3, 1, 4); // Read-write
 
+        Console.WriteLine($"[SourceFiles] Opening files: sources={sourcesPath}, changes={changesPath}");
+        Console.WriteLine($"[SourceFiles] Handles: sources={sourcesHandle}, changes={changesHandle}");
+
         if (sourcesHandle < 0 || changesHandle < 0)
         {
+            Console.WriteLine($"[SourceFiles] FAILED to open files");
             // Failed to open files - return nil
             if (sourcesHandle >= 0) FileOperations.CloseFileHandle(sourcesHandle);
             if (changesHandle >= 0) FileOperations.CloseFileHandle(changesHandle);
@@ -134,6 +138,7 @@ public class SystemDictionaryInstaller(
         // Create WindowsFileReference objects for each file
         var sourcesRef = CreateWindowsFileReference(sourcesPath, sourcesHandle);
         var changesRef = CreateWindowsFileReference(changesPath, changesHandle);
+        Console.WriteLine($"[SourceFiles] Created WindowsFileReference OOPs: sources={sourcesRef}, changes={changesRef}");
 
         // Create Array of size 2 for SourceFiles
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
@@ -162,11 +167,19 @@ public class SystemDictionaryInstaller(
         // Allocate instance with 3 named instance variables: pathName, handle, position
         var fileRefOOP = context.HeapManager.AllocateInstanceOf(windowsFileRefClassOOP, 0);
 
-        // Create WindowsPathName for the path
-        var pathNameOOP = CreateWindowsPathName(filePath);
+        // Store the path as a plain String instead of WindowsPathName.
+        // This is critical because WindowsPathName>>asString has issues on Linux:
+        // - Linux paths have no drive letter, so driveLetter is nil
+        // - WindowsPathName>>isUNC returns true for paths with 2+ components when driveLetter is nil
+        // - asString prepends "\\" for UNC paths, producing paths like "\\home\user\..."
+        // - These don't exist on Linux, causing File.Exists to return false
+        // - primitive 154 returns nil, size returns 0, atEnd is true, nextChunk returns ''
+        // Using a plain String avoids this: String>>asString returns self.
+        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+        var pathNameOOP = context.Allocator.AllocateString(stringClassOOP, filePath);
 
         // Set instance variables
-        // slot 0: pathName (WindowsPathName instance)
+        // slot 0: pathName (String with full path)
         // slot 1: handle (SmallInteger)
         // slot 2: position (SmallInteger, initialized to 0)
         context.HeapManager.SetInstanceVariable(fileRefOOP, 0, pathNameOOP);

@@ -1116,25 +1116,21 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         if (selectorIndex == 8) // blockCopy:
         {
             // blockCopy: is unique - it operates on the active context, not a receiver on the stack
-            // VM EXTENSION: Now accepts 2 arguments (nargs, argStartIndex) for unified temp frame
-            // Stack layout (top to bottom): argStartIndex, nargs
-            var argStartIndexOOP = context.Pop(); // Second arg (top of stack)
-            var nargsOOP = context.Pop(); // First arg
+            // BLUE BOOK: Accepts 1 argument (nargs) - block args stored via STORE_TEMP bytecodes
+            var nargsOOP = context.Pop(); // Only arg: block argument count
 
-            if (!nargsOOP.IsSmallInteger || !argStartIndexOOP.IsSmallInteger)
+            if (!nargsOOP.IsSmallInteger)
             {
-                throw new InvalidOperationException($"blockCopy: args must be SmallIntegers, got nargs={nargsOOP}, argStartIndex={argStartIndexOOP}");
+                throw new InvalidOperationException($"blockCopy: nargs must be SmallInteger, got {nargsOOP}");
             }
 
-            // Call primitive 80 (blockCopy:) using new IPrimitive static helper
-            // Need: heapManager, activeContext, blockContextClassOOP, nargs, argStartIndex, currentPC
+            // Call primitive 80 (blockCopy:) using static helper
             int currentPC = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.CONTEXT_PC_INDEX).AsSmallInteger();
             var result = ControlPrimitives.BlockCopy.CreateBlockContext(
                 heapManager,
                 context.ActiveContext,
                 metadata.BlockContextClassOOP,
                 nargsOOP,
-                argStartIndexOOP,
                 currentPC);
 
             if (!result.Success)

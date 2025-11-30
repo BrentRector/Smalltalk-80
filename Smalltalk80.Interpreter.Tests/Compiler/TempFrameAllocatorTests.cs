@@ -218,82 +218,8 @@ public class TempFrameAllocatorTests
 
     #endregion
 
-    #region GetCurrentBlockArgStartIndex Tests
-
-    [Fact]
-    public void GetCurrentBlockArgStartIndex_InMethodScope_ReturnsMethodStartIndex()
-    {
-        // Arrange
-        var allocator = new TempFrameAllocator();
-        allocator.EnterMethodScope(["arg1", "arg2"], ["temp"]);
-
-        // Act
-        int startIndex = allocator.GetCurrentBlockArgStartIndex();
-
-        // Assert - First slot in method scope
-        Assert.Equal(0, startIndex);
-    }
-
-    [Fact]
-    public void GetCurrentBlockArgStartIndex_InBlockScope_ReturnsBlockStartIndex()
-    {
-        // Arrange
-        var allocator = new TempFrameAllocator();
-        allocator.EnterMethodScope(["methodArg"], ["methodTemp"]);
-        allocator.EnterBlockScope(["blockArg"], ["blockTemp"], isNested: false);
-
-        // Act
-        int startIndex = allocator.GetCurrentBlockArgStartIndex();
-
-        // Assert - Block starts at slot 2
-        Assert.Equal(2, startIndex);
-    }
-
-    [Fact]
-    public void GetCurrentBlockArgStartIndex_EmptyBlock_ReturnsMinusOne()
-    {
-        // Arrange
-        var allocator = new TempFrameAllocator();
-        allocator.EnterMethodScope(["arg"], []);
-        allocator.EnterBlockScope([], [], isNested: false);
-
-        // Act
-        int startIndex = allocator.GetCurrentBlockArgStartIndex();
-
-        // Assert
-        Assert.Equal(-1, startIndex);
-    }
-
-    [Fact]
-    public void GetCurrentBlockArgStartIndex_NoScope_ReturnsMinusOne()
-    {
-        // Arrange
-        var allocator = new TempFrameAllocator();
-
-        // Act
-        int startIndex = allocator.GetCurrentBlockArgStartIndex();
-
-        // Assert
-        Assert.Equal(-1, startIndex);
-    }
-
-    [Fact]
-    public void GetCurrentBlockArgStartIndex_NestedBlock_ReturnsCorrectIndex()
-    {
-        // Arrange
-        var allocator = new TempFrameAllocator();
-        allocator.EnterMethodScope(["a"], []);                    // slot 0
-        allocator.EnterBlockScope(["b"], [], isNested: false);    // slot 1
-        allocator.EnterBlockScope(["c"], [], isNested: true);     // slot 2
-
-        // Act
-        int startIndex = allocator.GetCurrentBlockArgStartIndex();
-
-        // Assert
-        Assert.Equal(2, startIndex);
-    }
-
-    #endregion
+    // Note: GetCurrentBlockArgStartIndex tests removed - method no longer exists
+    // Block arguments are now stored via STORE_TEMP bytecodes at block body start (Blue Book compliant)
 
     #region ExitScope Tests
 
@@ -689,6 +615,74 @@ public class TempFrameAllocatorTests
         // Assert - All blocks start at slot 0
         Assert.Equal(0, allocator.GetSlotIndex("c1"));
         Assert.Equal(3, allocator.GetMaxFrameSize()); // Highest was 3 slots
+    }
+
+    #endregion
+
+    #region Blue Book Block Parameter Slot Reuse Tests
+
+    [Fact]
+    public void EnterBlockScope_BlockArgMatchesMethodTemp_ReusesSlot()
+    {
+        // Arrange - Blue Book scenario: block param shadows method temp
+        var allocator = new TempFrameAllocator();
+        allocator.EnterMethodScope([], ["foo"]);  // method temp foo at slot 0
+
+        // Act - block with same-named param
+        allocator.EnterBlockScope(["foo"], [], isNested: false);
+
+        // Assert - should reuse slot 0, not allocate new slot
+        Assert.Equal(0, allocator.GetSlotIndex("foo"));
+        Assert.Equal(1, allocator.GetMaxFrameSize());  // Only 1 slot used
+    }
+
+    [Fact]
+    public void EnterBlockScope_GrandparentTempReuse_ReusesSlot()
+    {
+        // Arrange - User's scenario: block arg matches temp from grandparent scope
+        var allocator = new TempFrameAllocator();
+        allocator.EnterMethodScope([], ["foo"]);          // slot 0: method temp foo
+        allocator.EnterBlockScope(["bar"], [], false);    // slot 1: outer block param bar
+
+        // Act - nested inner block with param matching method temp
+        allocator.EnterBlockScope(["foo"], [], true);     // should reuse slot 0
+
+        // Assert
+        Assert.Equal(0, allocator.GetSlotIndex("foo"));   // reused grandparent slot
+        Assert.Equal(1, allocator.GetSlotIndex("bar"));   // outer block param
+        Assert.Equal(2, allocator.GetMaxFrameSize());     // slots 0 and 1
+    }
+
+    [Fact]
+    public void EnterBlockScope_GreatGrandparentTempReuse_ReusesSlot()
+    {
+        // Arrange - deeply nested scenario
+        var allocator = new TempFrameAllocator();
+        allocator.EnterMethodScope([], ["foo"]);          // slot 0
+        allocator.EnterBlockScope(["a"], [], false);      // slot 1
+        allocator.EnterBlockScope(["b"], [], true);       // slot 2
+
+        // Act - 3 levels deep, param matches method temp
+        allocator.EnterBlockScope(["foo"], [], true);     // should reuse slot 0
+
+        // Assert
+        Assert.Equal(0, allocator.GetSlotIndex("foo"));
+    }
+
+    [Fact]
+    public void ExitScope_SequentialBlockReusedSlot_DoesNotRemoveOuterTemp()
+    {
+        // Arrange - potential bug: sequential block exit should not remove reused outer var
+        var allocator = new TempFrameAllocator();
+        allocator.EnterMethodScope([], ["foo"]);          // slot 0
+        allocator.EnterBlockScope(["foo"], [], false);    // reuses slot 0
+
+        // Act - exit the sequential block
+        allocator.ExitScope();
+
+        // Assert - method temp 'foo' should STILL be accessible
+        Assert.True(allocator.HasVariable("foo"), "Method temp 'foo' should still be accessible after block exit");
+        Assert.Equal(0, allocator.GetSlotIndex("foo"));
     }
 
     #endregion

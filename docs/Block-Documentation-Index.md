@@ -1,6 +1,6 @@
 # Block Implementation Documentation Index
 
-**Last Updated**: 2025-11-13
+**Last Updated**: 2025-11-30
 
 This index provides a guided tour through the block implementation documentation.
 
@@ -79,6 +79,13 @@ The authoritative, comprehensive reference for block context and variable access
 ---
 
 ## Recent Changes
+
+**2025-11-30**: Blue Book compliant block argument handling
+- Primitive 81 now pushes args to BlockContext stack (bytecodes store to temp slots)
+- Primitive 80 takes 1 argument (nargs only), no argStartIndex extension
+- BlockContext uses Blue Book standard 6 fixed fields
+- Removed Block-Context-Design-Validation.md (content merged into COMPREHENSIVE)
+- All 120 BlockContextTest tests pass (returns 1191)
 
 **2025-11-13**: Consolidated all block documentation
 - Created comprehensive reference consolidating 10+ separate documents

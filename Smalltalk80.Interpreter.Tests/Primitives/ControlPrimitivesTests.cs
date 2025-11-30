@@ -31,9 +31,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
+        // Blue Book: blockCopy: takes 1 argument (nargs only)
         var context = CreateContext(
             methodContextOOP,
-            [SmallInt(0), SmallInt(5)], // 0 args, argStartIndex = 5
+            [SmallInt(0)], // 0 args
             mockHeap.Object,
             mockRuntimeAccess.Object,
             instructionPointer: 100);
@@ -58,9 +59,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
+        // Blue Book: blockCopy: takes 1 argument (nargs only)
         var context = CreateContext(
             methodContextOOP,
-            [SmallInt(1), SmallInt(5)],
+            [SmallInt(1)],
             mockHeap.Object,
             mockRuntimeAccess.Object,
             instructionPointer: 100);
@@ -86,9 +88,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
+        // Blue Book: blockCopy: takes 1 argument (nargs only)
         var context = CreateContext(
             methodContextOOP,
-            [SmallInt(2), SmallInt(10)],
+            [SmallInt(2)],
             mockHeap.Object,
             mockRuntimeAccess.Object,
             instructionPointer: 100);
@@ -114,9 +117,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
+        // Blue Book: blockCopy: takes 1 argument (nargs only)
         var context = CreateContext(
             methodContextOOP,
-            [SmallInt(3), SmallInt(15)],
+            [SmallInt(3)],
             mockHeap.Object,
             mockRuntimeAccess.Object,
             instructionPointer: 100);
@@ -142,9 +146,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
+        // Blue Book: blockCopy: takes 1 argument (nargs only)
         var context = CreateContext(
             methodContextOOP,
-            [SmallInt(0), SmallInt(5)],
+            [SmallInt(0)],
             mockHeap.Object,
             mockRuntimeAccess.Object,
             instructionPointer: 100);
@@ -171,9 +176,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
+        // Blue Book: blockCopy: takes 1 argument (nargs only)
         var context = CreateContext(
             methodContextOOP,
-            [SmallInt(0), SmallInt(5)],
+            [SmallInt(0)],
             mockHeap.Object,
             mockRuntimeAccess.Object,
             instructionPointer: 100);
@@ -184,33 +190,8 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         mockHeap.Verify(h => h.SetInstanceVariable(newBlockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, methodContextOOP), Times.Once);
     }
 
-    [Fact]
-    public void BlockCopy_SetsArgStartIndex()
-    {
-        var primitive = new ControlPrimitives.BlockCopy();
-        var mockHeap = CreateMockHeapManager();
-        var methodContextOOP = ObjectOOP(100);
-        var blockContextClassOOP = ObjectOOP(50);
-        var newBlockContextOOP = ObjectOOP(200);
-
-        SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
-        mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
-
-        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
-        mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
-
-        var context = CreateContext(
-            methodContextOOP,
-            [SmallInt(1), SmallInt(7)],
-            mockHeap.Object,
-            mockRuntimeAccess.Object,
-            instructionPointer: 100);
-
-        var result = primitive.Execute(context);
-
-        AssertSuccess(result);
-        mockHeap.Verify(h => h.SetInstanceVariable(newBlockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmallInt(7)), Times.Once);
-    }
+    // Note: BlockCopy_SetsArgStartIndex test removed - argStartIndex VM extension no longer used
+    // Block arguments are now stored via STORE_TEMP bytecodes at block body start (Blue Book compliant)
 
     [Fact]
     public void BlockCopy_NestedBlock_UsesOuterBlocksHome()
@@ -231,9 +212,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
+        // Blue Book: blockCopy: takes 1 argument (nargs only)
         var context = CreateContext(
             outerBlockContextOOP,
-            [SmallInt(0), SmallInt(5)],
+            [SmallInt(0)],
             mockHeap.Object,
             mockRuntimeAccess.Object,
             instructionPointer: 100);
@@ -264,9 +246,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
+        // Blue Book: blockCopy: takes 1 argument (nargs only)
         var context = CreateContext(
             methodContextOOP,
-            [SmallInt(0), SmallInt(5)],
+            [SmallInt(0)],
             mockHeap.Object,
             mockRuntimeAccess.Object,
             instructionPointer: 100,
@@ -283,7 +266,8 @@ public class ControlPrimitivesTests : PrimitiveTestBase
     {
         var primitive = new ControlPrimitives.BlockCopy();
         var heapManager = CreateMockHeapManager().Object;
-        var context = CreateContext(ObjectOOP(100), [SmallInt(0)], heapManager); // Only 1 arg instead of 2
+        // Blue Book: blockCopy: takes exactly 1 argument (nargs only)
+        var context = CreateContext(ObjectOOP(100), [SmallInt(0), SmallInt(5)], heapManager); // 2 args instead of 1
 
         var result = primitive.Execute(context);
 
@@ -295,48 +279,30 @@ public class ControlPrimitivesTests : PrimitiveTestBase
     {
         var primitive = new ControlPrimitives.BlockCopy();
         var heapManager = CreateMockHeapManager().Object;
-        var context = CreateContext(ObjectOOP(100), [ObjectOOP(50), SmallInt(5)], heapManager);
+        // Blue Book: blockCopy: takes 1 argument (nargs only), must be SmallInteger
+        var context = CreateContext(ObjectOOP(100), [ObjectOOP(50)], heapManager);
 
         var result = primitive.Execute(context);
 
         AssertFailure(result);
     }
 
-    [Fact]
-    public void BlockCopy_NonSmallIntegerArgStartIndex_Fails()
-    {
-        var primitive = new ControlPrimitives.BlockCopy();
-        var heapManager = CreateMockHeapManager().Object;
-        var context = CreateContext(ObjectOOP(100), [SmallInt(0), ObjectOOP(50)], heapManager);
-
-        var result = primitive.Execute(context);
-
-        AssertFailure(result);
-    }
+    // Note: BlockCopy_NonSmallIntegerArgStartIndex_Fails test removed - argStartIndex parameter no longer exists
 
     [Fact]
     public void BlockCopy_NegativeArgCount_Fails()
     {
         var primitive = new ControlPrimitives.BlockCopy();
         var heapManager = CreateMockHeapManager().Object;
-        var context = CreateContext(ObjectOOP(100), [SmallInt(-1), SmallInt(5)], heapManager);
+        // Blue Book: blockCopy: takes 1 argument (nargs only), must be non-negative
+        var context = CreateContext(ObjectOOP(100), [SmallInt(-1)], heapManager);
 
         var result = primitive.Execute(context);
 
         AssertFailure(result);
     }
 
-    [Fact]
-    public void BlockCopy_NegativeArgStartIndex_Fails()
-    {
-        var primitive = new ControlPrimitives.BlockCopy();
-        var heapManager = CreateMockHeapManager().Object;
-        var context = CreateContext(ObjectOOP(100), [SmallInt(0), SmallInt(-1)], heapManager);
-
-        var result = primitive.Execute(context);
-
-        AssertFailure(result);
-    }
+    // Note: BlockCopy_NegativeArgStartIndex_Fails test removed - argStartIndex parameter no longer exists
 
     #endregion
 
@@ -354,7 +320,6 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var activeContextOOP = ObjectOOP(300);
 
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX, SmallInt(0));
-        SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmallInt(5));
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContextOOP);
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(50));
 
@@ -373,8 +338,9 @@ public class ControlPrimitivesTests : PrimitiveTestBase
     }
 
     [Fact]
-    public void Value_OneArgument_StoresInHomeContext()
+    public void Value_OneArgument_PushesToBlockContextStack()
     {
+        // Blue Book: Arguments are pushed to BlockContext stack, not stored directly in home
         var primitive = new ControlPrimitives.Value();
         var mockHeap = CreateMockHeapManager();
         var mockContext = new Mock<IContextManager>();
@@ -385,7 +351,6 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var argValue = SmallInt(42);
 
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX, SmallInt(1));
-        SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmallInt(5));
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContextOOP);
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(50));
 
@@ -400,13 +365,14 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var result = primitive.Execute(context);
 
         AssertSuccess(result);
-        // Argument stored at argStartIndex (5) in home context
-        mockHeap.Verify(h => h.SetIndexedOOP(homeContextOOP, 5, argValue), Times.Once);
+        // BLUE BOOK: Argument pushed to BlockContext stack at index 0
+        mockHeap.Verify(h => h.SetIndexedOOP(blockContextOOP, 0, argValue), Times.Once);
     }
 
     [Fact]
-    public void Value_TwoArguments_StoresAllInHomeContext()
+    public void Value_TwoArguments_PushesAllToBlockContextStack()
     {
+        // Blue Book: Arguments are pushed to BlockContext stack, not stored directly in home
         var primitive = new ControlPrimitives.Value();
         var mockHeap = CreateMockHeapManager();
         var mockContext = new Mock<IContextManager>();
@@ -418,7 +384,6 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var arg2 = SmallInt(20);
 
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX, SmallInt(2));
-        SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmallInt(5));
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContextOOP);
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(50));
 
@@ -433,13 +398,15 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var result = primitive.Execute(context);
 
         AssertSuccess(result);
-        mockHeap.Verify(h => h.SetIndexedOOP(homeContextOOP, 5, arg1), Times.Once);
-        mockHeap.Verify(h => h.SetIndexedOOP(homeContextOOP, 6, arg2), Times.Once);
+        // BLUE BOOK: Arguments pushed to BlockContext stack at indices 0 and 1
+        mockHeap.Verify(h => h.SetIndexedOOP(blockContextOOP, 0, arg1), Times.Once);
+        mockHeap.Verify(h => h.SetIndexedOOP(blockContextOOP, 1, arg2), Times.Once);
     }
 
     [Fact]
-    public void Value_ThreeArguments_StoresAllInHomeContext()
+    public void Value_ThreeArguments_PushesAllToBlockContextStack()
     {
+        // Blue Book: Arguments are pushed to BlockContext stack
         var primitive = new ControlPrimitives.Value();
         var mockHeap = CreateMockHeapManager();
         var mockContext = new Mock<IContextManager>();
@@ -452,7 +419,6 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var arg3 = SmallInt(30);
 
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX, SmallInt(3));
-        SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmallInt(5));
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContextOOP);
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(50));
 
@@ -467,9 +433,10 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var result = primitive.Execute(context);
 
         AssertSuccess(result);
-        mockHeap.Verify(h => h.SetIndexedOOP(homeContextOOP, 5, arg1), Times.Once);
-        mockHeap.Verify(h => h.SetIndexedOOP(homeContextOOP, 6, arg2), Times.Once);
-        mockHeap.Verify(h => h.SetIndexedOOP(homeContextOOP, 7, arg3), Times.Once);
+        // BLUE BOOK: Arguments pushed to BlockContext stack at indices 0, 1, 2
+        mockHeap.Verify(h => h.SetIndexedOOP(blockContextOOP, 0, arg1), Times.Once);
+        mockHeap.Verify(h => h.SetIndexedOOP(blockContextOOP, 1, arg2), Times.Once);
+        mockHeap.Verify(h => h.SetIndexedOOP(blockContextOOP, 2, arg3), Times.Once);
     }
 
     [Fact]
@@ -484,7 +451,6 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var activeContextOOP = ObjectOOP(300);
 
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX, SmallInt(0));
-        SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmallInt(5));
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContextOOP);
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(75));
 
@@ -514,7 +480,6 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var activeContextOOP = ObjectOOP(300);
 
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX, SmallInt(2));
-        SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmallInt(5));
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContextOOP);
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(50));
 
@@ -544,7 +509,6 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var activeContextOOP = ObjectOOP(300);
 
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX, SmallInt(0));
-        SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmallInt(5));
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContextOOP);
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(50));
 
@@ -654,8 +618,9 @@ public class ControlPrimitivesTests : PrimitiveTestBase
     #region Primitive 82: ValueWithArguments - 6 tests
 
     [Fact]
-    public void ValueWithArguments_ValidArray_ActivatesBlock()
+    public void ValueWithArguments_ValidArray_PushesArgsToBlockContextStack()
     {
+        // Blue Book: Arguments are pushed to BlockContext stack
         var primitive = new ControlPrimitives.ValueWithArguments();
         var mockHeap = CreateMockHeapManager();
         var mockContext = new Mock<IContextManager>();
@@ -668,7 +633,6 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var arg2 = SmallInt(20);
 
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX, SmallInt(2));
-        SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmallInt(5));
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContextOOP);
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(50));
 
@@ -688,8 +652,9 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var result = primitive.Execute(context);
 
         AssertSuccess(result);
-        mockHeap.Verify(h => h.SetIndexedOOP(homeContextOOP, 5, arg1), Times.Once);
-        mockHeap.Verify(h => h.SetIndexedOOP(homeContextOOP, 6, arg2), Times.Once);
+        // BLUE BOOK: Arguments pushed to BlockContext stack at indices 0, 1
+        mockHeap.Verify(h => h.SetIndexedOOP(blockContextOOP, 0, arg1), Times.Once);
+        mockHeap.Verify(h => h.SetIndexedOOP(blockContextOOP, 1, arg2), Times.Once);
     }
 
     [Fact]
@@ -705,7 +670,6 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var argsArrayOOP = ObjectOOP(400);
 
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX, SmallInt(0));
-        SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmallInt(5));
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContextOOP);
         SetupInstanceVariable(mockHeap, blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(50));
 
@@ -910,14 +874,19 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var receiverOOP = ObjectOOP(100);
         var selectorOOP = ObjectOOP(200);
         var argOOP = SmallInt(5);
+        var argsArrayOOP = ObjectOOP(300);  // Array containing the arguments
         var resultOOP = SmallInt(42);
+
+        // Set up the Array to contain one element (argOOP)
+        SetupIndexedSize(mockHeap, argsArrayOOP, 1);
+        SetupIndexedOOP(mockHeap, argsArrayOOP, 0, argOOP);
 
         mockSender.Setup(s => s.SendMessage(receiverOOP, selectorOOP, new[] { argOOP }))
             .Returns(resultOOP);
 
         var context = CreateContext(
             receiverOOP,
-            [selectorOOP, argOOP],
+            [selectorOOP, argsArrayOOP],  // Pass the Array, not the arg directly
             mockHeap.Object,
             messageSender: mockSender.Object);
 
