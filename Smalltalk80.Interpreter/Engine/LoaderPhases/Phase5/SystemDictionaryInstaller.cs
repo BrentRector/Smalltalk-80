@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Smalltalk80.Interpreter.HeapManager;
@@ -177,7 +178,7 @@ public class SystemDictionaryInstaller(
 
     /// <summary>
     /// Creates a WindowsPathName object for the given file path.
-    /// WindowsPathName has instance variables: drive, directory, name, extension
+    /// WindowsPathName has instance variables: components (Array), driveLetter (Character or nil)
     /// </summary>
     private SmalltalkOOP CreateWindowsPathName(string filePath)
     {
@@ -189,45 +190,55 @@ public class SystemDictionaryInstaller(
             return context.Allocator.AllocateString(stringClassOOP, filePath);
         }
 
-        // Parse the path
-        string drive = "";
-        string directory = "";
-        string name = "";
-        string extension = "";
+        // Parse the path to get drive letter and components
+        char? driveLetter = null;
+        var components = new List<string>();
 
         try
         {
-            drive = Path.GetPathRoot(filePath) ?? "";
-            directory = Path.GetDirectoryName(filePath) ?? "";
-            name = Path.GetFileNameWithoutExtension(filePath) ?? "";
-            extension = Path.GetExtension(filePath) ?? "";
-
-            // Remove drive from directory if present
-            if (!string.IsNullOrEmpty(drive) && directory.StartsWith(drive))
+            // Check for drive letter (e.g., "C:\...")
+            if (filePath.Length >= 2 && filePath[1] == ':')
             {
-                directory = directory.Substring(drive.Length);
+                driveLetter = filePath[0];
+                filePath = filePath.Substring(2);
             }
+
+            // Split path into components, filtering out empty parts
+            var parts = filePath.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            components.AddRange(parts);
         }
         catch
         {
-            // Use full path as name if parsing fails
-            name = filePath;
+            // On error, use whole path as single component
+            components.Add(filePath);
         }
 
-        // Allocate WindowsPathName instance (4 named instance variables)
+        // Allocate WindowsPathName instance (2 named instance variables: components, driveLetter)
         var pathNameOOP = context.HeapManager.AllocateInstanceOf(windowsPathNameClassOOP, 0);
 
-        // stringClassOOP already declared at top of method
-        var driveOOP = context.Allocator.AllocateString(stringClassOOP, drive);
-        var directoryOOP = context.Allocator.AllocateString(stringClassOOP, directory);
-        var nameOOP = context.Allocator.AllocateString(stringClassOOP, name);
-        var extensionOOP = context.Allocator.AllocateString(stringClassOOP, extension);
+        // Create Array of Strings for components
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var componentsArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, components.Count);
+        for (int i = 0; i < components.Count; i++)
+        {
+            var componentStringOOP = context.Allocator.AllocateString(stringClassOOP, components[i]);
+            context.Allocator.SetIndexedOOP(componentsArrayOOP, i, componentStringOOP);
+        }
 
-        // Set instance variables: drive, directory, name, extension
-        context.HeapManager.SetInstanceVariable(pathNameOOP, 0, driveOOP);
-        context.HeapManager.SetInstanceVariable(pathNameOOP, 1, directoryOOP);
-        context.HeapManager.SetInstanceVariable(pathNameOOP, 2, nameOOP);
-        context.HeapManager.SetInstanceVariable(pathNameOOP, 3, extensionOOP);
+        // Create Character for drive letter, or nil if none
+        SmalltalkOOP driveLetterOOP;
+        if (driveLetter.HasValue)
+        {
+            driveLetterOOP = context.HeapManager.GetCharacter(driveLetter.Value);
+        }
+        else
+        {
+            driveLetterOOP = context.HeapManager.GetNil();
+        }
+
+        // Set instance variables: slot 0 = components, slot 1 = driveLetter
+        context.HeapManager.SetInstanceVariable(pathNameOOP, 0, componentsArrayOOP);
+        context.HeapManager.SetInstanceVariable(pathNameOOP, 1, driveLetterOOP);
 
         return pathNameOOP;
     }
