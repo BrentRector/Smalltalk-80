@@ -320,7 +320,20 @@ public static class FileOperations
                 return PrimitiveResult.Fail(context.Metadata!);
             }
 
-            int handle = FileHandleManager.OpenFile(path, accessMode, shareMode, createMode);
+            // For read-only operations (OPEN_EXISTING), check if file exists in Data folder
+            // createMode 3 = OPEN_EXISTING (read), createMode 2 = CREATE_ALWAYS (write)
+            string actualPath = path;
+            if (createMode == 3 && !File.Exists(path))
+            {
+                // Try Data folder fallback for resource files (.form, .sources, etc.)
+                string dataPath = Path.Combine("Data", path);
+                if (File.Exists(dataPath))
+                {
+                    actualPath = dataPath;
+                }
+            }
+
+            int handle = FileHandleManager.OpenFile(actualPath, accessMode, shareMode, createMode);
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(handle));
         }
     }
@@ -832,12 +845,23 @@ public static class FileOperations
 
             try
             {
+                // Try direct path first, then fall back to Data folder for resource files
+                string actualPath = path;
                 if (!File.Exists(path) && !Directory.Exists(path))
                 {
-                    return PrimitiveResult.Ok(context.HeapManager.GetNil());
+                    // Fall back to Data folder (for .form, .sources, etc.)
+                    string dataPath = Path.Combine("Data", path);
+                    if (File.Exists(dataPath) || Directory.Exists(dataPath))
+                    {
+                        actualPath = dataPath;
+                    }
+                    else
+                    {
+                        return PrimitiveResult.Ok(context.HeapManager.GetNil());
+                    }
                 }
 
-                var info = new FileInfo(path);
+                var info = new FileInfo(actualPath);
                 long size = info.Exists ? info.Length : 0;
                 int attributes = (int)info.Attributes;
                 bool isDirectory = (info.Attributes & FileAttributes.Directory) != 0;
@@ -1275,9 +1299,20 @@ public static class FileOperations
 
             try
             {
-                // Handle "." as current directory
+                // Handle "." as current directory - use Data folder for resource files
                 if (dirPath == ".")
-                    dirPath = Directory.GetCurrentDirectory();
+                {
+                    // Try Data folder first, then fall back to current directory
+                    string dataPath = Path.Combine(Directory.GetCurrentDirectory(), "Data");
+                    dirPath = Directory.Exists(dataPath) ? dataPath : Directory.GetCurrentDirectory();
+                }
+                else if (!Directory.Exists(dirPath))
+                {
+                    // Try Data folder fallback
+                    string dataPath = Path.Combine("Data", dirPath);
+                    if (Directory.Exists(dataPath))
+                        dirPath = dataPath;
+                }
 
                 var entries = Directory.GetFileSystemEntries(dirPath, pattern);
                 var names = entries.Select(Path.GetFileName).Where(n => n != null).ToArray();
