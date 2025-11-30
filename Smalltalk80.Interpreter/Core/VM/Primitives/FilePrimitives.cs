@@ -770,7 +770,7 @@ public static class FileOperations
 
                 // IsDirectory
                 context.HeapManager.SetIndexedOOP(resultOOP, 2,
-                    isDirectory ? context.HeapManager.GetTrue() : context.HeapManager.GetFalse());
+                    isDirectory ? context.Metadata!.KnownObjects.True : context.Metadata!.KnownObjects.False);
 
                 return PrimitiveResult.Ok(resultOOP);
             }
