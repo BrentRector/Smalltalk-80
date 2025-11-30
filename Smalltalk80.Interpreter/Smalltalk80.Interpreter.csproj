@@ -36,26 +36,60 @@
     </ProjectReference>
   </ItemGroup>
   
-  <!-- Verify coldstart.json exists after build -->
+  <!-- Copy Data files (coldstart.json, .sources, .changes) to output Data folder after build -->
   <!-- Note: Each project has its own bin/obj directories -->
   <!-- Compiler outputs to: Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json -->
   <!-- Interpreter outputs to: Smalltalk80.Interpreter/bin/Debug/net9.0-windows/ -->
-  <Target Name="VerifyColdStartJson" AfterTargets="Build">
+  <Target Name="CopyDataFilesToOutput" AfterTargets="Build">
     <PropertyGroup>
-      <!-- Look for coldstart.json in Compiler's output directory -->
+      <!-- Source locations -->
       <CompilerOutputDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\</CompilerOutputDir>
-      <ColdStartFile>$(CompilerOutputDir)coldstart.json</ColdStartFile>
+      <SmalltalkSourceDir>$(MSBuildProjectDirectory)\..\Smalltalk-80 Source\</SmalltalkSourceDir>
+      <!-- Destination Data folder -->
+      <DataOutputDir>$(TargetDir)Data\</DataOutputDir>
     </PropertyGroup>
 
-    <!-- Check if coldstart.json exists in compiler output directory -->
-    <Message
-      Text="✓ coldstart.json found: $(ColdStartFile)"
-      Importance="high"
-      Condition="Exists('$(ColdStartFile)')" />
+    <!-- Create Data directory if it doesn't exist -->
+    <MakeDir Directories="$(DataOutputDir)" Condition="!Exists('$(DataOutputDir)')" />
 
+    <!-- Copy coldstart.json from Compiler output -->
+    <Copy
+      SourceFiles="$(CompilerOutputDir)coldstart.json"
+      DestinationFolder="$(DataOutputDir)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(CompilerOutputDir)coldstart.json')" />
+    <Message
+      Text="✓ Copied coldstart.json to $(DataOutputDir)"
+      Importance="high"
+      Condition="Exists('$(CompilerOutputDir)coldstart.json')" />
     <Warning
-      Text="⚠ coldstart.json not found: $(ColdStartFile) - Run build-standard.ps1 or build-with-tests.ps1 to generate it"
-      Condition="!Exists('$(ColdStartFile)')" />
+      Text="⚠ coldstart.json not found: $(CompilerOutputDir)coldstart.json - Run build-standard.ps1 or build-with-tests.ps1 to generate it"
+      Condition="!Exists('$(CompilerOutputDir)coldstart.json')" />
+
+    <!-- Copy Smalltalk-80.sources from source folder -->
+    <Copy
+      SourceFiles="$(SmalltalkSourceDir)Smalltalk-80.sources"
+      DestinationFolder="$(DataOutputDir)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(SmalltalkSourceDir)Smalltalk-80.sources')" />
+    <Message
+      Text="✓ Copied Smalltalk-80.sources to $(DataOutputDir)"
+      Importance="high"
+      Condition="Exists('$(SmalltalkSourceDir)Smalltalk-80.sources')" />
+
+    <!-- Copy any .changes files from source folder -->
+    <ItemGroup>
+      <ChangesFiles Include="$(SmalltalkSourceDir)*.changes" />
+    </ItemGroup>
+    <Copy
+      SourceFiles="@(ChangesFiles)"
+      DestinationFolder="$(DataOutputDir)"
+      SkipUnchangedFiles="true"
+      Condition="'@(ChangesFiles)' != ''" />
+    <Message
+      Text="✓ Copied %(ChangesFiles.Filename)%(ChangesFiles.Extension) to $(DataOutputDir)"
+      Importance="high"
+      Condition="'@(ChangesFiles)' != ''" />
   </Target>
 
 
