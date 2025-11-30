@@ -818,13 +818,55 @@ namespace Smalltalk80.Compiler
             // 2. There are NO unary messages (so the binary message is directly on super)
             bool binaryReceiverIsSuper = receiverIsSuper && !hasUnaryMessages;
 
-            // Compile first unary expression (the receiver)
-            CompileUnaryExpr(unaryExpr, receiverIsSuper);
-
-            // For cascades, dup the receiver after pushing it
             if (isCascadeBase && totalCascadeMessages > 1)
             {
+                // For cascades, we need to DUP the receiver BEFORE any messages are sent.
+                // The receiver is the messageBase of the unaryExpr.
+                //
+                // For "self step; step":
+                // Correct: PUSH self → DUP → SEND step → POP → SEND step
+                // Wrong:   PUSH self → SEND step → DUP (result!) → POP → SEND step (crash!)
+
+                // 1. Push just the message base (the actual receiver)
+                var messageBase = unaryExpr.messageBase();
+                CompileMessageBase(messageBase);
+
+                // 2. DUP the receiver for cascade support
                 emitter.Dup();
+
+                // 3. Send unary messages (if any)
+                if (unaryMessages != null)
+                {
+                    for (int i = 0; i < unaryMessages.Length; i++)
+                    {
+                        var msg = unaryMessages[i];
+                        var selector = msg.unarySelector().GetText();
+
+                        // Check for tail-recursive call optimization
+                        if (tailCalls != null && tailCalls.TryGetValue(msg, out var tailCallInfo))
+                        {
+                            if (tailCallInfo.IsSafeToOptimize && methodStartLabel >= 0)
+                            {
+                                emitter.EmitTailRecursiveJump(methodStartLabel, 0);
+                                continue;
+                            }
+                        }
+
+                        if (i == 0 && receiverIsSuper)
+                        {
+                            emitter.EmitSuperSend(selector, 0);
+                        }
+                        else
+                        {
+                            emitter.EmitSend(selector, 0);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Normal case - compile the full unary expression
+                CompileUnaryExpr(unaryExpr, receiverIsSuper);
             }
 
             // Process binary messages
