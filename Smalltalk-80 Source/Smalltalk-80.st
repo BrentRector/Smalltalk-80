@@ -841,7 +841,7 @@ fullName
 fullNameFor: fileName
     "Answer the full path for a file in this directory."
     pathName = '.' ifTrue: [^fileName].
-    ^pathName, PathSeparator asString, fileName!
+    ^pathName, (String with: PathSeparator), fileName!
 
 versionNumbers
     "Answer true if version numbers are supported."
@@ -975,11 +975,11 @@ entries
 
 fileNames
     "Answer only the file names."
-    ^self entries select: [:name | (name endsWith: PathSeparator asString) not]!
+    ^self entries select: [:name | (name endsWith: (String with: PathSeparator)) not]!
 
 directoryNames
     "Answer only the directory names."
-    ^self entries select: [:name | name endsWith: PathSeparator asString]! !
+    ^self entries select: [:name | name endsWith: (String with: PathSeparator)]! !
 
 !WindowsFileDirectory methodsFor: 'file accessing'!
 
