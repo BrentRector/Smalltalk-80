@@ -2,8 +2,7 @@
 
 **Last Updated**: 2025-11-30 (Updated to Blue Book compliant bytecode-driven block argument handling)
 **Status**: CANONICAL REFERENCE
-**Supersedes**: All previous block and variable access documentation
-**Companion Document**: Block-Context-Design-Validation.md (Expert analysis and implementation guidance)
+**Supersedes**: All previous block and variable access documentation (including Block-Context-Design-Validation.md)
 
 ---
 
@@ -57,7 +56,7 @@ This document consolidates information from:
 - Compiler-Block-Allocation-Strategy.md (compiler strategy)
 - Variable-Indexing-Architecture.md (indexing details)
 - CRITICAL-Block-Compilation-Discovery.md (historical evolution)
-- **Block-Context-Design-Validation.md** (Expert validation and advanced semantics)
+- Block-Context-Design-Validation.md (superseded - content merged here)
 
 **New in this revision**: Section 9 provides detailed semantic and implementation guidance for:
 - Variable shadowing with unique absolute indices
