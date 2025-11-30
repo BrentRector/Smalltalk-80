@@ -17794,14 +17794,13 @@ File class
 
 !File class methodsFor: 'class initialization'!
 initialize
-	"Initialize FilePool with file mode constants.
-	 Disk points to Data folder where resource files (.form, .sources, etc.) are located."
+	"Initialize FilePool with file mode constants."
 
 	Smalltalk at: #FilePool put: (FilePool _ Dictionary new).
 	FilePool at: #Read put: 1.
 	FilePool at: #Write put: 2.
 	FilePool at: #Shorten put: 3.
-	FilePool at: #Disk put: (WindowsFileDirectory on: 'Data')! !
+	FilePool at: #Disk put: WindowsFileDirectory default! !
 
 !File class methodsFor: 'documentation'!
 documentation
