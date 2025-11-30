@@ -19,16 +19,10 @@ x86/
 [Aa][Rr][Mm]64/
 bld/
 [Bb]in/
-# Exception: Allow Data folder contents in Compiler output directory
-# Must un-ignore parent directories first for the file exceptions to work
-!Smalltalk80.Compiler/bin/
-Smalltalk80.Compiler/bin/*
-!Smalltalk80.Compiler/bin/Debug/
-Smalltalk80.Compiler/bin/Debug/*
-!Smalltalk80.Compiler/bin/Debug/net9.0/
-Smalltalk80.Compiler/bin/Debug/net9.0/*
-!Smalltalk80.Compiler/bin/Debug/net9.0/Data/
-!Smalltalk80.Compiler/bin/Debug/net9.0/Data/**
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
 # Exception: Allow Data folder contents in Interpreter output directory
 !Smalltalk80.Interpreter/bin/
 Smalltalk80.Interpreter/bin/*
@@ -38,9 +32,6 @@ Smalltalk80.Interpreter/bin/Debug/*
 Smalltalk80.Interpreter/bin/Debug/net9.0-windows/*
 !Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
 !Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/**
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
 
 # .NET Core
 project.lock.json
