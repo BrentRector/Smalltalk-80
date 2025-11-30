@@ -1386,14 +1386,14 @@ rename: newName
     ^self!
 
 size
-    <primitive: 130>
+    <primitive: 144>
     | attrs |
     attrs _ self primGetAttributes: pathName asString.
     attrs isNil ifTrue: [^0].
     ^attrs at: #size ifAbsent: [0]!
 
 exists
-    <primitive: 130>
+    <primitive: 155>
     | attrs |
     attrs _ self primGetAttributes: pathName asString.
     ^attrs notNil and: [(attrs at: #attributes ifAbsent: [16rFFFFFFFF]) ~= 16rFFFFFFFF]! !
@@ -1518,7 +1518,7 @@ primSeek: aHandle offset: offset origin: origin
     ^-1!
 
 primGetAttributes: path
-    <primitive: 130>
+    <primitive: 154>
     ^nil! !
 
 WindowsFileReference class
