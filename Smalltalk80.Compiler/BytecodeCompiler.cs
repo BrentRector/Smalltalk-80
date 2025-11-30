@@ -1306,19 +1306,25 @@ namespace Smalltalk80.Compiler
             bool isNested = (savedScopeDepth > 0);
             allocator.EnterBlockScope(argumentNames, blockTempNames, isNested);
 
-            // UNIFIED TEMP FRAME: Get the starting index where block arguments are stored
-            // This is needed by Primitive 80 to initialize BlockContext.argStartIndex field
-            int argStartIndex = argCount > 0 ? allocator.GetCurrentBlockArgStartIndex() : 0;
+            // BLUE BOOK COMPLIANT: Block arguments are stored via STORE_TEMP bytecodes at block body start
+            // Primitive 81 pushes arguments onto BlockContext stack, bytecodes pop them into correct slots
+            // This handles non-contiguous slot mappings when block args have same names as method temps
+
+            // Get slot indices for each block argument (needed for STORE_TEMP bytecodes)
+            var argSlotIndices = new List<int>();
+            foreach (var argName in argumentNames)
+            {
+                argSlotIndices.Add(allocator.GetSlotIndex(argName));
+            }
 
             // Blue Book bytecode pattern: blockCopy: + LONG_JUMP + block body
             // Primitive 80 calculates initialIP = PC + 3 (skips 3-byte LONG_JUMP)
             // Block body comes AFTER the blockCopy: send and jump
 
-            // STEP 1: Emit blockCopy: send (VM EXTENSION - 2 arguments: nargs, argStartIndex)
+            // STEP 1: Emit blockCopy: send (Blue Book compliant - 1 argument: nargs)
             // NOTE: blockCopy: is a SPECIAL operation - it operates on the active context, NOT a receiver from stack
             // The VM's ExecuteSendSpecial handles it specially WITHOUT popping a receiver
-            emitter.PushSmallInteger(argCount); // First arg: block argument count
-            emitter.PushSmallInteger(argStartIndex); // Second arg: argStartIndex in unified frame (VM extension)
+            emitter.PushSmallInteger(argCount); // Only arg: block argument count
             emitter.EmitByte(0xC8); // SEND_SPECIAL_BLOCKCOPY ← Primitive executes here
 
             // STEP 2: Emit 3-byte LONG_JUMP to skip over block body
@@ -1331,6 +1337,15 @@ namespace Smalltalk80.Compiler
 
             // STEP 3: Block body starts here (initialIP = PC + 3 points here)
             int blockStartOffset = emitter.CurrentOffset;
+
+            // BLUE BOOK: Emit POP_STORE_TEMP bytecodes to move arguments from stack to temp slots
+            // Arguments are pushed in order (arg0, arg1, arg2...) by Primitive 81
+            // Stack is LIFO, so we pop in reverse order (last arg first)
+            // Each POP_STORE_TEMP pops from stack and stores to the correct temp slot
+            for (int i = argCount - 1; i >= 0; i--)
+            {
+                emitter.StoreTemporary(argSlotIndices[i]);
+            }
 
             // Compile block body statements
             var statements = block.statements();

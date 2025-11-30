@@ -218,82 +218,8 @@ public class TempFrameAllocatorTests
 
     #endregion
 
-    #region GetCurrentBlockArgStartIndex Tests
-
-    [Fact]
-    public void GetCurrentBlockArgStartIndex_InMethodScope_ReturnsMethodStartIndex()
-    {
-        // Arrange
-        var allocator = new TempFrameAllocator();
-        allocator.EnterMethodScope(["arg1", "arg2"], ["temp"]);
-
-        // Act
-        int startIndex = allocator.GetCurrentBlockArgStartIndex();
-
-        // Assert - First slot in method scope
-        Assert.Equal(0, startIndex);
-    }
-
-    [Fact]
-    public void GetCurrentBlockArgStartIndex_InBlockScope_ReturnsBlockStartIndex()
-    {
-        // Arrange
-        var allocator = new TempFrameAllocator();
-        allocator.EnterMethodScope(["methodArg"], ["methodTemp"]);
-        allocator.EnterBlockScope(["blockArg"], ["blockTemp"], isNested: false);
-
-        // Act
-        int startIndex = allocator.GetCurrentBlockArgStartIndex();
-
-        // Assert - Block starts at slot 2
-        Assert.Equal(2, startIndex);
-    }
-
-    [Fact]
-    public void GetCurrentBlockArgStartIndex_EmptyBlock_ReturnsMinusOne()
-    {
-        // Arrange
-        var allocator = new TempFrameAllocator();
-        allocator.EnterMethodScope(["arg"], []);
-        allocator.EnterBlockScope([], [], isNested: false);
-
-        // Act
-        int startIndex = allocator.GetCurrentBlockArgStartIndex();
-
-        // Assert
-        Assert.Equal(-1, startIndex);
-    }
-
-    [Fact]
-    public void GetCurrentBlockArgStartIndex_NoScope_ReturnsMinusOne()
-    {
-        // Arrange
-        var allocator = new TempFrameAllocator();
-
-        // Act
-        int startIndex = allocator.GetCurrentBlockArgStartIndex();
-
-        // Assert
-        Assert.Equal(-1, startIndex);
-    }
-
-    [Fact]
-    public void GetCurrentBlockArgStartIndex_NestedBlock_ReturnsCorrectIndex()
-    {
-        // Arrange
-        var allocator = new TempFrameAllocator();
-        allocator.EnterMethodScope(["a"], []);                    // slot 0
-        allocator.EnterBlockScope(["b"], [], isNested: false);    // slot 1
-        allocator.EnterBlockScope(["c"], [], isNested: true);     // slot 2
-
-        // Act
-        int startIndex = allocator.GetCurrentBlockArgStartIndex();
-
-        // Assert
-        Assert.Equal(2, startIndex);
-    }
-
-    #endregion
+    // Note: GetCurrentBlockArgStartIndex tests removed - method no longer exists
+    // Block arguments are now stored via STORE_TEMP bytecodes at block body start (Blue Book compliant)
 
     #region ExitScope Tests
 

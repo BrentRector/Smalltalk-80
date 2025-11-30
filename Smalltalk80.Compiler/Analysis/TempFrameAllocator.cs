@@ -114,24 +114,8 @@ public class TempFrameAllocator
         _maxSimultaneous = Math.Max(_maxSimultaneous, _nextSlot);
     }
 
-    /// <summary>
-    /// Gets the starting index where current block's arguments are allocated.
-    /// Returns -1 if not in block scope or no arguments.
-    /// Used by BytecodeCompiler to pass argStartIndex to Primitive 80.
-    /// </summary>
-    public int GetCurrentBlockArgStartIndex()
-    {
-        if (_scopeStack.Count == 0)
-            return -1;
-
-        var currentScope = _scopeStack.Peek();
-
-        if (currentScope.AllocatedSlots.Count == 0)
-            return -1;
-
-        // First slot allocated in this scope = first block argument
-        return currentScope.AllocatedSlots.Min();
-    }
+    // Note: GetCurrentBlockArgStartIndex() removed - block args now handled via STORE_TEMP bytecodes
+    // (Blue Book compliant: Primitive 81 pushes args to stack, block bytecodes store to correct slots)
 
     /// <summary>
     /// Exits the current scope.

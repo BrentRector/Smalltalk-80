@@ -9,8 +9,10 @@ namespace Smalltalk80.Interpreter.Core.VM.Views;
 ///
 /// BlockContext layout:
 ///   Fixed fields [0-5]: sender, pc, stackp, argumentCount, initialIP, home
-///   Extension field [6]: argStartIndex (VM extension for Primitive 81)
-///   Indexed slots: Expression stack only (NO variables - stored in home MethodContext)
+///   Indexed slots [6+]: Expression stack (also receives args from Primitive 81)
+///
+/// Block arguments: Pushed onto BlockContext stack by Primitive 81,
+/// then stored to correct temp slots via STORE_TEMP bytecodes at block body start.
 /// </summary>
 public readonly struct BlockContextView
 {
@@ -49,8 +51,7 @@ public readonly struct BlockContextView
     /// <summary>Gets the home MethodContext where variables are stored.</summary>
     public SmalltalkOOP Home => _heap.GetInstanceVariable(_oop, VMConstants.BLOCKCONTEXT_HOME_INDEX);
 
-    /// <summary>Gets the argument start index in home context (VM extension for Primitive 81).</summary>
-    public int ArgStartIndex => _heap.GetInstanceVariable(_oop, VMConstants.BLOCKCONTEXT_ARG_START_INDEX).AsSmallInteger();
+    // Note: ArgStartIndex VM extension removed - block args now stored via STORE_TEMP bytecodes
 
     /// <summary>Sets the caller context.</summary>
     public void SetCaller(SmalltalkOOP caller) =>
@@ -76,9 +77,7 @@ public readonly struct BlockContextView
     public void SetHome(SmalltalkOOP home) =>
         _heap.SetInstanceVariable(_oop, VMConstants.BLOCKCONTEXT_HOME_INDEX, home);
 
-    /// <summary>Sets the argument start index.</summary>
-    public void SetArgStartIndex(int value) =>
-        _heap.SetInstanceVariable(_oop, VMConstants.BLOCKCONTEXT_ARG_START_INDEX, SmalltalkOOP.FromSmallInteger(value));
+    // Note: SetArgStartIndex removed - block args now stored via STORE_TEMP bytecodes
 
     /// <summary>Gets a stack value relative to current stack pointer.</summary>
     public SmalltalkOOP GetStackValue(int offset) => _heap.GetIndexedOOP(_oop, StackPointer - offset);

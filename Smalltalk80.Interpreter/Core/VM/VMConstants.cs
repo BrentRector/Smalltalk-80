@@ -53,30 +53,27 @@ public static class VMConstants
     //   ContextPart variableSubclass: #BlockContext
     //   instanceVariableNames: 'nargs startpc home'
     //
-    // VM EXTENSION - UNIFIED TEMP FRAME ARCHITECTURE:
-    // This VM extends BlockContext with one additional field (argStartIndex) to support
-    // the unified temp frame architecture. All temporaries (method args/temps + ALL block
-    // args/temps) are allocated in the MethodContext's temp frame using absolute indices.
-    // The compiler performs static analysis to allocate slots with reuse for sequential
-    // non-overlapping blocks.
+    // BLUE BOOK COMPLIANT UNIFIED TEMP FRAME ARCHITECTURE:
+    // All temporaries (method args/temps + ALL block args/temps) are allocated in the
+    // MethodContext's temp frame using absolute indices. The compiler performs static
+    // analysis to allocate slots with reuse for sequential non-overlapping blocks.
     //
-    // Complete layout (Blue Book + VM Extension):
+    // BLOCK ARGUMENT HANDLING (Blue Book Chapter 30):
+    // - Primitive 81 (value/value:/value:value:) pushes args onto BlockContext's stack
+    // - Block body begins with STORE_TEMP bytecodes to pop args into correct temp slots
+    // - This handles non-contiguous slot mappings (e.g., block args reusing outer temps)
+    //
+    // Complete layout (Blue Book):
     //   Instance variable 0: sender (from InstructionStream) - caller field, set by primitiveValue
     //   Instance variable 1: pc (from InstructionStream) - instruction pointer
     //   Instance variable 2: stackp (from ContextPart) - stack pointer
     //   Instance variable 3: nargs (BlockContext field) - block argument count
     //   Instance variable 4: startpc (BlockContext field) - saved PC (called initialIP in Blue Book)
-    //   Instance variable 5: home (BlockContext field) - lexical parent (always the MethodContext in unified frame)
-    //   Instance variable 6: argStartIndex (VM EXTENSION) - starting index in MethodContext temp frame for block args
-    //   Instance variable 7+: indexed slots - expression stack ONLY
+    //   Instance variable 5: home (BlockContext field) - lexical parent (always the MethodContext)
+    //   Instance variable 6+: indexed slots - expression stack (also receives args from Primitive 81)
     //
     // NOTE: BlockContext shares the first 3 fields with MethodContext (sender, pc, stackp) but these
     // constants are defined separately for clarity in primitive implementations.
-    //
-    // IMPORTANT: BlockContext indexed slots (7+) are used ONLY for the expression stack.
-    // Block arguments are stored in the home MethodContext's unified temp frame at indices
-    // [argStartIndex, argStartIndex+nargs). Block temporaries are also in the unified frame.
-    // See docs/Block-Context-And-Variable-Access-COMPREHENSIVE.md for full architecture details.
     //
     // Blue Book BlockContext - used by primitives 80, 81, 82
     public const int BLOCKCONTEXT_CALLER_INDEX = 0;        // sender field (from InstructionStream)
@@ -86,16 +83,9 @@ public static class VMConstants
     public const int BLOCKCONTEXT_STARTPC_INDEX = 4;       // startpc/initialIP field (BlockContext) - WAS 5
     public const int BLOCKCONTEXT_HOME_INDEX = 5;          // home field (BlockContext) - WAS 6
 
-    // ========================================================================
-    // BlockContext Extension Field (VM Extension for Unified Temp Frame)
-    // ========================================================================
-    /// <summary>
-    /// Extension field: Starting index in MethodContext temp frame where block arguments are stored.
-    /// VM extension beyond Blue Book - enables unified temp frame architecture.
-    /// </summary>
-    public const int BLOCKCONTEXT_ARG_START_INDEX = 6;
-
-    public const int BLOCKCONTEXT_TEMP_FRAME_START = 7;    // First indexed slot (after extension field)
+    // BLUE BOOK: BlockContext has 6 instance variables (indices 0-5)
+    // Block arguments are now handled via STORE_TEMP bytecodes at block body start
+    public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;    // First indexed slot (after instance variables)
 
     // ========================================================================
     // Blue Book: Association field indices

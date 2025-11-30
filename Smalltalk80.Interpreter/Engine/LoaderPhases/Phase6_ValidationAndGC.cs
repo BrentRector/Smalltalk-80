@@ -1041,7 +1041,7 @@ public class Phase6_ValidationAndGC : IPhase
         ValidateConstant(results, "class:BlockContext", "nargs", VMConstants.BLOCKCONTEXT_NARGS_INDEX);
         ValidateConstant(results, "class:BlockContext", "startpc", VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
         ValidateConstant(results, "class:BlockContext", "home", VMConstants.BLOCKCONTEXT_HOME_INDEX);
-        ValidateConstant(results, "class:BlockContext", "argStartIndex", VMConstants.BLOCKCONTEXT_ARG_START_INDEX);
+        // Note: argStartIndex VM extension removed - block args now stored via STORE_TEMP bytecodes
 
         // Process field validation
         ValidateConstant(results, "class:Process", "nextLink", VMConstants.PROCESS_NEXTLINK_INDEX);

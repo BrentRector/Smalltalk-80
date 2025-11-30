@@ -5496,7 +5496,7 @@ locateMagnifiedView: aForm scale: scaleFactor
 BitEditor initialize!
 
 ContextPart variableSubclass: #BlockContext
-	instanceVariableNames: 'nargs startpc home argStartIndex '
+	instanceVariableNames: 'nargs startpc home '
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Kernel-Methods'!
@@ -5509,10 +5509,12 @@ Instance Variables: *indexed*
 	nargs		<Integer> number of block arguments
 	startpc		<Integer> initial program counter for block body
 	home		<Context> lexical parent context (MethodContext in unified temp frame)
-	argStartIndex	<Integer> VM EXTENSION - absolute index in MethodContext temp frame where block arguments begin (enables unified temp frame architecture)
 
-VM EXTENSION NOTE:
-The argStartIndex field is a VM extension beyond the Blue Book specification. It enables the unified temp frame architecture where ALL variables (method args/temps + block args/temps) are stored in the MethodContext temp frame with absolute indexing. This field is set by Primitive 80 (blockCopy:) and used by Primitive 81 (value/value:/value:value:) to correctly store block arguments in the home MethodContext.
+Block Argument Handling (Blue Book Chapter 30):
+Primitive 81 (value/value:/value:value:) pushes arguments onto the BlockContext stack.
+The block body begins with STORE_TEMP bytecodes that pop the arguments into the correct
+slots in the home MethodContext temp frame. This handles non-contiguous slot mappings
+when block arguments reuse outer temporaries with matching names.
 '!
 
 
