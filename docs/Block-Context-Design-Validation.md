@@ -1,8 +1,13 @@
 # Block Context Design Validation and Implementation Guidance
 
-**Date**: 2025-11-13
-**Status**: Expert Analysis and Recommendations
+**Date**: 2025-11-30
+**Status**: Updated to Blue Book compliant bytecode-driven block argument handling
 **Scope**: Unified Temp Frame Architecture with Variable Shadowing, Slot Reuse, and Escaping Block Detection
+
+> **IMPORTANT UPDATE (2025-11-30)**: Section 4 (GetBlockArgumentStartIndex) has been completely revised.
+> The old `argStartIndex` extension field approach has been replaced with a **Blue Book compliant
+> bytecode-driven approach** where Primitive 81 pushes arguments onto the BlockContext stack, and
+> the block's first bytecodes (POP_STORE_TEMP) store them into the correct temp slots.
 
 ---
 
@@ -12,7 +17,7 @@
 2. [Question 1: Shadowed Variables](#question-1-shadowed-variables)
 3. [Question 2: Home Context Traversal](#question-2-home-context-traversal)
 4. [Question 3: Slot Reuse with Escaping Blocks](#question-3-slot-reuse-with-escaping-blocks)
-5. [Question 4: GetBlockArgumentStartIndex Implementation](#question-4-getblockargumentstartindex-implementation)
+5. [Question 4: Block Argument Handling (Blue Book Compliant)](#question-4-block-argument-handling-blue-book-compliant)
 6. [Question 5: Strict Allocator Policy](#question-5-strict-allocator-policy)
 7. [Question 6: Detecting Escaping Blocks](#question-6-detecting-escaping-blocks)
 8. [Implementation Roadmap](#implementation-roadmap)
@@ -40,14 +45,14 @@ Your proposed **Unified Temp Frame** architecture is **correct and Blue Book com
 - ✅ **Simplified VM logic** (no dual routing)
 - ✅ **Easier slot reuse optimization**
 - ✅ **Clearer semantic model**
-- ⚠️ **Requires Primitive 81 to know block argument start indices** (solvable via metadata)
+- ✅ **Bytecode-driven argument storage** (no VM extension fields needed)
 
 ### Key Recommendations
 
 1. **Shadowing**: Fully supported with unique indices - no warnings needed
 2. **Home Traversal**: Direct to MethodContext (not chained through parent blocks)
 3. **Slot Reuse**: Conservative approach recommended - disable if ANY block might escape
-4. **Metadata**: Store block argument indices in CompiledMethod literal frame
+4. **Block Arguments**: Bytecode-driven - Primitive 81 pushes to stack, POP_STORE_TEMP bytecodes store to temp slots
 5. **Escape Detection**: Hybrid compile-time hints + runtime validation
 6. **Testing**: All 194 BlockContextTest tests must pass
 
@@ -577,168 +582,160 @@ public void EnterBlockScope(..., BlockEscapeInfo escapeInfo)
 
 ---
 
-## Question 4: GetBlockArgumentStartIndex Implementation
+## Question 4: Block Argument Handling (Blue Book Compliant)
+
+> **UPDATE (2025-11-30)**: This section has been completely revised. The old `argStartIndex` extension
+> field approach has been replaced with a **Blue Book compliant bytecode-driven approach**.
 
 ### Problem Statement
 
 **Primitive 81** (value/value:/value:value:) must store block arguments into the **home MethodContext temp frame** at the correct indices.
 
-**Question**: How does Primitive 81 know where block arguments start in the unified frame?
+**Challenge**: Block arguments may reuse slots from outer temporaries, and those slots may not be contiguous. Consider:
 
-### Blue Book Approach (Not Applicable)
-
-The Blue Book stores block arguments in **BlockContext indexed slots**, not in MethodContext. So Primitive 81 just copies arguments to BlockContext slots 0, 1, 2, etc.
-
-**Your unified approach requires metadata** because arguments go into MethodContext at compiler-determined indices.
-
-### Proposed Solution: Block Literal Metadata
-
-**Storage Location**: CompiledMethod literal frame
-
-**Structure**:
-```csharp
-public class BlockLiteralMetadata
-{
-    public int ArgumentStartIndex { get; set; }  // Absolute index in unified frame
-    public int ArgumentCount { get; set; }       // Number of args
-    public int TemporaryStartIndex { get; set; } // Absolute index of first temp (if any)
-    public int TemporaryCount { get; set; }      // Number of temps
-    public int BytecodeOffset { get; set; }      // Offset to block body bytecode
-}
-```
-
-**Encoding**: As a literal Array in the CompiledMethod
-
-**Example Method**:
 ```smalltalk
-method: arg1
-  | temp1 |
-  [:arg2 | | temp2 | arg1 + arg2 + temp2] value: 5
+method
+    | a b c |
+    [:c :b :a | a + b + c] value: 3 value: 2 value: 1
 ```
 
-**CompiledMethod Literal Frame**:
-```
-Literal 0: #+ (selector)
-Literal 1: BlockMetadata(argStart=2, argCount=1, tempStart=3, tempCount=1, offset=12)
-Literal 2: nil, true, false, etc. (other literals)
+Here block args `:c :b :a` map to slots 2, 1, 0 respectively - **not contiguous**.
+
+A simple `argStartIndex + i` scheme would store arguments into the wrong slots.
+
+### Blue Book Compliant Solution: Bytecode-Driven Argument Storage
+
+Per **Blue Book Chapter 30**, block argument handling uses bytecodes to store arguments:
+
+1. **Primitive 81** pushes arguments onto the **BlockContext's stack** (not directly to temp slots)
+2. **Block body** begins with **POP_STORE_TEMP** bytecodes that pop arguments from the stack and store them into the correct temp slots
+
+**This design correctly handles any slot mapping - contiguous or non-contiguous.**
+
+### VMConstants.cs (Blue Book Standard)
+
+```csharp
+// BlockContext fields (Blue Book: 0-5)
+public const int BLOCKCONTEXT_CALLER_INDEX = 0;
+public const int BLOCKCONTEXT_PC_INDEX = 1;
+public const int BLOCKCONTEXT_STACKP_INDEX = 2;
+public const int BLOCKCONTEXT_NARGS_INDEX = 3;
+public const int BLOCKCONTEXT_STARTPC_INDEX = 4;
+public const int BLOCKCONTEXT_HOME_INDEX = 5;
+
+// Indexed slots [6+]: Expression stack (also receives args from Primitive 81)
+public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;
 ```
 
-### Compiler Emission
+**Note**: No `BLOCKCONTEXT_ARG_START_INDEX` extension field needed - argument slot mapping is handled entirely by bytecodes.
+
+### Compiler Implementation
 
 **BytecodeCompiler.cs** - Block compilation:
 
 ```csharp
 void CompileBlock(BlockNode blockNode)
 {
+    var argumentNames = blockNode.Arguments;
+    int argCount = argumentNames.Count;
+
     // Allocate slots for block args and temps (unified frame)
-    _allocator.EnterBlockScope(blockNode.Arguments, blockNode.Temporaries, isNested);
+    allocator.EnterBlockScope(argumentNames, blockNode.Temporaries, isNested);
 
-    // Get indices assigned by allocator
-    int argStartIndex = _allocator.GetSlotIndex(blockNode.Arguments[0]);
-    int tempStartIndex = blockNode.Temporaries.Count > 0
-        ? _allocator.GetSlotIndex(blockNode.Temporaries[0])
-        : -1;
-
-    // Create metadata object
-    var metadata = new BlockLiteralMetadata
+    // Get slot indices for each block argument (for STORE_TEMP bytecodes)
+    var argSlotIndices = new List<int>();
+    foreach (var argName in argumentNames)
     {
-        ArgumentStartIndex = argStartIndex,
-        ArgumentCount = blockNode.Arguments.Count,
-        TemporaryStartIndex = tempStartIndex,
-        TemporaryCount = blockNode.Temporaries.Count,
-        BytecodeOffset = _emitter.CurrentPosition + 6  // After blockCopy: send
-    };
+        argSlotIndices.Add(allocator.GetSlotIndex(argName));
+    }
 
-    // Emit metadata as literal
-    int metadataIndex = AddLiteral(metadata);
+    // STEP 1: Emit blockCopy: send (Blue Book: 1 argument - nargs)
+    emitter.PushSmallInteger(argCount);
+    emitter.EmitByte(0xC8);  // SEND_SPECIAL_BLOCKCOPY
 
-    // Emit blockCopy: send
-    EmitByte(0x89);  // PUSH_ACTIVE_CONTEXT
-    EmitPushConstant(blockNode.Arguments.Count);  // arg count
-    EmitPushConstant(metadataIndex);  // metadata literal index (NEW!)
-    EmitSend("blockCopy:", 2);  // EXTENDED: now takes 2 args
+    // STEP 2: Emit LONG_JUMP over block body
+    int jumpOffset = emitter.CurrentOffset;
+    emitter.EmitJumpPlaceholder();
 
-    // ... emit block body
+    // STEP 3: Block body starts here (initialIP points here)
+    // Emit POP_STORE_TEMP bytecodes to move arguments from stack to temp slots
+    // Arguments are pushed in order (arg0, arg1, arg2...) by Primitive 81
+    // Stack is LIFO, so we pop in reverse order (last arg first)
+    for (int i = argCount - 1; i >= 0; i--)
+    {
+        emitter.StoreTemporary(argSlotIndices[i]);  // Emits POP_STORE_TEMP
+    }
+
+    // Compile block body statements
+    CompileStatements(blockNode.Body);
+
+    // STEP 4: Patch jump offset
+    emitter.PatchJump(jumpOffset);
 }
 ```
 
-### Primitive 80 Modification
+### Primitive 80 Implementation (Blue Book)
 
-**ControlPrimitives.cs**:
+**ControlPrimitives.cs** - BlockCopy takes **1 argument** (nargs only):
 
 ```csharp
 public static SmalltalkOOP BlockCopy(IPrimitiveContext ctx,
                                       SmalltalkOOP receiver,
                                       SmalltalkOOP[] args)
 {
-    if (args.Length != 2)
+    // Blue Book: Accept one argument (nargs only)
+    if (args.Length != 1)
     {
         ctx.PrimitiveFail();
         return SpecialObjectsArray.Instance.Nil;
     }
 
     SmalltalkOOP argCountOOP = args[0];
-    SmalltalkOOP metadataIndexOOP = args[1];  // NEW: metadata literal index
-
-    if (!argCountOOP.IsSmallInteger || !metadataIndexOOP.IsSmallInteger)
+    if (!argCountOOP.IsSmallInteger)
     {
         ctx.PrimitiveFail();
         return SpecialObjectsArray.Instance.Nil;
     }
 
     int argCount = argCountOOP.AsSmallInteger();
-    int metadataIndex = metadataIndexOOP.AsSmallInteger();
+    if (argCount < 0)
+    {
+        ctx.PrimitiveFail();
+        return SpecialObjectsArray.Instance.Nil;
+    }
 
-    // Get current method to access literals
-    SmalltalkOOP methodOOP = ctx.GetCurrentMethod();
+    // Find home context
+    SmalltalkOOP homeContext = /* ... determine from active context ... */;
 
-    // Read metadata from literal frame
-    SmalltalkOOP metadataOOP = ctx.HeapManager.GetInstanceVariable(
-        methodOOP,
-        VMConstants.METHOD_LITERALS_START + metadataIndex
-    );
-
-    // Decode metadata (stored as Array: #(argStart argCount tempStart tempCount offset))
-    int argStartIndex = ctx.HeapManager.GetIndexedOOP(metadataOOP, 0).AsSmallInteger();
-    // ... other fields
-
-    // Create BlockContext
+    // Create BlockContext with indexed slots for expression stack
     var blockContextOOP = ctx.HeapManager.AllocateInstanceOf(
         ctx.GetBlockContextClassOOP(),
-        indexedSize: 32  // Expression stack only, no variables
+        indexedSize: 32  // Stack space for args + expression stack
     );
 
-    // Store metadata in BlockContext for Primitive 81 to use
+    // Initialize BlockContext fields (Blue Book standard fields only)
     ctx.HeapManager.SetInstanceVariable(blockContextOOP,
-        VMConstants.BLOCKCONTEXT_NARGS_INDEX,
-        argCountOOP);
-
-    // Store argument start index (extension field)
+        VMConstants.BLOCKCONTEXT_NARGS_INDEX, argCountOOP);
     ctx.HeapManager.SetInstanceVariable(blockContextOOP,
-        VMConstants.BLOCKCONTEXT_ARG_START_INDEX,  // NEW FIELD!
-        SmalltalkOOP.FromSmallInteger(argStartIndex));
-
-    // ... rest of BlockContext initialization
+        VMConstants.BLOCKCONTEXT_HOME_INDEX, homeContext);
+    // ... other fields
 
     return blockContextOOP;
 }
 ```
 
-### Primitive 81 Modification
+### Primitive 81 Implementation (Blue Book)
 
-**ControlPrimitives.cs**:
+**ControlPrimitives.cs** - Arguments pushed to BlockContext stack:
 
 ```csharp
 public static void PrimitiveValue(IPrimitiveContext ctx, int argumentCount)
 {
-    // Get BlockContext receiver
     var blockContextOOP = ctx.StackValue(argumentCount);
 
-    // Validate argument count matches block's nargs
+    // Validate argument count
     var nargsOOP = ctx.HeapManager.GetInstanceVariable(
-        blockContextOOP,
-        VMConstants.BLOCKCONTEXT_NARGS_INDEX
-    );
+        blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
     int expectedArgs = nargsOOP.AsSmallInteger();
 
     if (argumentCount != expectedArgs)
@@ -747,69 +744,88 @@ public static void PrimitiveValue(IPrimitiveContext ctx, int argumentCount)
         return;
     }
 
-    // Get argument start index from BlockContext
-    var argStartIndexOOP = ctx.HeapManager.GetInstanceVariable(
-        blockContextOOP,
-        VMConstants.BLOCKCONTEXT_ARG_START_INDEX  // NEW!
-    );
-    int argStartIndex = argStartIndexOOP.AsSmallInteger();
+    // Get initialIP
+    var initialIPOOP = ctx.HeapManager.GetInstanceVariable(
+        blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
 
-    // Get home MethodContext
-    var homeContextOOP = ctx.HeapManager.GetInstanceVariable(
-        blockContextOOP,
-        VMConstants.BLOCKCONTEXT_HOME_INDEX
-    );
+    // Set PC to initialIP
+    ctx.HeapManager.SetInstanceVariable(blockContextOOP,
+        VMConstants.BLOCKCONTEXT_PC_INDEX, initialIPOOP);
 
-    // CRITICAL: Store arguments into HOME MethodContext temp frame
-    // at compiler-determined indices
+    // BLUE BOOK: Push arguments onto BlockContext's stack (in order)
+    // The block's first bytecodes (POP_STORE_TEMP) will pop them into correct slots
     for (int i = 0; i < argumentCount; i++)
     {
-        var argOOP = ctx.StackValue(argumentCount - 1 - i);
-        ctx.HeapManager.SetIndexedOOP(
-            homeContextOOP,
-            argStartIndex + i,  // Absolute index in unified frame
-            argOOP
-        );
+        ctx.HeapManager.SetIndexedOOP(blockContextOOP, i, ctx.StackValue(argumentCount - 1 - i));
     }
 
-    // ... rest of block activation
+    // Set stack pointer to argument count
+    ctx.HeapManager.SetInstanceVariable(blockContextOOP,
+        VMConstants.BLOCKCONTEXT_STACKP_INDEX,
+        SmalltalkOOP.FromSmallInteger(argumentCount));
+
+    // Set sender and switch context
+    ctx.HeapManager.SetInstanceVariable(blockContextOOP,
+        VMConstants.BLOCKCONTEXT_CALLER_INDEX, ctx.ActiveContext);
+    ctx.PopN(argumentCount + 1);
+    ctx.SetActiveContext(blockContextOOP);
 }
 ```
 
-### Alternative: BlockContext Extension Field
+### Example: Non-Contiguous Slot Mapping
 
-**Problem with metadata in literals**: Requires extending Primitive 80 signature.
-
-**Alternative**: Store arg start index directly in BlockContext as an extension field.
-
-**VMConstants.cs**:
-```csharp
-// BlockContext extension fields (beyond Blue Book)
-public const int BLOCKCONTEXT_ARG_START_INDEX = 6;  // NEW: unified frame offset
+**Source** (block args match temps but in different order):
+```smalltalk
+method
+    | a b c |
+    [:c :b :a | a + b + c] value: 3 value: 2 value: 1
 ```
 
-**Pros**:
-- ✅ No change to Primitive 80 signature
-- ✅ Simpler implementation
-- ✅ Direct access in Primitive 81
+**Compilation**:
+```
+Variable assignment: a→0, b→1, c→2
 
-**Cons**:
-- ⚠️ Deviates from Blue Book (adds field)
-- ⚠️ Larger BlockContext objects
+Block arg slot mapping (reusing outer temps):
+  :c → slot 2 (reuses outer 'c')
+  :b → slot 1 (reuses outer 'b')
+  :a → slot 0 (reuses outer 'a')
 
-### Recommendation: ✅ BLOCKCONTEXT EXTENSION FIELD
+Block bytecodes:
+  POP_STORE_TEMP 0   ; Store 'a' (last arg pushed, first popped)
+  POP_STORE_TEMP 1   ; Store 'b'
+  POP_STORE_TEMP 2   ; Store 'c' (first arg pushed, last popped)
+  PUSH_TEMP 0        ; Push 'a'
+  PUSH_TEMP 1        ; Push 'b'
+  SEND +
+  PUSH_TEMP 2        ; Push 'c'
+  SEND +
+  RETURN_TOP
+```
+
+**Runtime**:
+```
+Primitive 81 pushes: [3, 2, 1] → BlockContext stack (stackp=3)
+Block executes:
+  POP_STORE_TEMP 0: pops 1, stores to homeContext slot 0 (a)
+  POP_STORE_TEMP 1: pops 2, stores to homeContext slot 1 (b)
+  POP_STORE_TEMP 2: pops 3, stores to homeContext slot 2 (c)
+  (now a=1, b=2, c=3 in MethodContext temp frame)
+```
+
+### Recommendation: ✅ BYTECODE-DRIVEN APPROACH (IMPLEMENTED)
 
 **Rationale**:
-1. Simpler implementation
-2. Better encapsulation (metadata travels with block)
-3. No Primitive 80 signature change
-4. Acceptable deviation from Blue Book (internal optimization)
+1. ✅ **Fully Blue Book compliant** - no VM extension fields
+2. ✅ **Handles any slot mapping** - contiguous or non-contiguous
+3. ✅ **Supports legacy patterns** like `RunArray>>copyFrom:to:`
+4. ✅ **No runtime metadata lookup** - slot indices embedded in bytecode
+5. ✅ **Simpler Primitive 80** - only 1 argument needed
 
-**Implementation**:
-1. Add `BLOCKCONTEXT_ARG_START_INDEX = 6` to VMConstants.cs
-2. Modify Primitive 80 to store argStartIndex in BlockContext
-3. Modify Primitive 81 to read argStartIndex from BlockContext
-4. Update BlockContext class definition to have 7 fields (6 Blue Book + 1 extension)
+**Implementation Status** (2025-11-30):
+- [x] BytecodeCompiler emits POP_STORE_TEMP bytecodes at block start
+- [x] Primitive 80 takes 1 argument (nargs only)
+- [x] Primitive 81 pushes args to BlockContext stack
+- [x] BlockContext has 6 instance variables (Blue Book standard)
 
 ---
 
@@ -1265,14 +1281,14 @@ void HandleMethodReturn(SmalltalkOOP methodContext, SmalltalkOOP returnValue)
 
 **Tasks**:
 1. ✅ Fix Primitive 80 to inherit outer block's home (not point to outer block)
-2. ✅ Add BLOCKCONTEXT_ARG_START_INDEX field to VMConstants
-3. ✅ Modify Primitive 80 to store argStartIndex in BlockContext
-4. ✅ Modify Primitive 81 to read argStartIndex and store args in MethodContext
+2. ✅ **Bytecode-driven args** (2025-11-30): Emit POP_STORE_TEMP bytecodes at block body start
+3. ✅ **Primitive 80**: Takes 1 argument (nargs only), no argStartIndex extension
+4. ✅ **Primitive 81**: Pushes args to BlockContext stack (bytecodes store to temp slots)
 5. ✅ Remove dual routing (`if (index < nargs)`) from GetTemporaryVariable
 6. ✅ Remove dual routing from SetTemporaryVariable
 7. ✅ Update TempFrameAllocator to allocate ALL variables (including block args)
 8. ✅ Update BytecodeCompiler to emit correct indices for block arguments
-9. ✅ Run BlockContextTest suite - all 194 tests must pass
+9. ✅ Run BlockContextTest suite - all tests must pass
 
 **Success Criteria**:
 - Cold start succeeds
@@ -1350,13 +1366,12 @@ void HandleMethodReturn(SmalltalkOOP methodContext, SmalltalkOOP returnValue)
 
 ### What's a Compatible Deviation
 
-⚠️ **Unified temp frame**: Blue Book uses dual storage (block args in BlockContext, temps in MethodContext), you use unified storage (all in MethodContext)
-⚠️ **BlockContext extension field**: Added `argStartIndex` to enable unified temp frame
-⚠️ **Home chain**: Blue Book chains nested blocks, you point all blocks to MethodContext
+⚠️ **Unified temp frame**: All variables (method args, temps, block args) stored in MethodContext indexed slots
+⚠️ **Home chain**: All blocks in a method point directly to the MethodContext (not chained through nested blocks)
 
 **Why these deviations are acceptable**:
 1. **Functionally equivalent**: Both produce correct results
-2. **Performance trade-off**: Simpler VM logic vs. Blue Book's expression stack optimization
+2. **Blue Book compliant argument handling**: Primitive 81 pushes args to BlockContext stack, bytecodes store to temp slots
 3. **Internal optimization**: Not visible to Smalltalk code
 4. **Easier to maintain**: Unified model is simpler to reason about
 
@@ -1366,32 +1381,25 @@ void HandleMethodReturn(SmalltalkOOP methodContext, SmalltalkOOP returnValue)
 ❌ **Breaking closure behavior**: Blocks must capture variables correctly
 ❌ **Modifying primitive signatures**: Primitives 80, 81, 82 must accept same arguments
 
-**Exception**: Primitive 80 is being extended to take metadata as a second argument. This is acceptable because:
-- Blue Book allows "implementation-specific extensions" (Chapter 27)
-- Smalltalk code doesn't call primitives directly (bytecode does)
-- Backward compatibility maintained (old bytecode still works)
-
 ---
 
 ## Conclusion
 
-Your unified temp frame architecture is **sound, correct, and implementable**. The key insights:
+The unified temp frame architecture with Blue Book compliant block argument handling is **sound, correct, and fully implemented**. The key insights:
 
 1. **Shadowing**: Fully supported, no special handling needed beyond what TempFrameAllocator already does
 2. **Home traversal**: All blocks in a method point to the SAME MethodContext (not chained)
-3. **Slot reuse**: Conservative approach recommended - disable if ANY block might escape
-4. **Metadata**: Store argStartIndex as BlockContext extension field (slot 6)
+3. **Slot reuse**: Compiler assigns temp indices that allow block args to reuse outer temp slots
+4. **Blue Book argument handling**: Primitive 81/82 push args to BlockContext stack, bytecodes store to temp slots
 5. **Escape detection**: Hybrid compile-time hints + minimal runtime checks
-6. **Blue Book**: Compatible deviation with simpler semantics and easier maintenance
+6. **Blue Book compliance**: Standard 6-field BlockContext, bytecode-driven argument storage
 
-**Next Steps**:
-1. Fix Primitive 80 home chain bug (lines 96-109 in ControlPrimitives.cs)
-2. Add BLOCKCONTEXT_ARG_START_INDEX field
-3. Implement Primitive 80/81 modifications
-4. Run full BlockContextTest suite
-5. Document deviations from Blue Book in CLAUDE.md
-
-**Expected Outcome**: All 194 BlockContextTest tests pass with unified temp frame architecture.
+**Implementation Complete** (2025-11-30):
+- ✅ BlockContext uses Blue Book standard 6 fixed fields
+- ✅ Primitive 80 takes 1 argument (nargs only)
+- ✅ Primitive 81/82 push args to BlockContext stack
+- ✅ Compiler generates POP_STORE_TEMP bytecodes for block args
+- ✅ All 120 BlockContextTest tests pass (returns 1191)
 
 ---
 

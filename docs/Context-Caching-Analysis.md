@@ -1,9 +1,13 @@
 # Context Caching and Reuse Strategy Analysis
 
 **Author**: Claude (Sonnet 4.5)
-**Date**: 2025-11-21
-**Status**: Analysis Complete
+**Date**: 2025-11-21 (Updated 2025-11-30)
+**Status**: Analysis Complete (Updated to reflect Blue Book compliant block argument handling)
 **Related Issue**: Context creation optimization for init expressions
+
+> **Note (2025-11-30)**: BlockContext now uses Blue Book standard 6 instance variables. The old
+> `argStartIndex` VM extension field has been removed. Block arguments are now handled via
+> bytecodes (Primitive 81 pushes to stack, POP_STORE_TEMP bytecodes store to temp slots).
 
 ---
 
@@ -65,12 +69,12 @@ public SmalltalkOOP CreateMethodContext(
 **BlockContext Creation** (`ControlPrimitives.cs:61-105` - Primitive 80):
 
 ```csharp
+// Blue Book compliant: Takes 1 argument (nargs only)
 public static PrimitiveResult CreateBlockContext(
     ISmalltalkHeap heapManager,
     SmalltalkOOP activeContext,
     SmalltalkOOP blockContextClassOOP,
-    SmalltalkOOP blockArgumentCount,
-    SmalltalkOOP argStartIndexOOP,
+    SmalltalkOOP blockArgumentCount,  // Single argument: nargs
     int currentPC)
 {
     // Determine home context (MethodContext for variable storage)
@@ -87,12 +91,14 @@ public static PrimitiveResult CreateBlockContext(
         homeContext = activeContext;
     }
 
-    // Allocate BlockContext with indexed slots for stack
+    // Allocate BlockContext with indexed slots for expression stack
+    // (also receives arguments pushed by Primitive 81)
     int indexedSize = 32;
     SmalltalkOOP newBlockContext = heapManager.AllocateInstanceOf(
         blockContextClassOOP, indexedSize);
 
-    // Initialize BlockContext fields...
+    // Initialize BlockContext fields (Blue Book standard - 6 fields)
+    // Note: No argStartIndex extension - bytecodes handle slot mapping
     return PrimitiveResult.Ok(newBlockContext);
 }
 ```
@@ -169,7 +175,7 @@ This is **CORRECT BEHAVIOR** - Smalltalk-80 is a message-passing system where ev
 
 ### 2.2 BlockContext Structure
 
-**Fixed Slots** (7 instance variables):
+**Fixed Slots** (6 instance variables - Blue Book standard):
 ```
 [0] caller          - Calling context (for return) - 8 bytes
 [1] pc              - Program counter - 8 bytes
@@ -177,18 +183,22 @@ This is **CORRECT BEHAVIOR** - Smalltalk-80 is a message-passing system where ev
 [3] argumentCount   - Number of block arguments - 8 bytes
 [4] initialIP       - Starting bytecode offset - 8 bytes
 [5] home            - Home MethodContext (variable storage) - 8 bytes
-[6] argStartIndex   - VM extension (unified temp frame) - 8 bytes
 ```
 
 **Indexed Slots**:
 ```
-[0..31]  - Expression stack (fixed 32 slots for blocks)
+[0..31]  - Expression stack (also receives args from Primitive 81)
 ```
 
+**Block Argument Handling** (Blue Book Chapter 30):
+- Primitive 81 pushes arguments onto the indexed slots (stack)
+- Block body begins with POP_STORE_TEMP bytecodes
+- Bytecodes pop args from stack and store to correct temp slots in home MethodContext
+
 **Total Size**:
-- Fixed overhead: 56 bytes (7 pointers × 8 bytes)
+- Fixed overhead: 48 bytes (6 pointers × 8 bytes)
 - Indexed slots: 32 × 8 = 256 bytes
-- **Total: 312 bytes per BlockContext**
+- **Total: 304 bytes per BlockContext**
 
 ### 2.3 Key Observations
 
@@ -527,16 +537,16 @@ public SmalltalkOOP CreateBlockContext(...)
         heapManager.SetClassOOP(contextOOP, blockContextClassOOP);
     }
 
-    // Initialize all 7 fields + clear 32 indexed slots
+    // Initialize all 6 fields (Blue Book standard) + clear 32 indexed slots
     heapManager.SetInstanceVariable(contextOOP, BLOCKCONTEXT_CALLER_INDEX, heapManager.GetNil());
     heapManager.SetInstanceVariable(contextOOP, BLOCKCONTEXT_PC_INDEX, heapManager.GetNil());
     heapManager.SetInstanceVariable(contextOOP, BLOCKCONTEXT_STACKP_INDEX, heapManager.GetNil());
     heapManager.SetInstanceVariable(contextOOP, BLOCKCONTEXT_NARGS_INDEX, blockArgumentCount);
     heapManager.SetInstanceVariable(contextOOP, BLOCKCONTEXT_STARTPC_INDEX, startPC);
     heapManager.SetInstanceVariable(contextOOP, BLOCKCONTEXT_HOME_INDEX, homeContext);
-    heapManager.SetInstanceVariable(contextOOP, BLOCKCONTEXT_ARG_START_INDEX, argStartIndexOOP);
+    // Note: No argStartIndex - bytecodes handle slot mapping
 
-    // Clear indexed slots (expression stack)
+    // Clear indexed slots (expression stack + receives args from Primitive 81)
     for (int i = 0; i < 32; i++)
     {
         heapManager.SetIndexedOOP(contextOOP, i, heapManager.GetNil());
@@ -1010,7 +1020,7 @@ public const int CONTEXT_RECEIVER_INDEX = 5;
 public const int CONTEXT_TEMP_FRAME_START = 6;
 ```
 
-**BlockContext** (`VMConstants.cs:82-98`):
+**BlockContext** (`VMConstants.cs:79-91` - Blue Book standard):
 ```csharp
 public const int BLOCKCONTEXT_CALLER_INDEX = 0;
 public const int BLOCKCONTEXT_PC_INDEX = 1;
@@ -1018,8 +1028,8 @@ public const int BLOCKCONTEXT_STACKP_INDEX = 2;
 public const int BLOCKCONTEXT_NARGS_INDEX = 3;
 public const int BLOCKCONTEXT_STARTPC_INDEX = 4;
 public const int BLOCKCONTEXT_HOME_INDEX = 5;
-public const int BLOCKCONTEXT_ARG_START_INDEX = 6;  // VM extension
-public const int BLOCKCONTEXT_TEMP_FRAME_START = 7;
+public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;  // Indexed slots start here
+// Note: No ARG_START_INDEX - bytecodes handle slot mapping
 ```
 
 ---

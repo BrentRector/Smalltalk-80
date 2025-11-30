@@ -1,6 +1,6 @@
 # Block Context and Variable Access - Comprehensive Reference
 
-**Last Updated**: 2025-11-13 (Added Advanced Topics section)
+**Last Updated**: 2025-11-30 (Updated to Blue Book compliant bytecode-driven block argument handling)
 **Status**: CANONICAL REFERENCE
 **Supersedes**: All previous block and variable access documentation
 **Companion Document**: Block-Context-Design-Validation.md (Expert analysis and implementation guidance)
@@ -21,7 +21,7 @@
    - 9.1 [Variable Shadowing](#91-variable-shadowing)
    - 9.2 [Home Context Traversal for Nested Blocks](#92-home-context-traversal-for-nested-blocks)
    - 9.3 [Slot Reuse with Escaping Blocks](#93-slot-reuse-with-escaping-blocks)
-   - 9.4 [GetBlockArgumentStartIndex Implementation](#94-getblockargumentstartindex-implementation)
+   - 9.4 [Block Argument Handling (Blue Book Compliant)](#94-block-argument-handling-blue-book-compliant)
    - 9.5 [Strict Allocator Policy for Nested vs Sequential Blocks](#95-strict-allocator-policy-for-nested-vs-sequential-blocks)
    - 9.6 [Detecting Escaping Blocks](#96-detecting-escaping-blocks)
 10. [Common Pitfalls](#10-common-pitfalls)
@@ -63,7 +63,7 @@ This document consolidates information from:
 - Variable shadowing with unique absolute indices
 - Home context traversal (all blocks point to same MethodContext)
 - Slot reuse policies with escaping block detection
-- BlockContext extension field for argument start indices
+- **Blue Book compliant bytecode-driven block argument handling** (Primitive 81 pushes args to stack, STORE_TEMP bytecodes store to temp slots)
 - Strict allocator policies for nested vs sequential blocks
 - Three-tier escaping block detection strategy (compile-time + runtime)
 
@@ -648,14 +648,14 @@ private SmalltalkOOP FindHomeMethodContext(SmalltalkOOP contextOOP)
 **Blue Book Specification**: Lines 1146-1175
 
 **Receiver**: Current executing context (MethodContext or BlockContext)
-**Argument**: Block argument count (SmallInteger)
+**Argument**: Block argument count (SmallInteger) - **1 argument only**
 **Returns**: New BlockContext instance
 
 **Implementation**:
 ```csharp
 public static void PrimitiveBlockCopy(VirtualMachine vm)
 {
-    // Pop arguments
+    // BLUE BOOK: Accept one argument (nargs only)
     var blockArgumentCountOOP = vm.PopStack();
     var contextOOP = vm.PopStack();
 
@@ -667,6 +667,11 @@ public static void PrimitiveBlockCopy(VirtualMachine vm)
     }
 
     int blockArgumentCount = blockArgumentCountOOP.SmallIntegerValue;
+    if (blockArgumentCount < 0)
+    {
+        vm.PrimitiveFail();
+        return;
+    }
 
     // Find home context
     SmalltalkOOP methodContextOOP;
@@ -691,23 +696,23 @@ public static void PrimitiveBlockCopy(VirtualMachine vm)
         return;
     }
 
-    // Allocate BlockContext (NO indexed slots)
+    // Allocate BlockContext with indexed slots for expression stack
+    // (also receives arguments pushed by Primitive 81)
     var newContextOOP = vm.InstantiateClass(
         vm.ClassBlockContextPointer,
-        indexedSlotCount: 0  // CRITICAL: 0 indexed slots
+        indexedSlotCount: 32  // Stack space for args + expression stack
     );
 
-    // Calculate initialIP (current IP + 3 for blockCopy: send)
+    // Calculate initialIP (current IP + 3 for LONG_JUMP)
     int initialIP = vm.InstructionPointer + 3;
     var initialIPOOP = SmalltalkOOP.FromSmallInteger(initialIP);
 
-    // Initialize BlockContext fields
-    vm.SetInstanceVariable(newContextOOP, BLOCKCONTEXT_INITIALIP_INDEX, initialIPOOP);
-    vm.SetInstanceVariable(newContextOOP, BLOCKCONTEXT_PC_INDEX, initialIPOOP);
-    vm.SetInstanceVariable(newContextOOP, BLOCKCONTEXT_STACKP_INDEX,
-        SmalltalkOOP.FromSmallInteger(0));
-    vm.SetInstanceVariable(newContextOOP, BLOCKCONTEXT_NARGS_INDEX,
-        blockArgumentCountOOP);
+    // Initialize BlockContext fields (Blue Book standard fields only)
+    vm.SetInstanceVariable(newContextOOP, BLOCKCONTEXT_CALLER_INDEX, vm.GetNil());
+    vm.SetInstanceVariable(newContextOOP, BLOCKCONTEXT_PC_INDEX, vm.GetNil());
+    vm.SetInstanceVariable(newContextOOP, BLOCKCONTEXT_STACKP_INDEX, vm.GetNil());
+    vm.SetInstanceVariable(newContextOOP, BLOCKCONTEXT_NARGS_INDEX, blockArgumentCountOOP);
+    vm.SetInstanceVariable(newContextOOP, BLOCKCONTEXT_STARTPC_INDEX, initialIPOOP);
     vm.SetInstanceVariable(newContextOOP, BLOCKCONTEXT_HOME_INDEX, methodContextOOP);
 
     // Push result
@@ -715,17 +720,22 @@ public static void PrimitiveBlockCopy(VirtualMachine vm)
 }
 ```
 
+**Note**: BlockContext has 6 instance variables (indices 0-5) per Blue Book. Indexed slots (6+) are used for the expression stack and also receive arguments pushed by Primitive 81.
+
 ### 7.2 Primitive 81: value / value: / value:value:
 
-**Purpose**: Activates BlockContext and stores arguments into MethodContext temp frame.
+**Purpose**: Activates BlockContext by pushing arguments onto its stack.
 
-**Blue Book Specification**: Lines 1179-1204
+**Blue Book Specification**: Lines 1179-1204 (Blue Book Chapter 30)
 
 **Receiver**: BlockContext
 **Arguments**: 0-N arguments matching block's nargs
 **Returns**: Does NOT return - switches active context (trampoline)
 
-**Implementation**:
+**Blue Book Compliant Implementation**:
+
+Arguments are **pushed onto the BlockContext's stack**, NOT stored directly into temp slots. The block's first bytecodes (STORE_TEMP/POP_STORE_TEMP) handle storing arguments into the correct temp frame slots.
+
 ```csharp
 public static void PrimitiveValue(VirtualMachine vm, int argumentCount)
 {
@@ -754,46 +764,43 @@ public static void PrimitiveValue(VirtualMachine vm, int argumentCount)
         return;
     }
 
-    // Get home MethodContext
-    SmalltalkOOP homeContext = vm.GetInstanceVariable(
-        blockContextOOP,
-        VMConstants.BLOCKCONTEXT_HOME_INDEX
-    );
-
-    // CRITICAL: Store arguments into HOME MethodContext temp frame
-    // Arguments are stored at pre-assigned indices determined by compiler
-    int startIndex = GetBlockArgumentStartIndex(blockContextOOP);
-    for (int i = 0; i < argumentCount; i++)
-    {
-        var argOOP = vm.StackValue(argumentCount - 1 - i);
-        vm.WriteIndexedSlot(homeContext, startIndex + i, argOOP);
-    }
-
-    // Pop arguments + receiver from stack
-    vm.PopN(argumentCount + 1);
-
-    // Get initialIP
+    // Get initialIP from blockContext
     var initialIPOOP = vm.GetInstanceVariable(
         blockContextOOP,
-        VMConstants.BLOCKCONTEXT_INITIALIP_INDEX
-    );
-    int initialIP = initialIPOOP.SmallIntegerValue;
-
-    // Create new BlockContext for execution
-    var newContext = vm.AllocateExecutionBlockContext(
-        sender: vm._activeContext,
-        home: homeContext,
-        initialIP: initialIP,
-        nargs: expectedArgs
+        VMConstants.BLOCKCONTEXT_STARTPC_INDEX
     );
 
-    // Switch to new context (trampoline)
-    vm._activeContext = newContext;
-    vm._instructionPointer = initialIP;
+    // Set PC to initialIP
+    vm.SetInstanceVariable(blockContextOOP,
+        VMConstants.BLOCKCONTEXT_PC_INDEX, initialIPOOP);
+
+    // BLUE BOOK: Push arguments onto BlockContext's stack (in order)
+    // The block's first bytecodes (POP_STORE_TEMP) will pop them into correct temp slots
+    // Stack grows from index 0 upward, stackp points to next free slot
+    for (int i = 0; i < argumentCount; i++)
+    {
+        vm.SetIndexedOOP(blockContextOOP, i, vm.StackValue(argumentCount - 1 - i));
+    }
+
+    // Set stack pointer to argument count (points to next free slot after arguments)
+    vm.SetInstanceVariable(blockContextOOP,
+        VMConstants.BLOCKCONTEXT_STACKP_INDEX,
+        SmalltalkOOP.FromSmallInteger(argumentCount));
+
+    // Set sender to current active context
+    vm.SetInstanceVariable(blockContextOOP,
+        VMConstants.BLOCKCONTEXT_CALLER_INDEX, vm._activeContext);
+
+    // Pop arguments + receiver from caller's stack
+    vm.PopN(argumentCount + 1);
+
+    // Switch to the BlockContext
+    vm._activeContext = blockContextOOP;
+    vm._instructionPointer = initialIPOOP.SmallIntegerValue;
 }
 ```
 
-**Note**: `GetBlockArgumentStartIndex` needs compiler metadata to determine where block arguments start in the unified frame.
+**Key Point**: This design correctly handles **non-contiguous slot mappings** where block arguments reuse outer temporaries in a different order (e.g., block args `:c :b :a` mapping to temp slots 2, 1, 0).
 
 ---
 
@@ -813,6 +820,13 @@ Variable Index Assignment:
   x → index 0 (method arg)
   a → index 1 (block arg)
 Max frame size: 2
+
+Block Body Bytecodes:
+  POP_STORE_TEMP 1     ; Store 'a' argument from stack to temp slot 1
+  PUSH_TEMP 1          ; Push 'a'
+  PUSH_TEMP 0          ; Push 'x'
+  SEND +
+  RETURN_TOP
 ```
 
 **Runtime Execution**:
@@ -821,9 +835,12 @@ Max frame size: 2
    indexedSlots[0] = <x value from caller>
 
 2. Block activation (Primitive 81):
-   - Stores argument: homeContext.indexedSlots[1] = 5
+   - Pushes argument 5 onto BlockContext stack at index 0
+   - Sets stackp = 1 (pointing to next free slot)
+   - Switches to BlockContext
 
-3. Block bytecode execution:
+3. Block body begins executing:
+   - POP_STORE_TEMP 1: Pops 5 from stack, stores to homeContext.indexedSlots[1]
    - PUSH_TEMP 1: Read indexedSlots[1] → 5
    - PUSH_TEMP 0: Read indexedSlots[0] → x value
    - SEND +
@@ -845,15 +862,31 @@ Variable Index Assignment:
   a → index 0 (outer block arg)
   b → index 1 (inner block arg)
 Max frame size: 2
+
+Outer Block Bytecodes:
+  POP_STORE_TEMP 0     ; Store 'a' from stack to slot 0
+  ... create inner block ...
+  PUSH 2
+  SEND value:
+  RETURN_TOP
+
+Inner Block Bytecodes:
+  POP_STORE_TEMP 1     ; Store 'b' from stack to slot 1
+  PUSH_TEMP 0          ; Push 'a'
+  PUSH_TEMP 1          ; Push 'b'
+  SEND +
+  RETURN_TOP
 ```
 
 **Runtime Execution**:
 ```
-1. Outer block activation:
-   - homeContext.indexedSlots[0] = 1 (a)
+1. Outer block activation (Primitive 81):
+   - Pushes 1 onto BlockContext stack
+   - Block's POP_STORE_TEMP 0 stores to homeContext.indexedSlots[0]
 
-2. Inner block activation:
-   - homeContext.indexedSlots[1] = 2 (b)
+2. Inner block activation (Primitive 81):
+   - Pushes 2 onto inner BlockContext stack
+   - Block's POP_STORE_TEMP 1 stores to homeContext.indexedSlots[1]
 
 3. Inner block execution (a + b):
    - PUSH_TEMP 0: Read indexedSlots[0] → 1
@@ -1272,121 +1305,179 @@ bool canReuseSlots = !escapeInfo.ThisBlockMightEscape && !isNested;
 // Per-block escape analysis instead of method-wide flag
 ```
 
-### 9.4 GetBlockArgumentStartIndex Implementation
+### 9.4 Block Argument Handling (Blue Book Compliant)
 
-**Problem**: Primitive 81 must store block arguments into the **home MethodContext temp frame** at the correct indices.
+**Problem**: How does the VM store block arguments into the correct temp frame slots when arguments may not be stored contiguously?
 
-**Question**: How does Primitive 81 know where block arguments start in the unified frame?
+**Motivation**: Consider a method like `RunArray>>copyFrom:to:` where block arguments share storage with method temporaries:
 
-#### Recommended Solution: BlockContext Extension Field
+```smalltalk
+copyFrom: start to: stop
+    | run1 offset1 value1 |
+    self setRunOffsetAndValue: [:run :offset :value |
+        run1 := run. offset1 := offset. value1 := value]
+```
 
-Add `BLOCKCONTEXT_ARG_START_INDEX = 6` as an extension field to BlockContext.
+If the block is `[:offset :run :value | ...]` (arguments in different order than temps), a simple `argStartIndex + i` scheme would store arguments into the wrong slots.
 
-**VMConstants.cs**:
+#### Blue Book Compliant Solution: Bytecode-Driven Argument Storage
+
+Per **Blue Book Chapter 30**, block argument handling uses bytecodes to store arguments:
+
+1. **Primitive 81** pushes arguments onto the **BlockContext's stack** (not directly to temp slots)
+2. **Block body** begins with **POP_STORE_TEMP** bytecodes that pop arguments from the stack and store them into the correct temp slots
+
+**This design correctly handles non-contiguous slot mappings.**
+
+#### VMConstants.cs (Blue Book Standard)
+
 ```csharp
 // BlockContext fields (Blue Book: 0-5)
-public const int BLOCKCONTEXT_SENDER_INDEX = 0;
+public const int BLOCKCONTEXT_CALLER_INDEX = 0;
 public const int BLOCKCONTEXT_PC_INDEX = 1;
 public const int BLOCKCONTEXT_STACKP_INDEX = 2;
 public const int BLOCKCONTEXT_NARGS_INDEX = 3;
-public const int BLOCKCONTEXT_INITIALIP_INDEX = 4;
+public const int BLOCKCONTEXT_STARTPC_INDEX = 4;
 public const int BLOCKCONTEXT_HOME_INDEX = 5;
 
-// Extension field for unified temp frame (beyond Blue Book)
-public const int BLOCKCONTEXT_ARG_START_INDEX = 6;
+// Indexed slots [6+]: Expression stack (also receives args from Primitive 81)
+public const int BLOCKCONTEXT_TEMP_FRAME_START = 6;
 ```
 
-**Why Extension Field**:
-- ✅ Simpler than metadata in literal frame
-- ✅ No change to Primitive 80 signature
-- ✅ Direct access in Primitive 81
-- ✅ Better encapsulation (metadata travels with block)
-- ⚠️ Acceptable Blue Book deviation (internal optimization)
+**Note**: No `BLOCKCONTEXT_ARG_START_INDEX` extension field - argument slot mapping is handled entirely by bytecodes.
 
-#### Compiler Modification
+#### Compiler Implementation
 
 **BytecodeCompiler.cs** - Block compilation:
 
 ```csharp
 void CompileBlock(BlockNode blockNode)
 {
+    var argumentNames = blockNode.Arguments;
+    int argCount = argumentNames.Count;
+
     // Allocate slots for block args and temps (unified frame)
-    _allocator.EnterBlockScope(blockNode.Arguments, blockNode.Temporaries, isNested);
+    allocator.EnterBlockScope(argumentNames, blockNode.Temporaries, isNested);
 
-    // Get index of first block argument
-    int argStartIndex = blockNode.Arguments.Count > 0
-        ? _allocator.GetSlotIndex(blockNode.Arguments[0])
-        : 0;  // No args
+    // Get slot indices for each block argument (for STORE_TEMP bytecodes)
+    var argSlotIndices = new List<int>();
+    foreach (var argName in argumentNames)
+    {
+        argSlotIndices.Add(allocator.GetSlotIndex(argName));
+    }
 
-    // Store in metadata for Primitive 80
-    _currentBlockMetadata.ArgumentStartIndex = argStartIndex;
+    // STEP 1: Emit blockCopy: send (Blue Book: 1 argument - nargs)
+    emitter.PushSmallInteger(argCount);
+    emitter.EmitByte(0xC8);  // SEND_SPECIAL_BLOCKCOPY
 
-    // ... emit blockCopy: with argCount
+    // STEP 2: Emit LONG_JUMP over block body
+    int jumpOffset = emitter.CurrentOffset;
+    emitter.EmitJumpPlaceholder();
+
+    // STEP 3: Block body starts here
+    // Emit POP_STORE_TEMP bytecodes to move arguments from stack to temp slots
+    // Arguments are pushed in order (arg0, arg1, arg2...) by Primitive 81
+    // Stack is LIFO, so we pop in reverse order (last arg first)
+    for (int i = argCount - 1; i >= 0; i--)
+    {
+        emitter.StoreTemporary(argSlotIndices[i]);  // Emits POP_STORE_TEMP
+    }
+
+    // Compile block body statements
+    CompileStatements(blockNode.Body);
+
+    // STEP 4: Patch jump offset
+    emitter.PatchJump(jumpOffset);
 }
 ```
 
-#### Primitive 80 Modification
+#### Primitive 81 Implementation
 
-**ControlPrimitives.cs**:
-
-```csharp
-public static SmalltalkOOP BlockCopy(IPrimitiveContext ctx,
-                                      SmalltalkOOP receiver,
-                                      SmalltalkOOP[] args)
-{
-    // ... existing validation and BlockContext creation
-
-    // Calculate argStartIndex from compiler metadata
-    // (Passed via method call or embedded in bytecode)
-    int argStartIndex = GetCompilerProvidedArgStartIndex(ctx);
-
-    // Store in BlockContext extension field
-    ctx.HeapManager.SetInstanceVariable(newBlockContext,
-        VMConstants.BLOCKCONTEXT_ARG_START_INDEX,
-        SmalltalkOOP.FromSmallInteger(argStartIndex));
-
-    // ... rest of initialization
-}
-```
-
-#### Primitive 81 Modification
-
-**ControlPrimitives.cs**:
+**ControlPrimitives.cs** - Blue Book compliant:
 
 ```csharp
 public static void PrimitiveValue(IPrimitiveContext ctx, int argumentCount)
 {
-    // Get BlockContext receiver
     var blockContextOOP = ctx.StackValue(argumentCount);
 
-    // Get argument start index from BlockContext extension field
-    var argStartIndexOOP = ctx.HeapManager.GetInstanceVariable(
-        blockContextOOP,
-        VMConstants.BLOCKCONTEXT_ARG_START_INDEX
-    );
-    int argStartIndex = argStartIndexOOP.SmallIntegerValue;
+    // Validate and get expected argument count
+    var nargsOOP = ctx.HeapManager.GetInstanceVariable(
+        blockContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
+    int expectedArgs = nargsOOP.SmallIntegerValue;
 
-    // Get home MethodContext
-    var homeContextOOP = ctx.HeapManager.GetInstanceVariable(
-        blockContextOOP,
-        VMConstants.BLOCKCONTEXT_HOME_INDEX
-    );
-
-    // CRITICAL: Store arguments into HOME MethodContext temp frame
-    // at compiler-determined indices
-    for (int i = 0; i < argumentCount; i++)
+    if (argumentCount != expectedArgs)
     {
-        var argOOP = ctx.StackValue(argumentCount - 1 - i);
-        ctx.HeapManager.SetIndexedSlot(
-            homeContextOOP,
-            argStartIndex + i,  // Absolute index in unified frame
-            argOOP
-        );
+        ctx.PrimitiveFail();
+        return;
     }
 
-    // ... rest of block activation
+    // Get initialIP
+    var initialIPOOP = ctx.HeapManager.GetInstanceVariable(
+        blockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+
+    // Set PC to initialIP
+    ctx.HeapManager.SetInstanceVariable(blockContextOOP,
+        VMConstants.BLOCKCONTEXT_PC_INDEX, initialIPOOP);
+
+    // BLUE BOOK: Push arguments onto BlockContext's stack (in order)
+    // The block's first bytecodes (POP_STORE_TEMP) will pop them into correct slots
+    for (int i = 0; i < argumentCount; i++)
+    {
+        ctx.HeapManager.SetIndexedOOP(blockContextOOP, i, ctx.StackValue(argumentCount - 1 - i));
+    }
+
+    // Set stack pointer to argument count
+    ctx.HeapManager.SetInstanceVariable(blockContextOOP,
+        VMConstants.BLOCKCONTEXT_STACKP_INDEX,
+        SmalltalkOOP.FromSmallInteger(argumentCount));
+
+    // Set sender and switch context
+    ctx.HeapManager.SetInstanceVariable(blockContextOOP,
+        VMConstants.BLOCKCONTEXT_CALLER_INDEX, ctx.ActiveContext);
+    ctx.PopN(argumentCount + 1);
+    ctx.SetActiveContext(blockContextOOP);
 }
 ```
+
+#### Example: Non-Contiguous Slot Mapping
+
+**Source** (block args match temps but in different order):
+```smalltalk
+method
+    | a b c |
+    [:c :b :a | a + b + c] value: 3 value: 2 value: 1
+```
+
+**Compilation**:
+```
+Variable assignment: a→0, b→1, c→2
+
+Block arg slot mapping:
+  :c → slot 2
+  :b → slot 1
+  :a → slot 0
+
+Block bytecodes:
+  POP_STORE_TEMP 0   ; Store 'a' (last arg pushed, first popped)
+  POP_STORE_TEMP 1   ; Store 'b'
+  POP_STORE_TEMP 2   ; Store 'c' (first arg pushed, last popped)
+  ... block body ...
+```
+
+**Runtime**:
+```
+Primitive 81 pushes: [3, 2, 1] → BlockContext stack (stackp=3)
+Block executes:
+  POP_STORE_TEMP 0: pops 1, stores to slot 0 (a)
+  POP_STORE_TEMP 1: pops 2, stores to slot 1 (b)
+  POP_STORE_TEMP 2: pops 3, stores to slot 2 (c)
+```
+
+**Key Benefits**:
+- ✅ Correctly handles any slot mapping (contiguous or non-contiguous)
+- ✅ Fully Blue Book compliant (no VM extension fields)
+- ✅ Supports legacy patterns like `RunArray>>copyFrom:to:`
+- ✅ No runtime metadata lookup - slot indices embedded in bytecode
 
 ### 9.5 Strict Allocator Policy for Nested vs Sequential Blocks
 
@@ -1793,15 +1884,16 @@ if (contextClassOOP == ctx.GetBlockContextClassOOP())
 - [ ] NO index adjustment when traversing home
 
 **Primitives**:
-- [ ] **Primitive 80** (`blockCopy: nargs`) - creates BlockContext with home pointer
-- [ ] **Primitive 81** (`value`, `value:`, etc.) - stores arguments into home MethodContext temp frame
-- [ ] Primitive 80 allocates BlockContext with 0 indexed slots
-- [ ] Primitive 81 stores args at compiler-determined indices
+- [x] **Primitive 80** (`blockCopy: nargs`) - creates BlockContext with home pointer (1 argument only)
+- [x] **Primitive 81** (`value`, `value:`, etc.) - pushes arguments onto BlockContext stack
+- [x] Primitive 80 allocates BlockContext with indexed slots for expression stack (32 slots)
+- [x] Primitive 81 pushes args to BlockContext stack, bytecodes store to temp slots
+- [x] Block body starts with POP_STORE_TEMP bytecodes to store args into correct temp slots
 
 **Object Memory**:
-- [ ] MethodContext allocation calculates size: temp frame size + stack depth
-- [ ] BlockContext allocation: NO indexed slots allocated
-- [ ] All slots initialized to nil
+- [x] MethodContext allocation calculates size: temp frame size + stack depth
+- [x] BlockContext allocation: indexed slots for expression stack (also receives args from Primitive 81)
+- [x] All slots initialized to nil
 
 **Context Retention**:
 - [ ] Detect escaping blocks (blocks returned from methods)
@@ -1819,14 +1911,15 @@ if (contextClassOOP == ctx.GetBlockContextClassOOP())
 - [ ] METHODCONTEXT_RECEIVER_INDEX = 4
 - [ ] METHODCONTEXT_TEMP_FRAME_START = 5
 
-**BlockContext**:
-- [ ] BLOCKCONTEXT_SENDER_INDEX = 0
-- [ ] BLOCKCONTEXT_PC_INDEX = 1
-- [ ] BLOCKCONTEXT_STACKP_INDEX = 2
-- [ ] BLOCKCONTEXT_NARGS_INDEX = 3
-- [ ] BLOCKCONTEXT_INITIALIP_INDEX = 4
-- [ ] BLOCKCONTEXT_HOME_INDEX = 5
-- [ ] NO BLOCKCONTEXT_TEMP_FRAME_START (no indexed slots!)
+**BlockContext** (Blue Book compliant - 6 instance variables):
+- [x] BLOCKCONTEXT_CALLER_INDEX = 0 (sender)
+- [x] BLOCKCONTEXT_PC_INDEX = 1
+- [x] BLOCKCONTEXT_STACKP_INDEX = 2
+- [x] BLOCKCONTEXT_NARGS_INDEX = 3
+- [x] BLOCKCONTEXT_STARTPC_INDEX = 4 (initialIP)
+- [x] BLOCKCONTEXT_HOME_INDEX = 5
+- [x] BLOCKCONTEXT_TEMP_FRAME_START = 6 (indexed slots for expression stack + args from Primitive 81)
+- [x] NO argStartIndex extension field (bytecodes handle slot mapping)
 
 ### 11.4 Testing
 

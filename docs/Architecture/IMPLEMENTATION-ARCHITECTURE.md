@@ -83,7 +83,7 @@ Indexed slots [0..n]:
 
 **BlockContext** - Execution state for a block:
 ```
-Fixed slots [0-5]:
+Fixed slots [0-5] (Blue Book standard):
   [0] sender          - Calling context
   [1] pc              - Program counter
   [2] stackp          - Stack pointer
@@ -91,11 +91,13 @@ Fixed slots [0-5]:
   [4] initialIP       - Starting instruction pointer
   [5] home            - Home MethodContext
 
-Extension slot [6]:
-  argStartIndex       - VM extension for Primitive 81
+Indexed slots [6+]:
+  Expression stack (also receives args from Primitive 81)
 
-Indexed slots:
-  Expression stack only (NO variable storage)
+Block Argument Handling (Blue Book Chapter 30):
+  - Primitive 81 pushes args onto BlockContext stack
+  - Block body starts with POP_STORE_TEMP bytecodes
+  - Bytecodes store args into correct temp slots in home MethodContext
 ```
 
 ### Unified Temp Frame Architecture
