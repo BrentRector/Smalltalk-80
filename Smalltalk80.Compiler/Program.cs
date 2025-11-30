@@ -150,6 +150,11 @@ file sealed class Program
                 Console.WriteLine($"  Size: {sourcesFileContent.Length:N0} bytes");
             }
 
+            // Create empty .changes file (index 2) for runtime modifications
+            string changesFile = Path.Combine(outputDir ?? ".", "Smalltalk-80.changes");
+            File.WriteAllText(changesFile, "", System.Text.Encoding.UTF8);
+            Console.WriteLine($"Generated changes file: {changesFile} (empty)");
+
             Console.WriteLine();
             Console.WriteLine($"Successfully generated: {outputFile}");
             var stats = generator.GetStatistics();

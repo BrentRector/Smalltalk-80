@@ -77,19 +77,16 @@
       Importance="high"
       Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.sources')" />
 
-    <!-- Copy any .changes files from source folder -->
-    <ItemGroup>
-      <ChangesFiles Include="$(SmalltalkSourceDir)*.changes" />
-    </ItemGroup>
+    <!-- Copy Smalltalk-80.changes from Compiler output (generated during compilation) -->
     <Copy
-      SourceFiles="@(ChangesFiles)"
+      SourceFiles="$(CompilerOutputDir)Data\Smalltalk-80.changes"
       DestinationFolder="$(DataOutputDir)"
       SkipUnchangedFiles="true"
-      Condition="'@(ChangesFiles)' != ''" />
+      Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.changes')" />
     <Message
-      Text="✓ Copied %(ChangesFiles.Filename)%(ChangesFiles.Extension) to $(DataOutputDir)"
+      Text="✓ Copied Smalltalk-80.changes to $(DataOutputDir)"
       Importance="high"
-      Condition="'@(ChangesFiles)' != ''" />
+      Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.changes')" />
   </Target>
 
 
