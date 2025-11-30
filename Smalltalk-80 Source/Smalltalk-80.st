@@ -1386,17 +1386,19 @@ rename: newName
     ^self!
 
 size
+    "Return file size. Primitive 154 returns Array: [1]=size, [2]=attributes, [3]=isDirectory"
     <primitive: 144>
     | attrs |
     attrs _ self primGetAttributes: pathName asString.
     attrs isNil ifTrue: [^0].
-    ^attrs at: #size ifAbsent: [0]!
+    ^attrs at: 1!
 
 exists
+    "Answer true if file exists. Primitive 154 returns Array: [1]=size, [2]=attributes, [3]=isDirectory"
     <primitive: 155>
     | attrs |
     attrs _ self primGetAttributes: pathName asString.
-    ^attrs notNil and: [(attrs at: #attributes ifAbsent: [16rFFFFFFFF]) ~= 16rFFFFFFFF]! !
+    ^attrs notNil and: [(attrs at: 2) ~= 16rFFFFFFFF]! !
 
 !WindowsFileReference methodsFor: 'streaming'!
 
