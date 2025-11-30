@@ -29,6 +29,11 @@
    - Warning looked for `coldstart.json` in wrong location
    - Fix: Updated path to `Data\coldstart.json`, removed misleading warning
 
+4. **Data Folder File Lookup** (`FilePrimitives.cs`)
+   - FormMenuView initialize and other init expressions couldn't find .form files
+   - Files are in `Data/` folder but `Disk` pointed to current directory (`.`)
+   - Fix: Primitives 121, 146, 154 now fall back to `Data/<path>` for resource files
+
 ---
 
 ## Architecture Notes
@@ -56,6 +61,13 @@ Browser → Behavior>>sourceCodeForMethod:at:
 4. initialSP = 0 for BlockContexts (no reserved slots)
 ```
 
+### Resource File Location (Data Folder)
+```
+Resource files (.form, .sources, etc.) live in: bin/Debug/net9.0-windows/Data/
+File primitives automatically check Data/ folder when file not found in cwd.
+Affected primitives: 121 (Open), 146 (DirList), 154 (GetAttributes)
+```
+
 ---
 
 ## Known Issues
@@ -71,9 +83,10 @@ Parser error on number literals. Scanner produces `tokenType: #xDigit` instead o
 ## Key Files
 
 ### Recently Modified
-- `FilePrimitives.cs` - BOM offset handling (primitive 124 returns logical position)
+- `FilePrimitives.cs` - BOM offset handling + Data folder fallback for resource files
 - `StackManager.cs` - BlockContext initialSP = 0 for Blue Book arg handling
 - `Smalltalk80.Interpreter.csproj` - Removed outdated coldstart.json warning
+- `Smalltalk-80.st` - `File>>initialize` sets `Disk` to `Data` folder
 
 ### Source Lookup
 - `SystemDictionaryInstaller.cs` - Creates SourceFiles array with file handles
