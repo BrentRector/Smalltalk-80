@@ -123,8 +123,12 @@ public class SystemDictionaryInstaller(
         int sourcesHandle = FileOperations.OpenFileHandle(sourcesPath, 1, 1, 3); // Read-only
         int changesHandle = FileOperations.OpenFileHandle(changesPath, 3, 1, 4); // Read-write
 
+        Console.WriteLine($"[SourceFiles] Opening files: sources={sourcesPath}, changes={changesPath}");
+        Console.WriteLine($"[SourceFiles] Handles: sources={sourcesHandle}, changes={changesHandle}");
+
         if (sourcesHandle < 0 || changesHandle < 0)
         {
+            Console.WriteLine($"[SourceFiles] FAILED to open files");
             // Failed to open files - return nil
             if (sourcesHandle >= 0) FileOperations.CloseFileHandle(sourcesHandle);
             if (changesHandle >= 0) FileOperations.CloseFileHandle(changesHandle);
@@ -134,6 +138,7 @@ public class SystemDictionaryInstaller(
         // Create WindowsFileReference objects for each file
         var sourcesRef = CreateWindowsFileReference(sourcesPath, sourcesHandle);
         var changesRef = CreateWindowsFileReference(changesPath, changesHandle);
+        Console.WriteLine($"[SourceFiles] Created WindowsFileReference OOPs: sources={sourcesRef}, changes={changesRef}");
 
         // Create Array of size 2 for SourceFiles
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");

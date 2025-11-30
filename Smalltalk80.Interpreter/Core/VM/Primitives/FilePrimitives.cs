@@ -537,13 +537,24 @@ public static class FileOperations
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length < 2 || context.Arguments.Length > 3)
+            {
+                Console.WriteLine($"[Primitive 124] FAIL: wrong argument count {context.Arguments.Length}");
                 return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var handleOOP = context.Arguments[0];
             var offsetOOP = context.Arguments[1];
 
-            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (!offsetOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!handleOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[Primitive 124] FAIL: handle not SmallInteger: {handleOOP}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (!offsetOOP.IsSmallInteger)
+            {
+                Console.WriteLine($"[Primitive 124] FAIL: offset not SmallInteger: {offsetOOP}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             // Default origin to 0 (Begin) if not provided
             int origin = 0;
@@ -558,7 +569,11 @@ public static class FileOperations
             int offset = offsetOOP.AsSmallInteger();
 
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (stream == null)
+            {
+                Console.WriteLine($"[Primitive 124] FAIL: stream not found for handle={handle}. OpenFileCount={FileHandleManager.OpenFileCount}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             try
             {
@@ -575,10 +590,12 @@ public static class FileOperations
                 // Clamp to SmallInteger range
                 if (newPosition > 0x3FFFFFFF) newPosition = 0x3FFFFFFF;
 
+                Console.WriteLine($"[Primitive 124] OK: handle={handle}, offset={offset}, newPosition={newPosition}");
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)newPosition));
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[Primitive 124] EXCEPTION: handle={handle}, offset={offset}, error={ex.Message}");
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(-1));
             }
         }
@@ -1073,13 +1090,20 @@ public static class FileOperations
                 var receiverOOP = context.Receiver;
                 var handleOOP = context.HeapManager.GetInstanceVariable(receiverOOP, 1);
                 if (!handleOOP.IsSmallInteger)
+                {
+                    Console.WriteLine($"[Primitive 144] FAIL: handle is not SmallInteger. handleOOP={handleOOP}, receiver={receiverOOP}");
                     return PrimitiveResult.Fail(context.Metadata!);
+                }
 
                 int handle = handleOOP.AsSmallInteger();
                 var stream = FileHandleManager.GetStream(handle);
                 if (stream == null)
+                {
+                    Console.WriteLine($"[Primitive 144] FAIL: stream not found for handle={handle}. OpenFileCount={FileHandleManager.OpenFileCount}");
                     return PrimitiveResult.Fail(context.Metadata!);
+                }
                 size = stream.Length;
+                Console.WriteLine($"[Primitive 144] OK: handle={handle}, size={size}");
             }
             else if (context.Arguments.Length == 1)
             {
