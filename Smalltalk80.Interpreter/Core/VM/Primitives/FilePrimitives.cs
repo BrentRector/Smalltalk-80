@@ -441,8 +441,6 @@ public static class FileOperations
     /// </summary>
     public class FileReadByte : IPrimitive
     {
-        private static bool _firstCall = true;
-
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 2)
@@ -473,13 +471,6 @@ public static class FileOperations
                 int actualPosition = position + FileHandleManager.GetBomOffset(handle);
                 stream.Position = actualPosition;
                 int byteValue = stream.ReadByte();
-
-                // Log first successful read to confirm file access is working
-                if (_firstCall)
-                {
-                    Console.WriteLine($"[Primitive 132] First read OK: handle={handle}, position={position}, actualPosition={actualPosition}, byte={byteValue}");
-                    _firstCall = false;
-                }
 
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(byteValue));
             }
@@ -670,7 +661,6 @@ public static class FileOperations
                 if (logicalPosition > 0x3FFFFFFF) logicalPosition = 0x3FFFFFFF;
                 if (logicalPosition < 0) logicalPosition = 0; // Can happen if seeking before BOM
 
-                Console.WriteLine($"[Primitive 124] OK: handle={handle}, offset={offset}, physicalPos={newPosition}, logicalPos={logicalPosition}");
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)logicalPosition));
             }
             catch (Exception ex)
@@ -1183,7 +1173,6 @@ public static class FileOperations
                     return PrimitiveResult.Fail(context.Metadata!);
                 }
                 size = stream.Length;
-                Console.WriteLine($"[Primitive 144] OK: handle={handle}, size={size}");
             }
             else if (context.Arguments.Length == 1)
             {
