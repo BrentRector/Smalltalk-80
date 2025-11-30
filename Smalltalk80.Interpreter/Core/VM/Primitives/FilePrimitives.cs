@@ -647,16 +647,15 @@ public static class FileOperations
                     _ => SeekOrigin.Begin
                 };
 
+                // Get BOM offset once for use in both seek and return value calculation
+                int bomOffset = FileHandleManager.GetBomOffset(handle);
+
                 // Apply BOM offset for seeks from beginning
                 // This ensures source positions in CompiledMethods (which don't account for BOM) work correctly
                 int actualOffset = offset;
-                if (seekOrigin == SeekOrigin.Begin)
+                if (seekOrigin == SeekOrigin.Begin && bomOffset > 0)
                 {
-                    int bomOffset = FileHandleManager.GetBomOffset(handle);
-                    if (bomOffset > 0)
-                    {
-                        actualOffset = offset + bomOffset;
-                    }
+                    actualOffset = offset + bomOffset;
                 }
 
                 long newPosition = stream.Seek(actualOffset, seekOrigin);
@@ -665,7 +664,6 @@ public static class FileOperations
                 // This ensures Smalltalk code works with BOM-transparent positions
                 // and primitive 132 (read byte) can correctly add BOM offset
                 // For ALL seek origins, the returned position is physical, so subtract BOM
-                int bomOffset = FileHandleManager.GetBomOffset(handle);
                 long logicalPosition = bomOffset > 0 ? newPosition - bomOffset : newPosition;
 
                 // Clamp to SmallInteger range
