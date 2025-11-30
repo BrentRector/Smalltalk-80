@@ -326,7 +326,9 @@ public static class FileOperations
             if (createMode == 3 && !File.Exists(path))
             {
                 // Try Data folder fallback for resource files (.form, .sources, etc.)
-                string dataPath = Path.Combine("Data", path);
+                // Use executable directory, not current working directory
+                string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                string dataPath = Path.Combine(exeDir, "Data", path);
                 if (File.Exists(dataPath))
                 {
                     actualPath = dataPath;
@@ -850,7 +852,9 @@ public static class FileOperations
                 if (!File.Exists(path) && !Directory.Exists(path))
                 {
                     // Fall back to Data folder (for .form, .sources, etc.)
-                    string dataPath = Path.Combine("Data", path);
+                    // Use executable directory, not current working directory
+                    string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                    string dataPath = Path.Combine(exeDir, "Data", path);
                     if (File.Exists(dataPath) || Directory.Exists(dataPath))
                     {
                         actualPath = dataPath;
@@ -1299,17 +1303,20 @@ public static class FileOperations
 
             try
             {
+                // Use executable directory, not current working directory
+                string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+
                 // Handle "." as current directory - use Data folder for resource files
                 if (dirPath == ".")
                 {
-                    // Try Data folder first, then fall back to current directory
-                    string dataPath = Path.Combine(Directory.GetCurrentDirectory(), "Data");
-                    dirPath = Directory.Exists(dataPath) ? dataPath : Directory.GetCurrentDirectory();
+                    // Try Data folder first, then fall back to executable directory
+                    string dataPath = Path.Combine(exeDir, "Data");
+                    dirPath = Directory.Exists(dataPath) ? dataPath : exeDir;
                 }
                 else if (!Directory.Exists(dirPath))
                 {
                     // Try Data folder fallback
-                    string dataPath = Path.Combine("Data", dirPath);
+                    string dataPath = Path.Combine(exeDir, "Data", dirPath);
                     if (Directory.Exists(dataPath))
                         dirPath = dataPath;
                 }
