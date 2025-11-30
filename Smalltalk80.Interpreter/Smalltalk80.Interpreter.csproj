@@ -52,19 +52,17 @@
     <!-- Create Data directory if it doesn't exist -->
     <MakeDir Directories="$(DataOutputDir)" Condition="!Exists('$(DataOutputDir)')" />
 
-    <!-- Copy coldstart.json from Compiler output -->
+    <!-- Copy coldstart.json from Compiler output Data folder (if freshly compiled) -->
+    <!-- Note: coldstart.json is tracked in git in the Interpreter's Data folder, so this is optional -->
     <Copy
-      SourceFiles="$(CompilerOutputDir)coldstart.json"
+      SourceFiles="$(CompilerOutputDir)Data\coldstart.json"
       DestinationFolder="$(DataOutputDir)"
       SkipUnchangedFiles="true"
-      Condition="Exists('$(CompilerOutputDir)coldstart.json')" />
+      Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
     <Message
-      Text="✓ Copied coldstart.json to $(DataOutputDir)"
+      Text="✓ Copied freshly compiled coldstart.json to $(DataOutputDir)"
       Importance="high"
-      Condition="Exists('$(CompilerOutputDir)coldstart.json')" />
-    <Warning
-      Text="⚠ coldstart.json not found: $(CompilerOutputDir)coldstart.json - Run build-standard.ps1 or build-with-tests.ps1 to generate it"
-      Condition="!Exists('$(CompilerOutputDir)coldstart.json')" />
+      Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
 
     <!-- Copy Smalltalk-80.sources from Compiler output (generated during compilation) -->
     <Copy
