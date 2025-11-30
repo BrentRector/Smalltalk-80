@@ -402,9 +402,15 @@ public static class FileOperations
     /// </summary>
     public class FileReadByte : IPrimitive
     {
+        private static bool _firstCall = true;
+
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Arguments.Length != 2)
+            {
+                // Don't log this - happens every time next is called (expected fallback)
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             var handleOOP = context.Arguments[0];
             var positionOOP = context.Arguments[1];
@@ -416,16 +422,29 @@ public static class FileOperations
             int position = positionOOP.AsSmallInteger();
 
             var stream = FileHandleManager.GetStream(handle);
-            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (stream == null)
+            {
+                Console.WriteLine($"[Primitive 132] FAIL: stream not found for handle={handle}");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             try
             {
                 stream.Position = position;
                 int byteValue = stream.ReadByte();
+
+                // Log first successful read to confirm file access is working
+                if (_firstCall)
+                {
+                    Console.WriteLine($"[Primitive 132] First read OK: handle={handle}, position={position}, byte={byteValue}");
+                    _firstCall = false;
+                }
+
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(byteValue));
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[Primitive 132] EXCEPTION: handle={handle}, position={position}, error={ex.Message}");
                 return PrimitiveResult.Fail(context.Metadata!);
             }
         }
