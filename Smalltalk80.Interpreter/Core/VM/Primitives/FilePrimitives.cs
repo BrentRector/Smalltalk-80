@@ -661,11 +661,19 @@ public static class FileOperations
 
                 long newPosition = stream.Seek(actualOffset, seekOrigin);
 
-                // Clamp to SmallInteger range
-                if (newPosition > 0x3FFFFFFF) newPosition = 0x3FFFFFFF;
+                // Return LOGICAL position, not PHYSICAL position
+                // This ensures Smalltalk code works with BOM-transparent positions
+                // and primitive 132 (read byte) can correctly add BOM offset
+                // For ALL seek origins, the returned position is physical, so subtract BOM
+                int bomOffset = FileHandleManager.GetBomOffset(handle);
+                long logicalPosition = bomOffset > 0 ? newPosition - bomOffset : newPosition;
 
-                Console.WriteLine($"[Primitive 124] OK: handle={handle}, offset={offset}, newPosition={newPosition}");
-                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)newPosition));
+                // Clamp to SmallInteger range
+                if (logicalPosition > 0x3FFFFFFF) logicalPosition = 0x3FFFFFFF;
+                if (logicalPosition < 0) logicalPosition = 0; // Can happen if seeking before BOM
+
+                Console.WriteLine($"[Primitive 124] OK: handle={handle}, offset={offset}, physicalPos={newPosition}, logicalPos={logicalPosition}");
+                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)logicalPosition));
             }
             catch (Exception ex)
             {
