@@ -786,18 +786,65 @@ public static class CompiledMethodHelpers
         SmalltalkOOP[] literalOOPs,
         byte[] bytecodes)
     {
+        // Delegate to overload with no source position
+        return AllocateCompiledMethodInternal(
+            heapManager, compiledMethodClassOOP, byteArrayClassOOP, homeClassOOP,
+            headerWord, literalOOPs, bytecodes, null, null);
+    }
+
+    /// <summary>
+    /// Allocates a CompiledMethod object with source position encoding.
+    /// When fileIndex and sourcePosition are provided, appends 3 bytes to bytecodes
+    /// encoding the source location per Blue Book format:
+    /// - Last 3 bytes of bytecodes encode: [(fileIndex-1)*64 + high6bits] [midByte] [lowByte]
+    /// - This allows CompiledMethod>>getSource to retrieve source from SourceFiles
+    /// </summary>
+    public static SmalltalkOOP AllocateCompiledMethodInternal(
+        ISmalltalkHeap heapManager,
+        SmalltalkOOP compiledMethodClassOOP,
+        SmalltalkOOP byteArrayClassOOP,
+        SmalltalkOOP homeClassOOP,
+        int headerWord,
+        SmalltalkOOP[] literalOOPs,
+        byte[] bytecodes,
+        int? fileIndex,
+        int? sourcePosition)
+    {
         // Blue Book: CompiledMethod has heterogeneous format (pointers + bytes)
         // Our implementation: PointerIndexed CompiledMethod + separate ByteArray
         // CompiledMethod has 1 fixed slot (homeClass) plus indexed slots
         int fixedSlots = 1;  // slot 0 = homeClass
         int indexedSlots = 1 + literalOOPs.Length + 1; // header + literals + bytecodeArrayOOP
 
-        // Step 1: Create separate ByteArray for bytecodes
-        var bytecodeArrayOOP = heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, bytecodes.Length);
-        heapManager.SetClassOOP(bytecodeArrayOOP, byteArrayClassOOP);
-        for (int i = 0; i < bytecodes.Length; i++)
+        // Prepare bytecodes with optional source position encoding
+        byte[] finalBytecodes;
+        if (fileIndex.HasValue && sourcePosition.HasValue && sourcePosition.Value >= 0)
         {
-            heapManager.SetIndexedByte(bytecodeArrayOOP, i, bytecodes[i]);
+            // Append 3 bytes for source position encoding per Blue Book format
+            // Position encoding: 22-bit position (max ~4MB per file)
+            // Byte layout: [lowByte] [midByte] [(fileIndex-1)*64 + high6bits]
+            int pos = sourcePosition.Value;
+            byte lowByte = (byte)(pos & 0xFF);           // Bits 0-7
+            byte midByte = (byte)((pos >> 8) & 0xFF);    // Bits 8-15
+            byte highByte = (byte)(((fileIndex.Value - 1) << 6) | ((pos >> 16) & 0x3F)); // fileIndex + bits 16-21
+
+            finalBytecodes = new byte[bytecodes.Length + 3];
+            Array.Copy(bytecodes, finalBytecodes, bytecodes.Length);
+            finalBytecodes[bytecodes.Length] = lowByte;
+            finalBytecodes[bytecodes.Length + 1] = midByte;
+            finalBytecodes[bytecodes.Length + 2] = highByte;
+        }
+        else
+        {
+            finalBytecodes = bytecodes;
+        }
+
+        // Step 1: Create separate ByteArray for bytecodes
+        var bytecodeArrayOOP = heapManager.AllocateObject(ObjectFormat.ByteIndexed, 0, finalBytecodes.Length);
+        heapManager.SetClassOOP(bytecodeArrayOOP, byteArrayClassOOP);
+        for (int i = 0; i < finalBytecodes.Length; i++)
+        {
+            heapManager.SetIndexedByte(bytecodeArrayOOP, i, finalBytecodes[i]);
         }
 
         // Step 2: Allocate PointerIndexed CompiledMethod

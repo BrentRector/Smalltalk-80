@@ -1,7 +1,9 @@
 using System.Diagnostics;
+using System.IO;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
@@ -62,15 +64,172 @@ public class SystemDictionaryInstaller(
         // In traditional Smalltalk-80, SourceFiles is an Array of FileStreams for .sources and .changes
         // Since we store source in JSON, we set this to nil so CompiledMethod>>getSource returns nil
         // and the decompiler is used as fallback for displaying method source in the Browser
+        // NOTE: Setting to nil also prevents init expressions from crashing when trying to write
+        // class comments to file 2 (.changes file)
         InstallSourceFilesAsNil();
     }
 
     private void InstallSourceFilesAsNil()
     {
-        var nilOOP = context.HeapManager.GetNil();
+        // Try to create SourceFiles array with actual file streams
+        // File 1 (.sources) is read-only, File 2 (.changes) is read-write
+        var sourceFilesOOP = TryCreateSourceFilesArray();
+
         var associationOOP = associationManager.GetOrCreateCanonical("SourceFiles");
-        context.Allocator.SetInstanceVariable(associationOOP, 1, nilOOP);
+        context.Allocator.SetInstanceVariable(associationOOP, 1, sourceFilesOOP);
         InstallInSystemDictionary(associationOOP, "SourceFiles");
+    }
+
+    /// <summary>
+    /// Creates the SourceFiles array with WindowsFileReference streams for .sources and .changes files.
+    /// Returns nil if files cannot be found or opened.
+    /// </summary>
+    private SmalltalkOOP TryCreateSourceFilesArray()
+    {
+        var nilOOP = context.HeapManager.GetNil();
+
+        // Get the bundle directory from BundlePath
+        if (string.IsNullOrEmpty(context.BundlePath))
+        {
+            return nilOOP;
+        }
+
+        string bundleDir = Path.GetDirectoryName(context.BundlePath) ?? ".";
+        string sourcesPath = Path.Combine(bundleDir, "Smalltalk-80.sources");
+        string changesPath = Path.Combine(bundleDir, "Smalltalk-80.changes");
+
+        // Check if .sources file exists
+        if (!File.Exists(sourcesPath))
+        {
+            return nilOOP;
+        }
+
+        // Create .changes file if it doesn't exist
+        if (!File.Exists(changesPath))
+        {
+            try
+            {
+                File.WriteAllText(changesPath, "");
+            }
+            catch
+            {
+                // Cannot create .changes file - return nil to use decompiler fallback
+                return nilOOP;
+            }
+        }
+
+        // Open the files using FileHandleManager
+        int sourcesHandle = FileOperations.OpenFileHandle(sourcesPath, 1, 1, 3); // Read-only
+        int changesHandle = FileOperations.OpenFileHandle(changesPath, 3, 1, 4); // Read-write
+
+        if (sourcesHandle < 0 || changesHandle < 0)
+        {
+            // Failed to open files - return nil
+            if (sourcesHandle >= 0) FileOperations.CloseFileHandle(sourcesHandle);
+            if (changesHandle >= 0) FileOperations.CloseFileHandle(changesHandle);
+            return nilOOP;
+        }
+
+        // Create WindowsFileReference objects for each file
+        var sourcesRef = CreateWindowsFileReference(sourcesPath, sourcesHandle);
+        var changesRef = CreateWindowsFileReference(changesPath, changesHandle);
+
+        // Create Array of size 2 for SourceFiles
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var sourceFilesArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, 2);
+
+        // SourceFiles at: 1 = .sources file (read-only)
+        // SourceFiles at: 2 = .changes file (read-write)
+        context.Allocator.SetIndexedOOP(sourceFilesArrayOOP, 0, sourcesRef);
+        context.Allocator.SetIndexedOOP(sourceFilesArrayOOP, 1, changesRef);
+
+        return sourceFilesArrayOOP;
+    }
+
+    /// <summary>
+    /// Creates a WindowsFileReference object in the heap with the given path and file handle.
+    /// WindowsFileReference has instance variables: pathName (inherited), handle, position
+    /// </summary>
+    private SmalltalkOOP CreateWindowsFileReference(string filePath, int handle)
+    {
+        var windowsFileRefClassOOP = GlobalRegistry.LookupClassOOP("WindowsFileReference");
+        if (windowsFileRefClassOOP == context.HeapManager.GetNil())
+        {
+            throw new InvalidOperationException("WindowsFileReference class not found");
+        }
+
+        // Allocate instance with 3 named instance variables: pathName, handle, position
+        var fileRefOOP = context.HeapManager.AllocateInstanceOf(windowsFileRefClassOOP, 0);
+
+        // Create WindowsPathName for the path
+        var pathNameOOP = CreateWindowsPathName(filePath);
+
+        // Set instance variables
+        // slot 0: pathName (WindowsPathName instance)
+        // slot 1: handle (SmallInteger)
+        // slot 2: position (SmallInteger, initialized to 0)
+        context.HeapManager.SetInstanceVariable(fileRefOOP, 0, pathNameOOP);
+        context.HeapManager.SetInstanceVariable(fileRefOOP, 1, SmalltalkOOP.FromSmallInteger(handle));
+        context.HeapManager.SetInstanceVariable(fileRefOOP, 2, SmalltalkOOP.FromSmallInteger(0));
+
+        return fileRefOOP;
+    }
+
+    /// <summary>
+    /// Creates a WindowsPathName object for the given file path.
+    /// WindowsPathName has instance variables: drive, directory, name, extension
+    /// </summary>
+    private SmalltalkOOP CreateWindowsPathName(string filePath)
+    {
+        var windowsPathNameClassOOP = GlobalRegistry.LookupClassOOP("WindowsPathName");
+        if (windowsPathNameClassOOP == context.HeapManager.GetNil())
+        {
+            // Fall back to a simple String if WindowsPathName not found
+            var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+            return context.Allocator.AllocateString(stringClassOOP, filePath);
+        }
+
+        // Parse the path
+        string drive = "";
+        string directory = "";
+        string name = "";
+        string extension = "";
+
+        try
+        {
+            drive = Path.GetPathRoot(filePath) ?? "";
+            directory = Path.GetDirectoryName(filePath) ?? "";
+            name = Path.GetFileNameWithoutExtension(filePath) ?? "";
+            extension = Path.GetExtension(filePath) ?? "";
+
+            // Remove drive from directory if present
+            if (!string.IsNullOrEmpty(drive) && directory.StartsWith(drive))
+            {
+                directory = directory.Substring(drive.Length);
+            }
+        }
+        catch
+        {
+            // Use full path as name if parsing fails
+            name = filePath;
+        }
+
+        // Allocate WindowsPathName instance (4 named instance variables)
+        var pathNameOOP = context.HeapManager.AllocateInstanceOf(windowsPathNameClassOOP, 0);
+
+        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+        var driveOOP = context.Allocator.AllocateString(stringClassOOP, drive);
+        var directoryOOP = context.Allocator.AllocateString(stringClassOOP, directory);
+        var nameOOP = context.Allocator.AllocateString(stringClassOOP, name);
+        var extensionOOP = context.Allocator.AllocateString(stringClassOOP, extension);
+
+        // Set instance variables: drive, directory, name, extension
+        context.HeapManager.SetInstanceVariable(pathNameOOP, 0, driveOOP);
+        context.HeapManager.SetInstanceVariable(pathNameOOP, 1, directoryOOP);
+        context.HeapManager.SetInstanceVariable(pathNameOOP, 2, nameOOP);
+        context.HeapManager.SetInstanceVariable(pathNameOOP, 3, extensionOOP);
+
+        return pathNameOOP;
     }
 
     private void InstallSmalltalkGlobal()

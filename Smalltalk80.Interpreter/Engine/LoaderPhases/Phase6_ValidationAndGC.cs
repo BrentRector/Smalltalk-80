@@ -288,9 +288,17 @@ public class Phase6_ValidationAndGC : IPhase
                 byte[] expectedBytecodes = ClassHierarchyTraversal.DecodeBytecodes(method.Bytecodes);
                 int actualBytecodeSize = _allocator.GetIndexedSize(bytecodeArrayOOP);
 
-                if (actualBytecodeSize != expectedBytecodes.Length)
+                // Account for source position encoding: when FileIndex and SourcePosition are set,
+                // 3 extra bytes are appended to encode the source location per Blue Book format
+                int expectedSize = expectedBytecodes.Length;
+                if (method.FileIndex.HasValue && method.SourcePosition.HasValue && method.SourcePosition.Value >= 0)
                 {
-                    results.AddError($"Method {method.LocalId} bytecode size {actualBytecodeSize} != expected {expectedBytecodes.Length}");
+                    expectedSize += 3; // Source position encoding: [lowByte] [midByte] [fileIndex+highBits]
+                }
+
+                if (actualBytecodeSize != expectedSize)
+                {
+                    results.AddError($"Method {method.LocalId} bytecode size {actualBytecodeSize} != expected {expectedSize}");
                 }
             }
         }

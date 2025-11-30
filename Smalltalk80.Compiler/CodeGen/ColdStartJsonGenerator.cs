@@ -32,6 +32,10 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     private readonly Dictionary<string, string> _blockToHomeMethod = new(); // Maps block localId → home method localId
     private string? _currentMethodLocalId; // Tracks the current method being processed
 
+    // Source file tracking for Blue Book source code retrieval
+    private readonly System.Text.StringBuilder _sourcesFileContent = new();
+    private readonly Dictionary<string, int> _methodSourcePositions = new(); // Maps method localId → byte position in .sources file
+
     /// <summary>
     /// Block buffer for post-order emission.
     ///
@@ -102,6 +106,36 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     public (int SymbolCount, int StringCount, int ClassCount, int MethodCount, int InitExpressionCount) GetStatistics()
     {
         return (_symbols.Count, _strings.Count, _classes.Count, _methods.Count, _initExprs.Count);
+    }
+
+    /// <summary>
+    /// Gets the sources file content in Blue Book chunk format.
+    /// Each method source is written as: source_text! (with embedded ! doubled as !!)
+    /// </summary>
+    public string GetSourcesFileContent() => _sourcesFileContent.ToString();
+
+    /// <summary>
+    /// Writes a method's source to the sources file and returns its byte position.
+    /// Uses chunk format: source text terminated by !, with embedded ! doubled as !!
+    /// </summary>
+    private int WriteSourceToFile(string localId, string? source)
+    {
+        if (string.IsNullOrEmpty(source))
+            return -1;
+
+        // Record position before writing (byte offset)
+        int position = System.Text.Encoding.UTF8.GetByteCount(_sourcesFileContent.ToString());
+        _methodSourcePositions[localId] = position;
+
+        // Escape embedded ! characters as !! per chunk format
+        string escapedSource = source.Replace("!", "!!");
+
+        // Write chunk: source text followed by !
+        _sourcesFileContent.Append(escapedSource);
+        _sourcesFileContent.Append('!');
+        _sourcesFileContent.AppendLine(); // Add newline for readability
+
+        return position;
     }
 
     /// <summary>
@@ -740,9 +774,13 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                     literalCount++;
                 }
 
+                // Write source to .sources file and get position
+                string methodLocalId = $"method:{classNode.Name}>>{methodNode.Selector}";
+                int sourcePosition = WriteSourceToFile(methodLocalId, methodNode.Source);
+
                 var method = new JsonMethod
                 {
-                    LocalId = $"method:{classNode.Name}>>{methodNode.Selector}",
+                    LocalId = methodLocalId,
                     HomeClassLocalId = $"class:{classNode.Name}",
                     SelectorIndex = _symbolTable[methodNode.Selector],
                     Category = string.IsNullOrEmpty(methodNode.Category) ? null : methodNode.Category,
@@ -770,6 +808,8 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                     Literals = literals,
                     Bytecodes = methodNode.Bytecode,
                     Source = methodNode.Source,
+                    FileIndex = sourcePosition >= 0 ? 1 : null, // FileIndex 1 = .sources file
+                    SourcePosition = sourcePosition >= 0 ? sourcePosition : null,
                     ArgNames = methodNode.ArgNames.ToArray(),
                     TempNames = methodNode.TempNames.ToArray()
                 };
@@ -818,9 +858,13 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                     literalCount++;
                 }
 
+                // Write source to .sources file and get position
+                string classMethodLocalId = $"method:{classNode.Name}_class>>{methodNode.Selector}";
+                int classMethodSourcePosition = WriteSourceToFile(classMethodLocalId, methodNode.Source);
+
                 var method = new JsonMethod
                 {
-                    LocalId = $"method:{classNode.Name}_class>>{methodNode.Selector}",
+                    LocalId = classMethodLocalId,
                     HomeClassLocalId = $"meta:{classNode.Name}",
                     SelectorIndex = _symbolTable[methodNode.Selector],
                     Category = string.IsNullOrEmpty(methodNode.Category) ? null : methodNode.Category,
@@ -848,6 +892,8 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                     Literals = literals,
                     Bytecodes = methodNode.Bytecode,
                     Source = methodNode.Source,
+                    FileIndex = classMethodSourcePosition >= 0 ? 1 : null, // FileIndex 1 = .sources file
+                    SourcePosition = classMethodSourcePosition >= 0 ? classMethodSourcePosition : null,
                     ArgNames = methodNode.ArgNames.ToArray(),
                     TempNames = methodNode.TempNames.ToArray()
                 };
@@ -1438,6 +1484,21 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     /// </summary>
     private ColdStartBundle BuildColdStartBundle(List<int> optimizedSelectors)
     {
+        // Build source files metadata if we have any source content
+        List<SourceFileInfo>? sourceFiles = null;
+        if (_sourcesFileContent.Length > 0)
+        {
+            sourceFiles = new List<SourceFileInfo>
+            {
+                new SourceFileInfo
+                {
+                    Index = 1,
+                    Path = "Smalltalk-80.sources",
+                    Notes = "Generated by Smalltalk80.Compiler - method source in chunk format"
+                }
+            };
+        }
+
         return new ColdStartBundle
         {
             Metadata = GenerateMetadata(),
@@ -1451,7 +1512,8 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             InstallOrder = new InstallOrder { Phases = _installPhases },
             Patches = _patches,
             PoolDependencyGraph = CreateEmptyPoolDependencyGraph(),
-            Undeclared = ConvertUndeclaredVariables()
+            Undeclared = ConvertUndeclaredVariables(),
+            SourceFiles = sourceFiles
         };
     }
 
@@ -1518,6 +1580,33 @@ internal sealed record ColdStartBundle
     public required List<PatchDescriptor> Patches { get; init; }
     public List<UndeclaredVariable>? Undeclared { get; init; }  // v1.0.8: Compiler-tracked undeclared variables
     public required PoolDependencyGraph PoolDependencyGraph { get; init; }  // v1.0.8: Pool variable dependency analysis
+    /// <summary>
+    /// Source file metadata for Blue Book source retrieval (FileIndex 1 = .sources, 2 = .changes).
+    /// </summary>
+    public List<SourceFileInfo>? SourceFiles { get; init; }
+}
+
+/// <summary>
+/// Source file descriptor for the cold-start bundle.
+/// </summary>
+internal sealed record SourceFileInfo
+{
+    /// <summary>
+    /// Index in the SourceFiles array (1-based: 1 = .sources, 2 = .changes).
+    /// </summary>
+    public required int Index { get; init; }
+    /// <summary>
+    /// Relative path to the source file from the coldstart.json location.
+    /// </summary>
+    public required string Path { get; init; }
+    /// <summary>
+    /// Optional checksum of the source file contents.
+    /// </summary>
+    public string? Checksum { get; init; }
+    /// <summary>
+    /// Optional notes about the source file.
+    /// </summary>
+    public string? Notes { get; init; }
 }
 
 internal sealed record Metadata
@@ -1764,6 +1853,14 @@ internal sealed record JsonMethod
     public required List<object> Literals { get; init; }
     public required List<int> Bytecodes { get; init; }
     public string? Source { get; init; }
+    /// <summary>
+    /// Index into sourceFiles array (1 = .sources, 2 = .changes).
+    /// </summary>
+    public int? FileIndex { get; init; }
+    /// <summary>
+    /// Byte position in the source file where this method's source begins.
+    /// </summary>
+    public int? SourcePosition { get; init; }
     public string[]? ArgNames { get; init; }
     public string[]? TempNames { get; init; }
     /// <summary>

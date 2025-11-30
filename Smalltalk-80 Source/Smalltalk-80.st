@@ -1287,7 +1287,7 @@ FileReference class
 "==================== WindowsFileReference ===================="
 
 FileReference subclass: #WindowsFileReference
-    instanceVariableNames: 'handle'
+    instanceVariableNames: 'handle position'
     classVariableNames: ''
     poolDictionaries: ''
     category: 'Files-References'!
@@ -1301,12 +1301,24 @@ I implement file operations using Windows primitives.'!
 initialize
     super initialize.
     handle _ -1.
+    position _ 0.
     ^self! !
 
 !WindowsFileReference methodsFor: 'accessing'!
 
 handle
-    ^handle! !
+    ^handle!
+
+position
+    "Return the current read/write position"
+    ^position!
+
+position: anInteger
+    "Set the read/write position by seeking in the file"
+    | newPos |
+    newPos _ self primSeek: handle offset: anInteger origin: 0.
+    newPos >= 0 ifTrue: [position _ newPos].
+    ^position! !
 
 !WindowsFileReference methodsFor: 'operations'!
 
@@ -1336,6 +1348,16 @@ openAppend
         createMode: 4.
     handle < 0 ifTrue: [self error: 'Cannot open file for appending'].
     self seekToEnd.
+    ^self!
+
+openReadWrite
+    "Open for both reading and writing"
+    <primitive: 121>
+    handle _ self primOpen: pathName asString
+        accessMode: 3
+        shareMode: 1
+        createMode: 4.
+    handle < 0 ifTrue: [self error: 'Cannot open file for read/write'].
     ^self!
 
 close
@@ -1375,6 +1397,98 @@ exists
     | attrs |
     attrs _ self primGetAttributes: pathName asString.
     ^attrs notNil and: [(attrs at: #attributes ifAbsent: [16rFFFFFFFF]) ~= 16rFFFFFFFF]! !
+
+!WindowsFileReference methodsFor: 'streaming'!
+
+setToEnd
+    "Position the stream at the end of the file"
+    | newPos |
+    newPos _ self primSeek: handle offset: 0 origin: 2.
+    newPos >= 0 ifTrue: [position _ newPos].
+    ^self!
+
+next
+    "Read and return the next character from the file"
+    | byte |
+    <primitive: 132>
+    byte _ self primReadByte: handle at: position.
+    byte < 0 ifTrue: [^nil].
+    position _ position + 1.
+    ^Character value: byte!
+
+nextPut: aCharacter
+    "Write a character to the file at current position"
+    | byte |
+    <primitive: 134>
+    byte _ aCharacter asciiValue.
+    self primWriteByte: handle at: position value: byte.
+    position _ position + 1.
+    ^aCharacter!
+
+peek
+    "Return the next character without advancing position"
+    | byte |
+    <primitive: 132>
+    byte _ self primReadByte: handle at: position.
+    byte < 0 ifTrue: [^nil].
+    ^Character value: byte!
+
+atEnd
+    "Answer whether we are at end of file"
+    ^position >= self size!
+
+cr
+    "Write a carriage return to the file"
+    self nextPut: Character cr!
+
+nextChunk
+    "Read and return the next chunk (text terminated by !)
+     Doubled !! are converted to single !"
+    | result char prevWasBang |
+    result _ WriteStream on: (String new: 1000).
+    prevWasBang _ false.
+    [self atEnd] whileFalse: [
+        char _ self next.
+        char ifNil: [^result contents].
+        char == $!
+            ifTrue: [
+                prevWasBang
+                    ifTrue: [
+                        result nextPut: $!.
+                        prevWasBang _ false]
+                    ifFalse: [prevWasBang _ true]]
+            ifFalse: [
+                prevWasBang ifTrue: [^result contents].
+                result nextPut: char]].
+    ^result contents!
+
+nextChunkPut: aString
+    "Write aString as a chunk (with ! terminator)
+     Single ! in aString are doubled to !!"
+    aString do: [:char |
+        char == $! ifTrue: [self nextPut: $!].
+        self nextPut: char].
+    self nextPut: $!.
+    self cr.
+    ^aString!
+
+readOnly
+    "Set to read-only mode - no-op for basic implementation"
+    ^self!
+
+readWriteShorten
+    "Set to read-write mode - no-op for basic implementation"
+    ^self!
+
+primReadByte: aHandle at: pos
+    "Read a byte from file at position. Returns -1 on EOF/error"
+    <primitive: 132>
+    ^-1!
+
+primWriteByte: aHandle at: pos value: byte
+    "Write a byte to file at position"
+    <primitive: 134>
+    ^byte! !
 
 !WindowsFileReference methodsFor: 'private'!
 
