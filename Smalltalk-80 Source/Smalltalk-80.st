@@ -184,7 +184,7 @@ pathNameFromString: aString
         driveLetter _ nil.
         parts _ (aString copyFrom: 3 to: aString size) findTokens: PathSeparator.
         components _ parts].
-    components ifNil: [
+    components isNil ifTrue: [
         driveLetter _ nil.
         components _ aString findTokens: PathSeparator].
     ^self! !
@@ -212,7 +212,7 @@ asString
     "Answer the path as a Windows string."
     | stream |
     stream _ WriteStream on: (String new: 100).
-    driveLetter ifNotNil: [
+    driveLetter notNil ifTrue: [
         stream nextPut: driveLetter; nextPut: $:].
     self isUNC ifTrue: [
         stream nextPutAll: '\\'].
@@ -897,7 +897,7 @@ addNew: aFile
     | fullPath handle |
     fullPath _ self fullNameFor: aFile fileName.
     handle _ self primCreate: fullPath.
-    handle ifNotNil: [self primClose: handle].
+    handle notNil ifTrue: [self primClose: handle].
     aFile directory: self.
     ^aFile! !
 
@@ -1389,7 +1389,7 @@ size
     <primitive: 130>
     | attrs |
     attrs _ self primGetAttributes: pathName asString.
-    attrs ifNil: [^0].
+    attrs isNil ifTrue: [^0].
     ^attrs at: #size ifAbsent: [0]!
 
 exists
@@ -1449,7 +1449,7 @@ nextChunk
     prevWasBang _ false.
     [self atEnd] whileFalse: [
         char _ self next.
-        char ifNil: [^result contents].
+        char isNil ifTrue: [^result contents].
         char == $!
             ifTrue: [
                 prevWasBang
@@ -1616,7 +1616,7 @@ entries
     findHandle < 0 ifTrue: [^result].
 
     entry _ self primGetFindData: findHandle.
-    entry ifNotNil: [result add: entry].
+    entry notNil ifTrue: [result add: entry].
 
     [entry _ self nextEntry.
      entry notNil] whileTrue: [result add: entry].
@@ -2083,7 +2083,7 @@ totalSpace
 refresh
     | info |
     info _ self primGetVolumeInfo: driveLetter.
-    info ifNil: [^self].
+    info isNil ifTrue: [^self].
     volumeName _ info at: #name ifAbsent: [''].
     serialNumber _ info at: #serial ifAbsent: [0].
     freeSpace _ info at: #free ifAbsent: [0].
