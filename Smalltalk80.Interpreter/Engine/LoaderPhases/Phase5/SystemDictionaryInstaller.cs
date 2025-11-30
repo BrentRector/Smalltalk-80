@@ -181,11 +181,11 @@ public class SystemDictionaryInstaller(
     /// </summary>
     private SmalltalkOOP CreateWindowsPathName(string filePath)
     {
+        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
         var windowsPathNameClassOOP = GlobalRegistry.LookupClassOOP("WindowsPathName");
         if (windowsPathNameClassOOP == context.HeapManager.GetNil())
         {
             // Fall back to a simple String if WindowsPathName not found
-            var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
             return context.Allocator.AllocateString(stringClassOOP, filePath);
         }
 
@@ -217,7 +217,7 @@ public class SystemDictionaryInstaller(
         // Allocate WindowsPathName instance (4 named instance variables)
         var pathNameOOP = context.HeapManager.AllocateInstanceOf(windowsPathNameClassOOP, 0);
 
-        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+        // stringClassOOP already declared at top of method
         var driveOOP = context.Allocator.AllocateString(stringClassOOP, drive);
         var directoryOOP = context.Allocator.AllocateString(stringClassOOP, directory);
         var nameOOP = context.Allocator.AllocateString(stringClassOOP, name);
