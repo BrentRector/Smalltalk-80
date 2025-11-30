@@ -1064,39 +1064,59 @@ public static class FileOperations
 
         private PrimitiveResult ExecuteCore(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            var arg = context.Arguments[0];
             long size;
 
-            if (arg.IsSmallInteger)
+            if (context.Arguments.Length == 0)
             {
-                // Handle is an integer - get size from stream
-                int handle = arg.AsSmallInteger();
+                // No arguments: get handle from receiver's instance variable slot 1
+                // WindowsFileReference layout: slot 0 = pathName, slot 1 = handle, slot 2 = position
+                var receiverOOP = context.Receiver;
+                var handleOOP = context.HeapManager.GetInstanceVariable(receiverOOP, 1);
+                if (!handleOOP.IsSmallInteger)
+                    return PrimitiveResult.Fail(context.Metadata!);
+
+                int handle = handleOOP.AsSmallInteger();
                 var stream = FileHandleManager.GetStream(handle);
                 if (stream == null)
                     return PrimitiveResult.Fail(context.Metadata!);
                 size = stream.Length;
             }
+            else if (context.Arguments.Length == 1)
+            {
+                var arg = context.Arguments[0];
+
+                if (arg.IsSmallInteger)
+                {
+                    // Handle is an integer - get size from stream
+                    int handle = arg.AsSmallInteger();
+                    var stream = FileHandleManager.GetStream(handle);
+                    if (stream == null)
+                        return PrimitiveResult.Fail(context.Metadata!);
+                    size = stream.Length;
+                }
+                else
+                {
+                    // Path is a string
+                    string? path = ExtractString(context, arg);
+                    if (path == null)
+                        return PrimitiveResult.Fail(context.Metadata!);
+
+                    try
+                    {
+                        var info = new FileInfo(path);
+                        if (!info.Exists)
+                            return PrimitiveResult.Fail(context.Metadata!);
+                        size = info.Length;
+                    }
+                    catch
+                    {
+                        return PrimitiveResult.Fail(context.Metadata!);
+                    }
+                }
+            }
             else
             {
-                // Path is a string
-                string? path = ExtractString(context, arg);
-                if (path == null)
-                    return PrimitiveResult.Fail(context.Metadata!);
-
-                try
-                {
-                    var info = new FileInfo(path);
-                    if (!info.Exists)
-                        return PrimitiveResult.Fail(context.Metadata!);
-                    size = info.Length;
-                }
-                catch
-                {
-                    return PrimitiveResult.Fail(context.Metadata!);
-                }
+                return PrimitiveResult.Fail(context.Metadata!);
             }
 
             // Clamp to SmallInteger range
