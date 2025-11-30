@@ -162,11 +162,19 @@ public class SystemDictionaryInstaller(
         // Allocate instance with 3 named instance variables: pathName, handle, position
         var fileRefOOP = context.HeapManager.AllocateInstanceOf(windowsFileRefClassOOP, 0);
 
-        // Create WindowsPathName for the path
-        var pathNameOOP = CreateWindowsPathName(filePath);
+        // Store the path as a plain String instead of WindowsPathName.
+        // This is critical because WindowsPathName>>asString has issues on Linux:
+        // - Linux paths have no drive letter, so driveLetter is nil
+        // - WindowsPathName>>isUNC returns true for paths with 2+ components when driveLetter is nil
+        // - asString prepends "\\" for UNC paths, producing paths like "\\home\user\..."
+        // - These don't exist on Linux, causing File.Exists to return false
+        // - primitive 154 returns nil, size returns 0, atEnd is true, nextChunk returns ''
+        // Using a plain String avoids this: String>>asString returns self.
+        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
+        var pathNameOOP = context.Allocator.AllocateString(stringClassOOP, filePath);
 
         // Set instance variables
-        // slot 0: pathName (WindowsPathName instance)
+        // slot 0: pathName (String with full path)
         // slot 1: handle (SmallInteger)
         // slot 2: position (SmallInteger, initialized to 0)
         context.HeapManager.SetInstanceVariable(fileRefOOP, 0, pathNameOOP);
