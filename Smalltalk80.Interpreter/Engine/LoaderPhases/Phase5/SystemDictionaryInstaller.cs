@@ -229,7 +229,7 @@ public class SystemDictionaryInstaller(
         SmalltalkOOP driveLetterOOP;
         if (driveLetter.HasValue)
         {
-            driveLetterOOP = context.HeapManager.GetCharacter(driveLetter.Value);
+            driveLetterOOP = CharacterRegistry.GetCharacter(driveLetter.Value);
         }
         else
         {
