@@ -855,6 +855,10 @@ public static class FileOperations
                     // Use executable directory, not current working directory
                     string exeDir = AppDomain.CurrentDomain.BaseDirectory;
                     string dataPath = Path.Combine(exeDir, "Data", path);
+
+                    // Debug: show what paths we're checking
+                    Console.WriteLine($"[Prim154] Path '{path}' not found, trying '{dataPath}' (exists: {File.Exists(dataPath)})");
+
                     if (File.Exists(dataPath) || Directory.Exists(dataPath))
                     {
                         actualPath = dataPath;
