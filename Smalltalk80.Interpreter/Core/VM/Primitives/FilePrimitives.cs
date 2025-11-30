@@ -78,13 +78,19 @@ public static class FileOperations
                     if (fileStream.Length >= 3 && access != FileAccess.Write)
                     {
                         byte[] bom = new byte[3];
-                        bufferedStream.Read(bom, 0, 3);
-                        if (bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF)
+                        int bytesRead = 0;
+                        while (bytesRead < 3)
+                        {
+                            int read = bufferedStream.Read(bom, bytesRead, 3 - bytesRead);
+                            if (read == 0) break; // EOF
+                            bytesRead += read;
+                        }
+                        if (bytesRead == 3 && bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF)
                         {
                             bomOffset = 3;
                             Console.WriteLine($"[FileHandleManager] Detected UTF-8 BOM in {path}, offset={bomOffset}");
                         }
-                        // Reset position to start (or after BOM if we'll be adjusting)
+                        // Reset position to start
                         bufferedStream.Position = 0;
                     }
                     _bomOffsets[handle] = bomOffset;
