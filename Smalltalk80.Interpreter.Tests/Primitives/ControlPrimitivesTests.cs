@@ -874,14 +874,19 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var receiverOOP = ObjectOOP(100);
         var selectorOOP = ObjectOOP(200);
         var argOOP = SmallInt(5);
+        var argsArrayOOP = ObjectOOP(300);  // Array containing the arguments
         var resultOOP = SmallInt(42);
+
+        // Set up the Array to contain one element (argOOP)
+        SetupIndexedSize(mockHeap, argsArrayOOP, 1);
+        SetupIndexedOOP(mockHeap, argsArrayOOP, 0, argOOP);
 
         mockSender.Setup(s => s.SendMessage(receiverOOP, selectorOOP, new[] { argOOP }))
             .Returns(resultOOP);
 
         var context = CreateContext(
             receiverOOP,
-            [selectorOOP, argOOP],
+            [selectorOOP, argsArrayOOP],  // Pass the Array, not the arg directly
             mockHeap.Object,
             messageSender: mockSender.Object);
 
