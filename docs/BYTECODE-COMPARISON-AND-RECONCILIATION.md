@@ -1,16 +1,35 @@
 # Bytecode Comparison and Reconciliation Plan
 
 **Date**: 2025-12-01
+**Updated**: 2025-12-01
 **Purpose**: Compare and reconcile bytecode implementations between the runtime Smalltalk compiler and offline C# compiler
+
+## Implementation Status
+
+### ✅ Phase 1: Critical Compatibility - COMPLETED (2025-12-01)
+1. **Jump bytecode standardization** - Implemented Blue Book format (0x90-0xAF)
+2. **Extended bytecode format** - Implemented Blue Book type:index format (0x80-0x86)
+3. **Pop/Duplicate** - Moved to standard bytecodes (0x87, 0x88)
+
+### 🔲 Phase 2: Semantic Alignment - PENDING
+### 🔲 Phase 3: Optimization - PENDING
 
 ## Executive Summary
 
-Both compilers implement Blue Book compliant bytecodes with the same numeric values (when converting hex to decimal). However, there are significant differences in:
-1. **Jump bytecode encoding** - Completely different approaches
-2. **Extended bytecode format** - Different sub-opcode organization
-3. **Super send implementation** - Different bytecode strategies
-4. **Block return semantics** - Different opcodes used
-5. **Optimization strategies** - C# has disabled conditional optimization
+~~Both compilers implement Blue Book compliant bytecodes with the same numeric values (when converting hex to decimal). However, there are significant differences in:~~
+~~1. **Jump bytecode encoding** - Completely different approaches~~
+~~2. **Extended bytecode format** - Different sub-opcode organization~~
+
+**UPDATE**: After Phase 1 completion, the C# compiler now generates Blue Book compliant bytecodes for:
+- Jump operations (0x90-0xAF)
+- Extended push/store (0x80-0x82 with type:index encoding)
+- Extended sends (0x83-0x86)
+- Pop (0x87) and Duplicate (0x88)
+
+Remaining differences:
+1. **Super send implementation** - Different bytecode strategies (C# uses 0x85-0x86 Blue Book format)
+2. **Block return semantics** - Different opcodes used
+3. **Optimization strategies** - C# has disabled conditional optimization
 
 ## Section 1: Side-by-Side Comparison Table
 
@@ -38,22 +57,22 @@ Both compilers implement Blue Book compliant bytecodes with the same numeric val
 | **125** | Return from Block | Return Receiver from Block (0x7D) | ⚠️ DIFFERENT | Different usage |
 | **126** | Not documented | Return Top from Block (0x7E) | ❌ MISSING | C# has extra bytecode |
 | **127** | Not documented | Reserved (0x7F) | ❌ MISSING | C# has reserved slot |
-| **128** | Extended Push (LdInstLong) | Extended Prefix (0x80) | ⚠️ DIFFERENT | Different sub-opcode format |
-| **129** | Extended Store | Part of 0x80 extended | ⚠️ DIFFERENT | C# uses sub-opcodes |
-| **130** | Extended Store and Pop | Part of 0x80 extended | ⚠️ DIFFERENT | C# uses sub-opcodes |
-| **131-132** | Send Long format | Part of 0x80 extended | ⚠️ DIFFERENT | Different send encoding |
-| **133** | Push Super (LdSuper) | Not used | ❌ MISSING | Smalltalk specific |
-| **134** | Not documented | Not used | - | Unused |
-| **135** | Pop Stack | 0x80 0x12 (extended) | ⚠️ DIFFERENT | C# uses extended format |
-| **136** | Duplicate Top | 0x80 0x13 (extended) | ⚠️ DIFFERENT | C# uses extended format |
+| **128** | Extended Push (type:index) | Extended Push (0x80 type:index) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **129** | Extended Store (no pop) | Extended Store (0x81 type:index) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **130** | Extended Store and Pop | Extended Pop Store (0x82 type:index) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **131** | Single Extended Send | Single Extended Send (0x83 nnnlllll) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **132** | Double Extended Send | Double Extended Send (0x84) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **133** | Single Extended Super | Single Extended Super (0x85 nnnlllll) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **134** | Double Extended Super | Double Extended Super (0x86) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **135** | Pop Stack | Pop (0x87) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **136** | Duplicate Top | Duplicate (0x88) | ✅ MATCH | Blue Book compliant (Phase 1) |
 | **137** | Push Active Context | Push Active Context (0x89) | ✅ MATCH | Same value and semantics |
 | **138-143** | Not documented | Not used | - | Unused range |
-| **144-151** | Short Jump forward 1-8 | Not used | ❌ MISSING | Smalltalk specific |
-| **152-159** | Short Jump on False 1-8 | Not used | ❌ MISSING | Smalltalk specific |
-| **160-167** | Long Jump (forward/back) | Not used | ❌ MISSING | Smalltalk specific |
-| **161** | Not documented | Long Jump Forward (0xA1) | ⚠️ DIFFERENT | C# uses for blocks |
-| **168-175** | Long Jump on True | Not used | ❌ MISSING | Smalltalk specific |
-| **168** | Not documented | Jump Backward (0xA8) | ⚠️ DIFFERENT | C# tail recursion |
+| **144-151** | Short Jump forward 1-8 | Short Jump (0x90-0x97) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **152-159** | Short Jump on False 1-8 | Short Jump False (0x98-0x9F) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **160-167** | Long Jump (forward/back) | Long Jump (0xA0-0xA7) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **168-171** | Long Jump on True 0-3 | Long Jump True (0xA8-0xAB) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **172-175** | Long Jump on False 0-3 | Long Jump False (0xAC-0xAF) | ✅ MATCH | Blue Book compliant (Phase 1) |
 | **176-191** | Send Special Selectors | Send Arithmetic (0xB0-0xBF) | ✅ MATCH | Same selectors |
 | **192-207** | Send Special Selectors cont. | Send Special (0xC0-0xCF) | ✅ MATCH | Same selectors |
 | **208-223** | Send Literal 0 args | Send Literal 0 args (0xD0-0xDF) | ✅ MATCH | Same |

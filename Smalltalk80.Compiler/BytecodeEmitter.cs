@@ -434,9 +434,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.PUSH_IVAR);
-                Emit((byte)index);
+                // Blue Book Extended Push: 0x80 + type:index byte
+                // Type 0 = receiver variable
+                Emit(Bytecode.EXTENDED_PUSH); // 0x80
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.ReceiverVariable, index));
             }
         }
 
@@ -448,9 +449,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.PUSH_TEMP);
-                Emit((byte)index);
+                // Blue Book Extended Push: 0x80 + type:index byte
+                // Type 1 = temporary variable
+                Emit(Bytecode.EXTENDED_PUSH); // 0x80
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.TemporaryVariable, index));
             }
         }
 
@@ -479,10 +481,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                // Use extended push for indices > 31
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.PUSH_LITERAL);
-                Emit((byte)index);
+                // Blue Book Extended Push: 0x80 + type:index byte
+                // Type 2 = literal constant
+                Emit(Bytecode.EXTENDED_PUSH); // 0x80
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.LiteralConstant, index));
             }
         }
 
@@ -534,10 +536,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                // Use extended push for indices > 31
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.PUSH_LITERAL_VAR);
-                Emit((byte)index);
+                // Blue Book Extended Push: 0x80 + type:index byte
+                // Type 3 = literal variable
+                Emit(Bytecode.EXTENDED_PUSH); // 0x80
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.LiteralVariable, index));
             }
         }
 
@@ -597,9 +599,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.POP_STORE_IVAR);
-                Emit((byte)index);
+                // Blue Book Extended Pop and Store: 0x82 + type:index byte
+                // Type 0 = receiver variable
+                Emit(Bytecode.EXTENDED_POP_STORE); // 0x82
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.ReceiverVariable, index));
             }
         }
 
@@ -612,9 +615,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.POP_STORE_TEMP);
-                Emit((byte)index);
+                // Blue Book Extended Pop and Store: 0x82 + type:index byte
+                // Type 1 = temporary variable
+                Emit(Bytecode.EXTENDED_POP_STORE); // 0x82
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.TemporaryVariable, index));
             }
         }
 
@@ -653,23 +657,22 @@ namespace Smalltalk80.Compiler
                 index = AddLiteral(variable);
             }
 
-            Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-            Emit(ExtendedSubOp.POP_STORE_LITERAL_VAR);
-            Emit((byte)index);
+            // Blue Book Extended Pop and Store: 0x82 + type:index byte
+            // Type 3 = literal variable
+            Emit(Bytecode.EXTENDED_POP_STORE); // 0x82
+            Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.LiteralVariable, index));
         }
 
-        // Stack operations
+        // Stack operations - Blue Book bytecodes 0x87 (Pop) and 0x88 (Dup)
 
         public void Pop()
         {
-            Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-            Emit(ExtendedSubOp.POP);
+            Emit(Bytecode.POP); // 0x87 - Blue Book standard
         }
 
         public void Dup()
         {
-            Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-            Emit(ExtendedSubOp.DUP);
+            Emit(Bytecode.DUP); // 0x88 - Blue Book standard
         }
 
         // Return operations
@@ -718,27 +721,45 @@ namespace Smalltalk80.Compiler
 
         /// <summary>
         /// Emits a backward jump bytecode to the specified target offset.
-        /// Used for tail recursion optimization to jump back to method start.
+        /// Uses Blue Book long unconditional jump (0xA0-0xA7) format.
+        /// Blue Book formula: offset = ((bytecode & 0x07) - 4) * 256 + nextByte
+        /// For backward jumps, we need negative offset which requires (bytecode & 0x07) < 4
         /// </summary>
         /// <param name="targetOffset">Target bytecode offset (from MarkMethodStart)</param>
-        /// <exception cref="InvalidOperationException">Thrown if jump offset exceeds 255 bytes</exception>
+        /// <exception cref="InvalidOperationException">Thrown if jump offset exceeds range</exception>
         public void EmitJumpBackward(int targetOffset)
         {
-            // Calculate backward jump offset
+            // Calculate backward jump offset (negative for backward jumps)
             int currentOffset = CurrentIP;
-            int jumpDistance = currentOffset - targetOffset + 2; // +2 for the jump instruction size
+            int jumpOffset = targetOffset - currentOffset - 2; // -2 for the jump instruction size, negative = backward
 
-            if (jumpDistance > 255)
+            // Blue Book long jump range: -1024 to +1023
+            // For backward jumps, we need ((opcode & 0x07) - 4) * 256 + byte = negative offset
+            if (jumpOffset < -1024 || jumpOffset > 1023)
             {
                 throw new InvalidOperationException(
-                    $"Tail recursion jump offset {jumpDistance} exceeds 255-byte limit. " +
+                    $"Jump offset {jumpOffset} exceeds Blue Book long jump range (-1024 to +1023). " +
                     "Method too large for tail recursion optimization.");
             }
 
-            // Blue Book bytecode: 0xA8-0xAF are long unconditional backward jumps
-            // 0xA8 = jump back (offset in next byte)
-            Emit(0xA8);
-            Emit((byte)jumpDistance);
+            // Encode using Blue Book formula:
+            // offset = ((opcode & 0x07) - 4) * 256 + byte
+            // Solving for opcode and byte:
+            // Let hiPart = (opcode & 0x07) - 4, so hiPart = floor(offset / 256) if we want hiPart*256 + byte = offset
+            // hiPart must be in range -4 to +3 (so opcode bits are 0-7)
+            int hiPart = jumpOffset >= 0 ? jumpOffset / 256 : (jumpOffset - 255) / 256;
+            int loByte = jumpOffset - hiPart * 256;
+
+            // Ensure hiPart is in valid range -4 to +3
+            if (hiPart < -4 || hiPart > 3)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot encode jump offset {jumpOffset}: hiPart {hiPart} out of range");
+            }
+
+            int opcodeBits = hiPart + 4; // Convert -4..+3 to 0..7
+            Emit((byte)(0xA0 + opcodeBits));
+            Emit((byte)loByte);
         }
 
         /// <summary>
@@ -825,6 +846,8 @@ namespace Smalltalk80.Compiler
         /// Bytecodes 0xD0-0xDF: Send Literal Selector With 0 Arguments
         /// Bytecodes 0xE0-0xEF: Send Literal Selector With 1 Argument
         /// Bytecodes 0xF0-0xFF: Send Literal Selector With 2 Arguments
+        /// 0x83: Single Extended Send (for argCount 0-7 and literalIndex 0-31)
+        /// 0x84: Double Extended Send (for larger values)
         /// </summary>
         public void EmitSend(string selector, int argCount)
         {
@@ -855,26 +878,20 @@ namespace Smalltalk80.Compiler
                 // Bytecodes 0xF0-0xFF: Send Literal Selector With 2 Arguments
                 EmitWithOffset(Bytecode.SEND_LITERAL_2_BASE, selectorIndex);
             }
-            else if (argCount >= 0 && argCount <= 2)
+            else if (argCount <= 7 && selectorIndex <= 31)
             {
-                // Use extended SEND_0/1/2 for common arg counts with large selector indices
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(argCount switch
-                {
-                    0 => ExtendedSubOp.SEND_0,
-                    1 => ExtendedSubOp.SEND_1,
-                    2 => ExtendedSubOp.SEND_2,
-                    _ => throw new InvalidOperationException()
-                });
-                Emit((byte)selectorIndex);  // Selector index
+                // Blue Book Single Extended Send (0x83): nnnlllll format
+                // nnn = argCount (0-7), lllll = literalIndex (0-31)
+                Emit(Bytecode.SINGLE_EXTENDED_SEND); // 0x83
+                Emit(BytecodeUtil.MakeSingleExtendedSendByte(argCount, selectorIndex));
             }
             else
             {
-                // Use SEND_N for 3+ arguments or any other case
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.SEND_N);
-                Emit((byte)selectorIndex);  // Selector first
-                Emit((byte)argCount);        // Then arg count
+                // Blue Book Double Extended Send (0x84): 2 separate bytes
+                // First byte = argCount, second byte = literalIndex
+                Emit(Bytecode.DOUBLE_EXTENDED_SEND); // 0x84
+                Emit((byte)argCount);
+                Emit((byte)selectorIndex);
             }
         }
 
@@ -887,33 +904,28 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
-        /// Emits a super send bytecode using ExtendedSubOp.
-        /// Uses SEND_SUPER_0/1/2 for common cases, SEND_SUPER_N for others.
+        /// Emits a super send bytecode using Blue Book format.
+        /// 0x85: Single Extended Super Send (for argCount 0-7 and literalIndex 0-31)
+        /// 0x86: Double Extended Super Send (for larger values)
         /// </summary>
         public void EmitSuperSend(string selector, int argCount)
         {
             var index = AddLiteral(new Symbol(selector));
 
-            // Use optimized SEND_SUPER_0/1/2 for common arg counts
-            if (argCount >= 0 && argCount <= 2)
+            if (argCount <= 7 && index <= 31)
             {
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(argCount switch
-                {
-                    0 => ExtendedSubOp.SEND_SUPER_0,
-                    1 => ExtendedSubOp.SEND_SUPER_1,
-                    2 => ExtendedSubOp.SEND_SUPER_2,
-                    _ => throw new InvalidOperationException()
-                });
-                Emit((byte)index);  // Selector index
+                // Blue Book Single Extended Super Send (0x85): nnnlllll format
+                // nnn = argCount (0-7), lllll = literalIndex (0-31)
+                Emit(Bytecode.SINGLE_EXTENDED_SUPER); // 0x85
+                Emit(BytecodeUtil.MakeSingleExtendedSendByte(argCount, index));
             }
             else
             {
-                // Use SEND_SUPER_N for 3+ args
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.SEND_SUPER_N);
-                Emit((byte)index);      // Selector index first
-                Emit((byte)argCount);   // Then arg count
+                // Blue Book Double Extended Super Send (0x86): 2 separate bytes
+                // First byte = argCount, second byte = literalIndex
+                Emit(Bytecode.DOUBLE_EXTENDED_SUPER); // 0x86
+                Emit((byte)argCount);
+                Emit((byte)index);
             }
         }
 
