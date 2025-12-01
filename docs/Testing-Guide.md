@@ -327,27 +327,13 @@ To verify a specific primitive is tested and returns correct values:
    dotnet test --filter "FullyQualifiedName~Add"
    ```
 
-### Example Coverage Analysis Output
+### Example Test Run Output
 
 ```
-===== Smalltalk-80 Test Suite Status =====
-
-Test Results by Category:
-
-  ✓ Arithmetic: 34 tests (100% passing)
-  ✓ Comparison: 8 tests (100% passing)
-  ✓ Control: 26 tests (100% passing)
-  ✓ Float: 42 tests (100% passing)
-  ✓ LargeInteger: 15 tests (100% passing)
-  ✓ Object: 43 tests (100% passing)
-  ✓ String: 20 tests (100% passing)
-  ✓ System: 75 tests (100% passing)
-
-===== Summary =====
-
-  Total Tests: 385
-  Overall Pass Rate: 100.0%
-  Status: ✅ ALL TESTS PASSING
+dotnet test
+...
+Test summary: total: 385, failed: 0, succeeded: 385, skipped: 0
+Build succeeded
 ```
 
 ## Troubleshooting
