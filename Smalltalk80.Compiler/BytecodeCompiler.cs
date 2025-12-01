@@ -748,6 +748,15 @@ namespace Smalltalk80.Compiler
         {
             // New grammar structure: messageExpr = binaryExpr keywordMessage?
             var binaryExpr = expr.binaryExpr();
+            var keywordMessage = expr.keywordMessage();
+
+            // For cascades with a keyword message, the cascade receiver is the full binaryExpr result.
+            // DUP must happen here (between binaryExpr and keywordMessage), not inside CompileBinaryExpr.
+            //
+            // For "obj foo at: 1; at: 2":
+            //   Cascade receiver = obj foo (result of binaryExpr)
+            //   PUSH obj → SEND foo → DUP → PUSH 1 → SEND at: → POP → PUSH 2 → SEND at:
+            bool cascadeHasKeywordMessage = isCascadeBase && totalCascadeMessages > 1 && keywordMessage != null;
 
             if (binaryExpr != null)
             {
@@ -761,11 +770,19 @@ namespace Smalltalk80.Compiler
                 }
 
                 // Compile the binary expression
-                CompileBinaryExpr(binaryExpr, receiverIsSuper, isCascadeBase, totalCascadeMessages);
+                // When cascade has keyword message, don't let CompileBinaryExpr handle DUP
+                if (cascadeHasKeywordMessage)
+                {
+                    CompileBinaryExpr(binaryExpr, receiverIsSuper, isCascadeBase: false, totalCascadeMessages: 0);
+                    emitter.Dup(); // DUP here, between binaryExpr and keywordMessage
+                }
+                else
+                {
+                    CompileBinaryExpr(binaryExpr, receiverIsSuper, isCascadeBase, totalCascadeMessages);
+                }
             }
 
             // Process keyword message if present
-            var keywordMessage = expr.keywordMessage();
             if (keywordMessage != null)
             {
                 // Pass receiverIsSuper flag to handle super sends correctly
