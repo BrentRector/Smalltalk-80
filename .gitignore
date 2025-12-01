@@ -31,7 +31,11 @@ Smalltalk80.Interpreter/bin/Debug/*
 !Smalltalk80.Interpreter/bin/Debug/net9.0-windows/
 Smalltalk80.Interpreter/bin/Debug/net9.0-windows/*
 !Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
-!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/**
+!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/*
+!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/*.json
+!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/*.sources
+!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/*.changes
+!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/*.form
 
 # .NET Core
 project.lock.json
