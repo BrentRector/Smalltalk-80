@@ -237,7 +237,7 @@ Changes to these files MUST pass the regression test:
 
 ### C# Unit Tests
 
-**Status**: ✅ **388/388 tests passing (100%)**
+**Status**: ✅ **385/385 tests passing (100%)**
 
 Run the comprehensive C# unit test suite:
 
@@ -247,8 +247,8 @@ dotnet test
 ```
 
 **Test Coverage**:
-- **Primitives** (263 tests): All primitive operations including arithmetic, comparison, control flow, strings, floats, objects, and system operations
-- **HeapManager** (125 tests): Object allocation, garbage collection, memory management, and heap operations
+- **Primitives**: All primitive operations including arithmetic, comparison, control flow, strings, floats, objects, and system operations
+- **HeapManager**: Object allocation, garbage collection, memory management, and heap operations
 
 **Run tests by category**:
 ```bash

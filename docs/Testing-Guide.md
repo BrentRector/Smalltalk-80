@@ -6,15 +6,15 @@ Tests are organized into functional categories using xUnit's `[Trait]` attribute
 
 ### Test Categories
 
-| Category | Test Count | Description |
-|----------|-----------|-------------|
-| **Primitives** | 263 | All primitive operation tests (arithmetic, comparison, control, strings, floats, etc.) |
-| **HeapManager** | 125 | Heap management, object allocation, GC tests |
-| **VM** | TBD | Virtual machine core: message dispatch, execution state |
-| **Context** | TBD | Context management and execution context tests |
-| **Compiler** | TBD | Bytecode compiler tests: emitter, variable resolution, temp frames |
+| Category | Description |
+|----------|-------------|
+| **Primitives** | All primitive operation tests (arithmetic, comparison, control, strings, floats, etc.) |
+| **HeapManager** | Heap management, object allocation, GC tests |
+| **VM** | Virtual machine core: message dispatch, execution state |
+| **Context** | Context management and execution context tests |
+| **Compiler** | Bytecode compiler tests: emitter, variable resolution, temp frames |
 
-**Total Tests**: 388 (all passing)
+**Total Tests**: 385 (all passing)
 
 ## Running Tests by Category
 
@@ -110,10 +110,10 @@ dotnet test
 
 ## Current Test Status
 
-**Last Updated**: 2025-11-22
-**Status**: ✅ All 388 tests passing after RuntimeHeapAccessor refactoring
+**Last Updated**: 2025-12-01
+**Status**: ✅ All 385 tests passing
 
-### Primitives: ✅ 263/263 Passing (100%)
+### Primitives: ✅ Passing (100%)
 - SmallInteger arithmetic (Add, Subtract, Multiply, Divide, etc.)
 - Comparison operations (LessThan, GreaterThan, Equal, etc.)
 - Bitwise operations (BitAnd, BitOr, BitXor, BitShift)
@@ -124,7 +124,7 @@ dotnet test
 - Control flow (BlockCopy, BlockValue, Signal, Wait, Resume, Suspend)
 - System operations (CoreLeft, OopsLeft, InstSize, BecomeForward, etc.)
 
-### HeapManager: ✅ 125/125 Passing (100%)
+### HeapManager: ✅ Passing (100%)
 - Object allocation (Pointer, PointerIndexed, ByteIndexed, WordIndexed formats)
 - Object table management (allocation, validation, enumeration)
 - Garbage collection (mark, sweep, compaction)
@@ -345,9 +345,7 @@ Test Results by Category:
 
 ===== Summary =====
 
-  Total Primitives Tests: 263
-  Total HeapManager Tests: 125
-  Total Tests: 388
+  Total Tests: 385
   Overall Pass Rate: 100.0%
   Status: ✅ ALL TESTS PASSING
 ```

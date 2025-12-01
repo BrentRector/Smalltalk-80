@@ -354,8 +354,8 @@ results asArray  "=> #(1 2 3) or similar interleaving"
 
 Always run after changes:
 - BlockContext regression tests (120 tests, returns 1191)
-- C# unit tests (388 tests)
-- Init expression tests (47 expressions)
+- C# unit tests (385 tests)
+- Init expression tests (51 expressions)
 
 ---
 
