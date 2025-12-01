@@ -327,55 +327,14 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 context.Push(metadata.KnownObjects.Nil);
                 return false;
 
-            case Bytecode.RETURN_TOP:
-                // Value already on stack
-                return false;
-
-            case Bytecode.RETURN_SELF_POP:
-                // Blue Book: Return self from block's home MethodContext (non-local return)
-                {
-                    // Properly check if we're in a BlockContext by checking the class
-                    var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
-
-                    if (activeClassOOP == metadata.BlockContextClassOOP)
-                    {
-                        // We're in a BlockContext - get home and perform non-local return
-                        var homeOOP = heapManager.GetInstanceVariable(
-                            context.ActiveContext,
-                            VMConstants.BLOCKCONTEXT_HOME_INDEX
-                        );
-
-                        // Non-local return from BlockContext to home MethodContext
-                        var targetContextOOP = homeOOP;
-
-                        // Validate home is still in sender chain (not already returned)
-                        if (!context.IsInSenderChain(targetContextOOP, context.ActiveContext))
-                        {
-                            throw new InvalidOperationException(
-                                "Block return failed: home context has already returned");
-                        }
-
-                        // Initiate non-local return to home's sender
-                        context.NonLocalReturnPending = true;
-                        context.NLRTargetContext = targetContextOOP;
-                        context.NLRValue = receiverOOP;
-
-                        return false; // Exit bytecode loop to unwind
-                    }
-                    else
-                    {
-                        // We're in a MethodContext - normal return self
-                        context.Push(receiverOOP);
-                        return false;
-                    }
-                }
-
-            case Bytecode.RETURN_TOP_POP:
-                // Blue Book: Return top of stack from block's home MethodContext (non-local return)
+            case Bytecode.RETURN_TOP_FROM_MESSAGE: // 0x7C - Blue Book "Return Stack Top From Message"
+                // Blue Book: explicit ^expr return
+                // - In MethodContext: normal method return
+                // - In BlockContext: non-local return (NLR) to home.sender
                 {
                     var returnValue = context.Pop();
 
-                    // Properly check if we're in a BlockContext by checking the class
+                    // Check if we're in a BlockContext by checking the class
                     var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
 
                     if (activeClassOOP == metadata.BlockContextClassOOP)
@@ -395,7 +354,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                                 "Non-local return target not in sender chain - block's defining method has already returned");
                         }
 
-                        // Initiate non-local return
+                        // Initiate non-local return to home's sender
                         context.NonLocalReturnPending = true;
                         context.NLRTargetContext = targetContextOOP;
                         context.NLRValue = returnValue;
@@ -410,8 +369,19 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     }
                 }
 
-            case Bytecode.RESERVED_RETURN:
-                // No operation / reserved (0x7F)
+            case Bytecode.RETURN_TOP_FROM_BLOCK: // 0x7D - Blue Book "Return Stack Top From Block"
+                // Blue Book: local return from block to whoever sent value/value:/etc.
+                // This is used for implicit block returns (last statement value)
+                // Simple local return - no NLR check needed
+                // Value already on stack
+                return false;
+
+            case Bytecode.RESERVED_126: // 0x7E - Reserved/unused per Blue Book
+                // No operation / reserved
+                return true;
+
+            case Bytecode.RESERVED_127: // 0x7F - Reserved/unused per Blue Book
+                // No operation / reserved
                 return true;
         }
 

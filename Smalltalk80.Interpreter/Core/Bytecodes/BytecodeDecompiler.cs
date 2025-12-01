@@ -301,19 +301,19 @@ public class BytecodeDecompiler
                 continue;
             }
 
-            // Block returns (0x7D-0x7E)
-            if (b == 0x7D) // RETURN_SELF_POP
+            // Blue Book 0x7D: RETURN_TOP_FROM_BLOCK - local return from block (implicit)
+            // This is used for implicit block returns (last statement value)
+            // No ^ symbol - just ends the block and returns the value
+            if (b == 0x7D) // RETURN_TOP_FROM_BLOCK
             {
-                statements.Add("^ self");
+                // Implicit block return - the value is just the last expression's value
+                // No need to add "^ ..." since this is implicit
                 continue;
             }
-            if (b == 0x7E) // RETURN_TOP_POP
+            // 0x7E: Reserved/unused per Blue Book
+            if (b == 0x7E) // RESERVED_126
             {
-                if (stack.Count > 0)
-                {
-                    string value = stack.Pop();
-                    statements.Add($"^ {value}");
-                }
+                // Should not occur in valid bytecode
                 continue;
             }
 

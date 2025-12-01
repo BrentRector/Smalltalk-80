@@ -142,15 +142,25 @@ public enum Bytecode : byte
     PUSH_ONE       = 0x76,
     PUSH_TWO       = 0x77,
 
-    // 0x78 - 0x7F  Return variants
+    // 0x78 - 0x7F  Return variants (Blue Book Chapter 28)
     RETURN_SELF        = 0x78, // return receiver (self)
     RETURN_TRUE        = 0x79, // return true singleton
     RETURN_FALSE       = 0x7A, // return false singleton
     RETURN_NIL         = 0x7B, // return nil
-    RETURN_TOP         = 0x7C, // pop top and return it
-    RETURN_SELF_POP    = 0x7D, // return self from block context (block return)
-    RETURN_TOP_POP     = 0x7E, // pop and return from block context (block return)
-    RESERVED_RETURN    = 0x7F, // NOP
+    // Blue Book 0x7C: "Return Stack Top From Message"
+    // - In MethodContext: normal method return
+    // - In BlockContext: non-local return to home.sender
+    RETURN_TOP_FROM_MESSAGE = 0x7C,
+    // Blue Book 0x7D: "Return Stack Top From Block"
+    // - Local return from block to whoever sent value/value:/etc.
+    // - Used for implicit block returns (last statement value)
+    RETURN_TOP_FROM_BLOCK = 0x7D,
+    // 0x7E-0x7F: Reserved/unused per Blue Book
+    RESERVED_126       = 0x7E,
+    RESERVED_127       = 0x7F,
+
+    // Legacy aliases for backward compatibility during transition
+    RETURN_TOP         = RETURN_TOP_FROM_MESSAGE, // alias
 
     // 0x80 - 0x86  Blue Book Extended Operations
     // These follow the Blue Book encoding: 0x80-0x82 use type:index format,

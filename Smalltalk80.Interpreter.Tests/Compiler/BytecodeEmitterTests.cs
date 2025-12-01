@@ -407,7 +407,7 @@ public class BytecodeEmitterTests
         // Assert
         var bytecodes = emitter.GetBytecodes();
         Assert.Single(bytecodes);
-        Assert.Equal((byte)Bytecode.RETURN_TOP_POP, bytecodes[0]);
+        Assert.Equal((byte)Bytecode.RETURN_TOP_FROM_BLOCK, bytecodes[0]); // 0x7D - Blue Book local block return
     }
 
     [Fact]

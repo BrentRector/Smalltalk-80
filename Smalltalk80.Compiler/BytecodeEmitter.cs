@@ -681,7 +681,7 @@ namespace Smalltalk80.Compiler
             Emit(Bytecode.DUP); // 0x88 - Blue Book standard
         }
 
-        // Return operations
+        // Return operations - Blue Book Chapter 28
 
         public void ReturnSelf()
         {
@@ -703,14 +703,25 @@ namespace Smalltalk80.Compiler
             Emit(Bytecode.RETURN_NIL); // 0x7B
         }
 
+        /// <summary>
+        /// Blue Book 0x7C: "Return Stack Top From Message"
+        /// - In MethodContext: normal method return
+        /// - In BlockContext: non-local return to home.sender
+        /// Use for: explicit ^expr in BOTH methods AND blocks
+        /// </summary>
         public void ReturnTop()
         {
-            Emit(Bytecode.RETURN_TOP); // 0x7C
+            Emit(Bytecode.RETURN_TOP_FROM_MESSAGE); // 0x7C
         }
 
+        /// <summary>
+        /// Blue Book 0x7D: "Return Stack Top From Block"
+        /// Local return from block to whoever sent value/value:/etc.
+        /// Use for: implicit block returns (last statement value)
+        /// </summary>
         public void ReturnTopFromBlock()
         {
-            Emit(Bytecode.RETURN_TOP_POP); // 0x7E - block return
+            Emit(Bytecode.RETURN_TOP_FROM_BLOCK); // 0x7D - local block return
         }
 
         // Jump operations - Used for tail recursion optimization

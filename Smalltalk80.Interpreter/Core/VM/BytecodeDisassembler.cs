@@ -115,14 +115,14 @@ public static class BytecodeDisassembler
         {
             result = ((Bytecode)b) switch
             {
-                Bytecode.RETURN_TOP => "returnTop",
+                Bytecode.RETURN_TOP_FROM_MESSAGE => "returnTop",     // 0x7C - also NLR in blocks
                 Bytecode.RETURN_SELF => "returnSelf",
                 Bytecode.RETURN_FALSE => "returnFalse",
                 Bytecode.RETURN_TRUE => "returnTrue",
                 Bytecode.RETURN_NIL => "returnNil",
-                Bytecode.RETURN_SELF_POP => "blockReturnSelf",
-                Bytecode.RETURN_TOP_POP => "blockReturnTop",
-                Bytecode.RESERVED_RETURN => "nop",
+                Bytecode.RETURN_TOP_FROM_BLOCK => "blockReturnValue", // 0x7D - local block return
+                Bytecode.RESERVED_126 => "reserved126",              // 0x7E - unused
+                Bytecode.RESERVED_127 => "reserved127",              // 0x7F - unused
                 _ => $"return??? {b}"
             };
         }
@@ -437,14 +437,14 @@ public static class BytecodeDisassembler
         {
             return ((Bytecode)bytecode) switch
             {
-                Bytecode.RETURN_TOP => "RETURN_TOP",
+                Bytecode.RETURN_TOP_FROM_MESSAGE => "RETURN_TOP",
                 Bytecode.RETURN_SELF => "RETURN_SELF",
                 Bytecode.RETURN_FALSE => "RETURN_FALSE",
                 Bytecode.RETURN_TRUE => "RETURN_TRUE",
                 Bytecode.RETURN_NIL => "RETURN_NIL",
-                Bytecode.RETURN_SELF_POP => "BLOCK_RETURN_SELF",
-                Bytecode.RETURN_TOP_POP => "BLOCK_RETURN_TOP",
-                Bytecode.RESERVED_RETURN => "NOP",
+                Bytecode.RETURN_TOP_FROM_BLOCK => "BLOCK_RETURN_VALUE",
+                Bytecode.RESERVED_126 => "RESERVED_126",
+                Bytecode.RESERVED_127 => "RESERVED_127",
                 _ => "RETURN"
             };
         }

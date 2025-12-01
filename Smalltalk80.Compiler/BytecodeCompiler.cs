@@ -550,16 +550,12 @@ namespace Smalltalk80.Compiler
                 emitter.PushSelf();
             }
             
-            if (environment.ScopeDepth > 0)
-            {
-//Console.WriteLine($"[BYTECODE] CompileReturnStatement: Block scope, emitting ReturnTopFromBlock");
-                emitter.ReturnTopFromBlock();
-            }
-            else
-            {
-//Console.WriteLine($"[BYTECODE] CompileReturnStatement: Method scope, emitting ReturnTop");
-                emitter.ReturnTop();
-            }
+            // Blue Book: explicit ^expr always uses 0x7C (RETURN_TOP_FROM_MESSAGE)
+            // - In MethodContext: normal return to sender
+            // - In BlockContext: non-local return (NLR) to home.sender
+            // The VM handles the BlockContext check at runtime
+//Console.WriteLine($"[BYTECODE] CompileReturnStatement: emitting ReturnTop (0x7C)");
+            emitter.ReturnTop(); // 0x7C - handles both method returns and block NLR
 //Console.WriteLine($"[BYTECODE] CompileReturnStatement: Final bytecode count: {emitter.GetBytecodes().Length}");
         }
         
@@ -1561,10 +1557,10 @@ namespace Smalltalk80.Compiler
             }
 
             // STEP 4: Emit local return bytecode for implicit block returns
+            // Blue Book 0x7D (RETURN_TOP_FROM_BLOCK): "Return Stack Top From Block"
             // Implicit block returns (no ^) should return to the caller of value/value:/etc.
-            // Use RETURN_TOP (0x7C) which returns to sender without non-local semantics
-            // This is different from RETURN_TOP_POP (0x7E) which does non-local returns (^)
-            emitter.ReturnTop(); // 0x7C - local return to sender
+            // This is a LOCAL return - different from 0x7C which does NLR when in BlockContext
+            emitter.ReturnTopFromBlock(); // 0x7D - local return to block's value sender
 
             // STEP 5: Calculate jump offset and patch it using Blue Book format
             // The jump lands here (after the block body), so method execution continues
@@ -2076,8 +2072,9 @@ namespace Smalltalk80.Compiler
         private bool IsReturnBytecode(byte bytecode)
         {
             // Blue Book return bytecodes: 0x78-0x7F (120-127)
-            // RETURN_SELF, RETURN_TRUE, RETURN_FALSE, RETURN_NIL, RETURN_TOP,
-            // RETURN_SELF_POP (block), RETURN_TOP_POP (block), NOP
+            // RETURN_SELF, RETURN_TRUE, RETURN_FALSE, RETURN_NIL,
+            // RETURN_TOP_FROM_MESSAGE (0x7C), RETURN_TOP_FROM_BLOCK (0x7D),
+            // RESERVED_126 (0x7E), RESERVED_127 (0x7F)
             return bytecode >= 120 && bytecode <= 127;
         }
         

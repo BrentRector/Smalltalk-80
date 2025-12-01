@@ -12,7 +12,13 @@
 3. **Pop/Duplicate** - Moved to standard bytecodes (0x87, 0x88)
 4. **Block jump encoding fix** - Fixed blockCopy: jump to use 2-byte Blue Book format (was incorrectly using 3-byte format with wrong opcode 0xA1)
 
-### 🔲 Phase 2: Semantic Alignment - PENDING
+### ✅ Phase 2: Semantic Alignment - COMPLETED (2025-12-01)
+1. **Block return reconciliation** - Aligned with Blue Book specification:
+   - 0x7C: RETURN_TOP_FROM_MESSAGE - explicit ^expr (NLR in blocks)
+   - 0x7D: RETURN_TOP_FROM_BLOCK - implicit block return (local)
+   - 0x7E-0x7F: Reserved/unused
+2. **Super send implementation** - Already Blue Book compliant (0x85-0x86)
+
 ### 🔲 Phase 3: Optimization - PENDING
 
 ## Executive Summary
@@ -118,30 +124,30 @@ Remaining differences:
 
 **Blue Book Alignment**: Smalltalk follows Blue Book; C# deviates
 
-### 3. Block Return Semantics (IMPORTANT)
-**Difference**: Different bytecodes for block returns
-- **Smalltalk**:
-  - 125: Return from block (EndRemote)
-  - 124: Normal method return
-- **C# Compiler**:
-  - 0x7C (124): Normal returns AND implicit block returns
-  - 0x7D (125): Return receiver from block (not used)
-  - 0x7E (126): Non-local block return (^expr)
+### 3. Block Return Semantics - ✅ COMPLIANT
+**Status**: RESOLVED in Phase 2
 
-**Semantic Impact**: Block return behavior may differ
+**Blue Book Specification** (now implemented by both compilers):
+- **0x7C (124)**: RETURN_TOP_FROM_MESSAGE - In MethodContext: normal return. In BlockContext: non-local return to home.sender
+- **0x7D (125)**: RETURN_TOP_FROM_BLOCK - Local return from block to whoever sent value/value:/etc.
+- **0x7E-0x7F (126-127)**: Reserved / unused
 
-**Blue Book Alignment**: Needs investigation - both claim Blue Book compliance
+**Implementation Changes Made**:
+1. **Compiler**: Implicit block returns now emit 0x7D (local block return)
+2. **Compiler**: Explicit ^expr now emits 0x7C (NLR in blocks, normal in methods)
+3. **VM 0x7C**: Checks for BlockContext, performs NLR if yes, normal return if no
+4. **VM 0x7D**: Simple local return to sender (no NLR check)
+5. **VM 0x7E-0x7F**: Reserved/NOP
 
-### 4. Super Send Implementation (IMPORTANT)
-**Difference**: Different super send strategies
-- **Smalltalk**:
-  - 133: Push Super bytecode
-  - Uses regular send with super flag
-- **C# Compiler**:
-  - No Push Super bytecode
-  - Uses extended bytecodes 0x80 0x0E-0x11 for super sends
+### 4. Super Send Implementation - ✅ COMPLIANT
+**Status**: RESOLVED - Both compilers use Blue Book format
 
-**Semantic Impact**: Super message sending uses different bytecode patterns
+**Blue Book Specification** (implemented by both compilers):
+- **0x85**: Single Extended Super Send (nnnlllll format: nnn=argCount 0-7, lllll=literalIndex 0-31)
+- **0x86**: Double Extended Super Send (2 bytes: argCount, literalIndex)
+
+The C# compiler already uses 0x85 and 0x86 for super sends per Blue Book specification.
+No changes needed.
 
 ### 5. Stack Operation Bytecodes (MINOR)
 **Difference**: Pop and Duplicate location
@@ -310,8 +316,8 @@ Remaining differences:
 | Block jump encoding fix | ✅ Complete | claude/bytecode-comparison-reconciliation-* | 2-byte format, 0xA4-0xA7 |
 | Analysis tools compliance | ✅ Complete | claude/bytecode-comparison-reconciliation-* | 7 files fixed |
 | Stack operations alignment | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Pop (0x87), Dup (0x88) |
-| Block return reconciliation | 🔲 Phase 2 | - | Pending |
-| Super send implementation | 🔲 Phase 2 | - | Pending |
+| Super send implementation | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Already Blue Book compliant (0x85-0x86) |
+| Block return reconciliation | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Blue Book 0x7C-0x7F |
 | Conditional optimization | 🔲 Phase 3 | - | Pending |
 
 ## Appendix: Blue Book References
@@ -325,10 +331,17 @@ Remaining differences:
 1. ~~Review this plan with the team~~ ✅
 2. ~~Create feature branches for each phase~~ ✅
 3. ~~Begin Phase 1 implementation~~ ✅ COMPLETE
-4. Begin Phase 2: Block return reconciliation and super send implementation
+4. ~~Begin Phase 2: Block return reconciliation and super send implementation~~ ✅ COMPLETE
 5. Begin Phase 3: Enable conditional optimization (ifTrue:/ifFalse: inlining)
 
 ## Change Log
+
+- **2025-12-01**: Phase 2 completed
+  - Block return reconciliation (Blue Book semantics for 0x7C-0x7F)
+  - 0x7C: RETURN_TOP_FROM_MESSAGE - explicit ^expr, NLR in BlockContext
+  - 0x7D: RETURN_TOP_FROM_BLOCK - implicit block return (local return)
+  - 0x7E-0x7F: Reserved/unused per Blue Book
+  - Super sends confirmed already Blue Book compliant (0x85-0x86)
 
 - **2025-12-01**: Phase 1 completed
   - Jump bytecode standardization (compiler + VM + analysis tools)
