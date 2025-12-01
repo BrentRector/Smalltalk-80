@@ -836,7 +836,6 @@ namespace Smalltalk80.Compiler
                 //   PUSH obj → DUP → SEND + 1 → POP → SEND + 2
 
                 bool hasBinaryMessages = binaryMessages != null && binaryMessages.Length > 0;
-                int unaryCount = unaryMessages?.Length ?? 0;
 
                 if (hasBinaryMessages)
                 {
@@ -846,14 +845,14 @@ namespace Smalltalk80.Compiler
                     emitter.Dup();
                     // Binary messages will be sent by the common path below
                 }
-                else if (unaryCount > 0)
+                else if (unaryMessages != null && unaryMessages.Length > 0)
                 {
                     // Cascade receiver is all but the last unary message
                     var messageBase = unaryExpr.messageBase();
                     CompileMessageBase(messageBase);
 
                     // Send all but the last unary message
-                    for (int i = 0; i < unaryCount - 1; i++)
+                    for (int i = 0; i < unaryMessages.Length - 1; i++)
                     {
                         var msg = unaryMessages[i];
                         var selector = msg.unarySelector().GetText();
@@ -882,7 +881,7 @@ namespace Smalltalk80.Compiler
                     emitter.Dup();
 
                     // Send the last unary message
-                    var lastMsg = unaryMessages[unaryCount - 1];
+                    var lastMsg = unaryMessages[unaryMessages.Length - 1];
                     var lastSelector = lastMsg.unarySelector().GetText();
 
                     // Check for tail-recursive call on last message
