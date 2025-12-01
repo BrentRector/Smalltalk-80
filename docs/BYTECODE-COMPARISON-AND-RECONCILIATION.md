@@ -10,6 +10,7 @@
 1. **Jump bytecode standardization** - Implemented Blue Book format (0x90-0xAF)
 2. **Extended bytecode format** - Implemented Blue Book type:index format (0x80-0x86)
 3. **Pop/Duplicate** - Moved to standard bytecodes (0x87, 0x88)
+4. **Block jump encoding fix** - Fixed blockCopy: jump to use 2-byte Blue Book format (was incorrectly using 3-byte format with wrong opcode 0xA1)
 
 ### 🔲 Phase 2: Semantic Alignment - PENDING
 ### 🔲 Phase 3: Optimization - PENDING
