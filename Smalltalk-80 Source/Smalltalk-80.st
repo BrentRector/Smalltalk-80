@@ -841,7 +841,7 @@ fullName
 fullNameFor: fileName
     "Answer the full path for a file in this directory."
     pathName = '.' ifTrue: [^fileName].
-    ^pathName, PathSeparator asString, fileName!
+    ^pathName, (String with: PathSeparator), fileName!
 
 versionNumbers
     "Answer true if version numbers are supported."
@@ -975,11 +975,11 @@ entries
 
 fileNames
     "Answer only the file names."
-    ^self entries select: [:name | (name endsWith: PathSeparator asString) not]!
+    ^self entries select: [:name | (name endsWith: (String with: PathSeparator)) not]!
 
 directoryNames
     "Answer only the directory names."
-    ^self entries select: [:name | name endsWith: PathSeparator asString]! !
+    ^self entries select: [:name | name endsWith: (String with: PathSeparator)]! !
 
 !WindowsFileDirectory methodsFor: 'file accessing'!
 
@@ -38295,11 +38295,11 @@ initialize
 	"make up table of 1-char atoms"
 	v _ Array new: 128.
 	a _ String new: 1.
-	1 to: 128 do: 
-		[:i | 
+	1 to: 128 do:
+		[:i |
 		a at: 1 put: i - 1.
 		v at: i put: a asSymbol].
-	SingleCharSymbols _ v	
+	SingleCharSymbols _ v.
 	"Symbol initialize."! !
 
 !Symbol class methodsFor: 'instance creation'!

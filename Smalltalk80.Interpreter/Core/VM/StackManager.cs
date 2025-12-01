@@ -97,10 +97,10 @@ internal class StackManager(
 
         if (isBlockContext)
         {
-            // BlockContext: execution stack starts after block arguments
-            // Block's indexed area: [0..nargs-1] = args, [nargs..] = execution stack
-            var nargsOOP = heapManager.GetInstanceVariable(activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
-            initialSP = nargsOOP.AsSmallInteger();
+            // BlockContext: Blue Book model - arguments are pushed onto stack by value: primitive
+            // The block's first bytecodes pop them into temp slots via STORE_TEMP
+            // Therefore the execution stack starts at index 0 (no reserved slots)
+            initialSP = 0;
 
             // Get method from home context (needed for diagnostic messages)
             // For nested blocks, home might be another BlockContext

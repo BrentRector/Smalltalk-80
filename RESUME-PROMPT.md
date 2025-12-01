@@ -1,158 +1,127 @@
-# Resume Prompt: MVC Controller Loop and Compiler Optimization
+# Resume Prompt: Smalltalk-80 Interpreter
 
-**Session Date**: 2025-11-28
-**Branch**: `claude/smalltalk-mvc-processes-013RydArs54dc78quMu5GZic`
-**Status**: BLOCKED - Compiler optimization issue discovered
+**Session Date**: 2025-12-01
+**Status**: ✅ System Browser FULLY FUNCTIONAL
 
-## Current Issue
+## Current State
 
-### The Problem: `thisContext` Returns BlockContext Inside `ifTrue:` Blocks
+### What's Working
+- ✅ **System Browser**: Fully functional with source code retrieval
+- ✅ **Method Source Display**: All methods including `Cursor>>changed:` display correctly
+- ✅ **MVC Controller Loop**: Running, mouse/keyboard input working
+- ✅ **Process Primitives 85-88**: suspend, resume, terminate, yield
+- ✅ **Init Expressions**: 51/51 passing (100%)
+- ✅ **BlockContext Tests**: 120/120 passing (returns 1191)
+- ✅ **Source File Retrieval**: `CompiledMethod>>getSource` working via `.sources` file
 
-When `Process>>terminate` executes:
-```smalltalk
-Processor activeProcess == self
-    ifTrue:
-        [thisContext sender == nil ifFalse: [thisContext sender release].
-        thisContext removeSelf suspend]
-```
+### Recent Fixes (This Session)
 
-`thisContext` returns a **BlockContext** (not MethodContext), and `removeSelf` only exists on MethodContext.
+1. **SingleCharSymbols Initialization** (`ColdStartJsonGenerator.cs`, `SystemDictionaryInstaller.cs`)
+   - System Browser crashed with "nil ," error when viewing `Cursor>>changed:`
+   - Scanner's `xBinary` method called `Symbol internCharacter:` which returned nil
+   - Root cause: SingleCharSymbols array contained nils because it wasn't populated during cold start
+   - Fix Part 1: Compiler now adds Blue Book canonical binary selectors to symbol table:
+     `+ - * / < > = ~ & | @ , \ ? ! %` (16 characters)
+   - Fix Part 2: Phase 5 `InitializeSingleCharSymbols()` populates array with Symbol OOPs from bundle
 
-### Root Cause: Compiler Optimization Disabled
-
-**File**: `Smalltalk80.Compiler/BytecodeCompiler.cs` lines 1004-1018
-
-```csharp
-/// DISABLED (2025-10-07): Blue Book Smalltalk-80 does NOT inline conditionals!
-/// Control structures like ifTrue: and ifFalse: are ordinary message sends.
-private bool TryInlineConditional(...)
-{
-    return false;  // ALWAYS disabled
-}
-```
-
-**This comment is WRONG!** Blue Book Chapter 28 explicitly states:
-> "The conditional jumps are used in the compiled form of messages to booleans (e.g., `ifTrue:` and `whileFalse:`)."
-
-Blue Book compiles `ifTrue:`/`ifFalse:` to conditional jump bytecodes - NO BlockContext is created. The block body executes inline in the MethodContext. Therefore `thisContext` returns MethodContext and `removeSelf` works.
-
-### Workaround Applied (Band-aid)
-
-**File**: `VirtualMachine.MessageSending.cs` lines 254-264
-
-```csharp
-// SPECIAL CASE: BlockContext>>removeSelf forwards to home MethodContext
-if (selectorName == "removeSelf" && classOOP == _metadata.BlockContextClassOOP)
-{
-    var homeOOP = _heapManager.GetInstanceVariable(receiverOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-    return SendMessage(homeOOP, selectorOOP, args);
-}
-```
-
-This forwards `removeSelf` from BlockContext to home MethodContext at runtime. It's a workaround, not a fix.
+2. **Source File Line Endings** (`ColdStartJsonGenerator.cs`, `Program.cs`)
+   - Source positions in coldstart.json didn't match .sources file positions
+   - Root cause: CRLF vs LF line ending mismatch
+   - Fix: Normalize line endings to LF, use UTF-8 without BOM
 
 ---
 
-## Proper Fix Required
+## Architecture Notes
 
-### Option 1: Enable Compiler Optimization (Recommended)
+### SingleCharSymbols (Blue Book Binary Selectors)
+```
+Purpose: Fast lookup of single-character message selectors
+Location: Symbol class variable (classPool)
+Contents: Array of 128 Symbol OOPs indexed by ASCII value
+Blue Book canonical set: + - * / < > = ~ & | @ , \ ? ! %
 
-Re-enable `TryInlineConditional` in `BytecodeCompiler.cs` to generate:
-- Conditional jump bytecodes (152-159, 168-175)
-- Block body compiled inline
-- No `blockCopy:` bytecode
-- No BlockContext created
+Flow:
+1. Compiler adds 16 binary selectors to symbol table
+2. Phase 1 creates Symbol objects in heap
+3. Phase 5 populates SingleCharSymbols array from bundle
+4. Symbol>>internCharacter: uses array for fast lookup
+```
 
-**Benefits**:
-- Blue Book compliance
-- Better performance
-- All classic Smalltalk-80 code works correctly
+### Source Code Retrieval Flow
+```
+Browser → Behavior>>sourceCodeForMethod:at:
+       → CompiledMethod>>getSource
+       → RemoteString>>string
+       → WindowsFileReference>>position: + nextChunk
+       → Source text from .sources file
+```
 
-### Option 2: Additional VM Workarounds (Not Recommended)
+**Key Components**:
+- `.sources` file: Chunk-formatted source (! delimiters, !! escaping)
+- Source positions: Last 3 bytes of CompiledMethod bytecodes
+- `SourceFiles` global: Array of 2 WindowsFileReference objects
+- UTF-8 BOM: Automatically compensated in file primitives
 
-Continue adding special cases in VM for messages that assume `thisContext` returns MethodContext. This is fragile and non-compliant.
+### Block Argument Handling (Blue Book Model)
+```
+1. value: primitive pushes args onto BlockContext stack
+2. Block's first bytecodes are POP_STORE_TEMP
+3. These pop args from stack into temp slots in home MethodContext
+4. initialSP = 0 for BlockContexts (no reserved slots)
+```
 
 ---
 
-## What Has Been Completed
+## Known Issues
 
-### Process Primitives (85-88) ✅
-- Primitive 85: Semaphore wait
-- Primitive 86: Semaphore signal
-- Primitive 87: Process resume
-- Primitive 88: Process suspend
+### 🟡 Control Structure Optimization Disabled
+`BytecodeCompiler.cs` has `TryInlineConditional()` disabled. Blue Book says `ifTrue:`/`ifFalse:` should compile to conditional jumps (no BlockContext). Current workaround: `BlockContext>>removeSelf` delegates to home MethodContext.
 
-### MVC Startup Sequence ✅
-1. `Processor hiddenBackgroundProcess` - Creates idle process at priority 1
-2. `ControlManager new` - Creates controller manager
-3. `ScheduledControllers` global installed using canonical Association from AssociationRegistry
-
-### VM Changes ✅
-- `VirtualMachine.cs` - HandleReturn logic distinguishes initial process vs forked process termination
-- `VMConstants.cs` - Added LinkedList/Link constants for process queues
-- `SmalltalkInterpreterThread.cs` - `StartControllerLoop()` and `InstallScheduledControllersGlobal()` methods
+### 🟡 --execute Feature
+Parser error on number literals. Scanner produces `tokenType: #xDigit` instead of `#number`.
 
 ---
 
 ## Key Files
 
-### C# Interpreter
-- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` - HandleReturn, process switching
-- `Smalltalk80.Interpreter/Core/VM/VirtualMachine.MessageSending.cs` - removeSelf workaround
-- `Smalltalk80.Interpreter/SmalltalkInterpreterThread.cs` - Controller loop startup
+### Modified This Session
+- `ColdStartJsonGenerator.cs` - Blue Book binary selectors + line ending normalization
+- `SystemDictionaryInstaller.cs` - `InitializeSingleCharSymbols()` populates array from bundle
+- `BytecodeInterpreter.cs` - Removed NLR debug output
+- `VirtualMachine.cs` - Removed NLR debug output
+- `Smalltalk-80.st` - Reverted Symbol>>initialize to original Blue Book form
 
-### C# Compiler (needs fix)
-- `Smalltalk80.Compiler/BytecodeCompiler.cs` - `TryInlineConditional()` disabled
+### Source Lookup
+- `SystemDictionaryInstaller.cs` - Creates SourceFiles array + SingleCharSymbols
+- `ObjectPrimitives.cs` - `AllocateCompiledMethodInternal` encodes source positions
+- `docs/SOURCE-LOOKUP-ANALYSIS.md` - Complete documentation of source retrieval
 
-### Smalltalk Source
-- `Process>>terminate` (line 32612) - Uses `thisContext removeSelf`
-- `MethodContext>>removeSelf` (line 26493) - Nils receiver, returns old value
-
----
-
-## Blue Book References
-
-### Chapter 28: Formal Specification of the Interpreter
-
-**Conditional Jump Bytecodes** [Page 595]:
-```
-152-159  Pop and Jump On False (short form)
-168-171  Pop and Jump On True (long form)
-172-175  Pop and Jump On False (long form)
-```
-
-**Line 413**:
-> "The conditional jumps are used in the compiled form of messages to booleans (e.g., `ifTrue:` and `whileFalse:`)."
+### Block Handling
+- `ControlPrimitives.cs` - Primitive 81 (value*) pushes args to BlockContext stack
+- `BytecodeCompiler.cs` - Emits POP_STORE_TEMP at block start for args
 
 ---
 
 ## Test Commands
 
 ```bash
-# Build and run
+# Standard run
 cd Smalltalk80.Interpreter
-dotnet build
 dotnet run
 
-# Run BlockContext regression test (MUST PASS after any compiler changes)
-dotnet run -- --coldstart ../bin/Debug/net9.0/coldstart_with_runner.json
+# BlockContext regression test (MUST PASS)
+dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_with_runner.json
 # Expected: Returns 1191 (120 tests pass)
+
+# C# unit tests
+cd Smalltalk80.Interpreter.Tests
+dotnet test
+
+# Regenerate coldstart after source changes
+cd "Smalltalk-80 Source"
+dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
+cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/* ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
 ```
-
----
-
-## Verification Test
-
-To check if optimization is working, this Smalltalk code:
-```smalltalk
-testMethod
-    true ifTrue: [^thisContext class name].
-    ^nil
-```
-
-Should return:
-- **With optimization (correct)**: `'MethodContext'`
-- **Without optimization (current)**: `'BlockContext'`
 
 ---
 

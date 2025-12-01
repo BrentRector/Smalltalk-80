@@ -328,7 +328,7 @@ public class SystemDictionaryInstaller(
             throw new InvalidOperationException("Symbol classPool is nil during SingleCharSymbols installation");
         }
 
-        // Create Array with 128 nil elements
+        // Create Array with 128 elements (initialized to nil)
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         var arrayOOP = context.Allocator.AllocateArray(arrayClassOOP, 128);
 
@@ -336,6 +336,23 @@ public class SystemDictionaryInstaller(
         for (int i = 0; i < 128; i++)
         {
             context.Allocator.SetIndexedOOP(arrayOOP, i, nilOOP);
+        }
+
+        // Populate array with single-character symbols from the bundle's symbol table
+        // SingleCharSymbols is indexed by (asciiValue + 1), so char 0 is at index 1
+        for (int symbolIndex = 0; symbolIndex < context.Bundle.Symbols.Length; symbolIndex++)
+        {
+            string symbolName = context.Bundle.Symbols[symbolIndex];
+            if (symbolName.Length == 1)
+            {
+                int asciiValue = symbolName[0];
+                if (asciiValue < 128)
+                {
+                    var symbolOOP = SymbolRegistry.GetSymbolOOP(symbolIndex);
+                    // Store at asciiValue (0-based index, Smalltalk accesses at: ascii + 1)
+                    context.Allocator.SetIndexedOOP(arrayOOP, asciiValue, symbolOOP);
+                }
+            }
         }
 
         var associationOOP = associationManager.GetOrCreateCanonical("SingleCharSymbols");

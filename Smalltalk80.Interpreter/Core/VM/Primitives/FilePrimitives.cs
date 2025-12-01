@@ -320,7 +320,22 @@ public static class FileOperations
                 return PrimitiveResult.Fail(context.Metadata!);
             }
 
-            int handle = FileHandleManager.OpenFile(path, accessMode, shareMode, createMode);
+            // For read-only operations (OPEN_EXISTING), check if file exists in Data folder
+            // createMode 3 = OPEN_EXISTING (read), createMode 2 = CREATE_ALWAYS (write)
+            string actualPath = path;
+            if (createMode == 3 && !File.Exists(path))
+            {
+                // Try Data folder fallback for resource files (.form, .sources, etc.)
+                // Use executable directory, not current working directory
+                string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                string dataPath = Path.Combine(exeDir, "Data", path);
+                if (File.Exists(dataPath))
+                {
+                    actualPath = dataPath;
+                }
+            }
+
+            int handle = FileHandleManager.OpenFile(actualPath, accessMode, shareMode, createMode);
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(handle));
         }
     }
@@ -441,8 +456,6 @@ public static class FileOperations
     /// </summary>
     public class FileReadByte : IPrimitive
     {
-        private static bool _firstCall = true;
-
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 2)
@@ -473,13 +486,6 @@ public static class FileOperations
                 int actualPosition = position + FileHandleManager.GetBomOffset(handle);
                 stream.Position = actualPosition;
                 int byteValue = stream.ReadByte();
-
-                // Log first successful read to confirm file access is working
-                if (_firstCall)
-                {
-                    Console.WriteLine($"[Primitive 132] First read OK: handle={handle}, position={position}, actualPosition={actualPosition}, byte={byteValue}");
-                    _firstCall = false;
-                }
 
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(byteValue));
             }
@@ -647,25 +653,30 @@ public static class FileOperations
                     _ => SeekOrigin.Begin
                 };
 
+                // Get BOM offset once for use in both seek and return value calculation
+                int bomOffset = FileHandleManager.GetBomOffset(handle);
+
                 // Apply BOM offset for seeks from beginning
                 // This ensures source positions in CompiledMethods (which don't account for BOM) work correctly
                 int actualOffset = offset;
-                if (seekOrigin == SeekOrigin.Begin)
+                if (seekOrigin == SeekOrigin.Begin && bomOffset > 0)
                 {
-                    int bomOffset = FileHandleManager.GetBomOffset(handle);
-                    if (bomOffset > 0)
-                    {
-                        actualOffset = offset + bomOffset;
-                    }
+                    actualOffset = offset + bomOffset;
                 }
 
                 long newPosition = stream.Seek(actualOffset, seekOrigin);
 
-                // Clamp to SmallInteger range
-                if (newPosition > 0x3FFFFFFF) newPosition = 0x3FFFFFFF;
+                // Return LOGICAL position, not PHYSICAL position
+                // This ensures Smalltalk code works with BOM-transparent positions
+                // and primitive 132 (read byte) can correctly add BOM offset
+                // For ALL seek origins, the returned position is physical, so subtract BOM
+                long logicalPosition = bomOffset > 0 ? newPosition - bomOffset : newPosition;
 
-                Console.WriteLine($"[Primitive 124] OK: handle={handle}, offset={offset}, newPosition={newPosition}");
-                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)newPosition));
+                // Clamp to SmallInteger range
+                if (logicalPosition > 0x3FFFFFFF) logicalPosition = 0x3FFFFFFF;
+                if (logicalPosition < 0) logicalPosition = 0; // Can happen if seeking before BOM
+
+                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)logicalPosition));
             }
             catch (Exception ex)
             {
@@ -836,12 +847,26 @@ public static class FileOperations
 
             try
             {
+                // Try direct path first, then fall back to Data folder for resource files
+                string actualPath = path;
                 if (!File.Exists(path) && !Directory.Exists(path))
                 {
-                    return PrimitiveResult.Ok(context.HeapManager.GetNil());
+                    // Fall back to Data folder (for .form, .sources, etc.)
+                    // Use executable directory, not current working directory
+                    string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                    string dataPath = Path.Combine(exeDir, "Data", path);
+
+                    if (File.Exists(dataPath) || Directory.Exists(dataPath))
+                    {
+                        actualPath = dataPath;
+                    }
+                    else
+                    {
+                        return PrimitiveResult.Ok(context.HeapManager.GetNil());
+                    }
                 }
 
-                var info = new FileInfo(path);
+                var info = new FileInfo(actualPath);
                 long size = info.Exists ? info.Length : 0;
                 int attributes = (int)info.Attributes;
                 bool isDirectory = (info.Attributes & FileAttributes.Directory) != 0;
@@ -1177,7 +1202,6 @@ public static class FileOperations
                     return PrimitiveResult.Fail(context.Metadata!);
                 }
                 size = stream.Length;
-                Console.WriteLine($"[Primitive 144] OK: handle={handle}, size={size}");
             }
             else if (context.Arguments.Length == 1)
             {
@@ -1280,9 +1304,23 @@ public static class FileOperations
 
             try
             {
-                // Handle "." as current directory
+                // Use executable directory, not current working directory
+                string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+
+                // Handle "." as current directory - use Data folder for resource files
                 if (dirPath == ".")
-                    dirPath = Directory.GetCurrentDirectory();
+                {
+                    // Try Data folder first, then fall back to executable directory
+                    string dataPath = Path.Combine(exeDir, "Data");
+                    dirPath = Directory.Exists(dataPath) ? dataPath : exeDir;
+                }
+                else if (!Directory.Exists(dirPath))
+                {
+                    // Try Data folder fallback
+                    string dataPath = Path.Combine(exeDir, "Data", dirPath);
+                    if (Directory.Exists(dataPath))
+                        dirPath = dataPath;
+                }
 
                 var entries = Directory.GetFileSystemEntries(dirPath, pattern);
                 var names = entries.Select(Path.GetFileName).Where(n => n != null).ToArray();

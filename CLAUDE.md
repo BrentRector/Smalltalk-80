@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-11-28
+**Last Updated**: 2025-12-01
 
 ## Project Status
 
@@ -8,11 +8,12 @@
 
 - **Build**: 0 errors, 0 warnings
 - **Cold Start**: Phases 1-6 all succeed
-- **Init Expressions**: 50/51 succeed (98% success rate) - includes process scheduling
+- **Init Expressions**: 51/51 succeed (100% success rate)
 - **Comment Expressions**: ✅ **234/234 succeed** (100% success rate)
 - **BlockContext Tests**: ✅ **120/120 tests PASS** (returns 1191)
 - **VM Core**: Fully functional, verified operational
 - **Process Primitives**: ✅ **85-88 working** (suspend, resume, terminate, yield)
+- **System Browser**: ✅ **FULLY FUNCTIONAL** - source retrieval working
 
 ## Known Issues
 
@@ -22,8 +23,6 @@ The C# compiler has `ifTrue:`/`ifFalse:` optimization **incorrectly disabled**. 
 **Fix Applied**: Added `BlockContext>>removeSelf` method that delegates to `home removeSelf`. This follows the existing BlockContext pattern (like `receiver` and `method`) and automatically handles nested blocks via the chain of `home` references. The proper long-term fix still requires enabling compiler optimization.
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
-
-**FormMenuView .form File Loading**: `WindowsFile>>asFileStream:` calls `self size` before the file is open. Primitive 144 (GetFileSize) fails because `fileHandle` is nil. Fix needed: add `self reopen` before querying size, or handle nil handle in primitive by getting path from receiver's `fileName` instance variable.
 
 ## Migration Status
 
@@ -66,22 +65,31 @@ The C# compiler has `ifTrue:`/`ifFalse:` optimization **incorrectly disabled**. 
 
 **Key Lesson**: Display refresh architecture requires `InvalidateDisplayRegion()` after modifying Display bitmap. Without it, WinForms display shows stale cached data even though heap is correctly updated.
 
-**Phase 3: MVC and Process Scheduling** 🔄 **IN PROGRESS**
+**Phase 3: MVC and Process Scheduling** ✅ **COMPLETE**
 - ✅ Process primitives 85-88 implemented and working
 - ✅ `Processor hiddenBackgroundProcess` creates idle process at priority 1
 - ✅ `ControlManager new` creates controller manager
 - ✅ `ScheduledControllers` global installed using canonical Association
 - ✅ `BlockContext>>removeSelf` delegates to home MethodContext (Smalltalk-level fix)
-- ⏳ Controller event loop (`searchForActiveController`) - testing in progress
-- ⏳ Integration with InputSensor for mouse/keyboard events
+- ✅ Controller event loop (`searchForActiveController`) - working
+- ✅ System Browser fully functional with source code retrieval
+
+**Source Code Retrieval** ✅ **WORKING**
+- ✅ Compiler generates `.sources` file with chunk-formatted source
+- ✅ Source positions encoded in CompiledMethod bytecodes (last 3 bytes)
+- ✅ `SourceFiles` global initialized with WindowsFileReference objects
+- ✅ UTF-8 BOM handling in file primitives (transparent offset compensation)
+- ✅ `CompiledMethod>>getSource` retrieves source via `RemoteString`
 
 **Key Files Modified**:
 - `VirtualMachine.cs` - HandleReturn logic for process termination
 - `Smalltalk-80.st` - Added `BlockContext>>removeSelf` for process termination support
 - `VMConstants.cs` - LinkedList/Link constants for process queues
 - `SmalltalkInterpreterThread.cs` - StartControllerLoop, InstallScheduledControllersGlobal
+- `FilePrimitives.cs` - BOM offset handling for source file reading
+- `StackManager.cs` - Blue Book block argument handling
 
-See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, and `docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md` for complete migration documentation.
+See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, `docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md`, and `docs/SOURCE-LOOKUP-ANALYSIS.md` for complete documentation.
 
 ## Architecture Documentation
 
@@ -260,10 +268,12 @@ See `docs/Testing-Guide.md` for complete testing documentation.
 **⏭️ Skipped (0)**: None - all init expressions enabled
 
 **Recent Fixes**:
+- **SingleCharSymbols Initialization (2025-12-01)**: System Browser crashed with "nil ," error when viewing methods like `Cursor>>changed:`. Root cause: `Symbol internCharacter:` returned nil because SingleCharSymbols wasn't properly populated during cold start. Fix: (1) Compiler now includes Blue Book canonical binary selectors (`+ - * / < > = ~ & | @ , \ ? ! %`) in symbol table, (2) Phase 5 cold start populates SingleCharSymbols array with these Symbol OOPs from the bundle.
+- **BOM Double-Offset Bug (2025-11-30)**: Primitive 124 (FileSeek) returned physical position instead of logical, causing primitive 132 (FileReadByte) to add BOM offset twice. Fixed to return logical position.
+- **BlockContext Stack Underflow (2025-11-30)**: Blue Book block arg handling pushes args onto stack, but StackManager used old `initialSP=nargs` model. Fixed to use `initialSP=0` for BlockContexts.
 - **CharacterTable Implementation**: Phase 3 creates CharacterTable Array with 256 Character objects. Phase 5 installs it as CLASS VARIABLE in Character's classPool (following USTable pattern, NOT as a global).
 - **Primitive 121 (FileOpen)**: Fixed to support both 2-arg (path, mode string) and 4-arg (path, access, share, create integers) calling conventions for WindowsFile compatibility.
 - **Primitive 110 (Character literal identity)**: Fixed comparison bug with runtime canonicalization using CharacterRegistry.
-- **WindowsFile>>asFileStream:**: Added method for FileStream compatibility. Currently fails because file not open before size query.
 - **Primitive 65 (Stream>>next)**: Fixed to return Character objects (not SmallIntegers) when reading from Strings/Symbols, enabling Scanner and --execute feature to work correctly. Uses isKindOf: semantics to handle subclasses properly.
 - Added InputSensor install and InputSensor initSensor init expressions to properly initialize Sensor global
 - Fixed Cursor initialize to set CurrentCursor (was nil, causing cursorPoint failures)

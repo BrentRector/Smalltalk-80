@@ -632,91 +632,327 @@ namespace Smalltalk80.Compiler
         
         private void CompileCascadeExpr(Smalltalk80Parser.CascadeExprContext expr)
         {
-//Console.WriteLine($"[BYTECODE] CompileCascadeExpr called");
-//Console.WriteLine($"[BYTECODE] CompileCascadeExpr: Current bytecode count: {emitter.GetBytecodes().Length}");
+            // Clean cascade compilation following Blue Book specification.
+            // Key insight: Decompose into "cascade receiver" (all but last message)
+            // and "final message" (only the last message), rather than threading
+            // flags through nested method calls.
+
             var messageExpr = expr.messageExpr();
             var messageParts = expr.messagePart();
-//Console.WriteLine($"[BYTECODE] CompileCascadeExpr: messageExpr={messageExpr != null}, messageParts count={messageParts?.Length ?? 0}");
-            
-            if (messageParts != null && messageParts.Length > 0)
+
+            // No cascade - compile normally
+            if (messageParts == null || messageParts.Length == 0)
             {
-                // Cascade implementation following Smalltalk-80 Blue Book specification:
-                // 1. Push receiver once
-                // 2. For each message except the last:
-                //    - Dup the receiver (bytecode 136)
-                //    - Send the message
-                //    - Pop the result (bytecode 135)
-                // 3. For the last message:
-                //    - Send the message
-                //    - Leave result on stack
-                
-                // Check if the messageExpr actually sends a message or is just a receiver
-                bool firstIsJustReceiver = messageExpr != null && IsJustReceiver(messageExpr);
-                
-                if (firstIsJustReceiver && messageExpr != null)
+                if (messageExpr != null)
                 {
-                    // The first part is just a receiver (like "anObject"), not a message send
-                    // Push the receiver once
-                    CompileMessageExpr(messageExpr, isCascadeBase: false, totalCascadeMessages: 0);
-                    
-                    // Process all cascaded messages
-                    for (int i = 0; i < messageParts.Length; i++)
+                    CompileMessageExpr(messageExpr);
+                }
+                return;
+            }
+
+            // Check if the first expression is just a receiver (no messages)
+            if (messageExpr != null && IsJustReceiver(messageExpr))
+            {
+                // Simple case: "receiver; msg1; msg2"
+                // The receiver IS the cascade receiver
+                CompileMessageExpr(messageExpr);
+
+                // Process all cascaded messages
+                for (int i = 0; i < messageParts.Length; i++)
+                {
+                    bool isLast = (i == messageParts.Length - 1);
+
+                    if (!isLast)
                     {
-                        bool isLast = (i == messageParts.Length - 1);
-                        
-                        // Dup receiver for this message (except for the last)
-                        if (!isLast)
-                        {
-                            emitter.Dup(); // bytecode 136 - duplicate receiver for next message
-                        }
-                        
-                        // Compile the message part
-                        CompileMessagePart(messageParts[i]);
-                        
-                        // Pop result (except for the last)
-                        if (!isLast)
-                        {
-                            emitter.Pop(); // bytecode 135 - pop the result
-                        }
+                        emitter.Dup();
+                    }
+
+                    CompileMessagePart(messageParts[i]);
+
+                    if (!isLast)
+                    {
+                        emitter.Pop();
                     }
                 }
-                else if (messageExpr != null)
+                return;
+            }
+
+            // Complex case: "receiver msg1; msg2"
+            // Cascade receiver = everything except the last message
+            if (messageExpr == null) return;
+
+            // STEP 1: Compile the cascade receiver (all messages except the last one)
+            CompileCascadeReceiver(messageExpr);
+
+            // STEP 2: Duplicate the cascade receiver
+            emitter.Dup();
+
+            // STEP 3: Compile the final message from the first expression
+            CompileFinalMessage(messageExpr);
+
+            // STEP 4: Process cascade parts (messages after semicolons)
+            for (int i = 0; i < messageParts.Length; i++)
+            {
+                bool isLast = (i == messageParts.Length - 1);
+
+                // Pop the previous message result
+                emitter.Pop();
+
+                // Duplicate receiver for next message (except for the last)
+                if (!isLast)
                 {
-                    // The first part is a full message expression
-                    // Compile it with cascade support
-                    CompileMessageExpr(messageExpr, isCascadeBase: true, totalCascadeMessages: messageParts.Length + 1);
-                    
-                    // Process cascaded messages
-                    for (int i = 0; i < messageParts.Length; i++)
+                    emitter.Dup();
+                }
+
+                // Compile the cascade message
+                CompileMessagePart(messageParts[i]);
+            }
+        }
+
+        // =========================================================================
+        // CASCADE RECEIVER COMPILATION (everything except final message)
+        // =========================================================================
+
+        /// <summary>
+        /// Compiles the cascade receiver (all messages except the last one).
+        /// </summary>
+        /// <remarks>
+        /// For "obj foo bar; baz" → compiles "obj foo"
+        /// For "obj at: 1; at: 2" → compiles "obj"
+        /// For "obj + 1; + 2" → compiles "obj"
+        /// </remarks>
+        private void CompileCascadeReceiver(Smalltalk80Parser.MessageExprContext messageExpr)
+        {
+            if (messageExpr == null) return;
+
+            var binaryExpr = messageExpr.binaryExpr();
+            var keywordMessage = messageExpr.keywordMessage();
+
+            // Case 1: Keyword message present
+            // For "obj foo at: 1; at: 2" → receiver is "obj foo" (full binaryExpr)
+            if (keywordMessage != null)
+            {
+                if (binaryExpr != null)
+                {
+                    var unaryExpr = binaryExpr.unaryExpr();
+                    bool receiverIsSuper = IsReceiverSuper(unaryExpr?.messageBase());
+                    CompileBinaryExpr(binaryExpr, receiverIsSuper);
+                }
+                return;
+            }
+
+            // Case 2: No keyword message → compile binaryExpr except last message
+            CompileBinaryExprExceptLast(binaryExpr);
+        }
+
+        /// <summary>
+        /// Compiles a binary expression except its last message.
+        /// </summary>
+        private void CompileBinaryExprExceptLast(Smalltalk80Parser.BinaryExprContext binaryExpr)
+        {
+            if (binaryExpr == null) return;
+
+            var unaryExpr = binaryExpr.unaryExpr();
+            var binaryMessages = binaryExpr.binaryMessage();
+
+            // Case 1: Has binary messages → compile unaryExpr + all but last binary
+            if (binaryMessages != null && binaryMessages.Length > 0)
+            {
+                if (unaryExpr == null) return;
+                bool receiverIsSuper = IsReceiverSuper(unaryExpr.messageBase());
+                CompileUnaryExpr(unaryExpr, receiverIsSuper);
+
+                // Send all but the last binary message
+                var unaryMessages = unaryExpr.unaryMessage();
+                bool hasUnaryMessages = unaryMessages != null && unaryMessages.Length > 0;
+                bool binaryReceiverIsSuper = receiverIsSuper && !hasUnaryMessages;
+
+                for (int i = 0; i < binaryMessages.Length - 1; i++)
+                {
+                    var msg = binaryMessages[i];
+                    var selector = msg.binarySelector().GetText();
+                    var argument = msg.unaryExpr();
+
+                    if (i == 0 && binaryReceiverIsSuper)
                     {
-                        bool isLast = (i == messageParts.Length - 1);
-                        
-                        // Pop previous message result
-                        emitter.Pop(); // bytecode 135 - pop the result of the previous message
-                        
-                        // Dup receiver for next message (except for the last)
-                        if (!isLast)
+                        emitter.AddLiteral(new Symbol(selector));
+                    }
+
+                    CompileUnaryExpr(argument, false);
+
+                    if (i == 0 && binaryReceiverIsSuper)
+                    {
+                        emitter.EmitSuperSend(selector, 1);
+                    }
+                    else
+                    {
+                        emitter.EmitSend(selector, 1);
+                    }
+                }
+                return;
+            }
+
+            // Case 2: No binary messages → compile unaryExpr except last
+            CompileUnaryExprExceptLast(unaryExpr);
+        }
+
+        /// <summary>
+        /// Compiles a unary expression except its last message.
+        /// </summary>
+        private void CompileUnaryExprExceptLast(Smalltalk80Parser.UnaryExprContext unaryExpr)
+        {
+            if (unaryExpr == null) return;
+
+            var messageBase = unaryExpr.messageBase();
+            var unaryMessages = unaryExpr.unaryMessage();
+
+            // Always compile the message base (receiver)
+            CompileMessageBase(messageBase);
+
+            // Send all but the last unary message
+            if (unaryMessages != null && unaryMessages.Length > 1)
+            {
+                bool receiverIsSuper = IsReceiverSuper(messageBase);
+
+                for (int i = 0; i < unaryMessages.Length - 1; i++)
+                {
+                    var msg = unaryMessages[i];
+                    var selector = msg.unarySelector().GetText();
+                    bool isSuper = i == 0 && receiverIsSuper;
+
+                    // Check for tail-recursive call optimization
+                    if (tailCalls != null && tailCalls.TryGetValue(msg, out var tailCallInfo))
+                    {
+                        if (tailCallInfo.IsSafeToOptimize && methodStartLabel >= 0)
                         {
-                            emitter.Dup(); // bytecode 136 - duplicate receiver for next message
+                            emitter.EmitTailRecursiveJump(methodStartLabel, 0);
+                            continue;
                         }
-                        
-                        // Compile the message part
-                        CompileMessagePart(messageParts[i]);
+                    }
+
+                    if (isSuper)
+                    {
+                        emitter.EmitSuperSend(selector, 0);
+                    }
+                    else
+                    {
+                        emitter.EmitSend(selector, 0);
                     }
                 }
             }
-            else
+        }
+
+        // =========================================================================
+        // FINAL MESSAGE COMPILATION (only the last message)
+        // =========================================================================
+
+        /// <summary>
+        /// Compiles the final message from a message expression.
+        /// </summary>
+        /// <remarks>
+        /// For "obj foo bar; baz" → compiles "bar" message
+        /// For "obj at: 1; at: 2" → compiles "at: 1" message
+        /// For "obj + 1; + 2" → compiles "+ 1" message
+        /// </remarks>
+        private void CompileFinalMessage(Smalltalk80Parser.MessageExprContext messageExpr)
+        {
+            if (messageExpr == null) return;
+
+            var binaryExpr = messageExpr.binaryExpr();
+            var keywordMessage = messageExpr.keywordMessage();
+
+            // Case 1: Keyword message present → that's the final message
+            if (keywordMessage != null)
             {
-                // No cascade, just compile the message
-//Console.WriteLine($"[BYTECODE] CompileCascadeExpr: No cascade, compiling single messageExpr");
-                if (messageExpr != null)
+                bool receiverIsSuper = DetermineIfKeywordReceiverIsSuper(binaryExpr);
+                CompileKeywordMessage(keywordMessage, receiverIsSuper);
+                return;
+            }
+
+            // Case 2: No keyword → final message is from binaryExpr
+            CompileFinalBinaryMessage(binaryExpr);
+        }
+
+        /// <summary>
+        /// Determines if a keyword message's receiver is super (no intermediate messages).
+        /// </summary>
+        private bool DetermineIfKeywordReceiverIsSuper(Smalltalk80Parser.BinaryExprContext? binaryExpr)
+        {
+            if (binaryExpr == null) return false;
+
+            var unaryExpr = binaryExpr.unaryExpr();
+            if (unaryExpr == null) return false;
+
+            var messageBase = unaryExpr.messageBase();
+            var unaryMessages = unaryExpr.unaryMessage();
+            var binaryMessages = binaryExpr.binaryMessage();
+
+            bool hasNoUnaryMessages = unaryMessages == null || unaryMessages.Length == 0;
+            bool hasNoBinaryMessages = binaryMessages == null || binaryMessages.Length == 0;
+
+            return IsReceiverSuper(messageBase) && hasNoUnaryMessages && hasNoBinaryMessages;
+        }
+
+        /// <summary>
+        /// Compiles the final message from a binary expression.
+        /// </summary>
+        private void CompileFinalBinaryMessage(Smalltalk80Parser.BinaryExprContext binaryExpr)
+        {
+            if (binaryExpr == null) return;
+
+            var binaryMessages = binaryExpr.binaryMessage();
+
+            // Case 1: Has binary messages → last binary is the final message
+            if (binaryMessages != null && binaryMessages.Length > 0)
+            {
+                var lastMsg = binaryMessages[binaryMessages.Length - 1];
+                var selector = lastMsg.binarySelector().GetText();
+                var argument = lastMsg.unaryExpr();
+
+                CompileUnaryExpr(argument, false);
+                emitter.EmitSend(selector, 1);
+                return;
+            }
+
+            // Case 2: No binary messages → final message is from unaryExpr
+            CompileFinalUnaryMessage(binaryExpr.unaryExpr());
+        }
+
+        /// <summary>
+        /// Compiles the final message from a unary expression.
+        /// </summary>
+        private void CompileFinalUnaryMessage(Smalltalk80Parser.UnaryExprContext unaryExpr)
+        {
+            if (unaryExpr == null) return;
+
+            var messageBase = unaryExpr.messageBase();
+            var unaryMessages = unaryExpr.unaryMessage();
+
+            if (unaryMessages != null && unaryMessages.Length > 0)
+            {
+                var lastMsg = unaryMessages[unaryMessages.Length - 1];
+                var selector = lastMsg.unarySelector().GetText();
+
+                // Super send only if: single message AND receiver is super
+                bool isSuper = unaryMessages.Length == 1 && IsReceiverSuper(messageBase);
+
+                // Check for tail-recursive call optimization
+                if (tailCalls != null && tailCalls.TryGetValue(lastMsg, out var tailCallInfo))
                 {
-                    CompileMessageExpr(messageExpr, isCascadeBase: false, totalCascadeMessages: 0);
-//Console.WriteLine($"[BYTECODE] CompileCascadeExpr: After CompileMessageExpr, bytecode count: {emitter.GetBytecodes().Length}");
+                    if (tailCallInfo.IsSafeToOptimize && methodStartLabel >= 0)
+                    {
+                        emitter.EmitTailRecursiveJump(methodStartLabel, 0);
+                        return;
+                    }
+                }
+
+                if (isSuper)
+                {
+                    emitter.EmitSuperSend(selector, 0);
                 }
                 else
                 {
-//Console.WriteLine($"[BYTECODE] CompileCascadeExpr: ERROR - messageExpr is null!");
+                    emitter.EmitSend(selector, 0);
                 }
             }
         }
@@ -744,61 +980,34 @@ namespace Smalltalk80.Compiler
             return !hasUnaryMsgs && !hasBinaryMsgs && !hasKeywordMsg;
         }
         
-        private void CompileMessageExpr(Smalltalk80Parser.MessageExprContext expr, bool isCascadeBase = false, int totalCascadeMessages = 0)
+        /// <summary>
+        /// Compiles a message expression (no cascade logic - cascade is handled by CompileCascadeExpr).
+        /// </summary>
+        private void CompileMessageExpr(Smalltalk80Parser.MessageExprContext expr)
         {
-            // New grammar structure: messageExpr = binaryExpr keywordMessage?
+            // Grammar: messageExpr = binaryExpr keywordMessage?
             var binaryExpr = expr.binaryExpr();
+            var keywordMessage = expr.keywordMessage();
 
             if (binaryExpr != null)
             {
-                // Check if receiver is super (look at the unaryExpr's messageBase)
                 var unaryExpr = binaryExpr.unaryExpr();
-                bool receiverIsSuper = false;
-                if (unaryExpr != null)
-                {
-                    var messageBase = unaryExpr.messageBase();
-                    receiverIsSuper = IsReceiverSuper(messageBase);
-                }
-
-                // Compile the binary expression
-                CompileBinaryExpr(binaryExpr, receiverIsSuper, isCascadeBase, totalCascadeMessages);
+                bool receiverIsSuper = IsReceiverSuper(unaryExpr?.messageBase());
+                CompileBinaryExpr(binaryExpr, receiverIsSuper);
             }
 
-            // Process keyword message if present
-            var keywordMessage = expr.keywordMessage();
             if (keywordMessage != null)
             {
-                // Pass receiverIsSuper flag to handle super sends correctly
-                // This is necessary ONLY when:
-                // 1. The messageBase is super, AND
-                // 2. There are NO unary messages, AND
-                // 3. There are NO binary messages
-                // (e.g., "^super extent:fromArray:offset:")
-                //
-                // But NOT for cases like "super new compositionRectangle:..." where
-                // the keyword message's receiver is the result of "super new", not super itself.
-                var receiverIsSuper = false;
-                if (binaryExpr != null)
-                {
-                    var unaryExpr = binaryExpr.unaryExpr();
-                    if (unaryExpr != null)
-                    {
-                        var messageBase = unaryExpr.messageBase();
-                        var unaryMessages = unaryExpr.unaryMessage();
-                        var binaryMessages = binaryExpr.binaryMessage();
-
-                        // Only mark as super send if there are no intervening messages
-                        bool hasNoUnaryMessages = unaryMessages == null || unaryMessages.Length == 0;
-                        bool hasNoBinaryMessages = binaryMessages == null || binaryMessages.Length == 0;
-
-                        receiverIsSuper = IsReceiverSuper(messageBase) && hasNoUnaryMessages && hasNoBinaryMessages;
-                    }
-                }
+                // Super send only if: receiver is super AND no unary/binary messages
+                bool receiverIsSuper = DetermineIfKeywordReceiverIsSuper(binaryExpr);
                 CompileKeywordMessage(keywordMessage, receiverIsSuper);
             }
         }
 
-        private void CompileBinaryExpr(Smalltalk80Parser.BinaryExprContext expr, bool receiverIsSuper, bool isCascadeBase = false, int totalCascadeMessages = 0)
+        /// <summary>
+        /// Compiles a binary expression (no cascade logic - cascade is handled by CompileCascadeExpr).
+        /// </summary>
+        private void CompileBinaryExpr(Smalltalk80Parser.BinaryExprContext expr, bool receiverIsSuper)
         {
             // Grammar: unaryExpr (binaryMessage)*
             var unaryExpr = expr.unaryExpr();
@@ -806,6 +1015,9 @@ namespace Smalltalk80.Compiler
 
             if (unaryExpr == null)
                 return;
+
+            // Compile the unary expression
+            CompileUnaryExpr(unaryExpr, receiverIsSuper);
 
             // Check if there are unary messages - if so, they "consume" the super flag
             // For "super isControlActive & ..." the super send is for isControlActive,
@@ -818,15 +1030,6 @@ namespace Smalltalk80.Compiler
             // 2. There are NO unary messages (so the binary message is directly on super)
             bool binaryReceiverIsSuper = receiverIsSuper && !hasUnaryMessages;
 
-            // Compile first unary expression (the receiver)
-            CompileUnaryExpr(unaryExpr, receiverIsSuper);
-
-            // For cascades, dup the receiver after pushing it
-            if (isCascadeBase && totalCascadeMessages > 1)
-            {
-                emitter.Dup();
-            }
-
             // Process binary messages
             if (binaryMessages != null)
             {
@@ -836,9 +1039,6 @@ namespace Smalltalk80.Compiler
                     var selector = msg.binarySelector().GetText();
 
                     // For super sends, pre-add selector to literal frame BEFORE compiling arguments.
-                    // This is critical because super sends always need the selector in the literal frame
-                    // (they can't use special bytecodes), and argument literal indices depend on
-                    // selectors.Count being accurate.
                     if (i == 0 && binaryReceiverIsSuper)
                     {
                         emitter.AddLiteral(new Symbol(selector));
@@ -848,7 +1048,7 @@ namespace Smalltalk80.Compiler
                     var argExpr = msg.unaryExpr();
                     if (argExpr != null)
                     {
-                        CompileUnaryExpr(argExpr, false); // Arguments are never super sends
+                        CompileUnaryExpr(argExpr, false);
                     }
 
                     // Emit the send
@@ -1865,10 +2065,10 @@ namespace Smalltalk80.Compiler
             return bytecode >= 120 && bytecode <= 127;
         }
         
-        private bool IsReceiverSuper(Smalltalk80Parser.MessageBaseContext baseCtx)
+        private bool IsReceiverSuper(Smalltalk80Parser.MessageBaseContext? baseCtx)
         {
             // Check if the receiver is the special variable "super"
-            if (baseCtx.variable() != null)
+            if (baseCtx?.variable() != null)
             {
                 var varName = baseCtx.variable().GetText();
                 return varName == "super";

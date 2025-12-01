@@ -37,6 +37,20 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     private readonly Dictionary<string, int> _methodSourcePositions = new(); // Maps method localId → byte position in .sources file
 
     /// <summary>
+    /// Blue Book canonical single-character binary selector symbols.
+    /// From "Smalltalk-80: The Language and Its Implementation" (1983).
+    /// These are the valid one-character message selectors recognized by the parser.
+    /// </summary>
+    private static readonly string[] BluebookSingleCharSelectors =
+    [
+        "+", "-", "*", "/",     // Arithmetic
+        "<", ">", "=", "~",     // Comparison
+        "&", "|",               // Logical / bitwise
+        "@", ",",               // Point / array
+        "\\", "?", "!", "%"     // Miscellaneous punctuation
+    ];
+
+    /// <summary>
     /// Block buffer for post-order emission.
     ///
     /// WHY: The loader can only resolve block references in a single pass if blocks appear AFTER
@@ -127,13 +141,18 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
         int position = System.Text.Encoding.UTF8.GetByteCount(_sourcesFileContent.ToString());
         _methodSourcePositions[localId] = position;
 
-        // Escape embedded ! characters as !! per chunk format
-        string escapedSource = source.Replace("!", "!!");
+        // Normalize line endings to LF for consistent byte positions across platforms
+        string normalizedSource = source.Replace("\r\n", "\n").Replace("\r", "\n");
 
-        // Write chunk: source text followed by !
+        // Escape embedded ! characters as !! per chunk format
+        string escapedSource = normalizedSource.Replace("!", "!!");
+
+        // Write chunk: source text followed by ! and LF
+        // IMPORTANT: Use explicit \n (not AppendLine) to ensure consistent byte positions
+        // across platforms. AppendLine uses platform-specific line endings which would
+        // cause source position mismatches between Windows (CRLF) and Linux (LF).
         _sourcesFileContent.Append(escapedSource);
-        _sourcesFileContent.Append('!');
-        _sourcesFileContent.AppendLine(); // Add newline for readability
+        _sourcesFileContent.Append("!\n");
 
         return position;
     }
@@ -172,6 +191,13 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
         foreach (var initExpr in ast.InitializationExpressions)
         {
             ExtractSymbolsFromLiterals(initExpr.Literals, symbols);
+        }
+
+        // Add Blue Book canonical single-character binary selectors
+        // These must be in the symbol table for SingleCharSymbols initialization
+        foreach (string s in BluebookSingleCharSelectors)
+        {
+            symbols.Add(s);
         }
 
         // Sort symbols for deterministic output

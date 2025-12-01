@@ -141,18 +141,21 @@ file sealed class Program
             File.WriteAllText(outputFile, json);
 
             // Write the .sources file alongside the JSON
+            // Use UTF-8 WITHOUT BOM to ensure source positions match exactly
+            // (BOM adds 3 bytes that would offset all positions)
+            var utf8NoBom = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
             string sourcesFileContent = generator.GetSourcesFileContent();
             if (!string.IsNullOrEmpty(sourcesFileContent))
             {
                 string sourcesFile = Path.Combine(outputDir ?? ".", "Smalltalk-80.sources");
-                File.WriteAllText(sourcesFile, sourcesFileContent, System.Text.Encoding.UTF8);
+                File.WriteAllText(sourcesFile, sourcesFileContent, utf8NoBom);
                 Console.WriteLine($"Generated sources file: {sourcesFile}");
                 Console.WriteLine($"  Size: {sourcesFileContent.Length:N0} bytes");
             }
 
             // Create empty .changes file (index 2) for runtime modifications
             string changesFile = Path.Combine(outputDir ?? ".", "Smalltalk-80.changes");
-            File.WriteAllText(changesFile, "", System.Text.Encoding.UTF8);
+            File.WriteAllText(changesFile, "", utf8NoBom);
             Console.WriteLine($"Generated changes file: {changesFile} (empty)");
 
             Console.WriteLine();

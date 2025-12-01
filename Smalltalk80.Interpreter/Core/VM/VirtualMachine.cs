@@ -502,9 +502,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // Check if current context is the NLR target
             if (_nlrHandler.IsTargetReached(_contextManager.ActiveContext))
             {
-                // if (_verboseDebugMode)
-                //     Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_contextManager.ActiveContext}");
-
                 // Target reached - clear NLR state and get the value
                 SmalltalkOOP nlrValue = _nlrHandler.Complete();
 
@@ -523,8 +520,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                     _returnValue = nlrValue;
                     _contextManager.SetActiveContext(_initialContextOOP);
                     _contextManager.AddContextToPool(returningContext);
-                    // if (_verboseDebugMode)
-                    //     Console.WriteLine($"[HandleReturn NLR] Returning to initial context");
                     return InterpreterStatus.Return;
                 }
 
@@ -532,8 +527,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 _contextManager.SetActiveContext(senderOOP);
                 _contextManager.AddContextToPool(returningContext);
                 Push(nlrValue);
-                // if (_verboseDebugMode)
-                //     Console.WriteLine($"[HandleReturn NLR] Pushed NLR value onto sender {senderOOP}");
                 return InterpreterStatus.Continue;
             }
 
