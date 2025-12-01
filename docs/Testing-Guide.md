@@ -6,15 +6,18 @@ Tests are organized into functional categories using xUnit's `[Trait]` attribute
 
 ### Test Categories
 
-| Category | Description |
-|----------|-------------|
-| **Primitives** | All primitive operation tests (arithmetic, comparison, control, strings, floats, etc.) |
-| **HeapManager** | Heap management, object allocation, GC tests |
-| **VM** | Virtual machine core: message dispatch, execution state |
-| **Context** | Context management and execution context tests |
-| **Compiler** | Bytecode compiler tests: emitter, variable resolution, temp frames |
+| Category | Tests | Status | Description |
+|----------|-------|--------|-------------|
+| **Primitives** | 255 | ✅ Enabled | All primitive operation tests (arithmetic, comparison, control, strings, floats, etc.) |
+| **HeapManager** | 125 | ✅ Enabled | Heap management, object allocation, GC tests |
+| **Validator** | 5 | ✅ Enabled | Cold start bundle validation tests |
+| **VM** | 42 | ⏸️ Disabled | Virtual machine core: message dispatch, execution state |
+| **Context** | 72 | ⏸️ Disabled | Context management and execution context tests |
+| **Compiler** | 132 | ⏸️ Disabled | Bytecode compiler tests: emitter, variable resolution, temp frames |
 
-**Total Tests**: 385 (all passing)
+**Total Tests**: 385 (all passing) - Primitives (255) + HeapManager (125) + Validator (5)
+
+**Note**: VM, Context, and Compiler tests are excluded via `<Compile Remove>` in the .csproj file.
 
 ## Running Tests by Category
 
@@ -113,7 +116,7 @@ dotnet test
 **Last Updated**: 2025-12-01
 **Status**: ✅ All 385 tests passing
 
-### Primitives: ✅ Passing (100%)
+### Primitives: ✅ 255/255 Passing (100%)
 - SmallInteger arithmetic (Add, Subtract, Multiply, Divide, etc.)
 - Comparison operations (LessThan, GreaterThan, Equal, etc.)
 - Bitwise operations (BitAnd, BitOr, BitXor, BitShift)
@@ -124,7 +127,7 @@ dotnet test
 - Control flow (BlockCopy, BlockValue, Signal, Wait, Resume, Suspend)
 - System operations (CoreLeft, OopsLeft, InstSize, BecomeForward, etc.)
 
-### HeapManager: ✅ Passing (100%)
+### HeapManager: ✅ 125/125 Passing (100%)
 - Object allocation (Pointer, PointerIndexed, ByteIndexed, WordIndexed formats)
 - Object table management (allocation, validation, enumeration)
 - Garbage collection (mark, sweep, compaction)
@@ -136,8 +139,11 @@ dotnet test
 - ObjectTableEntry typed accessors (byte/OOP/word arrays)
 - Free list management and object table reuse
 
-### Other Categories: ⏸️ Ready to Enable
-VM, Context, and Compiler tests are categorized and ready for selective execution.
+### Validator: ✅ 5/5 Passing (100%)
+- Cold start bundle validation (structure, metadata, bytecode validation)
+
+### Other Categories: ⏸️ Disabled in .csproj
+VM (42), Context (72), and Compiler (132) tests exist but are excluded via `<Compile Remove>` directives.
 
 ## Continuous Integration
 
