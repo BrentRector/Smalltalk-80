@@ -37,13 +37,13 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     private readonly Dictionary<string, int> _methodSourcePositions = new(); // Maps method localId → byte position in .sources file
 
     /// <summary>
-    /// Valid single-character binary selector symbols from the Smalltalk-80 grammar.
-    /// These must be included in the symbol table for SingleCharSymbols initialization.
+    /// All 128 ASCII single-character symbols (0-127).
+    /// Symbol>>initialize creates SingleCharSymbols with all 128 entries,
+    /// so all must be in the symbol table for proper cold start initialization.
     /// </summary>
-    private static readonly char[] ValidSingleCharSymbols =
-    [
-        '+', '-', '*', '/', '%', '\\', '~', '|', '&', '=', '<', '>', '@', '?', ','
-    ];
+    private static readonly string[] AllSingleCharSymbols = Enumerable.Range(0, 128)
+        .Select(i => ((char)i).ToString())
+        .ToArray();
 
     /// <summary>
     /// Block buffer for post-order emission.
@@ -188,12 +188,12 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             ExtractSymbolsFromLiterals(initExpr.Literals, symbols);
         }
 
-        // Add all valid single-character binary selector symbols from the grammar
-        // These are needed for SingleCharSymbols initialization during cold start
-        // even if they aren't explicitly used in the source code
-        foreach (char c in ValidSingleCharSymbols)
+        // Add all 128 single-character symbols (ASCII 0-127)
+        // Symbol>>initialize creates SingleCharSymbols with all 128 entries,
+        // so all must be in the symbol table for proper cold start initialization
+        foreach (string s in AllSingleCharSymbols)
         {
-            symbols.Add(c.ToString());
+            symbols.Add(s);
         }
 
         // Sort symbols for deterministic output
