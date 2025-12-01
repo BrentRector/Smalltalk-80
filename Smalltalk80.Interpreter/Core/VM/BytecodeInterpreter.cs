@@ -388,12 +388,6 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
                         var targetContextOOP = homeOOP;
 
-                        // DEBUG: Trace NLR initiation
-                        Console.WriteLine($"[NLR DEBUG] RETURN_TOP_POP in BlockContext");
-                        Console.WriteLine($"  Block context: {context.ActiveContext}");
-                        Console.WriteLine($"  Home (target): {homeOOP}");
-                        Console.WriteLine($"  Return value: {returnValue} (isNil={returnValue == metadata.KnownObjects.Nil})");
-
                         // Validate target is in sender chain (safety check)
                         if (!context.IsInSenderChain(targetContextOOP, context.ActiveContext))
                         {
