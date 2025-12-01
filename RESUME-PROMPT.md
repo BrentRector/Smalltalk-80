@@ -1,12 +1,13 @@
 # Resume Prompt: Smalltalk-80 Interpreter
 
-**Session Date**: 2025-11-30
+**Session Date**: 2025-12-01
 **Status**: ✅ System Browser FULLY FUNCTIONAL
 
 ## Current State
 
 ### What's Working
 - ✅ **System Browser**: Fully functional with source code retrieval
+- ✅ **Method Source Display**: All methods including `Cursor>>changed:` display correctly
 - ✅ **MVC Controller Loop**: Running, mouse/keyboard input working
 - ✅ **Process Primitives 85-88**: suspend, resume, terminate, yield
 - ✅ **Init Expressions**: 51/51 passing (100%)
@@ -15,28 +16,36 @@
 
 ### Recent Fixes (This Session)
 
-1. **BOM Double-Offset Bug** (`FilePrimitives.cs`)
-   - Primitive 124 (FileSeek) returned physical position instead of logical
-   - Primitive 132 (FileReadByte) then added BOM offset again
-   - Fix: Seek now returns logical position (physical - BOM offset)
+1. **SingleCharSymbols Initialization** (`ColdStartJsonGenerator.cs`, `SystemDictionaryInstaller.cs`)
+   - System Browser crashed with "nil ," error when viewing `Cursor>>changed:`
+   - Scanner's `xBinary` method called `Symbol internCharacter:` which returned nil
+   - Root cause: SingleCharSymbols array contained nils because it wasn't populated during cold start
+   - Fix Part 1: Compiler now adds Blue Book canonical binary selectors to symbol table:
+     `+ - * / < > = ~ & | @ , \ ? ! %` (16 characters)
+   - Fix Part 2: Phase 5 `InitializeSingleCharSymbols()` populates array with Symbol OOPs from bundle
 
-2. **BlockContext Stack Underflow** (`StackManager.cs`)
-   - Blue Book block arg handling pushes args onto stack for pop/store bytecodes
-   - StackManager used old model: `initialSP = nargs` (assumed fixed arg slots)
-   - Fix: Changed `initialSP` to 0 for BlockContexts (args are on stack, not reserved)
-
-3. **Outdated Build Warning** (`Smalltalk80.Interpreter.csproj`)
-   - Warning looked for `coldstart.json` in wrong location
-   - Fix: Updated path to `Data\coldstart.json`, removed misleading warning
-
-4. **Data Folder File Lookup** (`FilePrimitives.cs`)
-   - FormMenuView initialize and other init expressions couldn't find .form files
-   - Files are in `Data/` folder but `Disk` pointed to current directory (`.`)
-   - Fix: Primitives 121, 146, 154 now fall back to `Data/<path>` for resource files
+2. **Source File Line Endings** (`ColdStartJsonGenerator.cs`, `Program.cs`)
+   - Source positions in coldstart.json didn't match .sources file positions
+   - Root cause: CRLF vs LF line ending mismatch
+   - Fix: Normalize line endings to LF, use UTF-8 without BOM
 
 ---
 
 ## Architecture Notes
+
+### SingleCharSymbols (Blue Book Binary Selectors)
+```
+Purpose: Fast lookup of single-character message selectors
+Location: Symbol class variable (classPool)
+Contents: Array of 128 Symbol OOPs indexed by ASCII value
+Blue Book canonical set: + - * / < > = ~ & | @ , \ ? ! %
+
+Flow:
+1. Compiler adds 16 binary selectors to symbol table
+2. Phase 1 creates Symbol objects in heap
+3. Phase 5 populates SingleCharSymbols array from bundle
+4. Symbol>>internCharacter: uses array for fast lookup
+```
 
 ### Source Code Retrieval Flow
 ```
@@ -61,13 +70,6 @@ Browser → Behavior>>sourceCodeForMethod:at:
 4. initialSP = 0 for BlockContexts (no reserved slots)
 ```
 
-### Resource File Location (Data Folder)
-```
-Resource files (.form, .sources, etc.) live in: bin/Debug/net9.0-windows/Data/
-File primitives automatically check Data/ folder when file not found in cwd.
-Affected primitives: 121 (Open), 146 (DirList), 154 (GetAttributes)
-```
-
 ---
 
 ## Known Issues
@@ -82,14 +84,15 @@ Parser error on number literals. Scanner produces `tokenType: #xDigit` instead o
 
 ## Key Files
 
-### Recently Modified
-- `FilePrimitives.cs` - BOM offset handling + Data folder fallback for resource files
-- `StackManager.cs` - BlockContext initialSP = 0 for Blue Book arg handling
-- `Smalltalk80.Interpreter.csproj` - Removed outdated coldstart.json warning
-- `Smalltalk-80.st` - `File>>initialize` sets `Disk` to `Data` folder
+### Modified This Session
+- `ColdStartJsonGenerator.cs` - Blue Book binary selectors + line ending normalization
+- `SystemDictionaryInstaller.cs` - `InitializeSingleCharSymbols()` populates array from bundle
+- `BytecodeInterpreter.cs` - Removed NLR debug output
+- `VirtualMachine.cs` - Removed NLR debug output
+- `Smalltalk-80.st` - Reverted Symbol>>initialize to original Blue Book form
 
 ### Source Lookup
-- `SystemDictionaryInstaller.cs` - Creates SourceFiles array with file handles
+- `SystemDictionaryInstaller.cs` - Creates SourceFiles array + SingleCharSymbols
 - `ObjectPrimitives.cs` - `AllocateCompiledMethodInternal` encodes source positions
 - `docs/SOURCE-LOOKUP-ANALYSIS.md` - Complete documentation of source retrieval
 
@@ -113,6 +116,11 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 # C# unit tests
 cd Smalltalk80.Interpreter.Tests
 dotnet test
+
+# Regenerate coldstart after source changes
+cd "Smalltalk-80 Source"
+dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
+cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/* ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
 ```
 
 ---
