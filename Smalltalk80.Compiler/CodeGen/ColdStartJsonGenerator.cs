@@ -127,13 +127,18 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
         int position = System.Text.Encoding.UTF8.GetByteCount(_sourcesFileContent.ToString());
         _methodSourcePositions[localId] = position;
 
-        // Escape embedded ! characters as !! per chunk format
-        string escapedSource = source.Replace("!", "!!");
+        // Normalize line endings to LF for consistent byte positions across platforms
+        string normalizedSource = source.Replace("\r\n", "\n").Replace("\r", "\n");
 
-        // Write chunk: source text followed by !
+        // Escape embedded ! characters as !! per chunk format
+        string escapedSource = normalizedSource.Replace("!", "!!");
+
+        // Write chunk: source text followed by ! and LF
+        // IMPORTANT: Use explicit \n (not AppendLine) to ensure consistent byte positions
+        // across platforms. AppendLine uses platform-specific line endings which would
+        // cause source position mismatches between Windows (CRLF) and Linux (LF).
         _sourcesFileContent.Append(escapedSource);
-        _sourcesFileContent.Append('!');
-        _sourcesFileContent.AppendLine(); // Add newline for readability
+        _sourcesFileContent.Append("!\n");
 
         return position;
     }
