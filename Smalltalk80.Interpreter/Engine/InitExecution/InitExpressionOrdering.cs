@@ -62,7 +62,23 @@ public static class InitExpressionOrdering
             "VariableNode initialize",
             "FormMenuView initialize",
             "TextCollector initialize",
-            "FormDisplayTest initialize"  // Must run last - depends on FormMenuView loading Forms
+            "FormDisplayTest initialize",  // Must run last - depends on FormMenuView loading Forms
+
+            // BlockContext Diagnostic Tests (9 individual variable tests)
+            "DiagOa initialize",
+            "DiagOt1 initialize",
+            "DiagOt2 initialize",
+            "DiagMa initialize",
+            "DiagMt1 initialize",
+            "DiagMt2 initialize",
+            "DiagIa initialize",
+            "DiagIt1 initialize",
+            "DiagIt2 initialize",
+            "DiagPow10 initialize",
+            "DiagZero initialize",
+
+            // BlockContext Test Runner (runs all 120 tests, expected result: 1191)
+            "BlockContextTestRunner initialize"
         };
     }
 }
