@@ -820,24 +820,40 @@ namespace Smalltalk80.Compiler
 
             if (isCascadeBase && totalCascadeMessages > 1)
             {
-                // For cascades, we need to DUP the receiver BEFORE any messages are sent.
-                // The receiver is the messageBase of the unaryExpr.
+                // For cascades, the cascade receiver is all messages EXCEPT the last one.
+                // DUP happens before the last message of the first cascade expression.
                 //
-                // For "self step; step":
-                // Correct: PUSH self → DUP → SEND step → POP → SEND step
-                // Wrong:   PUSH self → SEND step → DUP (result!) → POP → SEND step (crash!)
+                // For "self step; step" (1 unary message):
+                //   Cascade receiver = self, DUP before "step"
+                //   PUSH self → DUP → SEND step → POP → SEND step
+                //
+                // For "aController view display; deEmphasize" (2 unary messages):
+                //   Cascade receiver = aController view, DUP before "display"
+                //   PUSH aController → SEND view → DUP → SEND display → POP → SEND deEmphasize
+                //
+                // For "obj + 1; + 2" (binary message):
+                //   Cascade receiver = obj, DUP before "+ 1"
+                //   PUSH obj → DUP → SEND + 1 → POP → SEND + 2
 
-                // 1. Push just the message base (the actual receiver)
-                var messageBase = unaryExpr.messageBase();
-                CompileMessageBase(messageBase);
+                bool hasBinaryMessages = binaryMessages != null && binaryMessages.Length > 0;
+                int unaryCount = unaryMessages?.Length ?? 0;
 
-                // 2. DUP the receiver for cascade support
-                emitter.Dup();
-
-                // 3. Send unary messages (if any)
-                if (unaryMessages != null)
+                if (hasBinaryMessages)
                 {
-                    for (int i = 0; i < unaryMessages.Length; i++)
+                    // Cascade receiver is the full unaryExpr result
+                    // Compile all unary messages, then DUP before binary messages
+                    CompileUnaryExpr(unaryExpr, receiverIsSuper);
+                    emitter.Dup();
+                    // Binary messages will be sent by the common path below
+                }
+                else if (unaryCount > 0)
+                {
+                    // Cascade receiver is all but the last unary message
+                    var messageBase = unaryExpr.messageBase();
+                    CompileMessageBase(messageBase);
+
+                    // Send all but the last unary message
+                    for (int i = 0; i < unaryCount - 1; i++)
                     {
                         var msg = unaryMessages[i];
                         var selector = msg.unarySelector().GetText();
@@ -861,6 +877,40 @@ namespace Smalltalk80.Compiler
                             emitter.EmitSend(selector, 0);
                         }
                     }
+
+                    // DUP the cascade receiver
+                    emitter.Dup();
+
+                    // Send the last unary message
+                    var lastMsg = unaryMessages[unaryCount - 1];
+                    var lastSelector = lastMsg.unarySelector().GetText();
+
+                    // Check for tail-recursive call on last message
+                    if (tailCalls != null && tailCalls.TryGetValue(lastMsg, out var lastTailCallInfo))
+                    {
+                        if (lastTailCallInfo.IsSafeToOptimize && methodStartLabel >= 0)
+                        {
+                            emitter.EmitTailRecursiveJump(methodStartLabel, 0);
+                        }
+                        else
+                        {
+                            emitter.EmitSend(lastSelector, 0);
+                        }
+                    }
+                    else
+                    {
+                        // Super only applies to first message, last message is never super
+                        emitter.EmitSend(lastSelector, 0);
+                    }
+                    // No binary messages in this branch
+                }
+                else
+                {
+                    // Just messageBase, DUP it immediately
+                    var messageBase = unaryExpr.messageBase();
+                    CompileMessageBase(messageBase);
+                    emitter.Dup();
+                    // No unary or binary messages - cascade messages come from messageParts
                 }
             }
             else
