@@ -758,11 +758,12 @@ namespace Smalltalk80.Compiler
             // Case 1: Has binary messages → compile unaryExpr + all but last binary
             if (binaryMessages != null && binaryMessages.Length > 0)
             {
-                bool receiverIsSuper = IsReceiverSuper(unaryExpr?.messageBase());
+                if (unaryExpr == null) return;
+                bool receiverIsSuper = IsReceiverSuper(unaryExpr.messageBase());
                 CompileUnaryExpr(unaryExpr, receiverIsSuper);
 
                 // Send all but the last binary message
-                var unaryMessages = unaryExpr?.unaryMessage();
+                var unaryMessages = unaryExpr.unaryMessage();
                 bool hasUnaryMessages = unaryMessages != null && unaryMessages.Length > 0;
                 bool binaryReceiverIsSuper = receiverIsSuper && !hasUnaryMessages;
 
