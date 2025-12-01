@@ -1207,21 +1207,376 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Attempts to inline conditional message patterns (ifTrue:, ifFalse:, ifTrue:ifFalse:).
         /// Returns true if successfully inlined, false otherwise.
+        /// Blue Book Chapter 26: "The control structures that are so optimized by the
+        /// compiler are the conditional selection messages to Booleans (ifTrue:, ifFalse:,
+        /// and ifTrue:ifFalse:), some of the logical operation messages to Booleans (and:
+        /// and or:), and the conditional repetition messages to blocks (whileTrue: and
+        /// whileFalse:)."
         ///
-        /// DISABLED (2025-10-07): Blue Book Smalltalk-80 does NOT inline conditionals!
-        /// Control structures like ifTrue: and ifFalse: are ordinary message sends.
-        /// Blocks are compiled as literals and control flow happens via polymorphic
-        /// dispatch on True/False classes. See docs/Interpreter-Architecture.md
-        /// "Block Compilation and Control Flow" for complete explanation.
-        ///
-        /// Future optimization: Inlining code removed (550 lines). See IA documentation
-        /// section "Future Optimization: Inlined Control Flow" for how to implement
-        /// this as an optional optimization.
+        /// This optimization replaces message sends with conditional jump bytecodes,
+        /// avoiding BlockContext creation for simple control flow.
         /// </summary>
         private bool TryInlineConditional(string selector, Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
-            // ALWAYS return false - disable inlining optimization
-            // ifTrue:, ifFalse:, ifTrue:ifFalse: are ORDINARY MESSAGE SENDS
+            // Only inline specific selectors
+            switch (selector)
+            {
+                case "ifTrue:":
+                    return TryInlineIfTrue(keywordParts);
+                case "ifFalse:":
+                    return TryInlineIfFalse(keywordParts);
+                case "ifTrue:ifFalse:":
+                    return TryInlineIfTrueIfFalse(keywordParts);
+                case "ifFalse:ifTrue:":
+                    return TryInlineIfFalseIfTrue(keywordParts);
+                case "and:":
+                    return TryInlineAnd(keywordParts);
+                case "or:":
+                    return TryInlineOr(keywordParts);
+                case "whileTrue:":
+                    return TryInlineWhileTrue(keywordParts);
+                case "whileFalse:":
+                    return TryInlineWhileFalse(keywordParts);
+                case "whileTrue":
+                    return TryInlineWhileTrueNoArg(keywordParts);
+                case "whileFalse":
+                    return TryInlineWhileFalseNoArg(keywordParts);
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Checks if a block can be inlined (zero arguments, is a block literal).
+        /// </summary>
+        private bool CanInlineBlock(Smalltalk80Parser.KeywordPartContext keywordPart, out Smalltalk80Parser.BlockContext? block)
+        {
+            block = null;
+
+            // Get the expression for this keyword argument
+            var expr = keywordPart.binaryExpr();
+            if (expr == null) return false;
+
+            // Must be a simple unary expression (block literal)
+            var unaryExpr = expr.unaryExpr();
+            if (unaryExpr == null) return false;
+            if (expr.binaryMessage() != null && expr.binaryMessage().Length > 0) return false;
+
+            var messageBase = unaryExpr.messageBase();
+            if (messageBase == null) return false;
+            if (unaryExpr.unaryMessage() != null && unaryExpr.unaryMessage().Length > 0) return false;
+
+            // Must be a block literal
+            block = messageBase.block();
+            if (block == null) return false;
+
+            // Block must have no arguments (zero-arg blocks only)
+            var blockArgs = block.blockArgs();
+            if (blockArgs != null)
+            {
+                var argNodes = blockArgs.children?
+                    .OfType<Smalltalk80Parser.ArgumentNameContext>()
+                    .ToList();
+                if (argNodes != null && argNodes.Count > 0) return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Compiles a block's statements inline (without BlockContext wrapper).
+        /// The last expression value is left on the stack.
+        /// </summary>
+        private void CompileInlineBlockBody(Smalltalk80Parser.BlockContext block)
+        {
+            // Handle block temporaries by allocating them in the method's temp frame
+            var blockTemps = block.blockTemps();
+            var tempNames = new List<string>();
+            if (blockTemps != null)
+            {
+                tempNames = (blockTemps.children ?? Enumerable.Empty<IParseTree>())
+                    .OfType<Smalltalk80Parser.TemporaryNameContext>()
+                    .Select(t => t.GetText())
+                    .ToList();
+
+                // Allocate block temporaries in the unified temp frame
+                foreach (var tempName in tempNames)
+                {
+                    if (!environment.Temporaries.ContainsKey(tempName))
+                    {
+                        int slot = allocator.AllocateLocalTemporary(tempName);
+                        environment.Temporaries[tempName] = slot;
+                    }
+                }
+            }
+
+            // Compile block body statements
+            var statements = block.statements();
+            if (statements != null)
+            {
+                // Compile statements but DON'T emit implicit return
+                // The last expression value stays on stack
+                var stmtList = statements.statement();
+                if (stmtList != null)
+                {
+                    for (int i = 0; i < stmtList.Length; i++)
+                    {
+                        var stmt = stmtList[i];
+                        bool isLast = (i == stmtList.Length - 1);
+                        CompileStatement(stmt, isLast: isLast, inBlock: true);
+
+                        // Pop intermediate results except the last one
+                        if (!isLast)
+                        {
+                            emitter.Pop();
+                        }
+                    }
+                }
+                else
+                {
+                    // Empty statements - push nil
+                    emitter.PushNil();
+                }
+            }
+            else
+            {
+                // Empty block - push nil
+                emitter.PushNil();
+            }
+        }
+
+        /// <summary>
+        /// Inlines: condition ifTrue: [trueBlock]
+        /// Pattern: condition already on stack
+        ///   JUMP_IF_FALSE skip
+        ///   <trueBlock body>
+        /// skip:
+        ///   (value on stack or nil)
+        /// </summary>
+        private bool TryInlineIfTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts)
+        {
+            if (keywordParts.Length != 1) return false;
+            if (!CanInlineBlock(keywordParts[0], out var trueBlock)) return false;
+
+            // Emit: JUMP_IF_FALSE to end
+            int jumpPlaceholder = emitter.EmitJumpOnFalsePlaceholder();
+
+            // Compile true block body inline
+            CompileInlineBlockBody(trueBlock!);
+
+            // Emit: unconditional jump over nil (for false case)
+            int skipNilPlaceholder = emitter.EmitForwardJumpPlaceholder();
+
+            // Patch: JUMP_IF_FALSE lands here
+            emitter.PatchJumpOnFalse(jumpPlaceholder);
+
+            // False case: push nil (ifTrue: returns nil when condition is false)
+            emitter.PushNil();
+
+            // Patch: skip over nil landing
+            emitter.PatchForwardJump(skipNilPlaceholder);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Inlines: condition ifFalse: [falseBlock]
+        /// Pattern: condition already on stack
+        ///   JUMP_IF_TRUE skip
+        ///   <falseBlock body>
+        /// skip:
+        ///   (value on stack or nil)
+        /// </summary>
+        private bool TryInlineIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)
+        {
+            if (keywordParts.Length != 1) return false;
+            if (!CanInlineBlock(keywordParts[0], out var falseBlock)) return false;
+
+            // Emit: JUMP_IF_TRUE to end
+            int jumpPlaceholder = emitter.EmitJumpOnTruePlaceholder();
+
+            // Compile false block body inline
+            CompileInlineBlockBody(falseBlock!);
+
+            // Emit: unconditional jump over nil
+            int skipNilPlaceholder = emitter.EmitForwardJumpPlaceholder();
+
+            // Patch: JUMP_IF_TRUE lands here
+            emitter.PatchJumpOnTrue(jumpPlaceholder);
+
+            // True case: push nil (ifFalse: returns nil when condition is true)
+            emitter.PushNil();
+
+            // Patch: skip over nil landing
+            emitter.PatchForwardJump(skipNilPlaceholder);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Inlines: condition ifTrue: [trueBlock] ifFalse: [falseBlock]
+        /// Pattern: condition already on stack
+        ///   JUMP_IF_FALSE falseLabel
+        ///   <trueBlock body>
+        ///   JUMP endLabel
+        /// falseLabel:
+        ///   <falseBlock body>
+        /// endLabel:
+        /// </summary>
+        private bool TryInlineIfTrueIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)
+        {
+            if (keywordParts.Length != 2) return false;
+            if (!CanInlineBlock(keywordParts[0], out var trueBlock)) return false;
+            if (!CanInlineBlock(keywordParts[1], out var falseBlock)) return false;
+
+            // Emit: JUMP_IF_FALSE to falseBlock
+            int jumpToFalsePlaceholder = emitter.EmitJumpOnFalsePlaceholder();
+
+            // Compile true block body inline
+            CompileInlineBlockBody(trueBlock!);
+
+            // Emit: unconditional jump over false block
+            int jumpToEndPlaceholder = emitter.EmitForwardJumpPlaceholder();
+
+            // Patch: JUMP_IF_FALSE lands here (start of false block)
+            emitter.PatchJumpOnFalse(jumpToFalsePlaceholder);
+
+            // Compile false block body inline
+            CompileInlineBlockBody(falseBlock!);
+
+            // Patch: unconditional jump lands here (end)
+            emitter.PatchForwardJump(jumpToEndPlaceholder);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Inlines: condition ifFalse: [falseBlock] ifTrue: [trueBlock]
+        /// Same as ifTrue:ifFalse: but with reversed block order.
+        /// </summary>
+        private bool TryInlineIfFalseIfTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts)
+        {
+            if (keywordParts.Length != 2) return false;
+            if (!CanInlineBlock(keywordParts[0], out var falseBlock)) return false;
+            if (!CanInlineBlock(keywordParts[1], out var trueBlock)) return false;
+
+            // Emit: JUMP_IF_TRUE to trueBlock
+            int jumpToTruePlaceholder = emitter.EmitJumpOnTruePlaceholder();
+
+            // Compile false block body inline (condition was false)
+            CompileInlineBlockBody(falseBlock!);
+
+            // Emit: unconditional jump over true block
+            int jumpToEndPlaceholder = emitter.EmitForwardJumpPlaceholder();
+
+            // Patch: JUMP_IF_TRUE lands here (start of true block)
+            emitter.PatchJumpOnTrue(jumpToTruePlaceholder);
+
+            // Compile true block body inline
+            CompileInlineBlockBody(trueBlock!);
+
+            // Patch: unconditional jump lands here (end)
+            emitter.PatchForwardJump(jumpToEndPlaceholder);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Inlines: condition and: [block]
+        /// Short-circuit: if condition is false, return false without evaluating block.
+        /// </summary>
+        private bool TryInlineAnd(Smalltalk80Parser.KeywordPartContext[] keywordParts)
+        {
+            if (keywordParts.Length != 1) return false;
+            if (!CanInlineBlock(keywordParts[0], out var block)) return false;
+
+            // Emit: JUMP_IF_FALSE to end (short-circuit)
+            int jumpPlaceholder = emitter.EmitJumpOnFalsePlaceholder();
+
+            // Compile block body inline (evaluates to second boolean)
+            CompileInlineBlockBody(block!);
+
+            // Jump over the false push
+            int skipFalsePlaceholder = emitter.EmitForwardJumpPlaceholder();
+
+            // Patch: JUMP_IF_FALSE lands here
+            emitter.PatchJumpOnFalse(jumpPlaceholder);
+
+            // Short-circuit case: push false
+            emitter.PushFalse();
+
+            // Patch: skip over false
+            emitter.PatchForwardJump(skipFalsePlaceholder);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Inlines: condition or: [block]
+        /// Short-circuit: if condition is true, return true without evaluating block.
+        /// </summary>
+        private bool TryInlineOr(Smalltalk80Parser.KeywordPartContext[] keywordParts)
+        {
+            if (keywordParts.Length != 1) return false;
+            if (!CanInlineBlock(keywordParts[0], out var block)) return false;
+
+            // Emit: JUMP_IF_TRUE to end (short-circuit)
+            int jumpPlaceholder = emitter.EmitJumpOnTruePlaceholder();
+
+            // Compile block body inline (evaluates to second boolean)
+            CompileInlineBlockBody(block!);
+
+            // Jump over the true push
+            int skipTruePlaceholder = emitter.EmitForwardJumpPlaceholder();
+
+            // Patch: JUMP_IF_TRUE lands here
+            emitter.PatchJumpOnTrue(jumpPlaceholder);
+
+            // Short-circuit case: push true
+            emitter.PushTrue();
+
+            // Patch: skip over true
+            emitter.PatchForwardJump(skipTruePlaceholder);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Inlines: [conditionBlock] whileTrue: [bodyBlock]
+        /// Note: Receiver is a block, not evaluated yet!
+        /// </summary>
+        private bool TryInlineWhileTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts)
+        {
+            // whileTrue: requires special handling - receiver is a block
+            // This is more complex and may need to be called differently
+            // For now, return false to use standard message send
+            return false;
+        }
+
+        /// <summary>
+        /// Inlines: [conditionBlock] whileFalse: [bodyBlock]
+        /// </summary>
+        private bool TryInlineWhileFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)
+        {
+            // whileFalse: requires special handling - receiver is a block
+            return false;
+        }
+
+        /// <summary>
+        /// Inlines: [conditionBlock] whileTrue
+        /// </summary>
+        private bool TryInlineWhileTrueNoArg(Smalltalk80Parser.KeywordPartContext[] keywordParts)
+        {
+            // whileTrue (no arg) requires special handling
+            return false;
+        }
+
+        /// <summary>
+        /// Inlines: [conditionBlock] whileFalse
+        /// </summary>
+        private bool TryInlineWhileFalseNoArg(Smalltalk80Parser.KeywordPartContext[] keywordParts)
+        {
+            // whileFalse (no arg) requires special handling
             return false;
         }
 

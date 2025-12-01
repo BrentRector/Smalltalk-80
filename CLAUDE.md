@@ -17,10 +17,10 @@
 
 ## Known Issues
 
-**🟡 Control Structure Optimization Disabled**
-The C# compiler has `ifTrue:`/`ifFalse:` optimization **incorrectly disabled**. Blue Book Chapter 28 confirms these SHOULD be optimized to conditional jumps (no BlockContext created). Current behavior creates BlockContexts, causing `thisContext` to return BlockContext instead of MethodContext.
+**✅ Control Structure Optimization - IMPLEMENTED**
+The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:ifTrue:`, `and:`, and `or:` using Blue Book conditional jump bytecodes. No BlockContext is created for zero-argument blocks in these control structures.
 
-**Fix Applied**: Added `BlockContext>>removeSelf` method that delegates to `home removeSelf`. This follows the existing BlockContext pattern (like `receiver` and `method`) and automatically handles nested blocks via the chain of `home` references. The proper long-term fix still requires enabling compiler optimization.
+**Remaining**: `whileTrue:` and `whileFalse:` are NOT yet inlined (receiver is a block, requires special handling).
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 

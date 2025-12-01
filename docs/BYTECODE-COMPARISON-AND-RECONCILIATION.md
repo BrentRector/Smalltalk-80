@@ -318,7 +318,8 @@ No changes needed.
 | Stack operations alignment | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Pop (0x87), Dup (0x88) |
 | Super send implementation | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Already Blue Book compliant (0x85-0x86) |
 | Block return reconciliation | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Blue Book 0x7C-0x7F |
-| Conditional optimization | 🔲 Phase 3 | - | Pending |
+| Conditional optimization | ✅ Complete | claude/bytecode-comparison-reconciliation-* | ifTrue:/ifFalse:/ifTrue:ifFalse:/and:/or: inlined |
+| whileTrue:/whileFalse: | 🔲 Deferred | - | Requires special receiver handling (receiver is block) |
 
 ## Appendix: Blue Book References
 
@@ -332,9 +333,17 @@ No changes needed.
 2. ~~Create feature branches for each phase~~ ✅
 3. ~~Begin Phase 1 implementation~~ ✅ COMPLETE
 4. ~~Begin Phase 2: Block return reconciliation and super send implementation~~ ✅ COMPLETE
-5. Begin Phase 3: Enable conditional optimization (ifTrue:/ifFalse: inlining)
+5. ~~Begin Phase 3: Enable conditional optimization (ifTrue:/ifFalse: inlining)~~ ✅ COMPLETE
+6. Future: Implement whileTrue:/whileFalse: optimization (requires special receiver block handling)
 
 ## Change Log
+
+- **2025-12-01**: Phase 3 completed
+  - Conditional optimization enabled for: `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:ifTrue:`, `and:`, `or:`
+  - Added conditional jump methods to BytecodeEmitter (placeholders + patching)
+  - Inline block compilation (no BlockContext created for zero-arg blocks)
+  - Blue Book bytecodes: 0xA8-0xAB (jump on true), 0xAC-0xAF (jump on false)
+  - `whileTrue:`/`whileFalse:` deferred (receiver is a block, needs different approach)
 
 - **2025-12-01**: Phase 2 completed
   - Block return reconciliation (Blue Book semantics for 0x7C-0x7F)

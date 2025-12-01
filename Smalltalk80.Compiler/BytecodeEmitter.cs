@@ -724,7 +724,7 @@ namespace Smalltalk80.Compiler
             Emit(Bytecode.RETURN_TOP_FROM_BLOCK); // 0x7D - local block return
         }
 
-        // Jump operations - Used for tail recursion optimization
+        // Jump operations - Used for tail recursion optimization and control flow inlining
 
         /// <summary>
         /// Marks the current bytecode position as the method entry point.
@@ -734,6 +734,142 @@ namespace Smalltalk80.Compiler
         public int MarkMethodStart()
         {
             return CurrentIP;
+        }
+
+        // ============================================================================
+        // CONDITIONAL JUMP OPERATIONS - Blue Book Control Flow Inlining
+        // ============================================================================
+        // Blue Book bytecode specification:
+        //   0x90-0x97: Short unconditional jump (forward 1-8 bytes)
+        //   0x98-0x9F: Short conditional jump on FALSE (pop, forward 1-8 if false)
+        //   0xA0-0xA7: Long unconditional jump (range -1024 to +1023)
+        //   0xA8-0xAB: Long conditional jump on TRUE (pop, forward 0-1023)
+        //   0xAC-0xAF: Long conditional jump on FALSE (pop, forward 0-1023)
+        // ============================================================================
+
+        /// <summary>
+        /// Emits a placeholder for a forward jump on FALSE condition.
+        /// Returns the bytecode offset to be patched later with PatchJumpOnFalse().
+        /// Blue Book: Pops stack and jumps if top was false.
+        /// </summary>
+        /// <returns>Bytecode offset of the placeholder (for patching)</returns>
+        public int EmitJumpOnFalsePlaceholder()
+        {
+            // Reserve 2 bytes for long jump (0xAC-0xAF format)
+            // We don't know the offset yet, so emit placeholder bytes
+            int placeholderOffset = CurrentIP;
+            Emit(0xAC);  // Long jump on false, base offset 0
+            Emit(0x00);  // Extension byte placeholder
+            return placeholderOffset;
+        }
+
+        /// <summary>
+        /// Emits a placeholder for a forward jump on TRUE condition.
+        /// Returns the bytecode offset to be patched later with PatchJumpOnTrue().
+        /// Blue Book: Pops stack and jumps if top was true.
+        /// </summary>
+        /// <returns>Bytecode offset of the placeholder (for patching)</returns>
+        public int EmitJumpOnTruePlaceholder()
+        {
+            // Reserve 2 bytes for long jump (0xA8-0xAB format)
+            int placeholderOffset = CurrentIP;
+            Emit(0xA8);  // Long jump on true, base offset 0
+            Emit(0x00);  // Extension byte placeholder
+            return placeholderOffset;
+        }
+
+        /// <summary>
+        /// Emits a placeholder for an unconditional forward jump.
+        /// Returns the bytecode offset to be patched later with PatchForwardJump().
+        /// </summary>
+        /// <returns>Bytecode offset of the placeholder (for patching)</returns>
+        public int EmitForwardJumpPlaceholder()
+        {
+            // Reserve 2 bytes for long jump (0xA4-0xA7 format)
+            int placeholderOffset = CurrentIP;
+            Emit(0xA4);  // Long unconditional jump, base offset 0
+            Emit(0x00);  // Extension byte placeholder
+            return placeholderOffset;
+        }
+
+        /// <summary>
+        /// Patches a jump on FALSE placeholder with the actual offset.
+        /// The jump target is the current bytecode position.
+        /// Blue Book: offset = (opcode AND 0x03) * 256 + extensionByte
+        /// </summary>
+        /// <param name="placeholderOffset">Offset returned by EmitJumpOnFalsePlaceholder()</param>
+        /// <exception cref="InvalidOperationException">Thrown if offset exceeds range (0-1023)</exception>
+        public void PatchJumpOnFalse(int placeholderOffset)
+        {
+            // Calculate offset from after the jump instruction to current position
+            // Jump instruction is 2 bytes, so target IP after reading = placeholderOffset + 2
+            int jumpOffset = CurrentIP - (placeholderOffset + 2);
+
+            if (jumpOffset < 0)
+                throw new InvalidOperationException($"Jump on false cannot jump backward (offset={jumpOffset})");
+            if (jumpOffset > 1023)
+                throw new InvalidOperationException($"Jump on false offset {jumpOffset} exceeds Blue Book range (0-1023)");
+
+            // Blue Book: offset = (opcode AND 0x03) * 256 + extensionByte
+            // 0xAC = base 0, 0xAD = base 256, 0xAE = base 512, 0xAF = base 768
+            int hiPart = jumpOffset / 256;  // 0, 1, 2, or 3
+            int extensionByte = jumpOffset % 256;
+            byte opcode = (byte)(0xAC + hiPart);
+
+            PatchByteAt(placeholderOffset, opcode);
+            PatchByteAt(placeholderOffset + 1, (byte)extensionByte);
+        }
+
+        /// <summary>
+        /// Patches a jump on TRUE placeholder with the actual offset.
+        /// Blue Book: offset = (opcode AND 0x03) * 256 + extensionByte
+        /// </summary>
+        /// <param name="placeholderOffset">Offset returned by EmitJumpOnTruePlaceholder()</param>
+        /// <exception cref="InvalidOperationException">Thrown if offset exceeds range (0-1023)</exception>
+        public void PatchJumpOnTrue(int placeholderOffset)
+        {
+            int jumpOffset = CurrentIP - (placeholderOffset + 2);
+
+            if (jumpOffset < 0)
+                throw new InvalidOperationException($"Jump on true cannot jump backward (offset={jumpOffset})");
+            if (jumpOffset > 1023)
+                throw new InvalidOperationException($"Jump on true offset {jumpOffset} exceeds Blue Book range (0-1023)");
+
+            // Blue Book: 0xA8-0xAB for long jump on true
+            // 0xA8 = base 0, 0xA9 = base 256, 0xAA = base 512, 0xAB = base 768
+            int hiPart = jumpOffset / 256;
+            int extensionByte = jumpOffset % 256;
+            byte opcode = (byte)(0xA8 + hiPart);
+
+            PatchByteAt(placeholderOffset, opcode);
+            PatchByteAt(placeholderOffset + 1, (byte)extensionByte);
+        }
+
+        /// <summary>
+        /// Patches an unconditional forward jump placeholder with the actual offset.
+        /// Blue Book: offset = ((opcode AND 0x07) - 4) * 256 + extensionByte
+        /// For forward jumps, use 0xA4-0xA7 (base offsets 0, 256, 512, 768)
+        /// </summary>
+        /// <param name="placeholderOffset">Offset returned by EmitForwardJumpPlaceholder()</param>
+        /// <exception cref="InvalidOperationException">Thrown if offset exceeds range (0-1023)</exception>
+        public void PatchForwardJump(int placeholderOffset)
+        {
+            int jumpOffset = CurrentIP - (placeholderOffset + 2);
+
+            if (jumpOffset < 0)
+                throw new InvalidOperationException($"Forward jump cannot jump backward (offset={jumpOffset})");
+            if (jumpOffset > 1023)
+                throw new InvalidOperationException($"Forward jump offset {jumpOffset} exceeds Blue Book range (0-1023)");
+
+            // Blue Book: 0xA4-0xA7 for forward unconditional jumps
+            // offset = ((opcode & 0x07) - 4) * 256 + extensionByte
+            // So for offset N: hiPart = N / 256, opcode = 0xA4 + hiPart
+            int hiPart = jumpOffset / 256;
+            int extensionByte = jumpOffset % 256;
+            byte opcode = (byte)(0xA4 + hiPart);
+
+            PatchByteAt(placeholderOffset, opcode);
+            PatchByteAt(placeholderOffset + 1, (byte)extensionByte);
         }
 
         /// <summary>
