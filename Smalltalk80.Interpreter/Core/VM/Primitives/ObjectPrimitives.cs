@@ -138,10 +138,7 @@ public static class SimpleObjectPrimitives
                 int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
 
                 if (index < 1 || index > bytecodeCount)
-                {
-                    Console.WriteLine($"[Primitive 60 FAIL] CompiledMethod at: {index} failed - bytecodeCount={bytecodeCount}");
                     return PrimitiveResult.Fail(context.Metadata!);
-                }
 
                 byte b = context.HeapManager.GetIndexedByte(bytecodeArrayOOP, index - 1);
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(b));
@@ -151,11 +148,7 @@ public static class SimpleObjectPrimitives
 
             // Smalltalk indices are 1-based
             if (index < 1 || index > size)
-            {
-                // DIAGNOSTIC: Print details when basicAt: fails
-                Console.WriteLine($"[Primitive 60 FAIL] basicAt: {index} failed - receiver={context.Receiver}, size={size}, class={classOOP}");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
             var format = context.HeapManager.GetObjectFormat(context.Receiver);
             SmalltalkOOP value;

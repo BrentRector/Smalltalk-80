@@ -712,9 +712,6 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     {
         if (objectOOP.IsSmallInteger)
         {
-            // DEBUG: Add stack trace to help diagnose where this is called from
-            Console.WriteLine($"[DEBUG GetObjectFormat] ERROR: Called with SmallInteger OOP={objectOOP.RawValue}");
-            Console.WriteLine($"[DEBUG GetObjectFormat] Stack trace: {Environment.StackTrace}");
             throw new ArgumentException("SmallIntegers don't have object format");
         }
 
