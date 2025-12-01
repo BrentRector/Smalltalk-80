@@ -131,6 +131,6 @@ Write-Host "     DiagIt1 initialize... Returned: 188" -ForegroundColor White
 Write-Host "     DiagIt2 initialize... Returned: 266" -ForegroundColor White
 Write-Host
 Write-Host "  2. Full test suite:" -ForegroundColor Cyan
-Write-Host "     BlockContextTestRunner initialize... Returned: 1200" -ForegroundColor White
+Write-Host "     BlockContextTestRunner initialize... Returned: 1192" -ForegroundColor White
 Write-Host "     (120 tests × 10 points each)" -ForegroundColor DarkGray
 Write-Host
