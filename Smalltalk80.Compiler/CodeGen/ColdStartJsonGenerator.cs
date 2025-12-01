@@ -37,6 +37,15 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     private readonly Dictionary<string, int> _methodSourcePositions = new(); // Maps method localId → byte position in .sources file
 
     /// <summary>
+    /// Valid single-character binary selector symbols from the Smalltalk-80 grammar.
+    /// These must be included in the symbol table for SingleCharSymbols initialization.
+    /// </summary>
+    private static readonly char[] ValidSingleCharSymbols =
+    [
+        '+', '-', '*', '/', '%', '\\', '~', '|', '&', '=', '<', '>', '@', '?', ','
+    ];
+
+    /// <summary>
     /// Block buffer for post-order emission.
     ///
     /// WHY: The loader can only resolve block references in a single pass if blocks appear AFTER
@@ -177,6 +186,14 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
         foreach (var initExpr in ast.InitializationExpressions)
         {
             ExtractSymbolsFromLiterals(initExpr.Literals, symbols);
+        }
+
+        // Add all valid single-character binary selector symbols from the grammar
+        // These are needed for SingleCharSymbols initialization during cold start
+        // even if they aren't explicitly used in the source code
+        foreach (char c in ValidSingleCharSymbols)
+        {
+            symbols.Add(c.ToString());
         }
 
         // Sort symbols for deterministic output
