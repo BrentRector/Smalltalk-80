@@ -502,14 +502,15 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // Check if current context is the NLR target
             if (_nlrHandler.IsTargetReached(_contextManager.ActiveContext))
             {
-                // if (_verboseDebugMode)
-                //     Console.WriteLine($"[HandleReturn NLR] TARGET REACHED at {_contextManager.ActiveContext}");
+                Console.WriteLine($"[NLR DEBUG] TARGET REACHED at {_contextManager.ActiveContext}");
 
                 // Target reached - clear NLR state and get the value
                 SmalltalkOOP nlrValue = _nlrHandler.Complete();
+                Console.WriteLine($"[NLR DEBUG]   NLR value: {nlrValue} (isNil={nlrValue == _metadata.KnownObjects.Nil})");
 
                 // Get sender to continue execution
                 senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
+                Console.WriteLine($"[NLR DEBUG]   Sender (will push value): {senderOOP}");
 
                 // Save context to pool AFTER switching (must not be active)
                 returningContext = _contextManager.ActiveContext;
@@ -523,8 +524,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                     _returnValue = nlrValue;
                     _contextManager.SetActiveContext(_initialContextOOP);
                     _contextManager.AddContextToPool(returningContext);
-                    // if (_verboseDebugMode)
-                    //     Console.WriteLine($"[HandleReturn NLR] Returning to initial context");
+                    Console.WriteLine($"[NLR DEBUG]   Returning to initial context");
                     return InterpreterStatus.Return;
                 }
 
@@ -532,8 +532,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 _contextManager.SetActiveContext(senderOOP);
                 _contextManager.AddContextToPool(returningContext);
                 Push(nlrValue);
-                // if (_verboseDebugMode)
-                //     Console.WriteLine($"[HandleReturn NLR] Pushed NLR value onto sender {senderOOP}");
+                Console.WriteLine($"[NLR DEBUG]   Pushed {nlrValue} onto sender {senderOOP}");
                 return InterpreterStatus.Continue;
             }
 
