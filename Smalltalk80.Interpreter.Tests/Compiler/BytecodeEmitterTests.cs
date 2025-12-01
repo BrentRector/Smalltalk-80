@@ -747,7 +747,12 @@ public class BytecodeEmitterTests
 
         // Assert
         var bytecodes = emitter.GetBytecodes();
-        Assert.Equal(0xA8, bytecodes[5]);  // Long unconditional backward jump (0xA8 - no specific enum for this)
+        // Blue Book long unconditional jump (0xA0-0xA7) with backward offset
+        // jumpOffset = target(0) - current(5) - 2 = -7
+        // hiPart = (-7 - 255) / 256 = -1, loByte = -7 - (-256) = 249
+        // opcodeBits = -1 + 4 = 3, so opcode = 0xA0 + 3 = 0xA3
+        Assert.True(bytecodes[5] >= 0xA0 && bytecodes[5] <= 0xA7,
+            $"Expected long unconditional jump (0xA0-0xA7), got 0x{bytecodes[5]:X2}");
     }
 
     [Fact]

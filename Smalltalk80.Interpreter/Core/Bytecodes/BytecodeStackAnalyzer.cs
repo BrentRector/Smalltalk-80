@@ -138,25 +138,36 @@ public static class BytecodeStackAnalyzer
         if (b == 137)
             return +1;
 
-        // Short jumps (0x90-0x97 = 144-151): Jump forward 1-8 bytes
+        // Blue Book Short unconditional jumps (0x90-0x97): forward 1-8 bytes, no stack effect
         if (b >= 144 && b <= 151)
-            return 0; // Unconditional forward jump, no stack effect
+            return 0;
 
-        // Medium jump (0xA0 = 160): Jump forward with parameter
-        if (b == 160)
+        // Blue Book Short conditional jump on FALSE (0x98-0x9F): pops condition
+        if (b >= 152 && b <= 159)
+            return -1;
+
+        // Blue Book Long unconditional jump (0xA0-0xA7): 1 extension byte, no stack effect
+        if (b >= 160 && b <= 167)
         {
             if (pc < bytecodes.Length)
-                pc++; // Skip distance parameter
+                pc++; // Skip extension byte
             return 0;
         }
 
-        // Long jumps (0xA1-0xA7 = 161-167): Jump forward with multi-byte distance
-        if (b >= 161 && b <= 167)
+        // Blue Book Long conditional jump on TRUE (0xA8-0xAB): pops condition
+        if (b >= 168 && b <= 171)
         {
-            int bytesNeeded = b - 159; // N = 2 to 8
-            for (int i = 0; i < bytesNeeded && pc < bytecodes.Length; i++)
-                pc++;
-            return 0;
+            if (pc < bytecodes.Length)
+                pc++; // Skip extension byte
+            return -1;
+        }
+
+        // Blue Book Long conditional jump on FALSE (0xAC-0xAF): pops condition
+        if (b >= 172 && b <= 175)
+        {
+            if (pc < bytecodes.Length)
+                pc++; // Skip extension byte
+            return -1;
         }
 
         // Extended prefix (0x80)

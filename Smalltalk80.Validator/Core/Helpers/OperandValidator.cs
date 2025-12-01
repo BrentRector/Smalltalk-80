@@ -98,17 +98,18 @@ public static class OperandValidator
                 // 0x90-0x97: SHORT_JUMP_FWD_1..8 (single byte, no operands)
                 >= 144 and < 152 => null,
 
-                // 0x98-0x9F: Reserved
-                >= 152 and < 160 => null,
+                // 0x98-0x9F: Blue Book Short conditional jump on FALSE (forward 1-8)
+                >= 152 and < 160 => null, // Single-byte instruction, no operand
 
-                // 0xA0: MEDIUM_JUMP_FWD (1 byte offset)
-                160 => SkipOneByte(bytecodes, ref pc, startPc),
+                // 0xA0-0xA7: Blue Book Long unconditional jump (1 extension byte)
+                // Offset = ((opcode & 0x07) - 4) * 256 + extensionByte
+                >= 160 and < 168 => SkipOneByte(bytecodes, ref pc, startPc),
 
-                // 0xA1-0xA7: LONG_JUMP_FWD_2..8 (multi-byte offset)
-                >= 161 and < 168 => SkipLongJump(bytecodes, ref pc, b - 159, startPc),
+                // 0xA8-0xAB: Blue Book Long conditional jump on TRUE (1 extension byte)
+                >= 168 and < 172 => SkipOneByte(bytecodes, ref pc, startPc),
 
-                // 0xA8-0xAF: Reserved
-                >= 168 and < 176 => null,
+                // 0xAC-0xAF: Blue Book Long conditional jump on FALSE (1 extension byte)
+                >= 172 and < 176 => SkipOneByte(bytecodes, ref pc, startPc),
 
                 // 0xB0-0xBF: SEND_ARITH (arithmetic operators)
                 >= 176 and < 192 => null,
@@ -322,23 +323,7 @@ public static class OperandValidator
         return null;
     }
 
-    private static ValidationResult? SkipLongJump(byte[] bytecodes, ref int pc, int numBytes, int startPc)
-    {
-        // Long jumps (0xA1-0xA7) have N-byte offsets where N = bytecode - 159
-        // N ranges from 2 to 8
-        if (pc + numBytes - 1 >= bytecodes.Length)
-        {
-            return new ValidationResult
-            {
-                IsValid = false,
-                ErrorMessage = $"Truncated long jump bytecode (missing {numBytes} offset bytes)",
-                ErrorOffset = startPc
-            };
-        }
-
-        pc += numBytes; // Skip N offset bytes
-        return null;
-    }
+    // NOTE: SkipLongJump removed - Blue Book long jumps (0xA0-0xAF) all use 1 extension byte
 
     private static ValidationResult? SkipTwoBytes(byte[] bytecodes, ref int pc, int startPc)
     {
