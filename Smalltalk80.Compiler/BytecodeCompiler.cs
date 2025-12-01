@@ -1518,7 +1518,7 @@ namespace Smalltalk80.Compiler
             }
 
             // Blue Book bytecode pattern: blockCopy: + LONG_JUMP + block body
-            // Primitive 80 calculates initialIP = PC + 3 (skips 3-byte LONG_JUMP)
+            // Primitive 80 calculates initialIP = PC + 2 (skips 2-byte Blue Book LONG_JUMP)
             // Block body comes AFTER the blockCopy: send and jump
 
             // STEP 1: Emit blockCopy: send (Blue Book compliant - 1 argument: nargs)
@@ -1527,15 +1527,16 @@ namespace Smalltalk80.Compiler
             emitter.PushSmallInteger(argCount); // Only arg: block argument count
             emitter.EmitByte(0xC8); // SEND_SPECIAL_BLOCKCOPY ← Primitive executes here
 
-            // STEP 2: Emit 3-byte LONG_JUMP to skip over block body
-            // 0xA1 = long jump forward with 2-byte offset
+            // STEP 2: Emit 2-byte Blue Book LONG_JUMP to skip over block body
+            // Blue Book format: opcode (0xA0-0xA7) + 1 extension byte
+            // Formula: offset = ((opcode & 0x07) - 4) * 256 + extensionByte
+            // For forward jumps: use 0xA4-0xA7 (base offsets 0, 256, 512, 768)
             int jumpBytecodeOffset = emitter.CurrentOffset;
-            emitter.EmitByte(0xA1); // LONG_JUMP_FORWARD (3 bytes total: opcode + 2 offset bytes)
+            emitter.EmitByte(0xA4); // Placeholder opcode (will patch if needed)
             int jumpOffsetLocation = emitter.CurrentOffset;
-            emitter.EmitByte(0x00); // Placeholder for offset high byte
-            emitter.EmitByte(0x00); // Placeholder for offset low byte
+            emitter.EmitByte(0x00); // Placeholder for extension byte
 
-            // STEP 3: Block body starts here (initialIP = PC + 3 points here)
+            // STEP 3: Block body starts here (initialIP = PC + 2 points here)
             int blockStartOffset = emitter.CurrentOffset;
 
             // BLUE BOOK: Emit POP_STORE_TEMP bytecodes to move arguments from stack to temp slots
@@ -1565,17 +1566,34 @@ namespace Smalltalk80.Compiler
             // This is different from RETURN_TOP_POP (0x7E) which does non-local returns (^)
             emitter.ReturnTop(); // 0x7C - local return to sender
 
-            // STEP 5: Calculate jump offset and patch it
+            // STEP 5: Calculate jump offset and patch it using Blue Book format
             // The jump lands here (after the block body), so method execution continues
             int afterBlockOffset = emitter.CurrentOffset;
-            int jumpDistance = afterBlockOffset - (jumpOffsetLocation + 2); // Distance from after jump operand to here
+            // Blue Book: offset is relative to IP after reading extension byte
+            // IP after reading extension byte = jumpOffsetLocation + 1
+            // So offset = target - (jumpOffsetLocation + 1)
+            int jumpOffset = afterBlockOffset - (jumpOffsetLocation + 1);
 
-            // Patch the jump offset (big-endian 16-bit offset, encoded as distance - 1 per Blue Book)
-            int encodedDistance = jumpDistance - 1;  // Blue Book: distance encoded as (distance - 1)
-            byte offsetHigh = (byte)((encodedDistance >> 8) & 0xFF);
-            byte offsetLow = (byte)(encodedDistance & 0xFF);
-            emitter.PatchByteAt(jumpOffsetLocation, offsetHigh);
-            emitter.PatchByteAt(jumpOffsetLocation + 1, offsetLow);
+            // Blue Book long jump formula: offset = ((opcode & 0x07) - 4) * 256 + extensionByte
+            // For forward jumps (positive offset):
+            //   0xA4: offset 0-255   (base 0)
+            //   0xA5: offset 256-511 (base 256)
+            //   0xA6: offset 512-767 (base 512)
+            //   0xA7: offset 768-1023 (base 768)
+            if (jumpOffset < 0 || jumpOffset > 1023)
+            {
+                throw new InvalidOperationException(
+                    $"Block body too large: jump offset {jumpOffset} exceeds Blue Book forward jump range (0-1023)");
+            }
+
+            // Determine opcode and extension byte
+            int hiPart = jumpOffset / 256;  // 0, 1, 2, or 3
+            int extensionByte = jumpOffset % 256;
+            byte opcode = (byte)(0xA4 + hiPart);  // 0xA4, 0xA5, 0xA6, or 0xA7
+
+            // Patch the opcode and extension byte
+            emitter.PatchByteAt(jumpBytecodeOffset, opcode);
+            emitter.PatchByteAt(jumpOffsetLocation, (byte)extensionByte);
 
             // Exit block scope to allow slot reuse for sequential blocks
             // CRITICAL: Must happen BEFORE restoring environment to ensure proper slot reuse

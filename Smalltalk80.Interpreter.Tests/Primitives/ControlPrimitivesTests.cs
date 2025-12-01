@@ -157,8 +157,8 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         var result = primitive.Execute(context);
 
         AssertSuccess(result);
-        // startpc = currentPC + 3 (skip LONG_JUMP)
-        mockHeap.Verify(h => h.SetInstanceVariable(newBlockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(103)), Times.Once);
+        // startpc = currentPC + 2 (skip Blue Book 2-byte LONG_JUMP)
+        mockHeap.Verify(h => h.SetInstanceVariable(newBlockContextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX, SmallInt(102)), Times.Once);
     }
 
     [Fact]
