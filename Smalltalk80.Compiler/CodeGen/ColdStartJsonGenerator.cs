@@ -37,13 +37,18 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     private readonly Dictionary<string, int> _methodSourcePositions = new(); // Maps method localId → byte position in .sources file
 
     /// <summary>
-    /// All 128 ASCII single-character symbols (0-127).
-    /// Symbol>>initialize creates SingleCharSymbols with all 128 entries,
-    /// so all must be in the symbol table for proper cold start initialization.
+    /// Blue Book canonical single-character binary selector symbols.
+    /// From "Smalltalk-80: The Language and Its Implementation" (1983).
+    /// These are the valid one-character message selectors recognized by the parser.
     /// </summary>
-    private static readonly string[] AllSingleCharSymbols = Enumerable.Range(0, 128)
-        .Select(i => ((char)i).ToString())
-        .ToArray();
+    private static readonly string[] BluebookSingleCharSelectors =
+    [
+        "+", "-", "*", "/",     // Arithmetic
+        "<", ">", "=", "~",     // Comparison
+        "&", "|",               // Logical / bitwise
+        "@", ",",               // Point / array
+        "\\", "?", "!", "%"     // Miscellaneous punctuation
+    ];
 
     /// <summary>
     /// Block buffer for post-order emission.
@@ -188,10 +193,9 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             ExtractSymbolsFromLiterals(initExpr.Literals, symbols);
         }
 
-        // Add all 128 single-character symbols (ASCII 0-127)
-        // Symbol>>initialize creates SingleCharSymbols with all 128 entries,
-        // so all must be in the symbol table for proper cold start initialization
-        foreach (string s in AllSingleCharSymbols)
+        // Add Blue Book canonical single-character binary selectors
+        // These must be in the symbol table for SingleCharSymbols initialization
+        foreach (string s in BluebookSingleCharSelectors)
         {
             symbols.Add(s);
         }
