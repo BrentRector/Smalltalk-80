@@ -679,6 +679,8 @@ namespace Smalltalk80.Compiler
 
             // Complex case: "receiver msg1; msg2"
             // Cascade receiver = everything except the last message
+            if (messageExpr == null) return;
+
             // STEP 1: Compile the cascade receiver (all messages except the last one)
             CompileCascadeReceiver(messageExpr);
 
@@ -873,7 +875,7 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Determines if a keyword message's receiver is super (no intermediate messages).
         /// </summary>
-        private bool DetermineIfKeywordReceiverIsSuper(Smalltalk80Parser.BinaryExprContext binaryExpr)
+        private bool DetermineIfKeywordReceiverIsSuper(Smalltalk80Parser.BinaryExprContext? binaryExpr)
         {
             if (binaryExpr == null) return false;
 
@@ -2062,10 +2064,10 @@ namespace Smalltalk80.Compiler
             return bytecode >= 120 && bytecode <= 127;
         }
         
-        private bool IsReceiverSuper(Smalltalk80Parser.MessageBaseContext baseCtx)
+        private bool IsReceiverSuper(Smalltalk80Parser.MessageBaseContext? baseCtx)
         {
             // Check if the receiver is the special variable "super"
-            if (baseCtx.variable() != null)
+            if (baseCtx?.variable() != null)
             {
                 var varName = baseCtx.variable().GetText();
                 return varName == "super";
