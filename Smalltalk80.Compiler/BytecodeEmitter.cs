@@ -402,10 +402,16 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Emits an extended sub-operation enum value.
         /// </summary>
+        /// <remarks>
+        /// LEGACY: This method is kept for backward compatibility during transition.
+        /// New code should use Blue Book bytecodes directly.
+        /// </remarks>
+#pragma warning disable CS0618 // Type or member is obsolete
         public void Emit(ExtendedSubOp subOp)
         {
             bytecodes.Add((byte)subOp);
         }
+#pragma warning restore CS0618
 
         /// <summary>
         /// Emits multiple bytecodes.
@@ -722,8 +728,8 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Emits a backward jump bytecode to the specified target offset.
         /// Uses Blue Book long unconditional jump (0xA0-0xA7) format.
-        /// Blue Book formula: offset = ((bytecode & 0x07) - 4) * 256 + nextByte
-        /// For backward jumps, we need negative offset which requires (bytecode & 0x07) < 4
+        /// Blue Book formula: offset = ((bytecode AND 0x07) - 4) * 256 + nextByte
+        /// For backward jumps, we need negative offset which requires (bytecode AND 0x07) less than 4
         /// </summary>
         /// <param name="targetOffset">Target bytecode offset (from MarkMethodStart)</param>
         /// <exception cref="InvalidOperationException">Thrown if jump offset exceeds range</exception>

@@ -1661,8 +1661,7 @@ namespace Smalltalk80.Compiler
                 {
                     // DUP - duplicate array reference on stack
                     // (we need the array ref for at:put: and to leave on stack at end)
-                    emitter.Emit(Bytecode.EXTENDED_PREFIX);
-                    emitter.Emit((byte)ExtendedSubOp.DUP);
+                    emitter.Dup();
 
                     // Push 1-based index (Smalltalk arrays are 1-indexed)
                     // MUST push index FIRST (at: index put: value)
@@ -1676,8 +1675,7 @@ namespace Smalltalk80.Compiler
                     emitter.EmitSend("at:put:", 2);
 
                     // Pop the returned value (we don't need it, we have the array ref on stack)
-                    emitter.Emit(Bytecode.EXTENDED_PREFIX);
-                    emitter.Emit((byte)ExtendedSubOp.POP);
+                    emitter.Pop();
                 }
             }
 
