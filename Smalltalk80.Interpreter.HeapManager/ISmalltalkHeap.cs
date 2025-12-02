@@ -284,4 +284,11 @@ public interface ISmalltalkHeap
     /// Gets the become handler subsystem for object identity swapping.
     /// </summary>
     IBecomeHandler Become { get; }
+
+    /// <summary>
+    /// Controls whether allocation-triggered GC is enabled.
+    /// Should be disabled during cold start when objects are being built but not yet rooted.
+    /// Default is false (disabled). Enable after cold start completes and GC roots are established.
+    /// </summary>
+    bool AutoGCEnabled { get; set; }
 }

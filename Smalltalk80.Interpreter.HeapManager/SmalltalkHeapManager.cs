@@ -27,6 +27,12 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     private const int GC_TRIGGER_THRESHOLD = 10000;
     private bool _gcInProgress = false;  // Prevent recursive GC
 
+    /// <summary>
+    /// Controls whether allocation-triggered GC is enabled.
+    /// Disabled during cold start when objects are being built but not yet rooted.
+    /// </summary>
+    public bool AutoGCEnabled { get; set; } = false;
+
     // Verbose debug mode control
     public bool VerboseDebugMode { get; set; } = false;
 
@@ -93,7 +99,9 @@ public class SmalltalkHeapManager : ISmalltalkHeap
 
         // Blue Book GC trigger: Run GC when we need to grow the table and it's already large
         // This happens when there are no free indices to reuse and table size exceeds threshold
-        if (!_gcInProgress &&
+        // AutoGCEnabled must be true (disabled during cold start when objects aren't yet rooted)
+        if (AutoGCEnabled &&
+            !_gcInProgress &&
             _tableManager.GetFreeIndexCount() == 0 &&
             _tableManager.GetObjectTableSize() >= GC_TRIGGER_THRESHOLD)
         {
