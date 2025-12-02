@@ -28,8 +28,12 @@
    - `^nil` → 123 (0x7B) instead of 115, 124
 3. **Interpreter NLR fix** - Bytecodes 120-123 now properly handle non-local return in BlockContext
 
-### 🔲 Phase 4: Future Optimizations - PENDING
-1. **whileTrue:/whileFalse: inlining** - Deferred (receiver is a block, requires special handling)
+### ✅ Phase 4: Loop Optimization - IN PROGRESS
+1. **whileTrue:/whileFalse: inlining** - ✅ COMPLETE (2025-12-02)
+   - Compiler detects `[condition] whileTrue: [body]` and `[condition] whileFalse: [body]` patterns
+   - Emits inline loop bytecode instead of creating BlockContext objects
+   - Also supports zero-argument `[condition] whileTrue` and `[condition] whileFalse`
+   - Bytecode pattern: condition inline → conditional jump to exit → body inline → pop → backward jump → push nil
 2. **to:do: / to:by:do: inlining** - Not yet investigated
 
 ## Executive Summary
@@ -332,7 +336,8 @@ No changes needed.
 | Conditional optimization | ✅ Complete | claude/bytecode-comparison-reconciliation-* | ifTrue:/ifFalse:/ifTrue:ifFalse:/and:/or: inlined |
 | Optimized return bytecodes | ✅ Complete | claude/bytecode-comparison-reconciliation-* | 120-123 for ^self/^true/^false/^nil |
 | Interpreter NLR for 120-123 | ✅ Complete | claude/bytecode-comparison-reconciliation-* | HandleReturnFromMessage helper |
-| whileTrue:/whileFalse: | 🔲 Deferred | - | Requires special receiver handling (receiver is block) |
+| whileTrue:/whileFalse: | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Inlined loop with backward jumps |
+| whileTrue/whileFalse (no arg) | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Inlined loop without body block |
 | to:do: / to:by:do: | 🔲 Not Started | - | Loop unrolling optimization |
 
 ## Appendix: Blue Book References
@@ -372,6 +377,16 @@ No changes needed.
    - Emit: Direct arithmetic bytecodes with overflow check fallback
 
 ## Change Log
+
+- **2025-12-02**: whileTrue:/whileFalse: loop inlining implemented
+  - `TryInlineWhileLoop` method added to `BytecodeCompiler.cs` for keyword message variants
+  - `CompileInlinedWhileLoopNoArg` method added for unary message variants
+  - Early detection in `CompileMessageExpr` intercepts whileTrue:/whileFalse: before receiver is compiled
+  - Early detection in `CompileUnaryExpr` intercepts whileTrue/whileFalse (no arg) variants
+  - `IsBlockLiteralReceiver` helper detects block literal receivers with no messages
+  - `IsZeroArgBlock` helper validates blocks have no arguments (required for inlining)
+  - Bytecode pattern: loop start → condition inline → JUMP_IF_FALSE/TRUE exit → body inline → POP → backward jump → push nil
+  - All four variants supported: whileTrue:, whileFalse:, whileTrue, whileFalse
 
 - **2025-12-02**: Optimized return bytecodes implemented
   - Compiler emits bytecodes 120-123 for `^self`, `^true`, `^false`, `^nil`
