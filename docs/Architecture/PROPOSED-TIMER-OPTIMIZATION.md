@@ -209,30 +209,38 @@ public class SmalltalkEventQueue : IDisposable
 - **Issue**: Timer expiration during reschedule
 - **Mitigation**: Dispose old timer before creating new one under lock
 
+## Implementation Notes (2025-12-02)
+
+**WaitHandle.WaitAny Issue**: Initial implementation using `WaitHandle.WaitAny([eventHandle, timerHandle], timeout)` failed because:
+- `SmalltalkEventQueue` uses `AutoResetEvent` which auto-resets when WaitAny returns
+- This "consumes" the event signal before the event can be processed
+- Result: Input events (mouse clicks, etc.) were lost - popup menus stopped working
+
+**Current Implementation Status**:
+- ✅ TimerManager uses interrupt-driven `System.Threading.Timer`
+- ✅ ITimerManager extended with `TimerExpiredHandle` and `IDisposable`
+- ✅ Idle loop uses simple `WaitForEvents(timeout)` polling (reliable)
+- ❌ WaitHandle.WaitAny integration deferred - causes event loss
+
+**Future Fix**: To use WaitHandle.WaitAny, would need to:
+1. Change `SmalltalkEventQueue` to use `ManualResetEventSlim` instead of `AutoResetEvent`
+2. Manually reset the event after checking `HasPendingEvents`
+3. Handle race conditions between reset and new event arrival
+
 ## Recommendation
 
-**Implement in phases**, starting with Phase 1 (infrastructure) to minimize risk. The current implementation is correct and efficient; these changes provide marginal improvements in timer precision and code cleanliness.
+**Keep current hybrid implementation**:
+- Interrupt-driven timer provides precision improvements ✅
+- Simple polling-based wait is reliable for event handling ✅
+- WaitHandle.WaitAny integration is not worth the complexity
 
-**Priority**: LOW - Current implementation works well. Consider implementing when:
-- Animation timing precision becomes important
-- Multi-threaded Smalltalk processes are needed
-- Complex timer scenarios require sub-10ms accuracy
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `ITimerManager.cs` | Add `WaitHandle TimerExpiredHandle { get; }` |
-| `TimerManager.cs` | Rename to `PollingTimerManager.cs`, create new `InterruptDrivenTimerManager.cs` |
-| `SmalltalkEventQueue.cs` | Add `WaitHandle EventAvailableHandle` property |
-| `IPlatformBridge.cs` | Add `WaitHandle` exposure methods |
-| `VirtualMachine.cs` | Replace polling with `WaitHandle.WaitAny` in idle loop |
+**Priority**: COMPLETE - Timer precision improved, event handling reliable.
 
 ## Conclusion
 
-The current polling-based implementation is **correct, efficient, and Blue Book compliant**. The proposed changes offer:
-- Better timer precision (interrupt-driven vs polling)
-- Cleaner wait semantics (unified multi-source wait)
-- Foundation for future multi-threading enhancements
+The hybrid implementation provides the best of both worlds:
+- **Timer precision**: Interrupt-driven `System.Threading.Timer` signals immediately when delay expires
+- **Event reliability**: Simple polling via `WaitForEvents()` ensures no events are lost
+- **CPU efficiency**: Still achieves near-zero CPU during idle via timeout-based waiting
 
-Implementation is optional and should be prioritized based on actual needs for timer precision in the Smalltalk environment.
+The unified `WaitHandle.WaitAny` approach was attempted but caused event loss. The current design is stable and performant.
