@@ -39,6 +39,12 @@ internal interface IObjectTableManager
     int GetActiveObjectCount();
 
     /// <summary>
+    /// Gets the count of free indices available for reuse (without growing the table).
+    /// Used by heap manager to decide when to trigger GC.
+    /// </summary>
+    int GetFreeIndexCount();
+
+    /// <summary>
     /// Checks if an OOP refers to a valid object in the heap.
     /// </summary>
     bool IsValidObjectOOP(SmalltalkOOP objectOOP);

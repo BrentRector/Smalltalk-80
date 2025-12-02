@@ -22,6 +22,11 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     // DEBUG: Runtime allocation counter
     private static int _runtimeAllocationCount = 0;
 
+    // GC trigger threshold: Run GC when table has this many objects and no free indices
+    // Blue Book approach: GC runs when allocation would fail (need to grow table)
+    private const int GC_TRIGGER_THRESHOLD = 10000;
+    private bool _gcInProgress = false;  // Prevent recursive GC
+
     // Verbose debug mode control
     public bool VerboseDebugMode { get; set; } = false;
 
@@ -86,6 +91,28 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         int indexedWords = CalculateIndexedWords(format, indexedSize);
         int totalWords = headerWords + fixedSlots + indexedWords;
 
+        // Blue Book GC trigger: Run GC when we need to grow the table and it's already large
+        // This happens when there are no free indices to reuse and table size exceeds threshold
+        if (!_gcInProgress &&
+            _tableManager.GetFreeIndexCount() == 0 &&
+            _tableManager.GetObjectTableSize() >= GC_TRIGGER_THRESHOLD)
+        {
+            _gcInProgress = true;
+            try
+            {
+                // Run GC to reclaim unreachable objects and free their table indices
+                var gcStats = _garbageCollector.GarbageCollect();
+                if (gcStats.CollectedObjects > 0)
+                {
+                    Console.WriteLine($"[GC] Collected {gcStats.CollectedObjects} objects, freed {_tableManager.GetFreeIndexCount()} indices");
+                }
+            }
+            finally
+            {
+                _gcInProgress = false;
+            }
+        }
+
         // Allocate managed backing storage based on format
         object? managedStorage = format switch
         {
@@ -96,7 +123,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             _ => throw new ArgumentException($"Unknown object format: {format}")
         };
 
-        // Get ObjectTable index
+        // Get ObjectTable index (may reuse freed index from GC above, or grow table)
         int tableIndex = _tableManager.AllocateObjectTableIndex();
 
         // CRITICAL: Initialize ALL OOP slots to nil (Blue Book requirement)
