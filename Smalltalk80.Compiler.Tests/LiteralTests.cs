@@ -291,12 +291,12 @@ testMultipleLiterals
         var literals = (JArray)method["literals"]!;
         Assert.That(literals, Is.Not.Null);
         
-        // Check that all literal types are present
-        var hasInteger = literals.Any(l => l["type"]?.ToString() == "SmallInteger");
-        var hasString = literals.Any(l => l["type"]?.ToString() == "String");
-        var hasSymbol = literals.Any(l => l["type"]?.ToString() == "Symbol");
-        var hasChar = literals.Any(l => l["type"]?.ToString() == "Character");
-        var hasFloat = literals.Any(l => l["type"]?.ToString() == "Float");
+        // Check that all literal types are present (compiler uses lowercase type names)
+        var hasInteger = literals.Any(l => l["type"]?.ToString() == "smallInt" || l["type"]?.ToString() == "SmallInteger");
+        var hasString = literals.Any(l => l["type"]?.ToString() == "string" || l["type"]?.ToString() == "String");
+        var hasSymbol = literals.Any(l => l["type"]?.ToString() == "symbol" || l["type"]?.ToString() == "Symbol");
+        var hasChar = literals.Any(l => l["type"]?.ToString() == "character" || l["type"]?.ToString() == "Character");
+        var hasFloat = literals.Any(l => l["type"]?.ToString() == "float" || l["type"]?.ToString() == "Float");
         
         Assert.That(hasInteger || hasString || hasSymbol || hasChar || hasFloat, Is.True,
             "Method should contain various literal types");

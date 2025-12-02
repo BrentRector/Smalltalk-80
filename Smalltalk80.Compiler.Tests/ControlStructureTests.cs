@@ -21,7 +21,7 @@ testIfTrue
         var method = GetFirstMethod(json);
         
         // ifTrue: typically optimized with jump bytecodes
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should contain conditional jump bytecode (152-159 or 168-171)
@@ -42,7 +42,7 @@ testIfFalse
         var method = GetFirstMethod(json);
         
         // ifFalse: typically optimized with jump bytecodes
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should contain conditional jump
@@ -64,7 +64,7 @@ testIfTrueIfFalse
         var method = GetFirstMethod(json);
         
         // ifTrue:ifFalse: is optimized with conditional jumps
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should have conditional jump bytecodes
@@ -89,7 +89,7 @@ testNestedIf
         var method = GetFirstMethod(json);
         
         // Nested conditionals require multiple jumps
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         var jumpCount = bytecodes.Select(t => (int)t).Count(b => 
             (b >= 152 && b <= 175));
         Assert.That(jumpCount, Is.GreaterThanOrEqualTo(2), "Should have multiple jumps for nested ifs");
@@ -109,7 +109,7 @@ testWhileTrue
         var method = GetFirstMethod(json);
         
         // whileTrue: uses backward jumps for looping
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should contain jump bytecodes for loop
@@ -132,7 +132,7 @@ testWhileFalse
         var method = GetFirstMethod(json);
         
         // whileFalse: uses backward jumps for looping
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         var hasJump = bytecodes.Select(t => (int)t).Any(b => 
             (b >= 144 && b <= 175));
         Assert.That(hasJump, Is.True, "Should contain jumps for while loop");
@@ -174,7 +174,7 @@ testToDo
         var hasToDoMessage = literals.Any(l => l["value"]?.ToString() == "to:do:");
         
         // Block should be created for the loop body
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
         Assert.That(hasBlock, Is.True, "Should create block for to:do:");
     }
@@ -208,7 +208,7 @@ testAnd
         var method = GetFirstMethod(json);
         
         // and: might be optimized with conditional jumps
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should create a block for the second condition
         var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
@@ -226,7 +226,7 @@ testOr
         var method = GetFirstMethod(json);
         
         // or: might be optimized with conditional jumps
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should create a block for the second condition
         var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
@@ -244,7 +244,7 @@ testShortCircuitAnd
         var method = GetFirstMethod(json);
         
         // and: should short-circuit, not evaluating the block if receiver is false
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should have block creation
         var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
@@ -262,7 +262,7 @@ testShortCircuitOr
         var method = GetFirstMethod(json);
         
         // or: should short-circuit, not evaluating the block if receiver is true
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should have block creation
         var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
@@ -280,7 +280,7 @@ testComplexCondition
         var method = GetFirstMethod(json);
         
         // Complex boolean expressions with multiple blocks
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should have multiple blocks
         var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
@@ -301,7 +301,7 @@ testCaseAnalysis
         var method = GetFirstMethod(json);
         
         // Multiple sequential conditionals
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should have multiple conditional jumps
         var jumpCount = bytecodes.Select(t => (int)t).Count(b => 
@@ -322,7 +322,7 @@ testEarlyReturn
         var method = GetFirstMethod(json);
         
         // Early returns in conditionals
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should have multiple return bytecodes (124)
         var returnCount = bytecodes.Select(t => (int)t).Count(b => b == 124);
@@ -340,7 +340,7 @@ testInfiniteLoop
         var method = GetFirstMethod(json);
         
         // Infinite loop with backward jump
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should have jump bytecodes for infinite loop
         var hasJump = bytecodes.Select(t => (int)t).Any(b => 

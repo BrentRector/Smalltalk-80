@@ -21,7 +21,7 @@ testUnaryMessage
         
         // Push 3, send negated, return top
         // Bytecodes: 118 (push 1), send literal selector 0 args
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should have unary send
@@ -41,7 +41,7 @@ testBinaryMessage
         
         // Push 3, push 4, send +, return top
         // Special arithmetic sends use bytecodes 176-191
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // + is a special selector, should use bytecode 176
@@ -59,7 +59,7 @@ testKeywordMessage
         var method = GetFirstMethod(json);
         
         // Push Array, push 10, send new:, return top
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         var literals = (JArray)method["literals"]!;
         
         Assert.That(literals.Any(l => l["value"]?.ToString() == "new:"), Is.True);
@@ -108,7 +108,7 @@ testUnaryPrecedence
         if (negatedIndex >= 0 && plusIndex >= 0)
         {
             // In bytecode, negated should be sent before +
-            var bytecodes = (JArray)method["bytecode"]!;
+            var bytecodes = (JArray)method["bytecodes"]!;
             Assert.That(bytecodes, Is.Not.Null);
         }
     }
@@ -125,7 +125,7 @@ testBinaryPrecedence
         
         // Should evaluate as Array new: (2 + 3)
         // Binary + has higher precedence than keyword new:
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // The + should be evaluated before new:
@@ -147,7 +147,7 @@ testCascade
         var method = GetFirstMethod(json);
         
         // Cascades use bytecode 136 (duplicate stack top)
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(136), Is.True, "Should contain dup for cascade");
     }
     
@@ -166,7 +166,7 @@ testCascadeWithPop
         var method = GetFirstMethod(json);
         
         // Cascades with semicolon need dup and pop
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(136), Is.True, "Should contain dup for cascade");
         Assert.That(bytecodes.Select(t => (int)t).Contains(135), Is.True, "Should contain pop for cascade");
     }
@@ -182,7 +182,7 @@ testPlus
         var method = GetFirstMethod(json);
         
         // + is special selector 0, bytecode 176
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(176), Is.True, "Should use special + bytecode");
     }
     
@@ -197,7 +197,7 @@ testMinus
         var method = GetFirstMethod(json);
         
         // - is special selector 1, bytecode 177
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(177), Is.True, "Should use special - bytecode");
     }
     
@@ -212,7 +212,7 @@ testLessThan
         var method = GetFirstMethod(json);
         
         // < is special selector 2, bytecode 178
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(178), Is.True, "Should use special < bytecode");
     }
     
@@ -227,7 +227,7 @@ testEquals
         var method = GetFirstMethod(json);
         
         // = is special selector 6, bytecode 182
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(182), Is.True, "Should use special = bytecode");
     }
     
@@ -272,7 +272,7 @@ testComplexChain
         var method = GetFirstMethod(json);
         
         // Should evaluate left to right with proper precedence
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should contain +, *, negated, abs in that order
@@ -292,7 +292,7 @@ testSelfSend
         var method = GetFirstMethod(json);
         
         // Push self (112), send size, return
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         AssertBytecodeAt(bytecodes, 0, 112, "Push self");
     }
     
@@ -308,7 +308,7 @@ testSuperSend
         
         // Push self (for super), super send new, return
         // Super sends use special bytecodes 133-134
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         AssertBytecodeAt(bytecodes, 0, 112, "Push self for super");
         
         // Should have super send bytecode
@@ -328,7 +328,7 @@ testLongChain
         
         // Binary messages evaluate left to right
         // Should be ((((1 + 2) * 3) - 4) + 5)
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should have multiple binary sends

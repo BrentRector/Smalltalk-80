@@ -63,7 +63,7 @@ testDeepNesting
         var method = GetFirstMethod(json);
         
         // Should handle deep expression nesting
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should have multiple arithmetic operations
@@ -82,7 +82,7 @@ testDeepBlockNesting
         var method = GetFirstMethod(json);
         
         // Should have multiple nested blocks
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
         Assert.That(blockCount, Is.EqualTo(4), "Should have 4 nested blocks");
     }
@@ -126,7 +126,7 @@ testManyLiterals
         // Check for extended literal access if needed (>31 literals)
         if (literals.Count > 31)
         {
-            var bytecodes = (JArray)method["bytecode"]!;
+            var bytecodes = (JArray)method["bytecodes"]!;
             var hasExtended = bytecodes.Select(t => (int)t).Any(b => b == 132);
             Assert.That(hasExtended, Is.True, "Should use extended literal access");
         }
@@ -152,7 +152,7 @@ testManyTemps
         Assert.That((int)method["numTemps"]!, Is.EqualTo(20));
         
         // Should use extended temp access for temps > 15
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         var hasExtendedTemp = bytecodes.Select(t => (int)t).Any(b => b == 128 || b == 129);
         Assert.That(hasExtendedTemp, Is.True, "Should use extended temp access");
     }
@@ -193,7 +193,7 @@ testEmptyBlocks
         var method = GetFirstMethod(json);
         
         // Should handle empty blocks correctly
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
         Assert.That(blockCount, Is.EqualTo(2), "Should have two empty blocks");
     }
@@ -211,7 +211,7 @@ testChainedAssignment
         var method = GetFirstMethod(json);
         
         // Chained assignments should work correctly
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should have multiple store operations
         var storeCount = bytecodes.Select(t => (int)t).Count(b => b >= 104 && b <= 111);
@@ -229,7 +229,7 @@ testParenReceiver
         var method = GetFirstMethod(json);
         
         // Should evaluate parenthesized expression first
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // + should come before negated
         var plusIndex = Array.IndexOf(bytecodes.Select(t => (int)t).ToArray(), 176);
@@ -251,7 +251,7 @@ testArrayExpressions
         var method = GetFirstMethod(json);
         
         // Dynamic array with expressions (uses braces)
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should evaluate expressions and build array
         var hasArithmetic = bytecodes.Select(t => (int)t).Any(b => b >= 176 && b <= 191);
@@ -269,7 +269,7 @@ testLiteralCascade
         var method = GetFirstMethod(json);
         
         // Cascade on literal string
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(136), Is.True, "Should have dup for cascade");
     }
     
@@ -286,7 +286,7 @@ testUnusedBlock
         var method = GetFirstMethod(json);
         
         // Block created but never evaluated
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should create block");
         
         // Should not have value send
@@ -308,7 +308,7 @@ testAssignmentExpression
         var method = GetFirstMethod(json);
         
         // Assignment returns the assigned value
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should store a and use its value in addition
         Assert.That(bytecodes.Select(t => (int)t).Contains(104), Is.True, "Should store to first temp");
@@ -331,7 +331,7 @@ testNegativeIndex
             l["type"]?.ToString() == "SmallInteger" && (int)l["value"]! == -1);
         
         // -1 might use special bytecode 116
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         var hasMinusOne = bytecodes.Select(t => (int)t).Contains(116);
         
         Assert.That(hasNegOne || hasMinusOne, Is.True, "Should handle -1 literal");

@@ -52,7 +52,7 @@ testMultipleInstanceVars
         var method = GetFirstMethod(json);
         
         // This will involve storing to different instance variables and binary sends
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Verify stores to different instance variables
@@ -75,7 +75,7 @@ testTemporaryVar
         
         // Push literal 100, pop and store in temp 0, push temp 0, return top
         // Temporary variables use bytecodes 104-111 for store, 16-31 for push
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should contain store to temp and push temp
@@ -97,7 +97,7 @@ testMultipleTemps
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Verify stores to different temporaries
@@ -131,7 +131,7 @@ testMultipleParams: param1 with: param2 and: param3
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Parameters are temps 0, 1, 2
@@ -165,7 +165,7 @@ testSelfCall
         var method = GetFirstMethod(json);
         
         // Push receiver, send someMethod, return top
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         AssertBytecodeAt(bytecodes, 0, 112, "Push self");
     }
@@ -197,7 +197,7 @@ testSuperCall
         
         // Push receiver, super send initialize, return top
         // Super sends use bytecodes 133-134
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         AssertBytecodeAt(bytecodes, 0, 112, "Push self for super");
     }
@@ -214,7 +214,7 @@ testThisContext
         
         // thisContext might be a special push or a variable reference
         // It's typically bytecode 137 (push active context)
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         Assert.That(bytecodes.Count, Is.GreaterThan(0));
     }
@@ -230,7 +230,7 @@ testBlockParam
         var method = GetFirstMethod(json);
         
         // Block creation and parameter access
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should contain block bytecode (143) and block parameter access
@@ -248,7 +248,7 @@ testBlockTemp
         var method = GetFirstMethod(json);
         
         // Block with temporary variable
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should contain block creation
@@ -268,7 +268,7 @@ testClassVar
         
         // Class variables are accessed through associations in the literal frame
         // Push literal variable, store, push literal variable, return
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Class variables use bytecodes 64-95 for push literal variable
@@ -287,7 +287,7 @@ testGlobalVar
         var method = GetFirstMethod(json);
         
         // Global variables are accessed like class variables
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should push global variable
@@ -309,7 +309,7 @@ testShadowing: x
         var method = GetFirstMethod(json);
         
         // The parameter x (temp 0) should be accessed, not instance var x
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should push temp 0 (parameter), not receiver variable 0

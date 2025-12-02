@@ -39,7 +39,7 @@ testImplicitReturn
         var method = GetFirstMethod(json);
         
         // Methods without explicit return should return self (bytecode 120)
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         var lastBytecode = (int)bytecodes[bytecodes.Count - 1];
         Assert.That(lastBytecode, Is.EqualTo(120), "Should end with return self");
     }
@@ -117,7 +117,7 @@ testTemporaries
         Assert.That((int)method["numTemps"]!, Is.EqualTo(2));
         
         // Should store and access temporaries
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(104), Is.True, "Should store to temp1");
         Assert.That(bytecodes.Select(t => (int)t).Contains(105), Is.True, "Should store to temp2");
     }
@@ -137,7 +137,7 @@ add: a to: b
         Assert.That(method["selector"]?.ToString(), Is.EqualTo("add:to:"));
         
         // Parameters accessed as temps 0 and 1
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(16), Is.True, "Should push first param");
         Assert.That(bytecodes.Select(t => (int)t).Contains(17), Is.True, "Should push second param");
     }
@@ -158,7 +158,7 @@ testPrimitive
         Assert.That((int)method["primitive"]!, Is.EqualTo(1));
         
         // Should have fallback code
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Count, Is.GreaterThan(0), "Should have fallback bytecode");
     }
     
@@ -177,7 +177,7 @@ testPrimitiveNoFallback
         Assert.That((int)method["primitive"]!, Is.EqualTo(60));
         
         // Might have minimal bytecode or just return self
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
     }
     
@@ -195,7 +195,7 @@ testComplex
         var method = GetFirstMethod(json);
         
         // Should have multiple operations
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // Check for arithmetic operations
         var arithmeticOps = bytecodes.Select(t => (int)t).Count(b => b >= 176 && b <= 191);
@@ -242,7 +242,7 @@ testLongMethod
         Assert.That((int)method["numTemps"]!, Is.EqualTo(10));
         
         // Should have extended temp access if needed
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Count, Is.GreaterThan(20), "Should have many bytecodes");
     }
     
@@ -318,7 +318,7 @@ testMultipleReturns
         var method = GetFirstMethod(json);
         
         // Should have multiple return bytecodes
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         var returnCount = bytecodes.Select(t => (int)t).Count(b => b == 124);
         Assert.That(returnCount, Is.GreaterThanOrEqualTo(4), "Should have multiple returns");
     }
@@ -348,7 +348,7 @@ x: aValue
         var method = GetFirstMethod(json);
         
         // Mutator - push param, store in instance var, return self
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(16), Is.True, "Should push parameter");
         Assert.That(bytecodes.Select(t => (int)t).Contains(96), Is.True, "Should store in instance var");
         Assert.That((int)bytecodes[bytecodes.Count - 1], Is.EqualTo(120), "Should return self");
