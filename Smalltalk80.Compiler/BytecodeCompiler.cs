@@ -2266,32 +2266,36 @@ namespace Smalltalk80.Compiler
 
             // STEP 5: Calculate jump offset and patch it using Blue Book format
             // The jump lands here (after the block body), so method execution continues
-            int afterBlockOffset = emitter.CurrentOffset;
-            // Blue Book: offset is relative to IP after reading extension byte
-            // IP after reading extension byte = jumpOffsetLocation + 1
-            // So offset = target - (jumpOffsetLocation + 1)
-            int jumpOffset = afterBlockOffset - (jumpOffsetLocation + 1);
-
-            // Blue Book long jump formula: offset = ((opcode & 0x07) - 4) * 256 + extensionByte
-            // For forward jumps (positive offset):
-            //   0xA4: offset 0-255   (base 0)
-            //   0xA5: offset 256-511 (base 256)
-            //   0xA6: offset 512-767 (base 512)
-            //   0xA7: offset 768-1023 (base 768)
-            if (jumpOffset < 0 || jumpOffset > 1023)
+            // Skip validation and patching during sizing mode - we're just counting bytes
+            if (!emitter.IsSizingMode)
             {
-                throw new InvalidOperationException(
-                    $"Block body too large: jump offset {jumpOffset} exceeds Blue Book forward jump range (0-1023)");
+                int afterBlockOffset = emitter.CurrentOffset;
+                // Blue Book: offset is relative to IP after reading extension byte
+                // IP after reading extension byte = jumpOffsetLocation + 1
+                // So offset = target - (jumpOffsetLocation + 1)
+                int jumpOffset = afterBlockOffset - (jumpOffsetLocation + 1);
+
+                // Blue Book long jump formula: offset = ((opcode & 0x07) - 4) * 256 + extensionByte
+                // For forward jumps (positive offset):
+                //   0xA4: offset 0-255   (base 0)
+                //   0xA5: offset 256-511 (base 256)
+                //   0xA6: offset 512-767 (base 512)
+                //   0xA7: offset 768-1023 (base 768)
+                if (jumpOffset < 0 || jumpOffset > 1023)
+                {
+                    throw new InvalidOperationException(
+                        $"Block body too large: jump offset {jumpOffset} exceeds Blue Book forward jump range (0-1023)");
+                }
+
+                // Determine opcode and extension byte
+                int hiPart = jumpOffset / 256;  // 0, 1, 2, or 3
+                int extensionByte = jumpOffset % 256;
+                byte opcode = (byte)(0xA4 + hiPart);  // 0xA4, 0xA5, 0xA6, or 0xA7
+
+                // Patch the opcode and extension byte
+                emitter.PatchByteAt(jumpBytecodeOffset, opcode);
+                emitter.PatchByteAt(jumpOffsetLocation, (byte)extensionByte);
             }
-
-            // Determine opcode and extension byte
-            int hiPart = jumpOffset / 256;  // 0, 1, 2, or 3
-            int extensionByte = jumpOffset % 256;
-            byte opcode = (byte)(0xA4 + hiPart);  // 0xA4, 0xA5, 0xA6, or 0xA7
-
-            // Patch the opcode and extension byte
-            emitter.PatchByteAt(jumpBytecodeOffset, opcode);
-            emitter.PatchByteAt(jumpOffsetLocation, (byte)extensionByte);
 
             // Exit block scope to allow slot reuse for sequential blocks
             // CRITICAL: Must happen BEFORE restoring environment to ensure proper slot reuse
