@@ -1471,82 +1471,111 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
+        /// Calculates the bytecode size of a block body without emitting.
+        /// Uses sizing mode to traverse the block and count bytes.
+        /// </summary>
+        private int CalculateBlockBodySize(Smalltalk80Parser.BlockContext block)
+        {
+            emitter.EnterSizingMode();
+            try
+            {
+                CompileInlineBlockBody(block);
+                return emitter.EndSizingMode();
+            }
+            catch
+            {
+                // If sizing fails, ensure we exit sizing mode and return a large size
+                // to force long jumps (safe fallback)
+                if (emitter.IsSizingMode)
+                    emitter.EndSizingMode();
+                return 100; // Force long jumps
+            }
+        }
+
+        /// <summary>
         /// Inlines: condition ifTrue: [trueBlock]
+        /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Pattern: condition already on stack
-        ///   JUMP_IF_FALSE skip
+        ///   BFP (short or long)
         ///   trueBlock body
-        /// skip:
-        ///   (value on stack or nil)
+        ///   JMP (short or long) over nil
+        ///   PUSH_NIL
         /// </summary>
         private bool TryInlineIfTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             if (keywordParts.Length != 1) return false;
             if (!CanInlineBlock(keywordParts[0], out var trueBlock)) return false;
 
-            // Emit: JUMP_IF_FALSE to end
-            int jumpPlaceholder = emitter.EmitJumpOnFalsePlaceholder();
+            // PASS 1: Calculate sizes
+            int trueBlockSize = CalculateBlockBodySize(trueBlock!);
+
+            // Calculate jump offsets:
+            // Pattern: BFP -> <trueBlock> -> JMP -> PUSH_NIL
+            // BFP should land ON PUSH_NIL (skip trueBlock + JMP)
+            int skipNilJumpSize = BytecodeEmitter.SizeForwardJump(1); // JMP skips 1 byte (pushNil)
+            int bfpOffset = trueBlockSize + skipNilJumpSize; // Land on PUSH_NIL
+
+            // PASS 2: Emit with optimal jumps
+            emitter.EmitJumpOnFalse(bfpOffset);
 
             // Compile true block body inline
             CompileInlineBlockBody(trueBlock!);
 
             // Emit: unconditional jump over nil (for false case)
-            int skipNilPlaceholder = emitter.EmitForwardJumpPlaceholder();
-
-            // Patch: JUMP_IF_FALSE lands here
-            emitter.PatchJumpOnFalse(jumpPlaceholder);
+            emitter.EmitForwardJump(1); // Skip 1 byte (pushNil)
 
             // False case: push nil (ifTrue: returns nil when condition is false)
             emitter.PushNil();
-
-            // Patch: skip over nil landing
-            emitter.PatchForwardJump(skipNilPlaceholder);
 
             return true;
         }
 
         /// <summary>
         /// Inlines: condition ifFalse: [falseBlock]
+        /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Pattern: condition already on stack
-        ///   JUMP_IF_TRUE skip
+        ///   BTP (always 2 bytes)
         ///   falseBlock body
-        /// skip:
-        ///   (value on stack or nil)
+        ///   JMP (short or long) over nil
+        ///   PUSH_NIL
         /// </summary>
         private bool TryInlineIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             if (keywordParts.Length != 1) return false;
             if (!CanInlineBlock(keywordParts[0], out var falseBlock)) return false;
 
-            // Emit: JUMP_IF_TRUE to end
-            int jumpPlaceholder = emitter.EmitJumpOnTruePlaceholder();
+            // PASS 1: Calculate sizes
+            int falseBlockSize = CalculateBlockBodySize(falseBlock!);
+
+            // Calculate jump offsets:
+            // Pattern: BTP -> <falseBlock> -> JMP -> PUSH_NIL
+            // BTP should land ON PUSH_NIL (skip falseBlock + JMP)
+            int skipNilJumpSize = BytecodeEmitter.SizeForwardJump(1);
+            int btpOffset = falseBlockSize + skipNilJumpSize; // Land on PUSH_NIL
+
+            // PASS 2: Emit with optimal jumps
+            emitter.EmitJumpOnTrue(btpOffset);
 
             // Compile false block body inline
             CompileInlineBlockBody(falseBlock!);
 
             // Emit: unconditional jump over nil
-            int skipNilPlaceholder = emitter.EmitForwardJumpPlaceholder();
-
-            // Patch: JUMP_IF_TRUE lands here
-            emitter.PatchJumpOnTrue(jumpPlaceholder);
+            emitter.EmitForwardJump(1); // Skip 1 byte (pushNil)
 
             // True case: push nil (ifFalse: returns nil when condition is true)
             emitter.PushNil();
-
-            // Patch: skip over nil landing
-            emitter.PatchForwardJump(skipNilPlaceholder);
 
             return true;
         }
 
         /// <summary>
         /// Inlines: condition ifTrue: [trueBlock] ifFalse: [falseBlock]
+        /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Pattern: condition already on stack
-        ///   JUMP_IF_FALSE falseLabel
+        ///   BFP (short or long) to falseBlock
         ///   trueBlock body
-        ///   JUMP endLabel
-        /// falseLabel:
+        ///   JMP (short or long) to end
         ///   falseBlock body
-        /// endLabel:
         /// </summary>
         private bool TryInlineIfTrueIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
@@ -1554,29 +1583,32 @@ namespace Smalltalk80.Compiler
             if (!CanInlineBlock(keywordParts[0], out var trueBlock)) return false;
             if (!CanInlineBlock(keywordParts[1], out var falseBlock)) return false;
 
-            // Emit: JUMP_IF_FALSE to falseBlock
-            int jumpToFalsePlaceholder = emitter.EmitJumpOnFalsePlaceholder();
+            // PASS 1: Calculate sizes
+            int trueBlockSize = CalculateBlockBodySize(trueBlock!);
+            int falseBlockSize = CalculateBlockBodySize(falseBlock!);
+
+            // Calculate jump sizes iteratively (sizes depend on each other)
+            int skipFalseJumpSize = BytecodeEmitter.SizeForwardJump(falseBlockSize);
+            int bfpOffset = trueBlockSize + skipFalseJumpSize;
+
+            // PASS 2: Emit with optimal jumps
+            emitter.EmitJumpOnFalse(bfpOffset);
 
             // Compile true block body inline
             CompileInlineBlockBody(trueBlock!);
 
             // Emit: unconditional jump over false block
-            int jumpToEndPlaceholder = emitter.EmitForwardJumpPlaceholder();
-
-            // Patch: JUMP_IF_FALSE lands here (start of false block)
-            emitter.PatchJumpOnFalse(jumpToFalsePlaceholder);
+            emitter.EmitForwardJump(falseBlockSize);
 
             // Compile false block body inline
             CompileInlineBlockBody(falseBlock!);
-
-            // Patch: unconditional jump lands here (end)
-            emitter.PatchForwardJump(jumpToEndPlaceholder);
 
             return true;
         }
 
         /// <summary>
         /// Inlines: condition ifFalse: [falseBlock] ifTrue: [trueBlock]
+        /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Same as ifTrue:ifFalse: but with reversed block order.
         /// </summary>
         private bool TryInlineIfFalseIfTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts)
@@ -1585,29 +1617,33 @@ namespace Smalltalk80.Compiler
             if (!CanInlineBlock(keywordParts[0], out var falseBlock)) return false;
             if (!CanInlineBlock(keywordParts[1], out var trueBlock)) return false;
 
-            // Emit: JUMP_IF_TRUE to trueBlock
-            int jumpToTruePlaceholder = emitter.EmitJumpOnTruePlaceholder();
+            // PASS 1: Calculate sizes
+            int falseBlockSize = CalculateBlockBodySize(falseBlock!);
+            int trueBlockSize = CalculateBlockBodySize(trueBlock!);
+
+            // Calculate jump sizes
+            // BTP always 2 bytes in Blue Book
+            int skipTrueJumpSize = BytecodeEmitter.SizeForwardJump(trueBlockSize);
+            int btpOffset = falseBlockSize + skipTrueJumpSize;
+
+            // PASS 2: Emit with optimal jumps
+            emitter.EmitJumpOnTrue(btpOffset);
 
             // Compile false block body inline (condition was false)
             CompileInlineBlockBody(falseBlock!);
 
             // Emit: unconditional jump over true block
-            int jumpToEndPlaceholder = emitter.EmitForwardJumpPlaceholder();
-
-            // Patch: JUMP_IF_TRUE lands here (start of true block)
-            emitter.PatchJumpOnTrue(jumpToTruePlaceholder);
+            emitter.EmitForwardJump(trueBlockSize);
 
             // Compile true block body inline
             CompileInlineBlockBody(trueBlock!);
-
-            // Patch: unconditional jump lands here (end)
-            emitter.PatchForwardJump(jumpToEndPlaceholder);
 
             return true;
         }
 
         /// <summary>
         /// Inlines: condition and: [block]
+        /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Short-circuit: if condition is false, return false without evaluating block.
         /// </summary>
         private bool TryInlineAnd(Smalltalk80Parser.KeywordPartContext[] keywordParts)
@@ -1615,29 +1651,33 @@ namespace Smalltalk80.Compiler
             if (keywordParts.Length != 1) return false;
             if (!CanInlineBlock(keywordParts[0], out var block)) return false;
 
-            // Emit: JUMP_IF_FALSE to end (short-circuit)
-            int jumpPlaceholder = emitter.EmitJumpOnFalsePlaceholder();
+            // PASS 1: Calculate sizes
+            int blockSize = CalculateBlockBodySize(block!);
+
+            // Calculate jump offsets:
+            // Pattern: BFP -> <block> -> JMP -> PUSH_FALSE
+            // BFP should land ON PUSH_FALSE (skip block + JMP)
+            int skipFalseJumpSize = BytecodeEmitter.SizeForwardJump(1);
+            int bfpOffset = blockSize + skipFalseJumpSize; // Land on PUSH_FALSE
+
+            // PASS 2: Emit with optimal jumps
+            emitter.EmitJumpOnFalse(bfpOffset);
 
             // Compile block body inline (evaluates to second boolean)
             CompileInlineBlockBody(block!);
 
             // Jump over the false push
-            int skipFalsePlaceholder = emitter.EmitForwardJumpPlaceholder();
-
-            // Patch: JUMP_IF_FALSE lands here
-            emitter.PatchJumpOnFalse(jumpPlaceholder);
+            emitter.EmitForwardJump(1); // Skip 1 byte (pushFalse)
 
             // Short-circuit case: push false
             emitter.PushFalse();
-
-            // Patch: skip over false
-            emitter.PatchForwardJump(skipFalsePlaceholder);
 
             return true;
         }
 
         /// <summary>
         /// Inlines: condition or: [block]
+        /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Short-circuit: if condition is true, return true without evaluating block.
         /// </summary>
         private bool TryInlineOr(Smalltalk80Parser.KeywordPartContext[] keywordParts)
@@ -1645,23 +1685,26 @@ namespace Smalltalk80.Compiler
             if (keywordParts.Length != 1) return false;
             if (!CanInlineBlock(keywordParts[0], out var block)) return false;
 
-            // Emit: JUMP_IF_TRUE to end (short-circuit)
-            int jumpPlaceholder = emitter.EmitJumpOnTruePlaceholder();
+            // PASS 1: Calculate sizes
+            int blockSize = CalculateBlockBodySize(block!);
+
+            // Calculate jump offsets:
+            // Pattern: BTP -> <block> -> JMP -> PUSH_TRUE
+            // BTP should land ON PUSH_TRUE (skip block + JMP)
+            int skipTrueJumpSize = BytecodeEmitter.SizeForwardJump(1);
+            int btpOffset = blockSize + skipTrueJumpSize; // Land on PUSH_TRUE
+
+            // PASS 2: Emit with optimal jumps
+            emitter.EmitJumpOnTrue(btpOffset);
 
             // Compile block body inline (evaluates to second boolean)
             CompileInlineBlockBody(block!);
 
             // Jump over the true push
-            int skipTruePlaceholder = emitter.EmitForwardJumpPlaceholder();
-
-            // Patch: JUMP_IF_TRUE lands here
-            emitter.PatchJumpOnTrue(jumpPlaceholder);
+            emitter.EmitForwardJump(1); // Skip 1 byte (pushTrue)
 
             // Short-circuit case: push true
             emitter.PushTrue();
-
-            // Patch: skip over true
-            emitter.PatchForwardJump(skipTruePlaceholder);
 
             return true;
         }
@@ -1720,26 +1763,31 @@ namespace Smalltalk80.Compiler
                 return false; // Body is not an inlinable block
             }
 
-            // Emit inlined while loop
-            // Pattern:
-            //   loopStart:
-            //     <condition block body>    ; Inline, pushes boolean
-            //     JUMP_IF_FALSE/TRUE end    ; Exit condition (FALSE for whileTrue, TRUE for whileFalse)
-            //     <body block body>         ; Inline
-            //     POP                       ; Discard body result
-            //     JUMP loopStart            ; Loop back
-            //   end:
-            //     PUSH_NIL                  ; whileTrue:/whileFalse: always returns nil
+            // Two-pass approach for while loops:
+            // PASS 1: Calculate sizes
+            int conditionSize = CalculateBlockBodySize(conditionBlock!);
+            int bodySize = CalculateBlockBodySize(bodyBlock!);
 
+            // Calculate exit jump offset:
+            // Pattern: BFP/BTP -> <body> -> POP -> JMP_BACK -> PUSH_NIL
+            // Exit jump should land ON PUSH_NIL (skip body + pop + backward jump)
+            int exitJumpTarget = bodySize + 1 + 2; // body + pop + backwardJmp (land on pushNil)
+
+            // PASS 2: Emit with optimal jumps
             int loopStart = emitter.CurrentOffset;
 
             // Compile condition block body inline
             CompileInlineBlockBody(conditionBlock!);
 
-            // Exit loop: JUMP_IF_FALSE for whileTrue:, JUMP_IF_TRUE for whileFalse:
-            int exitJumpPlaceholder = isWhileTrue
-                ? emitter.EmitJumpOnFalsePlaceholder()
-                : emitter.EmitJumpOnTruePlaceholder();
+            // Exit loop: Use calculated offset
+            if (isWhileTrue)
+            {
+                emitter.EmitJumpOnFalse(exitJumpTarget);
+            }
+            else
+            {
+                emitter.EmitJumpOnTrue(exitJumpTarget);
+            }
 
             // Compile body block inline
             CompileInlineBlockBody(bodyBlock!);
@@ -1750,65 +1798,50 @@ namespace Smalltalk80.Compiler
             // Jump back to loop start
             emitter.EmitJumpBackward(loopStart);
 
-            // Patch exit jump to here
-            if (isWhileTrue)
-            {
-                emitter.PatchJumpOnFalse(exitJumpPlaceholder);
-            }
-            else
-            {
-                emitter.PatchJumpOnTrue(exitJumpPlaceholder);
-            }
-
             // While loops always return nil
             emitter.PushNil();
-
-            // Diagnostic: Log successful inlining
-            Console.WriteLine($"[WHILE-INLINE] Inlined {selector} in {emitter.currentMethodName}");
 
             return true;
         }
 
         /// <summary>
         /// Compiles an inlined while loop without a body argument.
+        /// Two-pass approach for optimal jump encoding.
         /// Pattern for [block] whileTrue:
         ///   loopStart:
         ///     (condition block body)    ; Inline, pushes boolean
-        ///     JUMP_IF_FALSE end         ; Exit if false
+        ///     JUMP_IF_FALSE end         ; Exit if false (short if possible)
         ///     JUMP loopStart            ; Loop back
         ///   end:
         ///     PUSH_NIL                  ; whileTrue returns nil
         /// </summary>
         private void CompileInlinedWhileLoopNoArg(Smalltalk80Parser.BlockContext conditionBlock, bool isWhileTrue)
         {
+            // PASS 1: Calculate sizes (not much to calculate for no-arg version)
+            // Exit jump offset: backward jump(2) lands on pushNil
+            int exitJumpTarget = 2; // Land on pushNil (skip backward jump only)
+
+            // PASS 2: Emit with optimal jumps
             int loopStart = emitter.CurrentOffset;
 
             // Compile condition block body inline
             CompileInlineBlockBody(conditionBlock);
 
-            // Exit loop: JUMP_IF_FALSE for whileTrue, JUMP_IF_TRUE for whileFalse
-            int exitJumpPlaceholder = isWhileTrue
-                ? emitter.EmitJumpOnFalsePlaceholder()
-                : emitter.EmitJumpOnTruePlaceholder();
+            // Exit loop: Use calculated offset
+            if (isWhileTrue)
+            {
+                emitter.EmitJumpOnFalse(exitJumpTarget);
+            }
+            else
+            {
+                emitter.EmitJumpOnTrue(exitJumpTarget);
+            }
 
             // Jump back to loop start (no body to execute)
             emitter.EmitJumpBackward(loopStart);
 
-            // Patch exit jump to here
-            if (isWhileTrue)
-            {
-                emitter.PatchJumpOnFalse(exitJumpPlaceholder);
-            }
-            else
-            {
-                emitter.PatchJumpOnTrue(exitJumpPlaceholder);
-            }
-
             // While loops always return nil
             emitter.PushNil();
-
-            // Diagnostic: Log successful inlining
-            Console.WriteLine($"[WHILE-INLINE] Inlined {(isWhileTrue ? "whileTrue" : "whileFalse")} (no-arg) in {emitter.currentMethodName}");
         }
 
         /// <summary>

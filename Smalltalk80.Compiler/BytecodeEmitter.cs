@@ -11,6 +11,14 @@ namespace Smalltalk80.Compiler
     {
         private readonly List<byte> bytecodes = new();
 
+        // Sizing mode support for two-pass compilation
+        private bool _sizingMode = false;
+        private int _sizingCounter = 0;
+        private int _savedBytecodeCount = 0;
+
+        // Blue Book jump limits
+        private const int ShortJumpLimit = 8;  // Short jumps: offset 1-8
+
         // Separate collections for selectors and other literals
         private readonly List<Symbol> selectors = new();
 
@@ -385,10 +393,18 @@ namespace Smalltalk80.Compiler
 
         /// <summary>
         /// Emits a single bytecode.
+        /// In sizing mode, just increments counter without emitting.
         /// </summary>
         public void Emit(byte bytecode)
         {
-            bytecodes.Add(bytecode);
+            if (_sizingMode)
+            {
+                _sizingCounter++;
+            }
+            else
+            {
+                bytecodes.Add(bytecode);
+            }
         }
 
         /// <summary>
@@ -1089,6 +1105,170 @@ namespace Smalltalk80.Compiler
         public void SendSuperMessage(string selector, int argCount)
         {
             EmitSuperSend(selector, argCount);
+        }
+
+        // ============================================================================
+        // SIZING MODE - Two-pass compilation support
+        // ============================================================================
+
+        /// <summary>
+        /// Enters sizing mode. In sizing mode, Emit() counts bytes instead of emitting.
+        /// Call EndSizingMode() to get the count and return to normal emission.
+        /// </summary>
+        public void EnterSizingMode()
+        {
+            if (_sizingMode)
+                throw new InvalidOperationException("Already in sizing mode");
+            _sizingMode = true;
+            _sizingCounter = 0;
+            _savedBytecodeCount = bytecodes.Count;
+        }
+
+        /// <summary>
+        /// Exits sizing mode and returns the number of bytes that would have been emitted.
+        /// </summary>
+        public int EndSizingMode()
+        {
+            if (!_sizingMode)
+                throw new InvalidOperationException("Not in sizing mode");
+            _sizingMode = false;
+            int size = _sizingCounter;
+            _sizingCounter = 0;
+            return size;
+        }
+
+        /// <summary>
+        /// Returns true if currently in sizing mode.
+        /// </summary>
+        public bool IsSizingMode => _sizingMode;
+
+        // ============================================================================
+        // SHORT JUMP SUPPORT - Blue Book optimized jump encoding
+        // ============================================================================
+
+        /// <summary>
+        /// Determines jump size for an unconditional forward jump.
+        /// Blue Book: 0x90-0x97 (short, 1 byte, offset 1-8) or 0xA0-0xA7 (long, 2 bytes)
+        /// </summary>
+        public static int SizeForwardJump(int offset)
+        {
+            return (offset >= 1 && offset <= ShortJumpLimit) ? 1 : 2;
+        }
+
+        /// <summary>
+        /// Determines jump size for a conditional BFP (branch on false, pop).
+        /// Blue Book: 0x98-0x9F (short, 1 byte, offset 1-8) or 0xAC-0xAF (long, 2 bytes)
+        /// </summary>
+        public static int SizeJumpOnFalse(int offset)
+        {
+            return (offset >= 1 && offset <= ShortJumpLimit) ? 1 : 2;
+        }
+
+        /// <summary>
+        /// Determines jump size for a conditional BTP (branch on true, pop).
+        /// Blue Book: BTP is always 2 bytes (no short form in Blue Book).
+        /// </summary>
+        public static int SizeJumpOnTrue(int offset)
+        {
+            // Blue Book has no short BTP - always 2 bytes
+            return 2;
+        }
+
+        /// <summary>
+        /// Emits a short unconditional forward jump (1 byte).
+        /// Blue Book: 0x90-0x97 for offset 1-8.
+        /// </summary>
+        /// <param name="offset">Jump offset (must be 1-8)</param>
+        public void EmitShortForwardJump(int offset)
+        {
+            if (offset < 1 || offset > ShortJumpLimit)
+                throw new ArgumentOutOfRangeException(nameof(offset),
+                    $"Short jump offset must be 1-{ShortJumpLimit}, got {offset}");
+            // 0x90 + (offset - 1) gives 0x90-0x97 for offsets 1-8
+            Emit((byte)(0x90 + offset - 1));
+        }
+
+        /// <summary>
+        /// Emits a short BFP (branch on false, pop) jump (1 byte).
+        /// Blue Book: 0x98-0x9F for offset 1-8.
+        /// </summary>
+        /// <param name="offset">Jump offset (must be 1-8)</param>
+        public void EmitShortJumpOnFalse(int offset)
+        {
+            if (offset < 1 || offset > ShortJumpLimit)
+                throw new ArgumentOutOfRangeException(nameof(offset),
+                    $"Short BFP offset must be 1-{ShortJumpLimit}, got {offset}");
+            // 0x98 + (offset - 1) gives 0x98-0x9F for offsets 1-8
+            Emit((byte)(0x98 + offset - 1));
+        }
+
+        /// <summary>
+        /// Emits an unconditional forward jump with optimal encoding.
+        /// Uses short (1-byte) form when offset is 1-8, long (2-byte) otherwise.
+        /// </summary>
+        /// <param name="offset">Jump offset (target - current position)</param>
+        public void EmitForwardJump(int offset)
+        {
+            if (offset >= 1 && offset <= ShortJumpLimit)
+            {
+                EmitShortForwardJump(offset);
+            }
+            else if (offset >= 0 && offset <= 1023)
+            {
+                // Long forward jump: 0xA0-0xA7
+                int hiPart = offset / 256;
+                int loPart = offset % 256;
+                Emit((byte)(0xA0 + hiPart));
+                Emit((byte)loPart);
+            }
+            else
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset),
+                    $"Forward jump offset {offset} exceeds Blue Book range (0-1023)");
+            }
+        }
+
+        /// <summary>
+        /// Emits a BFP (branch on false, pop) with optimal encoding.
+        /// Uses short (1-byte) form when offset is 1-8, long (2-byte) otherwise.
+        /// </summary>
+        /// <param name="offset">Jump offset (target - current position)</param>
+        public void EmitJumpOnFalse(int offset)
+        {
+            if (offset >= 1 && offset <= ShortJumpLimit)
+            {
+                EmitShortJumpOnFalse(offset);
+            }
+            else if (offset >= 0 && offset <= 1023)
+            {
+                // Long BFP: 0xAC-0xAF
+                int hiPart = offset / 256;
+                int loPart = offset % 256;
+                Emit((byte)(0xAC + hiPart));
+                Emit((byte)loPart);
+            }
+            else
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset),
+                    $"BFP offset {offset} exceeds Blue Book range (0-1023)");
+            }
+        }
+
+        /// <summary>
+        /// Emits a BTP (branch on true, pop).
+        /// Blue Book: Always 2 bytes (0xA8-0xAB), no short form.
+        /// </summary>
+        /// <param name="offset">Jump offset (target - current position)</param>
+        public void EmitJumpOnTrue(int offset)
+        {
+            if (offset < 0 || offset > 1023)
+                throw new ArgumentOutOfRangeException(nameof(offset),
+                    $"BTP offset {offset} exceeds Blue Book range (0-1023)");
+            // Long BTP: 0xA8-0xAB
+            int hiPart = offset / 256;
+            int loPart = offset % 256;
+            Emit((byte)(0xA8 + hiPart));
+            Emit((byte)loPart);
         }
     }
 }
