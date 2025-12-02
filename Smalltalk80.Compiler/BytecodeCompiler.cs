@@ -1298,15 +1298,19 @@ namespace Smalltalk80.Compiler
                     .OfType<Smalltalk80Parser.TemporaryNameContext>()
                     .Select(t => t.GetText())
                     .ToList();
+            }
 
-                // Allocate block temporaries in the unified temp frame
+            // Use EnterBlockScope/ExitScope to properly allocate inline block temps
+            // Note: Empty args list since inline blocks have no arguments (checked by CanInlineBlock)
+            if (tempNames.Count > 0)
+            {
+                allocator.EnterBlockScope(new List<string>(), tempNames, isNested: false);
+
+                // Add temps to environment for variable resolution
                 foreach (var tempName in tempNames)
                 {
-                    if (!environment.Temporaries.ContainsKey(tempName))
-                    {
-                        int slot = allocator.AllocateLocalTemporary(tempName);
-                        environment.Temporaries[tempName] = slot;
-                    }
+                    int slot = allocator.GetSlotIndex(tempName);
+                    environment.Temporaries[tempName] = slot;
                 }
             }
 
@@ -1343,13 +1347,19 @@ namespace Smalltalk80.Compiler
                 // Empty block - push nil
                 emitter.PushNil();
             }
+
+            // Exit block scope if we entered one for temps
+            if (tempNames.Count > 0)
+            {
+                allocator.ExitScope();
+            }
         }
 
         /// <summary>
         /// Inlines: condition ifTrue: [trueBlock]
         /// Pattern: condition already on stack
         ///   JUMP_IF_FALSE skip
-        ///   <trueBlock body>
+        ///   trueBlock body
         /// skip:
         ///   (value on stack or nil)
         /// </summary>
@@ -1383,7 +1393,7 @@ namespace Smalltalk80.Compiler
         /// Inlines: condition ifFalse: [falseBlock]
         /// Pattern: condition already on stack
         ///   JUMP_IF_TRUE skip
-        ///   <falseBlock body>
+        ///   falseBlock body
         /// skip:
         ///   (value on stack or nil)
         /// </summary>
@@ -1417,10 +1427,10 @@ namespace Smalltalk80.Compiler
         /// Inlines: condition ifTrue: [trueBlock] ifFalse: [falseBlock]
         /// Pattern: condition already on stack
         ///   JUMP_IF_FALSE falseLabel
-        ///   <trueBlock body>
+        ///   trueBlock body
         ///   JUMP endLabel
         /// falseLabel:
-        ///   <falseBlock body>
+        ///   falseBlock body
         /// endLabel:
         /// </summary>
         private bool TryInlineIfTrueIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)

@@ -758,8 +758,8 @@ namespace Smalltalk80.Compiler
             // Reserve 2 bytes for long jump (0xAC-0xAF format)
             // We don't know the offset yet, so emit placeholder bytes
             int placeholderOffset = CurrentIP;
-            Emit(0xAC);  // Long jump on false, base offset 0
-            Emit(0x00);  // Extension byte placeholder
+            Emit((byte)0xAC);  // Long jump on false, base offset 0
+            Emit((byte)0x00);  // Extension byte placeholder
             return placeholderOffset;
         }
 
@@ -773,8 +773,8 @@ namespace Smalltalk80.Compiler
         {
             // Reserve 2 bytes for long jump (0xA8-0xAB format)
             int placeholderOffset = CurrentIP;
-            Emit(0xA8);  // Long jump on true, base offset 0
-            Emit(0x00);  // Extension byte placeholder
+            Emit((byte)0xA8);  // Long jump on true, base offset 0
+            Emit((byte)0x00);  // Extension byte placeholder
             return placeholderOffset;
         }
 
@@ -787,8 +787,8 @@ namespace Smalltalk80.Compiler
         {
             // Reserve 2 bytes for long jump (0xA4-0xA7 format)
             int placeholderOffset = CurrentIP;
-            Emit(0xA4);  // Long unconditional jump, base offset 0
-            Emit(0x00);  // Extension byte placeholder
+            Emit((byte)0xA4);  // Long unconditional jump, base offset 0
+            Emit((byte)0x00);  // Extension byte placeholder
             return placeholderOffset;
         }
 
