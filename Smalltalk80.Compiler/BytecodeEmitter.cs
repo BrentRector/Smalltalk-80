@@ -395,18 +395,19 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
-        /// Increments the sizing counter for all active nesting levels.
-        /// Each byte emitted counts towards all enclosing sizing scopes.
+        /// Increments the sizing counter for the CURRENT nesting level only.
+        /// Parent levels should not be incremented - they get their counts
+        /// when bytecodes are emitted at their level after exiting nested sizing.
         /// </summary>
         private void IncrementSizingCounters(int count = 1)
         {
-            // Increment counters for all nesting levels
-            // We need to update all items in the stack
-            var items = _sizingCounterStack.ToArray();
-            _sizingCounterStack.Clear();
-            for (int i = items.Length - 1; i >= 0; i--)
+            // Only increment the topmost counter (current nesting level)
+            // Don't increment parent levels - they'll get their own increments
+            // when we emit bytecodes at their level (after nested sizing exits)
+            if (_sizingCounterStack.Count > 0)
             {
-                _sizingCounterStack.Push(items[i] + count);
+                var top = _sizingCounterStack.Pop();
+                _sizingCounterStack.Push(top + count);
             }
         }
 
