@@ -166,6 +166,10 @@ public static class VMConstants
     public const int LINKEDLIST_FIRSTLINK_INDEX = 0;
     public const int LINKEDLIST_LASTLINK_INDEX = 1;
 
+    // Semaphore instanceVariableNames: 'excessSignals'
+    // Semaphore extends LinkedList, so firstLink=0, lastLink=1, excessSignals=2
+    public const int SEMAPHORE_EXCESSSIGNALS_INDEX = 2;
+
     // Link instanceVariableNames: 'nextLink'
     // Process, Semaphore signal queues, etc. inherit from Link
     public const int LINK_NEXTLINK_INDEX = 0;

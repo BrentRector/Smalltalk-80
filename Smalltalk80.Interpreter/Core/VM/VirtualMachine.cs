@@ -4,6 +4,7 @@ using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core.VM.Interpreter;
 using Smalltalk80.Interpreter.Core.VM.Caching;
 using Smalltalk80.Interpreter.Core.VM.Diagnostics;
+using Smalltalk80.Interpreter.Core.VM.Scheduling;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.Attributes;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
@@ -50,6 +51,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private readonly SelectorCache _selectorCache;
     private readonly NonLocalReturnHandler _nlrHandler;
     private readonly ExecutionTracer _tracer;
+    private readonly ITimerManager _timerManager;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -121,6 +123,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Initialize tracer first as other components may need it
         _tracer = new ExecutionTracer();
+
+        // Initialize timer manager for Delay mechanism (primitive 100)
+        _timerManager = new TimerManager();
 
         _contextManager = new ContextManager(
             heapManager,
@@ -295,7 +300,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Idle detection: pause briefly when running background process to reduce CPU
         const int BackgroundProcessPriority = 1;  // SystemRockBottomPriority
-        const int IdleWaitMs = 10;  // How long to wait for events when idle
+        const int MaxIdleWaitMs = 10;  // Maximum time to wait for events when idle
 
         while (true)
         {
@@ -310,7 +315,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                     throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
                 }
 
-                // Idle detection: if running background process, wait briefly for events
+                // Check for expired timer and signal semaphore (for Delay mechanism)
+                CheckAndSignalExpiredTimer();
+
+                // Idle detection: if running background process, wait briefly for events/timers
                 // This reduces CPU usage from 100% to near-zero when the system is idle
                 if (_platformBridge != null)
                 {
@@ -320,9 +328,20 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                         var priorityOOP = _heapManager.GetInstanceVariable(activeProcess, VMConstants.PROCESS_PRIORITY_INDEX);
                         if (priorityOOP.IsSmallInteger && priorityOOP.AsSmallInteger() == BackgroundProcessPriority)
                         {
-                            // Running background process - wait briefly for events
+                            // Calculate wait time: MIN(timer expiration, max idle wait)
+                            int waitMs = MaxIdleWaitMs;
+                            int timerMs = _timerManager.GetMillisecondsUntilNextTimer();
+                            if (timerMs >= 0 && timerMs < waitMs)
+                            {
+                                waitMs = Math.Max(1, timerMs); // Wait at least 1ms
+                            }
+
+                            // Running background process - wait for events or timer
                             // This allows the OS to schedule other threads and reduces CPU
-                            _platformBridge.WaitForEvents(IdleWaitMs);
+                            _platformBridge.WaitForEvents(waitMs);
+
+                            // Check timer again after waking up
+                            CheckAndSignalExpiredTimer();
                         }
                     }
                 }
@@ -2264,6 +2283,96 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     }
 
     #region Process Scheduling Support
+
+    /// <summary>
+    /// Checks if a timer has expired and signals the associated semaphore.
+    /// This is the core mechanism for the Delay class.
+    /// Called periodically from the interpreter loop.
+    /// </summary>
+    private void CheckAndSignalExpiredTimer()
+    {
+        var semaphoreOOP = _timerManager.GetExpiredTimerSemaphore();
+        if (semaphoreOOP == default || semaphoreOOP == _metadata.KnownObjects.Nil)
+            return;
+
+        // Signal the semaphore by incrementing excessSignals or waking a waiter
+        // Semaphore layout: firstLink (0), lastLink (1), excessSignals (2)
+        var firstLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+
+        if (firstLinkOOP == _metadata.KnownObjects.Nil)
+        {
+            // No processes waiting - increment excessSignals
+            var excessOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
+            if (excessOOP.IsSmallInteger)
+            {
+                int excess = excessOOP.AsSmallInteger();
+                _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX,
+                    SmalltalkOOP.FromSmallInteger(excess + 1));
+            }
+        }
+        else
+        {
+            // Process is waiting - wake it up by moving to ready queue
+            // Remove first process from semaphore's wait list
+            var processOOP = firstLinkOOP;
+            var nextLinkOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX);
+            _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, nextLinkOOP);
+            if (nextLinkOOP == _metadata.KnownObjects.Nil)
+            {
+                _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, _metadata.KnownObjects.Nil);
+            }
+
+            // Clear process's myList and nextLink
+            _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
+            _heapManager.SetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
+
+            // Add process to its priority queue (make it runnable)
+            var priorityOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX);
+            if (priorityOOP.IsSmallInteger)
+            {
+                int priority = priorityOOP.AsSmallInteger();
+                AddProcessToReadyQueue(processOOP, priority);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds a process to the appropriate priority ready queue.
+    /// </summary>
+    private void AddProcessToReadyQueue(SmalltalkOOP processOOP, int priority)
+    {
+        var schedulerOOP = _metadata.ProcessorScheduler;
+        if (schedulerOOP == _metadata.KnownObjects.Nil)
+            return;
+
+        var processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        if (processListsOOP == _metadata.KnownObjects.Nil)
+            return;
+
+        // Get the LinkedList for this priority (index = priority - 1)
+        int index = priority - 1;
+        if (index < 0 || index >= _heapManager.GetIndexedSize(processListsOOP))
+            return;
+
+        var listOOP = _heapManager.GetIndexedOOP(processListsOOP, index);
+        if (listOOP == _metadata.KnownObjects.Nil)
+            return;
+
+        // Add process to end of list (LinkedList>>addLast:)
+        var lastLinkOOP = _heapManager.GetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
+        if (lastLinkOOP == _metadata.KnownObjects.Nil)
+        {
+            // List is empty
+            _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, processOOP);
+        }
+        else
+        {
+            // Append to end
+            _heapManager.SetInstanceVariable(lastLinkOOP, VMConstants.LINK_NEXTLINK_INDEX, processOOP);
+        }
+        _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, processOOP);
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, listOOP);
+    }
 
     /// <summary>
     /// Gets the currently active process OOP from ProcessorScheduler.
