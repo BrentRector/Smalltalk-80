@@ -311,63 +311,24 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 context.Push(SmalltalkOOP.FromSmallInteger(2));
                 return true;
 
+            // Return bytecodes 120-124: All "return from message" bytecodes handle NLR
+            // Blue Book: explicit ^expr return
+            // - In MethodContext: normal method return
+            // - In BlockContext: non-local return (NLR) to home.sender
             case Bytecode.RETURN_SELF:
-                context.Push(receiverOOP);
-                return false; // Return from method
+                return HandleReturnFromMessage(receiverOOP);
 
             case Bytecode.RETURN_TRUE:
-                context.Push(metadata.KnownObjects.True);
-                return false;
+                return HandleReturnFromMessage(metadata.KnownObjects.True);
 
             case Bytecode.RETURN_FALSE:
-                context.Push(metadata.KnownObjects.False);
-                return false;
+                return HandleReturnFromMessage(metadata.KnownObjects.False);
 
             case Bytecode.RETURN_NIL:
-                context.Push(metadata.KnownObjects.Nil);
-                return false;
+                return HandleReturnFromMessage(metadata.KnownObjects.Nil);
 
-            case Bytecode.RETURN_TOP_FROM_MESSAGE: // 0x7C - Blue Book "Return Stack Top From Message"
-                // Blue Book: explicit ^expr return
-                // - In MethodContext: normal method return
-                // - In BlockContext: non-local return (NLR) to home.sender
-                {
-                    var returnValue = context.Pop();
-
-                    // Check if we're in a BlockContext by checking the class
-                    var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
-
-                    if (activeClassOOP == metadata.BlockContextClassOOP)
-                    {
-                        // We're in a BlockContext - get home and perform non-local return
-                        var homeOOP = heapManager.GetInstanceVariable(
-                            context.ActiveContext,
-                            VMConstants.BLOCKCONTEXT_HOME_INDEX
-                        );
-
-                        var targetContextOOP = homeOOP;
-
-                        // Validate target is in sender chain (safety check)
-                        if (!context.IsInSenderChain(targetContextOOP, context.ActiveContext))
-                        {
-                            throw new InvalidOperationException(
-                                "Non-local return target not in sender chain - block's defining method has already returned");
-                        }
-
-                        // Initiate non-local return to home's sender
-                        context.NonLocalReturnPending = true;
-                        context.NLRTargetContext = targetContextOOP;
-                        context.NLRValue = returnValue;
-
-                        return false; // Exit bytecode loop to unwind
-                    }
-                    else
-                    {
-                        // We're in a MethodContext - normal method return
-                        context.Push(returnValue);
-                        return false;
-                    }
-                }
+            case Bytecode.RETURN_TOP_FROM_MESSAGE: // 0x7C
+                return HandleReturnFromMessage(context.Pop());
 
             case Bytecode.RETURN_TOP_FROM_BLOCK: // 0x7D - Blue Book "Return Stack Top From Block"
                 // Blue Book: local return from block to whoever sent value/value:/etc.
@@ -1145,6 +1106,50 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         catch
         {
             return metadata.KnownObjects.Nil;
+        }
+    }
+
+    /// <summary>
+    /// Handles "return from message" bytecodes (120-124).
+    /// In MethodContext: normal method return.
+    /// In BlockContext: non-local return (NLR) to home's sender.
+    /// </summary>
+    /// <param name="returnValue">The value to return.</param>
+    /// <returns>Always returns false to signal method/block return.</returns>
+    private bool HandleReturnFromMessage(SmalltalkOOP returnValue)
+    {
+        // Check if we're in a BlockContext by checking the class
+        var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
+
+        if (activeClassOOP == metadata.BlockContextClassOOP)
+        {
+            // We're in a BlockContext - get home and perform non-local return
+            var homeOOP = heapManager.GetInstanceVariable(
+                context.ActiveContext,
+                VMConstants.BLOCKCONTEXT_HOME_INDEX
+            );
+
+            var targetContextOOP = homeOOP;
+
+            // Validate target is in sender chain (safety check)
+            if (!context.IsInSenderChain(targetContextOOP, context.ActiveContext))
+            {
+                throw new InvalidOperationException(
+                    "Non-local return target not in sender chain - block's defining method has already returned");
+            }
+
+            // Initiate non-local return to home's sender
+            context.NonLocalReturnPending = true;
+            context.NLRTargetContext = targetContextOOP;
+            context.NLRValue = returnValue;
+
+            return false; // Exit bytecode loop to unwind
+        }
+        else
+        {
+            // We're in a MethodContext - normal method return
+            context.Push(returnValue);
+            return false;
         }
     }
 }
