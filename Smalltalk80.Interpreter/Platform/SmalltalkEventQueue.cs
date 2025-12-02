@@ -13,6 +13,19 @@ public enum SmalltalkEventType
 }
 
 /// <summary>
+/// Interface for event queue idle waiting support.
+/// </summary>
+public interface IEventWaitHandle
+{
+    /// <summary>
+    /// Waits for an event to arrive or timeout.
+    /// </summary>
+    /// <param name="timeoutMs">Timeout in milliseconds. -1 for infinite.</param>
+    /// <returns>True if event arrived, false if timeout.</returns>
+    bool WaitOne(int timeoutMs);
+}
+
+/// <summary>
 /// Represents a UI event from Windows that will be consumed by Smalltalk code.
 /// </summary>
 public class SmalltalkEvent
@@ -52,7 +65,7 @@ public class SmalltalkEvent
 /// - Yellow/Middle = 129 (8r201)
 /// - Blue/Right = 130 (8r202)
 /// </summary>
-public class SmalltalkEventQueue
+public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
 {
     // Input word type constants (shifted to bits 12-15)
     private const int TypeMouseX = 1 << 12;    // 0x1000
@@ -68,6 +81,10 @@ public class SmalltalkEventQueue
     private readonly ConcurrentQueue<SmalltalkEvent> _events;
     private readonly ConcurrentQueue<int> _inputWords;  // Processed input words ready for Smalltalk
     private readonly object _mouseLock = new object();
+
+    // Event wait handle for idle blocking
+    private readonly AutoResetEvent _eventSignal = new(false);
+    private bool _disposed = false;
 
     // Current state (for polling via primitive 90)
     private int _currentX;
@@ -90,6 +107,7 @@ public class SmalltalkEventQueue
     /// <summary>
     /// Enqueue an event from the WinForms thread.
     /// Thread-safe (can be called from any thread).
+    /// Signals waiting threads that events are available.
     /// </summary>
     public void Enqueue(SmalltalkEvent evt)
     {
@@ -107,6 +125,9 @@ public class SmalltalkEventQueue
                 _currentBlueButton = evt.BlueButton;
             }
         }
+
+        // Signal any waiting threads that events are available
+        _eventSignal.Set();
     }
 
     /// <summary>
@@ -229,4 +250,32 @@ public class SmalltalkEventQueue
     /// Note: This is a snapshot and may change immediately after calling.
     /// </summary>
     public int Count => _events.Count + _inputWords.Count;
+
+    /// <summary>
+    /// Waits for an event to arrive or timeout.
+    /// Used to reduce CPU usage when the VM is idle.
+    /// </summary>
+    /// <param name="timeoutMs">Timeout in milliseconds. -1 for infinite.</param>
+    /// <returns>True if event arrived, false if timeout.</returns>
+    public bool WaitOne(int timeoutMs)
+    {
+        // If events already pending, return immediately
+        if (HasPendingEvents)
+            return true;
+
+        // Wait for signal or timeout
+        return _eventSignal.WaitOne(timeoutMs);
+    }
+
+    /// <summary>
+    /// Disposes of the event wait handle.
+    /// </summary>
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _eventSignal.Dispose();
+            _disposed = true;
+        }
+    }
 }

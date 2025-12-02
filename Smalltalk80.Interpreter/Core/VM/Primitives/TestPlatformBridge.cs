@@ -201,6 +201,26 @@ public class TestPlatformBridge : IPlatformBridge
         // WinFormsDisplayProvider would store and signal this semaphore on events
     }
 
+    public SmalltalkOOP GetInputSemaphore()
+    {
+        // No semaphore in test mode
+        return default;
+    }
+
+    public bool HasPendingEvents()
+    {
+        // No events in test mode
+        return false;
+    }
+
+    public bool WaitForEvents(int timeoutMs)
+    {
+        // In test mode, just sleep briefly and return false (no events)
+        if (timeoutMs > 0)
+            Thread.Sleep(Math.Min(timeoutMs, 10));
+        return false;
+    }
+
     // ============================================================================
     // Clipboard
     // ============================================================================

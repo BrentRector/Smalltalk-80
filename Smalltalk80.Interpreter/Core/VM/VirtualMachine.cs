@@ -289,19 +289,42 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Save initial process - forked processes should switch, not exit to C#
         _initialProcessOOP = GetActiveProcess();
 
-        // Counter for periodic shutdown checks (every N bytecodes)
-        int shutdownCheckCounter = 0;
-        const int ShutdownCheckInterval = 1000;
+        // Counter for periodic shutdown and idle checks (every N bytecodes)
+        int periodicCheckCounter = 0;
+        const int PeriodicCheckInterval = 1000;
+
+        // Idle detection: pause briefly when running background process to reduce CPU
+        const int BackgroundProcessPriority = 1;  // SystemRockBottomPriority
+        const int IdleWaitMs = 10;  // How long to wait for events when idle
 
         while (true)
         {
-            // Periodic shutdown check (not every bytecode for performance)
-            if (++shutdownCheckCounter >= ShutdownCheckInterval)
+            // Periodic checks (not every bytecode for performance)
+            if (++periodicCheckCounter >= PeriodicCheckInterval)
             {
-                shutdownCheckCounter = 0;
+                periodicCheckCounter = 0;
+
+                // Shutdown check
                 if (ShutdownToken.IsCancellationRequested)
                 {
                     throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
+                }
+
+                // Idle detection: if running background process, wait briefly for events
+                // This reduces CPU usage from 100% to near-zero when the system is idle
+                if (_platformBridge != null)
+                {
+                    var activeProcess = GetActiveProcess();
+                    if (activeProcess != _metadata.KnownObjects.Nil)
+                    {
+                        var priorityOOP = _heapManager.GetInstanceVariable(activeProcess, VMConstants.PROCESS_PRIORITY_INDEX);
+                        if (priorityOOP.IsSmallInteger && priorityOOP.AsSmallInteger() == BackgroundProcessPriority)
+                        {
+                            // Running background process - wait briefly for events
+                            // This allows the OS to schedule other threads and reduces CPU
+                            _platformBridge.WaitForEvents(IdleWaitMs);
+                        }
+                    }
                 }
             }
 
