@@ -1183,7 +1183,10 @@ namespace Smalltalk80.Compiler
             }
 
             // NORMAL FLOW: Compile the base
-            CompileMessageBase(messageBase);
+            if (messageBase != null)
+            {
+                CompileMessageBase(messageBase);
+            }
 
             // Process unary messages
             if (unaryMessages != null)
@@ -1742,7 +1745,7 @@ namespace Smalltalk80.Compiler
             CompileInlineBlockBody(bodyBlock!);
 
             // Discard body result
-            emitter.PopTop();
+            emitter.Pop();
 
             // Jump back to loop start
             emitter.EmitJumpBackward(loopStart);
@@ -1767,7 +1770,7 @@ namespace Smalltalk80.Compiler
         /// Compiles an inlined while loop without a body argument.
         /// Pattern for [block] whileTrue:
         ///   loopStart:
-        ///     <condition block body>    ; Inline, pushes boolean
+        ///     (condition block body)    ; Inline, pushes boolean
         ///     JUMP_IF_FALSE end         ; Exit if false
         ///     JUMP loopStart            ; Loop back
         ///   end:
