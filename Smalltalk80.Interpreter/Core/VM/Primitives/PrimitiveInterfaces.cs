@@ -333,7 +333,8 @@ public interface IPrimitiveRegistry
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
         VMMetadata? metadata = null,
-        IStackManager? stackManager = null);
+        IStackManager? stackManager = null,
+        ITimerManager? timerManager = null);
 
     /// <summary>
     /// Checks if a primitive is registered.
