@@ -318,7 +318,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 // Check for expired timer and signal semaphore (for Delay mechanism)
                 CheckAndSignalExpiredTimer();
 
-                // Idle detection: if running background process, wait briefly for events/timers
+                // Idle detection: if running background process, wait for events/timers
+                // Uses WaitHandle.WaitAny for efficient multi-source waiting
                 // This reduces CPU usage from 100% to near-zero when the system is idle
                 if (_platformBridge != null)
                 {
@@ -328,19 +329,32 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                         var priorityOOP = _heapManager.GetInstanceVariable(activeProcess, VMConstants.PROCESS_PRIORITY_INDEX);
                         if (priorityOOP.IsSmallInteger && priorityOOP.AsSmallInteger() == BackgroundProcessPriority)
                         {
-                            // Calculate wait time: MIN(timer expiration, max idle wait)
-                            int waitMs = MaxIdleWaitMs;
-                            int timerMs = _timerManager.GetMillisecondsUntilNextTimer();
-                            if (timerMs >= 0 && timerMs < waitMs)
+                            // Build array of wait handles for unified waiting
+                            var eventHandle = _platformBridge.EventAvailableHandle;
+                            var timerHandle = _timerManager.TimerExpiredHandle;
+
+                            if (eventHandle != null && timerHandle != null)
                             {
-                                waitMs = Math.Max(1, timerMs); // Wait at least 1ms
+                                // Use WaitHandle.WaitAny for interrupt-driven waiting
+                                // Wakes immediately when either:
+                                // 1. Input event arrives (eventHandle signaled)
+                                // 2. Timer expires (timerHandle signaled)
+                                // 3. Max wait timeout (MaxIdleWaitMs)
+                                WaitHandle.WaitAny([eventHandle, timerHandle], MaxIdleWaitMs);
+                            }
+                            else
+                            {
+                                // Fallback to polling-based wait if handles not available
+                                int waitMs = MaxIdleWaitMs;
+                                int timerMs = _timerManager.GetMillisecondsUntilNextTimer();
+                                if (timerMs >= 0 && timerMs < waitMs)
+                                {
+                                    waitMs = Math.Max(1, timerMs);
+                                }
+                                _platformBridge.WaitForEvents(waitMs);
                             }
 
-                            // Running background process - wait for events or timer
-                            // This allows the OS to schedule other threads and reduces CPU
-                            _platformBridge.WaitForEvents(waitMs);
-
-                            // Check timer again after waking up
+                            // Check timer after waking up (handles both interrupt and polling cases)
                             CheckAndSignalExpiredTimer();
                         }
                     }

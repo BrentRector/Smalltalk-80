@@ -6,8 +6,13 @@ namespace Smalltalk80.Interpreter.Core.VM.Scheduling;
 /// Interface for managing timer-based semaphore signals.
 /// Used by primitive 100 (signal:atMilliseconds:) to implement Delay.
 /// </summary>
-public interface ITimerManager
+public interface ITimerManager : IDisposable
 {
+    /// <summary>
+    /// Gets a WaitHandle that is signaled when a timer expires.
+    /// Used with WaitHandle.WaitAny for efficient multi-source waiting.
+    /// </summary>
+    WaitHandle TimerExpiredHandle { get; }
     /// <summary>
     /// Schedules a semaphore to be signaled when the millisecond clock reaches the target time.
     /// If a timer is already pending, it is replaced.

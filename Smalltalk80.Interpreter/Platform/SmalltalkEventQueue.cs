@@ -252,6 +252,12 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     public int Count => _events.Count + _inputWords.Count;
 
     /// <summary>
+    /// Gets a WaitHandle that is signaled when events arrive.
+    /// Used with WaitHandle.WaitAny for efficient multi-source waiting.
+    /// </summary>
+    public WaitHandle EventAvailableHandle => _eventSignal;
+
+    /// <summary>
     /// Waits for an event to arrive or timeout.
     /// Used to reduce CPU usage when the VM is idle.
     /// </summary>

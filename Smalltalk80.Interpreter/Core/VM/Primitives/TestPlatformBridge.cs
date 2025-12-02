@@ -221,6 +221,9 @@ public class TestPlatformBridge : IPlatformBridge
         return false;
     }
 
+    // In test mode, no WaitHandle for events (use polling via WaitForEvents)
+    public WaitHandle? EventAvailableHandle => null;
+
     // ============================================================================
     // Clipboard
     // ============================================================================

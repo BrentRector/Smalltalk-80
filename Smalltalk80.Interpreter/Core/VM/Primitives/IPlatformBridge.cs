@@ -126,6 +126,13 @@ public interface IPlatformBridge
     /// <returns>True if an event arrived, false if timeout expired.</returns>
     bool WaitForEvents(int timeoutMs);
 
+    /// <summary>
+    /// Gets a WaitHandle that is signaled when input events are available.
+    /// Used with WaitHandle.WaitAny for efficient multi-source waiting.
+    /// </summary>
+    /// <returns>WaitHandle for event notification, or null if not supported.</returns>
+    WaitHandle? EventAvailableHandle { get; }
+
     // ============================================================================
     // Clipboard (Primitive 104)
     // ============================================================================

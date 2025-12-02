@@ -474,6 +474,8 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         return _eventQueue.WaitOne(timeoutMs);
     }
 
+    public WaitHandle? EventAvailableHandle => _eventQueue.EventAvailableHandle;
+
     public SmalltalkOOP ReadClipboardToStringOOP()
     {
         // Not implemented yet - return value should be provided by Smalltalk thread
