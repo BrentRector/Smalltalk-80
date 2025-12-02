@@ -6,6 +6,8 @@ Tests are organized into functional categories using xUnit's `[Trait]` attribute
 
 ### Test Categories
 
+#### Smalltalk80.Interpreter.Tests
+
 | Category | Tests | Status | Description |
 |----------|-------|--------|-------------|
 | **Primitives** | 255 | ✅ Enabled | All primitive operation tests (arithmetic, comparison, control, strings, floats, etc.) |
@@ -13,17 +15,31 @@ Tests are organized into functional categories using xUnit's `[Trait]` attribute
 | **Validator** | 5 | ✅ Enabled | Cold start bundle validation tests |
 | **VM** | 42 | ⏸️ Disabled | Virtual machine core: message dispatch, execution state |
 | **Context** | 72 | ⏸️ Disabled | Context management and execution context tests |
-| **Compiler** | 132 | ⏸️ Disabled | Bytecode compiler tests: emitter, variable resolution, temp frames |
 
-**Total Tests**: 385 (all passing) - Primitives (255) + HeapManager (125) + Validator (5)
+**Note**: VM and Context tests are excluded via `<Compile Remove>` in the Interpreter.Tests .csproj file.
 
-**Note**: VM, Context, and Compiler tests are excluded via `<Compile Remove>` in the .csproj file.
+#### Smalltalk80.Compiler.Tests
+
+| Category | Tests | Status | Description |
+|----------|-------|--------|-------------|
+| **Compiler** | ~200+ | ✅ Enabled | Comprehensive bytecode compiler tests including control structure inlining, variable resolution, blocks, temp frames |
+
+**Total Tests**: ~600+ across both test projects
 
 ## Running Tests by Category
 
 ### Run All Tests
 ```bash
+# Run all interpreter tests
 cd Smalltalk80.Interpreter.Tests
+dotnet test
+
+# Run all compiler tests
+cd Smalltalk80.Compiler.Tests
+dotnet test
+
+# Run all tests in solution
+cd /path/to/Smalltalk-80
 dotnet test
 ```
 
@@ -113,8 +129,10 @@ dotnet test
 
 ## Current Test Status
 
-**Last Updated**: 2025-12-01
-**Status**: ✅ All 385 tests passing
+**Last Updated**: 2025-12-02
+**Status**: ✅ All tests passing
+
+### Interpreter Tests: 385/385 Passing (100%)
 
 ### Primitives: ✅ 255/255 Passing (100%)
 - SmallInteger arithmetic (Add, Subtract, Multiply, Divide, etc.)
@@ -142,8 +160,21 @@ dotnet test
 ### Validator: ✅ 5/5 Passing (100%)
 - Cold start bundle validation (structure, metadata, bytecode validation)
 
-### Other Categories: ⏸️ Disabled in .csproj
-VM (42), Context (72), and Compiler (132) tests exist but are excluded via `<Compile Remove>` directives.
+### Compiler Tests (Separate Project)
+
+The `Smalltalk80.Compiler.Tests` project contains comprehensive bytecode compiler tests:
+
+- **ControlStructureInliningTests**: Phase 3 Blue Book control structure optimization (ifTrue:/ifFalse:/and:/or: inlining)
+- **BasicCompilationTests**: Basic method compilation
+- **BlockTests**: Block context compilation
+- **VariableTests**: Variable resolution and access
+- **MessageTests**: Message send bytecode generation
+- **LiteralTests**: Literal handling
+- **TailRecursionAnalyzerTests**: Tail call optimization analysis
+- **IntegrationTests**: End-to-end compiler integration
+
+### Other Categories: ⏸️ Disabled in Interpreter.Tests
+VM (42) and Context (72) tests exist but are excluded via `<Compile Remove>` directives.
 
 ## Continuous Integration
 
