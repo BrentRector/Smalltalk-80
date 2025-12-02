@@ -1258,10 +1258,13 @@ namespace Smalltalk80.Compiler
             }
             else if (offset >= 0 && offset <= 1023)
             {
-                // Long forward jump: 0xA0-0xA7
+                // Long forward jump: 0xA4-0xA7
+                // Blue Book: offset = ((bytecode AND 0x07) - 4) * 256 + nextByte
+                // For forward jumps (positive offsets), use 0xA4-0xA7 (bits 4-7)
+                // 0xA4: offset 0-255, 0xA5: offset 256-511, etc.
                 int hiPart = offset / 256;
                 int loPart = offset % 256;
-                Emit((byte)(0xA0 + hiPart));
+                Emit((byte)(0xA4 + hiPart));
                 Emit((byte)loPart);
             }
             else
