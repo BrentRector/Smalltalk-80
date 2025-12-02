@@ -53,7 +53,7 @@ public class TailRecursionAnalyzerTests
         {
             foreach (var diagnostic in analyzer.GetDiagnosticMessages())
             {
-                TestContext.WriteLine(diagnostic);
+                TestContext.Out.WriteLine(diagnostic);
             }
         }
 
