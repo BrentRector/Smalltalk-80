@@ -56,9 +56,9 @@ testMultipleInstanceVars
         Assert.That(bytecodes, Is.Not.Null);
         
         // Verify stores to different instance variables
-        Assert.That(bytecodes.Cast<int>().Contains(96), Is.True, "Should store to x (index 0)");
-        Assert.That(bytecodes.Cast<int>().Contains(97), Is.True, "Should store to y (index 1)");
-        Assert.That(bytecodes.Cast<int>().Contains(98), Is.True, "Should store to z (index 2)");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(96), Is.True, "Should store to x (index 0)");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(97), Is.True, "Should store to y (index 1)");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(98), Is.True, "Should store to z (index 2)");
     }
     
     [Test]
@@ -79,8 +79,8 @@ testTemporaryVar
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should contain store to temp and push temp
-        Assert.That(bytecodes.Cast<int>().Contains(104), Is.True, "Should store to temp 0");
-        Assert.That(bytecodes.Cast<int>().Contains(16), Is.True, "Should push temp 0");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(104), Is.True, "Should store to temp 0");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(16), Is.True, "Should push temp 0");
     }
     
     [Test]
@@ -101,9 +101,9 @@ testMultipleTemps
         Assert.That(bytecodes, Is.Not.Null);
         
         // Verify stores to different temporaries
-        Assert.That(bytecodes.Cast<int>().Contains(104), Is.True, "Should store to temp1");
-        Assert.That(bytecodes.Cast<int>().Contains(105), Is.True, "Should store to temp2");
-        Assert.That(bytecodes.Cast<int>().Contains(106), Is.True, "Should store to temp3");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(104), Is.True, "Should store to temp1");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(105), Is.True, "Should store to temp2");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(106), Is.True, "Should store to temp3");
     }
     
     [Test]
@@ -135,9 +135,9 @@ testMultipleParams: param1 with: param2 and: param3
         Assert.That(bytecodes, Is.Not.Null);
         
         // Parameters are temps 0, 1, 2
-        Assert.That(bytecodes.Cast<int>().Contains(16), Is.True, "Should push param1");
-        Assert.That(bytecodes.Cast<int>().Contains(17), Is.True, "Should push param2");
-        Assert.That(bytecodes.Cast<int>().Contains(18), Is.True, "Should push param3");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(16), Is.True, "Should push param1");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(17), Is.True, "Should push param2");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(18), Is.True, "Should push param3");
     }
     
     [Test]
@@ -234,7 +234,7 @@ testBlockParam
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should contain block bytecode (143) and block parameter access
-        Assert.That(bytecodes.Cast<int>().Any(b => b == 143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Any(b => b == 143), Is.True, "Should contain block creation");
     }
     
     [Test]
@@ -252,7 +252,7 @@ testBlockTemp
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should contain block creation
-        Assert.That(bytecodes.Cast<int>().Any(b => b == 143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Any(b => b == 143), Is.True, "Should contain block creation");
     }
     
     [Test]
@@ -272,7 +272,7 @@ testClassVar
         Assert.That(bytecodes, Is.Not.Null);
         
         // Class variables use bytecodes 64-95 for push literal variable
-        var hasClassVarAccess = bytecodes.Cast<int>().Any(b => b >= 64 && b <= 95);
+        var hasClassVarAccess = bytecodes.Select(t => (int)t).Any(b => b >= 64 && b <= 95);
         Assert.That(hasClassVarAccess, Is.True, "Should access class variable");
     }
     
@@ -291,7 +291,7 @@ testGlobalVar
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should push global variable
-        var hasGlobalAccess = bytecodes.Cast<int>().Any(b => b >= 64 && b <= 95);
+        var hasGlobalAccess = bytecodes.Select(t => (int)t).Any(b => b >= 64 && b <= 95);
         Assert.That(hasGlobalAccess, Is.True, "Should access global variable");
     }
     
@@ -313,7 +313,7 @@ testShadowing: x
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should push temp 0 (parameter), not receiver variable 0
-        Assert.That(bytecodes.Cast<int>().Contains(16), Is.True, "Should access parameter x");
-        Assert.That(bytecodes.Cast<int>().Contains(0), Is.False, "Should not access instance var x");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(16), Is.True, "Should access parameter x");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(0), Is.False, "Should not access instance var x");
     }
 }

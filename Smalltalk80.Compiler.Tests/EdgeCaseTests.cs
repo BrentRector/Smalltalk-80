@@ -67,7 +67,7 @@ testDeepNesting
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should have multiple arithmetic operations
-        var arithmeticOps = bytecodes.Cast<int>().Count(b => b >= 176 && b <= 191);
+        var arithmeticOps = bytecodes.Select(t => (int)t).Count(b => b >= 176 && b <= 191);
         Assert.That(arithmeticOps, Is.GreaterThanOrEqualTo(6), "Should have all arithmetic operations");
     }
     
@@ -83,7 +83,7 @@ testDeepBlockNesting
         
         // Should have multiple nested blocks
         var bytecodes = (JArray)method["bytecode"]!;
-        var blockCount = bytecodes.Cast<int>().Count(b => b == 143);
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
         Assert.That(blockCount, Is.EqualTo(4), "Should have 4 nested blocks");
     }
     
@@ -127,7 +127,7 @@ testManyLiterals
         if (literals.Count > 31)
         {
             var bytecodes = (JArray)method["bytecode"]!;
-            var hasExtended = bytecodes.Cast<int>().Any(b => b == 132);
+            var hasExtended = bytecodes.Select(t => (int)t).Any(b => b == 132);
             Assert.That(hasExtended, Is.True, "Should use extended literal access");
         }
     }
@@ -153,7 +153,7 @@ testManyTemps
         
         // Should use extended temp access for temps > 15
         var bytecodes = (JArray)method["bytecode"]!;
-        var hasExtendedTemp = bytecodes.Cast<int>().Any(b => b == 128 || b == 129);
+        var hasExtendedTemp = bytecodes.Select(t => (int)t).Any(b => b == 128 || b == 129);
         Assert.That(hasExtendedTemp, Is.True, "Should use extended temp access");
     }
     
@@ -194,7 +194,7 @@ testEmptyBlocks
         
         // Should handle empty blocks correctly
         var bytecodes = (JArray)method["bytecode"]!;
-        var blockCount = bytecodes.Cast<int>().Count(b => b == 143);
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
         Assert.That(blockCount, Is.EqualTo(2), "Should have two empty blocks");
     }
     
@@ -214,7 +214,7 @@ testChainedAssignment
         var bytecodes = (JArray)method["bytecode"]!;
         
         // Should have multiple store operations
-        var storeCount = bytecodes.Cast<int>().Count(b => b >= 104 && b <= 111);
+        var storeCount = bytecodes.Select(t => (int)t).Count(b => b >= 104 && b <= 111);
         Assert.That(storeCount, Is.GreaterThanOrEqualTo(3), "Should store to all three temps");
     }
     
@@ -232,7 +232,7 @@ testParenReceiver
         var bytecodes = (JArray)method["bytecode"]!;
         
         // + should come before negated
-        var plusIndex = Array.IndexOf(bytecodes.Cast<int>().ToArray(), 176);
+        var plusIndex = Array.IndexOf(bytecodes.Select(t => (int)t).ToArray(), 176);
         var literals = (JArray)method["literals"]!;
         var hasNegated = literals.Any(l => l["value"]?.ToString() == "negated");
         
@@ -254,7 +254,7 @@ testArrayExpressions
         var bytecodes = (JArray)method["bytecode"]!;
         
         // Should evaluate expressions and build array
-        var hasArithmetic = bytecodes.Cast<int>().Any(b => b >= 176 && b <= 191);
+        var hasArithmetic = bytecodes.Select(t => (int)t).Any(b => b >= 176 && b <= 191);
         Assert.That(hasArithmetic, Is.True, "Should evaluate arithmetic expressions");
     }
     
@@ -270,7 +270,7 @@ testLiteralCascade
         
         // Cascade on literal string
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(136), Is.True, "Should have dup for cascade");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(136), Is.True, "Should have dup for cascade");
     }
     
     [Test]
@@ -287,7 +287,7 @@ testUnusedBlock
         
         // Block created but never evaluated
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(143), Is.True, "Should create block");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should create block");
         
         // Should not have value send
         var literals = (JArray)method["literals"]!;
@@ -311,8 +311,8 @@ testAssignmentExpression
         var bytecodes = (JArray)method["bytecode"]!;
         
         // Should store a and use its value in addition
-        Assert.That(bytecodes.Cast<int>().Contains(104), Is.True, "Should store to first temp");
-        Assert.That(bytecodes.Cast<int>().Contains(176), Is.True, "Should have + operation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(104), Is.True, "Should store to first temp");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(176), Is.True, "Should have + operation");
     }
     
     [Test]
@@ -332,7 +332,7 @@ testNegativeIndex
         
         // -1 might use special bytecode 116
         var bytecodes = (JArray)method["bytecode"]!;
-        var hasMinusOne = bytecodes.Cast<int>().Contains(116);
+        var hasMinusOne = bytecodes.Select(t => (int)t).Contains(116);
         
         Assert.That(hasNegOne || hasMinusOne, Is.True, "Should handle -1 literal");
     }

@@ -118,8 +118,8 @@ testTemporaries
         
         // Should store and access temporaries
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(104), Is.True, "Should store to temp1");
-        Assert.That(bytecodes.Cast<int>().Contains(105), Is.True, "Should store to temp2");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(104), Is.True, "Should store to temp1");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(105), Is.True, "Should store to temp2");
     }
     
     [Test]
@@ -138,8 +138,8 @@ add: a to: b
         
         // Parameters accessed as temps 0 and 1
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(16), Is.True, "Should push first param");
-        Assert.That(bytecodes.Cast<int>().Contains(17), Is.True, "Should push second param");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(16), Is.True, "Should push first param");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(17), Is.True, "Should push second param");
     }
     
     [Test]
@@ -198,7 +198,7 @@ testComplex
         var bytecodes = (JArray)method["bytecode"]!;
         
         // Check for arithmetic operations
-        var arithmeticOps = bytecodes.Cast<int>().Count(b => b >= 176 && b <= 191);
+        var arithmeticOps = bytecodes.Select(t => (int)t).Count(b => b >= 176 && b <= 191);
         Assert.That(arithmeticOps, Is.GreaterThan(0), "Should have arithmetic operations");
     }
     
@@ -319,7 +319,7 @@ testMultipleReturns
         
         // Should have multiple return bytecodes
         var bytecodes = (JArray)method["bytecode"]!;
-        var returnCount = bytecodes.Cast<int>().Count(b => b == 124);
+        var returnCount = bytecodes.Select(t => (int)t).Count(b => b == 124);
         Assert.That(returnCount, Is.GreaterThanOrEqualTo(4), "Should have multiple returns");
     }
     
@@ -349,8 +349,8 @@ x: aValue
         
         // Mutator - push param, store in instance var, return self
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(16), Is.True, "Should push parameter");
-        Assert.That(bytecodes.Cast<int>().Contains(96), Is.True, "Should store in instance var");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(16), Is.True, "Should push parameter");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(96), Is.True, "Should store in instance var");
         Assert.That((int)bytecodes[bytecodes.Count - 1], Is.EqualTo(120), "Should return self");
     }
 }

@@ -45,7 +45,7 @@ testBinaryMessage
         Assert.That(bytecodes, Is.Not.Null);
         
         // + is a special selector, should use bytecode 176
-        Assert.That(bytecodes.Cast<int>().Contains(176), Is.True, "Should use special + send");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(176), Is.True, "Should use special + send");
     }
     
     [Test]
@@ -148,7 +148,7 @@ testCascade
         
         // Cascades use bytecode 136 (duplicate stack top)
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(136), Is.True, "Should contain dup for cascade");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(136), Is.True, "Should contain dup for cascade");
     }
     
     [Test]
@@ -167,8 +167,8 @@ testCascadeWithPop
         
         // Cascades with semicolon need dup and pop
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(136), Is.True, "Should contain dup for cascade");
-        Assert.That(bytecodes.Cast<int>().Contains(135), Is.True, "Should contain pop for cascade");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(136), Is.True, "Should contain dup for cascade");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(135), Is.True, "Should contain pop for cascade");
     }
     
     [Test]
@@ -183,7 +183,7 @@ testPlus
         
         // + is special selector 0, bytecode 176
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(176), Is.True, "Should use special + bytecode");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(176), Is.True, "Should use special + bytecode");
     }
     
     [Test]
@@ -198,7 +198,7 @@ testMinus
         
         // - is special selector 1, bytecode 177
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(177), Is.True, "Should use special - bytecode");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(177), Is.True, "Should use special - bytecode");
     }
     
     [Test]
@@ -213,7 +213,7 @@ testLessThan
         
         // < is special selector 2, bytecode 178
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(178), Is.True, "Should use special < bytecode");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(178), Is.True, "Should use special < bytecode");
     }
     
     [Test]
@@ -228,7 +228,7 @@ testEquals
         
         // = is special selector 6, bytecode 182
         var bytecodes = (JArray)method["bytecode"]!;
-        Assert.That(bytecodes.Cast<int>().Contains(182), Is.True, "Should use special = bytecode");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(182), Is.True, "Should use special = bytecode");
     }
     
     [Test]
@@ -312,7 +312,7 @@ testSuperSend
         AssertBytecodeAt(bytecodes, 0, 112, "Push self for super");
         
         // Should have super send bytecode
-        var hasSuperSend = bytecodes.Cast<int>().Any(b => b == 133 || b == 134);
+        var hasSuperSend = bytecodes.Select(t => (int)t).Any(b => b == 133 || b == 134);
         Assert.That(hasSuperSend, Is.True, "Should contain super send");
     }
     
@@ -332,7 +332,7 @@ testLongChain
         Assert.That(bytecodes, Is.Not.Null);
         
         // Should have multiple binary sends
-        var binarySends = bytecodes.Cast<int>().Count(b => b >= 176 && b <= 191);
+        var binarySends = bytecodes.Select(t => (int)t).Count(b => b >= 176 && b <= 191);
         Assert.That(binarySends, Is.GreaterThanOrEqualTo(4), "Should have multiple binary sends");
     }
 }
