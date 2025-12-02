@@ -25,13 +25,11 @@ internal class ContextManager(
     // Active context (current MethodContext being executed)
     private SmalltalkOOP _activeContextOOP;
 
-    // Context depth tracking to detect infinite recursion
-    // Note: With process scheduling, the global counter is approximate since each process
-    // has its own context chain. Forked processes that terminate via suspend leave
-    // orphaned contexts that increment but never decrement. A proper fix would track
-    // context depth per-process, but for now we use a high limit.
-    private int _activeContextCount;
-    private const int MaxContextDepth = 100000;
+    // Note: The Blue Book Smalltalk-80 did NOT track global context depth.
+    // Context memory is managed by garbage collection. With multi-process scheduling,
+    // a global depth counter is fundamentally flawed because contexts from all processes
+    // are counted together, and terminated processes leave "orphaned" increments.
+    // Stack overflow detection should use per-context depth tracking if needed.
 
     // Context pooling - separate pools for MethodContext and BlockContext by size
     // Key: (classOOP, size), Value: Stack of context OOPs
@@ -52,34 +50,8 @@ internal class ContextManager(
     /// <inheritdoc />
     public SmalltalkOOP ActiveContext => _activeContextOOP;
 
-    // Diagnostic: Track context depth warnings
-    // Note: With process scheduling, context depth grows due to orphaned contexts from terminated
-    // forked processes. This is expected behavior until per-process tracking is implemented.
-    private int _lastLoggedDepth = 0;
-    private const int DepthLogThreshold = 10000;  // Log every 10000 context accumulation
-
-    /// <inheritdoc />
-    public int ContextDepth => _activeContextCount;
-
     /// <inheritdoc />
     public void SetActiveContext(SmalltalkOOP contextOOP) => _activeContextOOP = contextOOP;
-
-    /// <inheritdoc />
-    public void ResetContextDepth() => _activeContextCount = 0;
-
-    /// <inheritdoc />
-    public void IncrementContextDepth() => _activeContextCount++;
-
-    /// <inheritdoc />
-    public void DecrementContextDepth()
-    {
-        _activeContextCount--;
-        // Diagnostic: Warn if count goes negative (indicates decrement without increment)
-        if (_activeContextCount < 0)
-        {
-            Console.WriteLine($"[CONTEXT DEPTH WARNING] Count went negative: {_activeContextCount}");
-        }
-    }
 
     /// <inheritdoc />
     public SmalltalkOOP CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP = default)
@@ -139,24 +111,6 @@ internal class ContextManager(
             contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
             heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
             _poolMisses++;  // Pool empty or doesn't exist
-        }
-
-        // Increment context depth and check limit
-        _activeContextCount++;
-
-        // Diagnostic: Log at threshold intervals when depth is growing
-        if (_activeContextCount > _lastLoggedDepth + DepthLogThreshold && _activeContextCount > 50)
-        {
-            _lastLoggedDepth = _activeContextCount;
-            // Get method selector for context (would need method info here)
-            Console.WriteLine($"[CONTEXT DEPTH] Count reached {_activeContextCount}");
-        }
-
-        if (_activeContextCount > MaxContextDepth)
-        {
-            throw new InvalidOperationException(
-                $"Context depth limit exceeded: {_activeContextCount} contexts (limit: {MaxContextDepth}). " +
-                $"This typically indicates infinite recursion or primitive failure causing excessive message sends.");
         }
 
         // Step 5: Get field indices from VMConstants
