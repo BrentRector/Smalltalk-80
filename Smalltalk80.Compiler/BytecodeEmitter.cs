@@ -71,12 +71,14 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Patches a byte at a specific offset in the bytecode stream.
         /// Used for backpatching jump offsets after compiling the target code.
-        /// Should not be called during sizing mode.
+        /// In sizing mode, this is a no-op (patches will be applied during emit pass).
         /// </summary>
         public void PatchByteAt(int offset, byte value)
         {
+            // During sizing mode, skip patching - we're just counting bytes.
+            // The actual patching happens during the emit pass.
             if (IsSizingMode)
-                throw new InvalidOperationException("PatchByteAt should not be called during sizing mode");
+                return;
             if (offset < 0 || offset >= bytecodes.Count)
                 throw new ArgumentOutOfRangeException(nameof(offset), $"Offset {offset} out of range [0, {bytecodes.Count})");
             bytecodes[offset] = value;
