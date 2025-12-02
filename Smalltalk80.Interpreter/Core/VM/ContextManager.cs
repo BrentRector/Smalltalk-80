@@ -48,6 +48,10 @@ internal class ContextManager(
     /// <inheritdoc />
     public SmalltalkOOP ActiveContext => _activeContextOOP;
 
+    // Diagnostic: Track context depth warnings
+    private int _lastLoggedDepth = 0;
+    private const int DepthLogThreshold = 100;  // Log every 100 context accumulation
+
     /// <inheritdoc />
     public int ContextDepth => _activeContextCount;
 
@@ -58,7 +62,15 @@ internal class ContextManager(
     public void ResetContextDepth() => _activeContextCount = 0;
 
     /// <inheritdoc />
-    public void DecrementContextDepth() => _activeContextCount--;
+    public void DecrementContextDepth()
+    {
+        _activeContextCount--;
+        // Diagnostic: Warn if count goes negative (indicates decrement without increment)
+        if (_activeContextCount < 0)
+        {
+            Console.WriteLine($"[CONTEXT DEPTH WARNING] Count went negative: {_activeContextCount}");
+        }
+    }
 
     /// <inheritdoc />
     public SmalltalkOOP CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP = default)
@@ -122,6 +134,14 @@ internal class ContextManager(
 
         // Increment context depth and check limit
         _activeContextCount++;
+
+        // Diagnostic: Log at threshold intervals when depth is growing
+        if (_activeContextCount > _lastLoggedDepth + DepthLogThreshold && _activeContextCount > 50)
+        {
+            _lastLoggedDepth = _activeContextCount;
+            // Get method selector for context (would need method info here)
+            Console.WriteLine($"[CONTEXT DEPTH] Count reached {_activeContextCount}");
+        }
 
         if (_activeContextCount > MaxContextDepth)
         {
