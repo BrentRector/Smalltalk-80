@@ -71,9 +71,12 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Patches a byte at a specific offset in the bytecode stream.
         /// Used for backpatching jump offsets after compiling the target code.
+        /// Should not be called during sizing mode.
         /// </summary>
         public void PatchByteAt(int offset, byte value)
         {
+            if (_sizingMode)
+                throw new InvalidOperationException("PatchByteAt should not be called during sizing mode");
             if (offset < 0 || offset >= bytecodes.Count)
                 throw new ArgumentOutOfRangeException(nameof(offset), $"Offset {offset} out of range [0, {bytecodes.Count})");
             bytecodes[offset] = value;
@@ -409,14 +412,23 @@ namespace Smalltalk80.Compiler
 
         /// <summary>
         /// Emits a bytecode enum value.
+        /// In sizing mode, just increments counter without emitting.
         /// </summary>
         public void Emit(Bytecode bytecode)
         {
-            bytecodes.Add((byte)bytecode);
+            if (_sizingMode)
+            {
+                _sizingCounter++;
+            }
+            else
+            {
+                bytecodes.Add((byte)bytecode);
+            }
         }
 
         /// <summary>
         /// Emits an extended sub-operation enum value.
+        /// In sizing mode, just increments counter without emitting.
         /// </summary>
         /// <remarks>
         /// LEGACY: This method is kept for backward compatibility during transition.
@@ -425,16 +437,31 @@ namespace Smalltalk80.Compiler
 #pragma warning disable CS0618 // Type or member is obsolete
         public void Emit(ExtendedSubOp subOp)
         {
-            bytecodes.Add((byte)subOp);
+            if (_sizingMode)
+            {
+                _sizingCounter++;
+            }
+            else
+            {
+                bytecodes.Add((byte)subOp);
+            }
         }
 #pragma warning restore CS0618
 
         /// <summary>
         /// Emits multiple bytecodes.
+        /// In sizing mode, just increments counter without emitting.
         /// </summary>
         public void EmitBytes(params byte[] bytes)
         {
-            bytecodes.AddRange(bytes);
+            if (_sizingMode)
+            {
+                _sizingCounter += bytes.Length;
+            }
+            else
+            {
+                bytecodes.AddRange(bytes);
+            }
         }
 
         /// <summary>
