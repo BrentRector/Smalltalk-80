@@ -540,29 +540,6 @@ namespace Smalltalk80.Compiler
             var expr = returnStmt.expression();
             if (expr != null)
             {
-                // Blue Book optimization: Use single-bytecode returns for pseudo-variables
-                // Bytecodes 120-123 are "return X from message" (work for both method and NLR)
-                var pseudoVar = TryGetSimplePseudoVariable(expr);
-                if (pseudoVar != null)
-                {
-//Console.WriteLine($"[BYTECODE] CompileReturnStatement: Optimized return for '{pseudoVar}'");
-                    switch (pseudoVar)
-                    {
-                        case "self":
-                            emitter.ReturnSelf(); // 0x78 (120)
-                            return;
-                        case "true":
-                            emitter.ReturnTrue(); // 0x79 (121)
-                            return;
-                        case "false":
-                            emitter.ReturnFalse(); // 0x7A (122)
-                            return;
-                        case "nil":
-                            emitter.ReturnNil(); // 0x7B (123)
-                            return;
-                    }
-                }
-
 //Console.WriteLine($"[BYTECODE] CompileReturnStatement: Has expression, about to compile it");
                 CompileExpression(expr);
 //Console.WriteLine($"[BYTECODE] CompileReturnStatement: After CompileExpression, bytecode count: {emitter.GetBytecodes().Length}");
@@ -570,81 +547,16 @@ namespace Smalltalk80.Compiler
             else
             {
 //Console.WriteLine($"[BYTECODE] CompileReturnStatement: No expression, pushing self");
-                // No expression means return self
-                emitter.ReturnSelf(); // 0x78 (120) - optimized
-                return;
+                emitter.PushSelf();
             }
-
-            // Blue Book: explicit ^expr uses 0x7C (RETURN_TOP_FROM_MESSAGE)
+            
+            // Blue Book: explicit ^expr always uses 0x7C (RETURN_TOP_FROM_MESSAGE)
             // - In MethodContext: normal return to sender
             // - In BlockContext: non-local return (NLR) to home.sender
             // The VM handles the BlockContext check at runtime
 //Console.WriteLine($"[BYTECODE] CompileReturnStatement: emitting ReturnTop (0x7C)");
             emitter.ReturnTop(); // 0x7C - handles both method returns and block NLR
 //Console.WriteLine($"[BYTECODE] CompileReturnStatement: Final bytecode count: {emitter.GetBytecodes().Length}");
-        }
-
-        /// <summary>
-        /// Checks if an expression is a simple pseudo-variable reference (self, true, false, nil).
-        /// Returns the variable name if so, otherwise null.
-        /// This enables the Blue Book optimization of using single-byte return opcodes (120-123)
-        /// instead of push + return top (two bytes).
-        /// </summary>
-        private string? TryGetSimplePseudoVariable(Smalltalk80Parser.ExpressionContext expr)
-        {
-            // Traverse the grammar: expression → assignmentExpr → cascadeExpr → messageExpr →
-            //                       binaryExpr → unaryExpr → messageBase → variable
-
-            var assignExpr = expr.assignmentExpr();
-            if (assignExpr == null) return null;
-
-            // Must not be an assignment (no := operator)
-            if (assignExpr.variable() != null && assignExpr.ASSIGN() != null) return null;
-
-            var cascadeExpr = assignExpr.cascadeExpr();
-            if (cascadeExpr == null) return null;
-
-            // Must not have cascade (no semicolons)
-            var cascadeParts = cascadeExpr.messagePart();
-            if (cascadeParts != null && cascadeParts.Length > 0) return null;
-
-            var messageExpr = cascadeExpr.messageExpr();
-            if (messageExpr == null) return null;
-
-            // Must not have keyword message
-            if (messageExpr.keywordMessage() != null) return null;
-
-            var binaryExpr = messageExpr.binaryExpr();
-            if (binaryExpr == null) return null;
-
-            // Must not have binary messages
-            var binaryMsgs = binaryExpr.binaryMessage();
-            if (binaryMsgs != null && binaryMsgs.Length > 0) return null;
-
-            var unaryExpr = binaryExpr.unaryExpr();
-            if (unaryExpr == null) return null;
-
-            // Must not have unary messages
-            var unaryMsgs = unaryExpr.unaryMessage();
-            if (unaryMsgs != null && unaryMsgs.Length > 0) return null;
-
-            var messageBase = unaryExpr.messageBase();
-            if (messageBase == null) return null;
-
-            // Must be a variable (not a literal, block, or parenthesized expression)
-            var variable = messageBase.variable();
-            if (variable == null) return null;
-
-            var varName = variable.GetText();
-
-            // Only return for the specific pseudo-variables that have optimized return bytecodes
-            // Note: super and thisContext are NOT included because they don't have dedicated return bytecodes
-            if (varName == "self" || varName == "true" || varName == "false" || varName == "nil")
-            {
-                return varName;
-            }
-
-            return null;
         }
         
         private void CompileExpression(Smalltalk80Parser.ExpressionContext expr, bool leaveOnStack = true)
