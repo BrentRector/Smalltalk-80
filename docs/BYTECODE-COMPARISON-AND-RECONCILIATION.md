@@ -1,7 +1,7 @@
 # Bytecode Comparison and Reconciliation Plan
 
 **Date**: 2025-12-01
-**Updated**: 2025-12-01
+**Updated**: 2025-12-02
 **Purpose**: Compare and reconcile bytecode implementations between the runtime Smalltalk compiler and offline C# compiler
 
 ## Implementation Status
@@ -19,7 +19,18 @@
    - 0x7E-0x7F: Reserved/unused
 2. **Super send implementation** - Already Blue Book compliant (0x85-0x86)
 
-### 🔲 Phase 3: Optimization - PENDING
+### ✅ Phase 3: Optimization - COMPLETED (2025-12-02)
+1. **Control structure inlining** - Implemented for ifTrue:/ifFalse:/ifTrue:ifFalse:/and:/or:
+2. **Optimized return bytecodes** - Compiler now emits bytecodes 120-123 for returning pseudo-variables:
+   - `^self` → 120 (0x78) instead of 112, 124
+   - `^true` → 121 (0x79) instead of 113, 124
+   - `^false` → 122 (0x7A) instead of 114, 124
+   - `^nil` → 123 (0x7B) instead of 115, 124
+3. **Interpreter NLR fix** - Bytecodes 120-123 now properly handle non-local return in BlockContext
+
+### 🔲 Phase 4: Future Optimizations - PENDING
+1. **whileTrue:/whileFalse: inlining** - Deferred (receiver is a block, requires special handling)
+2. **to:do: / to:by:do: inlining** - Not yet investigated
 
 ## Executive Summary
 
@@ -319,7 +330,10 @@ No changes needed.
 | Super send implementation | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Already Blue Book compliant (0x85-0x86) |
 | Block return reconciliation | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Blue Book 0x7C-0x7F |
 | Conditional optimization | ✅ Complete | claude/bytecode-comparison-reconciliation-* | ifTrue:/ifFalse:/ifTrue:ifFalse:/and:/or: inlined |
+| Optimized return bytecodes | ✅ Complete | claude/bytecode-comparison-reconciliation-* | 120-123 for ^self/^true/^false/^nil |
+| Interpreter NLR for 120-123 | ✅ Complete | claude/bytecode-comparison-reconciliation-* | HandleReturnFromMessage helper |
 | whileTrue:/whileFalse: | 🔲 Deferred | - | Requires special receiver handling (receiver is block) |
+| to:do: / to:by:do: | 🔲 Not Started | - | Loop unrolling optimization |
 
 ## Appendix: Blue Book References
 
@@ -334,11 +348,40 @@ No changes needed.
 3. ~~Begin Phase 1 implementation~~ ✅ COMPLETE
 4. ~~Begin Phase 2: Block return reconciliation and super send implementation~~ ✅ COMPLETE
 5. ~~Begin Phase 3: Enable conditional optimization (ifTrue:/ifFalse: inlining)~~ ✅ COMPLETE
-6. Future: Implement whileTrue:/whileFalse: optimization (requires special receiver block handling)
+6. ~~Implement optimized return bytecodes (120-123) for pseudo-variables~~ ✅ COMPLETE
+
+### Recommended Next Steps (Phase 4)
+
+1. **whileTrue:/whileFalse: inlining** (COMPLEX)
+   - Challenge: Receiver is a block, not a boolean
+   - Approach: Detect `[condition] whileTrue: [body]` pattern at compile time
+   - Emit: Loop with conditional backward jump
+   - Risk: Changes thisContext semantics for the receiver block
+
+2. **to:do: / to:by:do: inlining** (MEDIUM)
+   - Detect `start to: end do: [:i | body]` pattern
+   - Emit: Counting loop with increment and conditional jump
+   - Benefit: Significant performance improvement for numeric loops
+
+3. **timesRepeat: inlining** (SIMPLE)
+   - Detect `n timesRepeat: [body]` pattern
+   - Emit: Counting loop similar to to:do:
+
+4. **Primitive method inlining** (ADVANCED)
+   - Inline simple primitives like `+`, `-`, `<`, `>` for SmallIntegers
+   - Emit: Direct arithmetic bytecodes with overflow check fallback
 
 ## Change Log
 
-- **2025-12-01**: Phase 3 completed
+- **2025-12-02**: Optimized return bytecodes implemented
+  - Compiler emits bytecodes 120-123 for `^self`, `^true`, `^false`, `^nil`
+  - Removed unoptimized code path (push + return top) for pseudo-variable returns
+  - Fixed interpreter: bytecodes 120-123 now handle NLR correctly in BlockContext
+  - Added `HandleReturnFromMessage` helper in BytecodeInterpreter for unified return handling
+  - All return-from-message bytecodes (120-124) use the same NLR logic
+  - BytecodeDecompiler and BytecodeDisassembler already supported all return bytecodes
+
+- **2025-12-01**: Phase 3 control structure inlining completed
   - Conditional optimization enabled for: `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:ifTrue:`, `and:`, `or:`
   - Added conditional jump methods to BytecodeEmitter (placeholders + patching)
   - Inline block compilation (no BlockContext created for zero-arg blocks)
