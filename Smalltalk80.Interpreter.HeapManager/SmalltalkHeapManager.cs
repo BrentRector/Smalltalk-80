@@ -116,12 +116,9 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             try
             {
                 // Run GC to reclaim unreachable objects and free their table indices
-                var gcStats = _garbageCollector.GarbageCollect();
+                _garbageCollector.GarbageCollect();
                 _allocationsSinceLastGC = 0;  // Reset cooldown counter
-                if (gcStats.CollectedObjects > 0)
-                {
-                    Console.WriteLine($"[GC] Collected {gcStats.CollectedObjects} objects, freed {_tableManager.GetFreeIndexCount()} indices");
-                }
+                // GC messages suppressed - enable VerboseDebugMode for diagnostics
             }
             finally
             {
