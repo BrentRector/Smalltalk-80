@@ -62,6 +62,9 @@ internal class ContextManager(
     public void ResetContextDepth() => _activeContextCount = 0;
 
     /// <inheritdoc />
+    public void IncrementContextDepth() => _activeContextCount++;
+
+    /// <inheritdoc />
     public void DecrementContextDepth()
     {
         _activeContextCount--;

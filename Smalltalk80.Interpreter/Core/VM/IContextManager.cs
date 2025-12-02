@@ -41,6 +41,11 @@ public interface IContextManager
     void ResetContextDepth();
 
     /// <summary>
+    /// Increments the context depth counter for existing contexts not created via CreateMethodContext.
+    /// </summary>
+    void IncrementContextDepth();
+
+    /// <summary>
     /// Decrements the context depth counter when returning from a context.
     /// </summary>
     void DecrementContextDepth();

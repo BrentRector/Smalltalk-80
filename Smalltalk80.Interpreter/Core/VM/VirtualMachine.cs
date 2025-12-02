@@ -272,8 +272,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     public SmalltalkOOP ExecuteExistingContext(SmalltalkOOP contextOOP)
     {
         // Reset context depth counter for fresh execution
-        // Each init expression should start with depth=0
+        // Start at depth=1 because we're given an existing context that wasn't
+        // created via CreateMethodContext (which normally increments the count).
+        // When this context returns, it will decrement, returning to 0.
         _contextManager.ResetContextDepth();
+        _contextManager.IncrementContextDepth();  // Account for the existing context
 
         _contextManager.SetActiveContext(contextOOP);
         var result = InterpreterLoop();
