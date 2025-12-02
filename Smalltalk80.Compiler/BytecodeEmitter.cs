@@ -12,9 +12,9 @@ namespace Smalltalk80.Compiler
         private readonly List<byte> bytecodes = new();
 
         // Sizing mode support for two-pass compilation
-        private bool _sizingMode = false;
-        private int _sizingCounter = 0;
-        private int _savedBytecodeCount = 0;
+        // Supports nesting via depth counter and counter stack
+        private int _sizingDepth = 0;
+        private readonly Stack<int> _sizingCounterStack = new();
 
         // Blue Book jump limits
         private const int ShortJumpLimit = 8;  // Short jumps: offset 1-8
@@ -75,7 +75,7 @@ namespace Smalltalk80.Compiler
         /// </summary>
         public void PatchByteAt(int offset, byte value)
         {
-            if (_sizingMode)
+            if (IsSizingMode)
                 throw new InvalidOperationException("PatchByteAt should not be called during sizing mode");
             if (offset < 0 || offset >= bytecodes.Count)
                 throw new ArgumentOutOfRangeException(nameof(offset), $"Offset {offset} out of range [0, {bytecodes.Count})");
@@ -395,14 +395,30 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
+        /// Increments the sizing counter for all active nesting levels.
+        /// Each byte emitted counts towards all enclosing sizing scopes.
+        /// </summary>
+        private void IncrementSizingCounters(int count = 1)
+        {
+            // Increment counters for all nesting levels
+            // We need to update all items in the stack
+            var items = _sizingCounterStack.ToArray();
+            _sizingCounterStack.Clear();
+            for (int i = items.Length - 1; i >= 0; i--)
+            {
+                _sizingCounterStack.Push(items[i] + count);
+            }
+        }
+
+        /// <summary>
         /// Emits a single bytecode.
         /// In sizing mode, just increments counter without emitting.
         /// </summary>
         public void Emit(byte bytecode)
         {
-            if (_sizingMode)
+            if (IsSizingMode)
             {
-                _sizingCounter++;
+                IncrementSizingCounters(1);
             }
             else
             {
@@ -416,9 +432,9 @@ namespace Smalltalk80.Compiler
         /// </summary>
         public void Emit(Bytecode bytecode)
         {
-            if (_sizingMode)
+            if (IsSizingMode)
             {
-                _sizingCounter++;
+                IncrementSizingCounters(1);
             }
             else
             {
@@ -437,9 +453,9 @@ namespace Smalltalk80.Compiler
 #pragma warning disable CS0618 // Type or member is obsolete
         public void Emit(ExtendedSubOp subOp)
         {
-            if (_sizingMode)
+            if (IsSizingMode)
             {
-                _sizingCounter++;
+                IncrementSizingCounters(1);
             }
             else
             {
@@ -454,9 +470,9 @@ namespace Smalltalk80.Compiler
         /// </summary>
         public void EmitBytes(params byte[] bytes)
         {
-            if (_sizingMode)
+            if (IsSizingMode)
             {
-                _sizingCounter += bytes.Length;
+                IncrementSizingCounters(bytes.Length);
             }
             else
             {
@@ -1135,39 +1151,36 @@ namespace Smalltalk80.Compiler
         }
 
         // ============================================================================
-        // SIZING MODE - Two-pass compilation support
+        // SIZING MODE - Two-pass compilation support (with nesting)
         // ============================================================================
 
         /// <summary>
         /// Enters sizing mode. In sizing mode, Emit() counts bytes instead of emitting.
         /// Call EndSizingMode() to get the count and return to normal emission.
+        /// Supports nesting: inner sizing modes push/pop counters on a stack.
         /// </summary>
         public void EnterSizingMode()
         {
-            if (_sizingMode)
-                throw new InvalidOperationException("Already in sizing mode");
-            _sizingMode = true;
-            _sizingCounter = 0;
-            _savedBytecodeCount = bytecodes.Count;
+            _sizingDepth++;
+            _sizingCounterStack.Push(0);  // Start new counter for this level
         }
 
         /// <summary>
-        /// Exits sizing mode and returns the number of bytes that would have been emitted.
+        /// Exits sizing mode and returns the number of bytes that would have been emitted
+        /// at this nesting level.
         /// </summary>
         public int EndSizingMode()
         {
-            if (!_sizingMode)
+            if (_sizingDepth <= 0)
                 throw new InvalidOperationException("Not in sizing mode");
-            _sizingMode = false;
-            int size = _sizingCounter;
-            _sizingCounter = 0;
-            return size;
+            _sizingDepth--;
+            return _sizingCounterStack.Pop();
         }
 
         /// <summary>
-        /// Returns true if currently in sizing mode.
+        /// Returns true if currently in sizing mode (at any nesting level).
         /// </summary>
-        public bool IsSizingMode => _sizingMode;
+        public bool IsSizingMode => _sizingDepth > 0;
 
         // ============================================================================
         // SHORT JUMP SUPPORT - Blue Book optimized jump encoding
