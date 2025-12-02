@@ -25,7 +25,9 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     // GC trigger threshold: Run GC when table has this many objects and no free indices
     // Blue Book approach: GC runs when allocation would fail (need to grow table)
     private const int GC_TRIGGER_THRESHOLD = 10000;
+    private const int GC_MIN_ALLOCATIONS_BETWEEN = 1000;  // Minimum allocations between GC cycles
     private bool _gcInProgress = false;  // Prevent recursive GC
+    private int _allocationsSinceLastGC = 0;  // Track allocations for cooldown
 
     /// <summary>
     /// Controls whether allocation-triggered GC is enabled.
@@ -97,11 +99,16 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         int indexedWords = CalculateIndexedWords(format, indexedSize);
         int totalWords = headerWords + fixedSlots + indexedWords;
 
+        // Track allocations for GC cooldown
+        _allocationsSinceLastGC++;
+
         // Blue Book GC trigger: Run GC when we need to grow the table and it's already large
         // This happens when there are no free indices to reuse and table size exceeds threshold
         // AutoGCEnabled must be true (disabled during cold start when objects aren't yet rooted)
+        // Also require minimum allocations since last GC to prevent thrashing
         if (AutoGCEnabled &&
             !_gcInProgress &&
+            _allocationsSinceLastGC >= GC_MIN_ALLOCATIONS_BETWEEN &&
             _tableManager.GetFreeIndexCount() == 0 &&
             _tableManager.GetObjectTableSize() >= GC_TRIGGER_THRESHOLD)
         {
@@ -110,6 +117,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             {
                 // Run GC to reclaim unreachable objects and free their table indices
                 var gcStats = _garbageCollector.GarbageCollect();
+                _allocationsSinceLastGC = 0;  // Reset cooldown counter
                 if (gcStats.CollectedObjects > 0)
                 {
                     Console.WriteLine($"[GC] Collected {gcStats.CollectedObjects} objects, freed {_tableManager.GetFreeIndexCount()} indices");
