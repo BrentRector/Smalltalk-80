@@ -463,7 +463,7 @@ namespace Smalltalk80.Compiler
                         return new ResolutionResult(
                             VariableType.ParentVariable,
                             pArgIndex + accumulatedOffset,
-                            false,  // Block arguments are NOT assignable (Blue Book: pseudo-variables)
+                            true,  // Block arguments ARE assignable (only METHOD arguments are pseudo-variables)
                             varName
                         );
                     }
