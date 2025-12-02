@@ -511,8 +511,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 // Save context to pool AFTER switching (must not be active)
                 returningContext = _contextManager.ActiveContext;
 
-                // Decrement context depth
-                _contextManager.DecrementContextDepth();
+                // Decrement context depth ONLY for MethodContext returns
+                // BlockContext activation (via primitive 81 value/value:) doesn't increment,
+                // so BlockContext return shouldn't decrement either
+                var targetContextClass = _heapManager.GetClassOOP(returningContext);
+                if (targetContextClass != _metadata.BlockContextClassOOP)
+                {
+                    _contextManager.DecrementContextDepth();
+                }
 
                 // Check if target was the initial context
                 if (senderOOP == _initialContextOOP || senderOOP == _metadata.KnownObjects.Nil)
@@ -538,8 +544,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // Save context to pool AFTER switching (must not be active)
             returningContext = _contextManager.ActiveContext;
 
-            // Decrement context depth
-            _contextManager.DecrementContextDepth();
+            // Decrement context depth ONLY for MethodContext returns
+            // BlockContext activation (via primitive 81 value/value:) doesn't increment,
+            // so BlockContext return shouldn't decrement either
+            var unwindingContextClass = _heapManager.GetClassOOP(returningContext);
+            if (unwindingContextClass != _metadata.BlockContextClassOOP)
+            {
+                _contextManager.DecrementContextDepth();
+            }
 
             // Check if we ran out of contexts (error case)
             if (senderOOP == _metadata.KnownObjects.Nil)
@@ -609,8 +621,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Save context to pool AFTER switching (must not be active)
         returningContext = _contextManager.ActiveContext;
 
-        // Decrement context depth
-        _contextManager.DecrementContextDepth();
+        // Decrement context depth ONLY for MethodContext returns
+        // BlockContext activation (via primitive 81 value/value:) doesn't increment,
+        // so BlockContext return shouldn't decrement either
+        var returningContextClass = _heapManager.GetClassOOP(returningContext);
+        if (returningContextClass != _metadata.BlockContextClassOOP)
+        {
+            _contextManager.DecrementContextDepth();
+        }
 
         // Handle nil sender - the top-level context is returning
         // This could be initial process completion OR forked process termination
