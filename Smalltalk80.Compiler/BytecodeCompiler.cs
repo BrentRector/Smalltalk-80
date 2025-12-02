@@ -1327,13 +1327,9 @@ namespace Smalltalk80.Compiler
                     {
                         var stmt = stmtList[i];
                         bool isLast = (i == stmtList.Length - 1);
+                        // CompileStatement handles popping non-last results internally
+                        // based on the isLast parameter - don't add extra pops here!
                         CompileStatement(stmt, isLast: isLast, inBlock: true);
-
-                        // Pop intermediate results except the last one
-                        if (!isLast)
-                        {
-                            emitter.Pop();
-                        }
                     }
                 }
                 else
