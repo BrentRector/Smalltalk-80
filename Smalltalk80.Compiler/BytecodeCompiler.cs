@@ -1763,6 +1763,9 @@ namespace Smalltalk80.Compiler
             // While loops always return nil
             emitter.PushNil();
 
+            // Diagnostic: Log successful inlining
+            Console.WriteLine($"[WHILE-INLINE] Inlined {selector} in {emitter.currentMethodName}");
+
             return true;
         }
 
@@ -1803,6 +1806,9 @@ namespace Smalltalk80.Compiler
 
             // While loops always return nil
             emitter.PushNil();
+
+            // Diagnostic: Log successful inlining
+            Console.WriteLine($"[WHILE-INLINE] Inlined {(isWhileTrue ? "whileTrue" : "whileFalse")} (no-arg) in {emitter.currentMethodName}");
         }
 
         /// <summary>
