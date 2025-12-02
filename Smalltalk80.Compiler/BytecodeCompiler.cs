@@ -1064,6 +1064,18 @@ namespace Smalltalk80.Compiler
             var binaryExpr = expr.binaryExpr();
             var keywordMessage = expr.keywordMessage();
 
+            // EARLY DETECTION: Check for whileTrue:/whileFalse: with block receiver
+            // These require special handling because the receiver is a block that should NOT
+            // be compiled as a BlockContext - it needs to be inlined in a loop structure.
+            if (binaryExpr != null && keywordMessage != null)
+            {
+                if (TryInlineWhileLoop(binaryExpr, keywordMessage))
+                {
+                    return; // Successfully inlined the whole expression
+                }
+            }
+
+            // NORMAL FLOW: Compile receiver then keyword message
             if (binaryExpr != null)
             {
                 var unaryExpr = binaryExpr.unaryExpr();
@@ -1145,7 +1157,32 @@ namespace Smalltalk80.Compiler
             var messageBase = expr.messageBase();
             var unaryMessages = expr.unaryMessage();
 
-            // Compile the base
+            // EARLY DETECTION: Check for [block] whileTrue or [block] whileFalse (no argument)
+            // These require special handling - the receiver block should be inlined in a loop
+            if (unaryMessages is { Length: > 0 })
+            {
+                var firstSelector = unaryMessages[0].unarySelector().GetText();
+                if ((firstSelector == "whileTrue" || firstSelector == "whileFalse") &&
+                    messageBase?.block() != null)
+                {
+                    var block = messageBase.block();
+                    if (IsZeroArgBlock(block))
+                    {
+                        // Inline the while loop without body
+                        CompileInlinedWhileLoopNoArg(block, firstSelector == "whileTrue");
+
+                        // Process remaining unary messages (if any) on the nil result
+                        for (int i = 1; i < unaryMessages.Length; i++)
+                        {
+                            var selector = unaryMessages[i].unarySelector().GetText();
+                            emitter.EmitSend(selector, 0);
+                        }
+                        return;
+                    }
+                }
+            }
+
+            // NORMAL FLOW: Compile the base
             CompileMessageBase(messageBase);
 
             // Process unary messages
@@ -1627,41 +1664,224 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
-        /// Inlines: [conditionBlock] whileTrue: [bodyBlock]
-        /// Note: Receiver is a block, not evaluated yet!
+        /// Attempts to inline whileTrue:/whileFalse: loops.
+        /// Called from CompileMessageExpr BEFORE the receiver is compiled.
+        /// Returns true if successfully inlined, false to fall through to normal compilation.
+        ///
+        /// Blue Book Chapter 26: "The control structures that are so optimized by the
+        /// compiler are... the conditional repetition messages to blocks (whileTrue: and
+        /// whileFalse:)."
+        /// </summary>
+        private bool TryInlineWhileLoop(
+            Smalltalk80Parser.BinaryExprContext binaryExpr,
+            Smalltalk80Parser.KeywordMessageContext keywordMessage)
+        {
+            // Build selector to check if this is a while loop
+            var keywordParts = keywordMessage.keywordPart();
+            string selector = string.Join("", keywordParts.Select(p => p.IDENTIFIER().GetText() + ":"));
+
+            // Handle zero-argument unary versions (whileTrue, whileFalse)
+            // These have no keywordPart, so selector will be empty
+            if (keywordParts.Length == 0)
+            {
+                return false; // Not a keyword message, let normal flow handle it
+            }
+
+            // Check if this is a while selector
+            bool isWhileTrue = selector == "whileTrue:";
+            bool isWhileFalse = selector == "whileFalse:";
+            if (!isWhileTrue && !isWhileFalse)
+            {
+                return false; // Not a while loop, let normal flow handle it
+            }
+
+            // Check if receiver is a simple block literal (no binary/unary messages)
+            if (!IsBlockLiteralReceiver(binaryExpr, out var conditionBlock))
+            {
+                return false; // Receiver is not a block literal, can't inline
+            }
+
+            // Check condition block has no arguments (required for inlining)
+            if (!IsZeroArgBlock(conditionBlock!))
+            {
+                return false; // Block has arguments, can't inline
+            }
+
+            // Check if argument is a zero-arg block literal
+            if (keywordParts.Length != 1)
+            {
+                return false; // Wrong number of arguments
+            }
+            if (!CanInlineBlock(keywordParts[0], out var bodyBlock))
+            {
+                return false; // Body is not an inlinable block
+            }
+
+            // Emit inlined while loop
+            // Pattern:
+            //   loopStart:
+            //     <condition block body>    ; Inline, pushes boolean
+            //     JUMP_IF_FALSE/TRUE end    ; Exit condition (FALSE for whileTrue, TRUE for whileFalse)
+            //     <body block body>         ; Inline
+            //     POP                       ; Discard body result
+            //     JUMP loopStart            ; Loop back
+            //   end:
+            //     PUSH_NIL                  ; whileTrue:/whileFalse: always returns nil
+
+            int loopStart = emitter.CurrentOffset;
+
+            // Compile condition block body inline
+            CompileInlineBlockBody(conditionBlock!);
+
+            // Exit loop: JUMP_IF_FALSE for whileTrue:, JUMP_IF_TRUE for whileFalse:
+            int exitJumpPlaceholder = isWhileTrue
+                ? emitter.EmitJumpOnFalsePlaceholder()
+                : emitter.EmitJumpOnTruePlaceholder();
+
+            // Compile body block inline
+            CompileInlineBlockBody(bodyBlock!);
+
+            // Discard body result
+            emitter.PopTop();
+
+            // Jump back to loop start
+            emitter.EmitJumpBackward(loopStart);
+
+            // Patch exit jump to here
+            if (isWhileTrue)
+            {
+                emitter.PatchJumpOnFalse(exitJumpPlaceholder);
+            }
+            else
+            {
+                emitter.PatchJumpOnTrue(exitJumpPlaceholder);
+            }
+
+            // While loops always return nil
+            emitter.PushNil();
+
+            return true;
+        }
+
+        /// <summary>
+        /// Compiles an inlined while loop without a body argument.
+        /// Pattern for [block] whileTrue:
+        ///   loopStart:
+        ///     <condition block body>    ; Inline, pushes boolean
+        ///     JUMP_IF_FALSE end         ; Exit if false
+        ///     JUMP loopStart            ; Loop back
+        ///   end:
+        ///     PUSH_NIL                  ; whileTrue returns nil
+        /// </summary>
+        private void CompileInlinedWhileLoopNoArg(Smalltalk80Parser.BlockContext conditionBlock, bool isWhileTrue)
+        {
+            int loopStart = emitter.CurrentOffset;
+
+            // Compile condition block body inline
+            CompileInlineBlockBody(conditionBlock);
+
+            // Exit loop: JUMP_IF_FALSE for whileTrue, JUMP_IF_TRUE for whileFalse
+            int exitJumpPlaceholder = isWhileTrue
+                ? emitter.EmitJumpOnFalsePlaceholder()
+                : emitter.EmitJumpOnTruePlaceholder();
+
+            // Jump back to loop start (no body to execute)
+            emitter.EmitJumpBackward(loopStart);
+
+            // Patch exit jump to here
+            if (isWhileTrue)
+            {
+                emitter.PatchJumpOnFalse(exitJumpPlaceholder);
+            }
+            else
+            {
+                emitter.PatchJumpOnTrue(exitJumpPlaceholder);
+            }
+
+            // While loops always return nil
+            emitter.PushNil();
+        }
+
+        /// <summary>
+        /// Checks if a binaryExpr is a simple block literal with no messages.
+        /// Required pattern: Just a block literal, no unary or binary messages.
+        /// Example: [condition] whileTrue: [body]  ✓
+        ///          someVar whileTrue: [body]      ✗
+        ///          [x] value whileTrue: [body]    ✗
+        /// </summary>
+        private bool IsBlockLiteralReceiver(
+            Smalltalk80Parser.BinaryExprContext binaryExpr,
+            out Smalltalk80Parser.BlockContext? block)
+        {
+            block = null;
+
+            // Must have no binary messages
+            if (binaryExpr.binaryMessage() is { Length: > 0 })
+                return false;
+
+            var unaryExpr = binaryExpr.unaryExpr();
+            if (unaryExpr == null) return false;
+
+            // Must have no unary messages
+            if (unaryExpr.unaryMessage() is { Length: > 0 })
+                return false;
+
+            // messageBase must be a block
+            var messageBase = unaryExpr.messageBase();
+            if (messageBase == null) return false;
+
+            block = messageBase.block();
+            return block != null;
+        }
+
+        /// <summary>
+        /// Checks if a block has zero arguments (required for inlining).
+        /// </summary>
+        private bool IsZeroArgBlock(Smalltalk80Parser.BlockContext block)
+        {
+            var blockArgs = block.blockArgs();
+            if (blockArgs == null) return true;
+
+            var argNodes = blockArgs.children?
+                .OfType<Smalltalk80Parser.ArgumentNameContext>()
+                .ToList();
+            return argNodes == null || argNodes.Count == 0;
+        }
+
+        /// <summary>
+        /// Stub for TryInlineConditional - whileTrue: is now handled by TryInlineWhileLoop
         /// </summary>
         private bool TryInlineWhileTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
-            // whileTrue: requires special handling - receiver is a block
-            // This is more complex and may need to be called differently
-            // For now, return false to use standard message send
+            // whileTrue: is now handled by TryInlineWhileLoop in CompileMessageExpr
+            // This stub returns false so if somehow called, it falls back to normal send
             return false;
         }
 
         /// <summary>
-        /// Inlines: [conditionBlock] whileFalse: [bodyBlock]
+        /// Stub for TryInlineConditional - whileFalse: is now handled by TryInlineWhileLoop
         /// </summary>
         private bool TryInlineWhileFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
-            // whileFalse: requires special handling - receiver is a block
+            // whileFalse: is now handled by TryInlineWhileLoop in CompileMessageExpr
             return false;
         }
 
         /// <summary>
-        /// Inlines: [conditionBlock] whileTrue
+        /// Stub - whileTrue (no arg) is handled in CompileUnaryExpr
         /// </summary>
         private bool TryInlineWhileTrueNoArg(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
-            // whileTrue (no arg) requires special handling
+            // whileTrue (no arg) is a unary message, not keyword - handled in CompileUnaryExpr
             return false;
         }
 
         /// <summary>
-        /// Inlines: [conditionBlock] whileFalse
+        /// Stub - whileFalse (no arg) is handled in CompileUnaryExpr
         /// </summary>
         private bool TryInlineWhileFalseNoArg(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
-            // whileFalse (no arg) requires special handling
+            // whileFalse (no arg) is a unary message, not keyword - handled in CompileUnaryExpr
             return false;
         }
 
