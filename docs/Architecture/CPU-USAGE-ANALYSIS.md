@@ -211,31 +211,48 @@ install
     self primInputSemaphore: InputSemaphore
 ```
 
-#### InputState>>run (signals ControllerSemaphore after each event)
+#### InputState>>run (counting semaphore + sentinel + yieldToControllers)
 
 ```smalltalk
 run
-    "This is the loop that actually processes input events.
-     After processing each event, signal ControllerSemaphore to wake
-     any controllers waiting via Processor yield."
+    "Process input events using counting semaphore with end-of-event sentinel.
+     Each InputSemaphore wait corresponds to ONE OS event (via counting semaphore).
+     Process all words for that event until sentinel (type 6) or 0.
+     After button events, yield to let controllers see correct state."
+
     | word type param |
     [true]
         whileTrue:
             [InputSemaphore wait.
-            "Test for mouse X/Y events here to avoid an activation."
-            word _ self primInputWord.
-            type _ word bitShift: -12.
-            param _ word bitAnd: 4095.
-            type = 1
-                ifTrue:
-                    [x _ param "Mouse X"]
-                ifFalse:
-                    [type = 2
-                        ifTrue: [y _ param "Mouse Y"]
-                        ifFalse: [self nextEvent: type with: param]].
-            "Signal controller semaphore after updating sensor state.
-             This ensures controllers see correct state when they wake."
-            ControllerSemaphore signal]
+            "Process all words for THIS event until sentinel (type 6) or end (0)"
+            [word _ self primInputWord.
+             word ~= 0 and: [(word bitShift: -12) ~= 6]]
+                whileTrue:
+                    [type _ word bitShift: -12.
+                    param _ word bitAnd: 4095.
+                    type = 1
+                        ifTrue: [x _ param "Mouse X"]
+                        ifFalse:
+                            [type = 2
+                                ifTrue: [y _ param "Mouse Y"]
+                                ifFalse:
+                                    [self nextEvent: type with: param.
+                                     "After button event: yield to controllers"
+                                     ((type = 3 or: [type = 4]) and:
+                                        [param >= BitMin and: [param <= (BitMin + 2)]]) ifTrue:
+                                        [self yieldToControllers]]]]]
+
+yieldToControllers
+    "Suspend InputProcess briefly to let controllers (priority 4) run.
+     Fork a low-priority process (priority 3) to wake us after controllers
+     have had a chance to process the button state."
+
+    | sem proc |
+    sem _ Semaphore new.
+    proc _ [sem signal] newProcess.
+    proc priority: Processor userBackgroundPriority.  "priority 3, below controllers at 4"
+    proc resume.
+    sem wait
 ```
 
 #### InputState class>>controllerSemaphore
@@ -266,19 +283,32 @@ InputSensor>>waitForEvent
     InputState inputSemaphore wait
 ```
 
-### Event Flow Diagram
+### Event Flow Diagram (Counting Semaphore + Sentinel + yieldToControllers)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                          VM (C#)                                     │
+│                       WinForms (UI Thread)                          │
 │  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  WaitHandle.WaitAny([eventHandle, timerHandle])               │  │
+│  │  Mouse/Keyboard event arrives                                 │  │
 │  │         │                                                      │  │
 │  │         ▼                                                      │  │
-│  │  On wake:                                                      │  │
-│  │    SignalSemaphoreWithPreemption(InputSemaphore)   ← always   │  │
-│  │    if (buttonTransition)                                       │  │
-│  │      SignalSemaphoreWithPreemption(ControllerSemaphore) ← btn │  │
+│  │  SmalltalkEventQueue.Enqueue(event)                           │  │
+│  │         │                                                      │  │
+│  │         ├── Queue event (mouseX, mouseY, buttons)             │  │
+│  │         └── _eventSemaphore.Release()   ← counting semaphore  │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                          VM (C#)                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  WaitHandle.WaitAny([eventSemaphore, timerHandle])            │  │
+│  │         │                                                      │  │
+│  │         ▼                                                      │  │
+│  │  On wake (counting semaphore decrements):                     │  │
+│  │    ProcessOneEvent() → generates words + sentinel (type 6)    │  │
+│  │    SignalSemaphoreWithPreemption(InputSemaphore)              │  │
 │  └─────────┼─────────────────────────────────────────────────────┘  │
 └────────────┼────────────────────────────────────────────────────────┘
              │
@@ -290,13 +320,20 @@ InputSensor>>waitForEvent
 │  │  InputProcess (priority 6)       ← runs first due to priority │  │
 │  │         │                                                      │  │
 │  │         ├── InputSemaphore wait                               │  │
-│  │         ├── primInputWord (read raw event)                    │  │
-│  │         └── Update x, y, bitState, etc.                       │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│                                                                      │
+│  │         ├── Inner loop: read words until sentinel (type 6)    │  │
+│  │         │      ├── Update x, y, bitState via nextEvent        │  │
+│  │         │      └── If button event:                           │  │
+│  │         │              ├── ControllerSemaphore signal         │  │
+│  │         │              └── yieldToControllers (forks pri 3)   │  │
+│  │         │                        │                            │  │
+│  │         │                        ▼                            │  │
+│  │         │              InputProcess SUSPENDS on private sem   │  │
+│  └─────────┼────────────────────────────────────────────────────┘  │
+│            │                                                        │
+│            ▼                                                        │
 │  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  Controllers (priority 4)       ← runs after InputProcess     │  │
-│  │         │                                                      │  │
+│  │  Controllers (priority 4)       ← runs while InputProcess     │  │
+│  │         │                        suspended                    │  │
 │  │         ├── Sensor waitForControllerEvent                     │  │
 │  │         └── InputState controllerSemaphore wait               │  │
 │  │                                                               │  │
@@ -307,11 +344,13 @@ InputSensor>>waitForEvent
 
 ### Why This Works
 
-1. **No contention**: InputProcess and controllers wait on different semaphores
-2. **Ordering guaranteed**: Priority 6 > Priority 4, so InputProcess always runs first
-3. **State consistency**: Controllers always wake after sensor state is updated
-4. **No missed transitions**: Button down/up events are never missed
-5. **True 0% CPU**: When idle, both processes block on their respective semaphores
+1. **Counting semaphore**: One OS event = one semaphore release = one InputSemaphore wait
+2. **Sentinel-based processing**: Type 6 marks end of one OS event's words
+3. **yieldToControllers**: After button events, InputProcess suspends to let controllers run
+4. **Priority fork trick**: Low-priority (3) forked process wakes InputProcess AFTER controller (4)
+5. **State consistency**: Controllers always see correct button state (down vs up)
+6. **No missed transitions**: Each button down/up triggers controller wake
+7. **True 0% CPU**: When idle, all processes block on their respective semaphores
 
 ### Call Sites Automatically Fixed
 
@@ -338,23 +377,24 @@ InputSensor>>waitForEvent
 1. **InputState class variables** - Added `ControllerSemaphore`
 2. **InputState>>install** - Creates and registers both semaphores (primitives 93 & 160)
 3. **InputState>>primControllerSemaphore:** - Registers ControllerSemaphore (primitive 160)
-4. **InputState>>run** - Removed ControllerSemaphore signal (VM handles this)
-5. **InputState class>>controllerSemaphore** - Accessor
-6. **InputState class>>inputSemaphore** - Accessor
-7. **InputSensor>>waitForControllerEvent** - Waits on ControllerSemaphore (for controllers)
-8. **InputSensor>>waitForEvent** - Waits on InputSemaphore (for general yield)
-9. **ControlManager>>searchForActiveController** - Uses `Sensor waitForControllerEvent`
-10. **ProcessorScheduler>>yield** - Calls `Sensor waitForEvent`
+4. **InputState>>run** - Uses counting semaphore + sentinel + yieldToControllers
+5. **InputState>>yieldToControllers** - Forks low-priority process to wake InputProcess after controllers
+6. **InputState>>nextEvent:with:** - Signals ControllerSemaphore after button events
+7. **InputState class>>controllerSemaphore** - Accessor
+8. **InputState class>>inputSemaphore** - Accessor
+9. **InputSensor>>waitForControllerEvent** - Waits on ControllerSemaphore (for controllers)
+10. **InputSensor>>waitForEvent** - Waits on InputSemaphore (for general yield)
+11. **ControlManager>>searchForActiveController** - Uses `Sensor waitForControllerEvent`
+12. **ProcessorScheduler>>yield** - Calls `Sensor waitForEvent`
 
 ### VM (C#)
 
-- **VirtualMachine.cs** - `SignalInputSemaphoreIfRegistered` signals both semaphores appropriately
-- **SmalltalkEventQueue.cs** - Tracks button transitions at enqueue time
+- **SmalltalkEventQueue.cs** - Uses counting Semaphore, ProcessOneEvent adds sentinel (type 6)
+- **VirtualMachine.cs** - `SignalInputSemaphoreIfRegistered` signals InputSemaphore only (ControllerSemaphore signaled by Smalltalk)
 - **IPlatformBridge.cs** - Added `SetControllerSemaphore`, `GetControllerSemaphore`, `ConsumeButtonTransition`
 - **WinFormsDisplayProvider.cs** - Implements controller semaphore registration
 - **InputPrimitives.cs** - Added primitive 160 for controller semaphore registration
 - **PrimitiveRegistry.cs** - Registered primitive 160
-- **VirtualMachine.ProcessScheduling.cs** - Removed unused `SignalSemaphoreAllWaiters`
 
 ---
 

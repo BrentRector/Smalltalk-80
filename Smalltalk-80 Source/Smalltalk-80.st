@@ -22721,42 +22721,43 @@ primSampleInterval: anInteger
 	<primitive: 94>
 	^self primitiveFailed!
 run
-	"This is the loop that actually processes input events.
-	 Process ONE word at a time. After button events, temporarily lower priority
-	 to let controllers (priority 4) run before processing the next word.
-	 This ensures controllers see the pressed button state before we process release."
+	"Process input events using counting semaphore with end-of-event sentinel.
+	 Each InputSemaphore wait corresponds to ONE OS event (via counting semaphore).
+	 Process all words for that event until sentinel (type 6) or 0.
+	 After button events, yield to let controllers see correct state."
 
-	| word type param wasButtonEvent |
+	| word type param |
 	[true]
 		whileTrue:
 			[InputSemaphore wait.
-			word _ self primInputWord.
-			word ~= 0 ifTrue:
-				[type _ word bitShift: -12.
-				param _ word bitAnd: 4095.
-				wasButtonEvent _ false.
-				type = 1
-					ifTrue: [x _ param "Mouse X"]
-					ifFalse:
-						[type = 2
-							ifTrue: [y _ param "Mouse Y"]
-							ifFalse:
-								[self nextEvent: type with: param.
-								 "Check if this was a button event (codes 128-130)"
-								 ((type = 3 or: [type = 4]) and:
-									[param >= BitMin and: [param <= (BitMin + 2)]]) ifTrue:
-										[wasButtonEvent _ true]]].
-				"After button event: lower priority to let controllers run,
-				 then self-signal and yield to continue processing."
-				wasButtonEvent
-					ifTrue:
-						[Processor activeProcess priority: Processor userSchedulingPriority - 1.
-						 InputSemaphore signal.
-						 InputSemaphore wait.
-						 Processor activeProcess priority: Processor lowIOPriority]
-					ifFalse:
-						["Not a button event - continue immediately if more words"
-						 InputSemaphore signal]]]! !
+			"Process all words for THIS event until sentinel (type 6) or end (0)"
+			[word _ self primInputWord.
+			 word ~= 0 and: [(word bitShift: -12) ~= 6]]
+				whileTrue:
+					[type _ word bitShift: -12.
+					param _ word bitAnd: 4095.
+					type = 1
+						ifTrue: [x _ param "Mouse X"]
+						ifFalse:
+							[type = 2
+								ifTrue: [y _ param "Mouse Y"]
+								ifFalse:
+									[self nextEvent: type with: param.
+									 "After button event: yield to controllers"
+									 ((type = 3 or: [type = 4]) and:
+										[param >= BitMin and: [param <= (BitMin + 2)]]) ifTrue:
+										[self yieldToControllers]]]]]!
+yieldToControllers
+	"Suspend InputProcess briefly to let controllers (priority 4) run.
+	 Fork a low-priority process (priority 3) to wake us after controllers
+	 have had a chance to process the button state."
+
+	| sem proc |
+	sem _ Semaphore new.
+	proc _ [sem signal] newProcess.
+	proc priority: Processor userBackgroundPriority.  "priority 3, below controllers at 4"
+	proc resume.
+	sem wait! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputState class
