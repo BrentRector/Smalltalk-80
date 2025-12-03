@@ -144,6 +144,8 @@ InputSensor>>waitForControllerEvent
 
 This achieves 0% idle CPU with reliable event delivery and no deadlocks.
 
+> **Future Enhancement**: The current single-queue design supports one active controller at a time (classic Smalltalk-80 MVC). A broadcast queue architecture could support multiple simultaneous consumers (monitoring, debugging, multi-view UIs). See "Future Enhancement: Broadcast Queue Architecture" in `docs/Architecture/MOUSE-EVENT-QUEUE.md`.
+
 **Composite Event Model**: Primitive 95 (`primInputWord`) returns a composite event Array instead of packed integer words:
 ```smalltalk
 event _ self primInputWord.  "Returns #(eventType x y buttonMask hasTransition keyCode isKeyDown) or nil"

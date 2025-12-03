@@ -177,6 +177,8 @@ InputSensor>>nextMouseEvent
 This enables true 0% CPU when idle and guarantees no missed mouse transitions.
 See `MOUSE-EVENT-QUEUE.md` for complete design documentation.
 
+> **Future Enhancement**: The current single-queue design supports one active controller at a time (classic Smalltalk-80 MVC). A broadcast queue architecture could support multiple simultaneous consumers (monitoring, debugging, multi-view UIs). See "Future Enhancement: Broadcast Queue Architecture" in `MOUSE-EVENT-QUEUE.md`.
+
 **Original Blue Book Implementation** (caused 3% idle CPU and missed events):
 ```smalltalk
 yield

@@ -1,7 +1,7 @@
 # Mouse Event Queue Architecture
 
 **Date**: 2025-12-03
-**Status**: DESIGN COMPLETE - Ready for implementation
+**Status**: ✅ IMPLEMENTED
 **Supersedes**: Handshake-based design in CPU-USAGE-ANALYSIS.md
 
 ---
@@ -387,16 +387,16 @@ Enable with flags for troubleshooting:
 
 ## Implementation Checklist
 
-1. [ ] Add MouseEvent class to Smalltalk-80.st
-2. [ ] Add MouseEventQueue to InputState class variables
-3. [ ] Add EventSeq to InputState class variables
-4. [ ] Update InputState>>install to initialize queue and seq
-5. [ ] Update InputState>>run to enqueue mouse events
-6. [ ] Add InputState>>classifyButtonChange:to: helper
-7. [ ] Add InputState class>>mouseEventQueue accessor
-8. [ ] Add InputSensor>>nextMouseEvent
-9. [ ] Update InputSensor>>waitForControllerEvent (remove handshake signal)
-10. [ ] Remove HandshakeSemaphore (no longer needed)
+1. [x] Add MouseEvent class to Smalltalk-80.st
+2. [x] Add MouseEventQueue to InputState class variables
+3. [x] Add EventSeq to InputState class variables
+4. [x] Update InputState>>install to initialize queue and seq
+5. [x] Update InputState>>run to enqueue mouse events
+6. [x] Add InputState>>classifyButtonChange:to: helper
+7. [x] Add InputState class>>mouseEventQueue accessor
+8. [x] Add InputSensor>>nextMouseEvent
+9. [x] Update InputSensor>>waitForControllerEvent (remove handshake signal)
+10. [x] Remove HandshakeSemaphore (no longer needed)
 11. [ ] Update controller loops to consume from queue (if needed)
 12. [ ] Add optional VM move coalescing
 13. [ ] Add queue depth guard
@@ -447,3 +447,72 @@ Enable with flags for troubleshooting:
 - `CPU-USAGE-ANALYSIS.md` - Previous handshake design (superseded by this document)
 - `PROCESS-MANAGEMENT.md` - Process scheduling and semaphore usage
 - `PROPOSED-TIMER-OPTIMIZATION.md` - Timer and WaitAny implementation
+
+---
+
+## Future Enhancement: Broadcast Queue Architecture
+
+> **Status**: POSSIBLE FUTURE ENHANCEMENT - Not implemented
+
+In canonical Smalltalk-80 there's only one active controller at a time (the one bound to the active view). The current single-queue design works well for this model. However, future requirements may benefit from supporting multiple controllers consuming events in parallel.
+
+### Reasons to Support Multiple Controllers
+
+| Use Case | Description |
+|----------|-------------|
+| **Monitoring controllers** | Background tools that log or analyze input (e.g., accessibility aids, gesture recorders) |
+| **Composite UI frameworks** | Multiple overlapping views that each want to react to the same input (e.g., drag-and-drop between panes) |
+| **Instrumentation** | Debugging controllers that need to see raw events alongside the active controller |
+| **Future extensibility** | Multi-window or multi-touch support where multiple controllers may need to consume events simultaneously |
+| **Non-interactive consumers** | Analytics or replay systems that subscribe to input events without interfering with the active controller |
+
+### Broadcast Queue Model
+
+Instead of a single shared `MouseEventQueue`, InputProcess fans out each event to multiple per-controller queues. Each controller consumes independently.
+
+```
+OS Event → VM → InputSemaphore.signal
+                 │
+                 ▼
+InputProcess (prio 6)
+  dequeue OS event
+  update bitState, cursorPoint
+  ┌───────────────────────────────────────────────┐
+  │ Broadcast:                                     │
+  │   for each subscribed controller:              │
+  │       enqueue MouseEvent → ControllerQueue[i]  │
+  └───────────────────────────────────────────────┘
+  ControllerSemaphore.signal (wake all interested)
+  wait again
+
+Controllers (prio 4)
+  wait → wake
+  dequeue MouseEvent from their own queue
+  act on event (Down/Up/Move/Wheel)
+  loop back to wait
+```
+
+### Benefits of Broadcast Queues
+
+| Benefit | Description |
+|---------|-------------|
+| **Isolation** | Each controller has its own queue; no contention or missed events |
+| **Consistency** | All controllers see the same event objects, in the same order |
+| **Flexibility** | Active controller consumes normally; secondary controllers can monitor without interfering |
+| **Diagnostics** | Easy to add logging or replay by subscribing a "debug controller" |
+
+### Implementation Notes
+
+- **Subscription model**: Controllers register interest; InputProcess maintains a list of subscribers
+- **Queue type**: Use SharedQueue per controller; InputProcess enqueues into all
+- **Signaling**: After broadcast, InputProcess signals ControllerSemaphore to wake all waiting controllers
+- **Performance**: Fan-out adds overhead proportional to number of subscribers; usually small unless many controllers
+
+### Summary
+
+| Model | Active Controllers | Queue Structure | Best For |
+|-------|-------------------|-----------------|----------|
+| **Current (single queue)** | One at a time | Shared MouseEventQueue | Classic Smalltalk-80 MVC |
+| **Broadcast queue** | Multiple simultaneous | Per-controller queues | Monitoring, debugging, multi-view UIs |
+
+The current single-queue implementation is sufficient for classic Smalltalk-80 semantics. Broadcast queues would be a valuable enhancement for advanced use cases requiring multiple event consumers.
