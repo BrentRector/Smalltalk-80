@@ -1,8 +1,8 @@
 # Proposed Timer and Event Optimization
 
-**Last Updated**: 2025-12-02
-**Status**: PROPOSAL
-**Constraint**: No changes to Smalltalk-80.st source code
+**Last Updated**: 2025-12-03
+**Status**: ✅ COMPLETE (hybrid implementation)
+**Constraint**: No changes to Smalltalk-80.st source code (except defensive nil checks)
 
 ## Executive Summary
 
@@ -209,32 +209,46 @@ public class SmalltalkEventQueue : IDisposable
 - **Issue**: Timer expiration during reschedule
 - **Mitigation**: Dispose old timer before creating new one under lock
 
-## Implementation Notes (2025-12-02)
+## Implementation Notes (2025-12-03)
 
 **WaitHandle.WaitAny Issue**: Initial implementation using `WaitHandle.WaitAny([eventHandle, timerHandle], timeout)` failed because:
 - `SmalltalkEventQueue` uses `AutoResetEvent` which auto-resets when WaitAny returns
 - This "consumes" the event signal before the event can be processed
 - Result: Input events (mouse clicks, etc.) were lost - popup menus stopped working
+- **Decision**: Reverted to simple polling - complexity not worth the marginal benefit
 
-**Current Implementation Status**:
+**Final Implementation Status**:
 - ✅ TimerManager uses interrupt-driven `System.Threading.Timer`
 - ✅ ITimerManager extended with `TimerExpiredHandle` and `IDisposable`
 - ✅ Idle loop uses simple `WaitForEvents(timeout)` polling (reliable)
-- ❌ WaitHandle.WaitAny integration deferred - causes event loss
+- ✅ Process scheduling methods refactored to `VirtualMachine.ProcessScheduling.cs`
+- ❌ WaitHandle.WaitAny - abandoned due to event loss issue
 
-**Future Fix**: To use WaitHandle.WaitAny, would need to:
+**Code Organization (2025-12-03)**:
+Process scheduling methods extracted to partial class for maintainability:
+- `CheckAndSignalExpiredTimer()` - Timer expiration and semaphore signaling
+- `AddProcessToReadyQueue()` - Add process to priority queue
+- `GetActiveProcess()` - Get current process from ProcessorScheduler
+- `SwitchToNextRunnableProcess()` - Context switching on process termination
+- `FindHighestPriorityRunnableProcess()` - Priority-based process selection
+- `RemoveProcessFromList()` - LinkedList manipulation
+- `DumpProcessQueues()` - Diagnostic output
+
+**Future Fix (if needed)**: To use WaitHandle.WaitAny, would need to:
 1. Change `SmalltalkEventQueue` to use `ManualResetEventSlim` instead of `AutoResetEvent`
 2. Manually reset the event after checking `HasPendingEvents`
 3. Handle race conditions between reset and new event arrival
+4. **Not recommended** - current approach is simpler and equally effective
 
-## Recommendation
+## Final Recommendation
 
 **Keep current hybrid implementation**:
 - Interrupt-driven timer provides precision improvements ✅
 - Simple polling-based wait is reliable for event handling ✅
-- WaitHandle.WaitAny integration is not worth the complexity
+- WaitHandle.WaitAny integration is not worth the complexity ✅
+- Code is well-organized across partial class files ✅
 
-**Priority**: COMPLETE - Timer precision improved, event handling reliable.
+**Status**: ✅ COMPLETE - Timer precision improved, event handling reliable, code maintainable.
 
 ## Conclusion
 
@@ -242,5 +256,6 @@ The hybrid implementation provides the best of both worlds:
 - **Timer precision**: Interrupt-driven `System.Threading.Timer` signals immediately when delay expires
 - **Event reliability**: Simple polling via `WaitForEvents()` ensures no events are lost
 - **CPU efficiency**: Still achieves near-zero CPU during idle via timeout-based waiting
+- **Maintainability**: Process scheduling code extracted to dedicated partial class
 
-The unified `WaitHandle.WaitAny` approach was attempted but caused event loss. The current design is stable and performant.
+The unified `WaitHandle.WaitAny` approach was attempted but caused event loss. The current design is stable, performant, and well-organized.

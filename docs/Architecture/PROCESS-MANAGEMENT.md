@@ -1,6 +1,7 @@
 # Process Management Architecture
 
-**Last Updated**: 2025-12-02
+**Last Updated**: 2025-12-03
+**Status**: ✅ COMPLETE - Process scheduling fully operational
 
 ## Overview
 
@@ -348,9 +349,24 @@ SmalltalkEventQueue (C#)
 
 ## Related Files
 
-- `VirtualMachine.cs` - InterpreterLoop, CheckAndSignalExpiredTimer, AddProcessToReadyQueue
+- `VirtualMachine.cs` - InterpreterLoop, idle detection, main bytecode execution
+- `VirtualMachine.ProcessScheduling.cs` - Process scheduling methods:
+  - `CheckAndSignalExpiredTimer` - Timer expiration handling
+  - `AddProcessToReadyQueue` - Add process to priority queue
+  - `GetActiveProcess` - Get current process from ProcessorScheduler
+  - `SwitchToNextRunnableProcess` - Context switching on termination
+  - `FindHighestPriorityRunnableProcess` - Priority-based process selection
+  - `RemoveProcessFromList` - LinkedList manipulation
+  - `DumpProcessQueues` - Diagnostic output
 - `ControlPrimitives.cs` - Primitives 85-88 (Signal, Wait, Resume, Suspend)
 - `TimePrimitives.cs` - Primitive 100 (signal:atMilliseconds:)
-- `Scheduling/TimerManager.cs` - Timer state and expiration checking
-- `Platform/SmalltalkEventQueue.cs` - Event queue with wait handle
+- `Scheduling/TimerManager.cs` - Interrupt-driven timer with System.Threading.Timer
+- `Platform/SmalltalkEventQueue.cs` - Event queue with AutoResetEvent
 - `VMConstants.cs` - Process, Semaphore, LinkedList field indices
+
+## Recent Changes (2025-12-03)
+
+- **VirtualMachine Refactoring**: Process scheduling methods extracted to `VirtualMachine.ProcessScheduling.cs` partial class (~330 lines)
+- **Timer Implementation**: Uses interrupt-driven `System.Threading.Timer` for precise timing
+- **Event Handling**: Simple polling via `WaitForEvents()` - WaitHandle.WaitAny was attempted but caused event loss with AutoResetEvent
+- **Scroll Fix**: Defensive nil checks added to prevent crash when scrolling (rare edge case where region collection contains nil)
