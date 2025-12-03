@@ -22710,23 +22710,27 @@ primSampleInterval: anInteger
 	^self primitiveFailed!
 run
 	"This is the loop that actually processes input events.
-	 VM signals ControllerSemaphore on button transitions to wake controllers."
+	 VM signals ControllerSemaphore on button transitions to wake controllers.
+	 Drain ALL queued input words before waiting again - a single OS event
+	 may generate multiple input words (X, Y, button transitions)."
 
 	| word type param |
 	[true]
 		whileTrue:
 			[InputSemaphore wait.
-			"Test for mouse X/Y events here to avoid an activation."
-			word _ self primInputWord.
-			type _ word bitShift: -12.
-			param _ word bitAnd: 4095.
-			type = 1
-				ifTrue:
-					[x _ param "Mouse X"]
-				ifFalse:
-					[type = 2
-						ifTrue: [y _ param "Mouse Y"]
-						ifFalse: [self nextEvent: type with: param]]]! !
+			"Process ALL queued words (not just one per signal)"
+			[(word _ self primInputWord) ~= 0]
+				whileTrue:
+					["Test for mouse X/Y events here to avoid an activation."
+					type _ word bitShift: -12.
+					param _ word bitAnd: 4095.
+					type = 1
+						ifTrue:
+							[x _ param "Mouse X"]
+						ifFalse:
+							[type = 2
+								ifTrue: [y _ param "Mouse Y"]
+								ifFalse: [self nextEvent: type with: param]]]]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputState class
