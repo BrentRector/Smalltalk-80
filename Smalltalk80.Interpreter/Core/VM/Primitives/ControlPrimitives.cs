@@ -364,6 +364,12 @@ public static class ControlPrimitives
                     context.StackManager.Push(context.Receiver);
                 }
 
+                // CRITICAL: Save current context to the process's suspendedContext BEFORE
+                // adding to wait list. When this process is woken later by a signal,
+                // it needs a valid suspendedContext to resume from.
+                context.HeapManager.SetInstanceVariable(activeProcessOop,
+                    VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, context.GetActiveContext());
+
                 // Add process to semaphore wait list and switch to next runnable process
                 if (!scheduler.WaitOnSemaphore(context.Receiver, activeProcessOop))
                 {
