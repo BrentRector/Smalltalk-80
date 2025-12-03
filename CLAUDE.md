@@ -14,7 +14,7 @@
 - **VM Core**: Fully functional, verified operational
 - **Process Primitives**: ✅ **85-88 working** (suspend, resume, terminate, yield)
 - **System Browser**: ✅ **FULLY FUNCTIONAL** - source retrieval working
-- **Timer/Event System**: ✅ **FULLY OPERATIONAL** - 0% idle CPU via central yield fix
+- **Timer/Event System**: ✅ **FULLY OPERATIONAL** - 0% idle CPU via dual-semaphore architecture
 
 ## Known Issues
 
@@ -25,7 +25,7 @@ The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:i
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 
-**✅ Idle CPU Usage - RESOLVED**: The original Blue Book `Processor yield` created a forked process that signaled immediately, keeping priority 4 always occupied and preventing true idle. **Fix**: `ProcessorScheduler>>yield` now calls `Sensor waitForEvent`, which blocks on `InputSemaphore`. This enables 0% CPU when idle while preserving cooperative semantics. See `docs/Architecture/CPU-USAGE-ANALYSIS.md`.
+**✅ Idle CPU Usage - RESOLVED**: The original Blue Book `Processor yield` created a forked process that signaled immediately, keeping priority 4 always occupied and preventing true idle. **Fix**: Dual-semaphore architecture separates InputSemaphore (for InputProcess) from ControllerSemaphore (for controllers). `ProcessorScheduler>>yield` calls `Sensor waitForEvent`, which blocks on ControllerSemaphore. InputProcess signals ControllerSemaphore after updating sensor state, ensuring controllers see correct button/key state. This enables 0% idle CPU with no missed mouse transitions. See `docs/Architecture/CPU-USAGE-ANALYSIS.md`.
 
 ## Migration Status
 
@@ -104,16 +104,25 @@ Efficient idle detection using `WaitHandle.WaitAny` for unified multi-source wai
 
 **Key Implementation Details**:
 
-**Central Yield Fix**: The original Blue Book `ProcessorScheduler>>yield` created a forked process that signaled immediately, keeping the calling priority always occupied. The fix replaces it with a simple call to `Sensor waitForEvent`:
+**Dual-Semaphore Architecture**: Separates InputSemaphore (for InputProcess) from ControllerSemaphore (for controllers):
+
+1. **InputSemaphore** - VM signals when raw input arrives; InputProcess (priority 6) waits
+2. **ControllerSemaphore** - InputProcess signals after updating sensor state; controllers wait
 
 ```smalltalk
 ProcessorScheduler>>yield
     "Give other Processes at the current priority a chance to run.
-     Modern integration: block on InputSemaphore for true idle suspension."
+     Modern integration: block on ControllerSemaphore for true idle suspension."
     Sensor waitForEvent
+
+InputSensor>>waitForEvent
+    "Block until an input event arrives.
+     Returns immediately if button pressed or key held."
+    (self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
+    InputState controllerSemaphore wait
 ```
 
-This single-point fix benefits ALL yield callers (controlLoop, searchForActiveController, Rectangle>>fromUser, etc.) without modifying each call site.
+This guarantees controllers always see correct button/key state (no missed mouse transitions) while achieving 0% idle CPU.
 
 **ManualResetEventSlim Pattern**: The original AutoResetEvent caused event loss because it auto-resets when WaitAny returns. The fix uses ManualResetEventSlim with explicit reset:
 
@@ -132,8 +141,10 @@ public void ResetSignalIfEmpty()
 ```
 
 **Key Files**:
-- `Smalltalk-80.st` - Central yield fix: `ProcessorScheduler>>yield` calls `Sensor waitForEvent`
-- `Smalltalk-80.st` - Added `InputState class>>inputSemaphore` and `InputSensor>>waitForEvent`
+- `Smalltalk-80.st` - `ProcessorScheduler>>yield` calls `Sensor waitForEvent`
+- `Smalltalk-80.st` - `InputState` class with `ControllerSemaphore` and `InputSemaphore`
+- `Smalltalk-80.st` - `InputState>>run` signals ControllerSemaphore after processing events
+- `Smalltalk-80.st` - `InputSensor>>waitForEvent` waits on ControllerSemaphore
 - `VirtualMachine.cs` - InterpreterLoop uses `WaitHandle.WaitAny([eventHandle, timerHandle])`
 - `VirtualMachine.ProcessScheduling.cs` - Extracted process scheduling methods (~330 lines)
 - `SmalltalkEventQueue.cs` - ManualResetEventSlim with ResetSignalIfEmpty()

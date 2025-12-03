@@ -1,7 +1,7 @@
 # CPU Usage Analysis: Idle Detection and the Yield Problem
 
 **Date**: 2025-12-03
-**Status**: ✅ RESOLVED - Central fix implemented in ProcessorScheduler>>yield
+**Status**: ✅ RESOLVED - Dual-semaphore architecture implemented
 **Purpose**: Document the idle CPU problem, analysis, and implemented solution
 
 ---
@@ -116,56 +116,189 @@ But the background process **never became active** because:
 
 **Status**: INFRASTRUCTURE EXISTS but never triggers without yield fix
 
+### Solution 4: Single Semaphore with SignalAllWaiters
+
+**Approach**: Both InputProcess and controllers wait on InputSemaphore. VM signals all waiters on input arrival.
+
+**Why discarded**:
+- Missed mouse down/up transitions due to contention
+- When controller wakes first, InputProcess hasn't updated sensor state yet
+- Race condition between InputProcess and controller waking
+
+**Status**: IMPLEMENTED AND SUPERSEDED by dual-semaphore architecture
+
 ---
 
-## Implemented Solution: Central Yield Fix
+## Implemented Solution: Dual-Semaphore Architecture
 
 **Date**: 2025-12-03
 **Status**: ✅ IMPLEMENTED
 
-### The Fix
+### Architecture Overview
 
-Replace the original yield implementation with one that blocks on `InputSemaphore`:
+Two separate semaphores with different purposes:
+
+1. **InputSemaphore** - VM signals this when raw input arrives
+   - Only InputProcess (priority 6) waits on this
+   - InputProcess reads event, updates sensor state
+
+2. **ControllerSemaphore** - InputProcess signals this after updating state
+   - Controllers wait on this (via Processor yield → Sensor waitForEvent)
+   - Guarantees controllers see correct button/key state
+
+### Priority-Based Ordering
+
+The priority system guarantees correct ordering:
+
+1. **VM signals InputSemaphore** on raw input arrival
+2. **InputProcess (priority 6)** wakes, reads event, updates sensor state
+3. **InputProcess signals ControllerSemaphore**
+4. **Controllers (priority 4)** wake with correct state
+
+Since InputProcess runs at priority 6 and controllers at priority 4, InputProcess always completes before any controller runs.
+
+### The Fix
 
 ```smalltalk
 ProcessorScheduler>>yield
     "Give other Processes at the current priority a chance to run.
-     Modern integration: block on InputSemaphore for true idle suspension.
-     The VM signals InputSemaphore when events arrive, enabling 0% CPU when idle."
-
+     Modern integration: block on ControllerSemaphore for true idle suspension.
+     InputProcess signals this semaphore AFTER updating sensor state."
     Sensor waitForEvent
 ```
 
-### Supporting Methods Added
+### Supporting Methods
 
-#### InputState class>>inputSemaphore
+#### InputState class variables
 
 ```smalltalk
-!InputState class methodsFor: 'accessing'!
-inputSemaphore
-    "Answer the semaphore that is signaled when input events arrive.
-     Used by Sensor waitForEvent for true idle suspension."
-    ^InputSemaphore! !
+Object subclass: #InputState
+    instanceVariableNames: 'x y bitState ...'
+    classVariableNames: 'BitMax BitMin ControllerSemaphore CtrlKey InputProcess InputSemaphore LockKey LshiftKey RshiftKey '
+    poolDictionaries: ''
+    category: 'System-Support'
+```
+
+#### InputState>>install (creates both semaphores)
+
+```smalltalk
+install
+    "Initialize and connect the receiver to the hardware.
+     Terminate the old input process if any."
+    InputProcess == nil ifFalse: [InputProcess terminate].
+    self initState.
+    InputSemaphore _ Semaphore new.
+    ControllerSemaphore _ Semaphore new.
+    InputProcess _ [self run] newProcess.
+    InputProcess priority: Processor lowIOPriority.
+    InputProcess resume.
+    self primInputSemaphore: InputSemaphore
+```
+
+#### InputState>>run (signals ControllerSemaphore after each event)
+
+```smalltalk
+run
+    "This is the loop that actually processes input events.
+     After processing each event, signal ControllerSemaphore to wake
+     any controllers waiting via Processor yield."
+    | word type param |
+    [true]
+        whileTrue:
+            [InputSemaphore wait.
+            "Test for mouse X/Y events here to avoid an activation."
+            word _ self primInputWord.
+            type _ word bitShift: -12.
+            param _ word bitAnd: 4095.
+            type = 1
+                ifTrue:
+                    [x _ param "Mouse X"]
+                ifFalse:
+                    [type = 2
+                        ifTrue: [y _ param "Mouse Y"]
+                        ifFalse: [self nextEvent: type with: param]].
+            "Signal controller semaphore after updating sensor state.
+             This ensures controllers see correct state when they wake."
+            ControllerSemaphore signal]
+```
+
+#### InputState class>>controllerSemaphore
+
+```smalltalk
+controllerSemaphore
+    "Answer the semaphore that is signaled by InputProcess after processing events.
+     Used by Processor yield (via Sensor waitForEvent) for true idle suspension.
+     Separate from InputSemaphore to avoid contention with InputProcess."
+    ^ControllerSemaphore
 ```
 
 #### InputSensor>>waitForEvent
 
 ```smalltalk
-!InputSensor methodsFor: 'waiting'!
 waitForEvent
-    "Block until an input event (mouse, keyboard, or timer) arrives.
-     Modern integration: enables true idle suspension by blocking on InputSemaphore
-     instead of busy-waiting with Processor yield. The VM signals this semaphore
-     when events arrive, allowing 0% CPU usage when idle."
-    InputState inputSemaphore wait! !
+    "Block until an input event arrives.
+     Modern integration: enables true idle suspension by blocking on ControllerSemaphore.
+     InputProcess signals this semaphore AFTER updating sensor state, ensuring
+     controllers always see correct button/key state when they wake.
+
+     Ordering guarantee:
+     1. VM signals InputSemaphore on raw input arrival
+     2. InputProcess (priority 6) wakes, updates sensor state
+     3. InputProcess signals ControllerSemaphore
+     4. Controllers (priority 4) wake with correct state
+
+     IMPORTANT: Return immediately if user input is active (button pressed or key held).
+     This allows controller loops to keep processing continuous input states."
+    (self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
+    InputState controllerSemaphore wait
+```
+
+### Event Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                          VM (C#)                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  WaitHandle.WaitAny([eventHandle, timerHandle])               │  │
+│  │         │                                                      │  │
+│  │         ▼                                                      │  │
+│  │  On wake: SignalSemaphoreWithPreemption(InputSemaphore)       │  │
+│  │         │  (standard signaling - wakes ONE waiter)            │  │
+│  └─────────┼─────────────────────────────────────────────────────┘  │
+└────────────┼────────────────────────────────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       Smalltalk                                      │
+│                                                                      │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  InputProcess (priority 6)                                     │  │
+│  │         │                                                      │  │
+│  │         ├── InputSemaphore wait                               │  │
+│  │         ├── primInputWord (read raw event)                    │  │
+│  │         ├── Update x, y, bitState, etc.                       │  │
+│  │         └── ControllerSemaphore signal ─────────────┐         │  │
+│  └─────────────────────────────────────────────────────┼─────────┘  │
+│                                                         │            │
+│  ┌──────────────────────────────────────────────────────┼────────┐  │
+│  │  Controllers (priority 4)                            ▼        │  │
+│  │         │                                                      │  │
+│  │         ├── Processor yield                                   │  │
+│  │         ├── Sensor waitForEvent                               │  │
+│  │         └── InputState controllerSemaphore wait               │  │
+│  │                                                               │  │
+│  │  (Wake with CORRECT sensor state - no missed transitions)    │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Why This Works
 
-1. **Single point of fix**: All `Processor yield` callers automatically benefit
-2. **Preserves semantics**: Yield still "gives other processes a chance" - by waiting for events
-3. **True idle**: When no events arrive, process blocks on InputSemaphore
-4. **VM integration**: VM signals InputSemaphore when events arrive via `WaitHandle.WaitAny`
+1. **No contention**: InputProcess and controllers wait on different semaphores
+2. **Ordering guaranteed**: Priority 6 > Priority 4, so InputProcess always runs first
+3. **State consistency**: Controllers always wake after sensor state is updated
+4. **No missed transitions**: Button down/up events are never missed
+5. **True 0% CPU**: When idle, both processes block on their respective semaphores
 
 ### Call Sites Automatically Fixed
 
@@ -176,38 +309,11 @@ waitForEvent
 - `StandardSystemView` frame selection - window resize/move
 - Any other existing or future `Processor yield` calls
 
-### Event Flow
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        VM (C#)                                   │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  WaitHandle.WaitAny([eventHandle, timerHandle])         │   │
-│  │         │                                                │   │
-│  │         ▼                                                │   │
-│  │  On wake: SignalInputSemaphore()                        │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Smalltalk                                    │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  InputSemaphore wait  ←── Sensor waitForEvent           │   │
-│  │         ↑                        ↑                       │   │
-│  │         │                        │                       │   │
-│  │  ProcessorScheduler>>yield ──────┘                       │   │
-│  │         ↑                                                │   │
-│  │         │                                                │   │
-│  │  controlLoop, searchForActiveController, etc.           │   │
-│  └─────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
 ### Expected Behavior
 
-- **Idle CPU**: 0% (blocked in WaitAny → InputSemaphore wait)
+- **Idle CPU**: 0% (blocked in WaitAny → semaphore waits)
 - **Responsiveness**: Immediate wake on mouse/keyboard/timer events
+- **Reliability**: No missed mouse down/up transitions
 - **Compatibility**: All existing yield callers work without modification
 
 ---
@@ -216,13 +322,17 @@ waitForEvent
 
 ### Smalltalk-80 Source/Smalltalk-80.st
 
-1. **ProcessorScheduler>>yield** - Central fix, calls `Sensor waitForEvent`
-2. **InputState class>>inputSemaphore** - Accessor for InputSemaphore class variable
-3. **InputSensor>>waitForEvent** - Blocks on InputSemaphore
+1. **InputState class variables** - Added `ControllerSemaphore`
+2. **InputState>>install** - Creates both semaphores
+3. **InputState>>run** - Signals ControllerSemaphore after each event
+4. **InputState class>>controllerSemaphore** - Accessor
+5. **InputState class>>inputSemaphore** - Accessor (for InputProcess use)
+6. **InputSensor>>waitForEvent** - Waits on ControllerSemaphore
+7. **ProcessorScheduler>>yield** - Calls `Sensor waitForEvent`
 
-### No VM Changes Required
+### VirtualMachine.cs
 
-The VM infrastructure (`WaitHandle.WaitAny`, `SignalInputSemaphore`, etc.) was already correct. The fix is entirely in Smalltalk code.
+- **SignalInputSemaphoreIfRegistered** - Uses standard `SignalSemaphoreWithPreemption` (not SignalAllWaiters)
 
 ---
 
@@ -234,14 +344,17 @@ After regenerating coldstart bundle:
 2. **With windows**: Open System Browser, leave idle → verify 0% CPU
 3. **Multiple windows**: Open several windows, leave idle → verify 0% CPU
 4. **Responsiveness**: Move mouse while idle → verify immediate wake
-5. **Timer events**: Verify timer-based operations still work
+5. **Mouse transitions**: Click buttons → verify no missed down/up events
+6. **Yellow button menu**: Right-click → verify popup menu appears
+7. **Timer events**: Verify timer-based operations still work
 
 ---
 
 ## Rollback Instructions
 
-To revert to original Blue Book yield behavior (will restore ~3% idle CPU):
+To revert to original Blue Book yield behavior (will restore ~3% idle CPU and potential missed events):
 
+1. Restore original ProcessorScheduler>>yield:
 ```smalltalk
 ProcessorScheduler>>yield
     "Give other Processes at the current priority a chance to run"
@@ -251,7 +364,11 @@ ProcessorScheduler>>yield
     semaphore wait
 ```
 
-The `InputState class>>inputSemaphore` and `InputSensor>>waitForEvent` methods can remain - they're harmless if unused.
+2. Remove ControllerSemaphore from InputState class variables
+3. Remove ControllerSemaphore signal from InputState>>run
+4. Remove InputState class>>controllerSemaphore method
+
+The `InputState class>>inputSemaphore` and original `InputSensor>>waitForEvent` methods can remain.
 
 ---
 
@@ -275,8 +392,8 @@ ProcessorScheduler class>>initialize
 
 - **Background process** (priority 1): `[true] whileTrue: []` - idle sentinel
 - **Controller process** (priority 4): Runs `searchForActiveController` loop
-- **InputProcess** (priority 6): Waits on InputSemaphore, processes events
+- **InputProcess** (priority 6): Waits on InputSemaphore, processes events, signals ControllerSemaphore
 
 ### Process Selection
 
-The scheduler always picks the highest priority process with a non-empty ready queue. This is why fixing yield to block (rather than spin) is essential - it allows lower priority processes to run when there's no real work.
+The scheduler always picks the highest priority process with a non-empty ready queue. The dual-semaphore architecture leverages this to ensure correct ordering.

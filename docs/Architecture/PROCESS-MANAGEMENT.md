@@ -143,13 +143,31 @@ When a process calls `Processor yield`:
 ```smalltalk
 ProcessorScheduler>>yield
     "Give other Processes at the current priority a chance to run.
-     Modern integration: block on InputSemaphore for true idle suspension."
+     Modern integration: block on ControllerSemaphore for true idle suspension."
     Sensor waitForEvent
 ```
 
-The modern implementation blocks on `InputSemaphore` via `Sensor waitForEvent`, enabling true 0% CPU when idle. The VM signals InputSemaphore when events arrive.
+The modern implementation uses a **dual-semaphore architecture**:
 
-**Original Blue Book Implementation** (caused 3% idle CPU):
+1. **InputSemaphore** - VM signals when raw input arrives
+   - Only InputProcess (priority 6) waits on this
+   - InputProcess reads event, updates sensor state (x, y, bitState, etc.)
+
+2. **ControllerSemaphore** - InputProcess signals after updating state
+   - Controllers wait on this via `Sensor waitForEvent`
+   - Guarantees controllers see correct button/key state
+
+```smalltalk
+InputSensor>>waitForEvent
+    "Block until an input event arrives.
+     Returns immediately if button pressed or key held."
+    (self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
+    InputState controllerSemaphore wait
+```
+
+This enables true 0% CPU when idle and prevents missed mouse transitions.
+
+**Original Blue Book Implementation** (caused 3% idle CPU and missed events):
 ```smalltalk
 yield
     | semaphore |
@@ -328,7 +346,7 @@ CheckAndSignalExpiredTimer();
 | Idle, no timers | Near-zero (10ms sleeps) |
 | Background animation | Low (controlled by Delay) |
 
-**✅ RESOLVED**: The idle CPU issue (was ~3%) has been fixed by modifying `ProcessorScheduler>>yield` to call `Sensor waitForEvent`, which blocks on `InputSemaphore`. This enables true 0% CPU when idle. See `CPU-USAGE-ANALYSIS.md` for complete analysis.
+**✅ RESOLVED**: The idle CPU issue (was ~3%) has been fixed using a dual-semaphore architecture. `ProcessorScheduler>>yield` calls `Sensor waitForEvent`, which blocks on `ControllerSemaphore`. InputProcess signals this semaphore after updating sensor state, ensuring controllers see correct button/key state. This enables true 0% CPU when idle with no missed mouse transitions. See `CPU-USAGE-ANALYSIS.md` for complete analysis.
 
 ## Data Structure Summary
 
@@ -384,9 +402,15 @@ SmalltalkEventQueue (C#)
 
 ## Recent Changes (2025-12-03)
 
-- **Central Yield Fix**: `ProcessorScheduler>>yield` now calls `Sensor waitForEvent`, enabling true 0% CPU when idle
+- **Dual-Semaphore Architecture**: Fixes 0% idle CPU AND missed mouse transitions
+  - **InputSemaphore**: VM signals on raw input; InputProcess (priority 6) waits
+  - **ControllerSemaphore**: InputProcess signals after updating sensor state; controllers wait
+  - Added `InputState class>>controllerSemaphore` - accessor for ControllerSemaphore class variable
   - Added `InputState class>>inputSemaphore` - accessor for InputSemaphore class variable
-  - Added `InputSensor>>waitForEvent` - blocks on InputSemaphore
+  - Modified `InputState>>install` - creates both semaphores
+  - Modified `InputState>>run` - signals ControllerSemaphore after each event
+  - Added `InputSensor>>waitForEvent` - blocks on ControllerSemaphore (returns immediately if button pressed)
+  - Modified `ProcessorScheduler>>yield` - calls `Sensor waitForEvent`
   - All yield callers (controlLoop, searchForActiveController, etc.) automatically benefit
 - **VirtualMachine Refactoring**: Process scheduling methods extracted to `VirtualMachine.ProcessScheduling.cs` partial class (~330 lines)
 - **Timer Implementation**: Uses interrupt-driven `System.Threading.Timer` for precise timing

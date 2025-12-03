@@ -22396,14 +22396,20 @@ primMousePt
 !InputSensor methodsFor: 'waiting'!
 waitForEvent
 	"Block until an input event (mouse, keyboard, or timer) arrives.
-	 Modern integration: enables true idle suspension by blocking on InputSemaphore.
-	 The VM signals this semaphore (waking ALL waiters) when events arrive,
-	 allowing 0% CPU usage when idle.
+	 Modern integration: enables true idle suspension by blocking on ControllerSemaphore.
+	 InputProcess signals this semaphore AFTER updating sensor state, ensuring
+	 controllers always see correct button/key state when they wake.
+
+	 Ordering guarantee:
+	 1. VM signals InputSemaphore on raw input arrival
+	 2. InputProcess (priority 6) wakes, updates sensor state
+	 3. InputProcess signals ControllerSemaphore
+	 4. Controllers (priority 4) wake with correct state
 
 	 IMPORTANT: Return immediately if user input is active (button pressed or key held).
 	 This allows controller loops to keep processing continuous input states."
 	(self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
-	InputState inputSemaphore wait! !
+	InputState controllerSemaphore wait! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputSensor class
@@ -22506,7 +22512,7 @@ InputSensor install!
 InputSensor initSensor!
 Object subclass: #InputState
 	instanceVariableNames: 'x y bitState lshiftState rshiftState ctrlState lockState metaState keyboardQueue deltaTime baseTime timeProtect '
-	classVariableNames: 'BitMax BitMin CtrlKey InputProcess InputSemaphore LockKey LshiftKey RshiftKey '
+	classVariableNames: 'BitMax BitMin ControllerSemaphore CtrlKey InputProcess InputSemaphore LockKey LshiftKey RshiftKey '
 	poolDictionaries: ''
 	category: 'System-Support'!
 InputState comment:
@@ -22531,12 +22537,13 @@ Instance Variables:
 
 !InputState methodsFor: 'initialize-release'!
 install
-	"Initialize and connect the receiver to the hardware.  Terminate the old input 
+	"Initialize and connect the receiver to the hardware.  Terminate the old input
 	process if any."
 
 	InputProcess == nil ifFalse: [InputProcess terminate].
 	self initState.
 	InputSemaphore _ Semaphore new.
+	ControllerSemaphore _ Semaphore new.
 	InputProcess _ [self run] newProcess.
 	InputProcess priority: Processor lowIOPriority.
 	InputProcess resume.
@@ -22689,23 +22696,28 @@ primSampleInterval: anInteger
 	<primitive: 94>
 	^self primitiveFailed!
 run
-	"This is the loop that actually processes input events."
+	"This is the loop that actually processes input events.
+	 After processing each event, signal ControllerSemaphore to wake
+	 any controllers waiting via Processor yield."
 
 	| word type param |
 	[true]
-		whileTrue: 
+		whileTrue:
 			[InputSemaphore wait.
 			"Test for mouse X/Y events here to avoid an activation."
 			word _ self primInputWord.
 			type _ word bitShift: -12.
 			param _ word bitAnd: 4095.
 			type = 1
-				ifTrue: 
+				ifTrue:
 					[x _ param "Mouse X"]
-				ifFalse: 
+				ifFalse:
 					[type = 2
 						ifTrue: [y _ param "Mouse Y"]
-						ifFalse: [self nextEvent: type with: param]]]! !
+						ifFalse: [self nextEvent: type with: param]].
+			"Signal controller semaphore after updating sensor state.
+			 This ensures controllers see correct state when they wake."
+			ControllerSemaphore signal]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputState class
@@ -22724,9 +22736,14 @@ initialize
 	LockKey _ 8r213! !
 
 !InputState class methodsFor: 'accessing'!
+controllerSemaphore
+	"Answer the semaphore that is signaled by InputProcess after processing events.
+	 Used by Processor yield (via Sensor waitForEvent) for true idle suspension.
+	 Separate from InputSemaphore to avoid contention with InputProcess."
+	^ControllerSemaphore!
 inputSemaphore
 	"Answer the semaphore that is signaled when input events arrive.
-	 Used by Sensor waitForEvent for true idle suspension."
+	 Used by InputProcess to wake and process raw events."
 	^InputSemaphore! !
 
 InputState initialize!

@@ -440,9 +440,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     /// <summary>
     /// Signals the input semaphore if one is registered (via primitive 93).
-    /// Wakes ALL waiters on the semaphore (InputProcess + any yield waiters).
-    /// This is necessary because both InputProcess and Processor>>yield wait
-    /// on the same InputSemaphore.
+    /// With the dual-semaphore architecture:
+    /// - InputSemaphore wakes InputProcess only (priority 6)
+    /// - InputProcess updates sensor state, then signals ControllerSemaphore
+    /// - ControllerSemaphore wakes controllers (priority 4) via Processor yield
+    /// This ensures controllers always see correct button/key state.
     /// </summary>
     private void SignalInputSemaphoreIfRegistered()
     {
@@ -452,8 +454,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var inputSemaphore = _platformBridge.GetInputSemaphore();
         if (inputSemaphore != default && inputSemaphore != _metadata.KnownObjects.Nil)
         {
-            // Wake ALL waiters, not just one - both InputProcess and yield waiters need to wake
-            SignalSemaphoreAllWaiters(inputSemaphore);
+            // Standard signaling - wakes InputProcess only
+            // InputProcess will signal ControllerSemaphore after updating sensor state
+            SignalSemaphoreWithPreemption(inputSemaphore);
         }
         else
         {
