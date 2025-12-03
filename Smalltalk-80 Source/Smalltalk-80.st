@@ -13208,13 +13208,16 @@ controlInitialize
 	redefined in subclasses to perform some specific action."
 	^self!
 controlLoop
-	"Sent by Controller|startUp as part of the standard control sequence. 
-	Controller|controlLoop sends the message Controller|isControlActive to test 
-	for loop termination. As long as true is returned, the loop continues. When 
-	false is returned, the loop ends. Each time through the loop, the message 
-	Controller|controlActivity is sent."
+	"Sent by Controller|startUp as part of the standard control sequence.
+	Controller|controlLoop sends the message Controller|isControlActive to test
+	for loop termination. As long as true is returned, the loop continues. When
+	false is returned, the loop ends. Each time through the loop, the message
+	Controller|controlActivity is sent.
 
-	[self isControlActive] whileTrue: [Processor yield. self controlActivity]!
+	Modern integration: use Sensor waitForEvent instead of Processor yield
+	to enable true idle suspension (0% CPU when idle)."
+
+	[self isControlActive] whileTrue: [Sensor waitForEvent. self controlActivity]!
 controlTerminate
 	"Provide a place in the standard control sequence for terminating the  
 	receiver (taking into account the current state of its model and view). It  
