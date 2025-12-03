@@ -155,13 +155,13 @@ Button State Change Flow:
 
 ### Implementation Details
 
-#### InputState>>run (counting semaphore + sentinel + state-change handshake)
+#### InputState>>run (composite events + state-change handshake)
 
 ```smalltalk
 run
-    "Process input events using counting semaphore with end-of-event sentinel.
-     Each InputSemaphore wait corresponds to ONE OS event (via counting semaphore).
-     Process all words for that event until sentinel (type 6) or 0.
+    "Process input events using composite event model.
+     Each InputSemaphore wait corresponds to ONE OS event.
+     Dequeue composite event via primInputWord, update state, signal if buttons changed.
 
      Handshake protocol on button state change:
      1. Signal ControllerSemaphore (controller added to ready queue)
@@ -171,30 +171,38 @@ run
 
      Controllers use bitState (processed state) so they see correct button values."
 
-    | word type param prevBits newBits |
+    | event eventType newButtons keyCode isKeyDown prevBits |
     prevBits _ bitState bitAnd: 7.
     [true]
         whileTrue:
             [InputSemaphore wait.
-            "Process all words for THIS event until sentinel (type 6) or end (0)"
-            [word _ self primInputWord.
-             word ~= 0 and: [(word bitShift: -12) ~= 6]]
-                whileTrue:
-                    [type _ word bitShift: -12.
-                    param _ word bitAnd: 4095.
-                    type = 1
-                        ifTrue: [x _ param "Mouse X"]
-                        ifFalse:
-                            [type = 2
-                                ifTrue: [y _ param "Mouse Y"]
-                                ifFalse: [self nextEvent: type with: param]]].
-            "Signal controllers if button state changed, then wait for handshake"
-            newBits _ bitState bitAnd: 7.
-            newBits ~= prevBits ifTrue:
-                [prevBits _ newBits.
-                 ControllerSemaphore signal.
-                 HandshakeSemaphore wait]]
+            event _ self primInputWord.  "Returns Array or nil"
+            event == nil ifFalse:
+                [eventType _ event at: 1.
+                eventType = 1 ifTrue:
+                    ["Mouse event: update position and buttons"
+                    x _ event at: 2.
+                    y _ event at: 3.
+                    newButtons _ event at: 4.
+                    "Update bitState from button mask"
+                    bitState _ (bitState bitAnd: -8) bitOr: newButtons.
+                    "Signal controllers if button state changed"
+                    newButtons ~= prevBits ifTrue:
+                        [prevBits _ newButtons.
+                         ControllerSemaphore signal.
+                         HandshakeSemaphore wait]].
+                eventType = 2 ifTrue:
+                    ["Keyboard event: process key"
+                    keyCode _ event at: 6.
+                    isKeyDown _ event at: 7.
+                    isKeyDown
+                        ifTrue: [self keyAt: keyCode put: 1]
+                        ifFalse: [self keyAt: keyCode put: 0]]]]
 ```
+
+**Note**: Primitive 95 (`primInputWord`) now returns a composite event Array:
+`#(eventType x y buttonMask hasTransition keyCode isKeyDown)` or nil if no events.
+This replaces the old word-based format with sentinel parsing.
 
 #### InputState>>install (creates all three semaphores)
 
@@ -248,7 +256,7 @@ waitForControllerEvent
 │  │         ▼                                                      │  │
 │  │  SmalltalkEventQueue.Enqueue(event)                           │  │
 │  │         │                                                      │  │
-│  │         ├── Queue event (mouseX, mouseY, buttons)             │  │
+│  │         ├── Queue composite event (x, y, buttons, keyCode)    │  │
 │  │         └── _eventSemaphore.Release()   ← counting semaphore  │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
@@ -261,8 +269,8 @@ waitForControllerEvent
 │  │         │                                                      │  │
 │  │         ▼                                                      │  │
 │  │  On wake (counting semaphore decrements):                     │  │
-│  │    ProcessOneEvent() → generates words + sentinel (type 6)    │  │
 │  │    SignalSemaphoreWithPreemption(InputSemaphore)              │  │
+│  │    (Event stays in queue - dequeued by primitive 95)          │  │
 │  └─────────┼─────────────────────────────────────────────────────┘  │
 └────────────┼────────────────────────────────────────────────────────┘
              │
@@ -274,11 +282,11 @@ waitForControllerEvent
 │  │  InputProcess (priority 6)       ← runs first due to priority │  │
 │  │         │                                                      │  │
 │  │         ├── InputSemaphore wait                               │  │
-│  │         ├── Process words until sentinel (type 6)             │  │
-│  │         │      └── Update x, y, bitState via nextEvent        │  │
+│  │         ├── primInputWord → DequeueCompositeEvent()           │  │
+│  │         │      └── Returns Array #(type x y buttons ...)      │  │
+│  │         │      └── Update x, y, bitState from Array           │  │
 │  │         │                                                      │  │
-│  │         ├── Compare: newBits _ bitState bitAnd: 7             │  │
-│  │         │   newBits ~= prevBits?                              │  │
+│  │         ├── newButtons ~= prevBits?                           │  │
 │  │         │      YES: ┌── ControllerSemaphore signal            │  │
 │  │         │           └── HandshakeSemaphore wait ◄── BLOCKS    │  │
 │  │         │                        │                             │  │
@@ -313,7 +321,7 @@ waitForControllerEvent
 ### Why This Works
 
 1. **Counting semaphore**: One OS event = one semaphore release = one InputSemaphore wait
-2. **Sentinel-based processing**: Type 6 marks end of one OS event's words
+2. **Composite events**: Each event is a single Array - no sentinel parsing needed
 3. **State-change detection**: Handshake only on `(bitState bitAnd: 7)` changes
 4. **Processed state**: `buttons` returns bitState, not polled current state
 5. **Handshake protocol**: Formal synchronization without priority tricks
@@ -339,25 +347,26 @@ waitForControllerEvent
 
 1. **InputState class variables** - `ControllerSemaphore`, `HandshakeSemaphore`
 2. **InputState>>install** - Creates all three semaphores
-3. **InputState>>run** - State-change detection with handshake
-4. **InputState>>primControllerSemaphore:** - Registers ControllerSemaphore (primitive 160)
-5. **InputState class>>controllerSemaphore** - Accessor
-6. **InputState class>>handshakeSemaphore** - Accessor
-7. **InputState class>>inputSemaphore** - Accessor
-8. **InputSensor>>buttons** - Returns `CurrentInputState mouseButtons` (processed state)
-9. **InputSensor>>waitForControllerEvent** - Waits + handshake signal
-10. **InputSensor>>waitForEvent** - Waits on InputSemaphore
-11. **ControlManager>>searchForActiveController** - Uses `Sensor waitForControllerEvent`
-12. **ProcessorScheduler>>yield** - Calls `Sensor waitForEvent`
+3. **InputState>>primInputWord** - Returns composite event Array (primitive 95)
+4. **InputState>>run** - Uses composite events, no inner loop/sentinel
+5. **InputState>>primControllerSemaphore:** - Registers ControllerSemaphore (primitive 160)
+6. **InputState class>>controllerSemaphore** - Accessor
+7. **InputState class>>handshakeSemaphore** - Accessor
+8. **InputState class>>inputSemaphore** - Accessor
+9. **InputSensor>>buttons** - Returns `CurrentInputState mouseButtons` (processed state)
+10. **InputSensor>>waitForControllerEvent** - Waits + handshake signal
+11. **InputSensor>>waitForEvent** - Waits on InputSemaphore
+12. **ControlManager>>searchForActiveController** - Uses `Sensor waitForControllerEvent`
+13. **ProcessorScheduler>>yield** - Calls `Sensor waitForEvent`
 
 ### VM (C#)
 
-- **SmalltalkEventQueue.cs** - Counting Semaphore, ProcessOneEvent + sentinel, DequeueCompositeEvent
+- **SmalltalkEventQueue.cs** - Counting Semaphore, `DequeueCompositeEvent()` returns event Array
 - **VirtualMachine.cs** - `SignalInputSemaphoreIfRegistered` signals InputSemaphore only
-- **IPlatformBridge.cs** - `SetControllerSemaphore`, `GetControllerSemaphore`, `ConsumeButtonTransition`
-- **WinFormsDisplayProvider.cs** - Controller semaphore registration
-- **InputPrimitives.cs** - Primitive 160 for controller semaphore, primitive 199 for button polling
-- **PrimitiveRegistry.cs** - Registered primitive 160
+- **IPlatformBridge.cs** - `DequeueCompositeEvent()`, `SetControllerSemaphore`, `GetControllerSemaphore`
+- **WinFormsDisplayProvider.cs** - Delegates to event queue for composite events
+- **InputPrimitives.cs** - Primitive 95 returns composite Array, primitive 160 for controller semaphore
+- **PrimitiveRegistry.cs** - Registered primitives 95, 160, 199
 
 ---
 

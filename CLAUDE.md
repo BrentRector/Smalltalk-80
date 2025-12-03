@@ -144,6 +144,18 @@ InputSensor>>waitForControllerEvent
 
 This achieves 0% idle CPU while ensuring reliable button detection.
 
+**Composite Event Model**: Primitive 95 (`primInputWord`) returns a composite event Array instead of packed integer words:
+```smalltalk
+event _ self primInputWord.  "Returns #(eventType x y buttonMask hasTransition keyCode isKeyDown) or nil"
+event == nil ifFalse:
+    [eventType _ event at: 1.
+    eventType = 1 ifTrue:  "Mouse"
+        [x _ event at: 2. y _ event at: 3. newButtons _ event at: 4].
+    eventType = 2 ifTrue:  "Keyboard"
+        [keyCode _ event at: 6. isKeyDown _ event at: 7]]
+```
+This eliminates the inner loop and sentinel parsing from the old word-based format.
+
 **ManualResetEventSlim Pattern**: The original AutoResetEvent caused event loss because it auto-resets when WaitAny returns. The fix uses ManualResetEventSlim with explicit reset:
 
 ```csharp
@@ -163,9 +175,12 @@ public void ResetSignalIfEmpty()
 **Key Files**:
 - `Smalltalk-80.st` - `ProcessorScheduler>>yield` calls `Sensor waitForEvent`
 - `Smalltalk-80.st` - `InputState` class with `InputSemaphore`, `ControllerSemaphore`, `HandshakeSemaphore`
-- `Smalltalk-80.st` - `InputState>>run` detects button state changes, signals + handshake
+- `Smalltalk-80.st` - `InputState>>run` uses composite events, no inner loop/sentinel
+- `Smalltalk-80.st` - `InputState>>primInputWord` returns composite event Array (primitive 95)
 - `Smalltalk-80.st` - `InputSensor>>buttons` returns processed state from `CurrentInputState mouseButtons`
 - `Smalltalk-80.st` - `InputSensor>>waitForControllerEvent` waits on ControllerSemaphore + signals HandshakeSemaphore
+- `SmalltalkEventQueue.cs` - `DequeueCompositeEvent()` returns event data as tuple
+- `InputPrimitives.cs` - Primitive 95 builds composite Array from dequeued event
 - `VirtualMachine.cs` - InterpreterLoop uses `WaitHandle.WaitAny([eventHandle, timerHandle])`
 - `VirtualMachine.ProcessScheduling.cs` - Extracted process scheduling methods (~330 lines)
 - `SmalltalkEventQueue.cs` - ManualResetEventSlim with ResetSignalIfEmpty()
