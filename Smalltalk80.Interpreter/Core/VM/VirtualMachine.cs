@@ -373,6 +373,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// </summary>
     private void EnterIdleWait(SmalltalkOOP backgroundProcess)
     {
+        Console.WriteLine($"[IDLE] Entering idle wait (background process={backgroundProcess})");
+
         var eventHandle = _platformBridge?.EventAvailableHandle;
         var timerHandle = _timerManager.TimerExpiredHandle;
 
@@ -391,7 +393,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // Check if a process switch occurred (due to timer or input semaphore signal)
             var currentProcess = GetActiveProcess();
             if (currentProcess != backgroundProcess)
+            {
+                var newPriorityOOP = _heapManager.GetInstanceVariable(currentProcess, VMConstants.PROCESS_PRIORITY_INDEX);
+                int newPriority = newPriorityOOP.IsSmallInteger ? newPriorityOOP.AsSmallInteger() : -1;
+                Console.WriteLine($"[IDLE] Exiting idle - switched to process={currentProcess} priority={newPriority}");
                 return;  // Higher-priority process ready - exit idle
+            }
 
             // Block indefinitely until event, timer, or shutdown
             // TRUE 0% CPU - kernel-level wait on multiple handles
@@ -428,7 +435,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var inputSemaphore = _platformBridge.GetInputSemaphore();
         if (inputSemaphore != default && inputSemaphore != _metadata.KnownObjects.Nil)
         {
+            Console.WriteLine($"[INPUT-SEM] Signaling input semaphore={inputSemaphore}");
             SignalSemaphoreWithPreemption(inputSemaphore);
+        }
+        else
+        {
+            Console.WriteLine($"[INPUT-SEM] WARNING: No input semaphore registered (events will be lost!)");
         }
     }
 

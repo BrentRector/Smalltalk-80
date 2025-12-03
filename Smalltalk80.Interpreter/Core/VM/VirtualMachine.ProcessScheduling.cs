@@ -92,6 +92,8 @@ public partial class VirtualMachine
             var schedulerOOP = _metadata.ProcessorScheduler;
             if (schedulerOOP != _metadata.KnownObjects.Nil)
             {
+                Console.WriteLine($"[PREEMPT] Switching from priority={activePriority} to priority={wokenPriority} process={wokenProcessOOP}");
+
                 // Set woken process as active
                 _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, wokenProcessOOP);
 
@@ -103,6 +105,7 @@ public partial class VirtualMachine
         else
         {
             // No preemption needed - just add to ready queue
+            Console.WriteLine($"[QUEUE+] Process={wokenProcessOOP} priority={wokenPriority} added to ready queue (no preempt, active priority={activePriority})");
             AddProcessToReadyQueue(wokenProcessOOP, wokenPriority);
         }
     }
