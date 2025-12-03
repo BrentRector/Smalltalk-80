@@ -189,6 +189,12 @@ public class TestPlatformBridge : IPlatformBridge
         return 0;
     }
 
+    public (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? DequeueCompositeEvent()
+    {
+        // No composite events in test mode - return null
+        return null;
+    }
+
     public void SetSampleInterval(int intervalMs)
     {
         // No-op in test mode - no actual event polling needed

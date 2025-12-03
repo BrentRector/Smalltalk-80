@@ -92,6 +92,19 @@ public interface IPlatformBridge
     int GetInputWord();
 
     /// <summary>
+    /// Dequeues the next composite event, returning all event data in one call.
+    /// This is the simplified event model - one OS message = one composite event.
+    /// Returns null if no events available.
+    /// </summary>
+    /// <returns>
+    /// Tuple of (eventType, x, y, buttonMask, hasButtonTransition, keyCode, isKeyDown) or null.
+    /// eventType: 0=none, 1=mouse, 2=keyboard
+    /// buttonMask: bits 0-2 for red/yellow/blue buttons
+    /// hasButtonTransition: true if button state changed from previous event
+    /// </returns>
+    (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? DequeueCompositeEvent();
+
+    /// <summary>
     /// Sets the input sampling interval for event polling.
     /// </summary>
     /// <param name="intervalMs">Sampling interval in milliseconds.</param>

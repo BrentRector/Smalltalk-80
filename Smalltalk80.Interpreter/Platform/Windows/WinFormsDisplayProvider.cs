@@ -481,6 +481,12 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         return _eventQueue.GetNextInputWord();
     }
 
+    public (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? DequeueCompositeEvent()
+    {
+        // Delegate to event queue's composite event dequeue
+        return _eventQueue.DequeueCompositeEvent();
+    }
+
     public void SetSampleInterval(int intervalMs)
     {
         // Not implemented yet - would configure event polling rate

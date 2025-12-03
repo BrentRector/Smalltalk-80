@@ -22696,13 +22696,13 @@ primInputSemaphore: aSemaphore
 	<primitive: 93>
 	^self primitiveFailed!
 primInputWord
-	"Return the next word from the input buffer and remove the word from the 
-	buffer. This message should be sent just after the input semaphore 
-	finished a wait (was sent a signal by an I/O device). Fail of the input 
-	buffer is empty. Essential. See Object documentation whatIsAPrimitive."
+	"Dequeue the next composite event from the VM.
+	 Returns an Array #(eventType x y buttonMask hasTransition keyCode isKeyDown) or nil.
+	 eventType: 0=none, 1=mouse, 2=keyboard
+	 This is the simplified event model - one OS message = one composite event."
 
 	<primitive: 95>
-	^self primitiveFailed!
+	^nil!
 primMousePt
 	"Poll the mouse to find out its position.  Return a Point.  Fail if event-driven 
 	tracking is used instead of polling.  Optional.  See Object documentation 
@@ -22710,18 +22710,18 @@ primMousePt
 
 	<primitive: 90>
 	^x @ y!
-primSampleInterval: anInteger 
-	"Set the minimum time span between event driven mouse position 
-	samples.  The argument is a number of milliseconds.  Fail if the argument 
-	is not a SmallInteger.  Essential.  See Object documentation 
+primSampleInterval: anInteger
+	"Set the minimum time span between event driven mouse position
+	samples.  The argument is a number of milliseconds.  Fail if the argument
+	is not a SmallInteger.  Essential.  See Object documentation
 	whatIsAPrimitive. "
 
 	<primitive: 94>
 	^self primitiveFailed!
 run
-	"Process input events using counting semaphore with end-of-event sentinel.
-	 Each InputSemaphore wait corresponds to ONE OS event (via counting semaphore).
-	 Process all words for that event until sentinel (type 6) or 0.
+	"Process input events using composite event model.
+	 Each InputSemaphore wait corresponds to ONE OS event.
+	 Dequeue composite event via primInputWord, update state, signal if buttons changed.
 
 	 Handshake protocol on button state change:
 	 1. Signal ControllerSemaphore (controller added to ready queue)
@@ -22731,29 +22731,33 @@ run
 
 	 Controllers use bitState (processed state) so they see correct button values."
 
-	| word type param prevBits newBits |
+	| event eventType newButtons keyCode isKeyDown prevBits |
 	prevBits _ bitState bitAnd: 7.
 	[true]
 		whileTrue:
 			[InputSemaphore wait.
-			"Process all words for THIS event until sentinel (type 6) or end (0)"
-			[word _ self primInputWord.
-			 word ~= 0 and: [(word bitShift: -12) ~= 6]]
-				whileTrue:
-					[type _ word bitShift: -12.
-					param _ word bitAnd: 4095.
-					type = 1
-						ifTrue: [x _ param "Mouse X"]
-						ifFalse:
-							[type = 2
-								ifTrue: [y _ param "Mouse Y"]
-								ifFalse: [self nextEvent: type with: param]]].
-			"Signal controllers if button state changed, then wait for handshake"
-			newBits _ bitState bitAnd: 7.
-			newBits ~= prevBits ifTrue:
-				[prevBits _ newBits.
-				 ControllerSemaphore signal.
-				 HandshakeSemaphore wait]]! !
+			event _ self primInputWord.
+			event == nil ifFalse:
+				[eventType _ event at: 1.
+				eventType = 1 ifTrue:
+					["Mouse event: update position and buttons"
+					x _ event at: 2.
+					y _ event at: 3.
+					newButtons _ event at: 4.
+					"Update bitState from button mask"
+					bitState _ (bitState bitAnd: -8) bitOr: newButtons.
+					"Signal controllers if button state changed"
+					newButtons ~= prevBits ifTrue:
+						[prevBits _ newButtons.
+						 ControllerSemaphore signal.
+						 HandshakeSemaphore wait]].
+				eventType = 2 ifTrue:
+					["Keyboard event: process key"
+					keyCode _ event at: 6.
+					isKeyDown _ event at: 7.
+					isKeyDown
+						ifTrue: [self keyAt: keyCode put: 1]
+						ifFalse: [self keyAt: keyCode put: 0]]]]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputState class

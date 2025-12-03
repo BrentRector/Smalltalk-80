@@ -133,23 +133,48 @@ public static class InputOperations
         }
     }
 
-    /// <summary>Primitive 95: inputWord - Read raw input event word</summary>
+    /// <summary>Primitive 95: inputWord - Read next composite input event</summary>
+    /// <remarks>
+    /// Returns next composite event as an Array, or nil if no events.
+    /// Array format: #(eventType x y buttonMask hasTransition keyCode isKeyDown)
+    /// eventType: 0=none, 1=mouse, 2=keyboard
+    /// This is the simplified event model - one OS message = one composite event.
+    /// </remarks>
     public class InputWord : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Default to 0 (no events) for headless mode
-            int inputWord = 0;
+            // Get composite event from platform
+            var evt = context.Platform?.DequeueCompositeEvent();
 
-            // Get next input event from queue
-            if (context.Platform != null)
+            if (evt == null)
             {
-                inputWord = context.Platform.GetInputWord();
+                // No event available - return nil
+                return PrimitiveResult.Ok(context.HeapManager.GetNil());
             }
 
-            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(inputWord));
+            var (eventType, x, y, buttonMask, hasTransition, keyCode, isKeyDown) = evt.Value;
+
+            // Get Array class
+            var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array");
+            if (arrayClassOOP == null || arrayClassOOP == context.HeapManager.GetNil())
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // Allocate Array with 7 elements
+            SmalltalkOOP arrayOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP.Value, 7);
+
+            // Fill array: #(eventType x y buttonMask hasTransition keyCode isKeyDown)
+            context.HeapManager.SetIndexedField(arrayOOP, 0, SmalltalkOOP.FromSmallInteger(eventType));
+            context.HeapManager.SetIndexedField(arrayOOP, 1, SmalltalkOOP.FromSmallInteger(x));
+            context.HeapManager.SetIndexedField(arrayOOP, 2, SmalltalkOOP.FromSmallInteger(y));
+            context.HeapManager.SetIndexedField(arrayOOP, 3, SmalltalkOOP.FromSmallInteger(buttonMask));
+            context.HeapManager.SetIndexedField(arrayOOP, 4, hasTransition ? context.HeapManager.GetTrue() : context.HeapManager.GetFalse());
+            context.HeapManager.SetIndexedField(arrayOOP, 5, SmalltalkOOP.FromSmallInteger(keyCode));
+            context.HeapManager.SetIndexedField(arrayOOP, 6, isKeyDown ? context.HeapManager.GetTrue() : context.HeapManager.GetFalse());
+
+            return PrimitiveResult.Ok(arrayOOP);
         }
     }
 
