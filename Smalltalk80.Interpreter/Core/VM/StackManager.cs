@@ -127,9 +127,9 @@ internal class StackManager(
             Console.WriteLine($"  methodOOP: {methodOOP}, class: {methodClass}");
             Console.WriteLine($"  sp={sp}, initialSP={initialSP}");
 
-            // Get instruction pointer for debugging
-            var ipOOP = heapManager.GetInstanceVariable(activeContextOOP, VMConstants.CONTEXT_IP_INDEX);
-            Console.WriteLine($"  IP={ipOOP.AsSmallInteger()}");
+            // Get program counter for debugging
+            var pcOOP = heapManager.GetInstanceVariable(activeContextOOP, VMConstants.CONTEXT_PC_INDEX);
+            Console.WriteLine($"  PC={pcOOP.AsSmallInteger()}");
 
             if (isBlockContext)
             {
@@ -142,20 +142,13 @@ internal class StackManager(
                 Console.WriteLine($"  MethodContext: numArgs={header.NumArgs}, numTemps={header.NumTemps}, numLiterals={header.NumLiterals}");
 
                 // Print first few literals to help identify the method
-                Console.WriteLine($"  Literals:");
+                // Literals start at indexed slot 1 (slot 0 is header)
+                Console.WriteLine($"  Literals (first 5):");
                 for (int i = 0; i < Math.Min(header.NumLiterals, 5); i++)
                 {
-                    var litOOP = helpers.GetLiteral(methodOOP, i);
+                    var litOOP = heapManager.GetIndexedOOP(methodOOP, i + 1);
                     var litClass = litOOP.IsSmallInteger ? "SmallInteger" : helpers.GetClassName(helpers.GetClass(litOOP));
-                    if (litClass == "Symbol")
-                    {
-                        var symStr = helpers.GetSymbolString(litOOP);
-                        Console.WriteLine($"    [{i}] Symbol: {symStr}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"    [{i}] {litClass}: {litOOP}");
-                    }
+                    Console.WriteLine($"    [{i}] {litClass}: {litOOP}");
                 }
             }
 
