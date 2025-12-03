@@ -87,13 +87,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     // Cached background process OOP for idle detection (priority 1 sentinel)
     private SmalltalkOOP _backgroundProcessOOP;
 
-    // Yield-spin throttling fields - reduces CPU when system is idle but processes are cycling
-    // The canonical Blue Book yield implementation creates a new process on every yield,
-    // keeping priority 4 processes always active. Throttling detects this pattern.
-    private int _yieldSpinCounter = 0;
-    private const int ThrottleDelayMs = 5;       // Sleep duration when spinning
-    private long _lastInputEventTime = 0;        // Timestamp of last input event
-
     // Blue Book architectural constants are defined in VMConstants.cs
     // All context field indices are now static constants shared across the VM
 
@@ -334,7 +327,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 }
             }
 
-            // Periodic checks (shutdown, timer, and yield-spin throttling)
+            // Periodic checks (shutdown and timer) for non-idle execution
             if (++periodicCheckCounter >= PeriodicCheckInterval)
             {
                 periodicCheckCounter = 0;
@@ -346,12 +339,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
                 // Check for expired timer and signal semaphore (for Delay mechanism)
                 CheckAndSignalExpiredTimer();
-
-                // Yield-spin throttling: reduce CPU when system is idle
-                // The canonical Blue Book yield implementation creates a new process on every
-                // yield, keeping priority 4 processes always active (background never runs).
-                // This is correct behavior, but burns CPU on modern systems.
-                ThrottleIfYieldSpinning();
             }
 
             // Execute bytecode (only for real processes, NEVER background)
@@ -501,44 +488,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
 
         return backgroundProcessOOP == _metadata.KnownObjects.Nil ? default : backgroundProcessOOP;
-    }
-
-    /// <summary>
-    /// Detects yield-spin patterns and introduces throttling to reduce CPU usage.
-    ///
-    /// Background: The canonical Blue Book Processor>>yield implementation creates a new
-    /// process on every yield. When searchForActiveController loops with yield, there are
-    /// always priority 4 processes in the ready queue, so the background process never runs.
-    /// This is correct Blue Book behavior, but burns CPU on modern systems.
-    ///
-    /// Solution: Track how long the system has been running without meaningful input.
-    /// When we detect the yield-spin pattern (no input events for a while), introduce
-    /// brief sleep delays to reduce CPU usage while maintaining responsiveness.
-    /// </summary>
-    private void ThrottleIfYieldSpinning()
-    {
-        // Check if there have been recent input events
-        bool hasRecentInput = _platformBridge?.HasPendingEvents() ?? false;
-
-        if (hasRecentInput)
-        {
-            // Input activity - reset spin counter, no throttling
-            _yieldSpinCounter = 0;
-            _lastInputEventTime = Environment.TickCount64;
-            return;
-        }
-
-        // No input - check how long we've been in this state
-        long timeSinceLastInput = Environment.TickCount64 - _lastInputEventTime;
-
-        // Only throttle if we've had no input for at least 100ms
-        // This ensures we don't throttle during active user interaction
-        if (timeSinceLastInput > 100)
-        {
-            // Brief sleep to reduce CPU usage
-            // 5ms is short enough to maintain responsiveness but significantly reduces CPU
-            Thread.Sleep(ThrottleDelayMs);
-        }
     }
 
     /// <summary>
