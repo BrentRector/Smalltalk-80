@@ -335,8 +335,8 @@ public static class ControlPrimitives
             if (context.GetActiveContext() != originalContext)
             {
                 // Preemption occurred - result already pushed on old (now suspended) context.
-                // SignalSemaphoreWithPreemption already set _contextSwitchedByPrimitive = true,
-                // so the VM will return ContextSwitch instead of pushing the result again.
+                // PrimitiveRegistry will detect the context change and set _contextSwitchedByPrimitive = true,
+                // so the VM won't push the result again.
                 return PrimitiveResult.Ok(context.Receiver);
             }
 

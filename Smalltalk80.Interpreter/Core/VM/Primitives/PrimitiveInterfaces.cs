@@ -92,6 +92,12 @@ public readonly struct PrimitiveExecutionContext
     public IProcessScheduler? ProcessScheduler { get; }
 
     /// <summary>
+    /// Gets the legacy primitive context (the VM itself) for operations that need VM-level state.
+    /// Used by primitives that need to signal context switch (e.g., Signal primitive).
+    /// </summary>
+    public IPrimitiveContext? LegacyContext { get; }
+
+    /// <summary>
     /// Creates a new primitive execution context.
     /// </summary>
     public PrimitiveExecutionContext(
@@ -108,7 +114,8 @@ public readonly struct PrimitiveExecutionContext
         IPrimitiveMessageSender? messageSender = null,
         VMMetadata? metadata = null,
         ITimerManager? timerManager = null,
-        IProcessScheduler? processScheduler = null)
+        IProcessScheduler? processScheduler = null,
+        IPrimitiveContext? legacyContext = null)
     {
         Receiver = receiver;
         Arguments = arguments;
@@ -124,6 +131,7 @@ public readonly struct PrimitiveExecutionContext
         Metadata = metadata;
         TimerManager = timerManager;
         ProcessScheduler = processScheduler;
+        LegacyContext = legacyContext;
     }
 
     /// <summary>

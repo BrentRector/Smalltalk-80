@@ -258,7 +258,7 @@ public partial class VirtualMachine : IProcessScheduler
     }
 
     /// <inheritdoc/>
-    public void SignalSemaphoreWithPreemption(SmalltalkOOP semaphoreOOP)
+    public bool SignalSemaphoreWithPreemption(SmalltalkOOP semaphoreOOP)
     {
         // Semaphore layout: firstLink (0), lastLink (1), excessSignals (2)
         var firstLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
@@ -273,7 +273,7 @@ public partial class VirtualMachine : IProcessScheduler
                 _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX,
                     SmalltalkOOP.FromSmallInteger(excess + 1));
             }
-            return;  // No process woken, no preemption needed
+            return false;  // No process woken, no preemption
         }
 
         // Process is waiting - wake it up
@@ -304,15 +304,17 @@ public partial class VirtualMachine : IProcessScheduler
             // Activate the woken process
             ActivateProcess(wokenProcessOOP, "preemption");
 
-            // CRITICAL: Signal that a primitive caused a context switch.
-            // This tells the VM not to push the primitive's return value onto the stack
-            // (the old process already had its result pushed before this call).
-            _contextSwitchedByPrimitive = true;
+            // NOTE: Do NOT set _contextSwitchedByPrimitive here!
+            // Only the Signal primitive should set it (after pre-pushing result).
+            // When VM signals semaphores directly (e.g., InputSemaphore), the flag
+            // would incorrectly affect the next unrelated primitive call.
+            return true;  // Preemption occurred
         }
         else
         {
             // No preemption needed - just add to ready queue
             AddProcessToReadyQueue(wokenProcessOOP, wokenPriority);
+            return false;  // No preemption
         }
     }
 

@@ -80,7 +80,8 @@ public interface IProcessScheduler
     /// If no waiters, increments excessSignals.
     /// </summary>
     /// <param name="semaphoreOOP">The semaphore to signal</param>
-    void SignalSemaphoreWithPreemption(SmalltalkOOP semaphoreOOP);
+    /// <returns>True if preemption occurred (active context changed), false otherwise</returns>
+    bool SignalSemaphoreWithPreemption(SmalltalkOOP semaphoreOOP);
 
     /// <summary>
     /// Adds a process to a semaphore's wait list and switches to next runnable process.
