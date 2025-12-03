@@ -1,223 +1,62 @@
-# CPU Usage Analysis: Fixing 3% Idle CPU Consumption
+# CPU Usage Analysis: Why Idle Detection Fails
 
 **Date**: 2025-12-03
-**Status**: Analysis Complete - Fixes Proposed
-**Updated**: 2025-12-03 - Corrected analysis per architectural review
-
-## Executive Summary
-
-The Smalltalk-80 interpreter currently consumes **~3% CPU when completely idle** despite implementing `WaitHandle.WaitAny` for event/timer waiting.
-
-**Key Insight**: The system should be **100% idle** when the background process is active. We should **never execute the background process's bytecodes**. The only wake sources are:
-1. **UI event** → WaitAny returns → signal input semaphore → process switch
-2. **Timer expires** → WaitAny returns → signal timer semaphore → process switch
-
-**Root Causes**:
-1. **Breaking on `HasPendingEvents()`** - WRONG! Events don't wake processes; they sit in queue until input semaphore is signaled
-2. **Executing bytecodes before/after idle check** - We should never execute background process bytecodes
-
-**Expected Result**: 0% CPU when idle (true kernel-level blocking in WaitAny)
+**Status**: UNRESOLVED - Fundamental architecture issue identified
+**Purpose**: Brief another LLM on the problem, analysis, and discarded solutions
 
 ---
 
-## Root Cause Analysis
+## Problem Statement
 
-### The Correct Architecture
-
-When the background process is active, the system is **idle**. The background process exists solely as a sentinel - its bytecodes (`[true] whileTrue: []`) should **never execute**. Instead:
-
-1. **Detect idle immediately** when background process becomes active
-2. **Block in WaitAny** indefinitely (0% CPU)
-3. **On wake**: Handle the event/timer, check if process switch occurred
-4. **If no process switch**: Return to step 2 (stay idle)
-5. **If process switch**: Exit idle, execute the new process
-
-The only legitimate wake sources are:
-- **UI event** → signal input semaphore → wake Controller → process switch
-- **Timer expires** → signal timer semaphore → wake delayed process → process switch
-
-### Issue #1: Breaking on `HasPendingEvents()` (PRIMARY BUG)
-
-**Location**: `/home/user/Smalltalk-80/Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` lines 335-339
-
-```csharp
-while (true)  // Idle wait loop
-{
-    // ❌ THIS IS WRONG - causes busy-loop!
-    if (_platformBridge.HasPendingEvents())
-        break; // Events to process - exit idle loop
-
-    CheckAndSignalExpiredTimer();
-
-    var newActiveProcess = GetActiveProcess();
-    if (newActiveProcess != activeProcess)
-        break; // ✅ This is correct - process switch occurred
-
-    WaitHandle.WaitAny(handles);  // Blocks here (0% CPU)
-    _platformBridge.ResetEventSignalIfEmpty();
-}
-```
-
-**Why This Is Wrong**:
-
-Events in `SmalltalkEventQueue` do **not** directly wake processes. They sit in the queue until:
-1. The **input semaphore** is signaled (via primitive 93 registration)
-2. A **waiting process** wakes up due to that signal
-3. That process becomes **ready to run**
-4. A **process switch** occurs
-
-Breaking on `HasPendingEvents()` causes:
-1. WaitAny returns (event signal set)
-2. `HasPendingEvents()` = true → **Break from idle loop**
-3. Execute background process bytecodes (WRONG!)
-4. Re-enter idle check, `HasPendingEvents()` still true
-5. **Break immediately** → busy-loop
-
-**The Fix**: Remove the `HasPendingEvents()` check entirely. Only break when `GetActiveProcess() != backgroundProcess`.
-
-### Issue #2: Executing Background Process Bytecodes
-
-**Location**: `/home/user/Smalltalk-80/Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs` lines 304-399
-
-The current structure allows background process bytecodes to execute:
-- After exiting idle loop (due to `HasPendingEvents()` bug)
-- Before idle is detected (1000 bytecode interval)
-
-**The Problem**:
-```csharp
-while (true)
-{
-    if (++periodicCheckCounter >= PeriodicCheckInterval)  // Every 1000 iterations
-    {
-        // ... idle detection here ...
-    }
-
-    // This executes even when background process is active!
-    InterpreterStatus status = ExecuteBytecodeStep();
-}
-```
-
-**The Fix**: Check for background process **every iteration** and skip bytecode execution:
-```csharp
-while (true)
-{
-    if (GetActiveProcess() == _backgroundProcessOOP)
-    {
-        EnterIdleWait();  // Block until process switch
-        continue;         // Skip bytecode execution
-    }
-
-    InterpreterStatus status = ExecuteBytecodeStep();
-}
-```
-
-### Correct Idle Loop Implementation
-
-```csharp
-private void EnterIdleWait()
-{
-    var backgroundProcess = GetActiveProcess();
-
-    while (true)
-    {
-        // ✅ NO HasPendingEvents() check - events don't wake processes directly
-
-        // Check for expired timer - may wake a higher-priority process
-        CheckAndSignalExpiredTimer();
-
-        // Check if a process switch occurred
-        var currentProcess = GetActiveProcess();
-        if (currentProcess != backgroundProcess)
-            return;  // Higher-priority process ready - exit idle
-
-        // Block indefinitely until event, timer, or shutdown
-        WaitHandle.WaitAny(new[] { eventHandle, timerHandle, shutdownHandle });
-        _platformBridge.ResetEventSignalIfEmpty();
-
-        if (ShutdownToken.IsCancellationRequested)
-            throw new OperationCanceledException();
-    }
-}
-```
-
-**Key Points**:
-1. **No `HasPendingEvents()` check** - events signal the input semaphore, which causes process switch
-2. **No timeout on WaitAny** - wait indefinitely; all wake sources use signals
-3. **Only exit on process switch** - when `GetActiveProcess()` changes
-4. **Handle timer on wake** - `CheckAndSignalExpiredTimer()` may wake a process
+The Smalltalk-80 interpreter consumes **~3% CPU when completely idle** (gray screen, no user interaction). The goal is **0% CPU** via kernel-level blocking (`WaitHandle.WaitAny`).
 
 ---
 
-## The Fix
+## Current VM Architecture
 
-### Summary
+### The Intended Idle Detection
 
-1. **Remove `HasPendingEvents()` check** from the idle wait loop
-2. **Check for background process every iteration** and skip bytecode execution
-3. **Stay in WaitAny** until a process switch actually occurs
-
-### Complete Implementation
+The VM attempts to detect idle by checking if the **background process** (priority 1) becomes active:
 
 ```csharp
-private SmalltalkOOP? _backgroundProcessOOP = null;
-
-private SmalltalkOOP InterpreterLoop()
+// VirtualMachine.cs - InterpreterLoop (lines 319-337)
+while (true)
 {
-    _initialContextOOP = _contextManager.ActiveContext;
-    _initialProcessOOP = GetActiveProcess();
-
-    // Cache background process OOP for fast comparison
-    _backgroundProcessOOP = FindBackgroundProcess();
-
-    int periodicCheckCounter = 0;
-    const int PeriodicCheckInterval = 1000;
-
-    while (true)
+    // Check for idle EVERY iteration - when background process is active,
+    // block in WaitAny until a real process switch occurs.
+    if (_platformBridge != null && _backgroundProcessOOP != default)
     {
-        // ✅ Check idle EVERY iteration (cheap pointer comparison)
         var activeProcess = GetActiveProcess();
-        if (_platformBridge != null && _backgroundProcessOOP != null &&
-            activeProcess == _backgroundProcessOOP)
+        if (activeProcess == _backgroundProcessOOP)
         {
-            // Idle detected - block until process switch
+            // Idle detected - block until process switch (true 0% CPU)
             EnterIdleWait(activeProcess);
-            continue;  // Skip bytecode execution - never execute background process
-        }
-
-        // Periodic checks (shutdown and timer) for non-idle execution
-        if (++periodicCheckCounter >= PeriodicCheckInterval)
-        {
-            periodicCheckCounter = 0;
-
-            if (ShutdownToken.IsCancellationRequested)
-                throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
-
-            CheckAndSignalExpiredTimer();
-        }
-
-        // Execute bytecode (only for real processes, NEVER background)
-        InterpreterStatus status = ExecuteBytecodeStep();
-
-        switch (status)
-        {
-            case InterpreterStatus.Continue:
-                continue;
-            case InterpreterStatus.Return:
-                return _returnValue;
-            default:
-                throw new InvalidOperationException($"Unknown interpreter status: {status}");
+            continue;  // Skip bytecode execution
         }
     }
-}
 
-/// <summary>
-/// Enters idle wait loop - blocks indefinitely until work is available.
-/// Only exits when a higher-priority process becomes ready (process switch).
-///
-/// KEY DESIGN: No polling. We wait in WaitAny until:
-/// - UI event arrives → signals input semaphore → process switch
-/// - Timer expires → signals timer semaphore → process switch
-/// </summary>
+    // ... execute bytecodes ...
+}
+```
+
+### The Background Process
+
+Created by `ProcessorScheduler>>hiddenBackgroundProcess`:
+
+```smalltalk
+hiddenBackgroundProcess
+    "Install a default background process which is invisible."
+    self background: [[true] whileTrue: []]
+```
+
+This creates a Process at **priority 1** (lowest) that runs an infinite empty loop. The **intent** is that when no other processes are runnable, the scheduler selects this process, and the VM can detect "idle".
+
+### The Idle Wait Loop
+
+When idle is detected, the VM blocks on kernel handles:
+
+```csharp
+// VirtualMachine.cs - EnterIdleWait (lines 379-453)
 private void EnterIdleWait(SmalltalkOOP backgroundProcess)
 {
     var eventHandle = _platformBridge?.EventAvailableHandle;
@@ -225,136 +64,424 @@ private void EnterIdleWait(SmalltalkOOP backgroundProcess)
 
     while (true)
     {
-        // ✅ NO HasPendingEvents() check!
-        // Events signal input semaphore → wake process → process switch
-        // We detect that via GetActiveProcess() below
+        CheckAndSignalExpiredTimer();  // May wake a process
 
-        // Check for expired timer and signal semaphore
-        // This may wake a higher-priority process
-        CheckAndSignalExpiredTimer();
-
-        // Check if a process switch occurred
         var currentProcess = GetActiveProcess();
         if (currentProcess != backgroundProcess)
-            return;  // Higher-priority process ready - exit idle
+            return;  // Process switch occurred - exit idle
 
-        // Block indefinitely until event, timer, or shutdown
-        // TRUE 0% CPU - kernel-level wait on multiple handles
-        if (eventHandle != null)
-        {
-            var handles = new WaitHandle[] {
-                eventHandle,
-                timerHandle,
-                ShutdownToken.WaitHandle
-            };
-            WaitHandle.WaitAny(handles);  // Blocks here (0% CPU)
-            _platformBridge.ResetEventSignalIfEmpty();
-        }
-        else
-        {
-            // Fallback for test mode
-            Thread.Sleep(10);
-        }
+        // Block indefinitely (0% CPU)
+        var handles = new WaitHandle[] { eventHandle, timerHandle, ShutdownToken.WaitHandle };
+        int waitResult = WaitHandle.WaitAny(handles);
 
-        if (ShutdownToken.IsCancellationRequested)
-            throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
+        if (waitResult == 0)  // Event handle
+        {
+            SignalInputSemaphoreIfRegistered();  // Wake InputProcess
+            _platformBridge!.ForceResetEventSignal();
+        }
     }
-}
-
-/// <summary>
-/// Finds the background process OOP for idle detection.
-/// The background process runs at priority 1 (SystemRockBottomPriority).
-/// </summary>
-private SmalltalkOOP? FindBackgroundProcess()
-{
-    var schedulerOOP = _metadata.ProcessorScheduler;
-    if (schedulerOOP == _metadata.KnownObjects.Nil)
-        return null;
-
-    var processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP,
-        VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
-
-    if (processListsOOP == _metadata.KnownObjects.Nil)
-        return null;
-
-    // Priority 1 is at index 0
-    var priority1ListOOP = _heapManager.GetIndexedOOP(processListsOOP, 0);
-    if (priority1ListOOP == _metadata.KnownObjects.Nil)
-        return null;
-
-    var backgroundProcessOOP = _heapManager.GetInstanceVariable(priority1ListOOP,
-        VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-
-    return backgroundProcessOOP == _metadata.KnownObjects.Nil ? null : backgroundProcessOOP;
 }
 ```
 
-### Key Points
+---
 
-1. **Never execute background process bytecodes** - detect idle immediately and block
-2. **No `HasPendingEvents()` check** - events don't wake processes directly
-3. **WaitAny blocks indefinitely** - no timeout needed; all wake sources use signals
-4. **Only exit on process switch** - when `GetActiveProcess()` changes
-5. **Handle timer on every wake** - `CheckAndSignalExpiredTimer()` may cause process switch
+## Why Idle Detection NEVER Triggers
+
+### The Fundamental Flaw
+
+The VM checks `GetActiveProcess() == backgroundProcess`, but **this condition is never true** because:
+
+1. `ControlManager>>searchForActiveController` runs at priority 4
+2. It loops calling `Processor yield`
+3. Due to how `yield` works, there's **always** a priority 4 process in the ready queue
+4. The scheduler **never** selects the background process (priority 1)
+
+### The Controller Loop
+
+```smalltalk
+ControlManager>>searchForActiveController
+    "Find a scheduled controller that wants control and give control to it."
+
+    | aController |
+    activeController _ nil.
+    activeControllerProcess _ Processor activeProcess.
+    [Processor yield.
+     aController _ scheduledControllers
+        detect: [:aController | aController isControlWanted and: [aController ~~ screenController]]
+        ifNone: [screenController isControlWanted
+                    ifTrue: [screenController]
+                    ifFalse: [nil]].
+     aController isNil]
+        whileTrue.
+    self activeController: aController.
+    Processor terminateActive
+```
+
+This loop:
+1. Calls `Processor yield`
+2. Checks if any controller wants control (`isControlWanted`)
+3. If none found, loops back
+
+When no controller wants control (e.g., mouse not over any view on gray screen), **this loops indefinitely**.
+
+### The Yield Implementation
+
+```smalltalk
+ProcessorScheduler>>yield
+    "Give other Processes at the current priority a chance to run"
+    | semaphore |
+    semaphore _ Semaphore new.
+    [semaphore signal] fork.
+    semaphore wait
+```
+
+**Step-by-step execution:**
+
+1. Create new Semaphore (excessSignals=0)
+2. Fork `[semaphore signal]` - creates new Process at priority 4, adds to ready queue
+3. Current process calls `semaphore wait`:
+   - excessSignals=0, so process is **suspended**
+   - Added to semaphore's wait list
+   - Scheduler runs `SwitchToNextRunnableProcess`
+4. Scheduler finds forked process (priority 4) and activates it
+5. Forked process executes `semaphore signal`:
+   - Wakes original process, adds it back to ready queue
+6. Forked process block finishes, process **terminates**
+7. Scheduler runs `SwitchToNextRunnableProcess`
+8. Finds original process (priority 4) in ready queue - **NOT the background process**
+9. Original process resumes, continues the loop
+
+**Key insight**: At step 5, the signal adds the original process back to the ready queue **before** the forked process terminates. So at step 7, there's always a priority 4 process available.
+
+### The Timing Problem Visualized
+
+```
+Time →
+
+Controller:  [yield]─────[wait]═══════════════════════[resume]─[loop]─[yield]...
+                           │                              ↑
+                           ▼                              │
+Forked:                 [run]─[signal]─[terminate]        │
+                                  │                       │
+                                  └───────────────────────┘
+                                  (adds to ready queue)
+
+Ready Queue (priority 4):
+  Before yield:  [Controller]
+  After wait:    [Forked]
+  After signal:  [Forked, Controller]  ← Controller added back!
+  After term:    [Controller]          ← Never empty!
+```
+
+The ready queue at priority 4 is **never empty**, so the background process (priority 1) is **never selected**.
 
 ---
 
-## Expected Results
+## Smalltalk Process Scheduling Architecture
 
-| Metric | Before | After |
-|--------|--------|-------|
-| Idle CPU | ~3% | **0%** |
-| Background bytecodes executed | 1000/wake | **0** |
-| Idle detection | Every 1000 bytecodes | Every iteration |
-| Normal execution overhead | 0% | ~0.5% |
+### Priority Levels
 
-### Verification
+```smalltalk
+ProcessorScheduler class>>initialize
+    SystemRockBottomPriority _ 1.    "Background process"
+    SystemBackgroundPriority _ 2.
+    UserBackgroundPriority _ 3.
+    UserSchedulingPriority _ 4.      "Controller processes"
+    UserInterruptPriority _ 5.
+    LowIOPriority _ 6.               "InputProcess"
+    HighIOPriority _ 7.
+    TimingPriority _ 8
+```
 
-1. Start interpreter with System Browser
-2. Wait for system to stabilize
-3. Don't touch mouse/keyboard
-4. Observe CPU usage: should be **0%**
+### Process Selection (VM)
 
-When you move the mouse:
-1. UI event → `eventHandle` signaled
-2. WaitAny returns
-3. Input semaphore signaled (if registered)
-4. Controller process wakes
-5. `GetActiveProcess()` returns Controller (not background)
-6. Exit idle loop
-7. Execute Controller bytecodes
-8. Controller sleeps (Delay wait)
-9. Background becomes active
-10. Immediately re-enter idle (no bytecodes executed)
+```csharp
+// VirtualMachine.ProcessScheduling.cs - FindHighestPriorityRunnableProcess
+public SmalltalkOOP FindHighestPriorityRunnableProcess()
+{
+    // Search from highest priority (8) down to lowest (1)
+    for (int priority = 8; priority >= 1; priority--)
+    {
+        var priorityListOOP = _heapManager.GetIndexedOOP(processListsOOP, priority - 1);
+        var firstLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP,
+            VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+
+        if (firstLinkOOP != _metadata.KnownObjects.Nil)
+            return firstLinkOOP;  // Found a runnable process
+    }
+    return _metadata.KnownObjects.Nil;  // No runnable process (shouldn't happen)
+}
+```
+
+The scheduler always picks the **highest priority** process. Background (priority 1) only runs when priorities 2-8 are all empty.
+
+### The InputProcess
+
+```smalltalk
+InputState>>install
+    "Initialize and connect the receiver to the hardware."
+    InputProcess == nil ifFalse: [InputProcess terminate].
+    self initState.
+    InputSemaphore _ Semaphore new.
+    InputProcess _ [self run] newProcess.
+    InputProcess priority: Processor lowIOPriority.  "Priority 6"
+    InputProcess resume.
+    self primInputSemaphore: InputSemaphore
+
+InputState>>run
+    "Process input events. Waits on InputSemaphore."
+    | word type param |
+    [true] whileTrue:
+        [InputSemaphore wait.  "Blocks here until VM signals"
+         word _ self primInputWord.
+         "... process event ..."]
+```
+
+The InputProcess at priority 6 **does** block correctly on `InputSemaphore`. The VM signals this when events arrive. But this doesn't help because:
+- InputProcess wakes, processes event, waits again
+- Controller at priority 4 keeps running its yield loop
+- Background at priority 1 never selected
 
 ---
 
-## Implementation Files
+## Solutions Explored and Discarded
 
-**File to modify**:
-- `/home/user/Smalltalk-80/Smalltalk80.Interpreter/Core/VM/VirtualMachine.cs`
-  - Add `_backgroundProcessOOP` field
-  - Add `FindBackgroundProcess()` method
-  - Modify `InterpreterLoop()` to check idle every iteration
-  - Modify `EnterIdleWait()` to remove `HasPendingEvents` check
+### Solution 1: Background Process Detection (Current Implementation)
 
-**No changes needed**:
-- `SmalltalkEventQueue.cs` - Already correct (ManualResetEventSlim)
-- `TimerManager.cs` - Already correct (interrupt-driven)
-- `IPlatformBridge.cs` - Already correct
+**Approach**: Detect when `GetActiveProcess() == backgroundProcess`, then block in `WaitAny`.
+
+**Why it fails**: Background process **never becomes active** due to the yield loop keeping priority 4 always occupied.
+
+**Status**: DOES NOT WORK
+
+### Solution 2: VM-Level Yield-Spin Throttling
+
+**Approach**: Detect rapid process cycling and introduce `Thread.Sleep` delays.
+
+```csharp
+private void ThrottleIfYieldSpinning()
+{
+    bool hasRecentInput = _platformBridge?.HasPendingEvents() ?? false;
+    if (hasRecentInput)
+    {
+        _lastInputEventTime = Environment.TickCount64;
+        return;
+    }
+
+    long timeSinceLastInput = Environment.TickCount64 - _lastInputEventTime;
+    if (timeSinceLastInput > 100)  // No input for 100ms
+    {
+        Thread.Sleep(5);  // Throttle
+    }
+}
+```
+
+**Why discarded**:
+- Arbitrary heuristic (when to throttle?)
+- Doesn't achieve true 0% CPU
+- Adds latency to responsive operations
+- Masks the real problem rather than fixing it
+
+**Status**: IMPLEMENTED AND REVERTED
+
+### Solution 3: Modify Smalltalk Code
+
+**Approach**: Change `searchForActiveController` to wait on a semaphore instead of polling with yield.
+
+```smalltalk
+"Hypothetical fix - NOT IMPLEMENTED"
+searchForActiveController
+    | aController |
+    [aController _ self findControllerWantingControl.
+     aController isNil] whileTrue:
+        [Sensor waitForEvent].  "Block on input semaphore"
+    self activeController: aController
+```
+
+**Why not pursued**:
+- Smalltalk-80.st is canonical Blue Book source
+- Modifying it changes semantics
+- May break compatibility
+
+**Status**: NOT ATTEMPTED (policy decision)
+
+### Solution 4: Enhanced Wait Primitive
+
+**Approach**: Modify primitive 86 (wait) to detect "yield waits" (semaphore signaled immediately) and track them separately.
+
+**Why not pursued**:
+- Complex to implement
+- Requires understanding Smalltalk-level patterns at VM level
+- Fragile - depends on yield implementation details
+
+**Status**: NOT ATTEMPTED
 
 ---
 
-## Conclusion
+## Current State of the Code
 
-The 3% idle CPU is caused by two bugs:
-1. **Breaking on `HasPendingEvents()`** - events don't wake processes directly; they signal input semaphore
-2. **Executing background process bytecodes** - the background process is a sentinel, not work
+### VirtualMachine.cs - InterpreterLoop
 
-**The Fix**:
-- Remove `HasPendingEvents()` check entirely
-- Check for background process every iteration
-- Never execute background process bytecodes
-- Stay in `WaitAny` until a real process switch occurs
+```csharp
+private SmalltalkOOP InterpreterLoop()
+{
+    _initialContextOOP = _contextManager.ActiveContext;
+    _initialProcessOOP = GetActiveProcess();
 
-**Result**: True 0% CPU when idle. The system blocks in the kernel until events or timers require action.
+    // Cache background process OOP for idle detection
+    _backgroundProcessOOP = FindBackgroundProcess();
+    if (_backgroundProcessOOP != default)
+    {
+        Console.WriteLine($"[InterpreterLoop] Background process detected: {_backgroundProcessOOP}");
+    }
+
+    int periodicCheckCounter = 0;
+    const int PeriodicCheckInterval = 1000;
+
+    while (true)
+    {
+        // Check for idle EVERY iteration
+        // NOTE: This check NEVER succeeds because yield keeps priority 4 active
+        if (_platformBridge != null && _backgroundProcessOOP != default)
+        {
+            var activeProcess = GetActiveProcess();
+            if (activeProcess == _backgroundProcessOOP)
+            {
+                EnterIdleWait(activeProcess);  // Never reached!
+                continue;
+            }
+        }
+
+        if (++periodicCheckCounter >= PeriodicCheckInterval)
+        {
+            periodicCheckCounter = 0;
+            if (ShutdownToken.IsCancellationRequested)
+                throw new OperationCanceledException();
+            CheckAndSignalExpiredTimer();
+        }
+
+        InterpreterStatus status = ExecuteBytecodeStep();
+        // ... handle status ...
+    }
+}
+```
+
+### VirtualMachine.cs - EnterIdleWait
+
+```csharp
+private void EnterIdleWait(SmalltalkOOP backgroundProcess)
+{
+    var eventHandle = _platformBridge?.EventAvailableHandle;
+    var timerHandle = _timerManager.TimerExpiredHandle;
+
+    Console.WriteLine("[IDLE] Entering idle wait (background process active)");
+
+    while (true)
+    {
+        CheckAndSignalExpiredTimer();
+
+        var currentProcess = GetActiveProcess();
+        if (currentProcess != backgroundProcess)
+        {
+            Console.WriteLine("[IDLE] Exiting idle (process switch detected)");
+            return;
+        }
+
+        if (eventHandle != null)
+        {
+            var handles = new WaitHandle[] { eventHandle, timerHandle, ShutdownToken.WaitHandle };
+            int waitResult = WaitHandle.WaitAny(handles);
+
+            if (waitResult == 0)  // Event
+            {
+                SignalInputSemaphoreIfRegistered();
+                _platformBridge!.ForceResetEventSignal();
+            }
+        }
+        else
+        {
+            Thread.Sleep(10);  // Fallback
+        }
+
+        if (ShutdownToken.IsCancellationRequested)
+            throw new OperationCanceledException();
+    }
+}
+```
+
+### Diagnostic Output (What We See)
+
+When running the interpreter at idle:
+- `[InterpreterLoop] Background process detected: 69158` - Background process IS found
+- `[IDLE]` messages **never appear** - `EnterIdleWait` is never called
+- CPU usage: ~3%
+
+When adding logging to Wait primitive:
+```
+[WAIT] excessSignals=0, actually suspending process
+[WAIT] excessSignals=0, actually suspending process
+[WAIT] excessSignals=0, actually suspending process
+... (continuous)
+```
+
+Processes ARE waiting on semaphores, but they're the yield semaphores, and they get signaled immediately by the forked process.
+
+---
+
+## The Real Issue
+
+The problem is **architectural** at the Smalltalk level:
+
+1. **Blue Book design assumes 100% CPU is acceptable** - Original Xerox systems ran on dedicated hardware
+2. **`searchForActiveController` is a polling loop** - It checks `isControlWanted` repeatedly, yielding between checks
+3. **`yield` prevents starvation but not spinning** - It lets other same-priority processes run, but the caller always resumes quickly
+4. **No event-driven controller scheduling** - Controllers poll sensor state rather than blocking on input semaphore
+
+The VM's idle detection is **architecturally correct** - if the background process ran, we'd block properly. But the Smalltalk code **never lets** the background process run.
+
+---
+
+## Possible Future Approaches
+
+### Approach A: Detect "Yield-Only" Processes
+
+Track which processes are only doing yield waits (semaphore created, immediately signaled). When ALL runnable processes are in yield-wait state, treat system as idle.
+
+**Complexity**: High - requires VM to understand Smalltalk-level patterns.
+
+### Approach B: Time-Based Idle Detection
+
+If no "real work" (non-yield bytecodes? input events?) for N milliseconds, consider system idle and block.
+
+**Complexity**: Medium - but what is "real work"?
+
+### Approach C: Modify Yield Semantics
+
+Make `yield` check if any OTHER process at same priority exists. If not, don't create forked process - just return immediately or block.
+
+**Risk**: Changes Blue Book semantics.
+
+### Approach D: Accept the CPU Usage
+
+Document that ~3% idle CPU is expected behavior for canonical Smalltalk-80.
+
+---
+
+## Summary for Next LLM
+
+**The Problem**: VM idle detection checks if background process (priority 1) is active. But `searchForActiveController` loops with `Processor yield`, which keeps priority 4 always occupied. Background never runs. VM never enters idle wait. CPU burns at ~3%.
+
+**Root Cause**: `yield` creates a forked process that signals immediately, ensuring the original process is always back in the ready queue before the forked process terminates. Priority 4 is never empty.
+
+**What Works**:
+- `WaitHandle.WaitAny` infrastructure is correct
+- Background process detection is correct
+- Input semaphore signaling is correct
+
+**What Doesn't Work**:
+- Background process **never becomes active**
+- Smalltalk-level polling loop defeats VM-level idle detection
+
+**Constraint**: Cannot modify Smalltalk-80.st (canonical source).
+
+**Status**: Unresolved. Need a way to detect idle at VM level that doesn't depend on background process becoming active.
