@@ -22633,18 +22633,27 @@ keyAt: index put: value
 									(KeyboardEvent code: index meta: metaState)]]]]]].
 		metaState _ (ctrlState bitOr: (lshiftState bitOr: rshiftState)) bitOr: lockState]!
 nextEvent: type with: param
-	"Process a single input event, aside from mouse X/Y"
+	"Process a single input event, aside from mouse X/Y.
+	 Signal ControllerSemaphore after button events (codes 128-130)
+	 so controllers wake with correct button state."
 
-	| highTime lowTime |
+	| highTime lowTime isButtonEvent |
+	isButtonEvent _ false.
 	type = 0  "Delta time"
-		ifTrue: 
+		ifTrue:
 			[timeProtect critical: [deltaTime _ deltaTime + param]]
 		ifFalse:
 			[type = 3	"Key down"
-				ifTrue: [self keyAt: param put: 1]
+				ifTrue: [self keyAt: param put: 1.
+						 "Button codes are 128-130 (BitMin to BitMin+2)"
+						 (param >= BitMin and: [param <= (BitMin + 2)]) ifTrue:
+							[isButtonEvent _ true]]
 				ifFalse:
 					[type = 4	"Key up"
-						ifTrue: [self keyAt: param put: 0]
+						ifTrue: [self keyAt: param put: 0.
+								 "Button codes are 128-130 (BitMin to BitMin+2)"
+								 (param >= BitMin and: [param <= (BitMin + 2)]) ifTrue:
+									[isButtonEvent _ true]]
 						ifFalse:
 							[type = 5	"Reset time"
 								ifTrue:
@@ -22655,7 +22664,10 @@ nextEvent: type with: param
 									timeProtect critical:
 										[baseTime _ (highTime bitShift: 16) + lowTime.
 										 deltaTime _ 0]]
-								ifFalse: [self error: 'Bad event type']]]]!
+								ifFalse: [self error: 'Bad event type']]]].
+	"Signal ControllerSemaphore after button state is updated.
+	 This ensures controllers see the correct state when they wake."
+	isButtonEvent ifTrue: [ControllerSemaphore signal]!
 primCursorLocPut: aPoint 
 	"Move the cursor to the screen location specified by the argument. Fail if 
 	the argument is not a Point. Essential. See Object documentation 
@@ -22710,27 +22722,41 @@ primSampleInterval: anInteger
 	^self primitiveFailed!
 run
 	"This is the loop that actually processes input events.
-	 VM signals ControllerSemaphore on button transitions to wake controllers.
-	 Drain ALL queued input words before waiting again - a single OS event
-	 may generate multiple input words (X, Y, button transitions)."
+	 Process ONE word at a time. After button events, temporarily lower priority
+	 to let controllers (priority 4) run before processing the next word.
+	 This ensures controllers see the pressed button state before we process release."
 
-	| word type param |
+	| word type param wasButtonEvent |
 	[true]
 		whileTrue:
 			[InputSemaphore wait.
-			"Process ALL queued words (not just one per signal)"
-			[(word _ self primInputWord) ~= 0]
-				whileTrue:
-					["Test for mouse X/Y events here to avoid an activation."
-					type _ word bitShift: -12.
-					param _ word bitAnd: 4095.
-					type = 1
-						ifTrue:
-							[x _ param "Mouse X"]
-						ifFalse:
-							[type = 2
-								ifTrue: [y _ param "Mouse Y"]
-								ifFalse: [self nextEvent: type with: param]]]]! !
+			word _ self primInputWord.
+			word ~= 0 ifTrue:
+				[type _ word bitShift: -12.
+				param _ word bitAnd: 4095.
+				wasButtonEvent _ false.
+				type = 1
+					ifTrue: [x _ param "Mouse X"]
+					ifFalse:
+						[type = 2
+							ifTrue: [y _ param "Mouse Y"]
+							ifFalse:
+								[self nextEvent: type with: param.
+								 "Check if this was a button event (codes 128-130)"
+								 ((type = 3 or: [type = 4]) and:
+									[param >= BitMin and: [param <= (BitMin + 2)]]) ifTrue:
+										[wasButtonEvent _ true]]].
+				"After button event: lower priority to let controllers run,
+				 then self-signal and yield to continue processing."
+				wasButtonEvent
+					ifTrue:
+						[Processor activeProcess priority: Processor userSchedulingPriority - 1.
+						 InputSemaphore signal.
+						 InputSemaphore wait.
+						 Processor activeProcess priority: Processor lowIOPriority]
+					ifFalse:
+						["Not a button event - continue immediately if more words"
+						 InputSemaphore signal]]]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputState class

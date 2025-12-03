@@ -439,34 +439,27 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     }
 
     /// <summary>
-    /// Signals input semaphores based on event type.
-    /// Dual-semaphore architecture:
-    /// - InputSemaphore: signaled on ALL raw input (wakes InputProcess at priority 6)
-    /// - ControllerSemaphore: signaled on button transitions (wakes controllers at priority 4)
-    /// Priority ordering ensures InputProcess updates sensor state before controllers wake.
+    /// Signals InputSemaphore when raw input events arrive.
+    /// Only InputSemaphore is signaled from the VM - ControllerSemaphore is signaled
+    /// by InputProcess (in Smalltalk) AFTER updating sensor state for button events.
+    /// This ensures controllers see the correct button state when they wake.
     /// </summary>
     private void SignalInputSemaphoreIfRegistered()
     {
         if (_platformBridge == null)
             return;
 
-        // Always signal InputSemaphore on raw input
+        // Signal InputSemaphore on raw input - wakes InputProcess (priority 6)
+        // InputProcess will signal ControllerSemaphore after updating button state
         var inputSemaphore = _platformBridge.GetInputSemaphore();
         if (inputSemaphore != default && inputSemaphore != _metadata.KnownObjects.Nil)
         {
             SignalSemaphoreWithPreemption(inputSemaphore);
         }
 
-        // Signal ControllerSemaphore only on button transitions
-        // This wakes controllers waiting via Sensor waitForControllerEvent
-        if (_platformBridge.ConsumeButtonTransition())
-        {
-            var controllerSemaphore = _platformBridge.GetControllerSemaphore();
-            if (controllerSemaphore != default && controllerSemaphore != _metadata.KnownObjects.Nil)
-            {
-                SignalSemaphoreWithPreemption(controllerSemaphore);
-            }
-        }
+        // NOTE: ControllerSemaphore is now signaled by InputProcess in Smalltalk
+        // after processing button events, not here. This ensures controllers
+        // see the updated button state when they wake.
     }
 
     /// <summary>
