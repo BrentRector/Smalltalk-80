@@ -140,6 +140,14 @@ public interface IPlatformBridge
     /// </summary>
     void ResetEventSignalIfEmpty();
 
+    /// <summary>
+    /// Forces reset of the event signal regardless of queue state.
+    /// Used after signaling the input semaphore to prevent busy-loop when events
+    /// are pending but no Smalltalk process is waiting on the semaphore.
+    /// New events arriving will re-signal.
+    /// </summary>
+    void ForceResetEventSignal();
+
     // ============================================================================
     // Clipboard (Primitive 104)
     // ============================================================================

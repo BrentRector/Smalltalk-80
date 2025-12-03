@@ -323,6 +323,19 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     }
 
     /// <summary>
+    /// Forces reset of the event signal regardless of queue state.
+    /// Used after signaling the input semaphore to prevent busy-loop:
+    /// - We've signaled the semaphore once for pending events
+    /// - If no process switch occurred (no one waiting), we must block
+    /// - Force reset prevents WaitAny from returning immediately
+    /// - New events arriving will call Set() again
+    /// </summary>
+    public void ForceResetEventSignal()
+    {
+        _eventSignal.Reset();
+    }
+
+    /// <summary>
     /// Disposes of the event wait handle.
     /// </summary>
     public void Dispose()

@@ -366,32 +366,27 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// - UI event arrives → signals input semaphore → process switch
     /// - Timer expires → signals timer semaphore → process switch
     ///
-    /// When we wake:
-    /// 1. Check for expired timer → signal timer semaphore → may preempt
-    /// 2. Check for pending events → signal input semaphore → may preempt
-    /// 3. Check if activeProcess changed → if yes, exit idle
+    /// CRITICAL: We do NOT poll HasPendingEvents(). Events in queue don't directly
+    /// wake processes - they are consumed by Smalltalk's InputSensor which checks
+    /// the queue in waitForEvent before blocking on the semaphore.
     /// </summary>
     private void EnterIdleWait(SmalltalkOOP backgroundProcess)
     {
         var eventHandle = _platformBridge?.EventAvailableHandle;
         var timerHandle = _timerManager.TimerExpiredHandle;
 
+        Console.WriteLine("[IDLE] Entering idle wait (background process active)");
+
         while (true)
         {
             // Check for expired timer and signal semaphore (with preemption)
             CheckAndSignalExpiredTimer();
 
-            // Check for pending input events and signal input semaphore (with preemption)
-            // This wakes the input handling process (e.g., Controller)
-            if (_platformBridge != null && _platformBridge.HasPendingEvents())
-            {
-                SignalInputSemaphoreIfRegistered();
-            }
-
-            // Check if a process switch occurred (due to timer or input semaphore signal)
+            // Check if a process switch occurred (due to timer signal)
             var currentProcess = GetActiveProcess();
             if (currentProcess != backgroundProcess)
             {
+                Console.WriteLine("[IDLE] Exiting idle (process switch detected)");
                 return;  // Higher-priority process ready - exit idle
             }
 
@@ -404,8 +399,27 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                     timerHandle,
                     ShutdownToken.WaitHandle
                 };
-                WaitHandle.WaitAny(handles);  // Blocks here (0% CPU)
-                _platformBridge!.ResetEventSignalIfEmpty();
+
+                int waitResult = WaitHandle.WaitAny(handles);  // Blocks here (0% CPU)
+
+                // Handle wake based on which handle was signaled
+                if (waitResult == 0)  // Event handle
+                {
+                    // Event arrived - signal input semaphore ONCE to wake Controller
+                    // The Controller will then process all pending events via primitive 95
+                    SignalInputSemaphoreIfRegistered();
+
+                    // Force reset the event signal to prevent busy-loop
+                    // New events will re-signal when they arrive
+                    // Events in queue will be consumed by Smalltalk (InputSensor checks queue first)
+                    _platformBridge!.ForceResetEventSignal();
+                }
+                else if (waitResult == 1)  // Timer handle
+                {
+                    // Timer expired - already handled by CheckAndSignalExpiredTimer above
+                    // Just continue loop to recheck
+                }
+                // waitResult == 2 is shutdown handle - handled below
             }
             else
             {

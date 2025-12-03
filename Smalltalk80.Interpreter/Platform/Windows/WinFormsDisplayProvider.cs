@@ -481,6 +481,11 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         _eventQueue.ResetSignalIfEmpty();
     }
 
+    public void ForceResetEventSignal()
+    {
+        _eventQueue.ForceResetEventSignal();
+    }
+
     public SmalltalkOOP ReadClipboardToStringOOP()
     {
         // Not implemented yet - return value should be provided by Smalltalk thread

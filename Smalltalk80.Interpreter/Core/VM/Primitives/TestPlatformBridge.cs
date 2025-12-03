@@ -229,6 +229,11 @@ public class TestPlatformBridge : IPlatformBridge
         // No-op in test mode - no event signal to reset
     }
 
+    public void ForceResetEventSignal()
+    {
+        // No-op in test mode - no event signal to reset
+    }
+
     // ============================================================================
     // Clipboard
     // ============================================================================
