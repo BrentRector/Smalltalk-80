@@ -440,7 +440,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     /// <summary>
     /// Signals the input semaphore if one is registered (via primitive 93).
-    /// This wakes the input handling process when events are available.
+    /// Wakes ALL waiters on the semaphore (InputProcess + any yield waiters).
+    /// This is necessary because both InputProcess and Processor>>yield wait
+    /// on the same InputSemaphore.
     /// </summary>
     private void SignalInputSemaphoreIfRegistered()
     {
@@ -450,7 +452,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var inputSemaphore = _platformBridge.GetInputSemaphore();
         if (inputSemaphore != default && inputSemaphore != _metadata.KnownObjects.Nil)
         {
-            SignalSemaphoreWithPreemption(inputSemaphore);
+            // Wake ALL waiters, not just one - both InputProcess and yield waiters need to wake
+            SignalSemaphoreAllWaiters(inputSemaphore);
         }
         else
         {

@@ -22395,17 +22395,15 @@ primMousePt
 
 !InputSensor methodsFor: 'waiting'!
 waitForEvent
-	"Block briefly until an input event (mouse, keyboard, or timer) arrives.
-	 Modern integration: reduces CPU usage by using timed waits instead of
-	 busy-waiting with the original Processor yield.
-
-	 Uses Delay instead of InputSemaphore to avoid contention with InputProcess
-	 (both would wait on same semaphore, causing missed events).
+	"Block until an input event (mouse, keyboard, or timer) arrives.
+	 Modern integration: enables true idle suspension by blocking on InputSemaphore.
+	 The VM signals this semaphore (waking ALL waiters) when events arrive,
+	 allowing 0% CPU usage when idle.
 
 	 IMPORTANT: Return immediately if user input is active (button pressed or key held).
 	 This allows controller loops to keep processing continuous input states."
 	(self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
-	(Delay forMilliseconds: 50) wait! !
+	InputState inputSemaphore wait! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputSensor class
