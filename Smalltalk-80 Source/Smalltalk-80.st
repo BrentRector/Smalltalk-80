@@ -22724,12 +22724,13 @@ run
 	 Each InputSemaphore wait corresponds to ONE OS event (via counting semaphore).
 	 Process all words for that event until sentinel (type 6) or 0.
 
-	 After button events, use handshake protocol:
+	 After button DOWN (type=3) only, use handshake protocol to wake sleeping controller:
 	 1. Signal ControllerSemaphore (adds controller to ready queue, no preempt)
 	 2. Wait on HandshakeSemaphore (blocks InputProcess, controller runs)
 	 3. Controller signals HandshakeSemaphore (InputProcess unblocked, no preempt)
 	 4. Controller continues processing (cooperative multitasking)
-	 5. When controller waits again, InputProcess resumes"
+
+	 Button UP (type=4) does NOT handshake - controller is busy processing and polls state."
 
 	| word type param |
 	[true]
@@ -22748,9 +22749,8 @@ run
 								ifTrue: [y _ param "Mouse Y"]
 								ifFalse:
 									[self nextEvent: type with: param.
-									 "After button event: handshake with controller"
-									 ((type = 3 or: [type = 4]) and:
-										[param >= BitMin and: [param <= (BitMin + 2)]]) ifTrue:
+									 "After button DOWN only: handshake with controller"
+									 (type = 3 and: [param >= BitMin and: [param <= (BitMin + 2)]]) ifTrue:
 										[ControllerSemaphore signal.
 										 HandshakeSemaphore wait]]]]]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
