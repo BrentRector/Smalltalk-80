@@ -22331,9 +22331,11 @@ redButtonPressed
 	"Answer whether only the red mouse button is being pressed."
 	^self buttons = 4!
 waitButton
-	"Wait for the user to press any mouse button and then answer with the 
-	current location of the cursor."
-	[self anyButtonPressed] whileFalse.
+	"Wait for the user to press any mouse button and then answer with the
+	current location of the cursor.
+
+	Uses event-driven blocking (0% CPU) instead of busy-wait polling."
+	[self anyButtonPressed] whileFalse: [self waitForControllerEvent].
 	^self cursorPoint!
 waitClickButton
 	"Wait for the user to click (press and then release) any mouse button and then
@@ -22341,9 +22343,11 @@ waitClickButton
 	self waitButton.
 	^self waitNoButton!
 waitNoButton
-	"Wait for the user to release any mouse button and then answer with the 
-	current location of the cursor."
-	[self anyButtonPressed] whileTrue.
+	"Wait for the user to release any mouse button and then answer with the
+	current location of the cursor.
+
+	Uses event-driven blocking (0% CPU) instead of busy-wait polling."
+	[self anyButtonPressed] whileTrue: [self waitForControllerEvent].
 	^self cursorPoint!
 yellowButtonPressed
 	"Answer whether only the yellow mouse button is being pressed."
@@ -22402,8 +22406,10 @@ waitForControllerEvent
 	"Block until a mouse event is enqueued. Used by controller loops.
 	 InputProcess signals ControllerSemaphore after enqueueing each mouse event.
 	 Controllers then consume events via nextMouseEvent.
-	 Return immediately if user input is active (button pressed or key held)."
-	(self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
+
+	 ALWAYS blocks on semaphore - enables 0% CPU during mouse tracking.
+	 If multiple events arrive quickly, semaphore will have excess signals
+	 that are consumed in order (one per wait)."
 	InputState controllerSemaphore wait!
 waitForEvent
 	"Block until any input event (mouse, keyboard, or timer) arrives.
@@ -32698,37 +32704,42 @@ buttonPressed: aSymbol
 	aSymbol = #yellowButton ifTrue: [^Sensor yellowButtonPressed].
 	aSymbol = #blueButton ifTrue: [^Sensor blueButtonPressed].
 	^Sensor anyButtonPressed!
-startUp: aSymbol 
+startUp: aSymbol
 	"Display and make a selection from the receiver as long as the button
-	denoted by the symbol, aSymbol, is pressed.  Answer the current selection."
-	
-	self displayAt: Sensor cursorPoint 
+	denoted by the symbol, aSymbol, is pressed.  Answer the current selection.
+
+	Uses event-driven blocking (0% idle CPU) instead of busy-wait polling."
+
+	self displayAt: Sensor cursorPoint
 		during: [Sensor cursorPoint: marker center.
-				[self buttonPressed: aSymbol] whileFalse: [].
-				[self buttonPressed: aSymbol] whileTrue: [self manageMarker]].
+				[self buttonPressed: aSymbol] whileFalse: [Sensor waitForControllerEvent].
+				[self buttonPressed: aSymbol] whileTrue: [self manageMarker. Sensor waitForControllerEvent]].
 	^selection!
 startUp: aSymbol withHeading: aText
 	"Display and make a selection from the receiver as long as the button
-	denoted by the symbol, aSymbol, is pressed.  Answer the current selection."
-	
+	denoted by the symbol, aSymbol, is pressed.  Answer the current selection.
+
+	Uses event-driven blocking (0% idle CPU) instead of busy-wait polling."
+
 	self displayAt: Sensor cursorPoint withHeading: aText
 		during: [Sensor cursorPoint: marker center.
 				[self buttonPressed: aSymbol]
-					whileFalse: [(frame containsPoint: Sensor cursorPoint) ifFalse: [Display flash: frame]].
+					whileFalse: [(frame containsPoint: Sensor cursorPoint) ifFalse: [Display flash: frame].
+								Sensor waitForControllerEvent].
 				[self buttonPressed: aSymbol]
-					whileTrue: [self manageMarker]].
+					whileTrue: [self manageMarker. Sensor waitForControllerEvent]].
 	^selection!
 startUpAndWaitForSelectionAt: aPoint
 	"Display and make a selection from the receiver as long as the button denoted
-	by the symbol, aSymbol, is pressed.  Answer the current selection."
+	by the symbol, aSymbol, is pressed.  Answer the current selection.
 
-	  | upperLeft |
-	
-	self displayAt: aPoint 
+	Uses event-driven blocking (0% idle CPU) instead of busy-wait polling."
+
+	self displayAt: aPoint
 		during: [[(Sensor anyButtonPressed and: [frame inside containsPoint: Sensor cursorPoint])]
-					whileFalse: [].
+					whileFalse: [Sensor waitForControllerEvent].
 				[self buttonPressed: #anyButton]
-					whileTrue: [self manageMarker]].
+					whileTrue: [self manageMarker. Sensor waitForControllerEvent]].
 	^selection!
 startUpBlueButton
 	"Display and make a selection from the receiver as long as the blue button
