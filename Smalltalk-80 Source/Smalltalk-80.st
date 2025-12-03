@@ -13212,12 +13212,9 @@ controlLoop
 	Controller|controlLoop sends the message Controller|isControlActive to test
 	for loop termination. As long as true is returned, the loop continues. When
 	false is returned, the loop ends. Each time through the loop, the message
-	Controller|controlActivity is sent.
+	Controller|controlActivity is sent."
 
-	Modern integration: use Sensor waitForEvent instead of Processor yield
-	to enable true idle suspension (0% CPU when idle)."
-
-	[self isControlActive] whileTrue: [Sensor waitForEvent. self controlActivity]!
+	[self isControlActive] whileTrue: [Processor yield. self controlActivity]!
 controlTerminate
 	"Provide a place in the standard control sequence for terminating the  
 	receiver (taking into account the current state of its model and view). It  
@@ -13454,22 +13451,24 @@ schedulePassive: aController
 
 	scheduledControllers addFirst: aController!
 searchForActiveController
-	"Find a scheduled controller that wants control and give control to it.
-	 Modern integration: block until a controller wants control.
-	 Avoid yield-spinning so the VM can truly suspend at idle."
+	"Find a scheduled controller that wants control and give control to it.  If none
+	wants control, then see if the System Menu has been requested."
 
 	| aController |
 	activeController _ nil.
 	activeControllerProcess _ Processor activeProcess.
-	[aController _ scheduledControllers
-		detect: [:c | c isControlWanted and: [c ~~ screenController]]
-		ifNone: [screenController isControlWanted
-					ifTrue: [screenController]
-					ifFalse: [nil]].
-	 aController isNil]
-		whileTrue: [
-			"Block until input/timer occurs; VM signals InputSemaphore."
-			Sensor waitForEvent].
+	[Processor yield.
+	 aController _ scheduledControllers
+		detect:
+			[:aController |
+			aController isControlWanted and:
+				[aController ~~ screenController]]
+		ifNone:
+			[screenController isControlWanted
+				ifTrue: [screenController]
+				ifFalse: [nil]].
+	aController isNil]
+		whileTrue.
 	self activeController: aController.
 	Processor terminateActive!
 unschedule: aController
@@ -32984,12 +32983,11 @@ terminateActive
 
 	activeProcess terminate!
 yield
-	"Give other Processes at the current priority a chance to run"
+	"Give other Processes at the current priority a chance to run.
+	 Modern integration: block on InputSemaphore for true idle suspension.
+	 The VM signals InputSemaphore when events arrive, enabling 0% CPU when idle."
 
-	| semaphore |
-	semaphore _ Semaphore new.
-	[semaphore signal] fork.
-	semaphore wait! !
+	Sensor waitForEvent! !
 
 !ProcessorScheduler methodsFor: 'timing'!
 signal: aSemaphore atTime: timeInterval 
