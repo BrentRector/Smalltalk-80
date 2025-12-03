@@ -339,13 +339,13 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                                 if (_platformBridge.HasPendingEvents())
                                     break; // Events to process - exit idle loop
 
-                                var expiredSemaphore = _timerManager.GetExpiredTimerSemaphore();
-                                if (expiredSemaphore != default)
-                                {
-                                    // Timer expired - signal semaphore and exit idle loop
-                                    SignalSemaphore(expiredSemaphore);
-                                    break;
-                                }
+                                // Check for expired timer - this may wake a higher-priority process
+                                CheckAndSignalExpiredTimer();
+
+                                // If a higher-priority process is now ready, exit idle loop
+                                var newActiveProcess = GetActiveProcess();
+                                if (newActiveProcess != activeProcess)
+                                    break; // Process switched - exit idle loop
 
                                 // Nothing to do - wait for events or timer
                                 int waitMs = MaxIdleWaitMs;
