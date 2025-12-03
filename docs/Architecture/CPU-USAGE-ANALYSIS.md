@@ -1,8 +1,16 @@
 # CPU Usage Analysis: Idle Detection and the Yield Problem
 
 **Date**: 2025-12-03
-**Status**: ✅ RESOLVED - Dual-semaphore architecture with handshake protocol
-**Purpose**: Document the idle CPU problem, analysis, and implemented solution
+**Status**: ⚠️ SUPERSEDED - See MOUSE-EVENT-QUEUE.md for current design
+**Purpose**: Document the idle CPU problem, analysis, and original handshake solution
+
+---
+
+> **IMPORTANT**: The handshake-based design documented below has been superseded by a queue-based architecture.
+> The handshake approach caused deadlocks when controllers were busy (e.g., menu tracking).
+> See **[MOUSE-EVENT-QUEUE.md](MOUSE-EVENT-QUEUE.md)** for the current queue-based design that fixes these issues.
+
+---
 
 ---
 

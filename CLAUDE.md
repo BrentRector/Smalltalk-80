@@ -25,13 +25,13 @@ The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:i
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 
-**✅ Idle CPU Usage - RESOLVED**: The original Blue Book `Processor yield` created a forked process that signaled immediately, keeping priority 4 always occupied and preventing true idle. **Fix**: Dual-semaphore architecture with handshake protocol:
+**✅ Idle CPU Usage - RESOLVED**: The original Blue Book `Processor yield` created a forked process that signaled immediately, keeping priority 4 always occupied and preventing true idle. **Fix**: Dual-semaphore architecture with mouse event queue:
 - **InputSemaphore**: VM signals on raw input; InputProcess waits
-- **ControllerSemaphore**: InputProcess signals on button state CHANGES; controllers wait
-- **HandshakeSemaphore**: Controller signals to acknowledge; InputProcess waits after signaling
-- **Key**: `buttons` returns processed state from `bitState` (not polled current state)
+- **ControllerSemaphore**: InputProcess signals after enqueuing mouse event; controllers wait
+- **MouseEventQueue**: FIFO queue of discrete mouse events (mirrors keyboard queue design)
+- **Key**: Controllers consume events from queue, ensuring no transitions are missed
 
-This guarantees controllers ALWAYS see correct button state, enables 0% idle CPU, and eliminates missed mouse transitions. See `docs/Architecture/CPU-USAGE-ANALYSIS.md`.
+This guarantees controllers see EVERY mouse event, enables 0% idle CPU, and eliminates missed button transitions. See `docs/Architecture/MOUSE-EVENT-QUEUE.md` for complete design.
 
 ## Migration Status
 
@@ -106,15 +106,15 @@ Efficient idle detection using `WaitHandle.WaitAny` for unified multi-source wai
 - ✅ **WaitHandle.WaitAny**: Waits on both event queue and timer handles in single kernel call
 - ✅ **ManualResetEventSlim**: Replaced AutoResetEvent to prevent signal consumption
 - ✅ **Double-Check Reset Pattern**: Safe reset after WaitAny to handle race conditions
-- ✅ **CPU Efficiency**: 0% CPU during idle via central `ProcessorScheduler>>yield` fix
+- ✅ **CPU Efficiency**: 0% CPU during idle via mouse event queue architecture
 
 **Key Implementation Details**:
 
-**Dual-Semaphore Architecture with Handshake**: Separates InputSemaphore (for InputProcess) from ControllerSemaphore (for controllers), with HandshakeSemaphore for formal synchronization:
+**Mouse Event Queue Architecture**: Queue-based mouse handling that mirrors the keyboard queue design:
 
 1. **InputSemaphore** - VM signals when raw input arrives; InputProcess (priority 6) waits
-2. **ControllerSemaphore** - InputProcess signals on button state CHANGES; controllers wait
-3. **HandshakeSemaphore** - Controller signals to acknowledge; InputProcess waits after signaling
+2. **ControllerSemaphore** - InputProcess signals after enqueuing mouse event; controllers wait
+3. **MouseEventQueue** - FIFO SharedQueue of discrete MouseEvent objects
 
 ```smalltalk
 ProcessorScheduler>>yield
@@ -122,27 +122,27 @@ ProcessorScheduler>>yield
      Modern integration: block on ControllerSemaphore for true idle suspension."
     Sensor waitForEvent
 
-InputSensor>>buttons
-    "Return button state from processed events (bitState), not polled current state.
-     This ensures controllers see button state as of when the event was processed."
-    ^CurrentInputState mouseButtons
+InputSensor>>nextMouseEvent
+    "Answer next mouse event or nil if none."
+    ^InputState mouseEventQueue isEmpty
+        ifTrue: [nil]
+        ifFalse: [InputState mouseEventQueue next]
 
 InputSensor>>waitForControllerEvent
-    "Block until button transition. Handshake ensures correct state visibility."
+    "Block until a mouse event is available."
     (self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
-    InputState controllerSemaphore wait.
-    InputState handshakeSemaphore signal
+    InputState controllerSemaphore wait
 ```
 
-**Key Design Decision**: `buttons` returns processed state from `bitState` (not polled current state via primitive 199). Combined with the handshake protocol, this guarantees controllers ALWAYS see correct button state with no missed mouse transitions.
+**Key Design Decision**: Controllers consume discrete MouseEvent objects from a FIFO queue instead of polling `bitState`. This guarantees EVERY mouse transition is seen - no events are lost even during rapid clicking or when controllers are busy.
 
-**Handshake Protocol**:
-1. InputProcess processes event, updates bitState
-2. If button state changed: signal ControllerSemaphore, wait HandshakeSemaphore
-3. Controller wakes, immediately signals HandshakeSemaphore
-4. Controller continues with correct bitState visible
+**Queue Protocol**:
+1. InputProcess dequeues OS event, updates bitState for compatibility
+2. InputProcess enqueues MouseEvent to queue
+3. InputProcess signals ControllerSemaphore (no handshake needed)
+4. Controller wakes, dequeues events from MouseEventQueue
 
-This achieves 0% idle CPU while ensuring reliable button detection.
+This achieves 0% idle CPU with reliable event delivery and no deadlocks.
 
 **Composite Event Model**: Primitive 95 (`primInputWord`) returns a composite event Array instead of packed integer words:
 ```smalltalk
@@ -174,18 +174,18 @@ public void ResetSignalIfEmpty()
 
 **Key Files**:
 - `Smalltalk-80.st` - `ProcessorScheduler>>yield` calls `Sensor waitForEvent`
-- `Smalltalk-80.st` - `InputState` class with `InputSemaphore`, `ControllerSemaphore`, `HandshakeSemaphore`
-- `Smalltalk-80.st` - `InputState>>run` uses composite events, no inner loop/sentinel
+- `Smalltalk-80.st` - `InputState` class with `InputSemaphore`, `ControllerSemaphore`, `MouseEventQueue`
+- `Smalltalk-80.st` - `InputState>>run` enqueues MouseEvents to queue
 - `Smalltalk-80.st` - `InputState>>primInputWord` returns composite event Array (primitive 95)
-- `Smalltalk-80.st` - `InputSensor>>buttons` returns processed state from `CurrentInputState mouseButtons`
-- `Smalltalk-80.st` - `InputSensor>>waitForControllerEvent` waits on ControllerSemaphore + signals HandshakeSemaphore
+- `Smalltalk-80.st` - `InputSensor>>nextMouseEvent` dequeues from MouseEventQueue
+- `Smalltalk-80.st` - `InputSensor>>waitForControllerEvent` waits on ControllerSemaphore
 - `SmalltalkEventQueue.cs` - `DequeueCompositeEvent()` returns event data as tuple
 - `InputPrimitives.cs` - Primitive 95 builds composite Array from dequeued event
 - `VirtualMachine.cs` - InterpreterLoop uses `WaitHandle.WaitAny([eventHandle, timerHandle])`
 - `VirtualMachine.ProcessScheduling.cs` - Extracted process scheduling methods (~330 lines)
 - `SmalltalkEventQueue.cs` - ManualResetEventSlim with ResetSignalIfEmpty()
 - `TimerManager.cs` - Interrupt-driven timer with TimerExpiredHandle
-- `docs/Architecture/CPU-USAGE-ANALYSIS.md` - **Complete analysis and solution documentation**
+- `docs/Architecture/MOUSE-EVENT-QUEUE.md` - **Complete queue-based architecture documentation**
 
 See `docs/Architecture/PROPOSED-TIMER-OPTIMIZATION.md` and `docs/Architecture/PROCESS-MANAGEMENT.md` for complete documentation.
 

@@ -147,25 +147,35 @@ ProcessorScheduler>>yield
     Sensor waitForEvent
 ```
 
-The modern implementation uses a **dual-semaphore architecture**:
+The modern implementation uses a **mouse event queue architecture** (mirrors keyboard queue):
 
 1. **InputSemaphore** - VM signals when raw input arrives
    - Only InputProcess (priority 6) waits on this
    - InputProcess reads event, updates sensor state (x, y, bitState, etc.)
 
-2. **ControllerSemaphore** - InputProcess signals after updating state
-   - Controllers wait on this via `Sensor waitForEvent`
-   - Guarantees controllers see correct button/key state
+2. **ControllerSemaphore** - InputProcess signals after enqueuing mouse event
+   - Controllers wait on this via `Sensor waitForControllerEvent`
+   - Guarantees controllers receive every mouse event
+
+3. **MouseEventQueue** - FIFO SharedQueue of discrete MouseEvent objects
+   - Controllers dequeue events via `Sensor nextMouseEvent`
+   - No events are lost even during rapid clicking
 
 ```smalltalk
-InputSensor>>waitForEvent
-    "Block until an input event arrives.
-     Returns immediately if button pressed or key held."
+InputSensor>>waitForControllerEvent
+    "Block until a mouse event is available."
     (self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
     InputState controllerSemaphore wait
+
+InputSensor>>nextMouseEvent
+    "Answer next mouse event or nil if none."
+    ^InputState mouseEventQueue isEmpty
+        ifTrue: [nil]
+        ifFalse: [InputState mouseEventQueue next]
 ```
 
-This enables true 0% CPU when idle and prevents missed mouse transitions.
+This enables true 0% CPU when idle and guarantees no missed mouse transitions.
+See `MOUSE-EVENT-QUEUE.md` for complete design documentation.
 
 **Original Blue Book Implementation** (caused 3% idle CPU and missed events):
 ```smalltalk
@@ -346,7 +356,7 @@ CheckAndSignalExpiredTimer();
 | Idle, no timers | Near-zero (10ms sleeps) |
 | Background animation | Low (controlled by Delay) |
 
-**✅ RESOLVED**: The idle CPU issue (was ~3%) has been fixed using a dual-semaphore architecture. `ProcessorScheduler>>yield` calls `Sensor waitForEvent`, which blocks on `ControllerSemaphore`. InputProcess signals this semaphore after updating sensor state, ensuring controllers see correct button/key state. This enables true 0% CPU when idle with no missed mouse transitions. See `CPU-USAGE-ANALYSIS.md` for complete analysis.
+**✅ RESOLVED**: The idle CPU issue (was ~3%) has been fixed using a mouse event queue architecture. `ProcessorScheduler>>yield` calls `Sensor waitForEvent`, which blocks on `ControllerSemaphore`. InputProcess signals this semaphore after enqueuing a MouseEvent to the queue, ensuring controllers receive EVERY mouse event. This enables true 0% CPU when idle with no missed mouse transitions. See `MOUSE-EVENT-QUEUE.md` for complete design documentation.
 
 ## Data Structure Summary
 
@@ -383,7 +393,8 @@ SmalltalkEventQueue (C#)
 
 ## Related Files
 
-- `CPU-USAGE-ANALYSIS.md` - Analysis of 3% idle CPU and fix recommendations
+- `MOUSE-EVENT-QUEUE.md` - **Current design**: Queue-based mouse event handling
+- `CPU-USAGE-ANALYSIS.md` - Historical: Original handshake-based approach (superseded)
 - `PROPOSED-TIMER-OPTIMIZATION.md` - Timer and WaitAny implementation details
 - `VirtualMachine.cs` - InterpreterLoop, idle detection, main bytecode execution
 - `VirtualMachine.ProcessScheduling.cs` - Process scheduling methods:
@@ -402,16 +413,20 @@ SmalltalkEventQueue (C#)
 
 ## Recent Changes (2025-12-03)
 
-- **Dual-Semaphore Architecture**: Fixes 0% idle CPU AND missed mouse transitions
+- **Mouse Event Queue Architecture**: Fixes 0% idle CPU AND missed mouse transitions
   - **InputSemaphore**: VM signals on raw input; InputProcess (priority 6) waits
-  - **ControllerSemaphore**: InputProcess signals after updating sensor state; controllers wait
+  - **ControllerSemaphore**: InputProcess signals after enqueuing mouse event; controllers wait
+  - **MouseEventQueue**: FIFO SharedQueue of discrete MouseEvent objects
+  - Added `InputState class>>mouseEventQueue` - accessor for MouseEventQueue
   - Added `InputState class>>controllerSemaphore` - accessor for ControllerSemaphore class variable
   - Added `InputState class>>inputSemaphore` - accessor for InputSemaphore class variable
-  - Modified `InputState>>install` - creates both semaphores
-  - Modified `InputState>>run` - signals ControllerSemaphore after each event
-  - Added `InputSensor>>waitForEvent` - blocks on ControllerSemaphore (returns immediately if button pressed)
+  - Modified `InputState>>install` - creates semaphores and queue
+  - Modified `InputState>>run` - enqueues MouseEvents, signals ControllerSemaphore
+  - Added `InputSensor>>nextMouseEvent` - dequeues from MouseEventQueue
+  - Added `InputSensor>>waitForControllerEvent` - blocks on ControllerSemaphore
   - Modified `ProcessorScheduler>>yield` - calls `Sensor waitForEvent`
   - All yield callers (controlLoop, searchForActiveController, etc.) automatically benefit
+  - See `MOUSE-EVENT-QUEUE.md` for complete design documentation
 - **VirtualMachine Refactoring**: Process scheduling methods extracted to `VirtualMachine.ProcessScheduling.cs` partial class (~330 lines)
 - **Timer Implementation**: Uses interrupt-driven `System.Threading.Timer` for precise timing
 - **Event Handling**: `WaitHandle.WaitAny` with `ManualResetEventSlim` and double-check reset pattern
