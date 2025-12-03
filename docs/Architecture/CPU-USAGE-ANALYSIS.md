@@ -482,6 +482,116 @@ Document that ~3% idle CPU is expected behavior for canonical Smalltalk-80.
 - Background process **never becomes active**
 - Smalltalk-level polling loop defeats VM-level idle detection
 
-**Constraint**: Cannot modify Smalltalk-80.st (canonical source).
+---
 
-**Status**: Unresolved. Need a way to detect idle at VM level that doesn't depend on background process becoming active.
+## IMPLEMENTED SOLUTION: Controller Loop Modernization
+
+**Date**: 2025-12-03
+**Status**: IMPLEMENTED - Pending testing
+
+### Changes Made
+
+The fix replaces `Processor yield` with `Sensor waitForEvent` in the controller loop, allowing true idle suspension.
+
+#### 1. Added `InputState class>>inputSemaphore`
+
+```smalltalk
+!InputState class methodsFor: 'accessing'!
+inputSemaphore
+    "Answer the semaphore that is signaled when input events arrive.
+     Used by Sensor waitForEvent for true idle suspension."
+    ^InputSemaphore! !
+```
+
+#### 2. Added `InputSensor>>waitForEvent`
+
+```smalltalk
+!InputSensor methodsFor: 'waiting'!
+waitForEvent
+    "Block until an input event (mouse, keyboard, or timer) arrives.
+     Modern integration: enables true idle suspension by blocking on InputSemaphore
+     instead of busy-waiting with Processor yield. The VM signals this semaphore
+     when events arrive, allowing 0% CPU usage when idle."
+    InputState inputSemaphore wait! !
+```
+
+#### 3. Modified `ControlManager>>searchForActiveController`
+
+```smalltalk
+searchForActiveController
+    "Find a scheduled controller that wants control and give control to it.
+     Modern integration: block until a controller wants control.
+     Avoid yield-spinning so the VM can truly suspend at idle."
+
+    | aController |
+    activeController _ nil.
+    activeControllerProcess _ Processor activeProcess.
+    [aController _ scheduledControllers
+        detect: [:c | c isControlWanted and: [c ~~ screenController]]
+        ifNone: [screenController isControlWanted
+                    ifTrue: [screenController]
+                    ifFalse: [nil]].
+     aController isNil]
+        whileTrue: [
+            "Block until input/timer occurs; VM signals InputSemaphore."
+            Sensor waitForEvent].
+    self activeController: aController.
+    Processor terminateActive!
+```
+
+### How It Works
+
+1. Controller checks if any controller wants control
+2. If none wants control, blocks on `Sensor waitForEvent` (which waits on `InputSemaphore`)
+3. VM's `EnterIdleWait` signals `InputSemaphore` when events arrive
+4. Controller wakes, rechecks `isControlWanted`
+5. If still none wants control, blocks again
+6. When a controller wants control, activates it
+
+### Expected Behavior
+
+- **Idle CPU**: 0% (blocked in WaitAny → InputSemaphore wait)
+- **Responsiveness**: Immediate wake on mouse/keyboard/timer
+- **Background process**: Now becomes active when truly idle (all processes blocked)
+- **VM idle detection**: Now triggers correctly
+
+### Files Modified
+
+- `Smalltalk-80 Source/Smalltalk-80.st`:
+  - Added `InputState class>>inputSemaphore`
+  - Added `InputSensor>>waitForEvent`
+  - Modified `ControlManager>>searchForActiveController`
+
+### Next Steps
+
+1. **Regenerate coldstart bundle** (requires dotnet):
+   ```bash
+   cd "Smalltalk-80 Source"
+   dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
+   cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/* ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
+   ```
+
+2. **Test idle CPU usage**: Start interpreter, leave idle, verify 0% CPU
+
+3. **Test responsiveness**: Move mouse, verify immediate wake
+
+### Rollback
+
+To revert, restore original `searchForActiveController` with `Processor yield`:
+
+```smalltalk
+searchForActiveController
+    | aController |
+    activeController _ nil.
+    activeControllerProcess _ Processor activeProcess.
+    [Processor yield.
+     aController _ scheduledControllers
+        detect: [:aController | aController isControlWanted and: [aController ~~ screenController]]
+        ifNone: [screenController isControlWanted
+                    ifTrue: [screenController]
+                    ifFalse: [nil]].
+     aController isNil]
+        whileTrue.
+    self activeController: aController.
+    Processor terminateActive!
+```

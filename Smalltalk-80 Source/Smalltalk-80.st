@@ -13451,24 +13451,22 @@ schedulePassive: aController
 
 	scheduledControllers addFirst: aController!
 searchForActiveController
-	"Find a scheduled controller that wants control and give control to it.  If none
-	wants control, then see if the System Menu has been requested."
+	"Find a scheduled controller that wants control and give control to it.
+	 Modern integration: block until a controller wants control.
+	 Avoid yield-spinning so the VM can truly suspend at idle."
 
 	| aController |
 	activeController _ nil.
 	activeControllerProcess _ Processor activeProcess.
-	[Processor yield.
-	 aController _ scheduledControllers 
-		detect:
-			[:aController |
-			aController isControlWanted and:
-				[aController ~~ screenController]]
-		ifNone:
-			[screenController isControlWanted
-				ifTrue: [screenController]
-				ifFalse: [nil]].
-	aController isNil]
-		whileTrue.
+	[aController _ scheduledControllers
+		detect: [:c | c isControlWanted and: [c ~~ screenController]]
+		ifNone: [screenController isControlWanted
+					ifTrue: [screenController]
+					ifFalse: [nil]].
+	 aController isNil]
+		whileTrue: [
+			"Block until input/timer occurs; VM signals InputSemaphore."
+			Sensor waitForEvent].
 	self activeController: aController.
 	Processor terminateActive!
 unschedule: aController
@@ -22386,12 +22384,20 @@ primMouseButtons
 	<primitive: 199>
 	^CurrentInputState mouseButtons!
 primMousePt
-	"Poll the mouse to find out its position. Return a Point. Fail if event-driven 
-	tracking is used instead of polling. Optional. See Object documentation 
+	"Poll the mouse to find out its position. Return a Point. Fail if event-driven
+	tracking is used instead of polling. Optional. See Object documentation
 	whatIsAPrimitive. "
 
 	<primitive: 90>
 	^CurrentInputState mousePoint! !
+
+!InputSensor methodsFor: 'waiting'!
+waitForEvent
+	"Block until an input event (mouse, keyboard, or timer) arrives.
+	 Modern integration: enables true idle suspension by blocking on InputSemaphore
+	 instead of busy-waiting with Processor yield. The VM signals this semaphore
+	 when events arrive, allowing 0% CPU usage when idle."
+	InputState inputSemaphore wait! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputSensor class
@@ -22710,6 +22716,12 @@ initialize
 	RshiftKey _ 8r211.
 	CtrlKey _ 8r212.
 	LockKey _ 8r213! !
+
+!InputState class methodsFor: 'accessing'!
+inputSemaphore
+	"Answer the semaphore that is signaled when input events arrive.
+	 Used by Sensor waitForEvent for true idle suspension."
+	^InputSemaphore! !
 
 InputState initialize!
 Object subclass: #Inspector
