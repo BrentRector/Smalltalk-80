@@ -133,23 +133,79 @@ public static class InputOperations
         }
     }
 
-    /// <summary>Primitive 95: inputWord - Read raw input event word</summary>
+    /// <summary>Primitive 95: inputWord - Read next composite input event</summary>
+    /// <remarks>
+    /// Returns next composite event as an Array, or nil if no events.
+    /// Array format: #(eventType x y buttonMask hasTransition keyCode isKeyDown)
+    /// eventType: 0=none, 1=mouse, 2=keyboard
+    /// This is the simplified event model - one OS message = one composite event.
+    /// </remarks>
     public class InputWord : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Default to 0 (no events) for headless mode
-            int inputWord = 0;
+            // Get composite event from platform
+            var evt = context.Platform?.DequeueCompositeEvent();
 
-            // Get next input event from queue
-            if (context.Platform != null)
+            if (evt == null)
             {
-                inputWord = context.Platform.GetInputWord();
+                // No event available - return nil
+                return PrimitiveResult.Ok(context.HeapManager.GetNil());
             }
 
-            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(inputWord));
+            var (eventType, x, y, buttonMask, hasTransition, keyCode, isKeyDown) = evt.Value;
+
+            // Get Array class
+            var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array");
+            if (arrayClassOOP == null || arrayClassOOP == context.HeapManager.GetNil())
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // Allocate Array with 7 elements
+            SmalltalkOOP arrayOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP.Value, 7);
+
+            // Fill array: #(eventType x y buttonMask hasTransition keyCode isKeyDown)
+            context.HeapManager.SetIndexedOOP(arrayOOP, 0, SmalltalkOOP.FromSmallInteger(eventType));
+            context.HeapManager.SetIndexedOOP(arrayOOP, 1, SmalltalkOOP.FromSmallInteger(x));
+            context.HeapManager.SetIndexedOOP(arrayOOP, 2, SmalltalkOOP.FromSmallInteger(y));
+            context.HeapManager.SetIndexedOOP(arrayOOP, 3, SmalltalkOOP.FromSmallInteger(buttonMask));
+            context.HeapManager.SetIndexedOOP(arrayOOP, 4, hasTransition ? context.Metadata!.KnownObjects.True : context.Metadata!.KnownObjects.False);
+            context.HeapManager.SetIndexedOOP(arrayOOP, 5, SmalltalkOOP.FromSmallInteger(keyCode));
+            context.HeapManager.SetIndexedOOP(arrayOOP, 6, isKeyDown ? context.Metadata!.KnownObjects.True : context.Metadata!.KnownObjects.False);
+
+            return PrimitiveResult.Ok(arrayOOP);
+        }
+    }
+
+    /// <summary>Primitive 160: controllerSemaphore: - Register controller wake semaphore</summary>
+    /// <remarks>
+    /// Registers a semaphore that is signaled when button transitions occur.
+    /// Controllers wait on this semaphore (via Sensor waitForControllerEvent)
+    /// to wake only when button state changes, ensuring they see correct state.
+    /// This is part of the dual-semaphore architecture:
+    /// - InputSemaphore (primitive 93): signaled on ALL raw input, wakes InputProcess
+    /// - ControllerSemaphore (primitive 160): signaled on button transitions, wakes controllers
+    /// </remarks>
+    public class ControllerSemaphore : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+
+            var semaphoreOOP = context.Arguments[0];
+
+            // SmallIntegers not allowed (except nil)
+            if (semaphoreOOP.IsSmallInteger && semaphoreOOP != context.HeapManager.GetNil())
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // Register semaphore with platform event system
+            if (context.Platform != null)
+            {
+                context.Platform.SetControllerSemaphore(semaphoreOOP);
+            }
+
+            return PrimitiveResult.Ok(context.Receiver);
         }
     }
 

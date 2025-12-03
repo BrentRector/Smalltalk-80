@@ -88,6 +88,15 @@ public readonly struct PrimitiveExecutionContext
     /// <summary>Gets the timer manager for scheduling semaphore signals (used by Delay).</summary>
     public ITimerManager? TimerManager { get; }
 
+    /// <summary>Gets the process scheduler for process management primitives (signal, wait, resume, suspend).</summary>
+    public IProcessScheduler? ProcessScheduler { get; }
+
+    /// <summary>
+    /// Gets the legacy primitive context (the VM itself) for operations that need VM-level state.
+    /// Used by primitives that need to signal context switch (e.g., Signal primitive).
+    /// </summary>
+    public IPrimitiveContext? LegacyContext { get; }
+
     /// <summary>
     /// Creates a new primitive execution context.
     /// </summary>
@@ -104,7 +113,9 @@ public readonly struct PrimitiveExecutionContext
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
         VMMetadata? metadata = null,
-        ITimerManager? timerManager = null)
+        ITimerManager? timerManager = null,
+        IProcessScheduler? processScheduler = null,
+        IPrimitiveContext? legacyContext = null)
     {
         Receiver = receiver;
         Arguments = arguments;
@@ -119,6 +130,8 @@ public readonly struct PrimitiveExecutionContext
         MessageSender = messageSender;
         Metadata = metadata;
         TimerManager = timerManager;
+        ProcessScheduler = processScheduler;
+        LegacyContext = legacyContext;
     }
 
     /// <summary>
@@ -334,7 +347,8 @@ public interface IPrimitiveRegistry
         IPrimitiveMessageSender? messageSender = null,
         VMMetadata? metadata = null,
         IStackManager? stackManager = null,
-        ITimerManager? timerManager = null);
+        ITimerManager? timerManager = null,
+        IProcessScheduler? processScheduler = null);
 
     /// <summary>
     /// Checks if a primitive is registered.

@@ -52,10 +52,11 @@ public class SmalltalkEvent
 /// Thread-safe event queue for Windows UI thread -> Smalltalk interpreter thread communication.
 /// WinForms thread enqueues high-level events, Smalltalk thread dequeues via primitives 90 and 95.
 ///
-/// Uses ManualResetEventSlim for WaitHandle.WaitAny compatibility:
-/// - Signal is SET when events are enqueued
-/// - Signal is RESET when queue is confirmed empty
-/// - Double-check pattern prevents race conditions between producer and consumer
+/// Uses a COUNTING SEMAPHORE for 1:1 event correspondence:
+/// - Each Enqueue() increments the semaphore count
+/// - Each WaitAny return decrements the count
+/// - VM signals InputSemaphore once per event
+/// - InputProcess processes one event's words, then waits
 ///
 /// Smalltalk-80 input word format:
 /// - Bits 0-11: parameter value
@@ -64,6 +65,7 @@ public class SmalltalkEvent
 ///   - Type 2: Mouse Y (param = Y coordinate)
 ///   - Type 3: Key down (param = key code)
 ///   - Type 4: Key up (param = key code)
+///   - Type 6: End of event (sentinel - signals end of one event's words)
 ///
 /// Mouse buttons are encoded as key events with codes:
 /// - Red/Left = 128 (8r200)
@@ -77,6 +79,7 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     private const int TypeMouseY = 2 << 12;    // 0x2000
     private const int TypeKeyDown = 3 << 12;   // 0x3000
     private const int TypeKeyUp = 4 << 12;     // 0x4000
+    private const int TypeEndOfEvent = 6 << 12; // 0x6000 - Sentinel marking end of one event
 
     // Mouse button key codes (matching Smalltalk BitMin..BitMax)
     private const int ButtonCodeRed = 128;     // 8r200 - Left button
@@ -87,8 +90,9 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     private readonly ConcurrentQueue<int> _inputWords;  // Processed input words ready for Smalltalk
     private readonly object _mouseLock = new object();
 
-    // Event wait handle for idle blocking - ManualResetEventSlim for WaitAny compatibility
-    private readonly ManualResetEventSlim _eventSignal = new(false);
+    // Counting semaphore for 1:1 event signaling
+    // Each Enqueue increments, each WaitAny return decrements
+    private readonly Semaphore _eventSemaphore;
     private bool _disposed = false;
 
     // Current state (for polling via primitive 90)
@@ -98,102 +102,148 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     private bool _currentYellowButton;
     private bool _currentBlueButton;
 
-    // Previous state (for detecting transitions)
+    // Previous state (for detecting transitions at enqueue time)
+    private bool _lastRedButton;
+    private bool _lastYellowButton;
+    private bool _lastBlueButton;
+
+    // Previous state (for detecting transitions during ProcessOneEvent)
     private bool _prevRedButton;
     private bool _prevYellowButton;
     private bool _prevBlueButton;
+
+    // Flag set when button transition detected at enqueue time
+    // VM checks and clears this to signal ControllerSemaphore
+    private volatile bool _buttonTransitionPending;
 
     public SmalltalkEventQueue()
     {
         _events = new ConcurrentQueue<SmalltalkEvent>();
         _inputWords = new ConcurrentQueue<int>();
+        // Counting semaphore: initial count 0, max count allows many events
+        _eventSemaphore = new Semaphore(0, int.MaxValue);
+    }
+
+    /// <summary>
+    /// Returns true if a button transition occurred since last check, then clears the flag.
+    /// Thread-safe (uses volatile read and Interlocked.Exchange).
+    /// Called by VM to decide whether to signal ControllerSemaphore.
+    /// </summary>
+    public bool ConsumeButtonTransition()
+    {
+        if (!_buttonTransitionPending)
+            return false;
+        _buttonTransitionPending = false;
+        return true;
     }
 
     /// <summary>
     /// Enqueue an event from the WinForms thread.
     /// Thread-safe (can be called from any thread).
-    /// Signals waiting threads that events are available.
+    /// Increments counting semaphore for 1:1 event correspondence.
+    /// Detects button transitions and sets flag for ControllerSemaphore signaling.
     /// </summary>
     public void Enqueue(SmalltalkEvent evt)
     {
         _events.Enqueue(evt);
 
-        // Update current state for polling
+        // Update current state for polling and detect button transitions
         if (evt.Type == SmalltalkEventType.Mouse)
         {
             lock (_mouseLock)
             {
+                // Detect button transitions before updating state
+                bool buttonChanged =
+                    (evt.RedButton != _lastRedButton) ||
+                    (evt.YellowButton != _lastYellowButton) ||
+                    (evt.BlueButton != _lastBlueButton);
+
+                if (buttonChanged)
+                {
+                    _buttonTransitionPending = true;
+                }
+
+                // Update state
                 _currentX = evt.X;
                 _currentY = evt.Y;
                 _currentRedButton = evt.RedButton;
                 _currentYellowButton = evt.YellowButton;
                 _currentBlueButton = evt.BlueButton;
+
+                // Track last button state for next transition detection
+                _lastRedButton = evt.RedButton;
+                _lastYellowButton = evt.YellowButton;
+                _lastBlueButton = evt.BlueButton;
             }
         }
 
-        // Signal any waiting threads that events are available
-        // ManualResetEventSlim stays set until explicitly reset
-        _eventSignal.Set();
+        // Increment counting semaphore - one signal per event
+        _eventSemaphore.Release();
     }
 
     /// <summary>
-    /// Process all pending events and convert them to Smalltalk input words.
-    /// Called internally when getting next input word.
+    /// Process exactly ONE event from the queue and convert to Smalltalk input words.
+    /// Adds an end-of-event sentinel (type 6) after each event's words.
+    /// Returns true if an event was processed, false if queue was empty.
     /// </summary>
-    private void ProcessEvents()
+    private bool ProcessOneEvent()
     {
-        while (_events.TryDequeue(out var evt))
+        if (!_events.TryDequeue(out var evt) || evt == null)
+            return false;
+
+        if (evt.Type == SmalltalkEventType.Mouse)
         {
-            if (evt == null) continue;
+            // Generate mouse X event
+            int mouseX = Math.Clamp(evt.X, 0, 4095);  // 12-bit max
+            _inputWords.Enqueue(TypeMouseX | mouseX);
 
-            if (evt.Type == SmalltalkEventType.Mouse)
-            {
-                // Generate mouse X event
-                int mouseX = Math.Clamp(evt.X, 0, 4095);  // 12-bit max
-                _inputWords.Enqueue(TypeMouseX | mouseX);
+            // Generate mouse Y event
+            int mouseY = Math.Clamp(evt.Y, 0, 4095);  // 12-bit max
+            _inputWords.Enqueue(TypeMouseY | mouseY);
 
-                // Generate mouse Y event
-                int mouseY = Math.Clamp(evt.Y, 0, 4095);  // 12-bit max
-                _inputWords.Enqueue(TypeMouseY | mouseY);
+            // Generate button transition events
+            // Red button
+            if (evt.RedButton && !_prevRedButton)
+                _inputWords.Enqueue(TypeKeyDown | ButtonCodeRed);
+            else if (!evt.RedButton && _prevRedButton)
+                _inputWords.Enqueue(TypeKeyUp | ButtonCodeRed);
 
-                // Generate button transition events
-                // Red button
-                if (evt.RedButton && !_prevRedButton)
-                    _inputWords.Enqueue(TypeKeyDown | ButtonCodeRed);
-                else if (!evt.RedButton && _prevRedButton)
-                    _inputWords.Enqueue(TypeKeyUp | ButtonCodeRed);
+            // Yellow button
+            if (evt.YellowButton && !_prevYellowButton)
+                _inputWords.Enqueue(TypeKeyDown | ButtonCodeYellow);
+            else if (!evt.YellowButton && _prevYellowButton)
+                _inputWords.Enqueue(TypeKeyUp | ButtonCodeYellow);
 
-                // Yellow button
-                if (evt.YellowButton && !_prevYellowButton)
-                    _inputWords.Enqueue(TypeKeyDown | ButtonCodeYellow);
-                else if (!evt.YellowButton && _prevYellowButton)
-                    _inputWords.Enqueue(TypeKeyUp | ButtonCodeYellow);
+            // Blue button
+            if (evt.BlueButton && !_prevBlueButton)
+                _inputWords.Enqueue(TypeKeyDown | ButtonCodeBlue);
+            else if (!evt.BlueButton && _prevBlueButton)
+                _inputWords.Enqueue(TypeKeyUp | ButtonCodeBlue);
 
-                // Blue button
-                if (evt.BlueButton && !_prevBlueButton)
-                    _inputWords.Enqueue(TypeKeyDown | ButtonCodeBlue);
-                else if (!evt.BlueButton && _prevBlueButton)
-                    _inputWords.Enqueue(TypeKeyUp | ButtonCodeBlue);
-
-                // Update previous state
-                _prevRedButton = evt.RedButton;
-                _prevYellowButton = evt.YellowButton;
-                _prevBlueButton = evt.BlueButton;
-            }
-            else if (evt.Type == SmalltalkEventType.Keyboard)
-            {
-                int keyCode = evt.KeyCode & 0xFFF;  // 12-bit max
-                if (evt.IsKeyDown)
-                    _inputWords.Enqueue(TypeKeyDown | keyCode);
-                else
-                    _inputWords.Enqueue(TypeKeyUp | keyCode);
-            }
+            // Update previous state
+            _prevRedButton = evt.RedButton;
+            _prevYellowButton = evt.YellowButton;
+            _prevBlueButton = evt.BlueButton;
         }
+        else if (evt.Type == SmalltalkEventType.Keyboard)
+        {
+            int keyCode = evt.KeyCode & 0xFFF;  // 12-bit max
+            if (evt.IsKeyDown)
+                _inputWords.Enqueue(TypeKeyDown | keyCode);
+            else
+                _inputWords.Enqueue(TypeKeyUp | keyCode);
+        }
+
+        // Add end-of-event sentinel so InputProcess knows when to stop
+        _inputWords.Enqueue(TypeEndOfEvent);
+
+        return true;
     }
 
     /// <summary>
     /// Get the next input word for Smalltalk primitive 95.
     /// Returns 0 if no events are available.
+    /// Processes ONE event at a time (not all pending events).
     /// </summary>
     public int GetNextInputWord()
     {
@@ -201,12 +251,12 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
         if (_inputWords.TryDequeue(out int word))
             return word;
 
-        // Process any pending events to generate more input words
-        ProcessEvents();
-
-        // Try again after processing
-        if (_inputWords.TryDequeue(out word))
-            return word;
+        // Process ONE pending event to generate more input words
+        if (ProcessOneEvent())
+        {
+            if (_inputWords.TryDequeue(out word))
+                return word;
+        }
 
         return 0;  // No events
     }
@@ -219,6 +269,48 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     public bool TryDequeue(out SmalltalkEvent? evt)
     {
         return _events.TryDequeue(out evt);
+    }
+
+    /// <summary>
+    /// Dequeue the next composite event, returning all data in one call.
+    /// Returns null if no events available.
+    /// For mouse events: updates button transition state tracking.
+    /// Thread-safe.
+    /// </summary>
+    /// <returns>Tuple of (eventType, x, y, buttonMask, hasButtonTransition, keyCode, isKeyDown) or null if no events.</returns>
+    public (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? DequeueCompositeEvent()
+    {
+        if (!_events.TryDequeue(out var evt) || evt == null)
+            return null;
+
+        if (evt.Type == SmalltalkEventType.Mouse)
+        {
+            // Compute button mask
+            int buttonMask = 0;
+            if (evt.RedButton) buttonMask |= 1;      // Bit 0 = red/left
+            if (evt.YellowButton) buttonMask |= 2;   // Bit 1 = yellow/middle
+            if (evt.BlueButton) buttonMask |= 4;     // Bit 2 = blue/right
+
+            // Detect button transitions
+            bool hasTransition =
+                (evt.RedButton != _prevRedButton) ||
+                (evt.YellowButton != _prevYellowButton) ||
+                (evt.BlueButton != _prevBlueButton);
+
+            // Update previous state for next transition detection
+            _prevRedButton = evt.RedButton;
+            _prevYellowButton = evt.YellowButton;
+            _prevBlueButton = evt.BlueButton;
+
+            return (1, evt.X, evt.Y, buttonMask, hasTransition, 0, false);  // eventType=1 for mouse
+        }
+        else if (evt.Type == SmalltalkEventType.Keyboard)
+        {
+            return (2, 0, 0, 0, false, evt.KeyCode, evt.IsKeyDown);  // eventType=2 for keyboard
+        }
+
+        // System events - just skip
+        return (0, 0, 0, 0, false, 0, false);  // eventType=0 for system/unknown
     }
 
     /// <summary>
@@ -258,14 +350,11 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     public int Count => _events.Count + _inputWords.Count;
 
     /// <summary>
-    /// Gets a WaitHandle that is signaled when events arrive.
-    /// Used with WaitHandle.WaitAny for efficient multi-source waiting.
-    ///
-    /// IMPORTANT: After WaitAny returns for this handle, the caller should:
-    /// 1. Process any available events
-    /// 2. Call ResetSignalIfEmpty() to properly reset the signal state
+    /// Gets the counting semaphore's WaitHandle for use with WaitHandle.WaitAny.
+    /// Each Enqueue increments the count; each successful wait decrements it.
+    /// This provides 1:1 correspondence between events and signals.
     /// </summary>
-    public WaitHandle EventAvailableHandle => _eventSignal.WaitHandle;
+    public WaitHandle EventAvailableHandle => _eventSemaphore;
 
     /// <summary>
     /// Waits for an event to arrive or timeout.
@@ -275,61 +364,40 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     /// <returns>True if event arrived, false if timeout.</returns>
     public bool WaitOne(int timeoutMs)
     {
-        // If events already pending, return immediately
-        if (HasPendingEvents)
+        // If events already pending in word queue, return immediately
+        if (!_inputWords.IsEmpty)
             return true;
 
-        // Reset signal before waiting (in case it's stale)
-        // Use the safe pattern to handle race conditions
-        ResetSignalIfEmpty();
-
-        // Check again after reset
-        if (HasPendingEvents)
-            return true;
-
-        // Wait for signal or timeout
-        return _eventSignal.Wait(timeoutMs);
+        // Wait on counting semaphore
+        return _eventSemaphore.WaitOne(timeoutMs);
     }
 
     /// <summary>
-    /// Safely resets the event signal when the queue is empty.
-    /// Uses double-check pattern to handle race conditions with producers.
-    ///
-    /// Must be called from the single consumer thread (VM thread) after
-    /// processing events or after WaitAny returns for this handle.
-    ///
-    /// Race condition handling:
-    /// 1. We reset the signal
-    /// 2. If producer added event between our check and reset, the signal
-    ///    was Set() after our Reset(), so it's still set - no problem
-    /// 3. If producer adds after our reset but before our double-check,
-    ///    we detect it and re-signal
-    /// 4. If producer adds after our double-check, their Set() is effective
+    /// No-op for counting semaphore - kept for interface compatibility.
+    /// With counting semaphore, signal state is managed automatically.
     /// </summary>
     public void ResetSignalIfEmpty()
     {
-        // Only reset if queue appears empty
-        if (!HasPendingEvents)
-        {
-            _eventSignal.Reset();
-
-            // Double-check: producer might have added after our check but before reset
-            // If so, we need to re-signal
-            if (HasPendingEvents)
-            {
-                _eventSignal.Set();
-            }
-        }
+        // No-op - counting semaphore manages its own state
     }
 
     /// <summary>
-    /// Disposes of the event wait handle.
+    /// No-op for counting semaphore - kept for interface compatibility.
+    /// With counting semaphore, signal state is managed automatically.
+    /// </summary>
+    public void ForceResetEventSignal()
+    {
+        // No-op - counting semaphore manages its own state
+    }
+
+    /// <summary>
+    /// Disposes of the event semaphore.
     /// </summary>
     public void Dispose()
     {
         if (!_disposed)
         {
-            _eventSignal.Dispose();
+            _eventSemaphore.Dispose();
             _disposed = true;
         }
     }

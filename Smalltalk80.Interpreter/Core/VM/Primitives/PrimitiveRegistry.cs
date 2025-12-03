@@ -62,7 +62,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         IPrimitiveMessageSender? messageSender = null,
         VMMetadata? metadata = null,
         IStackManager? stackManager = null,
-        ITimerManager? timerManager = null)
+        ITimerManager? timerManager = null,
+        IProcessScheduler? processScheduler = null)
     {
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
@@ -83,7 +84,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 cacheManager: cacheManager,
                 messageSender: messageSender,
                 metadata: metadata,
-                timerManager: timerManager
+                timerManager: timerManager,
+                processScheduler: processScheduler
             );
 
             var result = primitive.Execute(execContext);
@@ -291,6 +293,10 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(153, new FileOperations.WriteStringToFile());
         registry.Register(154, new FileOperations.GetFileAttributes());
         registry.Register(155, new FileOperations.FileExists());
+
+        // Controller semaphore (160) - dual-semaphore architecture for input handling
+        // Signaled on button transitions to wake controllers with correct state
+        registry.Register(160, new InputOperations.ControllerSemaphore());
 
         // Extended input primitives (199)
         // Primitive 199: mouseButtons - Poll current mouse button state (polling model)

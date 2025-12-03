@@ -189,6 +189,12 @@ public class TestPlatformBridge : IPlatformBridge
         return 0;
     }
 
+    public (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? DequeueCompositeEvent()
+    {
+        // No composite events in test mode - return null
+        return null;
+    }
+
     public void SetSampleInterval(int intervalMs)
     {
         // No-op in test mode - no actual event polling needed
@@ -207,9 +213,26 @@ public class TestPlatformBridge : IPlatformBridge
         return default;
     }
 
+    public void SetControllerSemaphore(SmalltalkOOP semaphoreOOP)
+    {
+        // No-op in test mode - no async event generation
+    }
+
+    public SmalltalkOOP GetControllerSemaphore()
+    {
+        // No semaphore in test mode
+        return default;
+    }
+
     public bool HasPendingEvents()
     {
         // No events in test mode
+        return false;
+    }
+
+    public bool ConsumeButtonTransition()
+    {
+        // No button transitions in test mode
         return false;
     }
 
@@ -225,6 +248,11 @@ public class TestPlatformBridge : IPlatformBridge
     public WaitHandle? EventAvailableHandle => null;
 
     public void ResetEventSignalIfEmpty()
+    {
+        // No-op in test mode - no event signal to reset
+    }
+
+    public void ForceResetEventSignal()
     {
         // No-op in test mode - no event signal to reset
     }

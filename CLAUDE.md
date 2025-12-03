@@ -14,7 +14,7 @@
 - **VM Core**: Fully functional, verified operational
 - **Process Primitives**: ✅ **85-88 working** (suspend, resume, terminate, yield)
 - **System Browser**: ✅ **FULLY FUNCTIONAL** - source retrieval working
-- **Timer/Event System**: ✅ **WaitHandle.WaitAny** - efficient multi-source waiting
+- **Timer/Event System**: ✅ **FULLY OPERATIONAL** - 0% idle CPU via dual-semaphore architecture
 
 ## Known Issues
 
@@ -24,6 +24,14 @@ The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:i
 **Remaining**: `whileTrue:` and `whileFalse:` are NOT yet inlined (receiver is a block, requires special handling).
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
+
+**✅ Idle CPU Usage - RESOLVED**: The original Blue Book `Processor yield` created a forked process that signaled immediately, keeping priority 4 always occupied and preventing true idle. **Fix**: Dual-semaphore architecture with mouse event queue:
+- **InputSemaphore**: VM signals on raw input; InputProcess waits
+- **ControllerSemaphore**: InputProcess signals after enqueuing mouse event; controllers wait
+- **MouseEventQueue**: FIFO queue of discrete mouse events (mirrors keyboard queue design)
+- **Key**: Controllers consume events from queue, ensuring no transitions are missed
+
+This guarantees controllers see EVERY mouse event, enables 0% idle CPU, and eliminates missed button transitions. See `docs/Architecture/MOUSE-EVENT-QUEUE.md` for complete design.
 
 ## Migration Status
 
@@ -98,11 +106,59 @@ Efficient idle detection using `WaitHandle.WaitAny` for unified multi-source wai
 - ✅ **WaitHandle.WaitAny**: Waits on both event queue and timer handles in single kernel call
 - ✅ **ManualResetEventSlim**: Replaced AutoResetEvent to prevent signal consumption
 - ✅ **Double-Check Reset Pattern**: Safe reset after WaitAny to handle race conditions
-- ✅ **CPU Efficiency**: Near-zero CPU during idle via kernel-level waiting
+- ✅ **CPU Efficiency**: 0% CPU during idle via mouse event queue architecture
 
 **Key Implementation Details**:
 
-The original AutoResetEvent caused event loss because it auto-resets when WaitAny returns, consuming the signal before events could be processed. The fix uses ManualResetEventSlim with explicit reset:
+**Mouse Event Queue Architecture**: Queue-based mouse handling that mirrors the keyboard queue design:
+
+1. **InputSemaphore** - VM signals when raw input arrives; InputProcess (priority 6) waits
+2. **ControllerSemaphore** - InputProcess signals after enqueuing mouse event; controllers wait
+3. **MouseEventQueue** - FIFO SharedQueue of discrete MouseEvent objects
+
+```smalltalk
+ProcessorScheduler>>yield
+    "Give other Processes at the current priority a chance to run.
+     Modern integration: block on ControllerSemaphore for true idle suspension."
+    Sensor waitForEvent
+
+InputSensor>>nextMouseEvent
+    "Answer next mouse event or nil if none."
+    ^InputState mouseEventQueue isEmpty
+        ifTrue: [nil]
+        ifFalse: [InputState mouseEventQueue next]
+
+InputSensor>>waitForControllerEvent
+    "Block until a mouse event is available."
+    (self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
+    InputState controllerSemaphore wait
+```
+
+**Key Design Decision**: Controllers consume discrete MouseEvent objects from a FIFO queue instead of polling `bitState`. This guarantees EVERY mouse transition is seen - no events are lost even during rapid clicking or when controllers are busy.
+
+**Queue Protocol**:
+1. InputProcess dequeues OS event, updates bitState for compatibility
+2. InputProcess enqueues MouseEvent to queue
+3. InputProcess signals ControllerSemaphore (no handshake needed)
+4. Controller wakes, dequeues events from MouseEventQueue
+
+This achieves 0% idle CPU with reliable event delivery and no deadlocks.
+
+> **Future Enhancement**: The current single-queue design supports one active controller at a time (classic Smalltalk-80 MVC). A broadcast queue architecture could support multiple simultaneous consumers (monitoring, debugging, multi-view UIs). See "Future Enhancement: Broadcast Queue Architecture" in `docs/Architecture/MOUSE-EVENT-QUEUE.md`.
+
+**Composite Event Model**: Primitive 95 (`primInputWord`) returns a composite event Array instead of packed integer words:
+```smalltalk
+event _ self primInputWord.  "Returns #(eventType x y buttonMask hasTransition keyCode isKeyDown) or nil"
+event == nil ifFalse:
+    [eventType _ event at: 1.
+    eventType = 1 ifTrue:  "Mouse"
+        [x _ event at: 2. y _ event at: 3. newButtons _ event at: 4].
+    eventType = 2 ifTrue:  "Keyboard"
+        [keyCode _ event at: 6. isKeyDown _ event at: 7]]
+```
+This eliminates the inner loop and sentinel parsing from the old word-based format.
+
+**ManualResetEventSlim Pattern**: The original AutoResetEvent caused event loss because it auto-resets when WaitAny returns. The fix uses ManualResetEventSlim with explicit reset:
 
 ```csharp
 // After WaitAny returns, reset signal only if queue is empty
@@ -119,11 +175,19 @@ public void ResetSignalIfEmpty()
 ```
 
 **Key Files**:
+- `Smalltalk-80.st` - `ProcessorScheduler>>yield` calls `Sensor waitForEvent`
+- `Smalltalk-80.st` - `InputState` class with `InputSemaphore`, `ControllerSemaphore`, `MouseEventQueue`
+- `Smalltalk-80.st` - `InputState>>run` enqueues MouseEvents to queue
+- `Smalltalk-80.st` - `InputState>>primInputWord` returns composite event Array (primitive 95)
+- `Smalltalk-80.st` - `InputSensor>>nextMouseEvent` dequeues from MouseEventQueue
+- `Smalltalk-80.st` - `InputSensor>>waitForControllerEvent` waits on ControllerSemaphore
+- `SmalltalkEventQueue.cs` - `DequeueCompositeEvent()` returns event data as tuple
+- `InputPrimitives.cs` - Primitive 95 builds composite Array from dequeued event
 - `VirtualMachine.cs` - InterpreterLoop uses `WaitHandle.WaitAny([eventHandle, timerHandle])`
 - `VirtualMachine.ProcessScheduling.cs` - Extracted process scheduling methods (~330 lines)
 - `SmalltalkEventQueue.cs` - ManualResetEventSlim with ResetSignalIfEmpty()
 - `TimerManager.cs` - Interrupt-driven timer with TimerExpiredHandle
-- `IPlatformBridge.cs` - Added ResetEventSignalIfEmpty() interface method
+- `docs/Architecture/MOUSE-EVENT-QUEUE.md` - **Complete queue-based architecture documentation**
 
 See `docs/Architecture/PROPOSED-TIMER-OPTIMIZATION.md` and `docs/Architecture/PROCESS-MANAGEMENT.md` for complete documentation.
 

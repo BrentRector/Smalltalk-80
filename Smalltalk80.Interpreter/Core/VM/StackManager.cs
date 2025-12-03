@@ -127,6 +127,10 @@ internal class StackManager(
             Console.WriteLine($"  methodOOP: {methodOOP}, class: {methodClass}");
             Console.WriteLine($"  sp={sp}, initialSP={initialSP}");
 
+            // Get program counter for debugging
+            var pcOOP = heapManager.GetInstanceVariable(activeContextOOP, VMConstants.CONTEXT_PC_INDEX);
+            Console.WriteLine($"  PC={pcOOP.AsSmallInteger()}");
+
             if (isBlockContext)
             {
                 var nargsOOP = heapManager.GetInstanceVariable(activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
@@ -136,7 +140,67 @@ internal class StackManager(
             {
                 var header = helpers.ParseMethodHeader(methodOOP);
                 Console.WriteLine($"  MethodContext: numArgs={header.NumArgs}, numTemps={header.NumTemps}, numLiterals={header.NumLiterals}");
+
+                // Print first few literals to help identify the method
+                // Literals start at indexed slot 1 (slot 0 is header)
+                Console.WriteLine($"  Literals (first {Math.Min(header.NumLiterals, 10)}):");
+                for (int i = 0; i < Math.Min(header.NumLiterals, 10); i++)
+                {
+                    var litOOP = heapManager.GetIndexedOOP(methodOOP, i + 1);
+                    var litClass = litOOP.IsSmallInteger ? "SmallInteger" : helpers.GetClassName(helpers.GetClass(litOOP));
+                    string litValue = "";
+                    // Try to get string value for symbols/strings
+                    if (litClass == "Symbol" || litClass == "String")
+                    {
+                        try
+                        {
+                            int size = heapManager.GetIndexedSize(litOOP);
+                            byte[] bytes = new byte[size];
+                            for (int b = 0; b < size; b++)
+                                bytes[b] = heapManager.GetIndexedByte(litOOP, b);
+                            litValue = $" = \"{System.Text.Encoding.UTF8.GetString(bytes)}\"";
+                        }
+                        catch { /* ignore */ }
+                    }
+                    Console.WriteLine($"    [{i}] {litClass}: {litOOP}{litValue}");
+                }
             }
+
+            // Also print sender context to understand call chain
+            try
+            {
+                var senderOOP = heapManager.GetInstanceVariable(activeContextOOP, VMConstants.CONTEXT_SENDER_INDEX);
+                if (senderOOP != metadata.KnownObjects.Nil)
+                {
+                    var senderClass = helpers.GetClassName(helpers.GetClass(senderOOP));
+                    Console.WriteLine($"  Sender context: {senderOOP}, class: {senderClass}");
+
+                    // If sender is a MethodContext, print its method's selector
+                    var senderClassOOP = heapManager.GetClassOOP(senderOOP);
+                    if (senderClassOOP != metadata.BlockContextClassOOP)
+                    {
+                        var senderMethodOOP = heapManager.GetInstanceVariable(senderOOP, VMConstants.CONTEXT_METHOD_INDEX);
+                        var senderHeader = helpers.ParseMethodHeader(senderMethodOOP);
+                        Console.WriteLine($"  Sender method: numArgs={senderHeader.NumArgs}, numTemps={senderHeader.NumTemps}, numLiterals={senderHeader.NumLiterals}");
+
+                        // Print first literal (often the selector) of sender
+                        if (senderHeader.NumLiterals > 0)
+                        {
+                            var senderFirstLit = heapManager.GetIndexedOOP(senderMethodOOP, 1);
+                            var senderLitClass = senderFirstLit.IsSmallInteger ? "SmallInteger" : helpers.GetClassName(helpers.GetClass(senderFirstLit));
+                            if (senderLitClass == "Symbol")
+                            {
+                                int sndSize = heapManager.GetIndexedSize(senderFirstLit);
+                                byte[] sndBytes = new byte[sndSize];
+                                for (int sb = 0; sb < sndSize; sb++)
+                                    sndBytes[sb] = heapManager.GetIndexedByte(senderFirstLit, sb);
+                                Console.WriteLine($"  Sender first literal (selector?): \"{System.Text.Encoding.UTF8.GetString(sndBytes)}\"");
+                            }
+                        }
+                    }
+                }
+            }
+            catch { /* ignore errors in sender diagnostics */ }
 
             throw new InvalidOperationException(
                 $"Stack underflow: sp={sp}, initialSP={initialSP} in {contextClass}");

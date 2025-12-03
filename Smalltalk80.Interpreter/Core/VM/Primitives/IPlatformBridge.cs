@@ -92,6 +92,19 @@ public interface IPlatformBridge
     int GetInputWord();
 
     /// <summary>
+    /// Dequeues the next composite event, returning all event data in one call.
+    /// This is the simplified event model - one OS message = one composite event.
+    /// Returns null if no events available.
+    /// </summary>
+    /// <returns>
+    /// Tuple of (eventType, x, y, buttonMask, hasButtonTransition, keyCode, isKeyDown) or null.
+    /// eventType: 0=none, 1=mouse, 2=keyboard
+    /// buttonMask: bits 0-2 for red/yellow/blue buttons
+    /// hasButtonTransition: true if button state changed from previous event
+    /// </returns>
+    (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? DequeueCompositeEvent();
+
+    /// <summary>
     /// Sets the input sampling interval for event polling.
     /// </summary>
     /// <param name="intervalMs">Sampling interval in milliseconds.</param>
@@ -112,11 +125,33 @@ public interface IPlatformBridge
     SmalltalkOOP GetInputSemaphore();
 
     /// <summary>
+    /// Registers a controller semaphore to be signaled on button transitions.
+    /// Host platform stores this OOP and signals it when button state changes.
+    /// Controllers wait on this semaphore to wake with correct button state.
+    /// </summary>
+    /// <param name="semaphoreOOP">Semaphore OOP to signal (heap-resident object).</param>
+    void SetControllerSemaphore(SmalltalkOOP semaphoreOOP);
+
+    /// <summary>
+    /// Gets the registered controller semaphore OOP, or default if none registered.
+    /// Used by the VM to signal the semaphore on button transitions.
+    /// </summary>
+    /// <returns>The controller semaphore OOP, or default if none.</returns>
+    SmalltalkOOP GetControllerSemaphore();
+
+    /// <summary>
     /// Checks if there are pending input events to process.
     /// Used by the VM for idle detection and event signaling.
     /// </summary>
     /// <returns>True if events are pending.</returns>
     bool HasPendingEvents();
+
+    /// <summary>
+    /// Returns true if a button transition (down/up) occurred since the last check,
+    /// then clears the flag. Used by VM to decide when to signal ControllerSemaphore.
+    /// </summary>
+    /// <returns>True if button transition occurred, false otherwise.</returns>
+    bool ConsumeButtonTransition();
 
     /// <summary>
     /// Blocks the calling thread until an input event arrives or timeout expires.
@@ -139,6 +174,14 @@ public interface IPlatformBridge
     /// Uses double-check pattern to handle race conditions with producers.
     /// </summary>
     void ResetEventSignalIfEmpty();
+
+    /// <summary>
+    /// Forces reset of the event signal regardless of queue state.
+    /// Used after signaling the input semaphore to prevent busy-loop when events
+    /// are pending but no Smalltalk process is waiting on the semaphore.
+    /// New events arriving will re-signal.
+    /// </summary>
+    void ForceResetEventSignal();
 
     // ============================================================================
     // Clipboard (Primitive 104)

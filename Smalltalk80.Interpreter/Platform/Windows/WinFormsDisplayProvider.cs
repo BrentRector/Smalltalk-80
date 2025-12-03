@@ -25,8 +25,10 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     private readonly VMMetadata? _vmMetadata;
     private bool _disposed = false;
 
-    // Input semaphore OOP for event notification
+    // Input semaphore OOP for event notification (signaled on raw input)
     private SmalltalkOOP _inputSemaphore = default;
+    // Controller semaphore OOP for button transitions (signaled on button down/up)
+    private SmalltalkOOP _controllerSemaphore = default;
 
     public new int Width { get; private set; }
     public new int Height { get; private set; }
@@ -283,23 +285,53 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     private void OnMouseDown(object? sender, MouseEventArgs e)
     {
-        EnqueueMouseEvent(e);
+        // For MouseDown, the button that triggered the event IS pressed.
+        // Combine current button state with the button being pressed.
+        // This handles fast clicks where polling Control.MouseButtons might miss the press.
+        var currentButtons = Control.MouseButtons;
+
+        bool red = currentButtons.HasFlag(MouseButtons.Left) || e.Button == MouseButtons.Left;
+        bool yellow = currentButtons.HasFlag(MouseButtons.Middle) || e.Button == MouseButtons.Middle;
+        bool blue = currentButtons.HasFlag(MouseButtons.Right) || e.Button == MouseButtons.Right;
+
+        _eventQueue.Enqueue(new SmalltalkEvent
+        {
+            Type = SmalltalkEventType.Mouse,
+            X = e.X,
+            Y = e.Y,
+            RedButton = red,
+            YellowButton = yellow,
+            BlueButton = blue,
+            Milliseconds = Environment.TickCount64
+        });
     }
 
     private void OnMouseUp(object? sender, MouseEventArgs e)
     {
-        EnqueueMouseEvent(e);
+        // For MouseUp, the button that triggered the event is NOT pressed.
+        // Use current button state but ensure the released button is false.
+        // This handles fast clicks where polling Control.MouseButtons might miss the release.
+        var currentButtons = Control.MouseButtons;
+
+        bool red = currentButtons.HasFlag(MouseButtons.Left) && e.Button != MouseButtons.Left;
+        bool yellow = currentButtons.HasFlag(MouseButtons.Middle) && e.Button != MouseButtons.Middle;
+        bool blue = currentButtons.HasFlag(MouseButtons.Right) && e.Button != MouseButtons.Right;
+
+        _eventQueue.Enqueue(new SmalltalkEvent
+        {
+            Type = SmalltalkEventType.Mouse,
+            X = e.X,
+            Y = e.Y,
+            RedButton = red,
+            YellowButton = yellow,
+            BlueButton = blue,
+            Milliseconds = Environment.TickCount64
+        });
     }
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
-        EnqueueMouseEvent(e);
-    }
-
-    private void EnqueueMouseEvent(MouseEventArgs e)
-    {
-        // Use Control.MouseButtons to get CURRENT button state (not event-triggered button)
-        // This correctly reports which buttons are currently held down
+        // For MouseMove, use current button state as-is (which buttons are held during move)
         var currentButtons = Control.MouseButtons;
 
         _eventQueue.Enqueue(new SmalltalkEvent
@@ -449,6 +481,12 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         return _eventQueue.GetNextInputWord();
     }
 
+    public (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? DequeueCompositeEvent()
+    {
+        // Delegate to event queue's composite event dequeue
+        return _eventQueue.DequeueCompositeEvent();
+    }
+
     public void SetSampleInterval(int intervalMs)
     {
         // Not implemented yet - would configure event polling rate
@@ -464,9 +502,24 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         return _inputSemaphore;
     }
 
+    public void SetControllerSemaphore(SmalltalkOOP semaphoreOOP)
+    {
+        _controllerSemaphore = semaphoreOOP;
+    }
+
+    public SmalltalkOOP GetControllerSemaphore()
+    {
+        return _controllerSemaphore;
+    }
+
     public bool HasPendingEvents()
     {
         return _eventQueue.HasPendingEvents;
+    }
+
+    public bool ConsumeButtonTransition()
+    {
+        return _eventQueue.ConsumeButtonTransition();
     }
 
     public bool WaitForEvents(int timeoutMs)
@@ -479,6 +532,11 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     public void ResetEventSignalIfEmpty()
     {
         _eventQueue.ResetSignalIfEmpty();
+    }
+
+    public void ForceResetEventSignal()
+    {
+        _eventQueue.ForceResetEventSignal();
     }
 
     public SmalltalkOOP ReadClipboardToStringOOP()

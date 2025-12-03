@@ -1,8 +1,8 @@
 # Proposed Timer and Event Optimization
 
 **Last Updated**: 2025-12-03
-**Status**: ✅ COMPLETE (hybrid implementation)
-**Constraint**: No changes to Smalltalk-80.st source code (except defensive nil checks)
+**Status**: ✅ COMPLETE - WaitAny and idle detection fully operational (0% idle CPU)
+**Note**: Smalltalk-80.st modified with central yield fix - `ProcessorScheduler>>yield` now calls `Sensor waitForEvent`
 
 ## Executive Summary
 
@@ -283,3 +283,25 @@ The unified implementation provides optimal behavior:
 - **Maintainability**: Process scheduling code extracted to dedicated partial class
 
 The key insight was switching from AutoResetEvent to ManualResetEventSlim, which requires explicit reset but allows proper event handling after WaitAny returns.
+
+## ⚠️ Remaining Issue: 3% Idle CPU (2025-12-03)
+
+**Problem**: Despite WaitAny working correctly, idle CPU is ~3% instead of 0%.
+
+**Key Insight**: The system should be **100% idle** when the background process is active. We should **never execute the background process's bytecodes**. The only wake sources are:
+- UI event → signal input semaphore → process switch → WaitAny returns
+- Timer expires → signal timer semaphore → process switch → WaitAny returns
+
+**Root Causes**:
+
+1. **Breaking on `HasPendingEvents()`** - WRONG! Events don't wake processes directly; they sit in the queue until the input semaphore is signaled. Breaking on pending events causes a busy-loop.
+
+2. **Executing background process bytecodes** - The background process `[true] whileTrue: []` is a sentinel, not work. Its bytecodes should never execute. Currently, after exiting the idle loop (due to the HasPendingEvents bug), we execute bytecodes unnecessarily.
+
+**The Fix**:
+1. **Remove `HasPendingEvents()` check entirely** - only exit idle when `GetActiveProcess()` changes
+2. **Check for background process every iteration** - when detected, enter idle immediately
+3. **Never execute background process bytecodes** - skip `ExecuteBytecodeStep()` when idle
+4. **Stay in WaitAny** until a real process switch occurs
+
+**Full Analysis**: See `docs/Architecture/CPU-USAGE-ANALYSIS.md` for complete implementation.
