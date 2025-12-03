@@ -153,6 +153,37 @@ public static class InputOperations
         }
     }
 
+    /// <summary>Primitive 160: controllerSemaphore: - Register controller wake semaphore</summary>
+    /// <remarks>
+    /// Registers a semaphore that is signaled when button transitions occur.
+    /// Controllers wait on this semaphore (via Sensor waitForControllerEvent)
+    /// to wake only when button state changes, ensuring they see correct state.
+    /// This is part of the dual-semaphore architecture:
+    /// - InputSemaphore (primitive 93): signaled on ALL raw input, wakes InputProcess
+    /// - ControllerSemaphore (primitive 160): signaled on button transitions, wakes controllers
+    /// </remarks>
+    public class ControllerSemaphore : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+
+            var semaphoreOOP = context.Arguments[0];
+
+            // SmallIntegers not allowed (except nil)
+            if (semaphoreOOP.IsSmallInteger && semaphoreOOP != context.HeapManager.GetNil())
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // Register semaphore with platform event system
+            if (context.Platform != null)
+            {
+                context.Platform.SetControllerSemaphore(semaphoreOOP);
+            }
+
+            return PrimitiveResult.Ok(context.Receiver);
+        }
+    }
+
     /// <summary>Primitive 199: mouseButtons - Poll current mouse button state</summary>
     /// <remarks>
     /// Custom primitive to support polling-based input model.

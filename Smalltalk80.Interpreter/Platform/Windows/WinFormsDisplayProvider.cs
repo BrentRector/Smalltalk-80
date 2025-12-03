@@ -25,8 +25,10 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     private readonly VMMetadata? _vmMetadata;
     private bool _disposed = false;
 
-    // Input semaphore OOP for event notification
+    // Input semaphore OOP for event notification (signaled on raw input)
     private SmalltalkOOP _inputSemaphore = default;
+    // Controller semaphore OOP for button transitions (signaled on button down/up)
+    private SmalltalkOOP _controllerSemaphore = default;
 
     public new int Width { get; private set; }
     public new int Height { get; private set; }
@@ -464,9 +466,24 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         return _inputSemaphore;
     }
 
+    public void SetControllerSemaphore(SmalltalkOOP semaphoreOOP)
+    {
+        _controllerSemaphore = semaphoreOOP;
+    }
+
+    public SmalltalkOOP GetControllerSemaphore()
+    {
+        return _controllerSemaphore;
+    }
+
     public bool HasPendingEvents()
     {
         return _eventQueue.HasPendingEvents;
+    }
+
+    public bool ConsumeButtonTransition()
+    {
+        return _eventQueue.ConsumeButtonTransition();
     }
 
     public bool WaitForEvents(int timeoutMs)

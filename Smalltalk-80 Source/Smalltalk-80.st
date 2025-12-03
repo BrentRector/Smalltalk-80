@@ -13452,13 +13452,15 @@ schedulePassive: aController
 	scheduledControllers addFirst: aController!
 searchForActiveController
 	"Find a scheduled controller that wants control and give control to it.  If none
-	wants control, then see if the System Menu has been requested."
+	wants control, then see if the System Menu has been requested.
+
+	 Event-driven: wake only after sensor state is updated.
+	 VM signals ControllerSemaphore on button transitions."
 
 	| aController |
 	activeController _ nil.
 	activeControllerProcess _ Processor activeProcess.
-	[Processor yield.
-	 aController _ scheduledControllers
+	[aController _ scheduledControllers
 		detect:
 			[:aController |
 			aController isControlWanted and:
@@ -13468,7 +13470,7 @@ searchForActiveController
 				ifTrue: [screenController]
 				ifFalse: [nil]].
 	aController isNil]
-		whileTrue.
+		whileTrue: [Sensor waitForControllerEvent].
 	self activeController: aController.
 	Processor terminateActive!
 unschedule: aController
@@ -22394,22 +22396,21 @@ primMousePt
 	^CurrentInputState mousePoint! !
 
 !InputSensor methodsFor: 'waiting'!
-waitForEvent
-	"Block until an input event (mouse, keyboard, or timer) arrives.
-	 Modern integration: enables true idle suspension by blocking on ControllerSemaphore.
-	 InputProcess signals this semaphore AFTER updating sensor state, ensuring
-	 controllers always see correct button/key state when they wake.
-
-	 Ordering guarantee:
-	 1. VM signals InputSemaphore on raw input arrival
-	 2. InputProcess (priority 6) wakes, updates sensor state
-	 3. InputProcess signals ControllerSemaphore
-	 4. Controllers (priority 4) wake with correct state
+waitForControllerEvent
+	"Block until a controller-relevant event (button transition) occurs.
+	 Used by controller loops (searchForActiveController, controlLoop).
+	 VM signals ControllerSemaphore on button down/up transitions AFTER
+	 InputProcess has updated sensor state, ensuring correct button state.
 
 	 IMPORTANT: Return immediately if user input is active (button pressed or key held).
 	 This allows controller loops to keep processing continuous input states."
 	(self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
-	InputState controllerSemaphore wait! !
+	InputState controllerSemaphore wait!
+waitForEvent
+	"Block until any input event (mouse, keyboard, or timer) arrives.
+	 Used by general yield callers. VM signals InputSemaphore on raw input arrival.
+	 Enables true idle suspension and 0% CPU when idle."
+	InputState inputSemaphore wait! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputSensor class
@@ -22538,7 +22539,9 @@ Instance Variables:
 !InputState methodsFor: 'initialize-release'!
 install
 	"Initialize and connect the receiver to the hardware.  Terminate the old input
-	process if any."
+	process if any. Dual-semaphore architecture:
+	 - InputSemaphore: VM signals on ALL raw input, wakes InputProcess
+	 - ControllerSemaphore: VM signals on button transitions, wakes controllers"
 
 	InputProcess == nil ifFalse: [InputProcess terminate].
 	self initState.
@@ -22547,7 +22550,8 @@ install
 	InputProcess _ [self run] newProcess.
 	InputProcess priority: Processor lowIOPriority.
 	InputProcess resume.
-	self primInputSemaphore: InputSemaphore! !
+	self primInputSemaphore: InputSemaphore.
+	self primControllerSemaphore: ControllerSemaphore! !
 
 !InputState methodsFor: 'keyboard'!
 keyboardNext
@@ -22664,10 +22668,19 @@ primCursorLocPutAgain: aPoint
 
 	<primitive: 91>
 	^self primitiveFailed!
-primInputSemaphore: aSemaphore 
-	"Install the argument (a Semaphore) as the object to be signalled whenever 
-	an input event occurs. The semaphore will be signaled once for every 
-	word placed in the input buffer by an I/O device. Fail if the argument is 
+primControllerSemaphore: aSemaphore
+	"Install the argument (a Semaphore) as the object to be signalled whenever
+	a button transition (down/up) occurs. The semaphore will be signaled after
+	InputProcess has updated sensor state, ensuring controllers see correct state.
+	Part of dual-semaphore architecture. Fail if the argument is neither a
+	Semaphore nor nil."
+
+	<primitive: 160>
+	^self primitiveFailed!
+primInputSemaphore: aSemaphore
+	"Install the argument (a Semaphore) as the object to be signalled whenever
+	an input event occurs. The semaphore will be signaled once for every
+	word placed in the input buffer by an I/O device. Fail if the argument is
 	neither a Semaphore nor nil. Essential. See Object whatIsAPrimitive."
 
 	<primitive: 93>
@@ -22697,8 +22710,7 @@ primSampleInterval: anInteger
 	^self primitiveFailed!
 run
 	"This is the loop that actually processes input events.
-	 After processing each event, signal ControllerSemaphore to wake
-	 any controllers waiting via Processor yield."
+	 VM signals ControllerSemaphore on button transitions to wake controllers."
 
 	| word type param |
 	[true]
@@ -22714,10 +22726,7 @@ run
 				ifFalse:
 					[type = 2
 						ifTrue: [y _ param "Mouse Y"]
-						ifFalse: [self nextEvent: type with: param]].
-			"Signal controller semaphore after updating sensor state.
-			 This ensures controllers see correct state when they wake."
-			ControllerSemaphore signal]! !
+						ifFalse: [self nextEvent: type with: param]]]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputState class

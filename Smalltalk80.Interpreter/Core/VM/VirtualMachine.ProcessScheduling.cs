@@ -311,35 +311,6 @@ public partial class VirtualMachine : IProcessScheduler
         }
     }
 
-    /// <summary>
-    /// Signals a semaphore, waking ALL waiting processes (not just one).
-    /// Used for InputSemaphore where both InputProcess and yield waiters need to wake.
-    /// Also adds one excessSignal so the next waiter returns immediately.
-    /// </summary>
-    public void SignalSemaphoreAllWaiters(SmalltalkOOP semaphoreOOP)
-    {
-        // Keep signaling until no more waiters
-        while (true)
-        {
-            var firstLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-            if (firstLinkOOP == _metadata.KnownObjects.Nil)
-            {
-                // No more waiters - add one excessSignal for next wait call
-                var excessOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
-                if (excessOOP.IsSmallInteger)
-                {
-                    int excess = excessOOP.AsSmallInteger();
-                    _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX,
-                        SmalltalkOOP.FromSmallInteger(excess + 1));
-                }
-                return;
-            }
-
-            // Signal once (wakes one waiter)
-            SignalSemaphoreWithPreemption(semaphoreOOP);
-        }
-    }
-
     /// <inheritdoc/>
     public bool WaitOnSemaphore(SmalltalkOOP semaphoreOOP, SmalltalkOOP processOOP)
     {

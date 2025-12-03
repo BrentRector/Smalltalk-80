@@ -138,12 +138,13 @@ But the background process **never became active** because:
 
 Two separate semaphores with different purposes:
 
-1. **InputSemaphore** - VM signals this when raw input arrives
+1. **InputSemaphore** (primitive 93) - VM signals this when raw input arrives
    - Only InputProcess (priority 6) waits on this
    - InputProcess reads event, updates sensor state
 
-2. **ControllerSemaphore** - InputProcess signals this after updating state
-   - Controllers wait on this (via Processor yield → Sensor waitForEvent)
+2. **ControllerSemaphore** (primitive 160) - VM signals this on button transitions
+   - Controllers wait on this (via Sensor waitForControllerEvent)
+   - Signaled AFTER InputProcess updates state (priority ordering)
    - Guarantees controllers see correct button/key state
 
 ### Priority-Based Ordering
@@ -159,11 +160,26 @@ Since InputProcess runs at priority 6 and controllers at priority 4, InputProces
 
 ### The Fix
 
+Controller loops use `waitForControllerEvent` which waits on ControllerSemaphore:
+
 ```smalltalk
+ControlManager>>searchForActiveController
+    "Find a scheduled controller that wants control."
+    | aController |
+    activeController _ nil.
+    activeControllerProcess _ Processor activeProcess.
+    [aController _ scheduledControllers
+        detect: [:c | c isControlWanted and: [c ~~ screenController]]
+        ifNone: [screenController isControlWanted
+                    ifTrue: [screenController]
+                    ifFalse: [nil]].
+    aController isNil]
+        whileTrue: [Sensor waitForControllerEvent].
+    self activeController: aController.
+    Processor terminateActive
+
 ProcessorScheduler>>yield
-    "Give other Processes at the current priority a chance to run.
-     Modern integration: block on ControllerSemaphore for true idle suspension.
-     InputProcess signals this semaphore AFTER updating sensor state."
+    "Give other Processes at the current priority a chance to run."
     Sensor waitForEvent
 ```
 
@@ -232,25 +248,22 @@ controllerSemaphore
     ^ControllerSemaphore
 ```
 
-#### InputSensor>>waitForEvent
+#### InputSensor wait methods
 
 ```smalltalk
-waitForEvent
-    "Block until an input event arrives.
-     Modern integration: enables true idle suspension by blocking on ControllerSemaphore.
-     InputProcess signals this semaphore AFTER updating sensor state, ensuring
-     controllers always see correct button/key state when they wake.
+InputSensor>>waitForControllerEvent
+    "Block until a controller-relevant event (button transition) occurs.
+     Used by controller loops (searchForActiveController, controlLoop).
+     VM signals ControllerSemaphore on button transitions.
 
-     Ordering guarantee:
-     1. VM signals InputSemaphore on raw input arrival
-     2. InputProcess (priority 6) wakes, updates sensor state
-     3. InputProcess signals ControllerSemaphore
-     4. Controllers (priority 4) wake with correct state
-
-     IMPORTANT: Return immediately if user input is active (button pressed or key held).
-     This allows controller loops to keep processing continuous input states."
+     IMPORTANT: Return immediately if user input is active."
     (self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
     InputState controllerSemaphore wait
+
+InputSensor>>waitForEvent
+    "Block until any input event arrives.
+     Used by general yield callers. VM signals InputSemaphore on raw input."
+    InputState inputSemaphore wait
 ```
 
 ### Event Flow Diagram
@@ -262,8 +275,10 @@ waitForEvent
 │  │  WaitHandle.WaitAny([eventHandle, timerHandle])               │  │
 │  │         │                                                      │  │
 │  │         ▼                                                      │  │
-│  │  On wake: SignalSemaphoreWithPreemption(InputSemaphore)       │  │
-│  │         │  (standard signaling - wakes ONE waiter)            │  │
+│  │  On wake:                                                      │  │
+│  │    SignalSemaphoreWithPreemption(InputSemaphore)   ← always   │  │
+│  │    if (buttonTransition)                                       │  │
+│  │      SignalSemaphoreWithPreemption(ControllerSemaphore) ← btn │  │
 │  └─────────┼─────────────────────────────────────────────────────┘  │
 └────────────┼────────────────────────────────────────────────────────┘
              │
@@ -272,19 +287,17 @@ waitForEvent
 │                       Smalltalk                                      │
 │                                                                      │
 │  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  InputProcess (priority 6)                                     │  │
+│  │  InputProcess (priority 6)       ← runs first due to priority │  │
 │  │         │                                                      │  │
 │  │         ├── InputSemaphore wait                               │  │
 │  │         ├── primInputWord (read raw event)                    │  │
-│  │         ├── Update x, y, bitState, etc.                       │  │
-│  │         └── ControllerSemaphore signal ─────────────┐         │  │
-│  └─────────────────────────────────────────────────────┼─────────┘  │
-│                                                         │            │
-│  ┌──────────────────────────────────────────────────────┼────────┐  │
-│  │  Controllers (priority 4)                            ▼        │  │
+│  │         └── Update x, y, bitState, etc.                       │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  Controllers (priority 4)       ← runs after InputProcess     │  │
 │  │         │                                                      │  │
-│  │         ├── Processor yield                                   │  │
-│  │         ├── Sensor waitForEvent                               │  │
+│  │         ├── Sensor waitForControllerEvent                     │  │
 │  │         └── InputState controllerSemaphore wait               │  │
 │  │                                                               │  │
 │  │  (Wake with CORRECT sensor state - no missed transitions)    │  │
@@ -323,16 +336,25 @@ waitForEvent
 ### Smalltalk-80 Source/Smalltalk-80.st
 
 1. **InputState class variables** - Added `ControllerSemaphore`
-2. **InputState>>install** - Creates both semaphores
-3. **InputState>>run** - Signals ControllerSemaphore after each event
-4. **InputState class>>controllerSemaphore** - Accessor
-5. **InputState class>>inputSemaphore** - Accessor (for InputProcess use)
-6. **InputSensor>>waitForEvent** - Waits on ControllerSemaphore
-7. **ProcessorScheduler>>yield** - Calls `Sensor waitForEvent`
+2. **InputState>>install** - Creates and registers both semaphores (primitives 93 & 160)
+3. **InputState>>primControllerSemaphore:** - Registers ControllerSemaphore (primitive 160)
+4. **InputState>>run** - Removed ControllerSemaphore signal (VM handles this)
+5. **InputState class>>controllerSemaphore** - Accessor
+6. **InputState class>>inputSemaphore** - Accessor
+7. **InputSensor>>waitForControllerEvent** - Waits on ControllerSemaphore (for controllers)
+8. **InputSensor>>waitForEvent** - Waits on InputSemaphore (for general yield)
+9. **ControlManager>>searchForActiveController** - Uses `Sensor waitForControllerEvent`
+10. **ProcessorScheduler>>yield** - Calls `Sensor waitForEvent`
 
-### VirtualMachine.cs
+### VM (C#)
 
-- **SignalInputSemaphoreIfRegistered** - Uses standard `SignalSemaphoreWithPreemption` (not SignalAllWaiters)
+- **VirtualMachine.cs** - `SignalInputSemaphoreIfRegistered` signals both semaphores appropriately
+- **SmalltalkEventQueue.cs** - Tracks button transitions at enqueue time
+- **IPlatformBridge.cs** - Added `SetControllerSemaphore`, `GetControllerSemaphore`, `ConsumeButtonTransition`
+- **WinFormsDisplayProvider.cs** - Implements controller semaphore registration
+- **InputPrimitives.cs** - Added primitive 160 for controller semaphore registration
+- **PrimitiveRegistry.cs** - Registered primitive 160
+- **VirtualMachine.ProcessScheduling.cs** - Removed unused `SignalSemaphoreAllWaiters`
 
 ---
 

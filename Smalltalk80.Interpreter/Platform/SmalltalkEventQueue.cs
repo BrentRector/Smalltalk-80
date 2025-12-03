@@ -98,10 +98,19 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     private bool _currentYellowButton;
     private bool _currentBlueButton;
 
-    // Previous state (for detecting transitions)
+    // Previous state (for detecting transitions at enqueue time)
+    private bool _lastRedButton;
+    private bool _lastYellowButton;
+    private bool _lastBlueButton;
+
+    // Previous state (for detecting transitions during ProcessEvents)
     private bool _prevRedButton;
     private bool _prevYellowButton;
     private bool _prevBlueButton;
+
+    // Flag set when button transition detected at enqueue time
+    // VM checks and clears this to signal ControllerSemaphore
+    private volatile bool _buttonTransitionPending;
 
     public SmalltalkEventQueue()
     {
@@ -110,24 +119,55 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     }
 
     /// <summary>
+    /// Returns true if a button transition occurred since last check, then clears the flag.
+    /// Thread-safe (uses volatile read and Interlocked.Exchange).
+    /// Called by VM to decide whether to signal ControllerSemaphore.
+    /// </summary>
+    public bool ConsumeButtonTransition()
+    {
+        if (!_buttonTransitionPending)
+            return false;
+        _buttonTransitionPending = false;
+        return true;
+    }
+
+    /// <summary>
     /// Enqueue an event from the WinForms thread.
     /// Thread-safe (can be called from any thread).
     /// Signals waiting threads that events are available.
+    /// Detects button transitions and sets flag for ControllerSemaphore signaling.
     /// </summary>
     public void Enqueue(SmalltalkEvent evt)
     {
         _events.Enqueue(evt);
 
-        // Update current state for polling
+        // Update current state for polling and detect button transitions
         if (evt.Type == SmalltalkEventType.Mouse)
         {
             lock (_mouseLock)
             {
+                // Detect button transitions before updating state
+                bool buttonChanged =
+                    (evt.RedButton != _lastRedButton) ||
+                    (evt.YellowButton != _lastYellowButton) ||
+                    (evt.BlueButton != _lastBlueButton);
+
+                if (buttonChanged)
+                {
+                    _buttonTransitionPending = true;
+                }
+
+                // Update state
                 _currentX = evt.X;
                 _currentY = evt.Y;
                 _currentRedButton = evt.RedButton;
                 _currentYellowButton = evt.YellowButton;
                 _currentBlueButton = evt.BlueButton;
+
+                // Track last button state for next transition detection
+                _lastRedButton = evt.RedButton;
+                _lastYellowButton = evt.YellowButton;
+                _lastBlueButton = evt.BlueButton;
             }
         }
 

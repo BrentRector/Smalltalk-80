@@ -112,11 +112,33 @@ public interface IPlatformBridge
     SmalltalkOOP GetInputSemaphore();
 
     /// <summary>
+    /// Registers a controller semaphore to be signaled on button transitions.
+    /// Host platform stores this OOP and signals it when button state changes.
+    /// Controllers wait on this semaphore to wake with correct button state.
+    /// </summary>
+    /// <param name="semaphoreOOP">Semaphore OOP to signal (heap-resident object).</param>
+    void SetControllerSemaphore(SmalltalkOOP semaphoreOOP);
+
+    /// <summary>
+    /// Gets the registered controller semaphore OOP, or default if none registered.
+    /// Used by the VM to signal the semaphore on button transitions.
+    /// </summary>
+    /// <returns>The controller semaphore OOP, or default if none.</returns>
+    SmalltalkOOP GetControllerSemaphore();
+
+    /// <summary>
     /// Checks if there are pending input events to process.
     /// Used by the VM for idle detection and event signaling.
     /// </summary>
     /// <returns>True if events are pending.</returns>
     bool HasPendingEvents();
+
+    /// <summary>
+    /// Returns true if a button transition (down/up) occurred since the last check,
+    /// then clears the flag. Used by VM to decide when to signal ControllerSemaphore.
+    /// </summary>
+    /// <returns>True if button transition occurred, false otherwise.</returns>
+    bool ConsumeButtonTransition();
 
     /// <summary>
     /// Blocks the calling thread until an input event arrives or timeout expires.

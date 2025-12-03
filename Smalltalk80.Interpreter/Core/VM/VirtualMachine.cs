@@ -439,28 +439,33 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     }
 
     /// <summary>
-    /// Signals the input semaphore if one is registered (via primitive 93).
-    /// With the dual-semaphore architecture:
-    /// - InputSemaphore wakes InputProcess only (priority 6)
-    /// - InputProcess updates sensor state, then signals ControllerSemaphore
-    /// - ControllerSemaphore wakes controllers (priority 4) via Processor yield
-    /// This ensures controllers always see correct button/key state.
+    /// Signals input semaphores based on event type.
+    /// Dual-semaphore architecture:
+    /// - InputSemaphore: signaled on ALL raw input (wakes InputProcess at priority 6)
+    /// - ControllerSemaphore: signaled on button transitions (wakes controllers at priority 4)
+    /// Priority ordering ensures InputProcess updates sensor state before controllers wake.
     /// </summary>
     private void SignalInputSemaphoreIfRegistered()
     {
         if (_platformBridge == null)
             return;
 
+        // Always signal InputSemaphore on raw input
         var inputSemaphore = _platformBridge.GetInputSemaphore();
         if (inputSemaphore != default && inputSemaphore != _metadata.KnownObjects.Nil)
         {
-            // Standard signaling - wakes InputProcess only
-            // InputProcess will signal ControllerSemaphore after updating sensor state
             SignalSemaphoreWithPreemption(inputSemaphore);
         }
-        else
+
+        // Signal ControllerSemaphore only on button transitions
+        // This wakes controllers waiting via Sensor waitForControllerEvent
+        if (_platformBridge.ConsumeButtonTransition())
         {
-            Console.WriteLine($"[INPUT-SEM] WARNING: No input semaphore registered (events will be lost!)");
+            var controllerSemaphore = _platformBridge.GetControllerSemaphore();
+            if (controllerSemaphore != default && controllerSemaphore != _metadata.KnownObjects.Nil)
+            {
+                SignalSemaphoreWithPreemption(controllerSemaphore);
+            }
         }
     }
 

@@ -207,9 +207,26 @@ public class TestPlatformBridge : IPlatformBridge
         return default;
     }
 
+    public void SetControllerSemaphore(SmalltalkOOP semaphoreOOP)
+    {
+        // No-op in test mode - no async event generation
+    }
+
+    public SmalltalkOOP GetControllerSemaphore()
+    {
+        // No semaphore in test mode
+        return default;
+    }
+
     public bool HasPendingEvents()
     {
         // No events in test mode
+        return false;
+    }
+
+    public bool ConsumeButtonTransition()
+    {
+        // No button transitions in test mode
         return false;
     }
 
