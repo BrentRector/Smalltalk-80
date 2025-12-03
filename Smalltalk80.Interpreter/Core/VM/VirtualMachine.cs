@@ -396,7 +396,28 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             {
                 var newPriorityOOP = _heapManager.GetInstanceVariable(currentProcess, VMConstants.PROCESS_PRIORITY_INDEX);
                 int newPriority = newPriorityOOP.IsSmallInteger ? newPriorityOOP.AsSmallInteger() : -1;
+
+                // Log what context/method the new process will execute
+                var suspendedContext = _heapManager.GetInstanceVariable(currentProcess, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+                var ctxClassName = _heapManager.GetClassName(suspendedContext);
                 Console.WriteLine($"[IDLE] Exiting idle - switched to process={currentProcess} priority={newPriority}");
+                Console.WriteLine($"[IDLE]   Suspended context: {suspendedContext} ({ctxClassName})");
+
+                // Show method being executed
+                SmalltalkOOP methodOOP;
+                if (ctxClassName == "BlockContext")
+                {
+                    var homeOOP = _heapManager.GetInstanceVariable(suspendedContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                    methodOOP = _heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
+                }
+                else
+                {
+                    methodOOP = _heapManager.GetInstanceVariable(suspendedContext, VMConstants.CONTEXT_METHOD_INDEX);
+                }
+                var methodLocalId = GetLocalId(methodOOP);
+                var pcOOP = _heapManager.GetInstanceVariable(suspendedContext, VMConstants.CONTEXT_PC_INDEX);
+                Console.WriteLine($"[IDLE]   Method: {methodLocalId}, PC: {pcOOP}");
+
                 return;  // Higher-priority process ready - exit idle
             }
 

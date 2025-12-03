@@ -94,16 +94,25 @@ public partial class VirtualMachine
             {
                 Console.WriteLine($"[PREEMPT] Switching from priority={activePriority} process={activeProcessOOP} to priority={wokenPriority} process={wokenProcessOOP}");
 
-                // Put the preempted process back into its ready queue
-                // (it was active, so not in any queue - must return it to runnable state)
+                // Save current context to the preempted process's suspendedContext
                 if (activeProcessOOP != _metadata.KnownObjects.Nil)
                 {
+                    var currentContext = _contextManager.ActiveContext;
+                    _heapManager.SetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, currentContext);
+                    Console.WriteLine($"[PREEMPT] Saved context={currentContext} to preempted process");
+
+                    // Put the preempted process back into its ready queue
                     Console.WriteLine($"[PREEMPT] Returning preempted process={activeProcessOOP} priority={activePriority} to ready queue");
                     AddProcessToReadyQueue(activeProcessOOP, activePriority);
                 }
 
-                // Set woken process as active
+                // Set woken process as active in ProcessorScheduler
                 _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, wokenProcessOOP);
+
+                // Switch C# execution context to the woken process's suspended context
+                var wokenContext = _heapManager.GetInstanceVariable(wokenProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+                Console.WriteLine($"[PREEMPT] Switching to context={wokenContext}");
+                _contextManager.SetActiveContext(wokenContext);
             }
         }
         else
