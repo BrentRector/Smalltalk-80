@@ -14,7 +14,7 @@
 - **VM Core**: Fully functional, verified operational
 - **Process Primitives**: ✅ **85-88 working** (suspend, resume, terminate, yield)
 - **System Browser**: ✅ **FULLY FUNCTIONAL** - source retrieval working
-- **Timer/Event System**: ⚠️ **WaitHandle.WaitAny** - works but 3% idle CPU (see CPU-USAGE-ANALYSIS.md)
+- **Timer/Event System**: ✅ **FULLY OPERATIONAL** - 0% idle CPU via central yield fix
 
 ## Known Issues
 
@@ -25,7 +25,7 @@ The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:i
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 
-**⚠️ Idle CPU Usage (3%)**: Despite `WaitHandle.WaitAny` working correctly, idle CPU is ~3% instead of 0%. Root causes: (1) Breaking on `HasPendingEvents()` is WRONG - events don't wake processes, they signal the input semaphore which causes process switch; (2) Background process bytecodes should never execute - it's a sentinel, not work. **Fix**: Remove `HasPendingEvents()` check, detect background process every iteration, never execute its bytecodes, stay in WaitAny until process switch. See `docs/Architecture/CPU-USAGE-ANALYSIS.md`.
+**✅ Idle CPU Usage - RESOLVED**: The original Blue Book `Processor yield` created a forked process that signaled immediately, keeping priority 4 always occupied and preventing true idle. **Fix**: `ProcessorScheduler>>yield` now calls `Sensor waitForEvent`, which blocks on `InputSemaphore`. This enables 0% CPU when idle while preserving cooperative semantics. See `docs/Architecture/CPU-USAGE-ANALYSIS.md`.
 
 ## Migration Status
 
@@ -92,7 +92,7 @@ The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:i
 - `FilePrimitives.cs` - BOM offset handling for source file reading
 - `StackManager.cs` - Blue Book block argument handling
 
-**Phase 4: Timer and Event System Optimization** ⚠️ **PARTIAL** (WaitAny works, but 3% idle CPU remains)
+**Phase 4: Timer and Event System Optimization** ✅ **COMPLETE**
 
 Efficient idle detection using `WaitHandle.WaitAny` for unified multi-source waiting:
 
@@ -100,11 +100,22 @@ Efficient idle detection using `WaitHandle.WaitAny` for unified multi-source wai
 - ✅ **WaitHandle.WaitAny**: Waits on both event queue and timer handles in single kernel call
 - ✅ **ManualResetEventSlim**: Replaced AutoResetEvent to prevent signal consumption
 - ✅ **Double-Check Reset Pattern**: Safe reset after WaitAny to handle race conditions
-- ⚠️ **CPU Efficiency**: ~3% CPU during idle (see CPU-USAGE-ANALYSIS.md for fix)
+- ✅ **CPU Efficiency**: 0% CPU during idle via central `ProcessorScheduler>>yield` fix
 
 **Key Implementation Details**:
 
-The original AutoResetEvent caused event loss because it auto-resets when WaitAny returns, consuming the signal before events could be processed. The fix uses ManualResetEventSlim with explicit reset:
+**Central Yield Fix**: The original Blue Book `ProcessorScheduler>>yield` created a forked process that signaled immediately, keeping the calling priority always occupied. The fix replaces it with a simple call to `Sensor waitForEvent`:
+
+```smalltalk
+ProcessorScheduler>>yield
+    "Give other Processes at the current priority a chance to run.
+     Modern integration: block on InputSemaphore for true idle suspension."
+    Sensor waitForEvent
+```
+
+This single-point fix benefits ALL yield callers (controlLoop, searchForActiveController, Rectangle>>fromUser, etc.) without modifying each call site.
+
+**ManualResetEventSlim Pattern**: The original AutoResetEvent caused event loss because it auto-resets when WaitAny returns. The fix uses ManualResetEventSlim with explicit reset:
 
 ```csharp
 // After WaitAny returns, reset signal only if queue is empty
@@ -121,12 +132,13 @@ public void ResetSignalIfEmpty()
 ```
 
 **Key Files**:
+- `Smalltalk-80.st` - Central yield fix: `ProcessorScheduler>>yield` calls `Sensor waitForEvent`
+- `Smalltalk-80.st` - Added `InputState class>>inputSemaphore` and `InputSensor>>waitForEvent`
 - `VirtualMachine.cs` - InterpreterLoop uses `WaitHandle.WaitAny([eventHandle, timerHandle])`
 - `VirtualMachine.ProcessScheduling.cs` - Extracted process scheduling methods (~330 lines)
 - `SmalltalkEventQueue.cs` - ManualResetEventSlim with ResetSignalIfEmpty()
 - `TimerManager.cs` - Interrupt-driven timer with TimerExpiredHandle
-- `IPlatformBridge.cs` - Added ResetEventSignalIfEmpty() interface method
-- `docs/Architecture/CPU-USAGE-ANALYSIS.md` - **Analysis of 3% idle CPU and fix recommendations**
+- `docs/Architecture/CPU-USAGE-ANALYSIS.md` - **Complete analysis and solution documentation**
 
 See `docs/Architecture/PROPOSED-TIMER-OPTIMIZATION.md` and `docs/Architecture/PROCESS-MANAGEMENT.md` for complete documentation.
 

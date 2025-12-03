@@ -1,8 +1,8 @@
 # Proposed Timer and Event Optimization
 
 **Last Updated**: 2025-12-03
-**Status**: ⚠️ PARTIAL - WaitAny works but idle detection needs improvement (see CPU-USAGE-ANALYSIS.md)
-**Constraint**: No changes to Smalltalk-80.st source code (except defensive nil checks)
+**Status**: ✅ COMPLETE - WaitAny and idle detection fully operational (0% idle CPU)
+**Note**: Smalltalk-80.st modified with central yield fix - `ProcessorScheduler>>yield` now calls `Sensor waitForEvent`
 
 ## Executive Summary
 

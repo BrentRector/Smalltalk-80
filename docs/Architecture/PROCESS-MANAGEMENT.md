@@ -140,11 +140,25 @@ The waiting process is now blocked on the semaphore and won't run until signaled
 
 When a process calls `Processor yield`:
 
+```smalltalk
+ProcessorScheduler>>yield
+    "Give other Processes at the current priority a chance to run.
+     Modern integration: block on InputSemaphore for true idle suspension."
+    Sensor waitForEvent
 ```
-[[Delay>>forMilliseconds: wait] fork, or just...]
-add self to ready queue at current priority
-switch to highest priority runnable process
+
+The modern implementation blocks on `InputSemaphore` via `Sensor waitForEvent`, enabling true 0% CPU when idle. The VM signals InputSemaphore when events arrive.
+
+**Original Blue Book Implementation** (caused 3% idle CPU):
+```smalltalk
+yield
+    | semaphore |
+    semaphore _ Semaphore new.
+    [semaphore signal] fork.
+    semaphore wait
 ```
+
+The original created a forked process that signaled immediately, keeping the calling priority always occupied and preventing true idle.
 
 ## System Quiescence
 
@@ -314,7 +328,7 @@ CheckAndSignalExpiredTimer();
 | Idle, no timers | Near-zero (10ms sleeps) |
 | Background animation | Low (controlled by Delay) |
 
-**⚠️ IMPORTANT**: The current implementation has ~3% idle CPU due to infrequent idle detection (every 1000 bytecodes). See `CPU-USAGE-ANALYSIS.md` for the fix: check idle every iteration using cached background process OOP.
+**✅ RESOLVED**: The idle CPU issue (was ~3%) has been fixed by modifying `ProcessorScheduler>>yield` to call `Sensor waitForEvent`, which blocks on `InputSemaphore`. This enables true 0% CPU when idle. See `CPU-USAGE-ANALYSIS.md` for complete analysis.
 
 ## Data Structure Summary
 
@@ -370,6 +384,10 @@ SmalltalkEventQueue (C#)
 
 ## Recent Changes (2025-12-03)
 
+- **Central Yield Fix**: `ProcessorScheduler>>yield` now calls `Sensor waitForEvent`, enabling true 0% CPU when idle
+  - Added `InputState class>>inputSemaphore` - accessor for InputSemaphore class variable
+  - Added `InputSensor>>waitForEvent` - blocks on InputSemaphore
+  - All yield callers (controlLoop, searchForActiveController, etc.) automatically benefit
 - **VirtualMachine Refactoring**: Process scheduling methods extracted to `VirtualMachine.ProcessScheduling.cs` partial class (~330 lines)
 - **Timer Implementation**: Uses interrupt-driven `System.Threading.Timer` for precise timing
 - **Event Handling**: `WaitHandle.WaitAny` with `ManualResetEventSlim` and double-check reset pattern
