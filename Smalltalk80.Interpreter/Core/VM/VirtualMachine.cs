@@ -300,6 +300,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Cache background process OOP for fast idle detection
         // The background process is a sentinel - we should NEVER execute its bytecodes
         _backgroundProcessOOP = FindBackgroundProcess();
+        Console.WriteLine($"[InterpreterLoop] Background process OOP: {_backgroundProcessOOP}, platformBridge: {_platformBridge != null}");
 
         // Counter for periodic shutdown and timer checks (every N bytecodes)
         int periodicCheckCounter = 0;
@@ -462,26 +463,45 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     {
         var schedulerOOP = _metadata.ProcessorScheduler;
         if (schedulerOOP == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine("[FindBackgroundProcess] ProcessorScheduler is nil");
             return default;
+        }
 
         var processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP,
             VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
 
         if (processListsOOP == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine("[FindBackgroundProcess] quiescentProcessLists is nil");
             return default;
+        }
 
         // Priority 1 is at index 0 (arrays are 0-based, priorities are 1-based)
         if (_heapManager.GetIndexedSize(processListsOOP) < 1)
+        {
+            Console.WriteLine("[FindBackgroundProcess] processLists is empty");
             return default;
+        }
 
         var priority1ListOOP = _heapManager.GetIndexedOOP(processListsOOP, 0);
         if (priority1ListOOP == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine("[FindBackgroundProcess] priority 1 list is nil");
             return default;
+        }
 
         var backgroundProcessOOP = _heapManager.GetInstanceVariable(priority1ListOOP,
             VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
 
-        return backgroundProcessOOP == _metadata.KnownObjects.Nil ? default : backgroundProcessOOP;
+        if (backgroundProcessOOP == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine("[FindBackgroundProcess] priority 1 queue is empty (no firstLink)");
+            return default;
+        }
+
+        Console.WriteLine($"[FindBackgroundProcess] Found background process: {backgroundProcessOOP}");
+        return backgroundProcessOOP;
     }
 
     /// <summary>
