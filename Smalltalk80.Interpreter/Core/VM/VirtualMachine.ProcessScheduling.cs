@@ -69,7 +69,6 @@ public partial class VirtualMachine : IProcessScheduler
                 return false;
             }
 
-            Console.WriteLine($"[ACTIVATE] Initializing BlockContext: PC={startPC.AsSmallInteger()}, stackp=0");
             _heapManager.SetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_PC_INDEX, startPC);
             _heapManager.SetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SmalltalkOOP.FromSmallInteger(0));
             _heapManager.SetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_CALLER_INDEX, _metadata.KnownObjects.Nil);
@@ -81,7 +80,6 @@ public partial class VirtualMachine : IProcessScheduler
         // Switch C# execution context
         _contextManager.SetActiveContext(contextOOP);
 
-        Console.WriteLine($"[ACTIVATE] Process {processOOP} priority={priority} now active ({reason}), context={contextOOP}");
         return true;
     }
 
@@ -100,13 +98,7 @@ public partial class VirtualMachine : IProcessScheduler
         {
             var priorityOOP = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_PRIORITY_INDEX);
             int priority = priorityOOP.IsSmallInteger ? priorityOOP.AsSmallInteger() : 0;
-
-            Console.WriteLine($"[SUSPEND] Process {activeProcessOOP} priority={priority} suspended, context={currentContext}, returning to queue");
             AddProcessToReadyQueue(activeProcessOOP, priority);
-        }
-        else
-        {
-            Console.WriteLine($"[SUSPEND] Process {activeProcessOOP} suspended, context={currentContext}");
         }
     }
 
@@ -306,8 +298,6 @@ public partial class VirtualMachine : IProcessScheduler
         // Check for preemption: if woken process has higher priority, switch to it
         if (wokenPriority > activePriority)
         {
-            Console.WriteLine($"[PREEMPT] Preempting priority={activePriority} for priority={wokenPriority}");
-
             // Suspend current process and return it to ready queue
             SuspendActiveProcess(returnToQueue: true);
 
@@ -317,7 +307,6 @@ public partial class VirtualMachine : IProcessScheduler
         else
         {
             // No preemption needed - just add to ready queue
-            Console.WriteLine($"[QUEUE+] Process={wokenProcessOOP} priority={wokenPriority} added to ready queue (no preempt, active priority={activePriority})");
             AddProcessToReadyQueue(wokenProcessOOP, wokenPriority);
         }
     }

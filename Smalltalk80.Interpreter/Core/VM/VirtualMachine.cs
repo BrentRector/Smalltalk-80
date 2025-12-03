@@ -373,8 +373,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// </summary>
     private void EnterIdleWait(SmalltalkOOP backgroundProcess)
     {
-        Console.WriteLine($"[IDLE] Entering idle wait (background process={backgroundProcess})");
-
         var eventHandle = _platformBridge?.EventAvailableHandle;
         var timerHandle = _timerManager.TimerExpiredHandle;
 
@@ -391,11 +389,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             }
 
             // Check if a process switch occurred (due to timer or input semaphore signal)
-            // Note: ActivateProcess already logged the switch details
             var currentProcess = GetActiveProcess();
             if (currentProcess != backgroundProcess)
             {
-                Console.WriteLine($"[IDLE] Exiting idle wait");
                 return;  // Higher-priority process ready - exit idle
             }
 
@@ -434,7 +430,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var inputSemaphore = _platformBridge.GetInputSemaphore();
         if (inputSemaphore != default && inputSemaphore != _metadata.KnownObjects.Nil)
         {
-            Console.WriteLine($"[INPUT-SEM] Signaling input semaphore={inputSemaphore}");
             SignalSemaphoreWithPreemption(inputSemaphore);
         }
         else
