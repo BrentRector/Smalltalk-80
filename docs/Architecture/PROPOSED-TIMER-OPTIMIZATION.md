@@ -211,18 +211,25 @@ public class SmalltalkEventQueue : IDisposable
 
 ## Implementation Notes (2025-12-03)
 
-**WaitHandle.WaitAny Issue**: Initial implementation using `WaitHandle.WaitAny([eventHandle, timerHandle], timeout)` failed because:
-- `SmalltalkEventQueue` uses `AutoResetEvent` which auto-resets when WaitAny returns
-- This "consumes" the event signal before the event can be processed
+**WaitHandle.WaitAny - FIXED**:
+
+Initial implementation using `WaitHandle.WaitAny([eventHandle, timerHandle], timeout)` failed because:
+- `SmalltalkEventQueue` used `AutoResetEvent` which auto-resets when WaitAny returns
+- This "consumed" the event signal before the event could be processed
 - Result: Input events (mouse clicks, etc.) were lost - popup menus stopped working
-- **Decision**: Reverted to simple polling - complexity not worth the marginal benefit
+
+**Solution Implemented**:
+1. Changed `SmalltalkEventQueue` to use `ManualResetEventSlim` instead of `AutoResetEvent`
+2. Added `ResetSignalIfEmpty()` method with double-check pattern to safely reset the signal
+3. Added `ResetEventSignalIfEmpty()` to `IPlatformBridge` interface
+4. Updated InterpreterLoop to use `WaitHandle.WaitAny` with both event and timer handles
 
 **Final Implementation Status**:
 - ✅ TimerManager uses interrupt-driven `System.Threading.Timer`
 - ✅ ITimerManager extended with `TimerExpiredHandle` and `IDisposable`
-- ✅ Idle loop uses simple `WaitForEvents(timeout)` polling (reliable)
+- ✅ SmalltalkEventQueue uses `ManualResetEventSlim` with double-check reset pattern
+- ✅ InterpreterLoop uses `WaitHandle.WaitAny([eventHandle, timerHandle], timeout)`
 - ✅ Process scheduling methods refactored to `VirtualMachine.ProcessScheduling.cs`
-- ❌ WaitHandle.WaitAny - abandoned due to event loss issue
 
 **Code Organization (2025-12-03)**:
 Process scheduling methods extracted to partial class for maintainability:
@@ -234,28 +241,45 @@ Process scheduling methods extracted to partial class for maintainability:
 - `RemoveProcessFromList()` - LinkedList manipulation
 - `DumpProcessQueues()` - Diagnostic output
 
-**Future Fix (if needed)**: To use WaitHandle.WaitAny, would need to:
-1. Change `SmalltalkEventQueue` to use `ManualResetEventSlim` instead of `AutoResetEvent`
-2. Manually reset the event after checking `HasPendingEvents`
-3. Handle race conditions between reset and new event arrival
-4. **Not recommended** - current approach is simpler and equally effective
+**Double-Check Reset Pattern**:
+```csharp
+public void ResetSignalIfEmpty()
+{
+    // Only reset if queue appears empty
+    if (!HasPendingEvents)
+    {
+        _eventSignal.Reset();
+        // Double-check: producer might have added after our check but before reset
+        if (HasPendingEvents)
+        {
+            _eventSignal.Set();
+        }
+    }
+}
+```
+
+This pattern handles race conditions:
+1. If producer adds event between check and reset, their Set() comes after our Reset(), so it stays set
+2. If producer adds after reset but before double-check, we detect it and re-signal
+3. If producer adds after double-check, their Set() is effective
 
 ## Final Recommendation
 
-**Keep current hybrid implementation**:
+**Full WaitHandle.WaitAny implementation achieved**:
 - Interrupt-driven timer provides precision improvements ✅
-- Simple polling-based wait is reliable for event handling ✅
-- WaitHandle.WaitAny integration is not worth the complexity ✅
+- WaitHandle.WaitAny provides unified multi-source waiting ✅
+- ManualResetEventSlim with double-check pattern ensures no event loss ✅
 - Code is well-organized across partial class files ✅
 
-**Status**: ✅ COMPLETE - Timer precision improved, event handling reliable, code maintainable.
+**Status**: ✅ COMPLETE - Timer precision improved, WaitAny working, event handling reliable.
 
 ## Conclusion
 
-The hybrid implementation provides the best of both worlds:
+The unified implementation provides optimal behavior:
 - **Timer precision**: Interrupt-driven `System.Threading.Timer` signals immediately when delay expires
-- **Event reliability**: Simple polling via `WaitForEvents()` ensures no events are lost
-- **CPU efficiency**: Still achieves near-zero CPU during idle via timeout-based waiting
+- **Unified waiting**: `WaitHandle.WaitAny` waits on both event queue and timer in single call
+- **Event reliability**: ManualResetEventSlim with double-check reset pattern ensures no events are lost
+- **CPU efficiency**: Near-zero CPU during idle via kernel-level waiting on multiple handles
 - **Maintainability**: Process scheduling code extracted to dedicated partial class
 
-The unified `WaitHandle.WaitAny` approach was attempted but caused event loss. The current design is stable, performant, and well-organized.
+The key insight was switching from AutoResetEvent to ManualResetEventSlim, which requires explicit reset but allows proper event handling after WaitAny returns.

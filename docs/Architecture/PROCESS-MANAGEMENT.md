@@ -361,12 +361,15 @@ SmalltalkEventQueue (C#)
 - `ControlPrimitives.cs` - Primitives 85-88 (Signal, Wait, Resume, Suspend)
 - `TimePrimitives.cs` - Primitive 100 (signal:atMilliseconds:)
 - `Scheduling/TimerManager.cs` - Interrupt-driven timer with System.Threading.Timer
-- `Platform/SmalltalkEventQueue.cs` - Event queue with AutoResetEvent
+- `Platform/SmalltalkEventQueue.cs` - Event queue with ManualResetEventSlim and double-check reset
 - `VMConstants.cs` - Process, Semaphore, LinkedList field indices
 
 ## Recent Changes (2025-12-03)
 
 - **VirtualMachine Refactoring**: Process scheduling methods extracted to `VirtualMachine.ProcessScheduling.cs` partial class (~330 lines)
 - **Timer Implementation**: Uses interrupt-driven `System.Threading.Timer` for precise timing
-- **Event Handling**: Simple polling via `WaitForEvents()` - WaitHandle.WaitAny was attempted but caused event loss with AutoResetEvent
+- **Event Handling**: `WaitHandle.WaitAny` with `ManualResetEventSlim` and double-check reset pattern
+  - Changed from `AutoResetEvent` to `ManualResetEventSlim` to prevent signal consumption
+  - Added `ResetSignalIfEmpty()` with double-check pattern to safely reset after WaitAny
+  - InterpreterLoop now uses `WaitHandle.WaitAny([eventHandle, timerHandle], timeout)`
 - **Scroll Fix**: Defensive nil checks added to prevent crash when scrolling (rare edge case where region collection contains nil)

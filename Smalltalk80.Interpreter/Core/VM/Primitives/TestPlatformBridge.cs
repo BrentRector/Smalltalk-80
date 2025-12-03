@@ -224,6 +224,11 @@ public class TestPlatformBridge : IPlatformBridge
     // In test mode, no WaitHandle for events (use polling via WaitForEvents)
     public WaitHandle? EventAvailableHandle => null;
 
+    public void ResetEventSignalIfEmpty()
+    {
+        // No-op in test mode - no event signal to reset
+    }
+
     // ============================================================================
     // Clipboard
     // ============================================================================

@@ -52,6 +52,11 @@ public class SmalltalkEvent
 /// Thread-safe event queue for Windows UI thread -> Smalltalk interpreter thread communication.
 /// WinForms thread enqueues high-level events, Smalltalk thread dequeues via primitives 90 and 95.
 ///
+/// Uses ManualResetEventSlim for WaitHandle.WaitAny compatibility:
+/// - Signal is SET when events are enqueued
+/// - Signal is RESET when queue is confirmed empty
+/// - Double-check pattern prevents race conditions between producer and consumer
+///
 /// Smalltalk-80 input word format:
 /// - Bits 0-11: parameter value
 /// - Bits 12-15: event type
@@ -82,8 +87,8 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     private readonly ConcurrentQueue<int> _inputWords;  // Processed input words ready for Smalltalk
     private readonly object _mouseLock = new object();
 
-    // Event wait handle for idle blocking
-    private readonly AutoResetEvent _eventSignal = new(false);
+    // Event wait handle for idle blocking - ManualResetEventSlim for WaitAny compatibility
+    private readonly ManualResetEventSlim _eventSignal = new(false);
     private bool _disposed = false;
 
     // Current state (for polling via primitive 90)
@@ -127,6 +132,7 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
         }
 
         // Signal any waiting threads that events are available
+        // ManualResetEventSlim stays set until explicitly reset
         _eventSignal.Set();
     }
 
@@ -254,8 +260,12 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     /// <summary>
     /// Gets a WaitHandle that is signaled when events arrive.
     /// Used with WaitHandle.WaitAny for efficient multi-source waiting.
+    ///
+    /// IMPORTANT: After WaitAny returns for this handle, the caller should:
+    /// 1. Process any available events
+    /// 2. Call ResetSignalIfEmpty() to properly reset the signal state
     /// </summary>
-    public WaitHandle EventAvailableHandle => _eventSignal;
+    public WaitHandle EventAvailableHandle => _eventSignal.WaitHandle;
 
     /// <summary>
     /// Waits for an event to arrive or timeout.
@@ -269,8 +279,47 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
         if (HasPendingEvents)
             return true;
 
+        // Reset signal before waiting (in case it's stale)
+        // Use the safe pattern to handle race conditions
+        ResetSignalIfEmpty();
+
+        // Check again after reset
+        if (HasPendingEvents)
+            return true;
+
         // Wait for signal or timeout
-        return _eventSignal.WaitOne(timeoutMs);
+        return _eventSignal.Wait(timeoutMs);
+    }
+
+    /// <summary>
+    /// Safely resets the event signal when the queue is empty.
+    /// Uses double-check pattern to handle race conditions with producers.
+    ///
+    /// Must be called from the single consumer thread (VM thread) after
+    /// processing events or after WaitAny returns for this handle.
+    ///
+    /// Race condition handling:
+    /// 1. We reset the signal
+    /// 2. If producer added event between our check and reset, the signal
+    ///    was Set() after our Reset(), so it's still set - no problem
+    /// 3. If producer adds after our reset but before our double-check,
+    ///    we detect it and re-signal
+    /// 4. If producer adds after our double-check, their Set() is effective
+    /// </summary>
+    public void ResetSignalIfEmpty()
+    {
+        // Only reset if queue appears empty
+        if (!HasPendingEvents)
+        {
+            _eventSignal.Reset();
+
+            // Double-check: producer might have added after our check but before reset
+            // If so, we need to re-signal
+            if (HasPendingEvents)
+            {
+                _eventSignal.Set();
+            }
+        }
     }
 
     /// <summary>

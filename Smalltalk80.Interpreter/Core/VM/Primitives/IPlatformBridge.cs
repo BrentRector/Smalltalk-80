@@ -133,6 +133,13 @@ public interface IPlatformBridge
     /// <returns>WaitHandle for event notification, or null if not supported.</returns>
     WaitHandle? EventAvailableHandle { get; }
 
+    /// <summary>
+    /// Resets the event signal if the queue is empty.
+    /// Must be called from the consumer thread after WaitAny returns for the event handle.
+    /// Uses double-check pattern to handle race conditions with producers.
+    /// </summary>
+    void ResetEventSignalIfEmpty();
+
     // ============================================================================
     // Clipboard (Primitive 104)
     // ============================================================================

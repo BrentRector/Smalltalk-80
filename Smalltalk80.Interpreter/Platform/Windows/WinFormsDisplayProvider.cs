@@ -476,6 +476,11 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public WaitHandle? EventAvailableHandle => _eventQueue.EventAvailableHandle;
 
+    public void ResetEventSignalIfEmpty()
+    {
+        _eventQueue.ResetSignalIfEmpty();
+    }
+
     public SmalltalkOOP ReadClipboardToStringOOP()
     {
         // Not implemented yet - return value should be provided by Smalltalk thread

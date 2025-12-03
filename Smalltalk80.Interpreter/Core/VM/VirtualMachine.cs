@@ -336,11 +336,28 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                                 waitMs = Math.Max(1, timerMs); // Wait at least 1ms
                             }
 
-                            // Running background process - wait for events or timer
-                            // This allows the OS to schedule other threads and reduces CPU
-                            _platformBridge.WaitForEvents(waitMs);
+                            // Use WaitHandle.WaitAny for efficient multi-source waiting
+                            // Wait on both event queue and timer expiration handles
+                            var eventHandle = _platformBridge.EventAvailableHandle;
+                            var timerHandle = _timerManager.TimerExpiredHandle;
 
-                            // Check timer again after waking up
+                            if (eventHandle != null)
+                            {
+                                // Build array of wait handles (event queue + timer)
+                                var handles = new WaitHandle[] { eventHandle, timerHandle };
+                                WaitHandle.WaitAny(handles, waitMs);
+
+                                // After WaitAny returns, reset event signal if queue is empty
+                                // This prevents false wakeups on stale signals
+                                _platformBridge.ResetEventSignalIfEmpty();
+                            }
+                            else
+                            {
+                                // Fallback: no event handle available, use simple wait
+                                _platformBridge.WaitForEvents(waitMs);
+                            }
+
+                            // Check timer after waking up (either from WaitAny or fallback)
                             CheckAndSignalExpiredTimer();
                         }
                     }
