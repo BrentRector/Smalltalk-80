@@ -87,33 +87,13 @@ public partial class VirtualMachine
         // Check for preemption: if woken process has higher priority, switch to it
         if (wokenPriority > activePriority)
         {
-            // Preempt: switch to higher-priority process
-            // The woken process becomes active immediately (don't add to queue)
-            var schedulerOOP = _metadata.ProcessorScheduler;
-            if (schedulerOOP != _metadata.KnownObjects.Nil)
-            {
-                Console.WriteLine($"[PREEMPT] Switching from priority={activePriority} process={activeProcessOOP} to priority={wokenPriority} process={wokenProcessOOP}");
+            Console.WriteLine($"[PREEMPT] Preempting priority={activePriority} for priority={wokenPriority}");
 
-                // Save current context to the preempted process's suspendedContext
-                if (activeProcessOOP != _metadata.KnownObjects.Nil)
-                {
-                    var currentContext = _contextManager.ActiveContext;
-                    _heapManager.SetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, currentContext);
-                    Console.WriteLine($"[PREEMPT] Saved context={currentContext} to preempted process");
+            // Suspend current process and return it to ready queue
+            SuspendActiveProcess(returnToQueue: true);
 
-                    // Put the preempted process back into its ready queue
-                    Console.WriteLine($"[PREEMPT] Returning preempted process={activeProcessOOP} priority={activePriority} to ready queue");
-                    AddProcessToReadyQueue(activeProcessOOP, activePriority);
-                }
-
-                // Set woken process as active in ProcessorScheduler
-                _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, wokenProcessOOP);
-
-                // Switch C# execution context to the woken process's suspended context
-                var wokenContext = _heapManager.GetInstanceVariable(wokenProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-                Console.WriteLine($"[PREEMPT] Switching to context={wokenContext}");
-                _contextManager.SetActiveContext(wokenContext);
-            }
+            // Activate the woken process
+            ActivateProcess(wokenProcessOOP, "preemption");
         }
         else
         {
@@ -174,6 +154,95 @@ public partial class VirtualMachine
     }
 
     /// <summary>
+    /// Activates a process - sets it as the active process and switches to its context.
+    /// This is the common code path for all process switches (preemption, termination, yield).
+    ///
+    /// Steps:
+    /// 1. Update ProcessorScheduler.activeProcess
+    /// 2. Get the process's suspended context
+    /// 3. If BlockContext with nil PC, initialize it (set PC=startPC, stackp=0)
+    /// 4. Switch _contextManager.ActiveContext to the process's context
+    /// </summary>
+    /// <param name="processOOP">The process to activate</param>
+    /// <param name="reason">Logging reason (e.g., "preemption", "termination")</param>
+    /// <returns>True if successfully activated, false if context is invalid</returns>
+    private bool ActivateProcess(SmalltalkOOP processOOP, string reason)
+    {
+        var schedulerOOP = _metadata.ProcessorScheduler;
+        if (schedulerOOP == _metadata.KnownObjects.Nil)
+            return false;
+
+        // Get the process's suspended context
+        var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+        if (contextOOP == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine($"[ACTIVATE] ERROR: Process {processOOP} has nil suspendedContext");
+            return false;
+        }
+
+        // Get process priority for logging
+        var priorityOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX);
+        int priority = priorityOOP.IsSmallInteger ? priorityOOP.AsSmallInteger() : -1;
+
+        // Check if this is an unactivated BlockContext (PC is nil)
+        // This happens when resuming a newly created process via [block] newProcess
+        var pcOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_PC_INDEX);
+        if (pcOOP == _metadata.KnownObjects.Nil)
+        {
+            // Activate the block context - set PC from startPC
+            var startPC = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
+            if (startPC == _metadata.KnownObjects.Nil || !startPC.IsSmallInteger)
+            {
+                Console.WriteLine($"[ACTIVATE] ERROR: Process {processOOP} BlockContext has invalid startPC");
+                return false;
+            }
+
+            Console.WriteLine($"[ACTIVATE] Initializing BlockContext: PC={startPC.AsSmallInteger()}, stackp=0");
+            _heapManager.SetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_PC_INDEX, startPC);
+            _heapManager.SetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SmalltalkOOP.FromSmallInteger(0));
+            _heapManager.SetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_CALLER_INDEX, _metadata.KnownObjects.Nil);
+        }
+
+        // Update ProcessorScheduler.activeProcess
+        _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, processOOP);
+
+        // Switch C# execution context
+        _contextManager.SetActiveContext(contextOOP);
+
+        Console.WriteLine($"[ACTIVATE] Process {processOOP} priority={priority} now active ({reason}), context={contextOOP}");
+        return true;
+    }
+
+    /// <summary>
+    /// Suspends the current active process - saves its context and optionally returns it to ready queue.
+    /// Used when preempting or yielding.
+    /// </summary>
+    /// <param name="returnToQueue">If true, adds the process back to its priority queue</param>
+    private void SuspendActiveProcess(bool returnToQueue)
+    {
+        var activeProcessOOP = GetActiveProcess();
+        if (activeProcessOOP == _metadata.KnownObjects.Nil)
+            return;
+
+        // Save current context to the process's suspendedContext
+        var currentContext = _contextManager.ActiveContext;
+        _heapManager.SetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, currentContext);
+
+        if (returnToQueue)
+        {
+            var priorityOOP = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_PRIORITY_INDEX);
+            int priority = priorityOOP.IsSmallInteger ? priorityOOP.AsSmallInteger() : 0;
+
+            Console.WriteLine($"[SUSPEND] Process {activeProcessOOP} priority={priority} suspended, context={currentContext}, returning to queue");
+            AddProcessToReadyQueue(activeProcessOOP, priority);
+        }
+        else
+        {
+            Console.WriteLine($"[SUSPEND] Process {activeProcessOOP} suspended, context={currentContext}");
+        }
+    }
+
+    /// <summary>
     /// Switches execution to the next runnable process when the current process terminates.
     /// Used by HandleReturn when a forked process completes its block.
     /// Returns true if successfully switched, false if no runnable processes found.
@@ -198,73 +267,12 @@ public partial class VirtualMachine
         SmalltalkOOP myListOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX);
         if (myListOOP != _metadata.KnownObjects.Nil)
         {
-            // Get process priority for logging (only log priority 1 - background process)
-            var priorityOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_PRIORITY_INDEX);
-            int priority = priorityOOP.IsSmallInteger ? priorityOOP.AsSmallInteger() : -1;
-            if (priority == 1)
-                Console.WriteLine($"[PQ-] REMOVE process={nextProcess} from priority={priority} (activating after termination)");
-
             RemoveProcessFromList(nextProcess, myListOOP);
             _heapManager.SetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
         }
 
-        // Get the suspended context from the next process
-        SmalltalkOOP nextContext = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-        if (nextContext == _metadata.KnownObjects.Nil)
-            return false;
-
-        // Debug: Log when activating priority 1 process
-        var activatingPriorityOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_PRIORITY_INDEX);
-        int activatingPriority = activatingPriorityOOP.IsSmallInteger ? activatingPriorityOOP.AsSmallInteger() : -1;
-        if (activatingPriority == 1)
-        {
-            Console.WriteLine($"[ACTIVATING PROCESS] Priority 1 (background) process={nextProcess}");
-            Console.WriteLine($"  Suspended context: {nextContext}");
-            var ctxClassName = _heapManager.GetClassName(nextContext);
-            Console.WriteLine($"  Context class: {ctxClassName}");
-            var pcOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_PC_INDEX);
-            var startPCOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
-            var callerOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX);
-            Console.WriteLine($"  PC: {pcOOP}, startPC: {startPCOOP}, caller: {callerOOP}");
-            if (ctxClassName == "BlockContext")
-            {
-                var homeOOP = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                Console.WriteLine($"  Home context: {homeOOP}");
-                var homeClassName = _heapManager.GetClassName(homeOOP);
-                Console.WriteLine($"  Home class: {homeClassName}");
-                if (homeClassName == "MethodContext")
-                {
-                    var methodOOP = _heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
-                    Console.WriteLine($"  Method: {methodOOP}");
-                }
-            }
-        }
-
-        // Check if this is an unactivated BlockContext (PC is nil)
-        // This happens when resuming a newly created process via [block] newProcess
-        SmalltalkOOP nextContextPC = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_PC_INDEX);
-        if (nextContextPC == _metadata.KnownObjects.Nil)
-        {
-            // Activate the block context - set PC from startPC
-            SmalltalkOOP startPC = _heapManager.GetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
-            if (startPC == _metadata.KnownObjects.Nil || !startPC.IsSmallInteger)
-                return false;
-
-            if (activatingPriority == 1)
-                Console.WriteLine($"  Activating block: setting PC={startPC.AsSmallInteger()}, stackp=0, caller=nil");
-
-            _heapManager.SetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_PC_INDEX, startPC);
-            _heapManager.SetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SmalltalkOOP.FromSmallInteger(0));
-            _heapManager.SetInstanceVariable(nextContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, _metadata.KnownObjects.Nil);
-        }
-
-        // Update Processor's activeProcess
-        _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, nextProcess);
-
-        // Switch to the new context
-        _contextManager.SetActiveContext(nextContext);
-
-        return true;
+        // Activate the process using shared helper
+        return ActivateProcess(nextProcess, "termination");
     }
 
     /// <summary>
