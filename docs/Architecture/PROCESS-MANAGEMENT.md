@@ -314,6 +314,8 @@ CheckAndSignalExpiredTimer();
 | Idle, no timers | Near-zero (10ms sleeps) |
 | Background animation | Low (controlled by Delay) |
 
+**⚠️ IMPORTANT**: The current implementation has ~3% idle CPU due to infrequent idle detection (every 1000 bytecodes). See `CPU-USAGE-ANALYSIS.md` for the fix: check idle every iteration using cached background process OOP.
+
 ## Data Structure Summary
 
 ```
@@ -349,6 +351,8 @@ SmalltalkEventQueue (C#)
 
 ## Related Files
 
+- `CPU-USAGE-ANALYSIS.md` - Analysis of 3% idle CPU and fix recommendations
+- `PROPOSED-TIMER-OPTIMIZATION.md` - Timer and WaitAny implementation details
 - `VirtualMachine.cs` - InterpreterLoop, idle detection, main bytecode execution
 - `VirtualMachine.ProcessScheduling.cs` - Process scheduling methods:
   - `CheckAndSignalExpiredTimer` - Timer expiration handling

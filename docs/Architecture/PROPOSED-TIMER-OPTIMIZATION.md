@@ -1,7 +1,7 @@
 # Proposed Timer and Event Optimization
 
 **Last Updated**: 2025-12-03
-**Status**: ✅ COMPLETE (hybrid implementation)
+**Status**: ⚠️ PARTIAL - WaitAny works but idle detection needs improvement (see CPU-USAGE-ANALYSIS.md)
 **Constraint**: No changes to Smalltalk-80.st source code (except defensive nil checks)
 
 ## Executive Summary
@@ -283,3 +283,26 @@ The unified implementation provides optimal behavior:
 - **Maintainability**: Process scheduling code extracted to dedicated partial class
 
 The key insight was switching from AutoResetEvent to ManualResetEventSlim, which requires explicit reset but allows proper event handling after WaitAny returns.
+
+## ⚠️ Remaining Issue: 3% Idle CPU (2025-12-03)
+
+**Problem**: Despite WaitAny working correctly, idle CPU is ~3% instead of 0%.
+
+**Root Cause**: Idle detection only happens every 1000 bytecode executions. When the background process `[true] whileTrue: []` is active, the VM executes 1000 jump bytecodes before entering `WaitAny`. This pattern repeats after every wakeup:
+
+```
+Execute 1-999 bytecodes of background process (~3% CPU)
+Iteration 1000: Detect idle → WaitAny blocks (0% CPU)
+Event/timer wakes up → Exit wait
+Execute 1-999 more bytecodes (~3% CPU)
+Iteration 2000: Detect idle → WaitAny blocks (0% CPU)
+...
+```
+
+**Solution**: Check for idle **every iteration** by caching the background process OOP and using a cheap pointer comparison. When idle, skip bytecode execution entirely.
+
+**Secondary Issue**: The idle loop breaks when `HasPendingEvents()` returns true, even though no higher-priority process is ready. Events sit in the queue until the Controller timer expires - breaking on events creates a busy-loop.
+
+**Fix**: Remove `HasPendingEvents()` check from idle loop. Only break when `GetActiveProcess()` returns a different process (i.e., a higher-priority process became ready).
+
+**Full Analysis**: See `docs/Architecture/CPU-USAGE-ANALYSIS.md` for complete implementation details.

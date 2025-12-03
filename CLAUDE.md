@@ -14,7 +14,7 @@
 - **VM Core**: Fully functional, verified operational
 - **Process Primitives**: ✅ **85-88 working** (suspend, resume, terminate, yield)
 - **System Browser**: ✅ **FULLY FUNCTIONAL** - source retrieval working
-- **Timer/Event System**: ✅ **WaitHandle.WaitAny** - efficient multi-source waiting
+- **Timer/Event System**: ⚠️ **WaitHandle.WaitAny** - works but 3% idle CPU (see CPU-USAGE-ANALYSIS.md)
 
 ## Known Issues
 
@@ -24,6 +24,8 @@ The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:i
 **Remaining**: `whileTrue:` and `whileFalse:` are NOT yet inlined (receiver is a block, requires special handling).
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
+
+**⚠️ Idle CPU Usage (3%)**: Despite `WaitHandle.WaitAny` working correctly, idle CPU is ~3% instead of 0%. Root cause: idle detection only happens every 1000 bytecode executions - the background process `[true] whileTrue: []` executes 1000 jump bytecodes before entering the wait. **Fix**: Check idle every iteration using cached background process OOP, skip bytecode execution when idle. See `docs/Architecture/CPU-USAGE-ANALYSIS.md` for complete analysis and implementation.
 
 ## Migration Status
 
@@ -90,7 +92,7 @@ The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:i
 - `FilePrimitives.cs` - BOM offset handling for source file reading
 - `StackManager.cs` - Blue Book block argument handling
 
-**Phase 4: Timer and Event System Optimization** ✅ **COMPLETE**
+**Phase 4: Timer and Event System Optimization** ⚠️ **PARTIAL** (WaitAny works, but 3% idle CPU remains)
 
 Efficient idle detection using `WaitHandle.WaitAny` for unified multi-source waiting:
 
@@ -98,7 +100,7 @@ Efficient idle detection using `WaitHandle.WaitAny` for unified multi-source wai
 - ✅ **WaitHandle.WaitAny**: Waits on both event queue and timer handles in single kernel call
 - ✅ **ManualResetEventSlim**: Replaced AutoResetEvent to prevent signal consumption
 - ✅ **Double-Check Reset Pattern**: Safe reset after WaitAny to handle race conditions
-- ✅ **CPU Efficiency**: Near-zero CPU during idle via kernel-level waiting
+- ⚠️ **CPU Efficiency**: ~3% CPU during idle (see CPU-USAGE-ANALYSIS.md for fix)
 
 **Key Implementation Details**:
 
@@ -124,6 +126,7 @@ public void ResetSignalIfEmpty()
 - `SmalltalkEventQueue.cs` - ManualResetEventSlim with ResetSignalIfEmpty()
 - `TimerManager.cs` - Interrupt-driven timer with TimerExpiredHandle
 - `IPlatformBridge.cs` - Added ResetEventSignalIfEmpty() interface method
+- `docs/Architecture/CPU-USAGE-ANALYSIS.md` - **Analysis of 3% idle CPU and fix recommendations**
 
 See `docs/Architecture/PROPOSED-TIMER-OPTIMIZATION.md` and `docs/Architecture/PROCESS-MANAGEMENT.md` for complete documentation.
 
