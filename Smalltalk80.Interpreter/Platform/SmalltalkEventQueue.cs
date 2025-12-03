@@ -272,6 +272,48 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     }
 
     /// <summary>
+    /// Dequeue the next composite event, returning all data in one call.
+    /// Returns null if no events available.
+    /// For mouse events: updates button transition state tracking.
+    /// Thread-safe.
+    /// </summary>
+    /// <returns>Tuple of (eventType, x, y, buttonMask, hasButtonTransition, keyCode, isKeyDown) or null if no events.</returns>
+    public (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? DequeueCompositeEvent()
+    {
+        if (!_events.TryDequeue(out var evt) || evt == null)
+            return null;
+
+        if (evt.Type == SmalltalkEventType.Mouse)
+        {
+            // Compute button mask
+            int buttonMask = 0;
+            if (evt.RedButton) buttonMask |= 1;      // Bit 0 = red/left
+            if (evt.YellowButton) buttonMask |= 2;   // Bit 1 = yellow/middle
+            if (evt.BlueButton) buttonMask |= 4;     // Bit 2 = blue/right
+
+            // Detect button transitions
+            bool hasTransition =
+                (evt.RedButton != _prevRedButton) ||
+                (evt.YellowButton != _prevYellowButton) ||
+                (evt.BlueButton != _prevBlueButton);
+
+            // Update previous state for next transition detection
+            _prevRedButton = evt.RedButton;
+            _prevYellowButton = evt.YellowButton;
+            _prevBlueButton = evt.BlueButton;
+
+            return (1, evt.X, evt.Y, buttonMask, hasTransition, 0, false);  // eventType=1 for mouse
+        }
+        else if (evt.Type == SmalltalkEventType.Keyboard)
+        {
+            return (2, 0, 0, 0, false, evt.KeyCode, evt.IsKeyDown);  // eventType=2 for keyboard
+        }
+
+        // System events - just skip
+        return (0, 0, 0, 0, false, 0, false);  // eventType=0 for system/unknown
+    }
+
+    /// <summary>
     /// Get the current mouse position.
     /// Called by Primitive 90 (mousePoint).
     /// Thread-safe (can be called from any thread).

@@ -22368,7 +22368,9 @@ cursorPoint: aPoint
 
 !InputSensor methodsFor: 'private'!
 buttons
-	^self primMouseButtons!
+	"Return button state from processed events (bitState), not polled current state.
+	 This ensures controllers see button state as of when the event was processed."
+	^CurrentInputState mouseButtons!
 initMap
 	"Initialize a new instance with the default keyboard map"
 
@@ -22400,18 +22402,15 @@ waitForControllerEvent
 	"Block until a controller-relevant event (button transition) occurs.
 	 Used by controller loops (searchForActiveController, controlLoop).
 
-	 Handshake protocol with InputProcess:
-	 1. InputProcess processes button event, updates sensor state
-	 2. InputProcess signals ControllerSemaphore, waits on HandshakeSemaphore
-	 3. Controller wakes here, IMMEDIATELY signals HandshakeSemaphore
-	 4. Controller continues processing (signal doesn't preempt - cooperative)
-	 5. InputProcess is unblocked but won't run until controller waits
+	 Handshake protocol:
+	 1. InputProcess signals ControllerSemaphore, waits on HandshakeSemaphore
+	 2. Controller wakes here, immediately signals HandshakeSemaphore
+	 3. Controller continues (cooperative multitasking - signal doesn't preempt)
 
-	 IMPORTANT: Return immediately if user input is active (button pressed or key held).
-	 This allows controller loops to keep processing continuous input states."
+	 Controllers use bitState (processed state) so they see correct button values.
+	 Return immediately if user input is active (button pressed or key held)."
 	(self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
 	InputState controllerSemaphore wait.
-	"Acknowledge receipt - InputProcess unblocked but we continue (cooperative)"
 	InputState handshakeSemaphore signal!
 waitForEvent
 	"Block until any input event (mouse, keyboard, or timer) arrives.
@@ -22545,11 +22544,11 @@ Instance Variables:
 
 !InputState methodsFor: 'initialize-release'!
 install
-	"Initialize and connect the receiver to the hardware.  Terminate the old input
+	"Initialize and connect the receiver to the hardware. Terminate the old input
 	process if any. Dual-semaphore architecture:
 	 - InputSemaphore: VM signals on ALL raw input, wakes InputProcess
-	 - ControllerSemaphore: InputProcess signals on button events, wakes controllers
-	 - HandshakeSemaphore: Controller signals to acknowledge receipt, InputProcess waits"
+	 - ControllerSemaphore: InputProcess signals on button changes, wakes controllers
+	 - HandshakeSemaphore: Controller signals to acknowledge, InputProcess waits"
 
 	InputProcess == nil ifFalse: [InputProcess terminate].
 	self initState.
@@ -22724,15 +22723,16 @@ run
 	 Each InputSemaphore wait corresponds to ONE OS event (via counting semaphore).
 	 Process all words for that event until sentinel (type 6) or 0.
 
-	 After button DOWN (type=3) only, use handshake protocol to wake sleeping controller:
-	 1. Signal ControllerSemaphore (adds controller to ready queue, no preempt)
-	 2. Wait on HandshakeSemaphore (blocks InputProcess, controller runs)
-	 3. Controller signals HandshakeSemaphore (InputProcess unblocked, no preempt)
-	 4. Controller continues processing (cooperative multitasking)
+	 Handshake protocol on button state change:
+	 1. Signal ControllerSemaphore (controller added to ready queue)
+	 2. Wait on HandshakeSemaphore (InputProcess blocks, controller runs)
+	 3. Controller signals HandshakeSemaphore (InputProcess unblocked)
+	 4. Controller continues (cooperative multitasking)
 
-	 Button UP (type=4) does NOT handshake - controller is busy processing and polls state."
+	 Controllers use bitState (processed state) so they see correct button values."
 
-	| word type param |
+	| word type param prevBits newBits |
+	prevBits _ bitState bitAnd: 7.
 	[true]
 		whileTrue:
 			[InputSemaphore wait.
@@ -22747,12 +22747,13 @@ run
 						ifFalse:
 							[type = 2
 								ifTrue: [y _ param "Mouse Y"]
-								ifFalse:
-									[self nextEvent: type with: param.
-									 "After button DOWN only: handshake with controller"
-									 (type = 3 and: [param >= BitMin and: [param <= (BitMin + 2)]]) ifTrue:
-										[ControllerSemaphore signal.
-										 HandshakeSemaphore wait]]]]]! !
+								ifFalse: [self nextEvent: type with: param]]].
+			"Signal controllers if button state changed, then wait for handshake"
+			newBits _ bitState bitAnd: 7.
+			newBits ~= prevBits ifTrue:
+				[prevBits _ newBits.
+				 ControllerSemaphore signal.
+				 HandshakeSemaphore wait]]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputState class
@@ -22772,16 +22773,14 @@ initialize
 
 !InputState class methodsFor: 'accessing'!
 controllerSemaphore
-	"Answer the semaphore that is signaled by InputProcess after processing events.
-	 Used by Processor yield (via Sensor waitForEvent) for true idle suspension.
+	"Answer the semaphore that is signaled by InputProcess on button state changes.
+	 Used by Sensor waitForControllerEvent for true idle suspension.
 	 Separate from InputSemaphore to avoid contention with InputProcess."
 	^ControllerSemaphore!
 handshakeSemaphore
 	"Answer the semaphore used for InputProcess/Controller synchronization.
 	 InputProcess waits on this after signaling ControllerSemaphore.
-	 Controller signals this immediately upon waking to acknowledge receipt.
-	 This lets Controller continue processing while InputProcess is unblocked
-	 but won't run (cooperative multitasking - signal doesn't preempt)."
+	 Controller signals this immediately upon waking to acknowledge receipt."
 	^HandshakeSemaphore!
 inputSemaphore
 	"Answer the semaphore that is signaled when input events arrive.
