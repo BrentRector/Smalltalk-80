@@ -154,11 +154,11 @@ internal class StackManager(
                     {
                         try
                         {
-                            var bytes = heapManager.GetIndexedBytes(litOOP);
-                            if (bytes != null)
-                            {
-                                litValue = $" = \"{System.Text.Encoding.UTF8.GetString(bytes)}\"";
-                            }
+                            int size = heapManager.GetIndexedSize(litOOP);
+                            byte[] bytes = new byte[size];
+                            for (int b = 0; b < size; b++)
+                                bytes[b] = heapManager.GetIndexedByte(litOOP, b);
+                            litValue = $" = \"{System.Text.Encoding.UTF8.GetString(bytes)}\"";
                         }
                         catch { /* ignore */ }
                     }
@@ -190,11 +190,11 @@ internal class StackManager(
                             var senderLitClass = senderFirstLit.IsSmallInteger ? "SmallInteger" : helpers.GetClassName(helpers.GetClass(senderFirstLit));
                             if (senderLitClass == "Symbol")
                             {
-                                var bytes = heapManager.GetIndexedBytes(senderFirstLit);
-                                if (bytes != null)
-                                {
-                                    Console.WriteLine($"  Sender first literal (selector?): \"{System.Text.Encoding.UTF8.GetString(bytes)}\"");
-                                }
+                                int sndSize = heapManager.GetIndexedSize(senderFirstLit);
+                                byte[] sndBytes = new byte[sndSize];
+                                for (int sb = 0; sb < sndSize; sb++)
+                                    sndBytes[sb] = heapManager.GetIndexedByte(senderFirstLit, sb);
+                                Console.WriteLine($"  Sender first literal (selector?): \"{System.Text.Encoding.UTF8.GetString(sndBytes)}\"");
                             }
                         }
                     }
