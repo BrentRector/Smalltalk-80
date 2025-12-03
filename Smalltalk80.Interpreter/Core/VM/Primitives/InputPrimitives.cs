@@ -166,13 +166,13 @@ public static class InputOperations
             SmalltalkOOP arrayOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP.Value, 7);
 
             // Fill array: #(eventType x y buttonMask hasTransition keyCode isKeyDown)
-            context.HeapManager.SetIndexedField(arrayOOP, 0, SmalltalkOOP.FromSmallInteger(eventType));
-            context.HeapManager.SetIndexedField(arrayOOP, 1, SmalltalkOOP.FromSmallInteger(x));
-            context.HeapManager.SetIndexedField(arrayOOP, 2, SmalltalkOOP.FromSmallInteger(y));
-            context.HeapManager.SetIndexedField(arrayOOP, 3, SmalltalkOOP.FromSmallInteger(buttonMask));
-            context.HeapManager.SetIndexedField(arrayOOP, 4, hasTransition ? context.HeapManager.GetTrue() : context.HeapManager.GetFalse());
-            context.HeapManager.SetIndexedField(arrayOOP, 5, SmalltalkOOP.FromSmallInteger(keyCode));
-            context.HeapManager.SetIndexedField(arrayOOP, 6, isKeyDown ? context.HeapManager.GetTrue() : context.HeapManager.GetFalse());
+            context.HeapManager.SetIndexedOOP(arrayOOP, 0, SmalltalkOOP.FromSmallInteger(eventType));
+            context.HeapManager.SetIndexedOOP(arrayOOP, 1, SmalltalkOOP.FromSmallInteger(x));
+            context.HeapManager.SetIndexedOOP(arrayOOP, 2, SmalltalkOOP.FromSmallInteger(y));
+            context.HeapManager.SetIndexedOOP(arrayOOP, 3, SmalltalkOOP.FromSmallInteger(buttonMask));
+            context.HeapManager.SetIndexedOOP(arrayOOP, 4, hasTransition ? context.Metadata!.KnownObjects.True : context.Metadata!.KnownObjects.False);
+            context.HeapManager.SetIndexedOOP(arrayOOP, 5, SmalltalkOOP.FromSmallInteger(keyCode));
+            context.HeapManager.SetIndexedOOP(arrayOOP, 6, isKeyDown ? context.Metadata!.KnownObjects.True : context.Metadata!.KnownObjects.False);
 
             return PrimitiveResult.Ok(arrayOOP);
         }
