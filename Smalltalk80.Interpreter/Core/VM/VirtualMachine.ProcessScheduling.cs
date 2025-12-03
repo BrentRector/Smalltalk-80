@@ -92,14 +92,18 @@ public partial class VirtualMachine
             var schedulerOOP = _metadata.ProcessorScheduler;
             if (schedulerOOP != _metadata.KnownObjects.Nil)
             {
-                Console.WriteLine($"[PREEMPT] Switching from priority={activePriority} to priority={wokenPriority} process={wokenProcessOOP}");
+                Console.WriteLine($"[PREEMPT] Switching from priority={activePriority} process={activeProcessOOP} to priority={wokenPriority} process={wokenProcessOOP}");
+
+                // Put the preempted process back into its ready queue
+                // (it was active, so not in any queue - must return it to runnable state)
+                if (activeProcessOOP != _metadata.KnownObjects.Nil)
+                {
+                    Console.WriteLine($"[PREEMPT] Returning preempted process={activeProcessOOP} priority={activePriority} to ready queue");
+                    AddProcessToReadyQueue(activeProcessOOP, activePriority);
+                }
 
                 // Set woken process as active
                 _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, wokenProcessOOP);
-
-                // Note: We don't need to save/restore contexts here because:
-                // - If we're in EnterIdleWait(), background process has no meaningful context to save
-                // - The context switch happens naturally when we exit idle and check GetActiveProcess()
             }
         }
         else
