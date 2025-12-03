@@ -62,7 +62,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         IPrimitiveMessageSender? messageSender = null,
         VMMetadata? metadata = null,
         IStackManager? stackManager = null,
-        ITimerManager? timerManager = null)
+        ITimerManager? timerManager = null,
+        IProcessScheduler? processScheduler = null)
     {
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
@@ -83,7 +84,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 cacheManager: cacheManager,
                 messageSender: messageSender,
                 metadata: metadata,
-                timerManager: timerManager
+                timerManager: timerManager,
+                processScheduler: processScheduler
             );
 
             var result = primitive.Execute(execContext);

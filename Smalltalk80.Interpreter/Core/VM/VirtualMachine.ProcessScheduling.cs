@@ -1,22 +1,19 @@
 using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Core.VM.Scheduling;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
 /// Partial class containing process scheduling support methods.
-/// These methods implement the Smalltalk-80 process scheduling mechanism
-/// including timer-based semaphore signaling, process queue management,
-/// and context switching.
+/// Implements IProcessScheduler to provide a unified API for process scheduling
+/// used by both the VM interpreter loop and primitive implementations.
 /// </summary>
-public partial class VirtualMachine
+public partial class VirtualMachine : IProcessScheduler
 {
     /// <summary>
     /// Checks if a timer has expired and signals the associated semaphore.
     /// This is the core mechanism for the Delay class.
     /// Called periodically from the interpreter loop.
-    ///
-    /// IMPORTANT: After signaling, this also checks for preemption - if a higher-priority
-    /// process became ready, it switches activeProcess to that process.
     /// </summary>
     private void CheckAndSignalExpiredTimer()
     {
@@ -28,123 +25,10 @@ public partial class VirtualMachine
         SignalSemaphoreWithPreemption(semaphoreOOP);
     }
 
-    /// <summary>
-    /// Signals a semaphore and handles preemption if a higher-priority process wakes up.
-    /// This is the core semaphore signaling mechanism used by timer expiration and
-    /// potentially input event handling.
-    ///
-    /// Blue Book semantics:
-    /// 1. If processes waiting: wake first waiter, add to ready queue
-    /// 2. If no waiters: increment excessSignals
-    /// 3. After waking: if woken process has higher priority than active, preempt
-    /// </summary>
-    private void SignalSemaphoreWithPreemption(SmalltalkOOP semaphoreOOP)
-    {
-        // Semaphore layout: firstLink (0), lastLink (1), excessSignals (2)
-        var firstLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+    #region IProcessScheduler Implementation
 
-        if (firstLinkOOP == _metadata.KnownObjects.Nil)
-        {
-            // No processes waiting - increment excessSignals
-            var excessOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
-            if (excessOOP.IsSmallInteger)
-            {
-                int excess = excessOOP.AsSmallInteger();
-                _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX,
-                    SmalltalkOOP.FromSmallInteger(excess + 1));
-            }
-            return;  // No process woken, no preemption needed
-        }
-
-        // Process is waiting - wake it up
-        var wokenProcessOOP = firstLinkOOP;
-
-        // Remove from semaphore's wait list
-        var nextLinkOOP = _heapManager.GetInstanceVariable(wokenProcessOOP, VMConstants.LINK_NEXTLINK_INDEX);
-        _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, nextLinkOOP);
-        if (nextLinkOOP == _metadata.KnownObjects.Nil)
-        {
-            _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, _metadata.KnownObjects.Nil);
-        }
-
-        // Clear process's myList and nextLink
-        _heapManager.SetInstanceVariable(wokenProcessOOP, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
-        _heapManager.SetInstanceVariable(wokenProcessOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
-
-        // Get woken process priority
-        var wokenPriorityOOP = _heapManager.GetInstanceVariable(wokenProcessOOP, VMConstants.PROCESS_PRIORITY_INDEX);
-        int wokenPriority = wokenPriorityOOP.IsSmallInteger ? wokenPriorityOOP.AsSmallInteger() : 0;
-
-        // Get active process priority
-        var activeProcessOOP = GetActiveProcess();
-        int activePriority = 0;
-        if (activeProcessOOP != _metadata.KnownObjects.Nil)
-        {
-            var activePriorityOOP = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_PRIORITY_INDEX);
-            activePriority = activePriorityOOP.IsSmallInteger ? activePriorityOOP.AsSmallInteger() : 0;
-        }
-
-        // Check for preemption: if woken process has higher priority, switch to it
-        if (wokenPriority > activePriority)
-        {
-            Console.WriteLine($"[PREEMPT] Preempting priority={activePriority} for priority={wokenPriority}");
-
-            // Suspend current process and return it to ready queue
-            SuspendActiveProcess(returnToQueue: true);
-
-            // Activate the woken process
-            ActivateProcess(wokenProcessOOP, "preemption");
-        }
-        else
-        {
-            // No preemption needed - just add to ready queue
-            Console.WriteLine($"[QUEUE+] Process={wokenProcessOOP} priority={wokenPriority} added to ready queue (no preempt, active priority={activePriority})");
-            AddProcessToReadyQueue(wokenProcessOOP, wokenPriority);
-        }
-    }
-
-    /// <summary>
-    /// Adds a process to the appropriate priority ready queue.
-    /// </summary>
-    private void AddProcessToReadyQueue(SmalltalkOOP processOOP, int priority)
-    {
-        var schedulerOOP = _metadata.ProcessorScheduler;
-        if (schedulerOOP == _metadata.KnownObjects.Nil)
-            return;
-
-        var processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
-        if (processListsOOP == _metadata.KnownObjects.Nil)
-            return;
-
-        // Get the LinkedList for this priority (index = priority - 1)
-        int index = priority - 1;
-        if (index < 0 || index >= _heapManager.GetIndexedSize(processListsOOP))
-            return;
-
-        var listOOP = _heapManager.GetIndexedOOP(processListsOOP, index);
-        if (listOOP == _metadata.KnownObjects.Nil)
-            return;
-
-        // Add process to end of list (LinkedList>>addLast:)
-        var lastLinkOOP = _heapManager.GetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
-        if (lastLinkOOP == _metadata.KnownObjects.Nil)
-        {
-            // List is empty
-            _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, processOOP);
-        }
-        else
-        {
-            // Append to end
-            _heapManager.SetInstanceVariable(lastLinkOOP, VMConstants.LINK_NEXTLINK_INDEX, processOOP);
-        }
-        _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, processOOP);
-        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, listOOP);
-    }
-
-    /// <summary>
-    /// Gets the currently active process OOP from ProcessorScheduler.
-    /// </summary>
-    private SmalltalkOOP GetActiveProcess()
+    /// <inheritdoc/>
+    public SmalltalkOOP GetActiveProcess()
     {
         SmalltalkOOP schedulerOOP = _metadata.ProcessorScheduler;
         if (schedulerOOP == _metadata.KnownObjects.Nil)
@@ -153,20 +37,8 @@ public partial class VirtualMachine
         return _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
     }
 
-    /// <summary>
-    /// Activates a process - sets it as the active process and switches to its context.
-    /// This is the common code path for all process switches (preemption, termination, yield).
-    ///
-    /// Steps:
-    /// 1. Update ProcessorScheduler.activeProcess
-    /// 2. Get the process's suspended context
-    /// 3. If BlockContext with nil PC, initialize it (set PC=startPC, stackp=0)
-    /// 4. Switch _contextManager.ActiveContext to the process's context
-    /// </summary>
-    /// <param name="processOOP">The process to activate</param>
-    /// <param name="reason">Logging reason (e.g., "preemption", "termination")</param>
-    /// <returns>True if successfully activated, false if context is invalid</returns>
-    private bool ActivateProcess(SmalltalkOOP processOOP, string reason)
+    /// <inheritdoc/>
+    public bool ActivateProcess(SmalltalkOOP processOOP, string reason)
     {
         var schedulerOOP = _metadata.ProcessorScheduler;
         if (schedulerOOP == _metadata.KnownObjects.Nil)
@@ -213,12 +85,8 @@ public partial class VirtualMachine
         return true;
     }
 
-    /// <summary>
-    /// Suspends the current active process - saves its context and optionally returns it to ready queue.
-    /// Used when preempting or yielding.
-    /// </summary>
-    /// <param name="returnToQueue">If true, adds the process back to its priority queue</param>
-    private void SuspendActiveProcess(bool returnToQueue)
+    /// <inheritdoc/>
+    public void SuspendActiveProcess(bool returnToQueue)
     {
         var activeProcessOOP = GetActiveProcess();
         if (activeProcessOOP == _metadata.KnownObjects.Nil)
@@ -242,127 +110,44 @@ public partial class VirtualMachine
         }
     }
 
-    /// <summary>
-    /// Switches execution to the next runnable process when the current process terminates.
-    /// Used by HandleReturn when a forked process completes its block.
-    /// Returns true if successfully switched, false if no runnable processes found.
-    /// </summary>
-    private bool SwitchToNextRunnableProcess(SmalltalkOOP terminatingProcess)
+    /// <inheritdoc/>
+    public void AddProcessToReadyQueue(SmalltalkOOP processOOP, int priority)
     {
-        SmalltalkOOP schedulerOOP = _metadata.ProcessorScheduler;
+        var schedulerOOP = _metadata.ProcessorScheduler;
         if (schedulerOOP == _metadata.KnownObjects.Nil)
-            return false;
-
-        // Find highest priority runnable process
-        SmalltalkOOP nextProcess = FindHighestPriorityRunnableProcess(schedulerOOP);
-        if (nextProcess == _metadata.KnownObjects.Nil)
-        {
-            // This is the error condition - dump queues for debugging
-            Console.WriteLine($"[SwitchToNextRunnableProcess] No runnable process found!");
-            DumpProcessQueues(schedulerOOP);
-            return false;
-        }
-
-        // Remove the process from its priority queue (it's about to become active)
-        SmalltalkOOP myListOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX);
-        if (myListOOP != _metadata.KnownObjects.Nil)
-        {
-            RemoveProcessFromList(nextProcess, myListOOP);
-            _heapManager.SetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
-        }
-
-        // Activate the process using shared helper
-        return ActivateProcess(nextProcess, "termination");
-    }
-
-    /// <summary>
-    /// Finds the highest priority process that is runnable (on a quiescentProcessList).
-    /// Searches from priority 8 down to priority 1.
-    /// </summary>
-    private SmalltalkOOP FindHighestPriorityRunnableProcess(SmalltalkOOP schedulerOOP)
-    {
-        SmalltalkOOP processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
-        if (processListsOOP == _metadata.KnownObjects.Nil)
-            return _metadata.KnownObjects.Nil;
-
-        // Search from highest priority (8) down to lowest (1)
-        // Array indices are 0-7 for priorities 1-8
-        for (int priority = 8; priority >= 1; priority--)
-        {
-            int index = priority - 1;
-            SmalltalkOOP priorityListOOP = _heapManager.GetIndexedOOP(processListsOOP, index);
-            if (priorityListOOP == _metadata.KnownObjects.Nil)
-                continue;
-
-            // Check if list has any processes (firstLink != nil)
-            SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-            if (firstLinkOOP != _metadata.KnownObjects.Nil)
-            {
-                return firstLinkOOP;
-            }
-        }
-
-        return _metadata.KnownObjects.Nil;
-    }
-
-    /// <summary>
-    /// Diagnostic method to dump the contents of all process queues.
-    /// </summary>
-    private void DumpProcessQueues(SmalltalkOOP schedulerOOP)
-    {
-        SmalltalkOOP processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
-        if (processListsOOP == _metadata.KnownObjects.Nil)
-        {
-            Console.WriteLine("  quiescentProcessLists is nil!");
             return;
-        }
 
-        int arraySize = _heapManager.GetIndexedSize(processListsOOP);
-        Console.WriteLine($"  quiescentProcessLists array size: {arraySize}");
+        var processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        if (processListsOOP == _metadata.KnownObjects.Nil)
+            return;
 
-        for (int priority = 1; priority <= 8; priority++)
+        // Get the LinkedList for this priority (index = priority - 1)
+        int index = priority - 1;
+        if (index < 0 || index >= _heapManager.GetIndexedSize(processListsOOP))
+            return;
+
+        var listOOP = _heapManager.GetIndexedOOP(processListsOOP, index);
+        if (listOOP == _metadata.KnownObjects.Nil)
+            return;
+
+        // Add process to end of list (LinkedList>>addLast:)
+        var lastLinkOOP = _heapManager.GetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
+        if (lastLinkOOP == _metadata.KnownObjects.Nil)
         {
-            int index = priority - 1;
-            if (index >= arraySize)
-            {
-                Console.WriteLine($"  Priority {priority}: index out of bounds");
-                continue;
-            }
-
-            SmalltalkOOP priorityListOOP = _heapManager.GetIndexedOOP(processListsOOP, index);
-            if (priorityListOOP == _metadata.KnownObjects.Nil)
-            {
-                Console.WriteLine($"  Priority {priority}: LinkedList is nil");
-                continue;
-            }
-
-            SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-            SmalltalkOOP lastLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
-
-            if (firstLinkOOP == _metadata.KnownObjects.Nil)
-            {
-                Console.WriteLine($"  Priority {priority}: empty (firstLink=nil)");
-            }
-            else
-            {
-                // Count processes in the list
-                int count = 0;
-                SmalltalkOOP current = firstLinkOOP;
-                while (current != _metadata.KnownObjects.Nil && count < 100)
-                {
-                    count++;
-                    SmalltalkOOP suspCtx = _heapManager.GetInstanceVariable(current, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-                    Console.WriteLine($"  Priority {priority}: Process {current} (suspendedContext={suspCtx})");
-                    current = _heapManager.GetInstanceVariable(current, VMConstants.LINK_NEXTLINK_INDEX);
-                }
-            }
+            // List is empty
+            _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, processOOP);
         }
+        else
+        {
+            // Append to end
+            _heapManager.SetInstanceVariable(lastLinkOOP, VMConstants.LINK_NEXTLINK_INDEX, processOOP);
+        }
+        _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, processOOP);
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, listOOP);
     }
 
-    /// <summary>
-    /// Removes a process from a linked list (LinkedList structure).
-    /// </summary>
-    private void RemoveProcessFromList(SmalltalkOOP processOOP, SmalltalkOOP listOOP)
+    /// <inheritdoc/>
+    public void RemoveProcessFromList(SmalltalkOOP processOOP, SmalltalkOOP listOOP)
     {
         SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(listOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
         SmalltalkOOP lastLinkOOP = _heapManager.GetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
@@ -405,4 +190,239 @@ public partial class VirtualMachine
         // Clear the removed process's next link
         _heapManager.SetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
     }
+
+    /// <inheritdoc/>
+    public SmalltalkOOP FindHighestPriorityRunnableProcess()
+    {
+        SmalltalkOOP schedulerOOP = _metadata.ProcessorScheduler;
+        if (schedulerOOP == _metadata.KnownObjects.Nil)
+            return _metadata.KnownObjects.Nil;
+
+        SmalltalkOOP processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        if (processListsOOP == _metadata.KnownObjects.Nil)
+            return _metadata.KnownObjects.Nil;
+
+        // Search from highest priority (8) down to lowest (1)
+        // Array indices are 0-7 for priorities 1-8
+        for (int priority = 8; priority >= 1; priority--)
+        {
+            int index = priority - 1;
+            SmalltalkOOP priorityListOOP = _heapManager.GetIndexedOOP(processListsOOP, index);
+            if (priorityListOOP == _metadata.KnownObjects.Nil)
+                continue;
+
+            // Check if list has any processes (firstLink != nil)
+            SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+            if (firstLinkOOP != _metadata.KnownObjects.Nil)
+            {
+                return firstLinkOOP;
+            }
+        }
+
+        return _metadata.KnownObjects.Nil;
+    }
+
+    /// <inheritdoc/>
+    public bool SwitchToNextRunnableProcess(SmalltalkOOP terminatingProcess)
+    {
+        SmalltalkOOP schedulerOOP = _metadata.ProcessorScheduler;
+        if (schedulerOOP == _metadata.KnownObjects.Nil)
+            return false;
+
+        // Find highest priority runnable process
+        SmalltalkOOP nextProcess = FindHighestPriorityRunnableProcess();
+        if (nextProcess == _metadata.KnownObjects.Nil)
+        {
+            // This is the error condition - dump queues for debugging
+            Console.WriteLine($"[SwitchToNextRunnableProcess] No runnable process found!");
+            DumpProcessQueues(schedulerOOP);
+            return false;
+        }
+
+        // Remove the process from its priority queue (it's about to become active)
+        SmalltalkOOP myListOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX);
+        if (myListOOP != _metadata.KnownObjects.Nil)
+        {
+            RemoveProcessFromList(nextProcess, myListOOP);
+            _heapManager.SetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
+        }
+
+        // Activate the process using shared helper
+        return ActivateProcess(nextProcess, "termination");
+    }
+
+    /// <inheritdoc/>
+    public bool ShouldPreempt(SmalltalkOOP processOOP)
+    {
+        SmalltalkOOP activeProcessOOP = GetActiveProcess();
+        if (activeProcessOOP == _metadata.KnownObjects.Nil)
+            return false;
+
+        int processPriority = GetProcessPriority(processOOP);
+        int activePriority = GetProcessPriority(activeProcessOOP);
+
+        // Preempt if new process has STRICTLY higher priority
+        return processPriority > activePriority;
+    }
+
+    /// <inheritdoc/>
+    public void SignalSemaphoreWithPreemption(SmalltalkOOP semaphoreOOP)
+    {
+        // Semaphore layout: firstLink (0), lastLink (1), excessSignals (2)
+        var firstLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+
+        if (firstLinkOOP == _metadata.KnownObjects.Nil)
+        {
+            // No processes waiting - increment excessSignals
+            var excessOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
+            if (excessOOP.IsSmallInteger)
+            {
+                int excess = excessOOP.AsSmallInteger();
+                _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX,
+                    SmalltalkOOP.FromSmallInteger(excess + 1));
+            }
+            return;  // No process woken, no preemption needed
+        }
+
+        // Process is waiting - wake it up
+        var wokenProcessOOP = firstLinkOOP;
+
+        // Remove from semaphore's wait list
+        var nextLinkOOP = _heapManager.GetInstanceVariable(wokenProcessOOP, VMConstants.LINK_NEXTLINK_INDEX);
+        _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, nextLinkOOP);
+        if (nextLinkOOP == _metadata.KnownObjects.Nil)
+        {
+            _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, _metadata.KnownObjects.Nil);
+        }
+
+        // Clear process's myList and nextLink
+        _heapManager.SetInstanceVariable(wokenProcessOOP, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
+        _heapManager.SetInstanceVariable(wokenProcessOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
+
+        // Get priorities for preemption check
+        int wokenPriority = GetProcessPriority(wokenProcessOOP);
+        int activePriority = GetProcessPriority(GetActiveProcess());
+
+        // Check for preemption: if woken process has higher priority, switch to it
+        if (wokenPriority > activePriority)
+        {
+            Console.WriteLine($"[PREEMPT] Preempting priority={activePriority} for priority={wokenPriority}");
+
+            // Suspend current process and return it to ready queue
+            SuspendActiveProcess(returnToQueue: true);
+
+            // Activate the woken process
+            ActivateProcess(wokenProcessOOP, "preemption");
+        }
+        else
+        {
+            // No preemption needed - just add to ready queue
+            Console.WriteLine($"[QUEUE+] Process={wokenProcessOOP} priority={wokenPriority} added to ready queue (no preempt, active priority={activePriority})");
+            AddProcessToReadyQueue(wokenProcessOOP, wokenPriority);
+        }
+    }
+
+    /// <inheritdoc/>
+    public bool WaitOnSemaphore(SmalltalkOOP semaphoreOOP, SmalltalkOOP processOOP)
+    {
+        // Add process to semaphore's wait list (LinkedList>>addLast:)
+        var lastLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
+        if (lastLinkOOP == _metadata.KnownObjects.Nil)
+        {
+            // List is empty
+            _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, processOOP);
+        }
+        else
+        {
+            // Append to end
+            _heapManager.SetInstanceVariable(lastLinkOOP, VMConstants.LINK_NEXTLINK_INDEX, processOOP);
+        }
+        _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, processOOP);
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, semaphoreOOP);
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
+
+        // Switch to next runnable process
+        return SwitchToNextRunnableProcess(processOOP);
+    }
+
+    /// <inheritdoc/>
+    public int GetProcessPriority(SmalltalkOOP processOOP)
+    {
+        if (processOOP == _metadata.KnownObjects.Nil)
+            return 0;
+
+        var priorityOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX);
+        return priorityOOP.IsSmallInteger ? priorityOOP.AsSmallInteger() : 0;
+    }
+
+    /// <inheritdoc/>
+    public SmalltalkOOP GetProcessMyList(SmalltalkOOP processOOP)
+    {
+        return _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX);
+    }
+
+    /// <inheritdoc/>
+    public void SetProcessMyList(SmalltalkOOP processOOP, SmalltalkOOP listOOP)
+    {
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, listOOP);
+    }
+
+    #endregion
+
+    #region Internal Helpers
+
+    /// <summary>
+    /// Diagnostic method to dump the contents of all process queues.
+    /// </summary>
+    private void DumpProcessQueues(SmalltalkOOP schedulerOOP)
+    {
+        SmalltalkOOP processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+        if (processListsOOP == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine("  quiescentProcessLists is nil!");
+            return;
+        }
+
+        int arraySize = _heapManager.GetIndexedSize(processListsOOP);
+        Console.WriteLine($"  quiescentProcessLists array size: {arraySize}");
+
+        for (int priority = 1; priority <= 8; priority++)
+        {
+            int index = priority - 1;
+            if (index >= arraySize)
+            {
+                Console.WriteLine($"  Priority {priority}: index out of bounds");
+                continue;
+            }
+
+            SmalltalkOOP priorityListOOP = _heapManager.GetIndexedOOP(processListsOOP, index);
+            if (priorityListOOP == _metadata.KnownObjects.Nil)
+            {
+                Console.WriteLine($"  Priority {priority}: LinkedList is nil");
+                continue;
+            }
+
+            SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+
+            if (firstLinkOOP == _metadata.KnownObjects.Nil)
+            {
+                Console.WriteLine($"  Priority {priority}: empty (firstLink=nil)");
+            }
+            else
+            {
+                // Count processes in the list
+                int count = 0;
+                SmalltalkOOP current = firstLinkOOP;
+                while (current != _metadata.KnownObjects.Nil && count < 100)
+                {
+                    count++;
+                    SmalltalkOOP suspCtx = _heapManager.GetInstanceVariable(current, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+                    Console.WriteLine($"  Priority {priority}: Process {current} (suspendedContext={suspCtx})");
+                    current = _heapManager.GetInstanceVariable(current, VMConstants.LINK_NEXTLINK_INDEX);
+                }
+            }
+        }
+    }
+
+    #endregion
 }

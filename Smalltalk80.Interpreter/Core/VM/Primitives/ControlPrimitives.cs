@@ -1,19 +1,18 @@
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Core.VM.Scheduling;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
 /// <summary>
 /// Control flow primitives using new IPrimitive interface.
 /// Implements blocks (80-82), perform (83-84), process management (85-88), and cache (89).
+///
+/// Process management primitives (85-88) use IProcessScheduler for all process operations,
+/// ensuring consistency with the VM's process scheduling implementation.
 /// </summary>
 public static class ControlPrimitives
 {
-    // Debug flag for verbose process scheduling primitives (very noisy)
-    private static readonly bool DebugProcessScheduling = false;
-
-    // Debug flag for priority queue add/remove operations only (concise)
-    private static readonly bool DebugPriorityQueues = true;
     /// <summary>Primitive 80: blockCopy: - Creates a new BlockContext</summary>
     /// <remarks>
     /// BLUE BOOK COMPLIANT: Only accepts block argument count.
@@ -63,12 +62,6 @@ public static class ControlPrimitives
         /// Static helper for creating BlockContext. Called by BytecodeInterpreter directly
         /// for blockCopy: special selector handling.
         /// </summary>
-        /// <param name="heapManager">Heap manager for allocation and field access</param>
-        /// <param name="activeContext">The current active context (receiver)</param>
-        /// <param name="blockContextClassOOP">BlockContext class OOP</param>
-        /// <param name="blockArgumentCount">Number of block arguments (SmallInteger)</param>
-        /// <param name="currentPC">Current instruction pointer</param>
-        /// <returns>PrimitiveResult with newly created BlockContext OOP</returns>
         public static PrimitiveResult CreateBlockContext(
             ISmalltalkHeap heapManager,
             SmalltalkOOP activeContext,
@@ -115,11 +108,6 @@ public static class ControlPrimitives
     }
 
     /// <summary>Primitive 81: value* - Activates a BlockContext with 0-3 direct arguments</summary>
-    /// <remarks>
-    /// BLUE BOOK COMPLIANT: Arguments are pushed onto the BlockContext's stack.
-    /// The block's first bytecodes (POP_STORE_TEMP) will pop them into the correct temp slots.
-    /// This correctly handles non-contiguous slot mappings when block args have same names as method temps.
-    /// </remarks>
     public class Value : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -150,8 +138,6 @@ public static class ControlPrimitives
             context.HeapManager.SetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_PC_INDEX, initialIP);
 
             // BLUE BOOK: Push arguments onto BlockContext's stack (in order)
-            // The block's first bytecodes (POP_STORE_TEMP) will pop them into correct temp slots
-            // Stack grows from index 0 upward, stackp points to next free slot
             for (int i = 0; i < argumentCount; i++)
             {
                 context.HeapManager.SetIndexedOOP(blockContext, i, context.Arguments[i]);
@@ -173,10 +159,6 @@ public static class ControlPrimitives
     }
 
     /// <summary>Primitive 82: valueWithArguments: - Activates a BlockContext with an Array of arguments</summary>
-    /// <remarks>
-    /// BLUE BOOK COMPLIANT: Arguments are pushed onto the BlockContext's stack.
-    /// The block's first bytecodes (POP_STORE_TEMP) will pop them into the correct temp slots.
-    /// </remarks>
     public class ValueWithArguments : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -213,7 +195,6 @@ public static class ControlPrimitives
             context.HeapManager.SetInstanceVariable(blockContext, VMConstants.BLOCKCONTEXT_PC_INDEX, initialIP);
 
             // BLUE BOOK: Push arguments onto BlockContext's stack (in order)
-            // The block's first bytecodes (POP_STORE_TEMP) will pop them into correct temp slots
             for (int i = 0; i < arraySize; i++)
             {
                 var argOOP = context.HeapManager.GetIndexedOOP(arrayArg, i);
@@ -235,20 +216,7 @@ public static class ControlPrimitives
         }
     }
 
-    /// <summary>
-    /// Primitive 83: perform:, perform:with:, perform:with:with:, perform:with:with:with:
-    /// Dynamically sends a message with variable arguments.
-    ///
-    /// Arguments:
-    /// - args[0] = selector (Symbol)
-    /// - args[1..n] = message arguments (0-3 additional args)
-    ///
-    /// This primitive handles all perform: variants:
-    /// - perform: aSymbol                              → 1 arg (selector only), send with 0 args
-    /// - perform: aSymbol with: arg1                   → 2 args, send with 1 arg
-    /// - perform: aSymbol with: arg1 with: arg2        → 3 args, send with 2 args
-    /// - perform: aSymbol with: arg1 with: arg2 with: arg3 → 4 args, send with 3 args
-    /// </summary>
+    /// <summary>Primitive 83: perform: variants - Dynamically sends a message</summary>
     public class Perform : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -291,17 +259,7 @@ public static class ControlPrimitives
         }
     }
 
-    /// <summary>
-    /// Primitive 84: perform:withArguments:
-    /// Dynamically sends a message using arguments from an Array.
-    ///
-    /// Arguments:
-    /// - args[0] = selector (Symbol)
-    /// - args[1] = Array containing the message arguments
-    ///
-    /// The elements of the Array are extracted and passed as individual arguments
-    /// to the message send.
-    /// </summary>
+    /// <summary>Primitive 84: perform:withArguments: - Dynamically sends a message with Array args</summary>
     public class PerformWithArguments : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -336,267 +294,134 @@ public static class ControlPrimitives
         }
     }
 
-    /// <summary>Primitive 85: signal - Signals a Semaphore</summary>
+    /// <summary>
+    /// Primitive 85: signal - Signals a Semaphore.
+    /// Uses IProcessScheduler for all process scheduling operations.
+    /// </summary>
     public class Signal : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Signal] Called with receiver={context.Receiver}");
-
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver must be a Semaphore
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            string? className = context.GetClassNameForObject(context.Receiver);
-            if (className == null) return PrimitiveResult.Fail(context.Metadata!);
+            var scheduler = context.ProcessScheduler;
+            if (scheduler == null) return PrimitiveResult.Fail(context.Metadata!);
 
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Signal] Receiver class: {className}");
+            // Use the unified signaling method from IProcessScheduler
+            // This handles: wake first waiter, preemption check, or increment excessSignals
+            scheduler.SignalSemaphoreWithPreemption(context.Receiver);
 
-            // Get Semaphore fields
-            SmalltalkOOP firstLinkOop = context.GetFieldValue(context.Receiver, className, "firstLink");
-            SmalltalkOOP excessSignalsOop = context.GetFieldValue(context.Receiver, className, "excessSignals");
-
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Signal] firstLink={firstLinkOop}, excessSignals={excessSignalsOop}");
-
-            if (firstLinkOop == context.HeapManager.GetNil())
-            {
-                // No processes waiting - increment excessSignals
-                if (!excessSignalsOop.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-
-                int excessCount = excessSignalsOop.AsSmallInteger();
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Signal] No waiters, incrementing excessSignals from {excessCount} to {excessCount + 1}");
-                context.SetFieldValue(context.Receiver, className, "excessSignals", SmalltalkOOP.FromSmallInteger(excessCount + 1));
-            }
-            else
-            {
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Signal] Waking first waiting process");
-                // Processes are waiting - wake up the first one
-                SmalltalkOOP processOop = RemoveFirstLink(context, context.Receiver, className);
-
-                if (processOop == context.HeapManager.GetNil())
-                    return PrimitiveResult.Fail(context.Metadata!);
-
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Signal] Waking process: {processOop}");
-
-                // Check if woken process has higher priority - if so, preempt immediately
-                if (ShouldPreempt(context, processOop))
-                {
-                    if (DebugProcessScheduling)
-                        Console.WriteLine($"[Signal] Preempting to woken process");
-                    SmalltalkOOP activeProcessOop = GetActiveProcess(context);
-
-                    // CRITICAL: Push signal result onto signaling process's stack BEFORE switching
-                    // The woken process already has its wait result on its stack from when it was suspended
-                    if (context.StackManager != null)
-                    {
-                        context.StackManager.Push(context.Receiver);
-                        if (DebugProcessScheduling)
-                            Console.WriteLine($"[Signal] Pushed receiver onto signaling process stack before preempt");
-                    }
-
-                    // Put current process on its priority queue (it will run later)
-                    ResumeProcess(context, activeProcessOop);
-                    // Switch directly to the higher priority process (don't add it to queue)
-                    SwitchToProcess(context, activeProcessOop, processOop);
-
-                    // Result already pushed onto suspended process's stack
-                    // _contextSwitchedByPrimitive prevents double-push
-                    return PrimitiveResult.Ok(context.Receiver);
-                }
-                else
-                {
-                    if (DebugProcessScheduling)
-                        Console.WriteLine($"[Signal] No preempt, adding woken process to queue");
-                    // Woken process has same or lower priority - add to queue, it runs later
-                    if (!ResumeProcess(context, processOop))
-                        return PrimitiveResult.Fail(context.Metadata!);
-                    // No preemption - result will be pushed normally onto signaling process's stack
-                }
-            }
-
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Signal] SUCCESS");
             return PrimitiveResult.Ok(context.Receiver);
         }
     }
 
-    /// <summary>Primitive 86: wait - Waits on a Semaphore</summary>
+    /// <summary>
+    /// Primitive 86: wait - Waits on a Semaphore.
+    /// Uses IProcessScheduler for all process scheduling operations.
+    /// </summary>
     public class Wait : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Wait] Called with receiver={context.Receiver}");
-
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver must be a Semaphore
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            string? className = context.GetClassNameForObject(context.Receiver);
-            if (className == null) return PrimitiveResult.Fail(context.Metadata!);
-
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Wait] Semaphore class: {className}");
+            var scheduler = context.ProcessScheduler;
+            if (scheduler == null) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get excessSignals field
-            SmalltalkOOP excessSignalsOop = context.GetFieldValue(context.Receiver, className, "excessSignals");
+            SmalltalkOOP excessSignalsOop = context.HeapManager.GetInstanceVariable(
+                context.Receiver, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
 
             if (!excessSignalsOop.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int excessCount = excessSignalsOop.AsSmallInteger();
 
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Wait] excessSignals={excessCount}");
-
             if (excessCount > 0)
             {
                 // Signal available - decrement and continue
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Wait] Signal available, decrementing and continuing");
-                context.SetFieldValue(context.Receiver, className, "excessSignals", SmalltalkOOP.FromSmallInteger(excessCount - 1));
+                context.HeapManager.SetInstanceVariable(context.Receiver, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX,
+                    SmalltalkOOP.FromSmallInteger(excessCount - 1));
                 return PrimitiveResult.Ok(context.Receiver);
             }
             else
             {
                 // No signal available - must suspend active process and switch to another
-                SmalltalkOOP activeProcessOop = GetActiveProcess(context);
-
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Wait] No signal, suspending active process {activeProcessOop}");
+                SmalltalkOOP activeProcessOop = scheduler.GetActiveProcess();
 
                 if (activeProcessOop == context.HeapManager.GetNil())
                     return PrimitiveResult.Fail(context.Metadata!);
 
-                // CRITICAL: Push result onto the suspending process's stack BEFORE switching
+                // Push result onto the suspending process's stack BEFORE switching
                 // When this process resumes later, execution continues after the wait call
-                // and expects the result (receiver) to be on the stack
                 if (context.StackManager != null)
                 {
                     context.StackManager.Push(context.Receiver);
-                    if (DebugProcessScheduling)
-                        Console.WriteLine($"[Wait] Pushed receiver onto suspending process stack");
                 }
 
-                // Add active process to semaphore's waiting list
-                AddLastLink(context, context.Receiver, className, activeProcessOop);
-
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Wait] Added process to semaphore waiting list");
-
-                // Perform context switch to next runnable process
-                if (!SwitchToHighestPriorityProcess(context, activeProcessOop))
+                // Add process to semaphore wait list and switch to next runnable process
+                if (!scheduler.WaitOnSemaphore(context.Receiver, activeProcessOop))
                 {
-                    if (DebugProcessScheduling)
-                        Console.WriteLine($"[Wait] SwitchToHighestPriorityProcess FAILED");
-                    // Context switch failed - undo everything to leave state consistent
+                    // Context switch failed - undo the push
                     if (context.StackManager != null)
-                        context.StackManager.Pop(); // Undo the push
-                    RemoveProcessFromList(context, activeProcessOop, context.Receiver);
-                    context.SetFieldValue(activeProcessOop, "class:Process", "myList", context.HeapManager.GetNil());
+                        context.StackManager.Pop();
                     return PrimitiveResult.Fail(context.Metadata!);
                 }
 
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Wait] SUCCESS - switched to another process");
                 // Result already pushed onto suspended process's stack
-                // _contextSwitchedByPrimitive prevents double-push
                 return PrimitiveResult.Ok(context.Receiver);
             }
         }
     }
 
-    /// <summary>Primitive 87: resume - Resumes a suspended Process</summary>
+    /// <summary>
+    /// Primitive 87: resume - Resumes a suspended Process.
+    /// Uses IProcessScheduler for all process scheduling operations.
+    /// </summary>
     public class Resume : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Resume] Called with receiver={context.Receiver}");
-
-            if (context.Arguments.Length != 0)
-            {
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Resume] FAIL: Wrong argument count {context.Arguments.Length}");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             // Receiver must be a Process
-            if (context.Receiver.IsSmallInteger)
-            {
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Resume] FAIL: Receiver is SmallInteger");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            string? className = context.GetClassNameForObject(context.Receiver);
-            if (className == null)
-            {
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Resume] FAIL: Cannot get class name");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+            var scheduler = context.ProcessScheduler;
+            if (scheduler == null) return PrimitiveResult.Fail(context.Metadata!);
 
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Resume] Receiver class: {className}");
-
-            // Get Process fields: myList must be nil (not already scheduled)
-            SmalltalkOOP myListOop = context.GetFieldValue(context.Receiver, className, "myList");
-
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Resume] myList={myListOop}");
-
-            // Fail if already on a list
+            // Process must not already be on a list
+            SmalltalkOOP myListOop = scheduler.GetProcessMyList(context.Receiver);
             if (myListOop != context.HeapManager.GetNil())
-            {
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Resume] FAIL: Process already on a list");
                 return PrimitiveResult.Fail(context.Metadata!);
-            }
 
-            // Get process priority for debug
-            SmalltalkOOP processPriorityOop = context.HeapManager.GetInstanceVariable(context.Receiver, VMConstants.PROCESS_PRIORITY_INDEX);
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Resume] Process priority: {(processPriorityOop.IsSmallInteger ? processPriorityOop.AsSmallInteger().ToString() : "NOT_SMALLINT")}");
-
-            // Check if resumed process has higher priority - if so, preempt immediately
-            if (ShouldPreempt(context, context.Receiver))
+            // Check if resumed process has higher priority - if so, preempt
+            if (scheduler.ShouldPreempt(context.Receiver))
             {
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Resume] Preempting - resumed process has higher priority");
-                SmalltalkOOP activeProcessOop = GetActiveProcess(context);
-                // Put current process on its priority queue (it will run later)
-                ResumeProcess(context, activeProcessOop);
-                // Switch directly to the higher priority process (don't add it to queue)
-                SwitchToProcess(context, activeProcessOop, context.Receiver);
+                // Preempt: suspend current process and switch to resumed process
+                scheduler.SuspendActiveProcess(returnToQueue: true);
+                scheduler.ActivateProcess(context.Receiver, "resume");
             }
             else
             {
-                if (DebugProcessScheduling)
-                    Console.WriteLine($"[Resume] No preemption - adding to queue");
-                // Resumed process has same or lower priority - add to queue, it runs later
-                if (!ResumeProcess(context, context.Receiver))
-                {
-                    if (DebugProcessScheduling)
-                        Console.WriteLine($"[Resume] FAIL: ResumeProcess returned false");
-                    return PrimitiveResult.Fail(context.Metadata!);
-                }
+                // No preemption - add to ready queue
+                int priority = scheduler.GetProcessPriority(context.Receiver);
+                scheduler.AddProcessToReadyQueue(context.Receiver, priority);
             }
 
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[Resume] SUCCESS");
             return PrimitiveResult.Ok(context.Receiver);
         }
     }
 
-    /// <summary>Primitive 88: suspend - Suspends a Process</summary>
+    /// <summary>
+    /// Primitive 88: suspend - Suspends a Process.
+    /// Uses IProcessScheduler for all process scheduling operations.
+    /// </summary>
     public class Suspend : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -606,25 +431,24 @@ public static class ControlPrimitives
             // Receiver must be a Process
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            string? className = context.GetClassNameForObject(context.Receiver);
-            if (className == null) return PrimitiveResult.Fail(context.Metadata!);
+            var scheduler = context.ProcessScheduler;
+            if (scheduler == null) return PrimitiveResult.Fail(context.Metadata!);
 
-            SmalltalkOOP activeProcessOop = GetActiveProcess(context);
+            SmalltalkOOP activeProcessOop = scheduler.GetActiveProcess();
 
             if (context.Receiver == activeProcessOop)
             {
-                // Suspending active process - need to context switch
-                // The active process is NOT on a quiescentProcessList (it's running)
-                // Just save its context and switch to next runnable process
-
-                // CRITICAL: Push result (nil) onto the suspending process's stack BEFORE switching
-                // When/if this process resumes later, execution continues after the suspend call
+                // Suspending active process - save context and switch to next runnable
+                // Push result (nil) onto the suspending process's stack BEFORE switching
                 if (context.StackManager != null)
                 {
                     context.StackManager.Push(context.HeapManager.GetNil());
                 }
 
-                if (!SwitchToHighestPriorityProcess(context, activeProcessOop))
+                // Suspend without returning to queue (process is suspended, not ready)
+                scheduler.SuspendActiveProcess(returnToQueue: false);
+
+                if (!scheduler.SwitchToNextRunnableProcess(activeProcessOop))
                 {
                     // Context switch failed - undo the push
                     if (context.StackManager != null)
@@ -633,27 +457,24 @@ public static class ControlPrimitives
                 }
 
                 // Clear myList to indicate suspended (not on any list)
-                context.SetFieldValue(context.Receiver, className, "myList", context.HeapManager.GetNil());
+                scheduler.SetProcessMyList(context.Receiver, context.HeapManager.GetNil());
 
-                // Result already pushed onto suspended process's stack
-                // _contextSwitchedByPrimitive prevents double-push
                 return PrimitiveResult.Ok(context.HeapManager.GetNil());
             }
             else
             {
                 // Suspending a non-active process - remove it from its list
-                SmalltalkOOP myListOop = context.GetFieldValue(context.Receiver, className, "myList");
+                SmalltalkOOP myListOop = scheduler.GetProcessMyList(context.Receiver);
 
                 // Process must be on a list to suspend
                 if (myListOop == context.HeapManager.GetNil())
                     return PrimitiveResult.Fail(context.Metadata!);
 
                 // Remove process from its list
-                if (!RemoveProcessFromList(context, context.Receiver, myListOop))
-                    return PrimitiveResult.Fail(context.Metadata!);
+                scheduler.RemoveProcessFromList(context.Receiver, myListOop);
 
                 // Clear myList reference
-                context.SetFieldValue(context.Receiver, className, "myList", context.HeapManager.GetNil());
+                scheduler.SetProcessMyList(context.Receiver, context.HeapManager.GetNil());
 
                 return PrimitiveResult.Ok(context.Receiver);
             }
@@ -676,393 +497,4 @@ public static class ControlPrimitives
             return PrimitiveResult.Ok(context.Receiver);
         }
     }
-
-    #region Helper Methods
-
-    /// <summary>
-    /// Switches from the current active process to the highest priority runnable process.
-    /// Used by wait and suspend primitives.
-    /// </summary>
-    private static bool SwitchToHighestPriorityProcess(PrimitiveExecutionContext context, SmalltalkOOP currentProcessOop)
-    {
-        // Find the highest priority runnable process
-        SmalltalkOOP nextProcessOop = FindHighestPriorityProcess(context);
-
-        if (nextProcessOop == context.HeapManager.GetNil())
-            return false; // No runnable process - shouldn't happen if background process exists
-
-        // Remove the next process from its priority queue
-        SmalltalkOOP myListOop = context.HeapManager.GetInstanceVariable(nextProcessOop, VMConstants.PROCESS_MYLIST_INDEX);
-        if (myListOop != context.HeapManager.GetNil())
-        {
-            // Get process priority for logging
-            SmalltalkOOP priorityOop = context.HeapManager.GetInstanceVariable(nextProcessOop, VMConstants.PROCESS_PRIORITY_INDEX);
-            int priority = priorityOop.IsSmallInteger ? priorityOop.AsSmallInteger() : -1;
-
-            if (DebugPriorityQueues && priority == 1)
-                Console.WriteLine($"[PQ-] REMOVE process={nextProcessOop} from priority={priority} (activating)");
-
-            RemoveProcessFromList(context, nextProcessOop, myListOop);
-            context.HeapManager.SetInstanceVariable(nextProcessOop, VMConstants.PROCESS_MYLIST_INDEX, context.HeapManager.GetNil());
-        }
-
-        // Perform the context switch
-        return SwitchToProcess(context, currentProcessOop, nextProcessOop);
-    }
-
-    /// <summary>
-    /// Performs the actual context switch from one process to another.
-    /// Saves the current context to the old process and restores context from the new process.
-    /// </summary>
-    private static bool SwitchToProcess(PrimitiveExecutionContext context, SmalltalkOOP oldProcessOop, SmalltalkOOP newProcessOop)
-    {
-        if (context.Metadata == null)
-            return false;
-
-        SmalltalkOOP schedulerOop = context.Metadata.ProcessorScheduler;
-        if (schedulerOop == context.HeapManager.GetNil())
-            return false;
-
-        // Save current active context to old process's suspendedContext
-        SmalltalkOOP currentContext = context.GetActiveContext();
-        context.HeapManager.SetInstanceVariable(oldProcessOop, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, currentContext);
-
-        // Get new process's suspended context
-        SmalltalkOOP newContext = context.HeapManager.GetInstanceVariable(newProcessOop, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-
-        if (newContext == context.HeapManager.GetNil())
-            return false; // New process has no context to resume
-
-        // Check if this is an unactivated BlockContext (PC is nil)
-        // This happens when resuming a newly created process via [block] newProcess
-        SmalltalkOOP newContextPC = context.HeapManager.GetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_PC_INDEX);
-        if (newContextPC == context.HeapManager.GetNil())
-        {
-            // This is an unactivated BlockContext - need to activate it
-            // Set PC from startPC (where the block body begins)
-            SmalltalkOOP startPC = context.HeapManager.GetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
-            if (startPC == context.HeapManager.GetNil() || !startPC.IsSmallInteger)
-                return false;
-
-            context.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_PC_INDEX, startPC);
-
-            // Initialize stack pointer to 0 (process blocks typically have no arguments)
-            context.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SmalltalkOOP.FromSmallInteger(0));
-
-            // Caller is nil for a new process (not being called from anywhere)
-            context.HeapManager.SetInstanceVariable(newContext, VMConstants.BLOCKCONTEXT_CALLER_INDEX, context.HeapManager.GetNil());
-        }
-
-        // Update Processor's activeProcess
-        context.HeapManager.SetInstanceVariable(schedulerOop, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, newProcessOop);
-
-        // Switch to new context - this is the critical context switch!
-        context.SetActiveContext(newContext);
-
-        return true;
-    }
-
-    /// <summary>
-    /// Finds the highest priority process that is runnable (on a quiescentProcessList).
-    /// Searches from priority 8 down to priority 1.
-    /// </summary>
-    private static SmalltalkOOP FindHighestPriorityProcess(PrimitiveExecutionContext context)
-    {
-        if (context.Metadata == null)
-            return context.HeapManager.GetNil();
-
-        SmalltalkOOP schedulerOop = context.Metadata.ProcessorScheduler;
-        if (schedulerOop == context.HeapManager.GetNil())
-            return context.HeapManager.GetNil();
-
-        SmalltalkOOP processListsOop = context.HeapManager.GetInstanceVariable(schedulerOop, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
-        if (processListsOop == context.HeapManager.GetNil())
-            return context.HeapManager.GetNil();
-
-        // Search from highest priority (8) down to lowest (1)
-        // Array indices are 0-7 for priorities 1-8
-        for (int priority = 8; priority >= 1; priority--)
-        {
-            int index = priority - 1;
-            SmalltalkOOP priorityListOop = context.HeapManager.GetIndexedOOP(processListsOop, index);
-
-            if (priorityListOop == context.HeapManager.GetNil())
-                continue;
-
-            // Check if this priority list has any processes
-            SmalltalkOOP firstLinkOop = context.GetFieldValue(priorityListOop, "class:LinkedList", "firstLink");
-
-            if (firstLinkOop != context.HeapManager.GetNil())
-            {
-                return firstLinkOop; // Return first process at this priority
-            }
-        }
-
-        return context.HeapManager.GetNil(); // No runnable processes found
-    }
-
-    /// <summary>
-    /// Checks if a process should preempt the currently active process.
-    /// Returns true if the given process has higher priority than the active process.
-    /// During init expressions, the bootstrap process runs at priority 9 (higher than any
-    /// user process), so no preemption will occur naturally.
-    /// </summary>
-    private static bool ShouldPreempt(PrimitiveExecutionContext context, SmalltalkOOP processOop)
-    {
-        SmalltalkOOP activeProcessOop = GetActiveProcess(context);
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[ShouldPreempt] activeProcess={activeProcessOop}, newProcess={processOop}");
-
-        if (activeProcessOop == context.HeapManager.GetNil())
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[ShouldPreempt] No active process, returning false");
-            return false;
-        }
-
-        // Get priorities
-        SmalltalkOOP processPriorityOop = context.HeapManager.GetInstanceVariable(processOop, VMConstants.PROCESS_PRIORITY_INDEX);
-        SmalltalkOOP activePriorityOop = context.HeapManager.GetInstanceVariable(activeProcessOop, VMConstants.PROCESS_PRIORITY_INDEX);
-
-        if (!processPriorityOop.IsSmallInteger || !activePriorityOop.IsSmallInteger)
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[ShouldPreempt] Priority not SmallInteger: process={processPriorityOop}, active={activePriorityOop}");
-            return false;
-        }
-
-        int processPriority = processPriorityOop.AsSmallInteger();
-        int activePriority = activePriorityOop.AsSmallInteger();
-
-        bool shouldPreempt = processPriority > activePriority;
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[ShouldPreempt] newPriority={processPriority}, activePriority={activePriority}, preempt={shouldPreempt}");
-
-        // Preempt if new process has STRICTLY higher priority
-        return shouldPreempt;
-    }
-
-    private static SmalltalkOOP GetActiveProcess(PrimitiveExecutionContext context)
-    {
-        if (context.Metadata == null)
-            throw new InvalidOperationException("VMMetadata not available");
-
-        SmalltalkOOP schedulerOop = context.Metadata.ProcessorScheduler;
-
-        if (schedulerOop == context.HeapManager.GetNil())
-            return context.HeapManager.GetNil();
-
-        return context.GetFieldValue(schedulerOop, "class:ProcessorScheduler", "activeProcess");
-    }
-
-    private static SmalltalkOOP RemoveFirstLink(PrimitiveExecutionContext context, SmalltalkOOP listOop, string className)
-    {
-        SmalltalkOOP firstLinkOop = context.GetFieldValue(listOop, className, "firstLink");
-
-        if (firstLinkOop == context.HeapManager.GetNil())
-            return context.HeapManager.GetNil();
-
-        SmalltalkOOP nextLinkOop = context.GetFieldValue(firstLinkOop, "class:Link", "nextLink");
-
-        context.SetFieldValue(listOop, className, "firstLink", nextLinkOop);
-
-        if (nextLinkOop == context.HeapManager.GetNil())
-        {
-            context.SetFieldValue(listOop, className, "lastLink", context.HeapManager.GetNil());
-        }
-
-        context.SetFieldValue(firstLinkOop, "class:Link", "nextLink", context.HeapManager.GetNil());
-
-        // If this is a Process, clear its myList reference
-        SmalltalkOOP linkClassOop = context.HeapManager.GetClassOOP(firstLinkOop);
-        SmalltalkOOP processClassOop = context.GetGlobalObjectByName("class:Process");
-
-        if (linkClassOop == processClassOop)
-        {
-            context.SetFieldValue(firstLinkOop, "class:Process", "myList", context.HeapManager.GetNil());
-        }
-
-        return firstLinkOop;
-    }
-
-    private static void AddLastLink(PrimitiveExecutionContext context, SmalltalkOOP listOop, string className, SmalltalkOOP linkOop)
-    {
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[AddLastLink] list={listOop}, className={className}, link={linkOop}");
-
-        SmalltalkOOP lastLinkOop = context.GetFieldValue(listOop, className, "lastLink");
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[AddLastLink] Current lastLink: {lastLinkOop}");
-
-        if (lastLinkOop == context.HeapManager.GetNil())
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[AddLastLink] Empty list - setting firstLink and lastLink to {linkOop}");
-            context.SetFieldValue(listOop, className, "firstLink", linkOop);
-            context.SetFieldValue(listOop, className, "lastLink", linkOop);
-        }
-        else
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[AddLastLink] Appending to existing list");
-            context.SetFieldValue(lastLinkOop, "class:Link", "nextLink", linkOop);
-            context.SetFieldValue(listOop, className, "lastLink", linkOop);
-        }
-
-        context.SetFieldValue(linkOop, "class:Link", "nextLink", context.HeapManager.GetNil());
-
-        // Set myList if this is a Process
-        SmalltalkOOP linkClassOop = context.HeapManager.GetClassOOP(linkOop);
-        SmalltalkOOP processClassOop = context.GetGlobalObjectByName("class:Process");
-
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[AddLastLink] linkClass={linkClassOop}, ProcessClass={processClassOop}");
-
-        if (linkClassOop == processClassOop)
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[AddLastLink] Setting myList on Process");
-            context.SetFieldValue(linkOop, "class:Process", "myList", listOop);
-        }
-        else
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[AddLastLink] WARNING: link is not a Process, skipping myList");
-        }
-    }
-
-    private static bool ResumeProcess(PrimitiveExecutionContext context, SmalltalkOOP processOop)
-    {
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[ResumeProcess] Adding process {processOop} to priority queue");
-
-        SmalltalkOOP priorityOop = context.GetFieldValue(processOop, "class:Process", "priority");
-
-        if (!priorityOop.IsSmallInteger)
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[ResumeProcess] FAIL: priority is not SmallInteger: {priorityOop}");
-            return false;
-        }
-
-        int priority = priorityOop.AsSmallInteger();
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[ResumeProcess] Process priority: {priority}");
-
-        if (priority < 1 || priority > 100)
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[ResumeProcess] FAIL: priority {priority} out of valid range (1-100)");
-            return false;
-        }
-
-        if (context.Metadata == null)
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[ResumeProcess] FAIL: Metadata is null");
-            return false;
-        }
-
-        SmalltalkOOP schedulerOop = context.Metadata.ProcessorScheduler;
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[ResumeProcess] ProcessorScheduler: {schedulerOop}");
-
-        if (schedulerOop == context.HeapManager.GetNil())
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[ResumeProcess] FAIL: ProcessorScheduler is nil");
-            return false;
-        }
-
-        SmalltalkOOP processListsOop = context.GetFieldValue(schedulerOop, "class:ProcessorScheduler", "quiescentProcessLists");
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[ResumeProcess] quiescentProcessLists: {processListsOop}");
-
-        if (processListsOop == context.HeapManager.GetNil())
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[ResumeProcess] FAIL: quiescentProcessLists is nil");
-            return false;
-        }
-
-        int index = priority - 1;
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[ResumeProcess] Using queue index: {index} (priority {priority} - 1)");
-
-        // Check array size
-        int arraySize = context.HeapManager.GetIndexedSize(processListsOop);
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[ResumeProcess] quiescentProcessLists array size: {arraySize}");
-
-        if (index >= arraySize)
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[ResumeProcess] FAIL: index {index} >= array size {arraySize}");
-            return false;
-        }
-
-        SmalltalkOOP priorityListOop = context.HeapManager.GetIndexedOOP(processListsOop, index);
-        if (DebugProcessScheduling)
-            Console.WriteLine($"[ResumeProcess] Priority list at index {index}: {priorityListOop}");
-
-        if (priorityListOop == context.HeapManager.GetNil())
-        {
-            if (DebugProcessScheduling)
-                Console.WriteLine($"[ResumeProcess] FAIL: priority list at index {index} is nil");
-            return false;
-        }
-
-        AddLastLink(context, priorityListOop, "class:LinkedList", processOop);
-
-        // Log priority queue add operation (only priority 1 - background process)
-        if (DebugPriorityQueues && priority == 1)
-            Console.WriteLine($"[PQ+] ADD process={processOop} to priority={priority}");
-
-        return true;
-    }
-
-    private static bool RemoveProcessFromList(PrimitiveExecutionContext context, SmalltalkOOP processOop, SmalltalkOOP listOop)
-    {
-        SmalltalkOOP currentOop = context.GetFieldValue(listOop, "class:LinkedList", "firstLink");
-        SmalltalkOOP previousOop = context.HeapManager.GetNil();
-
-        while (currentOop != context.HeapManager.GetNil())
-        {
-            if (currentOop == processOop)
-            {
-                SmalltalkOOP nextLinkOop = context.GetFieldValue(processOop, "class:Link", "nextLink");
-
-                if (previousOop == context.HeapManager.GetNil())
-                {
-                    context.SetFieldValue(listOop, "class:LinkedList", "firstLink", nextLinkOop);
-
-                    if (nextLinkOop == context.HeapManager.GetNil())
-                    {
-                        context.SetFieldValue(listOop, "class:LinkedList", "lastLink", context.HeapManager.GetNil());
-                    }
-                }
-                else
-                {
-                    context.SetFieldValue(previousOop, "class:Link", "nextLink", nextLinkOop);
-
-                    SmalltalkOOP lastLinkOop = context.GetFieldValue(listOop, "class:LinkedList", "lastLink");
-                    if (lastLinkOop == processOop)
-                    {
-                        context.SetFieldValue(listOop, "class:LinkedList", "lastLink", previousOop);
-                    }
-                }
-
-                context.SetFieldValue(processOop, "class:Link", "nextLink", context.HeapManager.GetNil());
-
-                return true;
-            }
-
-            previousOop = currentOop;
-            currentOop = context.GetFieldValue(currentOop, "class:Link", "nextLink");
-        }
-
-        return false;
-    }
-
-    #endregion
 }
