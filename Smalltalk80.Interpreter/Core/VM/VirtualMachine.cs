@@ -84,6 +84,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private SmalltalkOOP _whileFalseSelectorOOP;
     private bool _conditionalSelectorsInitialized;
 
+    // Cached background process OOP for idle detection (priority 1 sentinel)
+    private SmalltalkOOP _backgroundProcessOOP;
+
     // Blue Book architectural constants are defined in VMConstants.cs
     // All context field indices are now static constants shared across the VM
 
@@ -294,21 +297,35 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Save initial process - forked processes should switch, not exit to C#
         _initialProcessOOP = GetActiveProcess();
 
-        // Counter for periodic shutdown and idle checks (every N bytecodes)
+        // Cache background process OOP for fast idle detection
+        // The background process is a sentinel - we should NEVER execute its bytecodes
+        _backgroundProcessOOP = FindBackgroundProcess();
+
+        // Counter for periodic shutdown and timer checks (every N bytecodes)
         int periodicCheckCounter = 0;
         const int PeriodicCheckInterval = 1000;
 
-        // Idle detection: wait indefinitely when running background process
-        const int BackgroundProcessPriority = 1;  // SystemRockBottomPriority
-
         while (true)
         {
-            // Periodic checks (not every bytecode for performance)
+            // Check for idle EVERY iteration - when background process is active,
+            // block in WaitAny until a real process switch occurs.
+            // The background process is a sentinel, not work - never execute its bytecodes.
+            if (_platformBridge != null && _backgroundProcessOOP != default)
+            {
+                var activeProcess = GetActiveProcess();
+                if (activeProcess == _backgroundProcessOOP)
+                {
+                    // Idle detected - block until process switch (true 0% CPU)
+                    EnterIdleWait(activeProcess);
+                    continue;  // Skip bytecode execution - NEVER execute background process
+                }
+            }
+
+            // Periodic checks (shutdown and timer) for non-idle execution
             if (++periodicCheckCounter >= PeriodicCheckInterval)
             {
                 periodicCheckCounter = 0;
 
-                // Shutdown check
                 if (ShutdownToken.IsCancellationRequested)
                 {
                     throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
@@ -316,66 +333,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
                 // Check for expired timer and signal semaphore (for Delay mechanism)
                 CheckAndSignalExpiredTimer();
-
-                // Idle detection: if running background process, wait for events/timers
-                // This reduces CPU usage from 100% to near-zero when the system is idle
-                if (_platformBridge != null)
-                {
-                    var activeProcess = GetActiveProcess();
-                    if (activeProcess != _metadata.KnownObjects.Nil)
-                    {
-                        var priorityOOP = _heapManager.GetInstanceVariable(activeProcess, VMConstants.PROCESS_PRIORITY_INDEX);
-                        if (priorityOOP.IsSmallInteger && priorityOOP.AsSmallInteger() == BackgroundProcessPriority)
-                        {
-                            // Background process is running - this is an infinite busy loop
-                            // Wait for events or timer, and keep waiting until something needs attention
-                            var eventHandle = _platformBridge.EventAvailableHandle;
-                            var timerHandle = _timerManager.TimerExpiredHandle;
-
-                            while (true)
-                            {
-                                // Check if there's work to do before waiting
-                                if (_platformBridge.HasPendingEvents())
-                                    break; // Events to process - exit idle loop
-
-                                // Check for expired timer - this may wake a higher-priority process
-                                CheckAndSignalExpiredTimer();
-
-                                // If a higher-priority process is now ready, exit idle loop
-                                var newActiveProcess = GetActiveProcess();
-                                if (newActiveProcess != activeProcess)
-                                    break; // Process switched - exit idle loop
-
-                                // Nothing to do - wait indefinitely for events, timer, or shutdown
-                                // No timeout needed: all wake sources are signaled via WaitHandles
-                                if (eventHandle != null)
-                                {
-                                    var handles = new WaitHandle[] {
-                                        eventHandle,
-                                        timerHandle,
-                                        ShutdownToken.WaitHandle
-                                    };
-                                    WaitHandle.WaitAny(handles);
-                                    _platformBridge.ResetEventSignalIfEmpty();
-                                }
-                                else
-                                {
-                                    // Fallback for test mode - use short timeout
-                                    _platformBridge.WaitForEvents(10);
-                                }
-
-                                // Check for shutdown
-                                if (ShutdownToken.IsCancellationRequested)
-                                {
-                                    throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
-                                }
-                            }
-                        }
-                    }
-                }
             }
 
-            // Execute bytecodes in current context
+            // Execute bytecode (only for real processes, NEVER background)
             InterpreterStatus status = ExecuteBytecodeStep();
 
             switch (status)
@@ -396,6 +356,93 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                     throw new InvalidOperationException($"Unknown interpreter status: {status}");
             }
         }
+    }
+
+    /// <summary>
+    /// Enters idle wait loop - blocks indefinitely until work is available.
+    /// Only exits when a higher-priority process becomes ready (process switch).
+    ///
+    /// KEY DESIGN: No polling. We wait in WaitAny until:
+    /// - UI event arrives → signals input semaphore → process switch
+    /// - Timer expires → signals timer semaphore → process switch
+    ///
+    /// IMPORTANT: Do NOT break on HasPendingEvents()! Events don't wake processes
+    /// directly - they signal the input semaphore which causes a process switch.
+    /// We detect process switches via GetActiveProcess().
+    /// </summary>
+    private void EnterIdleWait(SmalltalkOOP backgroundProcess)
+    {
+        var eventHandle = _platformBridge?.EventAvailableHandle;
+        var timerHandle = _timerManager.TimerExpiredHandle;
+
+        while (true)
+        {
+            // NO HasPendingEvents() check!
+            // Events signal input semaphore → wake process → process switch
+            // We detect that via GetActiveProcess() below
+
+            // Check for expired timer and signal semaphore
+            // This may wake a higher-priority process
+            CheckAndSignalExpiredTimer();
+
+            // Check if a process switch occurred
+            var currentProcess = GetActiveProcess();
+            if (currentProcess != backgroundProcess)
+                return;  // Higher-priority process ready - exit idle
+
+            // Block indefinitely until event, timer, or shutdown
+            // TRUE 0% CPU - kernel-level wait on multiple handles
+            if (eventHandle != null)
+            {
+                var handles = new WaitHandle[] {
+                    eventHandle,
+                    timerHandle,
+                    ShutdownToken.WaitHandle
+                };
+                WaitHandle.WaitAny(handles);  // Blocks here (0% CPU)
+                _platformBridge!.ResetEventSignalIfEmpty();
+            }
+            else
+            {
+                // Fallback for test mode without WaitHandle
+                Thread.Sleep(10);
+            }
+
+            if (ShutdownToken.IsCancellationRequested)
+                throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
+        }
+    }
+
+    /// <summary>
+    /// Finds the background process OOP for idle detection.
+    /// The background process runs at priority 1 (SystemRockBottomPriority) and
+    /// executes [true] whileTrue: [] - an infinite empty loop used as idle sentinel.
+    /// Returns default if not found (idle detection will be disabled).
+    /// </summary>
+    private SmalltalkOOP FindBackgroundProcess()
+    {
+        var schedulerOOP = _metadata.ProcessorScheduler;
+        if (schedulerOOP == _metadata.KnownObjects.Nil)
+            return default;
+
+        var processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP,
+            VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
+
+        if (processListsOOP == _metadata.KnownObjects.Nil)
+            return default;
+
+        // Priority 1 is at index 0 (arrays are 0-based, priorities are 1-based)
+        if (_heapManager.GetIndexedSize(processListsOOP) < 1)
+            return default;
+
+        var priority1ListOOP = _heapManager.GetIndexedOOP(processListsOOP, 0);
+        if (priority1ListOOP == _metadata.KnownObjects.Nil)
+            return default;
+
+        var backgroundProcessOOP = _heapManager.GetInstanceVariable(priority1ListOOP,
+            VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+
+        return backgroundProcessOOP == _metadata.KnownObjects.Nil ? default : backgroundProcessOOP;
     }
 
     /// <summary>
