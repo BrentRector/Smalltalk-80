@@ -318,7 +318,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 // Check for expired timer and signal semaphore (for Delay mechanism)
                 CheckAndSignalExpiredTimer();
 
-                // Idle detection: if running background process, wait briefly for events/timers
+                // Idle detection: if running background process, wait for events/timers
                 // This reduces CPU usage from 100% to near-zero when the system is idle
                 if (_platformBridge != null)
                 {
@@ -328,37 +328,50 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                         var priorityOOP = _heapManager.GetInstanceVariable(activeProcess, VMConstants.PROCESS_PRIORITY_INDEX);
                         if (priorityOOP.IsSmallInteger && priorityOOP.AsSmallInteger() == BackgroundProcessPriority)
                         {
-                            // Calculate wait time: MIN(timer expiration, max idle wait)
-                            int waitMs = MaxIdleWaitMs;
-                            int timerMs = _timerManager.GetMillisecondsUntilNextTimer();
-                            if (timerMs >= 0 && timerMs < waitMs)
-                            {
-                                waitMs = Math.Max(1, timerMs); // Wait at least 1ms
-                            }
-
-                            // Use WaitHandle.WaitAny for efficient multi-source waiting
-                            // Wait on both event queue and timer expiration handles
+                            // Background process is running - this is an infinite busy loop
+                            // Wait for events or timer, and keep waiting until something needs attention
                             var eventHandle = _platformBridge.EventAvailableHandle;
                             var timerHandle = _timerManager.TimerExpiredHandle;
 
-                            if (eventHandle != null)
+                            while (true)
                             {
-                                // Build array of wait handles (event queue + timer)
-                                var handles = new WaitHandle[] { eventHandle, timerHandle };
-                                WaitHandle.WaitAny(handles, waitMs);
+                                // Check if there's work to do before waiting
+                                if (_platformBridge.HasPendingEvents())
+                                    break; // Events to process - exit idle loop
 
-                                // After WaitAny returns, reset event signal if queue is empty
-                                // This prevents false wakeups on stale signals
-                                _platformBridge.ResetEventSignalIfEmpty();
-                            }
-                            else
-                            {
-                                // Fallback: no event handle available, use simple wait
-                                _platformBridge.WaitForEvents(waitMs);
-                            }
+                                var expiredSemaphore = _timerManager.GetExpiredTimerSemaphore();
+                                if (expiredSemaphore != default)
+                                {
+                                    // Timer expired - signal semaphore and exit idle loop
+                                    SignalSemaphore(expiredSemaphore);
+                                    break;
+                                }
 
-                            // Check timer after waking up (either from WaitAny or fallback)
-                            CheckAndSignalExpiredTimer();
+                                // Nothing to do - wait for events or timer
+                                int waitMs = MaxIdleWaitMs;
+                                int timerMs = _timerManager.GetMillisecondsUntilNextTimer();
+                                if (timerMs >= 0 && timerMs < waitMs)
+                                {
+                                    waitMs = Math.Max(1, timerMs);
+                                }
+
+                                if (eventHandle != null)
+                                {
+                                    var handles = new WaitHandle[] { eventHandle, timerHandle };
+                                    WaitHandle.WaitAny(handles, waitMs);
+                                    _platformBridge.ResetEventSignalIfEmpty();
+                                }
+                                else
+                                {
+                                    _platformBridge.WaitForEvents(waitMs);
+                                }
+
+                                // Check for shutdown during idle
+                                if (ShutdownToken.IsCancellationRequested)
+                                {
+                                    throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
+                                }
+                            }
                         }
                     }
                 }
