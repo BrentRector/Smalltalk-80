@@ -303,6 +303,11 @@ public partial class VirtualMachine : IProcessScheduler
 
             // Activate the woken process
             ActivateProcess(wokenProcessOOP, "preemption");
+
+            // CRITICAL: Signal that a primitive caused a context switch.
+            // This tells the VM not to push the primitive's return value onto the stack
+            // (the old process already had its result pushed before this call).
+            _contextSwitchedByPrimitive = true;
         }
         else
         {

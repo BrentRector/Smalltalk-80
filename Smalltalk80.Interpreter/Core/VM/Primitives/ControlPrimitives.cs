@@ -297,6 +297,11 @@ public static class ControlPrimitives
     /// <summary>
     /// Primitive 85: signal - Signals a Semaphore.
     /// Uses IProcessScheduler for all process scheduling operations.
+    ///
+    /// CRITICAL: Signal can cause preemption if the woken process has higher priority.
+    /// When preemption occurs, the active context switches MID-PRIMITIVE.
+    /// We must push the return value BEFORE potential preemption so the signaling
+    /// process has it when it resumes. This matches how Wait handles suspension.
     /// </summary>
     public class Signal : IPrimitive
     {
@@ -310,9 +315,36 @@ public static class ControlPrimitives
             var scheduler = context.ProcessScheduler;
             if (scheduler == null) return PrimitiveResult.Fail(context.Metadata!);
 
+            // Push result onto current process's stack BEFORE potential preemption.
+            // If preemption occurs, the signaling process will have this value when it resumes.
+            // This is the same pattern as Wait primitive (which pushes before suspending).
+            if (context.StackManager != null)
+            {
+                context.StackManager.Push(context.Receiver);
+            }
+
+            // Save current context to detect if preemption occurred
+            var originalContext = context.GetActiveContext();
+
             // Use the unified signaling method from IProcessScheduler
             // This handles: wake first waiter, preemption check, or increment excessSignals
+            // If woken process has higher priority, THIS WILL PREEMPT US!
             scheduler.SignalSemaphoreWithPreemption(context.Receiver);
+
+            // Check if preemption occurred (active context changed)
+            if (context.GetActiveContext() != originalContext)
+            {
+                // Preemption occurred - result already pushed on old (now suspended) context.
+                // SignalSemaphoreWithPreemption already set _contextSwitchedByPrimitive = true,
+                // so the VM will return ContextSwitch instead of pushing the result again.
+                return PrimitiveResult.Ok(context.Receiver);
+            }
+
+            // No preemption - pop the pre-pushed value since PrimitiveResult.Ok will push it
+            if (context.StackManager != null)
+            {
+                context.StackManager.Pop();
+            }
 
             return PrimitiveResult.Ok(context.Receiver);
         }
