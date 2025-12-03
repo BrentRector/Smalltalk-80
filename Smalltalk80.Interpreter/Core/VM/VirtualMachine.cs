@@ -332,15 +332,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             {
                 periodicCheckCounter = 0;
 
-                // Log active process periodically (every 1000 bytecodes) - only when idle detection is active
-                if (_platformBridge != null && _backgroundProcessOOP != default)
-                {
-                    var activeProc = GetActiveProcess();
-                    var activePriority = GetProcessPriority(activeProc);
-                    Console.WriteLine($"[PERIODIC] activeProcess={activeProc}, priority={activePriority}, bgProcess={_backgroundProcessOOP}");
-                    Console.Out.Flush();
-                }
-
                 if (ShutdownToken.IsCancellationRequested)
                 {
                     throw new OperationCanceledException("VM shutdown requested", ShutdownToken);

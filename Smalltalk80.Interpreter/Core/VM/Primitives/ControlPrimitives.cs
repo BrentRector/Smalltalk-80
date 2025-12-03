@@ -344,14 +344,17 @@ public static class ControlPrimitives
 
             if (excessCount > 0)
             {
-                // Signal available - decrement and continue
+                // Signal available - decrement and continue (no actual wait)
                 context.HeapManager.SetInstanceVariable(context.Receiver, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX,
                     SmalltalkOOP.FromSmallInteger(excessCount - 1));
+                // Log when we DON'T actually wait due to excess signals
+                Console.WriteLine($"[WAIT] excessSignals={excessCount}, returning immediately (no wait)");
                 return PrimitiveResult.Ok(context.Receiver);
             }
             else
             {
                 // No signal available - must suspend active process and switch to another
+                Console.WriteLine($"[WAIT] excessSignals=0, actually suspending process");
                 SmalltalkOOP activeProcessOop = scheduler.GetActiveProcess();
 
                 if (activeProcessOop == context.HeapManager.GetNil())
