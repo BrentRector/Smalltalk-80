@@ -288,21 +288,20 @@ The key insight was switching from AutoResetEvent to ManualResetEventSlim, which
 
 **Problem**: Despite WaitAny working correctly, idle CPU is ~3% instead of 0%.
 
-**Root Cause**: Idle detection only happens every 1000 bytecode executions. When the background process `[true] whileTrue: []` is active, the VM executes 1000 jump bytecodes before entering `WaitAny`. This pattern repeats after every wakeup:
+**Key Insight**: The system should be **100% idle** when the background process is active. We should **never execute the background process's bytecodes**. The only wake sources are:
+- UI event → signal input semaphore → process switch → WaitAny returns
+- Timer expires → signal timer semaphore → process switch → WaitAny returns
 
-```
-Execute 1-999 bytecodes of background process (~3% CPU)
-Iteration 1000: Detect idle → WaitAny blocks (0% CPU)
-Event/timer wakes up → Exit wait
-Execute 1-999 more bytecodes (~3% CPU)
-Iteration 2000: Detect idle → WaitAny blocks (0% CPU)
-...
-```
+**Root Causes**:
 
-**Solution**: Check for idle **every iteration** by caching the background process OOP and using a cheap pointer comparison. When idle, skip bytecode execution entirely.
+1. **Breaking on `HasPendingEvents()`** - WRONG! Events don't wake processes directly; they sit in the queue until the input semaphore is signaled. Breaking on pending events causes a busy-loop.
 
-**Secondary Issue**: The idle loop breaks when `HasPendingEvents()` returns true, even though no higher-priority process is ready. Events sit in the queue until the Controller timer expires - breaking on events creates a busy-loop.
+2. **Executing background process bytecodes** - The background process `[true] whileTrue: []` is a sentinel, not work. Its bytecodes should never execute. Currently, after exiting the idle loop (due to the HasPendingEvents bug), we execute bytecodes unnecessarily.
 
-**Fix**: Remove `HasPendingEvents()` check from idle loop. Only break when `GetActiveProcess()` returns a different process (i.e., a higher-priority process became ready).
+**The Fix**:
+1. **Remove `HasPendingEvents()` check entirely** - only exit idle when `GetActiveProcess()` changes
+2. **Check for background process every iteration** - when detected, enter idle immediately
+3. **Never execute background process bytecodes** - skip `ExecuteBytecodeStep()` when idle
+4. **Stay in WaitAny** until a real process switch occurs
 
-**Full Analysis**: See `docs/Architecture/CPU-USAGE-ANALYSIS.md` for complete implementation details.
+**Full Analysis**: See `docs/Architecture/CPU-USAGE-ANALYSIS.md` for complete implementation.

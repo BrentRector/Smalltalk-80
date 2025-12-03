@@ -25,7 +25,7 @@ The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:i
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 
-**⚠️ Idle CPU Usage (3%)**: Despite `WaitHandle.WaitAny` working correctly, idle CPU is ~3% instead of 0%. Root cause: idle detection only happens every 1000 bytecode executions - the background process `[true] whileTrue: []` executes 1000 jump bytecodes before entering the wait. **Fix**: Check idle every iteration using cached background process OOP, skip bytecode execution when idle. See `docs/Architecture/CPU-USAGE-ANALYSIS.md` for complete analysis and implementation.
+**⚠️ Idle CPU Usage (3%)**: Despite `WaitHandle.WaitAny` working correctly, idle CPU is ~3% instead of 0%. Root causes: (1) Breaking on `HasPendingEvents()` is WRONG - events don't wake processes, they signal the input semaphore which causes process switch; (2) Background process bytecodes should never execute - it's a sentinel, not work. **Fix**: Remove `HasPendingEvents()` check, detect background process every iteration, never execute its bytecodes, stay in WaitAny until process switch. See `docs/Architecture/CPU-USAGE-ANALYSIS.md`.
 
 ## Migration Status
 
