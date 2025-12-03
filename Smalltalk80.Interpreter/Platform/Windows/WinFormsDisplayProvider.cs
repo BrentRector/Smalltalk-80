@@ -285,23 +285,53 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     private void OnMouseDown(object? sender, MouseEventArgs e)
     {
-        EnqueueMouseEvent(e);
+        // For MouseDown, the button that triggered the event IS pressed.
+        // Combine current button state with the button being pressed.
+        // This handles fast clicks where polling Control.MouseButtons might miss the press.
+        var currentButtons = Control.MouseButtons;
+
+        bool red = currentButtons.HasFlag(MouseButtons.Left) || e.Button == MouseButtons.Left;
+        bool yellow = currentButtons.HasFlag(MouseButtons.Middle) || e.Button == MouseButtons.Middle;
+        bool blue = currentButtons.HasFlag(MouseButtons.Right) || e.Button == MouseButtons.Right;
+
+        _eventQueue.Enqueue(new SmalltalkEvent
+        {
+            Type = SmalltalkEventType.Mouse,
+            X = e.X,
+            Y = e.Y,
+            RedButton = red,
+            YellowButton = yellow,
+            BlueButton = blue,
+            Milliseconds = Environment.TickCount64
+        });
     }
 
     private void OnMouseUp(object? sender, MouseEventArgs e)
     {
-        EnqueueMouseEvent(e);
+        // For MouseUp, the button that triggered the event is NOT pressed.
+        // Use current button state but ensure the released button is false.
+        // This handles fast clicks where polling Control.MouseButtons might miss the release.
+        var currentButtons = Control.MouseButtons;
+
+        bool red = currentButtons.HasFlag(MouseButtons.Left) && e.Button != MouseButtons.Left;
+        bool yellow = currentButtons.HasFlag(MouseButtons.Middle) && e.Button != MouseButtons.Middle;
+        bool blue = currentButtons.HasFlag(MouseButtons.Right) && e.Button != MouseButtons.Right;
+
+        _eventQueue.Enqueue(new SmalltalkEvent
+        {
+            Type = SmalltalkEventType.Mouse,
+            X = e.X,
+            Y = e.Y,
+            RedButton = red,
+            YellowButton = yellow,
+            BlueButton = blue,
+            Milliseconds = Environment.TickCount64
+        });
     }
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
-        EnqueueMouseEvent(e);
-    }
-
-    private void EnqueueMouseEvent(MouseEventArgs e)
-    {
-        // Use Control.MouseButtons to get CURRENT button state (not event-triggered button)
-        // This correctly reports which buttons are currently held down
+        // For MouseMove, use current button state as-is (which buttons are held during move)
         var currentButtons = Control.MouseButtons;
 
         _eventQueue.Enqueue(new SmalltalkEvent
