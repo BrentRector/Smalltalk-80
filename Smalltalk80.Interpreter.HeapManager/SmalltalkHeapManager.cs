@@ -22,6 +22,19 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     // DEBUG: Runtime allocation counter
     private static int _runtimeAllocationCount = 0;
 
+    // GC trigger threshold: Run GC when table has this many objects and no free indices
+    // Blue Book approach: GC runs when allocation would fail (need to grow table)
+    private const int GC_TRIGGER_THRESHOLD = 10000;
+    private const int GC_MIN_ALLOCATIONS_BETWEEN = 1000;  // Minimum allocations between GC cycles
+    private bool _gcInProgress = false;  // Prevent recursive GC
+    private int _allocationsSinceLastGC = 0;  // Track allocations for cooldown
+
+    /// <summary>
+    /// Controls whether allocation-triggered GC is enabled.
+    /// Disabled during cold start when objects are being built but not yet rooted.
+    /// </summary>
+    public bool AutoGCEnabled { get; set; } = false;
+
     // Verbose debug mode control
     public bool VerboseDebugMode { get; set; } = false;
 
@@ -86,6 +99,33 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         int indexedWords = CalculateIndexedWords(format, indexedSize);
         int totalWords = headerWords + fixedSlots + indexedWords;
 
+        // Track allocations for GC cooldown
+        _allocationsSinceLastGC++;
+
+        // Blue Book GC trigger: Run GC when we need to grow the table and it's already large
+        // This happens when there are no free indices to reuse and table size exceeds threshold
+        // AutoGCEnabled must be true (disabled during cold start when objects aren't yet rooted)
+        // Also require minimum allocations since last GC to prevent thrashing
+        if (AutoGCEnabled &&
+            !_gcInProgress &&
+            _allocationsSinceLastGC >= GC_MIN_ALLOCATIONS_BETWEEN &&
+            _tableManager.GetFreeIndexCount() == 0 &&
+            _tableManager.GetObjectTableSize() >= GC_TRIGGER_THRESHOLD)
+        {
+            _gcInProgress = true;
+            try
+            {
+                // Run GC to reclaim unreachable objects and free their table indices
+                _garbageCollector.GarbageCollect();
+                _allocationsSinceLastGC = 0;  // Reset cooldown counter
+                // GC messages suppressed - enable VerboseDebugMode for diagnostics
+            }
+            finally
+            {
+                _gcInProgress = false;
+            }
+        }
+
         // Allocate managed backing storage based on format
         object? managedStorage = format switch
         {
@@ -96,7 +136,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             _ => throw new ArgumentException($"Unknown object format: {format}")
         };
 
-        // Get ObjectTable index
+        // Get ObjectTable index (may reuse freed index from GC above, or grow table)
         int tableIndex = _tableManager.AllocateObjectTableIndex();
 
         // CRITICAL: Initialize ALL OOP slots to nil (Blue Book requirement)
@@ -712,9 +752,6 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     {
         if (objectOOP.IsSmallInteger)
         {
-            // DEBUG: Add stack trace to help diagnose where this is called from
-            Console.WriteLine($"[DEBUG GetObjectFormat] ERROR: Called with SmallInteger OOP={objectOOP.RawValue}");
-            Console.WriteLine($"[DEBUG GetObjectFormat] Stack trace: {Environment.StackTrace}");
             throw new ArgumentException("SmallIntegers don't have object format");
         }
 

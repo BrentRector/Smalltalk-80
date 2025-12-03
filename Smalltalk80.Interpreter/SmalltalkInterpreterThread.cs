@@ -218,17 +218,27 @@ public class SmalltalkInterpreterThread
             {
                 succeeded++;
 
-                // Display return value for test runners
-                if (expr.Source != null && expr.Source.Contains("TestRunner") && result.ReturnValueOop?.IsSmallInteger == true)
+                // Display return value for test runners and diagnostic tests
+                if (expr.Source != null && result.ReturnValueOop?.IsSmallInteger == true)
                 {
                     var returnOOP = result.ReturnValueOop.Value;
                     int testResult = returnOOP.AsSmallInteger();
-                    Console.WriteLine($"\n  ✓✓✓ TEST RESULT: {testResult} ✓✓✓");
 
-                    // BlockContextTestRunner: 120 tests × 9 + 111 = 1191
-                    if (expr.Source.Contains("BlockContextTestRunner") && testResult == 1191)
+                    // Show results for Diag* tests (individual variable tests)
+                    if (expr.Source.StartsWith("Diag"))
                     {
-                        Console.WriteLine($"  ✓✓✓ ALL 120 BLOCK CONTEXT TESTS PASSED ✓✓✓\n");
+                        Console.WriteLine($"    Returned: {testResult}");
+                    }
+                    // Show results for test runners
+                    else if (expr.Source.Contains("TestRunner"))
+                    {
+                        Console.WriteLine($"\n  ✓✓✓ TEST RESULT: {testResult} ✓✓✓");
+
+                        // BlockContextTestRunner: 120 tests × 9 + 111 = 1191
+                        if (expr.Source.Contains("BlockContextTestRunner") && testResult == 1191)
+                        {
+                            Console.WriteLine($"  ✓✓✓ ALL 120 BLOCK CONTEXT TESTS PASSED ✓✓✓\n");
+                        }
                     }
                 }
             }

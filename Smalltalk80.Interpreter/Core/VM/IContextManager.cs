@@ -15,11 +15,6 @@ public interface IContextManager
     SmalltalkOOP ActiveContext { get; }
 
     /// <summary>
-    /// Gets the current context depth (number of active contexts).
-    /// </summary>
-    int ContextDepth { get; }
-
-    /// <summary>
     /// Creates a MethodContext for executing a method.
     /// </summary>
     /// <param name="methodOOP">CompiledMethod OOP to execute.</param>
@@ -34,16 +29,6 @@ public interface IContextManager
     /// </summary>
     /// <param name="contextOOP">The context to make active.</param>
     void SetActiveContext(SmalltalkOOP contextOOP);
-
-    /// <summary>
-    /// Resets context depth counter. Used before executing init expressions.
-    /// </summary>
-    void ResetContextDepth();
-
-    /// <summary>
-    /// Decrements the context depth counter when returning from a context.
-    /// </summary>
-    void DecrementContextDepth();
 
     /// <summary>
     /// Finds the ultimate MethodContext by traversing the home chain.

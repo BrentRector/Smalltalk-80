@@ -67,8 +67,8 @@ public class IntegrationTests : CompilerTestBase
         Assert.That((int)arithmetic!["numTemps"]!, Is.GreaterThan(0));
         
         // Should have arithmetic bytecodes
-        var bytecodes = (JArray)arithmetic["bytecode"]!;
-        var hasArithmetic = bytecodes.Cast<int>().Any(b => b >= 176 && b <= 191);
+        var bytecodes = (JArray)arithmetic["bytecodes"]!;
+        var hasArithmetic = bytecodes.Select(t => (int)t).Any(b => b >= 176 && b <= 191);
         Assert.That(hasArithmetic, Is.True);
         
         // Test nested conditionals
@@ -77,8 +77,8 @@ public class IntegrationTests : CompilerTestBase
         Assert.That(conditionals, Is.Not.Null);
         
         // Should have conditional jumps
-        bytecodes = (JArray)conditionals!["bytecode"]!;
-        var hasJumps = bytecodes.Cast<int>().Any(b => b >= 152 && b <= 175);
+        bytecodes = (JArray)conditionals!["bytecodes"]!;
+        var hasJumps = bytecodes.Select(t => (int)t).Any(b => b >= 152 && b <= 175);
         Assert.That(hasJumps, Is.True);
         
         // Test block methods
@@ -87,8 +87,8 @@ public class IntegrationTests : CompilerTestBase
         Assert.That(blockComp, Is.Not.Null);
         
         // Should have block creations
-        bytecodes = (JArray)blockComp!["bytecode"]!;
-        var blockCount = bytecodes.Cast<int>().Count(b => b == 143);
+        bytecodes = (JArray)blockComp!["bytecodes"]!;
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
         Assert.That(blockCount, Is.GreaterThan(0), "Should have blocks");
     }
     
@@ -107,9 +107,9 @@ public class IntegrationTests : CompilerTestBase
             m["selector"]?.ToString() == "whileTrueExample");
         Assert.That(whileTrue, Is.Not.Null);
         
-        var bytecodes = (JArray)whileTrue!["bytecode"]!;
+        var bytecodes = (JArray)whileTrue!["bytecodes"]!;
         // Should have backward jump for loop
-        var hasJump = bytecodes.Cast<int>().Any(b => b >= 144 && b <= 175);
+        var hasJump = bytecodes.Select(t => (int)t).Any(b => b >= 144 && b <= 175);
         Assert.That(hasJump, Is.True, "whileTrue should have jumps");
         
         // Test to:do: loop
@@ -118,8 +118,8 @@ public class IntegrationTests : CompilerTestBase
         Assert.That(toDo, Is.Not.Null);
         
         // Should have block for loop body
-        bytecodes = (JArray)toDo!["bytecode"]!;
-        var hasBlock = bytecodes.Cast<int>().Any(b => b == 143);
+        bytecodes = (JArray)toDo!["bytecodes"]!;
+        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
         Assert.That(hasBlock, Is.True, "to:do: should have block");
         
         // Test early returns
@@ -128,8 +128,8 @@ public class IntegrationTests : CompilerTestBase
         Assert.That(earlyReturn, Is.Not.Null);
         
         // Should have multiple return bytecodes
-        bytecodes = (JArray)earlyReturn!["bytecode"]!;
-        var returnCount = bytecodes.Cast<int>().Count(b => b == 124);
+        bytecodes = (JArray)earlyReturn!["bytecodes"]!;
+        var returnCount = bytecodes.Select(t => (int)t).Count(b => b == 124);
         Assert.That(returnCount, Is.GreaterThan(3), "Should have multiple returns");
     }
     
@@ -170,10 +170,10 @@ testOptimizations
         var method = GetFirstMethod(json);
         
         // Should use optimized bytecodes where possible
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         
         // ifNil: and = nil ifTrue: might be optimized
-        var hasOptimizedJumps = bytecodes.Cast<int>().Any(b => b >= 152 && b <= 159);
+        var hasOptimizedJumps = bytecodes.Select(t => (int)t).Any(b => b >= 152 && b <= 159);
         Assert.That(hasOptimizedJumps || bytecodes.Count < 20, Is.True, 
             "Should optimize common patterns");
     }
@@ -218,7 +218,7 @@ size
             Assert.That(primNum, Is.GreaterThan(0), "Primitive number should be positive");
             
             // Should have fallback code
-            var bytecodes = (JArray)method["bytecode"]!;
+            var bytecodes = (JArray)method["bytecodes"]!;
             Assert.That(bytecodes.Count, Is.GreaterThan(0), "Should have fallback bytecode");
         }
     }
@@ -250,11 +250,11 @@ largeMethod
         Assert.That((int)method["numTemps"]!, Is.EqualTo(51)); // 50 temps + result
         
         // Should have extended bytecodes for large temp/literal access
-        var bytecodes = (JArray)method["bytecode"]!;
+        var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Count, Is.GreaterThan(100), "Large method should have many bytecodes");
         
         // Should use extended temp access for high-numbered temps
-        var hasExtended = bytecodes.Cast<int>().Any(b => b == 128 || b == 129 || b == 132);
+        var hasExtended = bytecodes.Select(t => (int)t).Any(b => b == 128 || b == 129 || b == 132);
         Assert.That(hasExtended, Is.True, "Should use extended bytecodes");
     }
     

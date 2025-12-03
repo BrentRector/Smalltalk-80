@@ -142,24 +142,93 @@ public enum Bytecode : byte
     PUSH_ONE       = 0x76,
     PUSH_TWO       = 0x77,
 
-    // 0x78 - 0x7F  Return variants
+    // 0x78 - 0x7F  Return variants (Blue Book Chapter 28)
     RETURN_SELF        = 0x78, // return receiver (self)
     RETURN_TRUE        = 0x79, // return true singleton
     RETURN_FALSE       = 0x7A, // return false singleton
     RETURN_NIL         = 0x7B, // return nil
-    RETURN_TOP         = 0x7C, // pop top and return it
-    RETURN_SELF_POP    = 0x7D, // return self from block context (block return)
-    RETURN_TOP_POP     = 0x7E, // pop and return from block context (block return)
-    RESERVED_RETURN    = 0x7F, // NOP
+    // Blue Book 0x7C: "Return Stack Top From Message"
+    // - In MethodContext: normal method return
+    // - In BlockContext: non-local return to home.sender
+    RETURN_TOP_FROM_MESSAGE = 0x7C,
+    // Blue Book 0x7D: "Return Stack Top From Block"
+    // - Local return from block to whoever sent value/value:/etc.
+    // - Used for implicit block returns (last statement value)
+    RETURN_TOP_FROM_BLOCK = 0x7D,
+    // 0x7E-0x7F: Reserved/unused per Blue Book
+    RESERVED_126       = 0x7E,
+    RESERVED_127       = 0x7F,
 
-    // 0x80 - 0xAF  Extended operations (prefix 0x80 + sub-op bytes)
-    EXTENDED_PREFIX   = 0x80,
-    // 0x81..0x88 reserved/variant extended encodings
+    // Legacy aliases for backward compatibility during transition
+    RETURN_TOP         = RETURN_TOP_FROM_MESSAGE, // alias
+
+    // 0x80 - 0x86  Blue Book Extended Operations
+    // These follow the Blue Book encoding: 0x80-0x82 use type:index format,
+    // 0x83-0x86 are extended sends with their own formats
+    EXTENDED_PUSH         = 0x80, // Blue Book: ttiiiii format (tt=type, iiiiii=index)
+    EXTENDED_STORE        = 0x81, // Blue Book: ttiiiii format (tt=type, iiiiii=index), no pop
+    EXTENDED_POP_STORE    = 0x82, // Blue Book: ttiiiii format (tt=type, iiiiii=index), with pop
+    SINGLE_EXTENDED_SEND  = 0x83, // Blue Book: nnnlllll (nnn=argCount, lllll=literalIndex)
+    DOUBLE_EXTENDED_SEND  = 0x84, // Blue Book: 2 bytes (argCount, literalIndex)
+    SINGLE_EXTENDED_SUPER = 0x85, // Blue Book: nnnlllll (nnn=argCount, lllll=literalIndex)
+    DOUBLE_EXTENDED_SUPER = 0x86, // Blue Book: 2 bytes (argCount, literalIndex)
+
+    // 0x87 - 0x88  Blue Book Stack Operations
+    POP                   = 0x87, // Pop stack top (Blue Book standard)
+    DUP                   = 0x88, // Duplicate stack top (Blue Book standard)
 
     // 0x89 - Push active context (for blockCopy: primitive)
     PUSH_ACTIVE_CONTEXT = 0x89, // LdThisContext - pushes current execution context
 
-    // 0x8A..0xAF reserved/variant extended encodings
+    // 0x8A..0x8F reserved
+
+    // 0x90 - 0x97  Blue Book Short Unconditional Jump (jump forward 1-8 bytes)
+    SHORT_JUMP_0 = 0x90, // Jump forward 1 byte
+    SHORT_JUMP_1 = 0x91, // Jump forward 2 bytes
+    SHORT_JUMP_2 = 0x92, // Jump forward 3 bytes
+    SHORT_JUMP_3 = 0x93, // Jump forward 4 bytes
+    SHORT_JUMP_4 = 0x94, // Jump forward 5 bytes
+    SHORT_JUMP_5 = 0x95, // Jump forward 6 bytes
+    SHORT_JUMP_6 = 0x96, // Jump forward 7 bytes
+    SHORT_JUMP_7 = 0x97, // Jump forward 8 bytes
+
+    // 0x98 - 0x9F  Blue Book Short Conditional Jump on False (jump forward 1-8 bytes if false)
+    SHORT_JUMP_FALSE_0 = 0x98, // Jump forward 1 byte if false
+    SHORT_JUMP_FALSE_1 = 0x99, // Jump forward 2 bytes if false
+    SHORT_JUMP_FALSE_2 = 0x9A, // Jump forward 3 bytes if false
+    SHORT_JUMP_FALSE_3 = 0x9B, // Jump forward 4 bytes if false
+    SHORT_JUMP_FALSE_4 = 0x9C, // Jump forward 5 bytes if false
+    SHORT_JUMP_FALSE_5 = 0x9D, // Jump forward 6 bytes if false
+    SHORT_JUMP_FALSE_6 = 0x9E, // Jump forward 7 bytes if false
+    SHORT_JUMP_FALSE_7 = 0x9F, // Jump forward 8 bytes if false
+
+    // 0xA0 - 0xA7  Blue Book Long Unconditional Jump
+    // Blue Book formula: offset = ((bytecode & 0x07) - 4) * 256 + nextByte
+    // This gives range -1024 to +1023 (backward and forward jumps)
+    LONG_JUMP_0 = 0xA0, // Long jump with offset formula
+    LONG_JUMP_1 = 0xA1,
+    LONG_JUMP_2 = 0xA2,
+    LONG_JUMP_3 = 0xA3,
+    LONG_JUMP_4 = 0xA4,
+    LONG_JUMP_5 = 0xA5,
+    LONG_JUMP_6 = 0xA6,
+    LONG_JUMP_7 = 0xA7,
+
+    // 0xA8 - 0xAB  Blue Book Long Conditional Jump on True
+    // Blue Book formula: offset = (bytecode & 0x03) * 256 + nextByte
+    // Range 0-1023 (forward only)
+    LONG_JUMP_TRUE_0 = 0xA8,
+    LONG_JUMP_TRUE_1 = 0xA9,
+    LONG_JUMP_TRUE_2 = 0xAA,
+    LONG_JUMP_TRUE_3 = 0xAB,
+
+    // 0xAC - 0xAF  Blue Book Long Conditional Jump on False
+    // Blue Book formula: offset = (bytecode & 0x03) * 256 + nextByte
+    // Range 0-1023 (forward only)
+    LONG_JUMP_FALSE_0 = 0xAC,
+    LONG_JUMP_FALSE_1 = 0xAD,
+    LONG_JUMP_FALSE_2 = 0xAE,
+    LONG_JUMP_FALSE_3 = 0xAF,
 
     // 0xB0 - 0xBF  Send arithmetic selector with 0, 1, or 2 args
     SEND_ARITH_PLUS        = 0xB0, // +
@@ -211,12 +280,27 @@ public enum Bytecode : byte
 }
 
 /// <summary>
-/// Sub-opcodes for EXTENDED_PREFIX (0x80) instructions.
-/// These are the second byte following 0x80.
+/// Blue Book Extended Bytecode Type Codes.
+/// Used in the extension byte for bytecodes 0x80 (extended push), 0x81 (extended store),
+/// and 0x82 (extended pop and store). The type is encoded in bits 6-7 of the extension byte.
 /// </summary>
+public enum ExtendedType : byte
+{
+    ReceiverVariable = 0,  // Instance variable
+    TemporaryVariable = 1, // Temp/arg
+    LiteralConstant = 2,   // Literal constant
+    LiteralVariable = 3    // Association/global/pool variable
+}
+
+/// <summary>
+/// LEGACY: Sub-opcodes for non-Blue Book extended format (0x80 prefix system).
+/// This is the OLD C# compiler format that is being phased out.
+/// New code should use the Blue Book bytecodes (0x80-0x82 with type:index encoding).
+/// </summary>
+[Obsolete("Use Blue Book bytecode format instead. This legacy format is being phased out.")]
 public enum ExtendedSubOp : byte
 {
-    // Push/Store extended
+    // Push/Store extended (LEGACY - use Blue Book 0x80-0x82 with type:index instead)
     PUSH_IVAR      = 0x00, // next byte = ivar index
     STORE_IVAR     = 0x01, // next byte = ivar index
     POP_STORE_IVAR = 0x02, // next byte = ivar index
@@ -228,7 +312,7 @@ public enum ExtendedSubOp : byte
     STORE_LITERAL_VAR = 0x08, // next byte = literal var index
     POP_STORE_LITERAL_VAR = 0x09, // next byte = literal var index
 
-    // Send extended
+    // Send extended (LEGACY - use Blue Book 0x83-0x86 instead)
     SEND_0         = 0x0A, // next byte = selector index (0 args)
     SEND_1         = 0x0B, // next byte = selector index (1 arg)
     SEND_2         = 0x0C, // next byte = selector index (2 args)
@@ -238,11 +322,11 @@ public enum ExtendedSubOp : byte
     SEND_SUPER_2   = 0x10, // next byte = selector index (super, 2 args)
     SEND_SUPER_N   = 0x11, // next 2 bytes: selector index, arg count (super)
 
-    // Stack operations
+    // Stack operations (LEGACY - use Blue Book 0x87/0x88 instead)
     POP            = 0x12, // pop and discard top
     DUP            = 0x13, // duplicate top
 
-    // Control flow
+    // Control flow (LEGACY - use Blue Book 0x90-0xAF instead)
     JUMP_TRUE      = 0x14, // next 2 bytes = signed offset; pop and jump if true
     JUMP_FALSE     = 0x15, // next 2 bytes = signed offset; pop and jump if false
     JUMP           = 0x16, // next 2 bytes = signed offset; unconditional jump
@@ -255,6 +339,7 @@ public enum ExtendedSubOp : byte
 
 /// <summary>
 /// Helper utilities for decoding bytecode ranges and extracting embedded indices.
+/// Updated for Blue Book compliance.
 /// </summary>
 public static class BytecodeUtil
 {
@@ -290,8 +375,59 @@ public static class BytecodeUtil
     // Return variants (0x78 - 0x7F)
     public static bool IsReturn(byte op) => op >= 0x78 && op <= 0x7F;
 
-    // Extended prefix (0x80)
+    // Blue Book Extended Operations (0x80 - 0x86)
+    // 0x80: Extended push with type:index encoding
+    // 0x81: Extended store (no pop) with type:index encoding
+    // 0x82: Extended pop and store with type:index encoding
+    // 0x83: Single extended send
+    // 0x84: Double extended send
+    // 0x85: Single extended super send
+    // 0x86: Double extended super send
+    public static bool IsExtendedPush(byte op) => op == 0x80;
+    public static bool IsExtendedStore(byte op) => op == 0x81;
+    public static bool IsExtendedPopStore(byte op) => op == 0x82;
+    public static bool IsSingleExtendedSend(byte op) => op == 0x83;
+    public static bool IsDoubleExtendedSend(byte op) => op == 0x84;
+    public static bool IsSingleExtendedSuperSend(byte op) => op == 0x85;
+    public static bool IsDoubleExtendedSuperSend(byte op) => op == 0x86;
+
+    // LEGACY: Extended prefix check (for backward compatibility during transition)
     public static bool IsExtended(byte op) => op == 0x80;
+
+    // Blue Book Stack Operations (0x87 - 0x88)
+    public static bool IsPop(byte op) => op == 0x87;
+    public static bool IsDup(byte op) => op == 0x88;
+
+    // Blue Book Short Unconditional Jump (0x90 - 0x97)
+    // Jump distance = (bytecode & 0x07) + 1 (range 1-8)
+    public static bool IsShortJump(byte op) => op >= 0x90 && op <= 0x97;
+    public static int ShortJumpDistance(byte op) => (op & 0x07) + 1;
+
+    // Blue Book Short Conditional Jump on False (0x98 - 0x9F)
+    // Jump distance = (bytecode & 0x07) + 1 (range 1-8)
+    public static bool IsShortJumpFalse(byte op) => op >= 0x98 && op <= 0x9F;
+    public static int ShortJumpFalseDistance(byte op) => (op & 0x07) + 1;
+
+    // Blue Book Long Unconditional Jump (0xA0 - 0xA7)
+    // Offset = ((bytecode & 0x07) - 4) * 256 + nextByte
+    // Range: -1024 to +1023 (backward and forward)
+    public static bool IsLongJump(byte op) => op >= 0xA0 && op <= 0xA7;
+    public static int LongJumpBaseOffset(byte op) => ((op & 0x07) - 4) * 256;
+
+    // Blue Book Long Conditional Jump on True (0xA8 - 0xAB)
+    // Offset = (bytecode & 0x03) * 256 + nextByte
+    // Range: 0-1023 (forward only)
+    public static bool IsLongJumpTrue(byte op) => op >= 0xA8 && op <= 0xAB;
+    public static int LongJumpTrueBaseOffset(byte op) => (op & 0x03) * 256;
+
+    // Blue Book Long Conditional Jump on False (0xAC - 0xAF)
+    // Offset = (bytecode & 0x03) * 256 + nextByte
+    // Range: 0-1023 (forward only)
+    public static bool IsLongJumpFalse(byte op) => op >= 0xAC && op <= 0xAF;
+    public static int LongJumpFalseBaseOffset(byte op) => (op & 0x03) * 256;
+
+    // Any jump bytecode (0x90 - 0xAF)
+    public static bool IsJump(byte op) => op >= 0x90 && op <= 0xAF;
 
     // Send arithmetic (0xB0 - 0xBF)
     public static bool IsSendArithmetic(byte op) => op >= 0xB0 && op <= 0xBF;
@@ -315,4 +451,32 @@ public static class BytecodeUtil
 
     // Any send operation (0xB0 - 0xFF)
     public static bool IsSend(byte op) => op >= 0xB0;
+
+    // Blue Book Extended Type Decoding Helpers
+    // For bytecodes 0x80-0x82, the extension byte has format: ttiiiiiii
+    // tt = type (00=ivar, 01=temp, 10=literal const, 11=literal var)
+    // iiiiii = index (0-63)
+    public static ExtendedType GetExtendedType(byte extensionByte) =>
+        (ExtendedType)((extensionByte >> 6) & 0x03);
+
+    public static int GetExtendedIndex(byte extensionByte) =>
+        extensionByte & 0x3F;
+
+    // Blue Book Single Extended Send Decoding Helpers
+    // For bytecode 0x83, extension byte has format: nnnlllll
+    // nnn = arg count (0-7)
+    // lllll = literal index (0-31)
+    public static int GetSingleExtendedSendArgCount(byte extensionByte) =>
+        (extensionByte >> 5) & 0x07;
+
+    public static int GetSingleExtendedSendLiteralIndex(byte extensionByte) =>
+        extensionByte & 0x1F;
+
+    // Helper to create Blue Book extended push/store extension byte
+    public static byte MakeExtendedByte(ExtendedType type, int index) =>
+        (byte)(((int)type << 6) | (index & 0x3F));
+
+    // Helper to create Blue Book single extended send extension byte
+    public static byte MakeSingleExtendedSendByte(int argCount, int literalIndex) =>
+        (byte)(((argCount & 0x07) << 5) | (literalIndex & 0x1F));
 }

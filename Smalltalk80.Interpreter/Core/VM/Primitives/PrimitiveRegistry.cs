@@ -1,5 +1,6 @@
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Core.VM.Scheduling;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -60,7 +61,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
         VMMetadata? metadata = null,
-        IStackManager? stackManager = null)
+        IStackManager? stackManager = null,
+        ITimerManager? timerManager = null)
     {
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
@@ -80,7 +82,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 instructionPointer: instructionPointer,
                 cacheManager: cacheManager,
                 messageSender: messageSender,
-                metadata: metadata
+                metadata: metadata,
+                timerManager: timerManager
             );
 
             var result = primitive.Execute(execContext);
@@ -218,12 +221,16 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(94, new InputOperations.SampleInterval());
         registry.Register(95, new InputOperations.InputWord());
 
-        // Graphics primitives (96-104)
+        // Graphics primitives (96-97)
         registry.Register(96, new GraphicsOperations.CopyBits());
         registry.Register(97, new GraphicsOperations.Snapshot());
-        registry.Register(98, new GraphicsOperations.OopsLeft());
-        registry.Register(99, new GraphicsOperations.CoreLeft());
-        registry.Register(100, new GraphicsOperations.TimeWords());
+
+        // Time primitives (98-100) - Blue Book specification
+        registry.Register(98, new TimeOperations.SecondClockInto());    // Blue Book: Time class secondClockInto:
+        registry.Register(99, new TimeOperations.MillisecondClockInto()); // Blue Book: Time class millisecondClockInto:
+        registry.Register(100, new TimeOperations.SignalAtMilliseconds()); // Blue Book: ProcessorScheduler signal:atMilliseconds:
+
+        // Display primitives (101-104)
         registry.Register(101, new GraphicsOperations.BeCursor());     // Blue Book: Primitive 101 = beCursor
         registry.Register(102, new GraphicsOperations.BeDisplay());    // Blue Book: Primitive 102 = beDisplay
         registry.Register(103, new GraphicsOperations.Beep());

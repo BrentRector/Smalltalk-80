@@ -94,8 +94,8 @@ public static class ControlPrimitives
                 homeContext = activeContext;
             }
 
-            // Calculate startpc (skip 3-byte LONG_JUMP)
-            int blockBodyPC = currentPC + 3;
+            // Calculate startpc (skip 2-byte Blue Book LONG_JUMP: opcode + extension byte)
+            int blockBodyPC = currentPC + 2;
             SmalltalkOOP startPC = SmalltalkOOP.FromSmallInteger(blockBodyPC);
 
             // Allocate BlockContext with indexed slots for temps/stack

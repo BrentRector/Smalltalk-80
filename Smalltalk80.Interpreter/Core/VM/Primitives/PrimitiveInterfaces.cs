@@ -1,5 +1,6 @@
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Core.VM.Scheduling;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
@@ -84,6 +85,9 @@ public readonly struct PrimitiveExecutionContext
     /// <summary>Gets the VM metadata for accessing special objects and field indices.</summary>
     public VMMetadata? Metadata { get; }
 
+    /// <summary>Gets the timer manager for scheduling semaphore signals (used by Delay).</summary>
+    public ITimerManager? TimerManager { get; }
+
     /// <summary>
     /// Creates a new primitive execution context.
     /// </summary>
@@ -99,7 +103,8 @@ public readonly struct PrimitiveExecutionContext
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
-        VMMetadata? metadata = null)
+        VMMetadata? metadata = null,
+        ITimerManager? timerManager = null)
     {
         Receiver = receiver;
         Arguments = arguments;
@@ -113,6 +118,7 @@ public readonly struct PrimitiveExecutionContext
         CacheManager = cacheManager;
         MessageSender = messageSender;
         Metadata = metadata;
+        TimerManager = timerManager;
     }
 
     /// <summary>
@@ -327,7 +333,8 @@ public interface IPrimitiveRegistry
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
         VMMetadata? metadata = null,
-        IStackManager? stackManager = null);
+        IStackManager? stackManager = null,
+        ITimerManager? timerManager = null);
 
     /// <summary>
     /// Checks if a primitive is registered.

@@ -1,16 +1,42 @@
 # Bytecode Comparison and Reconciliation Plan
 
 **Date**: 2025-12-01
+**Updated**: 2025-12-01
 **Purpose**: Compare and reconcile bytecode implementations between the runtime Smalltalk compiler and offline C# compiler
+
+## Implementation Status
+
+### ✅ Phase 1: Critical Compatibility - COMPLETED (2025-12-01)
+1. **Jump bytecode standardization** - Implemented Blue Book format (0x90-0xAF)
+2. **Extended bytecode format** - Implemented Blue Book type:index format (0x80-0x86)
+3. **Pop/Duplicate** - Moved to standard bytecodes (0x87, 0x88)
+4. **Block jump encoding fix** - Fixed blockCopy: jump to use 2-byte Blue Book format (was incorrectly using 3-byte format with wrong opcode 0xA1)
+
+### ✅ Phase 2: Semantic Alignment - COMPLETED (2025-12-01)
+1. **Block return reconciliation** - Aligned with Blue Book specification:
+   - 0x7C: RETURN_TOP_FROM_MESSAGE - explicit ^expr (NLR in blocks)
+   - 0x7D: RETURN_TOP_FROM_BLOCK - implicit block return (local)
+   - 0x7E-0x7F: Reserved/unused
+2. **Super send implementation** - Already Blue Book compliant (0x85-0x86)
+
+### 🔲 Phase 3: Optimization - PENDING
 
 ## Executive Summary
 
-Both compilers implement Blue Book compliant bytecodes with the same numeric values (when converting hex to decimal). However, there are significant differences in:
-1. **Jump bytecode encoding** - Completely different approaches
-2. **Extended bytecode format** - Different sub-opcode organization
-3. **Super send implementation** - Different bytecode strategies
-4. **Block return semantics** - Different opcodes used
-5. **Optimization strategies** - C# has disabled conditional optimization
+~~Both compilers implement Blue Book compliant bytecodes with the same numeric values (when converting hex to decimal). However, there are significant differences in:~~
+~~1. **Jump bytecode encoding** - Completely different approaches~~
+~~2. **Extended bytecode format** - Different sub-opcode organization~~
+
+**UPDATE**: After Phase 1 completion, the C# compiler now generates Blue Book compliant bytecodes for:
+- Jump operations (0x90-0xAF)
+- Extended push/store (0x80-0x82 with type:index encoding)
+- Extended sends (0x83-0x86)
+- Pop (0x87) and Duplicate (0x88)
+
+Remaining differences:
+1. **Super send implementation** - Different bytecode strategies (C# uses 0x85-0x86 Blue Book format)
+2. **Block return semantics** - Different opcodes used
+3. **Optimization strategies** - C# has disabled conditional optimization
 
 ## Section 1: Side-by-Side Comparison Table
 
@@ -38,22 +64,22 @@ Both compilers implement Blue Book compliant bytecodes with the same numeric val
 | **125** | Return from Block | Return Receiver from Block (0x7D) | ⚠️ DIFFERENT | Different usage |
 | **126** | Not documented | Return Top from Block (0x7E) | ❌ MISSING | C# has extra bytecode |
 | **127** | Not documented | Reserved (0x7F) | ❌ MISSING | C# has reserved slot |
-| **128** | Extended Push (LdInstLong) | Extended Prefix (0x80) | ⚠️ DIFFERENT | Different sub-opcode format |
-| **129** | Extended Store | Part of 0x80 extended | ⚠️ DIFFERENT | C# uses sub-opcodes |
-| **130** | Extended Store and Pop | Part of 0x80 extended | ⚠️ DIFFERENT | C# uses sub-opcodes |
-| **131-132** | Send Long format | Part of 0x80 extended | ⚠️ DIFFERENT | Different send encoding |
-| **133** | Push Super (LdSuper) | Not used | ❌ MISSING | Smalltalk specific |
-| **134** | Not documented | Not used | - | Unused |
-| **135** | Pop Stack | 0x80 0x12 (extended) | ⚠️ DIFFERENT | C# uses extended format |
-| **136** | Duplicate Top | 0x80 0x13 (extended) | ⚠️ DIFFERENT | C# uses extended format |
+| **128** | Extended Push (type:index) | Extended Push (0x80 type:index) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **129** | Extended Store (no pop) | Extended Store (0x81 type:index) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **130** | Extended Store and Pop | Extended Pop Store (0x82 type:index) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **131** | Single Extended Send | Single Extended Send (0x83 nnnlllll) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **132** | Double Extended Send | Double Extended Send (0x84) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **133** | Single Extended Super | Single Extended Super (0x85 nnnlllll) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **134** | Double Extended Super | Double Extended Super (0x86) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **135** | Pop Stack | Pop (0x87) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **136** | Duplicate Top | Duplicate (0x88) | ✅ MATCH | Blue Book compliant (Phase 1) |
 | **137** | Push Active Context | Push Active Context (0x89) | ✅ MATCH | Same value and semantics |
 | **138-143** | Not documented | Not used | - | Unused range |
-| **144-151** | Short Jump forward 1-8 | Not used | ❌ MISSING | Smalltalk specific |
-| **152-159** | Short Jump on False 1-8 | Not used | ❌ MISSING | Smalltalk specific |
-| **160-167** | Long Jump (forward/back) | Not used | ❌ MISSING | Smalltalk specific |
-| **161** | Not documented | Long Jump Forward (0xA1) | ⚠️ DIFFERENT | C# uses for blocks |
-| **168-175** | Long Jump on True | Not used | ❌ MISSING | Smalltalk specific |
-| **168** | Not documented | Jump Backward (0xA8) | ⚠️ DIFFERENT | C# tail recursion |
+| **144-151** | Short Jump forward 1-8 | Short Jump (0x90-0x97) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **152-159** | Short Jump on False 1-8 | Short Jump False (0x98-0x9F) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **160-167** | Long Jump (forward/back) | Long Jump (0xA0-0xA7) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **168-171** | Long Jump on True 0-3 | Long Jump True (0xA8-0xAB) | ✅ MATCH | Blue Book compliant (Phase 1) |
+| **172-175** | Long Jump on False 0-3 | Long Jump False (0xAC-0xAF) | ✅ MATCH | Blue Book compliant (Phase 1) |
 | **176-191** | Send Special Selectors | Send Arithmetic (0xB0-0xBF) | ✅ MATCH | Same selectors |
 | **192-207** | Send Special Selectors cont. | Send Special (0xC0-0xCF) | ✅ MATCH | Same selectors |
 | **208-223** | Send Literal 0 args | Send Literal 0 args (0xD0-0xDF) | ✅ MATCH | Same |
@@ -62,22 +88,20 @@ Both compilers implement Blue Book compliant bytecodes with the same numeric val
 
 ## Section 2: Identified Differences
 
-### 1. Jump Bytecode Architecture (CRITICAL)
-**Difference**: Completely different jump encoding schemes
-- **Smalltalk**:
-  - Short jumps: 144-151 (forward 1-8 bytes)
-  - Short conditional: 152-159 (jump on false 1-8 bytes)
-  - Long jumps: 160-167 (forward/backward with formula)
-  - Conditional long: 168-175 (jump on true)
-- **C# Compiler**:
-  - Long jump forward: 0xA1 (161) with 2-byte offset
-  - Jump backward: 0xA8 (168) with 1-byte offset
-  - No short jump bytecodes
+### 1. Jump Bytecode Architecture (CRITICAL) - ✅ FIXED
+**Status**: RESOLVED in Phase 1
 
-**Semantic Impact**:
-- Bytecode streams are incompatible between compilers
-- Control flow optimization strategies differ
-- Jump offset calculations differ
+**Blue Book Specification** (now implemented by both compilers):
+- **0x90-0x97**: Short unconditional jump (forward 1-8 bytes)
+- **0x98-0x9F**: Short conditional jump on FALSE (forward 1-8 bytes)
+- **0xA0-0xA7**: Long unconditional jump, offset = ((opcode & 0x07) - 4) * 256 + ext (range -1024 to +1023)
+- **0xA8-0xAB**: Long conditional jump on TRUE, offset = (opcode & 0x03) * 256 + ext (forward 0-1023)
+- **0xAC-0xAF**: Long conditional jump on FALSE, offset = (opcode & 0x03) * 256 + ext (forward 0-1023)
+
+**Previous C# Compiler Issues** (now fixed):
+- Was using 0xA1 with 3-byte format for blocks (now uses 0xA4-0xA7 with 2-byte format)
+- Some analysis tools incorrectly treated 0xA4-0xA7 as conditional (now all 0xA0-0xA7 are unconditional)
+- Analysis tools marked 0xA8-0xAF as "Reserved" (now properly handled as conditional jumps)
 
 **Blue Book Alignment**: Smalltalk compiler follows Blue Book specification exactly
 
@@ -100,30 +124,30 @@ Both compilers implement Blue Book compliant bytecodes with the same numeric val
 
 **Blue Book Alignment**: Smalltalk follows Blue Book; C# deviates
 
-### 3. Block Return Semantics (IMPORTANT)
-**Difference**: Different bytecodes for block returns
-- **Smalltalk**:
-  - 125: Return from block (EndRemote)
-  - 124: Normal method return
-- **C# Compiler**:
-  - 0x7C (124): Normal returns AND implicit block returns
-  - 0x7D (125): Return receiver from block (not used)
-  - 0x7E (126): Non-local block return (^expr)
+### 3. Block Return Semantics - ✅ COMPLIANT
+**Status**: RESOLVED in Phase 2
 
-**Semantic Impact**: Block return behavior may differ
+**Blue Book Specification** (now implemented by both compilers):
+- **0x7C (124)**: RETURN_TOP_FROM_MESSAGE - In MethodContext: normal return. In BlockContext: non-local return to home.sender
+- **0x7D (125)**: RETURN_TOP_FROM_BLOCK - Local return from block to whoever sent value/value:/etc.
+- **0x7E-0x7F (126-127)**: Reserved / unused
 
-**Blue Book Alignment**: Needs investigation - both claim Blue Book compliance
+**Implementation Changes Made**:
+1. **Compiler**: Implicit block returns now emit 0x7D (local block return)
+2. **Compiler**: Explicit ^expr now emits 0x7C (NLR in blocks, normal in methods)
+3. **VM 0x7C**: Checks for BlockContext, performs NLR if yes, normal return if no
+4. **VM 0x7D**: Simple local return to sender (no NLR check)
+5. **VM 0x7E-0x7F**: Reserved/NOP
 
-### 4. Super Send Implementation (IMPORTANT)
-**Difference**: Different super send strategies
-- **Smalltalk**:
-  - 133: Push Super bytecode
-  - Uses regular send with super flag
-- **C# Compiler**:
-  - No Push Super bytecode
-  - Uses extended bytecodes 0x80 0x0E-0x11 for super sends
+### 4. Super Send Implementation - ✅ COMPLIANT
+**Status**: RESOLVED - Both compilers use Blue Book format
 
-**Semantic Impact**: Super message sending uses different bytecode patterns
+**Blue Book Specification** (implemented by both compilers):
+- **0x85**: Single Extended Super Send (nnnlllll format: nnn=argCount 0-7, lllll=literalIndex 0-31)
+- **0x86**: Double Extended Super Send (2 bytes: argCount, literalIndex)
+
+The C# compiler already uses 0x85 and 0x86 for super sends per Blue Book specification.
+No changes needed.
 
 ### 5. Stack Operation Bytecodes (MINOR)
 **Difference**: Pop and Duplicate location
@@ -285,14 +309,17 @@ Both compilers implement Blue Book compliant bytecodes with the same numeric val
 
 ## Implementation Tracking
 
-| Task | Status | Assignee | Branch | PR |
-|------|--------|----------|--------|-------|
-| Jump bytecode standardization | 🔴 Not Started | - | - | - |
-| Extended bytecode format | 🔴 Not Started | - | - | - |
-| Block return reconciliation | 🔴 Not Started | - | - | - |
-| Super send implementation | 🔴 Not Started | - | - | - |
-| Conditional optimization | 🔴 Not Started | - | - | - |
-| Stack operations alignment | 🔴 Not Started | - | - | - |
+| Task | Status | Branch | Notes |
+|------|--------|--------|-------|
+| Jump bytecode standardization | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Blue Book 0x90-0xAF format |
+| Extended bytecode format | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Blue Book type:index (0x80-0x86) |
+| Block jump encoding fix | ✅ Complete | claude/bytecode-comparison-reconciliation-* | 2-byte format, 0xA4-0xA7 |
+| Analysis tools compliance | ✅ Complete | claude/bytecode-comparison-reconciliation-* | 7 files fixed |
+| Stack operations alignment | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Pop (0x87), Dup (0x88) |
+| Super send implementation | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Already Blue Book compliant (0x85-0x86) |
+| Block return reconciliation | ✅ Complete | claude/bytecode-comparison-reconciliation-* | Blue Book 0x7C-0x7F |
+| Conditional optimization | ✅ Complete | claude/bytecode-comparison-reconciliation-* | ifTrue:/ifFalse:/ifTrue:ifFalse:/and:/or: inlined |
+| whileTrue:/whileFalse: | 🔲 Deferred | - | Requires special receiver handling (receiver is block) |
 
 ## Appendix: Blue Book References
 
@@ -302,8 +329,31 @@ Both compilers implement Blue Book compliant bytecodes with the same numeric val
 
 ## Next Steps
 
-1. Review this plan with the team
-2. Create feature branches for each phase
-3. Begin Phase 1 implementation
-4. Schedule code review checkpoints
-5. Plan deployment strategy
+1. ~~Review this plan with the team~~ ✅
+2. ~~Create feature branches for each phase~~ ✅
+3. ~~Begin Phase 1 implementation~~ ✅ COMPLETE
+4. ~~Begin Phase 2: Block return reconciliation and super send implementation~~ ✅ COMPLETE
+5. ~~Begin Phase 3: Enable conditional optimization (ifTrue:/ifFalse: inlining)~~ ✅ COMPLETE
+6. Future: Implement whileTrue:/whileFalse: optimization (requires special receiver block handling)
+
+## Change Log
+
+- **2025-12-01**: Phase 3 completed
+  - Conditional optimization enabled for: `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:ifTrue:`, `and:`, `or:`
+  - Added conditional jump methods to BytecodeEmitter (placeholders + patching)
+  - Inline block compilation (no BlockContext created for zero-arg blocks)
+  - Blue Book bytecodes: 0xA8-0xAB (jump on true), 0xAC-0xAF (jump on false)
+  - `whileTrue:`/`whileFalse:` deferred (receiver is a block, needs different approach)
+
+- **2025-12-01**: Phase 2 completed
+  - Block return reconciliation (Blue Book semantics for 0x7C-0x7F)
+  - 0x7C: RETURN_TOP_FROM_MESSAGE - explicit ^expr, NLR in BlockContext
+  - 0x7D: RETURN_TOP_FROM_BLOCK - implicit block return (local return)
+  - 0x7E-0x7F: Reserved/unused per Blue Book
+  - Super sends confirmed already Blue Book compliant (0x85-0x86)
+
+- **2025-12-01**: Phase 1 completed
+  - Jump bytecode standardization (compiler + VM + analysis tools)
+  - Extended bytecode format (0x80-0x86 with type:index)
+  - Block jump encoding fixed (2-byte Blue Book format)
+  - Analysis tools compliance (7 files updated for correct 0xA0-0xAF handling)

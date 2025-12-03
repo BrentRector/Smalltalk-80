@@ -8,4 +8,4 @@ git pull
 # Run the tests
 cd Smalltalk80.Interpreter
 # cls
-dotnet run -- --coldstart ..\Smalltalk80.Compiler\bin\Debug\net9.0\coldstart_with_runner.json
+dotnet run -- --coldstart ..\Smalltalk80.Interpreter\bin\Debug\net9.0-windows\Data\coldstart_with_runner.json

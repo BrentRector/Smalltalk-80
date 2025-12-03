@@ -87,6 +87,11 @@ internal class ObjectTableManager : IObjectTableManager
         return _objectTableBlocks.Sum(block => block.ActiveCount);
     }
 
+    public int GetFreeIndexCount()
+    {
+        return _freeObjectTableIndices.Count;
+    }
+
     public bool IsValidObjectOOP(SmalltalkOOP objectOOP)
     {
         if (objectOOP.IsSmallInteger)

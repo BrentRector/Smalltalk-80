@@ -372,47 +372,35 @@ public class BytecodeValidator : IValidator
 
     /// <summary>
     /// Returns true and outputs target if opcode is an unconditional jump.
+    /// Blue Book: 0x90-0x97 short forward, 0xA0-0xA7 long forward/backward
     /// </summary>
     private bool IsUnconditionalJump(byte opcode, byte[] bytecodes, int pc, out int target)
     {
         target = -1;
 
-        // Short unconditional forward jump (0x90-0x97)
+        // Blue Book Short unconditional forward jump (0x90-0x97)
+        // Distance = (opcode & 0x07) + 1 (range 1-8)
         if (opcode >= 0x90 && opcode <= 0x97)
         {
-            int offset = (opcode & 0x07) + 1;
-            target = pc + 1 + offset;
+            int distance = (opcode & 0x07) + 1;
+            target = pc + 1 + distance;
             return true;
         }
 
-        // Long unconditional forward jump (0xA0-0xA3)
-        if (opcode >= 0xA0 && opcode <= 0xA3)
+        // Blue Book Long unconditional jump (0xA0-0xA7)
+        // Offset = ((opcode & 0x07) - 4) * 256 + extensionByte
+        // Range: -1024 to +1023 (can jump backward or forward)
+        if (opcode >= 0xA0 && opcode <= 0xA7)
         {
             if (pc + 1 >= bytecodes.Length)
                 return false;
 
-            int highBits = (opcode & 0x07) << 8;
-            int lowBits = bytecodes[pc + 1];
-            int offset = highBits | lowBits;
-            target = pc + 2 + offset + 1; // Blue Book: jump distance = offset + 1
+            int baseOffset = ((opcode & 0x07) - 4) * 256;
+            int extensionByte = bytecodes[pc + 1];
+            int offset = baseOffset + extensionByte;
+            // IP after reading extension byte = pc + 2, then add offset
+            target = pc + 2 + offset;
             return true;
-        }
-
-        // Extended unconditional jump (0x80 0x16 or 0x80 0x19)
-        if (opcode == 0x80 && pc + 1 < bytecodes.Length)
-        {
-            byte subOp = bytecodes[pc + 1];
-            if (subOp == 0x16 || subOp == 0x19)
-            {
-                if (pc + 3 >= bytecodes.Length)
-                    return false;
-
-                int highByte = bytecodes[pc + 2];
-                int lowByte = bytecodes[pc + 3];
-                int offset = (highByte << 8) | lowByte;
-                target = pc + 4 + offset + 1; // Blue Book: jump distance = offset + 1
-                return true;
-            }
         }
 
         return false;
@@ -420,47 +408,49 @@ public class BytecodeValidator : IValidator
 
     /// <summary>
     /// Returns true and outputs target if opcode is a conditional jump.
+    /// Blue Book: 0x98-0x9F short false, 0xA8-0xAB long true, 0xAC-0xAF long false
     /// </summary>
     private bool IsConditionalJump(byte opcode, byte[] bytecodes, int pc, out int target)
     {
         target = -1;
 
-        // Short conditional forward jump if false (0x98-0x9F)
+        // Blue Book Short conditional forward jump on FALSE (0x98-0x9F)
+        // Distance = (opcode & 0x07) + 1 (range 1-8)
         if (opcode >= 0x98 && opcode <= 0x9F)
         {
-            int offset = (opcode & 0x07) + 1;
-            target = pc + 1 + offset;
+            int distance = (opcode & 0x07) + 1;
+            target = pc + 1 + distance;
             return true;
         }
 
-        // Long conditional forward jump if false (0xA4-0xA7)
-        if (opcode >= 0xA4 && opcode <= 0xA7)
+        // Blue Book Long conditional forward jump on TRUE (0xA8-0xAB)
+        // Offset = (opcode & 0x03) * 256 + extensionByte (range 0-1023, forward only)
+        if (opcode >= 0xA8 && opcode <= 0xAB)
         {
             if (pc + 1 >= bytecodes.Length)
                 return false;
 
-            int highBits = (opcode & 0x03) << 8;
-            int lowBits = bytecodes[pc + 1];
-            int offset = highBits | lowBits;
-            target = pc + 2 + offset + 1; // Blue Book: jump distance = offset + 1
+            int baseOffset = (opcode & 0x03) * 256;
+            int extensionByte = bytecodes[pc + 1];
+            int offset = baseOffset + extensionByte;
+            // IP after reading extension byte = pc + 2, then add offset
+            target = pc + 2 + offset;
             return true;
         }
 
-        // Extended conditional jumps (0x80 0x14/0x15/0x17/0x18)
-        if (opcode == 0x80 && pc + 1 < bytecodes.Length)
+        // Blue Book Long conditional forward jump on FALSE (0xAC-0xAF)
+        // Offset = (opcode & 0x03) * 256 + extensionByte (range 0-1023, forward only)
+        if (opcode >= 0xAC && opcode <= 0xAF)
         {
-            byte subOp = bytecodes[pc + 1];
-            if (subOp == 0x14 || subOp == 0x15 || subOp == 0x17 || subOp == 0x18)
-            {
-                if (pc + 3 >= bytecodes.Length)
-                    return false;
+            if (pc + 1 >= bytecodes.Length)
+                return false;
 
-                int highByte = bytecodes[pc + 2];
-                int lowByte = bytecodes[pc + 3];
-                int offset = (highByte << 8) | lowByte;
-                target = pc + 4 + offset + 1; // Blue Book: jump distance = offset + 1
-                return true;
-            }
+            int baseOffset = (opcode & 0x03) * 256;
+            int extensionByte = bytecodes[pc + 1];
+            int offset = baseOffset + extensionByte;
+            // IP after reading extension byte = pc + 2, then add offset
+            target = pc + 2 + offset;
+            return true;
         }
 
         return false;
@@ -518,13 +508,20 @@ public class BytecodeValidator : IValidator
             return +1;
 
         // Jumps
-        if (opcode >= 0x90 && opcode <= 0x97)  // Unconditional short jump
+        // Blue Book: 0x90-0x97 short unconditional (no condition pop)
+        if (opcode >= 0x90 && opcode <= 0x97)
             return 0;
-        if (opcode >= 0x98 && opcode <= 0x9F)  // Conditional short jump
+        // Blue Book: 0x98-0x9F short conditional on FALSE (pops condition)
+        if (opcode >= 0x98 && opcode <= 0x9F)
             return -1;
-        if (opcode >= 0xA0 && opcode <= 0xA3)  // Unconditional long jump
+        // Blue Book: 0xA0-0xA7 ALL long unconditional (no condition pop)
+        if (opcode >= 0xA0 && opcode <= 0xA7)
             return 0;
-        if (opcode >= 0xA4 && opcode <= 0xA7)  // Conditional long jump
+        // Blue Book: 0xA8-0xAB long conditional on TRUE (pops condition)
+        if (opcode >= 0xA8 && opcode <= 0xAB)
+            return -1;
+        // Blue Book: 0xAC-0xAF long conditional on FALSE (pops condition)
+        if (opcode >= 0xAC && opcode <= 0xAF)
             return -1;
 
         // Send arithmetic (0xB0-0xBF): binary operator

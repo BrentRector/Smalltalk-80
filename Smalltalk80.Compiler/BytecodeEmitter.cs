@@ -11,6 +11,14 @@ namespace Smalltalk80.Compiler
     {
         private readonly List<byte> bytecodes = new();
 
+        // Sizing mode support for two-pass compilation
+        // Supports nesting via depth counter and counter stack
+        private int _sizingDepth = 0;
+        private readonly Stack<int> _sizingCounterStack = new();
+
+        // Blue Book jump limits
+        private const int ShortJumpLimit = 8;  // Short jumps: offset 1-8
+
         // Separate collections for selectors and other literals
         private readonly List<Symbol> selectors = new();
 
@@ -63,9 +71,14 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Patches a byte at a specific offset in the bytecode stream.
         /// Used for backpatching jump offsets after compiling the target code.
+        /// In sizing mode, this is a no-op (patches will be applied during emit pass).
         /// </summary>
         public void PatchByteAt(int offset, byte value)
         {
+            // During sizing mode, skip patching - we're just counting bytes.
+            // The actual patching happens during the emit pass.
+            if (IsSizingMode)
+                return;
             if (offset < 0 || offset >= bytecodes.Count)
                 throw new ArgumentOutOfRangeException(nameof(offset), $"Offset {offset} out of range [0, {bytecodes.Count})");
             bytecodes[offset] = value;
@@ -384,35 +397,90 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
+        /// Increments the sizing counter for the CURRENT nesting level only.
+        /// Parent levels should not be incremented - they get their counts
+        /// when bytecodes are emitted at their level after exiting nested sizing.
+        /// </summary>
+        private void IncrementSizingCounters(int count = 1)
+        {
+            // Only increment the topmost counter (current nesting level)
+            // Don't increment parent levels - they'll get their own increments
+            // when we emit bytecodes at their level (after nested sizing exits)
+            if (_sizingCounterStack.Count > 0)
+            {
+                var top = _sizingCounterStack.Pop();
+                _sizingCounterStack.Push(top + count);
+            }
+        }
+
+        /// <summary>
         /// Emits a single bytecode.
+        /// In sizing mode, just increments counter without emitting.
         /// </summary>
         public void Emit(byte bytecode)
         {
-            bytecodes.Add(bytecode);
+            if (IsSizingMode)
+            {
+                IncrementSizingCounters(1);
+            }
+            else
+            {
+                bytecodes.Add(bytecode);
+            }
         }
 
         /// <summary>
         /// Emits a bytecode enum value.
+        /// In sizing mode, just increments counter without emitting.
         /// </summary>
         public void Emit(Bytecode bytecode)
         {
-            bytecodes.Add((byte)bytecode);
+            if (IsSizingMode)
+            {
+                IncrementSizingCounters(1);
+            }
+            else
+            {
+                bytecodes.Add((byte)bytecode);
+            }
         }
 
         /// <summary>
         /// Emits an extended sub-operation enum value.
+        /// In sizing mode, just increments counter without emitting.
         /// </summary>
+        /// <remarks>
+        /// LEGACY: This method is kept for backward compatibility during transition.
+        /// New code should use Blue Book bytecodes directly.
+        /// </remarks>
+#pragma warning disable CS0618 // Type or member is obsolete
         public void Emit(ExtendedSubOp subOp)
         {
-            bytecodes.Add((byte)subOp);
+            if (IsSizingMode)
+            {
+                IncrementSizingCounters(1);
+            }
+            else
+            {
+                bytecodes.Add((byte)subOp);
+            }
         }
+#pragma warning restore CS0618
 
         /// <summary>
         /// Emits multiple bytecodes.
+        /// In sizing mode, just increments counter without emitting.
         /// </summary>
         public void EmitBytes(params byte[] bytes)
         {
-            bytecodes.AddRange(bytes);
+            if (IsSizingMode)
+            {
+                IncrementSizingCounters(bytes.Length);
+            }
+            else
+            {
+                bytecodes.AddRange(bytes);
+            }
         }
 
         /// <summary>
@@ -434,9 +502,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.PUSH_IVAR);
-                Emit((byte)index);
+                // Blue Book Extended Push: 0x80 + type:index byte
+                // Type 0 = receiver variable
+                Emit(Bytecode.EXTENDED_PUSH); // 0x80
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.ReceiverVariable, index));
             }
         }
 
@@ -448,9 +517,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.PUSH_TEMP);
-                Emit((byte)index);
+                // Blue Book Extended Push: 0x80 + type:index byte
+                // Type 1 = temporary variable
+                Emit(Bytecode.EXTENDED_PUSH); // 0x80
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.TemporaryVariable, index));
             }
         }
 
@@ -479,10 +549,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                // Use extended push for indices > 31
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.PUSH_LITERAL);
-                Emit((byte)index);
+                // Blue Book Extended Push: 0x80 + type:index byte
+                // Type 2 = literal constant
+                Emit(Bytecode.EXTENDED_PUSH); // 0x80
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.LiteralConstant, index));
             }
         }
 
@@ -534,10 +604,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                // Use extended push for indices > 31
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.PUSH_LITERAL_VAR);
-                Emit((byte)index);
+                // Blue Book Extended Push: 0x80 + type:index byte
+                // Type 3 = literal variable
+                Emit(Bytecode.EXTENDED_PUSH); // 0x80
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.LiteralVariable, index));
             }
         }
 
@@ -597,9 +667,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.POP_STORE_IVAR);
-                Emit((byte)index);
+                // Blue Book Extended Pop and Store: 0x82 + type:index byte
+                // Type 0 = receiver variable
+                Emit(Bytecode.EXTENDED_POP_STORE); // 0x82
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.ReceiverVariable, index));
             }
         }
 
@@ -612,9 +683,10 @@ namespace Smalltalk80.Compiler
             }
             else
             {
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.POP_STORE_TEMP);
-                Emit((byte)index);
+                // Blue Book Extended Pop and Store: 0x82 + type:index byte
+                // Type 1 = temporary variable
+                Emit(Bytecode.EXTENDED_POP_STORE); // 0x82
+                Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.TemporaryVariable, index));
             }
         }
 
@@ -653,26 +725,25 @@ namespace Smalltalk80.Compiler
                 index = AddLiteral(variable);
             }
 
-            Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-            Emit(ExtendedSubOp.POP_STORE_LITERAL_VAR);
-            Emit((byte)index);
+            // Blue Book Extended Pop and Store: 0x82 + type:index byte
+            // Type 3 = literal variable
+            Emit(Bytecode.EXTENDED_POP_STORE); // 0x82
+            Emit(BytecodeUtil.MakeExtendedByte(ExtendedType.LiteralVariable, index));
         }
 
-        // Stack operations
+        // Stack operations - Blue Book bytecodes 0x87 (Pop) and 0x88 (Dup)
 
         public void Pop()
         {
-            Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-            Emit(ExtendedSubOp.POP);
+            Emit(Bytecode.POP); // 0x87 - Blue Book standard
         }
 
         public void Dup()
         {
-            Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-            Emit(ExtendedSubOp.DUP);
+            Emit(Bytecode.DUP); // 0x88 - Blue Book standard
         }
 
-        // Return operations
+        // Return operations - Blue Book Chapter 28
 
         public void ReturnSelf()
         {
@@ -694,17 +765,28 @@ namespace Smalltalk80.Compiler
             Emit(Bytecode.RETURN_NIL); // 0x7B
         }
 
+        /// <summary>
+        /// Blue Book 0x7C: "Return Stack Top From Message"
+        /// - In MethodContext: normal method return
+        /// - In BlockContext: non-local return to home.sender
+        /// Use for: explicit ^expr in BOTH methods AND blocks
+        /// </summary>
         public void ReturnTop()
         {
-            Emit(Bytecode.RETURN_TOP); // 0x7C
+            Emit(Bytecode.RETURN_TOP_FROM_MESSAGE); // 0x7C
         }
 
+        /// <summary>
+        /// Blue Book 0x7D: "Return Stack Top From Block"
+        /// Local return from block to whoever sent value/value:/etc.
+        /// Use for: implicit block returns (last statement value)
+        /// </summary>
         public void ReturnTopFromBlock()
         {
-            Emit(Bytecode.RETURN_TOP_POP); // 0x7E - block return
+            Emit(Bytecode.RETURN_TOP_FROM_BLOCK); // 0x7D - local block return
         }
 
-        // Jump operations - Used for tail recursion optimization
+        // Jump operations - Used for tail recursion optimization and control flow inlining
 
         /// <summary>
         /// Marks the current bytecode position as the method entry point.
@@ -716,29 +798,183 @@ namespace Smalltalk80.Compiler
             return CurrentIP;
         }
 
+        // ============================================================================
+        // CONDITIONAL JUMP OPERATIONS - Blue Book Control Flow Inlining
+        // ============================================================================
+        // Blue Book bytecode specification:
+        //   0x90-0x97: Short unconditional jump (forward 1-8 bytes)
+        //   0x98-0x9F: Short conditional jump on FALSE (pop, forward 1-8 if false)
+        //   0xA0-0xA7: Long unconditional jump (range -1024 to +1023)
+        //   0xA8-0xAB: Long conditional jump on TRUE (pop, forward 0-1023)
+        //   0xAC-0xAF: Long conditional jump on FALSE (pop, forward 0-1023)
+        // ============================================================================
+
+        /// <summary>
+        /// Emits a placeholder for a forward jump on FALSE condition.
+        /// Returns the bytecode offset to be patched later with PatchJumpOnFalse().
+        /// Blue Book: Pops stack and jumps if top was false.
+        /// </summary>
+        /// <returns>Bytecode offset of the placeholder (for patching)</returns>
+        public int EmitJumpOnFalsePlaceholder()
+        {
+            // Reserve 2 bytes for long jump (0xAC-0xAF format)
+            // We don't know the offset yet, so emit placeholder bytes
+            int placeholderOffset = CurrentIP;
+            Emit((byte)0xAC);  // Long jump on false, base offset 0
+            Emit((byte)0x00);  // Extension byte placeholder
+            return placeholderOffset;
+        }
+
+        /// <summary>
+        /// Emits a placeholder for a forward jump on TRUE condition.
+        /// Returns the bytecode offset to be patched later with PatchJumpOnTrue().
+        /// Blue Book: Pops stack and jumps if top was true.
+        /// </summary>
+        /// <returns>Bytecode offset of the placeholder (for patching)</returns>
+        public int EmitJumpOnTruePlaceholder()
+        {
+            // Reserve 2 bytes for long jump (0xA8-0xAB format)
+            int placeholderOffset = CurrentIP;
+            Emit((byte)0xA8);  // Long jump on true, base offset 0
+            Emit((byte)0x00);  // Extension byte placeholder
+            return placeholderOffset;
+        }
+
+        /// <summary>
+        /// Emits a placeholder for an unconditional forward jump.
+        /// Returns the bytecode offset to be patched later with PatchForwardJump().
+        /// </summary>
+        /// <returns>Bytecode offset of the placeholder (for patching)</returns>
+        public int EmitForwardJumpPlaceholder()
+        {
+            // Reserve 2 bytes for long jump (0xA4-0xA7 format)
+            int placeholderOffset = CurrentIP;
+            Emit((byte)0xA4);  // Long unconditional jump, base offset 0
+            Emit((byte)0x00);  // Extension byte placeholder
+            return placeholderOffset;
+        }
+
+        /// <summary>
+        /// Patches a jump on FALSE placeholder with the actual offset.
+        /// The jump target is the current bytecode position.
+        /// Blue Book: offset = (opcode AND 0x03) * 256 + extensionByte
+        /// </summary>
+        /// <param name="placeholderOffset">Offset returned by EmitJumpOnFalsePlaceholder()</param>
+        /// <exception cref="InvalidOperationException">Thrown if offset exceeds range (0-1023)</exception>
+        public void PatchJumpOnFalse(int placeholderOffset)
+        {
+            // Calculate offset from after the jump instruction to current position
+            // Jump instruction is 2 bytes, so target IP after reading = placeholderOffset + 2
+            int jumpOffset = CurrentIP - (placeholderOffset + 2);
+
+            if (jumpOffset < 0)
+                throw new InvalidOperationException($"Jump on false cannot jump backward (offset={jumpOffset})");
+            if (jumpOffset > 1023)
+                throw new InvalidOperationException($"Jump on false offset {jumpOffset} exceeds Blue Book range (0-1023)");
+
+            // Blue Book: offset = (opcode AND 0x03) * 256 + extensionByte
+            // 0xAC = base 0, 0xAD = base 256, 0xAE = base 512, 0xAF = base 768
+            int hiPart = jumpOffset / 256;  // 0, 1, 2, or 3
+            int extensionByte = jumpOffset % 256;
+            byte opcode = (byte)(0xAC + hiPart);
+
+            PatchByteAt(placeholderOffset, opcode);
+            PatchByteAt(placeholderOffset + 1, (byte)extensionByte);
+        }
+
+        /// <summary>
+        /// Patches a jump on TRUE placeholder with the actual offset.
+        /// Blue Book: offset = (opcode AND 0x03) * 256 + extensionByte
+        /// </summary>
+        /// <param name="placeholderOffset">Offset returned by EmitJumpOnTruePlaceholder()</param>
+        /// <exception cref="InvalidOperationException">Thrown if offset exceeds range (0-1023)</exception>
+        public void PatchJumpOnTrue(int placeholderOffset)
+        {
+            int jumpOffset = CurrentIP - (placeholderOffset + 2);
+
+            if (jumpOffset < 0)
+                throw new InvalidOperationException($"Jump on true cannot jump backward (offset={jumpOffset})");
+            if (jumpOffset > 1023)
+                throw new InvalidOperationException($"Jump on true offset {jumpOffset} exceeds Blue Book range (0-1023)");
+
+            // Blue Book: 0xA8-0xAB for long jump on true
+            // 0xA8 = base 0, 0xA9 = base 256, 0xAA = base 512, 0xAB = base 768
+            int hiPart = jumpOffset / 256;
+            int extensionByte = jumpOffset % 256;
+            byte opcode = (byte)(0xA8 + hiPart);
+
+            PatchByteAt(placeholderOffset, opcode);
+            PatchByteAt(placeholderOffset + 1, (byte)extensionByte);
+        }
+
+        /// <summary>
+        /// Patches an unconditional forward jump placeholder with the actual offset.
+        /// Blue Book: offset = ((opcode AND 0x07) - 4) * 256 + extensionByte
+        /// For forward jumps, use 0xA4-0xA7 (base offsets 0, 256, 512, 768)
+        /// </summary>
+        /// <param name="placeholderOffset">Offset returned by EmitForwardJumpPlaceholder()</param>
+        /// <exception cref="InvalidOperationException">Thrown if offset exceeds range (0-1023)</exception>
+        public void PatchForwardJump(int placeholderOffset)
+        {
+            int jumpOffset = CurrentIP - (placeholderOffset + 2);
+
+            if (jumpOffset < 0)
+                throw new InvalidOperationException($"Forward jump cannot jump backward (offset={jumpOffset})");
+            if (jumpOffset > 1023)
+                throw new InvalidOperationException($"Forward jump offset {jumpOffset} exceeds Blue Book range (0-1023)");
+
+            // Blue Book: 0xA4-0xA7 for forward unconditional jumps
+            // offset = ((opcode & 0x07) - 4) * 256 + extensionByte
+            // So for offset N: hiPart = N / 256, opcode = 0xA4 + hiPart
+            int hiPart = jumpOffset / 256;
+            int extensionByte = jumpOffset % 256;
+            byte opcode = (byte)(0xA4 + hiPart);
+
+            PatchByteAt(placeholderOffset, opcode);
+            PatchByteAt(placeholderOffset + 1, (byte)extensionByte);
+        }
+
         /// <summary>
         /// Emits a backward jump bytecode to the specified target offset.
-        /// Used for tail recursion optimization to jump back to method start.
+        /// Uses Blue Book long unconditional jump (0xA0-0xA7) format.
+        /// Blue Book formula: offset = ((bytecode AND 0x07) - 4) * 256 + nextByte
+        /// For backward jumps, we need negative offset which requires (bytecode AND 0x07) less than 4
         /// </summary>
         /// <param name="targetOffset">Target bytecode offset (from MarkMethodStart)</param>
-        /// <exception cref="InvalidOperationException">Thrown if jump offset exceeds 255 bytes</exception>
+        /// <exception cref="InvalidOperationException">Thrown if jump offset exceeds range</exception>
         public void EmitJumpBackward(int targetOffset)
         {
-            // Calculate backward jump offset
+            // Calculate backward jump offset (negative for backward jumps)
             int currentOffset = CurrentIP;
-            int jumpDistance = currentOffset - targetOffset + 2; // +2 for the jump instruction size
+            int jumpOffset = targetOffset - currentOffset - 2; // -2 for the jump instruction size, negative = backward
 
-            if (jumpDistance > 255)
+            // Blue Book long jump range: -1024 to +1023
+            // For backward jumps, we need ((opcode & 0x07) - 4) * 256 + byte = negative offset
+            if (jumpOffset < -1024 || jumpOffset > 1023)
             {
                 throw new InvalidOperationException(
-                    $"Tail recursion jump offset {jumpDistance} exceeds 255-byte limit. " +
+                    $"Jump offset {jumpOffset} exceeds Blue Book long jump range (-1024 to +1023). " +
                     "Method too large for tail recursion optimization.");
             }
 
-            // Blue Book bytecode: 0xA8-0xAF are long unconditional backward jumps
-            // 0xA8 = jump back (offset in next byte)
-            Emit(0xA8);
-            Emit((byte)jumpDistance);
+            // Encode using Blue Book formula:
+            // offset = ((opcode & 0x07) - 4) * 256 + byte
+            // Solving for opcode and byte:
+            // Let hiPart = (opcode & 0x07) - 4, so hiPart = floor(offset / 256) if we want hiPart*256 + byte = offset
+            // hiPart must be in range -4 to +3 (so opcode bits are 0-7)
+            int hiPart = jumpOffset >= 0 ? jumpOffset / 256 : (jumpOffset - 255) / 256;
+            int loByte = jumpOffset - hiPart * 256;
+
+            // Ensure hiPart is in valid range -4 to +3
+            if (hiPart < -4 || hiPart > 3)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot encode jump offset {jumpOffset}: hiPart {hiPart} out of range");
+            }
+
+            int opcodeBits = hiPart + 4; // Convert -4..+3 to 0..7
+            Emit((byte)(0xA0 + opcodeBits));
+            Emit((byte)loByte);
         }
 
         /// <summary>
@@ -825,6 +1061,8 @@ namespace Smalltalk80.Compiler
         /// Bytecodes 0xD0-0xDF: Send Literal Selector With 0 Arguments
         /// Bytecodes 0xE0-0xEF: Send Literal Selector With 1 Argument
         /// Bytecodes 0xF0-0xFF: Send Literal Selector With 2 Arguments
+        /// 0x83: Single Extended Send (for argCount 0-7 and literalIndex 0-31)
+        /// 0x84: Double Extended Send (for larger values)
         /// </summary>
         public void EmitSend(string selector, int argCount)
         {
@@ -855,26 +1093,20 @@ namespace Smalltalk80.Compiler
                 // Bytecodes 0xF0-0xFF: Send Literal Selector With 2 Arguments
                 EmitWithOffset(Bytecode.SEND_LITERAL_2_BASE, selectorIndex);
             }
-            else if (argCount >= 0 && argCount <= 2)
+            else if (argCount <= 7 && selectorIndex <= 31)
             {
-                // Use extended SEND_0/1/2 for common arg counts with large selector indices
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(argCount switch
-                {
-                    0 => ExtendedSubOp.SEND_0,
-                    1 => ExtendedSubOp.SEND_1,
-                    2 => ExtendedSubOp.SEND_2,
-                    _ => throw new InvalidOperationException()
-                });
-                Emit((byte)selectorIndex);  // Selector index
+                // Blue Book Single Extended Send (0x83): nnnlllll format
+                // nnn = argCount (0-7), lllll = literalIndex (0-31)
+                Emit(Bytecode.SINGLE_EXTENDED_SEND); // 0x83
+                Emit(BytecodeUtil.MakeSingleExtendedSendByte(argCount, selectorIndex));
             }
             else
             {
-                // Use SEND_N for 3+ arguments or any other case
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.SEND_N);
-                Emit((byte)selectorIndex);  // Selector first
-                Emit((byte)argCount);        // Then arg count
+                // Blue Book Double Extended Send (0x84): 2 separate bytes
+                // First byte = argCount, second byte = literalIndex
+                Emit(Bytecode.DOUBLE_EXTENDED_SEND); // 0x84
+                Emit((byte)argCount);
+                Emit((byte)selectorIndex);
             }
         }
 
@@ -887,33 +1119,28 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
-        /// Emits a super send bytecode using ExtendedSubOp.
-        /// Uses SEND_SUPER_0/1/2 for common cases, SEND_SUPER_N for others.
+        /// Emits a super send bytecode using Blue Book format.
+        /// 0x85: Single Extended Super Send (for argCount 0-7 and literalIndex 0-31)
+        /// 0x86: Double Extended Super Send (for larger values)
         /// </summary>
         public void EmitSuperSend(string selector, int argCount)
         {
             var index = AddLiteral(new Symbol(selector));
 
-            // Use optimized SEND_SUPER_0/1/2 for common arg counts
-            if (argCount >= 0 && argCount <= 2)
+            if (argCount <= 7 && index <= 31)
             {
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(argCount switch
-                {
-                    0 => ExtendedSubOp.SEND_SUPER_0,
-                    1 => ExtendedSubOp.SEND_SUPER_1,
-                    2 => ExtendedSubOp.SEND_SUPER_2,
-                    _ => throw new InvalidOperationException()
-                });
-                Emit((byte)index);  // Selector index
+                // Blue Book Single Extended Super Send (0x85): nnnlllll format
+                // nnn = argCount (0-7), lllll = literalIndex (0-31)
+                Emit(Bytecode.SINGLE_EXTENDED_SUPER); // 0x85
+                Emit(BytecodeUtil.MakeSingleExtendedSendByte(argCount, index));
             }
             else
             {
-                // Use SEND_SUPER_N for 3+ args
-                Emit(Bytecode.EXTENDED_PREFIX); // 0x80
-                Emit(ExtendedSubOp.SEND_SUPER_N);
-                Emit((byte)index);      // Selector index first
-                Emit((byte)argCount);   // Then arg count
+                // Blue Book Double Extended Super Send (0x86): 2 separate bytes
+                // First byte = argCount, second byte = literalIndex
+                Emit(Bytecode.DOUBLE_EXTENDED_SUPER); // 0x86
+                Emit((byte)argCount);
+                Emit((byte)index);
             }
         }
 
@@ -924,6 +1151,170 @@ namespace Smalltalk80.Compiler
         public void SendSuperMessage(string selector, int argCount)
         {
             EmitSuperSend(selector, argCount);
+        }
+
+        // ============================================================================
+        // SIZING MODE - Two-pass compilation support (with nesting)
+        // ============================================================================
+
+        /// <summary>
+        /// Enters sizing mode. In sizing mode, Emit() counts bytes instead of emitting.
+        /// Call EndSizingMode() to get the count and return to normal emission.
+        /// Supports nesting: inner sizing modes push/pop counters on a stack.
+        /// </summary>
+        public void EnterSizingMode()
+        {
+            _sizingDepth++;
+            _sizingCounterStack.Push(0);  // Start new counter for this level
+        }
+
+        /// <summary>
+        /// Exits sizing mode and returns the number of bytes that would have been emitted
+        /// at this nesting level.
+        /// </summary>
+        public int EndSizingMode()
+        {
+            if (_sizingDepth <= 0)
+                throw new InvalidOperationException("Not in sizing mode");
+            _sizingDepth--;
+            return _sizingCounterStack.Pop();
+        }
+
+        /// <summary>
+        /// Returns true if currently in sizing mode (at any nesting level).
+        /// </summary>
+        public bool IsSizingMode => _sizingDepth > 0;
+
+        // ============================================================================
+        // SHORT JUMP SUPPORT - Blue Book optimized jump encoding
+        // ============================================================================
+
+        /// <summary>
+        /// Determines jump size for an unconditional forward jump.
+        /// Blue Book: 0x90-0x97 (short, 1 byte, offset 1-8) or 0xA0-0xA7 (long, 2 bytes)
+        /// </summary>
+        public static int SizeForwardJump(int offset)
+        {
+            return (offset >= 1 && offset <= ShortJumpLimit) ? 1 : 2;
+        }
+
+        /// <summary>
+        /// Determines jump size for a conditional BFP (branch on false, pop).
+        /// Blue Book: 0x98-0x9F (short, 1 byte, offset 1-8) or 0xAC-0xAF (long, 2 bytes)
+        /// </summary>
+        public static int SizeJumpOnFalse(int offset)
+        {
+            return (offset >= 1 && offset <= ShortJumpLimit) ? 1 : 2;
+        }
+
+        /// <summary>
+        /// Determines jump size for a conditional BTP (branch on true, pop).
+        /// Blue Book: BTP is always 2 bytes (no short form in Blue Book).
+        /// </summary>
+        public static int SizeJumpOnTrue(int offset)
+        {
+            // Blue Book has no short BTP - always 2 bytes
+            return 2;
+        }
+
+        /// <summary>
+        /// Emits a short unconditional forward jump (1 byte).
+        /// Blue Book: 0x90-0x97 for offset 1-8.
+        /// </summary>
+        /// <param name="offset">Jump offset (must be 1-8)</param>
+        public void EmitShortForwardJump(int offset)
+        {
+            if (offset < 1 || offset > ShortJumpLimit)
+                throw new ArgumentOutOfRangeException(nameof(offset),
+                    $"Short jump offset must be 1-{ShortJumpLimit}, got {offset}");
+            // 0x90 + (offset - 1) gives 0x90-0x97 for offsets 1-8
+            Emit((byte)(0x90 + offset - 1));
+        }
+
+        /// <summary>
+        /// Emits a short BFP (branch on false, pop) jump (1 byte).
+        /// Blue Book: 0x98-0x9F for offset 1-8.
+        /// </summary>
+        /// <param name="offset">Jump offset (must be 1-8)</param>
+        public void EmitShortJumpOnFalse(int offset)
+        {
+            if (offset < 1 || offset > ShortJumpLimit)
+                throw new ArgumentOutOfRangeException(nameof(offset),
+                    $"Short BFP offset must be 1-{ShortJumpLimit}, got {offset}");
+            // 0x98 + (offset - 1) gives 0x98-0x9F for offsets 1-8
+            Emit((byte)(0x98 + offset - 1));
+        }
+
+        /// <summary>
+        /// Emits an unconditional forward jump with optimal encoding.
+        /// Uses short (1-byte) form when offset is 1-8, long (2-byte) otherwise.
+        /// </summary>
+        /// <param name="offset">Jump offset (target - current position)</param>
+        public void EmitForwardJump(int offset)
+        {
+            if (offset >= 1 && offset <= ShortJumpLimit)
+            {
+                EmitShortForwardJump(offset);
+            }
+            else if (offset >= 0 && offset <= 1023)
+            {
+                // Long forward jump: 0xA4-0xA7
+                // Blue Book: offset = ((bytecode AND 0x07) - 4) * 256 + nextByte
+                // For forward jumps (positive offsets), use 0xA4-0xA7 (bits 4-7)
+                // 0xA4: offset 0-255, 0xA5: offset 256-511, etc.
+                int hiPart = offset / 256;
+                int loPart = offset % 256;
+                Emit((byte)(0xA4 + hiPart));
+                Emit((byte)loPart);
+            }
+            else
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset),
+                    $"Forward jump offset {offset} exceeds Blue Book range (0-1023)");
+            }
+        }
+
+        /// <summary>
+        /// Emits a BFP (branch on false, pop) with optimal encoding.
+        /// Uses short (1-byte) form when offset is 1-8, long (2-byte) otherwise.
+        /// </summary>
+        /// <param name="offset">Jump offset (target - current position)</param>
+        public void EmitJumpOnFalse(int offset)
+        {
+            if (offset >= 1 && offset <= ShortJumpLimit)
+            {
+                EmitShortJumpOnFalse(offset);
+            }
+            else if (offset >= 0 && offset <= 1023)
+            {
+                // Long BFP: 0xAC-0xAF
+                int hiPart = offset / 256;
+                int loPart = offset % 256;
+                Emit((byte)(0xAC + hiPart));
+                Emit((byte)loPart);
+            }
+            else
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset),
+                    $"BFP offset {offset} exceeds Blue Book range (0-1023)");
+            }
+        }
+
+        /// <summary>
+        /// Emits a BTP (branch on true, pop).
+        /// Blue Book: Always 2 bytes (0xA8-0xAB), no short form.
+        /// </summary>
+        /// <param name="offset">Jump offset (target - current position)</param>
+        public void EmitJumpOnTrue(int offset)
+        {
+            if (offset < 0 || offset > 1023)
+                throw new ArgumentOutOfRangeException(nameof(offset),
+                    $"BTP offset {offset} exceeds Blue Book range (0-1023)");
+            // Long BTP: 0xA8-0xAB
+            int hiPart = offset / 256;
+            int loPart = offset % 256;
+            Emit((byte)(0xA8 + hiPart));
+            Emit((byte)loPart);
         }
     }
 }

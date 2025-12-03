@@ -223,38 +223,46 @@ public static class BytecodeStackAnalyzerCFG
             return currentPc + 1 + offset;
         }
 
-        // Long jumps (0xA0-0xA7)
+        // Blue Book Long Unconditional Jump (0xA0-0xA7)
+        // Offset = ((bytecode & 0x07) - 4) * 256 + extensionByte
+        // Range: -1024 to +1023 (can jump backward or forward)
         if (b >= 0xA0 && b <= 0xA7)
         {
             if (pc >= bytecodes.Length)
                 return null;
 
-            int highBits = (b & 0x07) << 8;
-            int lowBits = bytecodes[pc++];
-            int offset = highBits | lowBits;
-            return currentPc + 2 + offset; // Target is relative to PC after offset byte
+            int baseOffset = ((b & 0x07) - 4) * 256;
+            int extensionByte = bytecodes[pc++];
+            int offset = baseOffset + extensionByte;
+            return currentPc + 2 + offset; // Target is relative to PC after extension byte
         }
 
-        // Extended prefix
-        if (BytecodeUtil.IsExtended(b))
+        // Blue Book Long Conditional Jump on TRUE (0xA8-0xAB)
+        // Offset = (bytecode & 0x03) * 256 + extensionByte
+        // Range: 0-1023 (forward only)
+        if (b >= 0xA8 && b <= 0xAB)
         {
             if (pc >= bytecodes.Length)
                 return null;
 
-            byte subOp = bytecodes[pc];
+            int baseOffset = (b & 0x03) * 256;
+            int extensionByte = bytecodes[pc++];
+            int offset = baseOffset + extensionByte;
+            return currentPc + 2 + offset;
+        }
 
-            // Extended jump instructions (0x14-0x19)
-            if (subOp >= 0x14 && subOp <= 0x19)
-            {
-                pc++; // Skip subop
-                if (pc + 1 >= bytecodes.Length)
-                    return null;
+        // Blue Book Long Conditional Jump on FALSE (0xAC-0xAF)
+        // Offset = (bytecode & 0x03) * 256 + extensionByte
+        // Range: 0-1023 (forward only)
+        if (b >= 0xAC && b <= 0xAF)
+        {
+            if (pc >= bytecodes.Length)
+                return null;
 
-                int highByte = bytecodes[pc++];
-                int lowByte = bytecodes[pc++];
-                int offset = (highByte << 8) | lowByte;
-                return currentPc + 4 + offset; // Target is relative to PC after 2-byte offset
-            }
+            int baseOffset = (b & 0x03) * 256;
+            int extensionByte = bytecodes[pc++];
+            int offset = baseOffset + extensionByte;
+            return currentPc + 2 + offset;
         }
 
         return null; // Not a jump
@@ -262,24 +270,21 @@ public static class BytecodeStackAnalyzerCFG
 
     /// <summary>
     /// Returns true if the instruction is a conditional jump.
+    /// Blue Book: 0x98-0x9F (short false), 0xA8-0xAB (long true), 0xAC-0xAF (long false)
     /// </summary>
     private static bool IsConditionalJump(byte b, byte[] bytecodes, int currentPc)
     {
-        // Short conditional jump (0x98-0x9F)
+        // Blue Book Short conditional jump on FALSE (0x98-0x9F)
         if (b >= 0x98 && b <= 0x9F)
             return true;
 
-        // Extended conditional jumps
-        if (BytecodeUtil.IsExtended(b))
-        {
-            int subOpPc = currentPc + 1;
-            if (subOpPc < bytecodes.Length)
-            {
-                byte subOp = bytecodes[subOpPc];
-                // JUMP_TRUE, JUMP_FALSE, JUMP_LONG_TRUE, JUMP_LONG_FALSE
-                return subOp == 0x14 || subOp == 0x15 || subOp == 0x17 || subOp == 0x18;
-            }
-        }
+        // Blue Book Long conditional jump on TRUE (0xA8-0xAB)
+        if (b >= 0xA8 && b <= 0xAB)
+            return true;
+
+        // Blue Book Long conditional jump on FALSE (0xAC-0xAF)
+        if (b >= 0xAC && b <= 0xAF)
+            return true;
 
         return false;
     }
@@ -318,17 +323,29 @@ public static class BytecodeStackAnalyzerCFG
         if (BytecodeUtil.IsReturn(b))
             return 0;
 
-        // Jumps: depends on type
-        if (b >= 0x90 && b <= 0x97) // Short unconditional jump
+        // Blue Book Jumps
+        if (b >= 0x90 && b <= 0x97) // Short unconditional jump (forward 1-8)
             return 0;
 
-        if (b >= 0x98 && b <= 0x9F) // Short conditional jump (pops condition)
+        if (b >= 0x98 && b <= 0x9F) // Short conditional jump on FALSE (pops condition)
             return -1;
 
-        if (b >= 0xA0 && b <= 0xA7) // Long jump
+        if (b >= 0xA0 && b <= 0xA7) // Long unconditional jump (ALL of 0xA0-0xA7)
         {
-            pc++; // Skip offset byte
-            return (b >= 0xA0 && b <= 0xA3) ? 0 : -1; // A0-A3 unconditional, A4-A7 conditional
+            pc++; // Skip extension byte
+            return 0;
+        }
+
+        if (b >= 0xA8 && b <= 0xAB) // Long conditional jump on TRUE (pops condition)
+        {
+            pc++; // Skip extension byte
+            return -1;
+        }
+
+        if (b >= 0xAC && b <= 0xAF) // Long conditional jump on FALSE (pops condition)
+        {
+            pc++; // Skip extension byte
+            return -1;
         }
 
         // Extended bytecodes

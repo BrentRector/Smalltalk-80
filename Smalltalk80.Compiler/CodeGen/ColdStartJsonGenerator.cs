@@ -141,18 +141,18 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
         int position = System.Text.Encoding.UTF8.GetByteCount(_sourcesFileContent.ToString());
         _methodSourcePositions[localId] = position;
 
-        // Normalize line endings to LF for consistent byte positions across platforms
-        string normalizedSource = source.Replace("\r\n", "\n").Replace("\r", "\n");
+        // Normalize line endings to CR for Smalltalk-80 Blue Book compliance
+        // Smalltalk-80 uses CR (character 13) for line breaks, not LF (character 10)
+        // The CompositionScanner only registers CR as a stop condition for line breaks
+        string normalizedSource = source.Replace("\r\n", "\r").Replace("\n", "\r");
 
         // Escape embedded ! characters as !! per chunk format
         string escapedSource = normalizedSource.Replace("!", "!!");
 
-        // Write chunk: source text followed by ! and LF
-        // IMPORTANT: Use explicit \n (not AppendLine) to ensure consistent byte positions
-        // across platforms. AppendLine uses platform-specific line endings which would
-        // cause source position mismatches between Windows (CRLF) and Linux (LF).
+        // Write chunk: source text followed by ! and CR
+        // IMPORTANT: Use explicit \r (CR) to match Smalltalk-80 conventions
         _sourcesFileContent.Append(escapedSource);
-        _sourcesFileContent.Append("!\n");
+        _sourcesFileContent.Append("!\r");
 
         return position;
     }

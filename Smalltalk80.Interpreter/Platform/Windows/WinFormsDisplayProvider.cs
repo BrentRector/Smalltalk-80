@@ -25,6 +25,9 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     private readonly VMMetadata? _vmMetadata;
     private bool _disposed = false;
 
+    // Input semaphore OOP for event notification
+    private SmalltalkOOP _inputSemaphore = default;
+
     public new int Width { get; private set; }
     public new int Height { get; private set; }
 
@@ -453,7 +456,29 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public void SetInputSemaphore(SmalltalkOOP semaphoreOOP)
     {
-        // Not implemented yet - would signal semaphore when events available
+        _inputSemaphore = semaphoreOOP;
+    }
+
+    public SmalltalkOOP GetInputSemaphore()
+    {
+        return _inputSemaphore;
+    }
+
+    public bool HasPendingEvents()
+    {
+        return _eventQueue.HasPendingEvents;
+    }
+
+    public bool WaitForEvents(int timeoutMs)
+    {
+        return _eventQueue.WaitOne(timeoutMs);
+    }
+
+    public WaitHandle? EventAvailableHandle => _eventQueue.EventAvailableHandle;
+
+    public void ResetEventSignalIfEmpty()
+    {
+        _eventQueue.ResetSignalIfEmpty();
     }
 
     public SmalltalkOOP ReadClipboardToStringOOP()

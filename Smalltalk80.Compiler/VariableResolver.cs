@@ -90,14 +90,27 @@ namespace Smalltalk80.Compiler
                 // Check current scope first
                 if (context.LocalArgumentIndices.TryGetValue(varName, out int argIndex))
                 {
-                    // Must be method argument (scope depth == 0)
-                    // Block arguments are handled above before allocator check
-                    return new ResolutionResult(
-                        VariableType.MethodArgument,
-                        slotIndex,  // Absolute unified frame index
-                        false,  // Method args are read-only
-                        varName
-                    );
+                    // Distinguish between method arguments and block arguments
+                    if (context.ScopeDepth == 0)
+                    {
+                        // Method scope: This is a method argument (read-only pseudo-variable)
+                        return new ResolutionResult(
+                            VariableType.MethodArgument,
+                            slotIndex,  // Absolute unified frame index
+                            false,  // Method args are read-only
+                            varName
+                        );
+                    }
+                    else
+                    {
+                        // Block scope: This is a block argument (assignable per Blue Book)
+                        return new ResolutionResult(
+                            VariableType.BlockTemporary,
+                            slotIndex,  // Absolute unified frame index
+                            true,  // Block args ARE assignable
+                            varName
+                        );
+                    }
                 }
 
                 if (context.LocalTemporaryIndices.ContainsKey(varName))
@@ -416,7 +429,7 @@ namespace Smalltalk80.Compiler
                 return new ResolutionResult(
                     VariableType.BlockTemporary,
                     argIndex,
-                    false,  // Block arguments are NOT assignable (Blue Book: pseudo-variables)
+                    true,  // Block arguments ARE assignable (only METHOD arguments are pseudo-variables)
                     varName
                 );
             }
@@ -463,7 +476,7 @@ namespace Smalltalk80.Compiler
                         return new ResolutionResult(
                             VariableType.ParentVariable,
                             pArgIndex + accumulatedOffset,
-                            false,  // Block arguments are NOT assignable (Blue Book: pseudo-variables)
+                            true,  // Block arguments ARE assignable (only METHOD arguments are pseudo-variables)
                             varName
                         );
                     }

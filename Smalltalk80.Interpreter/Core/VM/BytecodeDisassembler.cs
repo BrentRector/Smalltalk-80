@@ -115,14 +115,14 @@ public static class BytecodeDisassembler
         {
             result = ((Bytecode)b) switch
             {
-                Bytecode.RETURN_TOP => "returnTop",
+                Bytecode.RETURN_TOP_FROM_MESSAGE => "returnTop",     // 0x7C - also NLR in blocks
                 Bytecode.RETURN_SELF => "returnSelf",
                 Bytecode.RETURN_FALSE => "returnFalse",
                 Bytecode.RETURN_TRUE => "returnTrue",
                 Bytecode.RETURN_NIL => "returnNil",
-                Bytecode.RETURN_SELF_POP => "blockReturnSelf",
-                Bytecode.RETURN_TOP_POP => "blockReturnTop",
-                Bytecode.RESERVED_RETURN => "nop",
+                Bytecode.RETURN_TOP_FROM_BLOCK => "blockReturnValue", // 0x7D - local block return
+                Bytecode.RESERVED_126 => "reserved126",              // 0x7E - unused
+                Bytecode.RESERVED_127 => "reserved127",              // 0x7F - unused
                 _ => $"return??? {b}"
             };
         }
@@ -138,13 +138,101 @@ public static class BytecodeDisassembler
 
     private static string DisassembleExtended(byte b, byte[] bytecodes, ref int pc, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, string[] optimizedSelectors, ref int bytesConsumed)
     {
-        // Extended prefix (0x80)
-        if (BytecodeUtil.IsExtended(b))
+        // Blue Book extended bytecodes (0x80-0x88)
+        switch (b)
         {
-            return DisassembleExtendedPrefix(bytecodes, ref pc, literalOOPs, getLiteralDisplay, ref bytesConsumed);
+            // Extended push (0x80) - type:index format
+            case 0x80:
+                return DisassembleExtendedPush(bytecodes, ref pc, literalOOPs, getLiteralDisplay, ref bytesConsumed);
+
+            // Extended store no pop (0x81) - type:index format
+            case 0x81:
+                return DisassembleExtendedStore(bytecodes, ref pc, literalOOPs, getLiteralDisplay, ref bytesConsumed, "store");
+
+            // Extended pop and store (0x82) - type:index format
+            case 0x82:
+                return DisassembleExtendedStore(bytecodes, ref pc, literalOOPs, getLiteralDisplay, ref bytesConsumed, "popStore");
+
+            // Single extended send (0x83) - nnnlllll format
+            case 0x83:
+                return DisassembleSingleExtendedSend(bytecodes, ref pc, literalOOPs, getLiteralDisplay, ref bytesConsumed, "send");
+
+            // Double extended send (0x84)
+            case 0x84:
+                return DisassembleDoubleExtendedSend(bytecodes, ref pc, literalOOPs, getLiteralDisplay, ref bytesConsumed, "send");
+
+            // Single extended super send (0x85) - nnnlllll format
+            case 0x85:
+                return DisassembleSingleExtendedSend(bytecodes, ref pc, literalOOPs, getLiteralDisplay, ref bytesConsumed, "sendSuper");
+
+            // Double extended super send (0x86)
+            case 0x86:
+                return DisassembleDoubleExtendedSend(bytecodes, ref pc, literalOOPs, getLiteralDisplay, ref bytesConsumed, "sendSuper");
+
+            // Pop (0x87)
+            case 0x87:
+                return "pop";
+
+            // Duplicate (0x88)
+            case 0x88:
+                return "dup";
+
+            // Push active context (0x89)
+            case 0x89:
+                return "pushActiveContext";
         }
+
+        // Short jump forward 1-8 (0x90-0x97)
+        if (BytecodeUtil.IsShortJump(b))
+        {
+            int offset = (b & 0x07) + 1; // 1-8 bytes forward
+            return $"jump +{offset}";
+        }
+
+        // Short jump on false 1-8 (0x98-0x9F)
+        if (BytecodeUtil.IsShortJumpFalse(b))
+        {
+            int offset = (b & 0x07) + 1; // 1-8 bytes forward
+            return $"jumpFalse +{offset}";
+        }
+
+        // Long jump (0xA0-0xA7)
+        if (BytecodeUtil.IsLongJump(b))
+        {
+            if (pc + 1 >= bytecodes.Length) return "longJump (incomplete)";
+            byte nextByte = bytecodes[pc + 1];
+            pc++;
+            bytesConsumed = 2;
+            // Offset formula: ((b & 7) - 4) * 256 + nextByte
+            int offset = ((b & 0x07) - 4) * 256 + nextByte;
+            string direction = offset >= 0 ? $"+{offset}" : offset.ToString();
+            return $"jump {direction}";
+        }
+
+        // Long jump on true (0xA8-0xAB)
+        if (BytecodeUtil.IsLongJumpTrue(b))
+        {
+            if (pc + 1 >= bytecodes.Length) return "longJumpTrue (incomplete)";
+            byte nextByte = bytecodes[pc + 1];
+            pc++;
+            bytesConsumed = 2;
+            int offset = (b & 0x03) * 256 + nextByte;
+            return $"jumpTrue +{offset}";
+        }
+
+        // Long jump on false (0xAC-0xAF)
+        if (BytecodeUtil.IsLongJumpFalse(b))
+        {
+            if (pc + 1 >= bytecodes.Length) return "longJumpFalse (incomplete)";
+            byte nextByte = bytecodes[pc + 1];
+            pc++;
+            bytesConsumed = 2;
+            int offset = (b & 0x03) * 256 + nextByte;
+            return $"jumpFalse +{offset}";
+        }
+
         // Send arithmetic (0xB0-0xBF)
-        else if (BytecodeUtil.IsSendArithmetic(b))
+        if (BytecodeUtil.IsSendArithmetic(b))
         {
             int opIndex = BytecodeUtil.SendArithmeticIndex(b);
             string[] arithmeticOps = [
@@ -154,8 +242,9 @@ public static class BytecodeDisassembler
             string selector = opIndex < arithmeticOps.Length ? arithmeticOps[opIndex] : $"arith[{opIndex}]";
             return $"send #{selector}";
         }
+
         // Send special selector (0xC0-0xCF)
-        else if (BytecodeUtil.IsSendSpecial(b))
+        if (BytecodeUtil.IsSendSpecial(b))
         {
             int specialIndex = BytecodeUtil.SendSpecialIndex(b);
             string[] specialSelectors = [
@@ -165,123 +254,135 @@ public static class BytecodeDisassembler
             string selector = specialIndex < specialSelectors.Length ? specialSelectors[specialIndex] : $"special[{specialIndex}]";
             return $"send #{selector}";
         }
+
         // Send literal selector with 0 args (0xD0-0xDF)
-        else if (BytecodeUtil.IsSend0(b))
+        if (BytecodeUtil.IsSend0(b))
         {
             int litIndex = BytecodeUtil.Send0Index(b) + 1; // +1 to skip header at literalOOPs[0]
             string selector = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : $"lit[{litIndex - 1}]";
             return $"send {selector}";
         }
+
         // Send literal selector with 1 arg (0xE0-0xEF)
-        else if (BytecodeUtil.IsSend1(b))
+        if (BytecodeUtil.IsSend1(b))
         {
             int litIndex = BytecodeUtil.Send1Index(b) + 1; // +1 to skip header at literalOOPs[0]
             string selector = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : $"lit[{litIndex - 1}]";
             return $"send {selector}";
         }
+
         // Send literal selector with 2 args (0xF0-0xFF)
-        else if (BytecodeUtil.IsSend2(b))
+        if (BytecodeUtil.IsSend2(b))
         {
             int litIndex = BytecodeUtil.Send2Index(b) + 1; // +1 to skip header at literalOOPs[0]
             string selector = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : $"lit[{litIndex - 1}]";
             return $"send {selector}";
         }
-        else
-        {
-            return $"unknown extended bytecode 0x{b:X2}";
-        }
+
+        return $"unknown extended bytecode 0x{b:X2}";
     }
 
-    private static string DisassembleExtendedPrefix(byte[] bytecodes, ref int pc, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, ref int bytesConsumed)
+    /// <summary>
+    /// Disassemble Blue Book extended push (0x80) with type:index encoding.
+    /// </summary>
+    private static string DisassembleExtendedPush(byte[] bytecodes, ref int pc, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, ref int bytesConsumed)
     {
-        // Extended prefix (0x80) followed by sub-operation byte
-        if (pc + 1 >= bytecodes.Length)
-        {
-            return "extended (incomplete)";
-        }
+        if (pc + 1 >= bytecodes.Length) return "extPush (incomplete)";
 
-        byte subOp = bytecodes[pc + 1];
-        pc++; // Consume sub-operation byte
+        byte typeIndex = bytecodes[pc + 1];
+        pc++;
         bytesConsumed = 2;
 
-        return ((ExtendedSubOp)subOp) switch
+        int type = (typeIndex >> 6) & 0x03;  // tt bits
+        int index = typeIndex & 0x3F;         // iiiiii bits
+
+        return type switch
         {
-            ExtendedSubOp.PUSH_IVAR when pc + 1 < bytecodes.Length =>
-                GetExtendedOperandString("pushReceiver", bytecodes, ref pc, ref bytesConsumed),
-            ExtendedSubOp.STORE_IVAR when pc + 1 < bytecodes.Length =>
-                GetExtendedOperandString("storeReceiver", bytecodes, ref pc, ref bytesConsumed),
-            ExtendedSubOp.POP_STORE_IVAR when pc + 1 < bytecodes.Length =>
-                GetExtendedOperandString("popStoreReceiver", bytecodes, ref pc, ref bytesConsumed),
-            ExtendedSubOp.PUSH_TEMP when pc + 1 < bytecodes.Length =>
-                GetExtendedOperandString("pushTemporary", bytecodes, ref pc, ref bytesConsumed),
-            ExtendedSubOp.STORE_TEMP when pc + 1 < bytecodes.Length =>
-                GetExtendedOperandString("storeTemporary", bytecodes, ref pc, ref bytesConsumed),
-            ExtendedSubOp.POP_STORE_TEMP when pc + 1 < bytecodes.Length =>
-                GetExtendedOperandString("popStoreTemporary", bytecodes, ref pc, ref bytesConsumed),
-            ExtendedSubOp.PUSH_LITERAL when pc + 1 < bytecodes.Length =>
-                GetExtendedOperandString("pushLiteral", bytecodes, ref pc, ref bytesConsumed),
-            ExtendedSubOp.PUSH_LITERAL_VAR when pc + 1 < bytecodes.Length =>
-                GetExtendedOperandString("pushLiteralVariable", bytecodes, ref pc, ref bytesConsumed),
-            ExtendedSubOp.STORE_LITERAL_VAR when pc + 1 < bytecodes.Length =>
-                GetExtendedOperandString("storeLiteralVariable", bytecodes, ref pc, ref bytesConsumed),
-            ExtendedSubOp.POP_STORE_LITERAL_VAR when pc + 1 < bytecodes.Length =>
-                GetExtendedOperandString("popStoreLiteralVariable", bytecodes, ref pc, ref bytesConsumed),
-
-            // Send operations with single operand (selector index)
-            ExtendedSubOp.SEND_0 when pc + 1 < bytecodes.Length =>
-                GetExtendedSendString("send", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 0),
-            ExtendedSubOp.SEND_1 when pc + 1 < bytecodes.Length =>
-                GetExtendedSendString("send", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 1),
-            ExtendedSubOp.SEND_2 when pc + 1 < bytecodes.Length =>
-                GetExtendedSendString("send", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 2),
-            ExtendedSubOp.SEND_SUPER_0 when pc + 1 < bytecodes.Length =>
-                GetExtendedSendString("sendSuper", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 0),
-            ExtendedSubOp.SEND_SUPER_1 when pc + 1 < bytecodes.Length =>
-                GetExtendedSendString("sendSuper", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 1),
-            ExtendedSubOp.SEND_SUPER_2 when pc + 1 < bytecodes.Length =>
-                GetExtendedSendString("sendSuper", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay, 2),
-
-            // Send operations with two operands (selector index + arg count)
-            ExtendedSubOp.SEND_N when pc + 2 < bytecodes.Length =>
-                GetExtendedSendNString("send", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay),
-            ExtendedSubOp.SEND_SUPER_N when pc + 2 < bytecodes.Length =>
-                GetExtendedSendNString("sendSuper", bytecodes, ref pc, ref bytesConsumed, literalOOPs, getLiteralDisplay),
-
-            ExtendedSubOp.POP => "pop",
-            ExtendedSubOp.DUP => "dup",
-            _ => $"extended subOp 0x{subOp:X2}"
+            0 => $"pushReceiver {index}",     // ReceiverVariable
+            1 => $"pushTemporary {index}",    // TemporaryVariable
+            2 => GetLiteralDisplay("pushLiteral", index, literalOOPs, getLiteralDisplay),
+            3 => GetLiteralDisplay("pushLiteralVariable", index, literalOOPs, getLiteralDisplay),
+            _ => $"extPush type={type} index={index}"
         };
     }
 
-    private static string GetExtendedOperandString(string mnemonic, byte[] bytecodes, ref int pc, ref int bytesConsumed)
+    /// <summary>
+    /// Disassemble Blue Book extended store (0x81/0x82) with type:index encoding.
+    /// </summary>
+    private static string DisassembleExtendedStore(byte[] bytecodes, ref int pc, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, ref int bytesConsumed, string prefix)
     {
-        byte operand = bytecodes[pc + 1];
+        if (pc + 1 >= bytecodes.Length) return $"{prefix} (incomplete)";
+
+        byte typeIndex = bytecodes[pc + 1];
         pc++;
-        bytesConsumed = 3; // 0x80 + subOp + operand
-        return $"{mnemonic} {operand}";
+        bytesConsumed = 2;
+
+        int type = (typeIndex >> 6) & 0x03;  // tt bits
+        int index = typeIndex & 0x3F;         // iiiiii bits
+
+        return type switch
+        {
+            0 => $"{prefix}Receiver {index}",
+            1 => $"{prefix}Temporary {index}",
+            2 => GetLiteralDisplay($"{prefix}Literal", index, literalOOPs, getLiteralDisplay),
+            3 => GetLiteralDisplay($"{prefix}LiteralVariable", index, literalOOPs, getLiteralDisplay),
+            _ => $"{prefix} type={type} index={index}"
+        };
     }
 
-    private static string GetExtendedSendString(string mnemonic, byte[] bytecodes, ref int pc, ref int bytesConsumed, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, int argCount)
+    /// <summary>
+    /// Disassemble Blue Book single extended send (0x83/0x85) with nnnlllll encoding.
+    /// </summary>
+    private static string DisassembleSingleExtendedSend(byte[] bytecodes, ref int pc, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, ref int bytesConsumed, string mnemonic)
     {
-        byte selectorIndex = bytecodes[pc + 1];
-        pc++;
-        bytesConsumed = 3; // 0x80 + subOp + selectorIndex
+        if (pc + 1 >= bytecodes.Length) return $"{mnemonic} (incomplete)";
 
-        int litIndex = selectorIndex + 1; // +1 to skip header at literalOOPs[0]
-        string selector = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : $"lit[{selectorIndex}]";
+        byte descriptor = bytecodes[pc + 1];
+        pc++;
+        bytesConsumed = 2;
+
+        int argCount = (descriptor >> 5) & 0x07;  // nnn bits (0-7)
+        int litIndex = descriptor & 0x1F;          // lllll bits (0-31)
+
+        int adjustedIndex = litIndex + 1; // +1 to skip header
+        string selector = adjustedIndex < literalOOPs.Length
+            ? getLiteralDisplay(literalOOPs[adjustedIndex])
+            : $"lit[{litIndex}]";
+
         return $"{mnemonic} #{selector} ({argCount} args)";
     }
 
-    private static string GetExtendedSendNString(string mnemonic, byte[] bytecodes, ref int pc, ref int bytesConsumed, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay)
+    /// <summary>
+    /// Disassemble Blue Book double extended send (0x84/0x86).
+    /// Format: opcode argCount litIndex
+    /// </summary>
+    private static string DisassembleDoubleExtendedSend(byte[] bytecodes, ref int pc, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay, ref int bytesConsumed, string mnemonic)
     {
-        byte selectorIndex = bytecodes[pc + 1];
-        byte argCount = bytecodes[pc + 2];
+        if (pc + 2 >= bytecodes.Length) return $"{mnemonic} (incomplete)";
+
+        byte argCount = bytecodes[pc + 1];
+        byte litIndex = bytecodes[pc + 2];
         pc += 2;
-        bytesConsumed = 4; // 0x80 + subOp + selectorIndex + argCount
+        bytesConsumed = 3;
 
-        int litIndex = selectorIndex + 1; // +1 to skip header at literalOOPs[0]
-        string selector = litIndex < literalOOPs.Length ? getLiteralDisplay(literalOOPs[litIndex]) : $"lit[{selectorIndex}]";
+        int adjustedIndex = litIndex + 1; // +1 to skip header
+        string selector = adjustedIndex < literalOOPs.Length
+            ? getLiteralDisplay(literalOOPs[adjustedIndex])
+            : $"lit[{litIndex}]";
+
         return $"{mnemonic} #{selector} ({argCount} args)";
+    }
+
+    /// <summary>
+    /// Helper to format literal display with index.
+    /// </summary>
+    private static string GetLiteralDisplay(string mnemonic, int index, SmalltalkOOP[] literalOOPs, Func<SmalltalkOOP, string> getLiteralDisplay)
+    {
+        int adjustedIndex = index + 1; // +1 to skip header
+        string litValue = adjustedIndex < literalOOPs.Length
+            ? getLiteralDisplay(literalOOPs[adjustedIndex])
+            : "???";
+        return $"{mnemonic} {index} ({litValue})";
     }
 
     /// <summary>
@@ -336,21 +437,52 @@ public static class BytecodeDisassembler
         {
             return ((Bytecode)bytecode) switch
             {
-                Bytecode.RETURN_TOP => "RETURN_TOP",
+                Bytecode.RETURN_TOP_FROM_MESSAGE => "RETURN_TOP",
                 Bytecode.RETURN_SELF => "RETURN_SELF",
                 Bytecode.RETURN_FALSE => "RETURN_FALSE",
                 Bytecode.RETURN_TRUE => "RETURN_TRUE",
                 Bytecode.RETURN_NIL => "RETURN_NIL",
-                Bytecode.RETURN_SELF_POP => "BLOCK_RETURN_SELF",
-                Bytecode.RETURN_TOP_POP => "BLOCK_RETURN_TOP",
-                Bytecode.RESERVED_RETURN => "NOP",
+                Bytecode.RETURN_TOP_FROM_BLOCK => "BLOCK_RETURN_VALUE",
+                Bytecode.RESERVED_126 => "RESERVED_126",
+                Bytecode.RESERVED_127 => "RESERVED_127",
                 _ => "RETURN"
             };
         }
 
-        // Extended prefix (0x80)
-        if (BytecodeUtil.IsExtended(bytecode))
-            return "EXTENDED";
+        // Blue Book extended bytecodes (0x80-0x88)
+        switch (bytecode)
+        {
+            case 0x80: return "EXT_PUSH";
+            case 0x81: return "EXT_STORE";
+            case 0x82: return "EXT_POP_STORE";
+            case 0x83: return "SINGLE_SEND";
+            case 0x84: return "DOUBLE_SEND";
+            case 0x85: return "SINGLE_SUPER";
+            case 0x86: return "DOUBLE_SUPER";
+            case 0x87: return "POP";
+            case 0x88: return "DUP";
+            case 0x89: return "PUSH_CONTEXT";
+        }
+
+        // Short jump forward (0x90-0x97)
+        if (BytecodeUtil.IsShortJump(bytecode))
+            return "SHORT_JUMP";
+
+        // Short jump on false (0x98-0x9F)
+        if (BytecodeUtil.IsShortJumpFalse(bytecode))
+            return "SHORT_JUMP_FALSE";
+
+        // Long jump (0xA0-0xA7)
+        if (BytecodeUtil.IsLongJump(bytecode))
+            return "LONG_JUMP";
+
+        // Long jump on true (0xA8-0xAB)
+        if (BytecodeUtil.IsLongJumpTrue(bytecode))
+            return "LONG_JUMP_TRUE";
+
+        // Long jump on false (0xAC-0xAF)
+        if (BytecodeUtil.IsLongJumpFalse(bytecode))
+            return "LONG_JUMP_FALSE";
 
         // Send arithmetic (0xB0-0xBF)
         if (BytecodeUtil.IsSendArithmetic(bytecode))

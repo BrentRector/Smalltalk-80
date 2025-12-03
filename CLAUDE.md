@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-12-01
+**Last Updated**: 2025-12-03
 
 ## Project Status
 
@@ -14,13 +14,14 @@
 - **VM Core**: Fully functional, verified operational
 - **Process Primitives**: ✅ **85-88 working** (suspend, resume, terminate, yield)
 - **System Browser**: ✅ **FULLY FUNCTIONAL** - source retrieval working
+- **Timer/Event System**: ✅ **WaitHandle.WaitAny** - efficient multi-source waiting
 
 ## Known Issues
 
-**🟡 Control Structure Optimization Disabled**
-The C# compiler has `ifTrue:`/`ifFalse:` optimization **incorrectly disabled**. Blue Book Chapter 28 confirms these SHOULD be optimized to conditional jumps (no BlockContext created). Current behavior creates BlockContexts, causing `thisContext` to return BlockContext instead of MethodContext.
+**✅ Control Structure Optimization - IMPLEMENTED**
+The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:ifTrue:`, `and:`, and `or:` using Blue Book conditional jump bytecodes. No BlockContext is created for zero-argument blocks in these control structures.
 
-**Fix Applied**: Added `BlockContext>>removeSelf` method that delegates to `home removeSelf`. This follows the existing BlockContext pattern (like `receiver` and `method`) and automatically handles nested blocks via the chain of `home` references. The proper long-term fix still requires enabling compiler optimization.
+**Remaining**: `whileTrue:` and `whileFalse:` are NOT yet inlined (receiver is a block, requires special handling).
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 
@@ -89,6 +90,43 @@ The C# compiler has `ifTrue:`/`ifFalse:` optimization **incorrectly disabled**. 
 - `FilePrimitives.cs` - BOM offset handling for source file reading
 - `StackManager.cs` - Blue Book block argument handling
 
+**Phase 4: Timer and Event System Optimization** ✅ **COMPLETE**
+
+Efficient idle detection using `WaitHandle.WaitAny` for unified multi-source waiting:
+
+- ✅ **Interrupt-Driven Timer**: `System.Threading.Timer` signals immediately when delay expires
+- ✅ **WaitHandle.WaitAny**: Waits on both event queue and timer handles in single kernel call
+- ✅ **ManualResetEventSlim**: Replaced AutoResetEvent to prevent signal consumption
+- ✅ **Double-Check Reset Pattern**: Safe reset after WaitAny to handle race conditions
+- ✅ **CPU Efficiency**: Near-zero CPU during idle via kernel-level waiting
+
+**Key Implementation Details**:
+
+The original AutoResetEvent caused event loss because it auto-resets when WaitAny returns, consuming the signal before events could be processed. The fix uses ManualResetEventSlim with explicit reset:
+
+```csharp
+// After WaitAny returns, reset signal only if queue is empty
+public void ResetSignalIfEmpty()
+{
+    if (!HasPendingEvents)
+    {
+        _eventSignal.Reset();
+        // Double-check: producer might have added after check but before reset
+        if (HasPendingEvents)
+            _eventSignal.Set();
+    }
+}
+```
+
+**Key Files**:
+- `VirtualMachine.cs` - InterpreterLoop uses `WaitHandle.WaitAny([eventHandle, timerHandle])`
+- `VirtualMachine.ProcessScheduling.cs` - Extracted process scheduling methods (~330 lines)
+- `SmalltalkEventQueue.cs` - ManualResetEventSlim with ResetSignalIfEmpty()
+- `TimerManager.cs` - Interrupt-driven timer with TimerExpiredHandle
+- `IPlatformBridge.cs` - Added ResetEventSignalIfEmpty() interface method
+
+See `docs/Architecture/PROPOSED-TIMER-OPTIMIZATION.md` and `docs/Architecture/PROCESS-MANAGEMENT.md` for complete documentation.
+
 See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, `docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md`, and `docs/SOURCE-LOOKUP-ANALYSIS.md` for complete documentation.
 
 ## Architecture Documentation
@@ -98,6 +136,8 @@ See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, `d
 - **[PHYSICAL-ARCHITECTURE.md](docs/Architecture/PHYSICAL-ARCHITECTURE.md)** - File system organization, subsystems, dependencies
 - **[IMPLEMENTATION-ARCHITECTURE.md](docs/Architecture/IMPLEMENTATION-ARCHITECTURE.md)** - Bytecode execution, contexts, primitives, message sending
 - **[DEVELOPMENT-GUIDE.md](docs/Architecture/DEVELOPMENT-GUIDE.md)** - How to extend the interpreter (adding primitives, phases, components)
+- **[PROCESS-MANAGEMENT.md](docs/Architecture/PROCESS-MANAGEMENT.md)** - Process scheduling, semaphores, priority queues
+- **[PROPOSED-TIMER-OPTIMIZATION.md](docs/Architecture/PROPOSED-TIMER-OPTIMIZATION.md)** - Timer/event system, WaitHandle.WaitAny implementation
 
 ## Block Context Architecture
 
@@ -237,7 +277,7 @@ Changes to these files MUST pass the regression test:
 
 ### C# Unit Tests
 
-**Status**: ✅ **388/388 tests passing (100%)**
+**Status**: ✅ **385/385 tests passing (100%)**
 
 Run the comprehensive C# unit test suite:
 
@@ -247,8 +287,8 @@ dotnet test
 ```
 
 **Test Coverage**:
-- **Primitives** (263 tests): All primitive operations including arithmetic, comparison, control flow, strings, floats, objects, and system operations
-- **HeapManager** (125 tests): Object allocation, garbage collection, memory management, and heap operations
+- **Primitives**: All primitive operations including arithmetic, comparison, control flow, strings, floats, objects, and system operations
+- **HeapManager**: Object allocation, garbage collection, memory management, and heap operations
 
 **Run tests by category**:
 ```bash
@@ -285,6 +325,25 @@ See `docs/Testing-Guide.md` for complete testing documentation.
 - **Trust source code over analysis** - When agent analysis contradicts source, trust source
 - **Use instruction tracing** - 5K+ instructions indicates infinite loop
 - **Validate with tests** - BlockContextTest suite validates core functionality
+
+## Threading and Synchronization Guidelines
+
+**Two-Thread Architecture**:
+- **UI Thread (WinForms)**: Runs message loop, handles display, enqueues input events
+- **Smalltalk Thread**: Executes bytecodes, processes events from queue
+
+**Event Queue Pattern**:
+- Producer (UI thread) calls `Enqueue()` then `Set()` on signal
+- Consumer (Smalltalk thread) uses `WaitHandle.WaitAny` then `ResetSignalIfEmpty()`
+- Always use `ManualResetEventSlim` (not AutoResetEvent) with WaitAny
+- Double-check pattern required: reset, then check if producer added, re-signal if needed
+
+**Timer Pattern**:
+- Use `System.Threading.Timer` for interrupt-driven precision
+- Expose `TimerExpiredHandle` (ManualResetEventSlim.WaitHandle) for WaitAny
+- Timer callback only sets signal; VM thread checks expiration and signals semaphore
+
+**Key Insight**: AutoResetEvent auto-resets when WaitAny returns, consuming the signal before the event can be processed. ManualResetEventSlim requires explicit reset but allows proper event handling.
 
 ## Model Selection
 

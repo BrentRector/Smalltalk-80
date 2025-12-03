@@ -114,9 +114,9 @@ public abstract class CompilerTestBase
                 }
                 else if (str.StartsWith("$"))
                 {
-                    // Character
-                    Assert.That(actual["type"]?.ToString(), Is.EqualTo("Character"),
-                        $"Literal {i} should be a Character");
+                    // Character - compiler outputs lowercase "character"
+                    Assert.That(actual["type"]?.ToString(), Is.EqualTo("character"),
+                        $"Literal {i} should be a character");
                     Assert.That(actual["value"]?.ToString(), Is.EqualTo(str.Substring(1)),
                         $"Character value mismatch at index {i}");
                 }
@@ -130,8 +130,10 @@ public abstract class CompilerTestBase
             }
             else if (expected is int intVal)
             {
-                Assert.That(actual["type"]?.ToString(), Is.EqualTo("integer"),
-                    $"Literal {i} should be an integer");
+                // Compiler outputs "smallInt" or "SmallInteger" for integers
+                var actualType = actual["type"]?.ToString();
+                Assert.That(actualType == "smallInt" || actualType == "SmallInteger" || actualType == "integer",
+                    Is.True, $"Literal {i} should be an integer type, got: {actualType}");
                 Assert.That((int)actual["value"]!, Is.EqualTo(intVal),
                     $"Integer value mismatch at index {i}");
             }

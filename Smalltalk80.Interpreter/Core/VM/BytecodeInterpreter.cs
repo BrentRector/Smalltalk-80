@@ -311,114 +311,107 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 context.Push(SmalltalkOOP.FromSmallInteger(2));
                 return true;
 
+            // Return bytecodes 120-124: All "return from message" bytecodes handle NLR
+            // Blue Book: explicit ^expr return
+            // - In MethodContext: normal method return
+            // - In BlockContext: non-local return (NLR) to home.sender
             case Bytecode.RETURN_SELF:
-                context.Push(receiverOOP);
-                return false; // Return from method
+                return HandleReturnFromMessage(receiverOOP);
 
             case Bytecode.RETURN_TRUE:
-                context.Push(metadata.KnownObjects.True);
-                return false;
+                return HandleReturnFromMessage(metadata.KnownObjects.True);
 
             case Bytecode.RETURN_FALSE:
-                context.Push(metadata.KnownObjects.False);
-                return false;
+                return HandleReturnFromMessage(metadata.KnownObjects.False);
 
             case Bytecode.RETURN_NIL:
-                context.Push(metadata.KnownObjects.Nil);
-                return false;
+                return HandleReturnFromMessage(metadata.KnownObjects.Nil);
 
-            case Bytecode.RETURN_TOP:
+            case Bytecode.RETURN_TOP_FROM_MESSAGE: // 0x7C
+                return HandleReturnFromMessage(context.Pop());
+
+            case Bytecode.RETURN_TOP_FROM_BLOCK: // 0x7D - Blue Book "Return Stack Top From Block"
+                // Blue Book: local return from block to whoever sent value/value:/etc.
+                // This is used for implicit block returns (last statement value)
+                // Simple local return - no NLR check needed
                 // Value already on stack
                 return false;
 
-            case Bytecode.RETURN_SELF_POP:
-                // Blue Book: Return self from block's home MethodContext (non-local return)
-                {
-                    // Properly check if we're in a BlockContext by checking the class
-                    var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
+            case Bytecode.RESERVED_126: // 0x7E - Reserved/unused per Blue Book
+                // No operation / reserved
+                return true;
 
-                    if (activeClassOOP == metadata.BlockContextClassOOP)
-                    {
-                        // We're in a BlockContext - get home and perform non-local return
-                        var homeOOP = heapManager.GetInstanceVariable(
-                            context.ActiveContext,
-                            VMConstants.BLOCKCONTEXT_HOME_INDEX
-                        );
-
-                        // Non-local return from BlockContext to home MethodContext
-                        var targetContextOOP = homeOOP;
-
-                        // Validate home is still in sender chain (not already returned)
-                        if (!context.IsInSenderChain(targetContextOOP, context.ActiveContext))
-                        {
-                            throw new InvalidOperationException(
-                                "Block return failed: home context has already returned");
-                        }
-
-                        // Initiate non-local return to home's sender
-                        context.NonLocalReturnPending = true;
-                        context.NLRTargetContext = targetContextOOP;
-                        context.NLRValue = receiverOOP;
-
-                        return false; // Exit bytecode loop to unwind
-                    }
-                    else
-                    {
-                        // We're in a MethodContext - normal return self
-                        context.Push(receiverOOP);
-                        return false;
-                    }
-                }
-
-            case Bytecode.RETURN_TOP_POP:
-                // Blue Book: Return top of stack from block's home MethodContext (non-local return)
-                {
-                    var returnValue = context.Pop();
-
-                    // Properly check if we're in a BlockContext by checking the class
-                    var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
-
-                    if (activeClassOOP == metadata.BlockContextClassOOP)
-                    {
-                        // We're in a BlockContext - get home and perform non-local return
-                        var homeOOP = heapManager.GetInstanceVariable(
-                            context.ActiveContext,
-                            VMConstants.BLOCKCONTEXT_HOME_INDEX
-                        );
-
-                        var targetContextOOP = homeOOP;
-
-                        // Validate target is in sender chain (safety check)
-                        if (!context.IsInSenderChain(targetContextOOP, context.ActiveContext))
-                        {
-                            throw new InvalidOperationException(
-                                "Non-local return target not in sender chain - block's defining method has already returned");
-                        }
-
-                        // Initiate non-local return
-                        context.NonLocalReturnPending = true;
-                        context.NLRTargetContext = targetContextOOP;
-                        context.NLRValue = returnValue;
-
-                        return false; // Exit bytecode loop to unwind
-                    }
-                    else
-                    {
-                        // We're in a MethodContext - normal method return
-                        context.Push(returnValue);
-                        return false;
-                    }
-                }
-
-            case Bytecode.RESERVED_RETURN:
-                // No operation / reserved (0x7F)
+            case Bytecode.RESERVED_127: // 0x7F - Reserved/unused per Blue Book
+                // No operation / reserved
                 return true;
         }
 
-        // Extended bytecodes (0x80)
+        // Blue Book Extended Bytecodes (0x80-0x88)
+        // 0x80: Extended Push (type:index format)
+        // 0x81: Extended Store (type:index format, no pop)
+        // 0x82: Extended Pop and Store (type:index format)
+        // 0x83: Single Extended Send (nnnlllll format)
+        // 0x84: Double Extended Send (argCount, literalIndex)
+        // 0x85: Single Extended Super Send (nnnlllll format)
+        // 0x86: Double Extended Super Send (argCount, literalIndex)
+        // 0x87: Pop (standalone)
+        // 0x88: Duplicate (standalone)
+
         if (bytecode == 0x80)
         {
-            return ExecuteExtendedBytecode(methodOOP);
+            return ExecuteExtendedPush(methodOOP);
+        }
+
+        if (bytecode == 0x81)
+        {
+            return ExecuteExtendedStore(methodOOP, popValue: false);
+        }
+
+        if (bytecode == 0x82)
+        {
+            return ExecuteExtendedStore(methodOOP, popValue: true);
+        }
+
+        if (bytecode == 0x83)
+        {
+            return ExecuteSingleExtendedSend(methodOOP, isSuper: false);
+        }
+
+        if (bytecode == 0x84)
+        {
+            return ExecuteDoubleExtendedSend(methodOOP, isSuper: false);
+        }
+
+        if (bytecode == 0x85)
+        {
+            return ExecuteSingleExtendedSend(methodOOP, isSuper: true);
+        }
+
+        if (bytecode == 0x86)
+        {
+            return ExecuteDoubleExtendedSend(methodOOP, isSuper: true);
+        }
+
+        // Blue Book standalone Pop (0x87)
+        if (bytecode == 0x87)
+        {
+            context.Pop();
+            return true;
+        }
+
+        // Blue Book standalone Dup (0x88)
+        if (bytecode == 0x88)
+        {
+            int dupSpIndex = VMConstants.CONTEXT_STACKP_INDEX;
+            var dupSpOOP = heapManager.GetInstanceVariable(context.ActiveContext, dupSpIndex);
+            int dupSp = dupSpOOP.AsSmallInteger();
+            if (dupSp <= 0)
+            {
+                throw new InvalidOperationException("Stack underflow on DUP");
+            }
+            var valueOOP = heapManager.GetIndexedOOP(context.ActiveContext, dupSp - 1);
+            context.Push(valueOOP);
+            return true;
         }
 
         // Push active context (0x89) - used for blockCopy: primitive
@@ -428,10 +421,11 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             return true;
         }
 
-        // Short jump forward (0x90-0x97)
-        if (bytecode >= 0x90 && bytecode <= 0x97)
+        // Blue Book Short Unconditional Jump (0x90-0x97)
+        // Jump distance = (bytecode & 0x07) + 1 (range 1-8)
+        if (BytecodeUtil.IsShortJump(bytecode))
         {
-            int distance = (bytecode - 0x90) + 1; // Jump 1-8 bytes
+            int distance = BytecodeUtil.ShortJumpDistance(bytecode);
             int ipIndex = VMConstants.CONTEXT_PC_INDEX;
             var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
             int currentIp = ipOOP.AsSmallInteger();
@@ -439,63 +433,82 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             return true;
         }
 
-        // Medium jump forward (0xA0)
-        if (bytecode == 0xA0)
+        // Blue Book Short Conditional Jump on False (0x98-0x9F)
+        // Jump distance = (bytecode & 0x07) + 1 (range 1-8)
+        // Pops top of stack, jumps if false
+        if (BytecodeUtil.IsShortJumpFalse(bytecode))
         {
-            byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
+            int distance = BytecodeUtil.ShortJumpFalseDistance(bytecode);
             int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-            var ipOOP2 = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
-            int currentIp = ipOOP2.AsSmallInteger();
+            var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
+            int currentIp = ipOOP.AsSmallInteger();
 
-            byte distanceByte = bytecodes[currentIp++];
-            int distance = distanceByte + 1; // Distance is encoded as (distance - 1)
-
-            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
+            var valueOOP = context.Pop();
+            if (valueOOP == metadata.KnownObjects.False)
+            {
+                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
+            }
             return true;
         }
 
-        // Long jump forward (0xA1-0xA7)
-        if (bytecode >= 0xA1 && bytecode <= 0xA7)
+        // Blue Book Long Unconditional Jump (0xA0-0xA7)
+        // Offset = ((bytecode & 0x07) - 4) * 256 + nextByte
+        // Range: -1024 to +1023 (backward and forward jumps)
+        if (BytecodeUtil.IsLongJump(bytecode))
         {
             byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
             int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-            var ipOOP3 = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
-            int currentIp = ipOOP3.AsSmallInteger();
+            var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
+            int currentIp = ipOOP.AsSmallInteger();
 
-            int numBytes = bytecode - 0x9F; // 0xA1 => 2 bytes, 0xA2 => 3 bytes, etc.
-            int distance = 0;
-            for (int i = 0; i < numBytes; i++)
-            {
-                distance = (distance << 8) | bytecodes[currentIp++];
-            }
+            byte extByte = bytecodes[currentIp++];
+            int offset = BytecodeUtil.LongJumpBaseOffset(bytecode) + extByte;
 
-            distance += 1; // Distance is encoded as (distance - 1)
-
-            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
+            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
             return true;
         }
 
-        // Backward jumps (0xA8-0xAF) - for tail recursion optimization
-        if (bytecode >= 0xA8 && bytecode <= 0xAF)
+        // Blue Book Long Conditional Jump on True (0xA8-0xAB)
+        // Offset = (bytecode & 0x03) * 256 + nextByte
+        // Range: 0-1023 (forward only)
+        if (BytecodeUtil.IsLongJumpTrue(bytecode))
         {
-            int offset = bytecode - 0xA8;  // 0xA8 => jump back 0 (nop), 0xA9 => back 1, ..., 0xAF => back 7
+            byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
             int ipIndex = VMConstants.CONTEXT_PC_INDEX;
-            var ipOOP4 = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
-            int currentIp = ipOOP4.AsSmallInteger();
+            var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
+            int currentIp = ipOOP.AsSmallInteger();
 
-            // Jump backward by offset bytes
-            // For tail recursion, compiler emits STORE_TEMP for each argument, then JUMP_BACKWARD
-            // The offset should point back to the method start (after argument setup)
-            int newIp = currentIp - offset;
+            byte extByte = bytecodes[currentIp++];
+            int offset = BytecodeUtil.LongJumpTrueBaseOffset(bytecode) + extByte;
+            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp));
 
-            if (newIp < 0)
+            var valueOOP = context.Pop();
+            if (valueOOP == metadata.KnownObjects.True)
             {
-                throw new InvalidOperationException(
-                    $"Backward jump offset {offset} would jump before method start " +
-                    $"(currentIp={currentIp}, newIp={newIp})");
+                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
             }
+            return true;
+        }
 
-            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(newIp));
+        // Blue Book Long Conditional Jump on False (0xAC-0xAF)
+        // Offset = (bytecode & 0x03) * 256 + nextByte
+        // Range: 0-1023 (forward only)
+        if (BytecodeUtil.IsLongJumpFalse(bytecode))
+        {
+            byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
+            int ipIndex = VMConstants.CONTEXT_PC_INDEX;
+            var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
+            int currentIp = ipOOP.AsSmallInteger();
+
+            byte extByte = bytecodes[currentIp++];
+            int offset = BytecodeUtil.LongJumpFalseBaseOffset(bytecode) + extByte;
+            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp));
+
+            var valueOOP = context.Pop();
+            if (valueOOP == metadata.KnownObjects.False)
+            {
+                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
+            }
             return true;
         }
 
@@ -553,156 +566,81 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     }
 
     /// <summary>
-    /// Executes extended bytecode operations (0x80 + sub-operation byte).
+    /// Executes Blue Book Extended Push (bytecode 0x80).
+    /// Extension byte format: ttiiiii where tt=type (00=ivar, 01=temp, 10=literal const, 11=literal var)
+    /// and iiiiii=index (0-63).
     /// </summary>
-    /// <param name="methodOOP">The method OOP containing the bytecodes.</param>
-    /// <returns>True to continue execution, false to exit the bytecode loop.</returns>
-    private bool ExecuteExtendedBytecode(SmalltalkOOP methodOOP)
+    private bool ExecuteExtendedPush(SmalltalkOOP methodOOP)
     {
         byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
         int ipIndex = VMConstants.CONTEXT_PC_INDEX;
 
         var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
         int ip = ipOOP.AsSmallInteger();
-        byte subOp = bytecodes[ip++];
+        byte extByte = bytecodes[ip++];
         heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
 
-        // Check if this is a BlockContext - they retrieve receiver from home MethodContext
+        // Decode Blue Book type:index format
+        var varType = BytecodeUtil.GetExtendedType(extByte);
+        int index = BytecodeUtil.GetExtendedIndex(extByte);
+
+        // Get receiver for instance variable access
         var contextClassOOP = heapManager.GetClassOOP(context.ActiveContext);
         bool isBlockContext = contextClassOOP == metadata.BlockContextClassOOP;
-
-        int receiverIndex = VMConstants.CONTEXT_RECEIVER_INDEX;
         SmalltalkOOP receiverOOP;
 
         if (isBlockContext)
         {
-            // BlockContext: receiver from home MethodContext
-            // CRITICAL: Must use FindMethodContext() to traverse the entire home chain for nested blocks
-            // Just reading one level up would fail for nested blocks where home could be another BlockContext
             var methodContextOOP = context.FindMethodContext(context.ActiveContext);
-            receiverOOP = heapManager.GetInstanceVariable(methodContextOOP, receiverIndex);
+            receiverOOP = heapManager.GetInstanceVariable(methodContextOOP, VMConstants.CONTEXT_RECEIVER_INDEX);
         }
         else
         {
-            // MethodContext: receiver is at instance variable 4
-            receiverOOP = heapManager.GetInstanceVariable(context.ActiveContext, receiverIndex);
+            receiverOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.CONTEXT_RECEIVER_INDEX);
         }
 
-        switch (subOp)
+        switch (varType)
         {
-            case 0x00: // PUSH_IVAR - Push instance variable at any index
+            case ExtendedType.ReceiverVariable:
                 {
-                    byte index = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = heapManager.GetInstanceVariable(receiverOOP, index);
                     context.Push(valueOOP);
                     return true;
                 }
 
-            case 0x01: // STORE_IVAR - Store to instance variable without popping
+            case ExtendedType.TemporaryVariable:
                 {
-                    byte index = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var valueOOP = context.Pop();
-                    heapManager.SetInstanceVariable(receiverOOP, index, valueOOP);
-                    context.Push(valueOOP); // Leave value on stack
-                    return true;
-                }
-
-            case 0x02: // POP_STORE_IVAR - Pop and store to instance variable
-                {
-                    byte index = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var valueOOP = context.Pop();
-                    heapManager.SetInstanceVariable(receiverOOP, index, valueOOP);
-                    return true;
-                }
-
-            case 0x03: // PUSH_TEMP - Push temporary at any index
-                // Uses BlockContext home chain traversal for proper variable access
-                {
-                    byte index = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var valueOOP = context.GetTemporaryVariable(context.ActiveContext, index);
                     context.Push(valueOOP);
                     return true;
                 }
 
-            case 0x04: // STORE_TEMP - Store to temporary without popping
-                // Uses BlockContext home chain traversal for proper variable access
+            case ExtendedType.LiteralConstant:
                 {
-                    byte index = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var valueOOP = context.Peek(); // Don't pop - STORE keeps value on stack
-                    context.SetTemporaryVariable(context.ActiveContext, index, valueOOP);
-                    return true;
-                }
-
-            case 0x05: // POP_STORE_TEMP - Pop and store to temporary
-                // Uses BlockContext home chain traversal for proper variable access
-                {
-                    byte index = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var valueOOP = context.Pop();
-                    context.SetTemporaryVariable(context.ActiveContext, index, valueOOP);
-                    return true;
-                }
-
-            case 0x06: // PUSH_LITERAL - Push literal constant at any index
-                {
-                    byte index = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var literal = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-
-                    // CRITICAL: Canonicalize Character literals at runtime.
-                    // Character literals in method literal frames were created during cold start,
-                    // but CharacterTable entries (created by Character initialize) are canonical.
-                    // Without this, identity comparison (==) fails between literals and CharacterTable entries.
+                    // Canonicalize Character literals
                     if (!literal.IsSmallInteger && runtimeHeapAccess.IsCharacter(literal))
                     {
                         literal = runtimeHeapAccess.GetCanonicalCharacter(literal);
                     }
-
                     context.Push(literal);
                     return true;
                 }
 
-            case 0x07: // PUSH_LITERAL_VAR - Push literal variable (association value or qualified pool var)
+            case ExtendedType.LiteralVariable:
                 {
-                    byte index = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
                     var literalOOP = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-
-                    // Check if this is an Association (unqualified variable) or Array (qualified pool variable)
                     var literalClass = context.GetClassName(context.GetClass(literalOOP));
 
                     if (literalClass == "Association")
                     {
-                        // Unqualified variable reference: push Association value directly
                         var valueOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-
-                        // DEBUG: Check if we're pushing an Association as a value (bug indicator)
-                        var valueClass = context.GetClassName(context.GetClass(valueOOP));
-                        if (valueClass == "Association")
-                        {
-                            var keyOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                            string? keyName = context.GetSymbolName(keyOOP);
-                            Console.WriteLine($"[PUSH_LITERAL_VAR ext] WARNING: Association value is another Association!");
-                            Console.WriteLine($"  Outer Association: {literalOOP} key='{keyName ?? keyOOP.ToString()}'");
-                            Console.WriteLine($"  Value (inner Association): {valueOOP}");
-
-                            // Try to get the inner Association's key
-                            var innerKeyOOP = heapManager.GetInstanceVariable(valueOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                            var innerKeyName = context.GetSymbolName(innerKeyOOP);
-                            Console.WriteLine($"  Inner Association key: '{innerKeyName}'");
-                        }
-
                         context.Push(valueOOP);
                         return true;
                     }
                     else if (literalClass == "Array")
                     {
-                        // Qualified pool variable reference: #(poolDictName variableName)
+                        // Qualified pool variable reference
                         int size = heapManager.GetIndexedSize(literalOOP);
                         if (size == 2)
                         {
@@ -713,11 +651,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
                             if (poolDictName == null || varName == null)
                             {
-                                throw new InvalidOperationException($"PUSH_LITERAL_VAR: Qualified pool variable Array must contain Symbols");
+                                throw new InvalidOperationException("Extended Push Literal Variable: Array must contain Symbols");
                             }
 
-                            // Look up pool dictionary in Smalltalk SystemDictionary
-                            // NOTE: LookupGlobalByName returns the VALUE, not the Association
                             var systemDictOOP = metadata.KnownObjects.Smalltalk;
                             var poolDictOOP = runtimeHeapAccess.LookupGlobalByName(systemDictOOP, poolDictName);
 
@@ -726,296 +662,142 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                                 throw new InvalidOperationException($"Pool dictionary not found: {poolDictName}");
                             }
 
-                            // Verify it's a Dictionary
-                            var poolDictClass2 = context.GetClassName(context.GetClass(poolDictOOP));
-                            if (poolDictClass2 != "Dictionary")
-                            {
-                                throw new InvalidOperationException(
-                                    $"PUSH_LITERAL_VAR: Expected Dictionary for pool '{poolDictName}', got {poolDictClass2} (OOP={poolDictOOP})");
-                            }
-
-                            // Look up variable value in pool dictionary by variable name
-                            // NOTE: LookupGlobalByName returns the VALUE, not the Association
                             var valueOOP = runtimeHeapAccess.LookupGlobalByName(poolDictOOP, varName);
-
-                            if (valueOOP == metadata.KnownObjects.Nil)
-                            {
-                                throw new InvalidOperationException($"Variable not found in pool dictionary {poolDictName}: {varName}");
-                            }
-
-                            // Push the variable value
                             context.Push(valueOOP);
                             return true;
                         }
-                        else
-                        {
-                            throw new InvalidOperationException($"PUSH_LITERAL_VAR: Array literal has size {size}, expected 2 for qualified pool variable");
-                        }
                     }
-                    else
-                    {
-                        throw new InvalidOperationException($"PUSH_LITERAL_VAR: Expected Association or Array, got {literalClass}");
-                    }
-                }
-
-            case 0x08: // STORE_LITERAL_VAR - Store to literal variable without popping
-                {
-                    byte index = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var valueOOP = context.Pop();
-                    var associationOOP = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-
-                    heapManager.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
-                    context.Push(valueOOP); // Leave value on stack
-                    return true;
-                }
-
-            case 0x09: // POP_STORE_LITERAL_VAR - Pop and store to literal variable (class/global variable)
-                {
-                    byte index = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var valueOOP = context.Pop();
-                    var associationOOP = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
-
-                    // DIAGNOSTIC: Validate this is actually an Association
-                    if (associationOOP.IsSmallInteger)
-                    {
-                        string? methodLocalId = context.GetLocalId(methodOOP);
-                        throw new InvalidOperationException(
-                            $"POP_STORE_LITERAL_VAR: literal[{index}] is SmallInteger({associationOOP.AsSmallInteger()}), expected Association. " +
-                            $"Method: {methodLocalId}, PC: {ip - 2}");
-                    }
-
-                    var literalClass = heapManager.GetClassOOP(associationOOP);
-                    string? literalClassName = context.GetClassName(literalClass);
-
-                    // Allow "Association" or "class:Association" as valid class names
-                    bool isAssociation = literalClassName == "class:Association" || literalClassName == "Association";
-
-                    if (!isAssociation)
-                    {
-                        string? methodLocalId = context.GetLocalId(methodOOP);
-                        throw new InvalidOperationException(
-                            $"POP_STORE_LITERAL_VAR: literal[{index}] is {literalClassName} (oop={associationOOP}), expected Association. " +
-                            $"Method: {methodLocalId}, PC: {ip - 2}. " +
-                            $"This likely means the compiler generated wrong bytecode (should be POP_STORE_TEMP for temp variable).");
-                    }
-
-                    // Store the value in the Association
-                    heapManager.SetInstanceVariableWithBarrier(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
-
-                    // Add Association to classPool if it's a class variable (lazy initialization)
-                    // For class-side methods, receiver IS the class object which has the classPool
-                    context.AddAssociationToClassPoolIfNeeded(receiverOOP, associationOOP);
-
-                    return true;
-                }
-
-            case 0x0A: // SEND_0 - Send with 0 args
-                {
-                    byte selectorIndex = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
-                    var receiver = context.Pop();
-                    return context.SendMessageAndContinue(receiver, selectorOOP, []);
-                }
-
-            case 0x0B: // SEND_1 - Send with 1 arg
-                {
-                    byte selectorIndex = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
-                    var arg = context.Pop();
-                    var receiver = context.Pop();
-                    return context.SendMessageAndContinue(receiver, selectorOOP, [arg]);
-                }
-
-            case 0x0C: // SEND_2 - Send with 2 args
-                {
-                    byte selectorIndex = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
-                    var arg2 = context.Pop();
-                    var arg1 = context.Pop();
-                    var receiver = context.Pop();
-                    return context.SendMessageAndContinue(receiver, selectorOOP, [arg1, arg2]);
-                }
-
-            case 0x0D: // SEND_N - Send with N args (N >= 3)
-                {
-                    byte selectorIndex = bytecodes[ip++];
-                    byte argCount = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
-
-                    var args = new SmalltalkOOP[argCount];
-                    for (int i = argCount - 1; i >= 0; i--)
-                    {
-                        args[i] = context.Pop();
-                    }
-
-                    var receiver = context.Pop();
-                    return context.SendMessageAndContinue(receiver, selectorOOP, args);
-                }
-
-            case 0x0E: // SEND_SUPER_0 - Send to super with 0 args
-                {
-                    byte selectorIndex = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
-                    var receiver = context.Pop();
-                    return context.SendSuperMessageAndContinue(receiver, selectorOOP, []);
-                }
-
-            case 0x0F: // SEND_SUPER_1 - Send to super with 1 arg
-                {
-                    byte selectorIndex = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
-                    var arg = context.Pop();
-                    var receiver = context.Pop();
-                    return context.SendSuperMessageAndContinue(receiver, selectorOOP, [arg]);
-                }
-
-            case 0x10: // SEND_SUPER_2 - Send to super with 2 args
-                {
-                    byte selectorIndex = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
-                    var arg2 = context.Pop();
-                    var arg1 = context.Pop();
-                    var receiver = context.Pop();
-                    return context.SendSuperMessageAndContinue(receiver, selectorOOP, [arg1, arg2]);
-                }
-
-            case 0x11: // SEND_SUPER_N - Send to super with N args (N >= 3)
-                {
-                    byte selectorIndex = bytecodes[ip++];
-                    byte argCount = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-                    var selectorOOP = context.GetMethodLiteral(methodOOP, selectorIndex + 1); // +1 to skip header
-
-                    var args = new SmalltalkOOP[argCount];
-                    for (int i = argCount - 1; i >= 0; i--)
-                    {
-                        args[i] = context.Pop();
-                    }
-
-                    var receiver = context.Pop();
-                    return context.SendSuperMessageAndContinue(receiver, selectorOOP, args);
-                }
-
-            case 0x12: // POP - Pop and discard top of stack
-                {
-                    context.Pop();
-                    return true;
-                }
-
-            case 0x13: // DUP - Duplicate top of stack
-                {
-                    int dupSpIndex = VMConstants.CONTEXT_STACKP_INDEX;
-                    var dupSpOOP = heapManager.GetInstanceVariable(context.ActiveContext, dupSpIndex);
-                    int dupSp = dupSpOOP.AsSmallInteger();
-                    if (dupSp <= 0)
-                    {
-                        throw new InvalidOperationException("Stack underflow on DUP");
-                    }
-
-                    var valueOOP = heapManager.GetIndexedOOP(context.ActiveContext, dupSp - 1);
-                    context.Push(valueOOP);
-                    return true;
-                }
-
-            case 0x14: // JUMP_TRUE - Pop and jump forward if true
-                {
-                    byte offsetHigh = bytecodes[ip++];
-                    byte offsetLow = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-
-                    int offset = (offsetHigh << 8) | offsetLow;
-                    var valueOOP = context.Pop();
-
-                    if (valueOOP == metadata.KnownObjects.True)
-                    {
-                        heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
-                    }
-
-                    return true;
-                }
-
-            case 0x15: // JUMP_FALSE - Pop and jump forward if false
-                {
-                    byte offsetHigh = bytecodes[ip++];
-                    byte offsetLow = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-
-                    int offset = (offsetHigh << 8) | offsetLow;
-                    var valueOOP = context.Pop();
-
-                    if (valueOOP == metadata.KnownObjects.False)
-                    {
-                        heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
-                    }
-
-                    return true;
-                }
-
-            case 0x16: // JUMP - Unconditional jump forward
-                {
-                    byte offsetHigh = bytecodes[ip++];
-                    byte offsetLow = bytecodes[ip++];
-                    int offset = (offsetHigh << 8) | offsetLow;
-                    int newIP = ip + offset;
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(newIP));
-                    return true;
-                }
-
-            case 0x17: // JUMP_LONG_TRUE - Pop and long jump forward if true
-                {
-                    byte offsetHigh = bytecodes[ip++];
-                    byte offsetLow = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-
-                    int offset = (offsetHigh << 8) | offsetLow;
-                    var valueOOP = context.Pop();
-
-                    if (valueOOP == metadata.KnownObjects.True)
-                    {
-                        heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
-                    }
-
-                    return true;
-                }
-
-            case 0x18: // JUMP_LONG_FALSE - Pop and long jump forward if false
-                {
-                    byte offsetHigh = bytecodes[ip++];
-                    byte offsetLow = bytecodes[ip++];
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
-
-                    int offset = (offsetHigh << 8) | offsetLow;
-                    var valueOOP = context.Pop();
-
-                    if (valueOOP == metadata.KnownObjects.False)
-                    {
-                        heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
-                    }
-
-                    return true;
-                }
-
-            case 0x19: // JUMP_LONG - Unconditional long jump forward
-                {
-                    byte offsetHigh = bytecodes[ip++];
-                    byte offsetLow = bytecodes[ip++];
-                    int offset = (offsetHigh << 8) | offsetLow;
-                    heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip + offset));
-                    return true;
+                    throw new InvalidOperationException($"Extended Push Literal Variable: Expected Association or 2-element Array, got {literalClass}");
                 }
 
             default:
-                throw new NotImplementedException($"Extended bytecode 0x80 0x{subOp:X2} not implemented");
+                throw new NotImplementedException($"Extended Push type {varType} not implemented");
         }
+    }
+
+    /// <summary>
+    /// Executes Blue Book Extended Store (0x81) or Extended Pop and Store (0x82).
+    /// Extension byte format: ttiiiii where tt=type and iiiiii=index.
+    /// </summary>
+    private bool ExecuteExtendedStore(SmalltalkOOP methodOOP, bool popValue)
+    {
+        byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
+        int ipIndex = VMConstants.CONTEXT_PC_INDEX;
+
+        var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
+        int ip = ipOOP.AsSmallInteger();
+        byte extByte = bytecodes[ip++];
+        heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+
+        var varType = BytecodeUtil.GetExtendedType(extByte);
+        int index = BytecodeUtil.GetExtendedIndex(extByte);
+
+        // Get the value - pop if 0x82, peek if 0x81
+        SmalltalkOOP valueOOP = popValue ? context.Pop() : context.Peek();
+
+        // Get receiver for instance variable access
+        var contextClassOOP = heapManager.GetClassOOP(context.ActiveContext);
+        bool isBlockContext = contextClassOOP == metadata.BlockContextClassOOP;
+        SmalltalkOOP receiverOOP;
+
+        if (isBlockContext)
+        {
+            var methodContextOOP = context.FindMethodContext(context.ActiveContext);
+            receiverOOP = heapManager.GetInstanceVariable(methodContextOOP, VMConstants.CONTEXT_RECEIVER_INDEX);
+        }
+        else
+        {
+            receiverOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.CONTEXT_RECEIVER_INDEX);
+        }
+
+        switch (varType)
+        {
+            case ExtendedType.ReceiverVariable:
+                heapManager.SetInstanceVariable(receiverOOP, index, valueOOP);
+                return true;
+
+            case ExtendedType.TemporaryVariable:
+                context.SetTemporaryVariable(context.ActiveContext, index, valueOOP);
+                return true;
+
+            case ExtendedType.LiteralVariable:
+                {
+                    var associationOOP = context.GetMethodLiteral(methodOOP, index + 1);
+                    heapManager.SetInstanceVariableWithBarrier(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
+                    context.AddAssociationToClassPoolIfNeeded(receiverOOP, associationOOP);
+                    return true;
+                }
+
+            case ExtendedType.LiteralConstant:
+                throw new InvalidOperationException("Cannot store to literal constant");
+
+            default:
+                throw new NotImplementedException($"Extended Store type {varType} not implemented");
+        }
+    }
+
+    /// <summary>
+    /// Executes Blue Book Single Extended Send (0x83) or Single Extended Super Send (0x85).
+    /// Extension byte format: nnnlllll where nnn=argCount (0-7) and lllll=literalIndex (0-31).
+    /// </summary>
+    private bool ExecuteSingleExtendedSend(SmalltalkOOP methodOOP, bool isSuper)
+    {
+        byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
+        int ipIndex = VMConstants.CONTEXT_PC_INDEX;
+
+        var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
+        int ip = ipOOP.AsSmallInteger();
+        byte extByte = bytecodes[ip++];
+        heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+
+        int argCount = BytecodeUtil.GetSingleExtendedSendArgCount(extByte);
+        int literalIndex = BytecodeUtil.GetSingleExtendedSendLiteralIndex(extByte);
+
+        var selectorOOP = context.GetMethodLiteral(methodOOP, literalIndex + 1); // +1 to skip header
+
+        // Pop arguments in reverse order
+        var args = new SmalltalkOOP[argCount];
+        for (int i = argCount - 1; i >= 0; i--)
+        {
+            args[i] = context.Pop();
+        }
+
+        var receiver = context.Pop();
+
+        return isSuper
+            ? context.SendSuperMessageAndContinue(receiver, selectorOOP, args)
+            : context.SendMessageAndContinue(receiver, selectorOOP, args);
+    }
+
+    /// <summary>
+    /// Executes Blue Book Double Extended Send (0x84) or Double Extended Super Send (0x86).
+    /// Two extension bytes: first=argCount, second=literalIndex.
+    /// </summary>
+    private bool ExecuteDoubleExtendedSend(SmalltalkOOP methodOOP, bool isSuper)
+    {
+        byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
+        int ipIndex = VMConstants.CONTEXT_PC_INDEX;
+
+        var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
+        int ip = ipOOP.AsSmallInteger();
+        byte argCount = bytecodes[ip++];
+        byte literalIndex = bytecodes[ip++];
+        heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(ip));
+
+        var selectorOOP = context.GetMethodLiteral(methodOOP, literalIndex + 1); // +1 to skip header
+
+        // Pop arguments in reverse order
+        var args = new SmalltalkOOP[argCount];
+        for (int i = argCount - 1; i >= 0; i--)
+        {
+            args[i] = context.Pop();
+        }
+
+        var receiver = context.Pop();
+
+        return isSuper
+            ? context.SendSuperMessageAndContinue(receiver, selectorOOP, args)
+            : context.SendMessageAndContinue(receiver, selectorOOP, args);
     }
 
     /// <summary>
@@ -1324,6 +1106,50 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         catch
         {
             return metadata.KnownObjects.Nil;
+        }
+    }
+
+    /// <summary>
+    /// Handles "return from message" bytecodes (120-124).
+    /// In MethodContext: normal method return.
+    /// In BlockContext: non-local return (NLR) to home's sender.
+    /// </summary>
+    /// <param name="returnValue">The value to return.</param>
+    /// <returns>Always returns false to signal method/block return.</returns>
+    private bool HandleReturnFromMessage(SmalltalkOOP returnValue)
+    {
+        // Check if we're in a BlockContext by checking the class
+        var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
+
+        if (activeClassOOP == metadata.BlockContextClassOOP)
+        {
+            // We're in a BlockContext - get home and perform non-local return
+            var homeOOP = heapManager.GetInstanceVariable(
+                context.ActiveContext,
+                VMConstants.BLOCKCONTEXT_HOME_INDEX
+            );
+
+            var targetContextOOP = homeOOP;
+
+            // Validate target is in sender chain (safety check)
+            if (!context.IsInSenderChain(targetContextOOP, context.ActiveContext))
+            {
+                throw new InvalidOperationException(
+                    "Non-local return target not in sender chain - block's defining method has already returned");
+            }
+
+            // Initiate non-local return to home's sender
+            context.NonLocalReturnPending = true;
+            context.NLRTargetContext = targetContextOOP;
+            context.NLRValue = returnValue;
+
+            return false; // Exit bytecode loop to unwind
+        }
+        else
+        {
+            // We're in a MethodContext - normal method return
+            context.Push(returnValue);
+            return false;
         }
     }
 }

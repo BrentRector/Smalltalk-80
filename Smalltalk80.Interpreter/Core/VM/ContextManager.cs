@@ -25,9 +25,11 @@ internal class ContextManager(
     // Active context (current MethodContext being executed)
     private SmalltalkOOP _activeContextOOP;
 
-    // Context depth tracking to detect infinite recursion
-    private int _activeContextCount;
-    private const int MaxContextDepth = 5000;
+    // Note: The Blue Book Smalltalk-80 did NOT track global context depth.
+    // Context memory is managed by garbage collection. With multi-process scheduling,
+    // a global depth counter is fundamentally flawed because contexts from all processes
+    // are counted together, and terminated processes leave "orphaned" increments.
+    // Stack overflow detection should use per-context depth tracking if needed.
 
     // Context pooling - separate pools for MethodContext and BlockContext by size
     // Key: (classOOP, size), Value: Stack of context OOPs
@@ -49,16 +51,7 @@ internal class ContextManager(
     public SmalltalkOOP ActiveContext => _activeContextOOP;
 
     /// <inheritdoc />
-    public int ContextDepth => _activeContextCount;
-
-    /// <inheritdoc />
     public void SetActiveContext(SmalltalkOOP contextOOP) => _activeContextOOP = contextOOP;
-
-    /// <inheritdoc />
-    public void ResetContextDepth() => _activeContextCount = 0;
-
-    /// <inheritdoc />
-    public void DecrementContextDepth() => _activeContextCount--;
 
     /// <inheritdoc />
     public SmalltalkOOP CreateMethodContext(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP, SmalltalkOOP[] arguments, SmalltalkOOP callerContextOOP = default)
@@ -118,16 +111,6 @@ internal class ContextManager(
             contextOOP = heapManager.AllocateObject(ObjectFormat.PointerIndexed, METHODCONTEXT_INSTANCE_VAR_COUNT, stackSize);
             heapManager.SetClassOOP(contextOOP, methodContextClassOOP);
             _poolMisses++;  // Pool empty or doesn't exist
-        }
-
-        // Increment context depth and check limit
-        _activeContextCount++;
-
-        if (_activeContextCount > MaxContextDepth)
-        {
-            throw new InvalidOperationException(
-                $"Context depth limit exceeded: {_activeContextCount} contexts (limit: {MaxContextDepth}). " +
-                $"This typically indicates infinite recursion or primitive failure causing excessive message sends.");
         }
 
         // Step 5: Get field indices from VMConstants
@@ -272,6 +255,9 @@ internal class ContextManager(
         }
     }
 
+    // Track if we added the active context as a temporary root (to remove after GC)
+    private SmalltalkOOP _temporaryRootContext;
+
     /// <summary>
     /// Initializes the ContextManager and registers for GC events.
     /// Must be called after construction to enable pool clearing before GC.
@@ -280,8 +266,8 @@ internal class ContextManager(
     {
         if (_diagnostics != null)
         {
-            // Register to receive ONLY GCStart events
-            _diagnostics.Register(this, DiagnosticEventTypes.GCStart);
+            // Register for both GCStart (to add active context root) and GCEnd (to remove it)
+            _diagnostics.Register(this, DiagnosticEventTypes.GCStart | DiagnosticEventTypes.GCEnd);
         }
     }
 
@@ -298,14 +284,34 @@ internal class ContextManager(
     /// <inheritdoc />
     public void OnEvent(DiagnosticEvent evt)
     {
-        // Hub only dispatches GCStart events (our registered type)
-        // Safe to cast without checking
-        var gcStart = (GCStartEvent)evt;
+        if (evt is GCStartEvent)
+        {
+            // CRITICAL: Add the active context as a temporary GC root
+            // Per Blue Book Chapter 30: GC roots include "the interpreter's stacks" (active context chain)
+            // When a process is RUNNING, its suspendedContext is nil, so the active context
+            // is NOT reachable from the Smalltalk object graph - only from the interpreter's register.
+            // We must explicitly root it or GC will incorrectly collect it.
+            _temporaryRootContext = default;
+            if (_activeContextOOP != default && _activeContextOOP != metadata.KnownObjects.Nil)
+            {
+                heapManager.GC.AddGCRoot(_activeContextOOP);
+                _temporaryRootContext = _activeContextOOP;
+            }
 
-        // Display statistics before clearing pools
-        DisplayPoolStatistics();
+            // Display statistics before clearing pools
+            DisplayPoolStatistics();
 
-        ClearAllPools();
+            ClearAllPools();
+        }
+        else if (evt is GCEndEvent)
+        {
+            // Remove the temporary root we added at GCStart
+            if (_temporaryRootContext != default)
+            {
+                heapManager.GC.RemoveGCRoot(_temporaryRootContext);
+                _temporaryRootContext = default;
+            }
+        }
     }
 
     /// <summary>

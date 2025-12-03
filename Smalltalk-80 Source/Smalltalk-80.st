@@ -20196,12 +20196,15 @@ borderWidth: anInteger mask: aMask
 	self border: self boundingBox width: anInteger mask: aMask! !
 
 !Form methodsFor: 'coloring'!
-fill: aRectangle rule: anInteger mask: aForm 
-	"Replace a rectangular area of the receiver with the pattern described by aForm 
+fill: aRectangle rule: anInteger mask: aForm
+	"Replace a rectangular area of the receiver with the pattern described by aForm
 	according to the rule anInteger."
 
+	"Defensive nil check for debugging scroll issues"
+	aRectangle isNil ifTrue: [self error: 'fill:rule:mask: received nil rectangle'].
+
 	"Make up a BitBlt table and copy the bits"
-	(BitBlt 
+	(BitBlt
 		destForm: self
 		sourceForm: nil
 		halftoneForm: aForm
@@ -34808,7 +34811,7 @@ scrollAbsolute
 				0@((sensor cursorPoint y - marker center y min:
 					scrollBar inside bottom - marker bottom) max: scrollBar inside top - marker top).
 			(oldMarker areasOutside: marker), (marker areasOutside: oldMarker) do:
-				[:region | Display fill: region rule: Form reverse mask: Form gray]].
+				[:region | region isNil ifFalse: [Display fill: region rule: Form reverse mask: Form gray]]].
 			self scrollView.
 			scrollBar display.
 			self moveMarker]!

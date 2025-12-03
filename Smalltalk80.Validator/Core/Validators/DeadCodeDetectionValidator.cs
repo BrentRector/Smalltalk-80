@@ -247,17 +247,48 @@ public class DeadCodeDetectionValidator : IValidator
 
         byte opcode = bytecodes[pc];
 
-        // Short jumps
-        if (opcode >= 0x90 && opcode <= 0x9F)
+        // Blue Book Short unconditional forward jump (0x90-0x97)
+        // Distance = (opcode & 0x07) + 1 (range 1-8)
+        if (opcode >= 0x90 && opcode <= 0x97)
         {
             int offset = (opcode & 0x07) + 1;
-            return pc + offset + 1;
+            return pc + 1 + offset;
         }
-        // Long jumps
-        else if (opcode == 0xA0 && pc + 1 < bytecodes.Length)
+
+        // Blue Book Short conditional forward jump on FALSE (0x98-0x9F)
+        // Distance = (opcode & 0x07) + 1 (range 1-8)
+        if (opcode >= 0x98 && opcode <= 0x9F)
         {
-            int offset = bytecodes[pc + 1];
-            return pc + offset + 2;
+            int offset = (opcode & 0x07) + 1;
+            return pc + 1 + offset;
+        }
+
+        // Blue Book Long unconditional jump (0xA0-0xA7)
+        // Offset = ((opcode & 0x07) - 4) * 256 + extensionByte (range -1024 to +1023)
+        if (opcode >= 0xA0 && opcode <= 0xA7 && pc + 1 < bytecodes.Length)
+        {
+            int baseOffset = ((opcode & 0x07) - 4) * 256;
+            int extensionByte = bytecodes[pc + 1];
+            int offset = baseOffset + extensionByte;
+            return pc + 2 + offset;
+        }
+
+        // Blue Book Long conditional jump on TRUE (0xA8-0xAB)
+        // Offset = (opcode & 0x03) * 256 + extensionByte (forward only, range 0-1023)
+        if (opcode >= 0xA8 && opcode <= 0xAB && pc + 1 < bytecodes.Length)
+        {
+            int baseOffset = (opcode & 0x03) * 256;
+            int extensionByte = bytecodes[pc + 1];
+            return pc + 2 + baseOffset + extensionByte;
+        }
+
+        // Blue Book Long conditional jump on FALSE (0xAC-0xAF)
+        // Offset = (opcode & 0x03) * 256 + extensionByte (forward only, range 0-1023)
+        if (opcode >= 0xAC && opcode <= 0xAF && pc + 1 < bytecodes.Length)
+        {
+            int baseOffset = (opcode & 0x03) * 256;
+            int extensionByte = bytecodes[pc + 1];
+            return pc + 2 + baseOffset + extensionByte;
         }
 
         return -1;
@@ -277,10 +308,10 @@ public class DeadCodeDetectionValidator : IValidator
             pc++; // Skip sub-opcode
             if (pc < bytecodes.Length) pc++; // Most extended ops have 1 operand
         }
-        // Handle jumps with operands
-        else if (opcode == 0xA0 && pc < bytecodes.Length)
+        // Blue Book Long jumps (0xA0-0xAF): all have 1 extension byte
+        else if (opcode >= 0xA0 && opcode <= 0xAF && pc < bytecodes.Length)
         {
-            pc++; // 1 byte offset
+            pc++; // 1 byte extension
         }
 
         return pc;

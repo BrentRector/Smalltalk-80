@@ -98,11 +98,47 @@ public interface IPlatformBridge
     void SetSampleInterval(int intervalMs);
 
     /// <summary>
-    /// Signals an input semaphore when events are available.
-    /// Host platform should call this to wake up the Smalltalk input handler.
+    /// Registers an input semaphore to be signaled when events are available.
+    /// Host platform stores this OOP and the VM polls it periodically.
     /// </summary>
     /// <param name="semaphoreOOP">Semaphore OOP to signal (heap-resident object).</param>
     void SetInputSemaphore(SmalltalkOOP semaphoreOOP);
+
+    /// <summary>
+    /// Gets the registered input semaphore OOP, or default if none registered.
+    /// Used by the VM to signal the semaphore when events arrive.
+    /// </summary>
+    /// <returns>The input semaphore OOP, or default if none.</returns>
+    SmalltalkOOP GetInputSemaphore();
+
+    /// <summary>
+    /// Checks if there are pending input events to process.
+    /// Used by the VM for idle detection and event signaling.
+    /// </summary>
+    /// <returns>True if events are pending.</returns>
+    bool HasPendingEvents();
+
+    /// <summary>
+    /// Blocks the calling thread until an input event arrives or timeout expires.
+    /// Used to reduce CPU usage when all Smalltalk processes are idle.
+    /// </summary>
+    /// <param name="timeoutMs">Maximum time to wait in milliseconds. -1 for infinite.</param>
+    /// <returns>True if an event arrived, false if timeout expired.</returns>
+    bool WaitForEvents(int timeoutMs);
+
+    /// <summary>
+    /// Gets a WaitHandle that is signaled when input events are available.
+    /// Used with WaitHandle.WaitAny for efficient multi-source waiting.
+    /// </summary>
+    /// <returns>WaitHandle for event notification, or null if not supported.</returns>
+    WaitHandle? EventAvailableHandle { get; }
+
+    /// <summary>
+    /// Resets the event signal if the queue is empty.
+    /// Must be called from the consumer thread after WaitAny returns for the event handle.
+    /// Uses double-check pattern to handle race conditions with producers.
+    /// </summary>
+    void ResetEventSignalIfEmpty();
 
     // ============================================================================
     // Clipboard (Primitive 104)

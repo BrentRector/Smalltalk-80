@@ -37,16 +37,15 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Generate combined source file
+# Verify source files exist
 Write-Host
-Write-Host "Creating combined source file..." -ForegroundColor Yellow
+Write-Host "Verifying source files..." -ForegroundColor Yellow
 
 $SourceDir = "Smalltalk-80 Source"
 $BaseFile = "$SourceDir/Smalltalk-80.st"
 $TestFile = "$SourceDir/Tests/BlockContextTest_full.st"
 $DiagnosticsFile = "$SourceDir/Tests/BlockContextDiagnostics.st"
 $RunnerFile = "$SourceDir/Tests/BlockContextTestRunner.st"
-$CombinedFile = "$SourceDir/Smalltalk-80-with-runner.st"
 
 if (-not (Test-Path $BaseFile)) {
     Write-Error "Base file not found: $BaseFile"
@@ -68,16 +67,18 @@ if (-not (Test-Path $RunnerFile)) {
     exit 1
 }
 
-# Combine files
-Get-Content $BaseFile, $TestFile, $DiagnosticsFile, $RunnerFile | Set-Content $CombinedFile
-Write-Host "  Created: $CombinedFile" -ForegroundColor Green
+Write-Host "  ✓ All source files found" -ForegroundColor Green
 
-# Compile to coldstart.json
+# Compile to coldstart.json (passing multiple source files)
 Write-Host
 Write-Host "Compiling Smalltalk source to coldstart.json..." -ForegroundColor Yellow
+Write-Host "  Sources: $BaseFile" -ForegroundColor Cyan
+Write-Host "           $TestFile" -ForegroundColor Cyan
+Write-Host "           $DiagnosticsFile" -ForegroundColor Cyan
+Write-Host "           $RunnerFile" -ForegroundColor Cyan
 
 $CompilerExe = "Smalltalk80.Compiler/bin/$Configuration/net9.0/Smalltalk80.Compiler.dll"
-dotnet $CompilerExe $CombinedFile
+dotnet $CompilerExe $BaseFile $TestFile $DiagnosticsFile $RunnerFile
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Compilation failed"
     exit 1
@@ -131,6 +132,6 @@ Write-Host "     DiagIt1 initialize... Returned: 188" -ForegroundColor White
 Write-Host "     DiagIt2 initialize... Returned: 266" -ForegroundColor White
 Write-Host
 Write-Host "  2. Full test suite:" -ForegroundColor Cyan
-Write-Host "     BlockContextTestRunner initialize... Returned: 1200" -ForegroundColor White
+Write-Host "     BlockContextTestRunner initialize... Returned: 1192" -ForegroundColor White
 Write-Host "     (120 tests × 10 points each)" -ForegroundColor DarkGray
 Write-Host

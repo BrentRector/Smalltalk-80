@@ -301,19 +301,19 @@ public class BytecodeDecompiler
                 continue;
             }
 
-            // Block returns (0x7D-0x7E)
-            if (b == 0x7D) // RETURN_SELF_POP
+            // Blue Book 0x7D: RETURN_TOP_FROM_BLOCK - local return from block (implicit)
+            // This is used for implicit block returns (last statement value)
+            // No ^ symbol - just ends the block and returns the value
+            if (b == 0x7D) // RETURN_TOP_FROM_BLOCK
             {
-                statements.Add("^ self");
+                // Implicit block return - the value is just the last expression's value
+                // No need to add "^ ..." since this is implicit
                 continue;
             }
-            if (b == 0x7E) // RETURN_TOP_POP
+            // 0x7E: Reserved/unused per Blue Book
+            if (b == 0x7E) // RESERVED_126
             {
-                if (stack.Count > 0)
-                {
-                    string value = stack.Pop();
-                    statements.Add($"^ {value}");
-                }
+                // Should not occur in valid bytecode
                 continue;
             }
 
@@ -728,15 +728,22 @@ public class BytecodeDecompiler
                 }
                 continue;
             }
-            if (b >= 0xA0 && b <= 0xA7) // Long unconditional forward jump
+            if (b >= 0xA0 && b <= 0xA7) // Blue Book Long unconditional jump
             {
                 if (pc >= bytecodes.Length)
                 {
                     statements.Add("<< long jump missing offset byte >>");
                     break;
                 }
-                int offset = ((b & 0x07) << 8) | bytecodes[pc++];
-                statements.Add($"<jump +{offset}>");
+                // Blue Book: offset = ((opcode & 0x07) - 4) * 256 + extensionByte
+                // Range: -1024 to +1023 (can jump backward or forward)
+                int baseOffset = ((b & 0x07) - 4) * 256;
+                int extensionByte = bytecodes[pc++];
+                int offset = baseOffset + extensionByte;
+                if (offset >= 0)
+                    statements.Add($"<jump +{offset}>");
+                else
+                    statements.Add($"<jump {offset}>");
                 continue;
             }
             if (b >= 0xA8 && b <= 0xAB) // Long conditional forward jump if true
