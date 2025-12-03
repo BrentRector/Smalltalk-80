@@ -22399,24 +22399,34 @@ primMousePt
 
 !InputSensor methodsFor: 'waiting'!
 waitForControllerEvent
-	"Block until a controller-relevant event (button transition) occurs.
-	 Used by controller loops (searchForActiveController, controlLoop).
-
-	 Handshake protocol:
-	 1. InputProcess signals ControllerSemaphore, waits on HandshakeSemaphore
-	 2. Controller wakes here, immediately signals HandshakeSemaphore
-	 3. Controller continues (cooperative multitasking - signal doesn't preempt)
-
-	 Controllers use bitState (processed state) so they see correct button values.
+	"Block until a mouse event is enqueued. Used by controller loops.
+	 InputProcess signals ControllerSemaphore after enqueueing each mouse event.
+	 Controllers then consume events via nextMouseEvent.
 	 Return immediately if user input is active (button pressed or key held)."
 	(self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
-	InputState controllerSemaphore wait.
-	InputState handshakeSemaphore signal!
+	InputState controllerSemaphore wait!
 waitForEvent
 	"Block until any input event (mouse, keyboard, or timer) arrives.
 	 Used by general yield callers. VM signals InputSemaphore on raw input arrival.
 	 Enables true idle suspension and 0% CPU when idle."
 	InputState inputSemaphore wait! !
+
+!InputSensor methodsFor: 'mouse events'!
+nextMouseEvent
+	"Dequeue and answer the next MouseEvent from the queue, or nil if empty.
+	 Controllers use this to consume discrete mouse events.
+	 Each event contains: kind (#down/#up/#move), button, buttonsMask, position, timestamp, seq."
+	^InputState mouseEventQueue isEmpty
+		ifTrue: [nil]
+		ifFalse: [InputState mouseEventQueue next]!
+peekMouseEvent
+	"Answer the next MouseEvent without removing it, or nil if empty."
+	^InputState mouseEventQueue isEmpty
+		ifTrue: [nil]
+		ifFalse: [InputState mouseEventQueue peek]!
+hasMouseEvent
+	"Answer whether there are any pending mouse events."
+	^InputState mouseEventQueue isEmpty not! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputSensor class
@@ -22519,7 +22529,7 @@ InputSensor install!
 InputSensor initSensor!
 Object subclass: #InputState
 	instanceVariableNames: 'x y bitState lshiftState rshiftState ctrlState lockState metaState keyboardQueue deltaTime baseTime timeProtect '
-	classVariableNames: 'BitMax BitMin ControllerSemaphore CtrlKey HandshakeSemaphore InputProcess InputSemaphore LockKey LshiftKey RshiftKey '
+	classVariableNames: 'BitMax BitMin ControllerSemaphore CtrlKey EventSeq InputProcess InputSemaphore LockKey LshiftKey MouseEventQueue RshiftKey '
 	poolDictionaries: ''
 	category: 'System-Support'!
 InputState comment:
@@ -22545,16 +22555,17 @@ Instance Variables:
 !InputState methodsFor: 'initialize-release'!
 install
 	"Initialize and connect the receiver to the hardware. Terminate the old input
-	process if any. Dual-semaphore architecture:
+	process if any. Mouse event queue architecture:
 	 - InputSemaphore: VM signals on ALL raw input, wakes InputProcess
-	 - ControllerSemaphore: InputProcess signals on button changes, wakes controllers
-	 - HandshakeSemaphore: Controller signals to acknowledge, InputProcess waits"
+	 - ControllerSemaphore: InputProcess signals after enqueuing mouse event
+	 - MouseEventQueue: FIFO queue of discrete MouseEvent objects"
 
 	InputProcess == nil ifFalse: [InputProcess terminate].
 	self initState.
 	InputSemaphore _ Semaphore new.
 	ControllerSemaphore _ Semaphore new.
-	HandshakeSemaphore _ Semaphore new.
+	MouseEventQueue _ SharedQueue new.
+	EventSeq _ 0.
 	InputProcess _ [self run] newProcess.
 	InputProcess priority: Processor lowIOPriority.
 	InputProcess resume.
@@ -22719,19 +22730,20 @@ primSampleInterval: anInteger
 	<primitive: 94>
 	^self primitiveFailed!
 run
-	"Process input events using composite event model.
+	"Process input events using composite event model with mouse event queue.
 	 Each InputSemaphore wait corresponds to ONE OS event.
-	 Dequeue composite event via primInputWord, update state, signal if buttons changed.
+	 Dequeue composite event via primInputWord, update state, enqueue mouse events.
 
-	 Handshake protocol on button state change:
-	 1. Signal ControllerSemaphore (controller added to ready queue)
-	 2. Wait on HandshakeSemaphore (InputProcess blocks, controller runs)
-	 3. Controller signals HandshakeSemaphore (InputProcess unblocked)
-	 4. Controller continues (cooperative multitasking)
+	 Queue protocol on mouse event:
+	 1. Update bitState FIRST (so Sensor queries return correct state)
+	 2. Enqueue MouseEvent with all details
+	 3. Signal ControllerSemaphore (no handshake needed)
 
-	 Controllers use bitState (processed state) so they see correct button values."
+	 Controllers use both:
+	 - bitState for quick polling (anyButtonPressed, cursorPoint)
+	 - MouseEventQueue for discrete event consumption (nextMouseEvent)"
 
-	| event eventType newButtons keyCode isKeyDown prevBits |
+	| event eventType newButtons keyCode isKeyDown prevBits mouseEvent buttonSym |
 	prevBits _ bitState bitAnd: 7.
 	[true]
 		whileTrue:
@@ -22740,24 +22752,62 @@ run
 			event == nil ifFalse:
 				[eventType _ event at: 1.
 				eventType = 1 ifTrue:
-					["Mouse event: update position and buttons"
+					["Mouse event: update position and buttons, enqueue event"
 					x _ event at: 2.
 					y _ event at: 3.
 					newButtons _ event at: 4.
-					"Update bitState from button mask"
+
+					"Determine event kind and button"
+					EventSeq _ EventSeq + 1.
+					newButtons ~= prevBits
+						ifTrue: [
+							"Button changed - create down or up event"
+							buttonSym _ self classifyButtonChange: prevBits to: newButtons.
+							newButtons > prevBits
+								ifTrue: [mouseEvent _ MouseEvent
+											down: buttonSym
+											mask: newButtons
+											position: x @ y
+											timestamp: self currentTime
+											seq: EventSeq]
+								ifFalse: [mouseEvent _ MouseEvent
+											up: buttonSym
+											mask: newButtons
+											position: x @ y
+											timestamp: self currentTime
+											seq: EventSeq].
+							prevBits _ newButtons]
+						ifFalse: [
+							"Position only - move event"
+							mouseEvent _ MouseEvent
+								move: newButtons
+								position: x @ y
+								timestamp: self currentTime
+								seq: EventSeq].
+
+					"Update processed state"
 					bitState _ (bitState bitAnd: -8) bitOr: newButtons.
-					"Signal controllers if button state changed"
-					newButtons ~= prevBits ifTrue:
-						[prevBits _ newButtons.
-						 ControllerSemaphore signal.
-						 HandshakeSemaphore wait]].
+
+					"Enqueue and signal"
+					MouseEventQueue nextPut: mouseEvent.
+					ControllerSemaphore signal].
+
 				eventType = 2 ifTrue:
-					["Keyboard event: process key"
+					["Keyboard event: process key (unchanged)"
 					keyCode _ event at: 6.
 					isKeyDown _ event at: 7.
 					isKeyDown
 						ifTrue: [self keyAt: keyCode put: 1]
-						ifFalse: [self keyAt: keyCode put: 0]]]]! !
+						ifFalse: [self keyAt: keyCode put: 0]]]]!
+classifyButtonChange: oldMask to: newMask
+	"Determine which button changed. Returns #red, #yellow, or #blue.
+	 Red=4, Yellow=2, Blue=1"
+	| diff |
+	diff _ oldMask bitXor: newMask.
+	(diff bitAnd: 4) ~= 0 ifTrue: [^#red].
+	(diff bitAnd: 2) ~= 0 ifTrue: [^#yellow].
+	(diff bitAnd: 1) ~= 0 ifTrue: [^#blue].
+	^nil! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputState class
@@ -22777,19 +22827,18 @@ initialize
 
 !InputState class methodsFor: 'accessing'!
 controllerSemaphore
-	"Answer the semaphore that is signaled by InputProcess on button state changes.
+	"Answer the semaphore that is signaled by InputProcess after enqueuing a mouse event.
 	 Used by Sensor waitForControllerEvent for true idle suspension.
 	 Separate from InputSemaphore to avoid contention with InputProcess."
 	^ControllerSemaphore!
-handshakeSemaphore
-	"Answer the semaphore used for InputProcess/Controller synchronization.
-	 InputProcess waits on this after signaling ControllerSemaphore.
-	 Controller signals this immediately upon waking to acknowledge receipt."
-	^HandshakeSemaphore!
 inputSemaphore
 	"Answer the semaphore that is signaled when input events arrive.
 	 Used by InputProcess to wake and process raw events."
-	^InputSemaphore! !
+	^InputSemaphore!
+mouseEventQueue
+	"Answer the FIFO queue of MouseEvent objects.
+	 Controllers consume events via Sensor nextMouseEvent."
+	^MouseEventQueue! !
 
 InputState initialize!
 Object subclass: #Inspector
@@ -24282,8 +24331,112 @@ KeyboardEvent class
 code: code meta: meta 
 	"Answer an instance of me, with code the regular key and meta the special
 	keys--ctrl, shift, lock."
-	^self new key: code meta: meta! !Integer variableByteSubclass: #LargeNegativeInteger
-	instanceVariableNames: ''
+	^self new key: code meta: meta\! \!
+Object subclass: #MouseEvent
+	instanceVariableNames: 'kind button buttonsMask position timestamp seq '
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'System-Support'!
+MouseEvent comment:
+'
+I represent a discrete mouse event for queue-based input handling.
+Controllers consume me from MouseEventQueue to see every button transition.
+
+Instance Variables:
+	kind <Symbol> #down, #up, or #move
+	button <Symbol> #red, #yellow, #blue, or nil (for move events)
+	buttonsMask <Integer> composite button state (0-7) after this event
+	position <Point> mouse x@y at event time
+	timestamp <Integer> milliseconds since midnight
+	seq <Integer> monotonically increasing sequence number
+'!
+
+
+!MouseEvent methodsFor: 'accessing'!
+kind
+	"Answer the kind of event: #down, #up, or #move"
+	^kind!
+kind: aSymbol
+	kind _ aSymbol!
+button
+	"Answer which button for down/up events: #red, #yellow, #blue, or nil"
+	^button!
+button: aSymbol
+	button _ aSymbol!
+buttonsMask
+	"Answer the composite button mask (0-7) after this event"
+	^buttonsMask!
+buttonsMask: anInteger
+	buttonsMask _ anInteger!
+position
+	"Answer the mouse position as a Point"
+	^position!
+position: aPoint
+	position _ aPoint!
+timestamp
+	"Answer the timestamp in milliseconds"
+	^timestamp!
+timestamp: anInteger
+	timestamp _ anInteger!
+seq
+	"Answer the sequence number"
+	^seq!
+seq: anInteger
+	seq _ anInteger! !
+
+!MouseEvent methodsFor: 'testing'!
+isDown
+	^kind == #down!
+isUp
+	^kind == #up!
+isMove
+	^kind == #move!
+isRedButton
+	^button == #red!
+isYellowButton
+	^button == #yellow!
+isBlueButton
+	^button == #blue! !
+
+!MouseEvent methodsFor: 'printing'!
+printOn: aStream
+	aStream nextPutAll: 'MouseEvent('.
+	aStream nextPutAll: kind printString.
+	button notNil ifTrue: [aStream space; nextPutAll: button printString].
+	aStream nextPutAll: ' at '.
+	position printOn: aStream.
+	aStream nextPutAll: ' mask='.
+	buttonsMask printOn: aStream.
+	aStream nextPutAll: ' seq='.
+	seq printOn: aStream.
+	aStream nextPut: $)! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+MouseEvent class
+	instanceVariableNames: ''!
+
+
+!MouseEvent class methodsFor: 'instance creation'!
+kind: kindSymbol button: buttonSymbol mask: maskInteger position: aPoint timestamp: msInteger seq: seqInteger
+	"Create a fully initialized MouseEvent"
+	^self new
+		kind: kindSymbol;
+		button: buttonSymbol;
+		buttonsMask: maskInteger;
+		position: aPoint;
+		timestamp: msInteger;
+		seq: seqInteger;
+		yourself!
+down: buttonSymbol mask: maskInteger position: aPoint timestamp: msInteger seq: seqInteger
+	"Create a button-down event"
+	^self kind: #down button: buttonSymbol mask: maskInteger position: aPoint timestamp: msInteger seq: seqInteger!
+up: buttonSymbol mask: maskInteger position: aPoint timestamp: msInteger seq: seqInteger
+	"Create a button-up event"
+	^self kind: #up button: buttonSymbol mask: maskInteger position: aPoint timestamp: msInteger seq: seqInteger!
+move: maskInteger position: aPoint timestamp: msInteger seq: seqInteger
+	"Create a move event (no button change)"
+	^self kind: #move button: nil mask: maskInteger position: aPoint timestamp: msInteger seq: seqInteger! !
+	instanceVariableNames: ''
 	classVariableNames: 'MinHi '
 	poolDictionaries: ''
 	category: 'Numeric-Numbers'!
