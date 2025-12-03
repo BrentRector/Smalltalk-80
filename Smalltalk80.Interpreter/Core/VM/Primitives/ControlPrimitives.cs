@@ -406,12 +406,24 @@ public static class ControlPrimitives
             if (myListOop != context.HeapManager.GetNil())
                 return PrimitiveResult.Fail(context.Metadata!);
 
+            // CRITICAL: Process must have a valid suspendedContext to be resumed
+            // Without this check, we could add an invalid process to the ready queue
+            SmalltalkOOP suspendedContext = context.HeapManager.GetInstanceVariable(
+                context.Receiver, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+            if (suspendedContext == context.HeapManager.GetNil())
+                return PrimitiveResult.Fail(context.Metadata!);
+
             // Check if resumed process has higher priority - if so, preempt
             if (scheduler.ShouldPreempt(context.Receiver))
             {
                 // Preempt: suspend current process and switch to resumed process
                 scheduler.SuspendActiveProcess(returnToQueue: true);
-                scheduler.ActivateProcess(context.Receiver, "resume");
+                if (!scheduler.ActivateProcess(context.Receiver, "resume"))
+                {
+                    // Activation failed - this shouldn't happen since we validated above,
+                    // but handle it gracefully by failing the primitive
+                    return PrimitiveResult.Fail(context.Metadata!);
+                }
             }
             else
             {
