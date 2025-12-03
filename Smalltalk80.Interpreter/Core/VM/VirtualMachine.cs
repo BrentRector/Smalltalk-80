@@ -298,9 +298,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         int periodicCheckCounter = 0;
         const int PeriodicCheckInterval = 1000;
 
-        // Idle detection: pause briefly when running background process to reduce CPU
+        // Idle detection: wait indefinitely when running background process
         const int BackgroundProcessPriority = 1;  // SystemRockBottomPriority
-        const int MaxIdleWaitMs = 10;  // Maximum time to wait for events when idle
 
         while (true)
         {
@@ -347,26 +346,25 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                                 if (newActiveProcess != activeProcess)
                                     break; // Process switched - exit idle loop
 
-                                // Nothing to do - wait for events or timer
-                                int waitMs = MaxIdleWaitMs;
-                                int timerMs = _timerManager.GetMillisecondsUntilNextTimer();
-                                if (timerMs >= 0 && timerMs < waitMs)
-                                {
-                                    waitMs = Math.Max(1, timerMs);
-                                }
-
+                                // Nothing to do - wait indefinitely for events, timer, or shutdown
+                                // No timeout needed: all wake sources are signaled via WaitHandles
                                 if (eventHandle != null)
                                 {
-                                    var handles = new WaitHandle[] { eventHandle, timerHandle };
-                                    WaitHandle.WaitAny(handles, waitMs);
+                                    var handles = new WaitHandle[] {
+                                        eventHandle,
+                                        timerHandle,
+                                        ShutdownToken.WaitHandle
+                                    };
+                                    WaitHandle.WaitAny(handles);
                                     _platformBridge.ResetEventSignalIfEmpty();
                                 }
                                 else
                                 {
-                                    _platformBridge.WaitForEvents(waitMs);
+                                    // Fallback for test mode - use short timeout
+                                    _platformBridge.WaitForEvents(10);
                                 }
 
-                                // Check for shutdown during idle
+                                // Check for shutdown
                                 if (ShutdownToken.IsCancellationRequested)
                                 {
                                     throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
