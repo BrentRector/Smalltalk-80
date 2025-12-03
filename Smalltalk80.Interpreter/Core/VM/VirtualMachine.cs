@@ -366,9 +366,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// - UI event arrives → signals input semaphore → process switch
     /// - Timer expires → signals timer semaphore → process switch
     ///
-    /// IMPORTANT: Do NOT break on HasPendingEvents()! Events don't wake processes
-    /// directly - they signal the input semaphore which causes a process switch.
-    /// We detect process switches via GetActiveProcess().
+    /// When we wake:
+    /// 1. Check for expired timer → signal timer semaphore → may preempt
+    /// 2. Check for pending events → signal input semaphore → may preempt
+    /// 3. Check if activeProcess changed → if yes, exit idle
     /// </summary>
     private void EnterIdleWait(SmalltalkOOP backgroundProcess)
     {
@@ -377,15 +378,17 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         while (true)
         {
-            // NO HasPendingEvents() check!
-            // Events signal input semaphore → wake process → process switch
-            // We detect that via GetActiveProcess() below
-
-            // Check for expired timer and signal semaphore
-            // This may wake a higher-priority process
+            // Check for expired timer and signal semaphore (with preemption)
             CheckAndSignalExpiredTimer();
 
-            // Check if a process switch occurred
+            // Check for pending input events and signal input semaphore (with preemption)
+            // This wakes the input handling process (e.g., Controller)
+            if (_platformBridge != null && _platformBridge.HasPendingEvents())
+            {
+                SignalInputSemaphoreIfRegistered();
+            }
+
+            // Check if a process switch occurred (due to timer or input semaphore signal)
             var currentProcess = GetActiveProcess();
             if (currentProcess != backgroundProcess)
                 return;  // Higher-priority process ready - exit idle
@@ -410,6 +413,22 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
             if (ShutdownToken.IsCancellationRequested)
                 throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
+        }
+    }
+
+    /// <summary>
+    /// Signals the input semaphore if one is registered (via primitive 93).
+    /// This wakes the input handling process when events are available.
+    /// </summary>
+    private void SignalInputSemaphoreIfRegistered()
+    {
+        if (_platformBridge == null)
+            return;
+
+        var inputSemaphore = _platformBridge.GetInputSemaphore();
+        if (inputSemaphore != default && inputSemaphore != _metadata.KnownObjects.Nil)
+        {
+            SignalSemaphoreWithPreemption(inputSemaphore);
         }
     }
 

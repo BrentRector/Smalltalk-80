@@ -14,6 +14,9 @@ public partial class VirtualMachine
     /// Checks if a timer has expired and signals the associated semaphore.
     /// This is the core mechanism for the Delay class.
     /// Called periodically from the interpreter loop.
+    ///
+    /// IMPORTANT: After signaling, this also checks for preemption - if a higher-priority
+    /// process became ready, it switches activeProcess to that process.
     /// </summary>
     private void CheckAndSignalExpiredTimer()
     {
@@ -21,7 +24,22 @@ public partial class VirtualMachine
         if (semaphoreOOP == default || semaphoreOOP == _metadata.KnownObjects.Nil)
             return;
 
-        // Signal the semaphore by incrementing excessSignals or waking a waiter
+        // Signal the semaphore - this may wake a process and trigger preemption
+        SignalSemaphoreWithPreemption(semaphoreOOP);
+    }
+
+    /// <summary>
+    /// Signals a semaphore and handles preemption if a higher-priority process wakes up.
+    /// This is the core semaphore signaling mechanism used by timer expiration and
+    /// potentially input event handling.
+    ///
+    /// Blue Book semantics:
+    /// 1. If processes waiting: wake first waiter, add to ready queue
+    /// 2. If no waiters: increment excessSignals
+    /// 3. After waking: if woken process has higher priority than active, preempt
+    /// </summary>
+    private void SignalSemaphoreWithPreemption(SmalltalkOOP semaphoreOOP)
+    {
         // Semaphore layout: firstLink (0), lastLink (1), excessSignals (2)
         var firstLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
 
@@ -35,30 +53,57 @@ public partial class VirtualMachine
                 _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX,
                     SmalltalkOOP.FromSmallInteger(excess + 1));
             }
+            return;  // No process woken, no preemption needed
+        }
+
+        // Process is waiting - wake it up
+        var wokenProcessOOP = firstLinkOOP;
+
+        // Remove from semaphore's wait list
+        var nextLinkOOP = _heapManager.GetInstanceVariable(wokenProcessOOP, VMConstants.LINK_NEXTLINK_INDEX);
+        _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, nextLinkOOP);
+        if (nextLinkOOP == _metadata.KnownObjects.Nil)
+        {
+            _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, _metadata.KnownObjects.Nil);
+        }
+
+        // Clear process's myList and nextLink
+        _heapManager.SetInstanceVariable(wokenProcessOOP, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
+        _heapManager.SetInstanceVariable(wokenProcessOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
+
+        // Get woken process priority
+        var wokenPriorityOOP = _heapManager.GetInstanceVariable(wokenProcessOOP, VMConstants.PROCESS_PRIORITY_INDEX);
+        int wokenPriority = wokenPriorityOOP.IsSmallInteger ? wokenPriorityOOP.AsSmallInteger() : 0;
+
+        // Get active process priority
+        var activeProcessOOP = GetActiveProcess();
+        int activePriority = 0;
+        if (activeProcessOOP != _metadata.KnownObjects.Nil)
+        {
+            var activePriorityOOP = _heapManager.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_PRIORITY_INDEX);
+            activePriority = activePriorityOOP.IsSmallInteger ? activePriorityOOP.AsSmallInteger() : 0;
+        }
+
+        // Check for preemption: if woken process has higher priority, switch to it
+        if (wokenPriority > activePriority)
+        {
+            // Preempt: switch to higher-priority process
+            // The woken process becomes active immediately (don't add to queue)
+            var schedulerOOP = _metadata.ProcessorScheduler;
+            if (schedulerOOP != _metadata.KnownObjects.Nil)
+            {
+                // Set woken process as active
+                _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, wokenProcessOOP);
+
+                // Note: We don't need to save/restore contexts here because:
+                // - If we're in EnterIdleWait(), background process has no meaningful context to save
+                // - The context switch happens naturally when we exit idle and check GetActiveProcess()
+            }
         }
         else
         {
-            // Process is waiting - wake it up by moving to ready queue
-            // Remove first process from semaphore's wait list
-            var processOOP = firstLinkOOP;
-            var nextLinkOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX);
-            _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, nextLinkOOP);
-            if (nextLinkOOP == _metadata.KnownObjects.Nil)
-            {
-                _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, _metadata.KnownObjects.Nil);
-            }
-
-            // Clear process's myList and nextLink
-            _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
-            _heapManager.SetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
-
-            // Add process to its priority queue (make it runnable)
-            var priorityOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX);
-            if (priorityOOP.IsSmallInteger)
-            {
-                int priority = priorityOOP.AsSmallInteger();
-                AddProcessToReadyQueue(processOOP, priority);
-            }
+            // No preemption needed - just add to ready queue
+            AddProcessToReadyQueue(wokenProcessOOP, wokenPriority);
         }
     }
 
