@@ -24331,7 +24331,7 @@ KeyboardEvent class
 code: code meta: meta 
 	"Answer an instance of me, with code the regular key and meta the special
 	keys--ctrl, shift, lock."
-	^self new key: code meta: meta\! \!
+	^self new key: code meta: meta! !
 Object subclass: #MouseEvent
 	instanceVariableNames: 'kind button buttonsMask position timestamp seq '
 	classVariableNames: ''
@@ -24436,7 +24436,8 @@ up: buttonSymbol mask: maskInteger position: aPoint timestamp: msInteger seq: se
 move: maskInteger position: aPoint timestamp: msInteger seq: seqInteger
 	"Create a move event (no button change)"
 	^self kind: #move button: nil mask: maskInteger position: aPoint timestamp: msInteger seq: seqInteger! !
-	instanceVariableNames: ''
+Integer variableByteSubclass: #LargeNegativeInteger
+	instanceVariableNames: ''
 	classVariableNames: 'MinHi '
 	poolDictionaries: ''
 	category: 'Numeric-Numbers'!
