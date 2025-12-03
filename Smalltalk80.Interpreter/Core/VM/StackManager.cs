@@ -127,6 +127,10 @@ internal class StackManager(
             Console.WriteLine($"  methodOOP: {methodOOP}, class: {methodClass}");
             Console.WriteLine($"  sp={sp}, initialSP={initialSP}");
 
+            // Get instruction pointer for debugging
+            var ipOOP = heapManager.GetInstanceVariable(activeContextOOP, VMConstants.CONTEXT_IP_INDEX);
+            Console.WriteLine($"  IP={ipOOP.AsSmallInteger()}");
+
             if (isBlockContext)
             {
                 var nargsOOP = heapManager.GetInstanceVariable(activeContextOOP, VMConstants.BLOCKCONTEXT_NARGS_INDEX);
@@ -136,6 +140,23 @@ internal class StackManager(
             {
                 var header = helpers.ParseMethodHeader(methodOOP);
                 Console.WriteLine($"  MethodContext: numArgs={header.NumArgs}, numTemps={header.NumTemps}, numLiterals={header.NumLiterals}");
+
+                // Print first few literals to help identify the method
+                Console.WriteLine($"  Literals:");
+                for (int i = 0; i < Math.Min(header.NumLiterals, 5); i++)
+                {
+                    var litOOP = helpers.GetLiteral(methodOOP, i);
+                    var litClass = litOOP.IsSmallInteger ? "SmallInteger" : helpers.GetClassName(helpers.GetClass(litOOP));
+                    if (litClass == "Symbol")
+                    {
+                        var symStr = helpers.GetSymbolString(litOOP);
+                        Console.WriteLine($"    [{i}] Symbol: {symStr}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"    [{i}] {litClass}: {litOOP}");
+                    }
+                }
             }
 
             throw new InvalidOperationException(
