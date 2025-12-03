@@ -1,7 +1,7 @@
 # CPU Usage Analysis: Idle Detection and the Yield Problem
 
 **Date**: 2025-12-03
-**Status**: ✅ RESOLVED - Dual-semaphore architecture implemented
+**Status**: ✅ RESOLVED - Dual-semaphore architecture with handshake protocol
 **Purpose**: Document the idle CPU problem, analysis, and implemented solution
 
 ---
@@ -83,135 +83,79 @@ But the background process **never became active** because:
 
 ---
 
-## Solutions Explored and Discarded
-
-### Solution 1: VM-Level Yield-Spin Throttling
-
-**Approach**: Detect rapid process cycling and introduce `Thread.Sleep` delays.
-
-**Why discarded**:
-- Arbitrary heuristic (when to throttle?)
-- Doesn't achieve true 0% CPU
-- Adds latency to responsive operations
-- Masks the real problem rather than fixing it
-
-**Status**: IMPLEMENTED AND REVERTED
-
-### Solution 2: Modify Individual Call Sites
-
-**Approach**: Change `searchForActiveController` and `controlLoop` to use `Sensor waitForEvent` instead of `Processor yield`.
-
-**Why discarded**:
-- Requires modifying each call site individually
-- Doesn't fix other yield callers (Rectangle>>fromUser, ScrollController>>scroll, etc.)
-- More invasive changes to Blue Book code
-
-**Status**: IMPLEMENTED THEN SUPERSEDED by central fix
-
-### Solution 3: Background Process Detection Only
-
-**Approach**: Detect when background process is active and block.
-
-**Why it fails**: Background process **never becomes active** due to yield keeping higher priorities occupied.
-
-**Status**: INFRASTRUCTURE EXISTS but never triggers without yield fix
-
-### Solution 4: Single Semaphore with SignalAllWaiters
-
-**Approach**: Both InputProcess and controllers wait on InputSemaphore. VM signals all waiters on input arrival.
-
-**Why discarded**:
-- Missed mouse down/up transitions due to contention
-- When controller wakes first, InputProcess hasn't updated sensor state yet
-- Race condition between InputProcess and controller waking
-
-**Status**: IMPLEMENTED AND SUPERSEDED by dual-semaphore architecture
-
----
-
-## Implemented Solution: Dual-Semaphore Architecture
+## Implemented Solution: Dual-Semaphore Architecture with Handshake
 
 **Date**: 2025-12-03
-**Status**: ✅ IMPLEMENTED
+**Status**: ✅ IMPLEMENTED AND VALIDATED
 
 ### Architecture Overview
 
-Two separate semaphores with different purposes:
+Three semaphores with distinct purposes:
 
-1. **InputSemaphore** (primitive 93) - VM signals this when raw input arrives
+1. **InputSemaphore** (primitive 93) - VM signals when raw input arrives
    - Only InputProcess (priority 6) waits on this
-   - InputProcess reads event, updates sensor state
+   - InputProcess reads event words, updates sensor state
 
-2. **ControllerSemaphore** (primitive 160) - VM signals this on button transitions
-   - Controllers wait on this (via Sensor waitForControllerEvent)
-   - Signaled AFTER InputProcess updates state (priority ordering)
-   - Guarantees controllers see correct button/key state
+2. **ControllerSemaphore** (primitive 160) - InputProcess signals on button state CHANGES
+   - Controllers wait on this (via `Sensor waitForControllerEvent`)
+   - Signaled only when `bitState bitAnd: 7` changes (not every event)
+   - Guarantees controllers see correct button state
 
-### Priority-Based Ordering
+3. **HandshakeSemaphore** - Formal synchronization between InputProcess and Controller
+   - InputProcess waits on this after signaling ControllerSemaphore
+   - Controller signals this immediately upon waking
+   - Ensures InputProcess doesn't process more events until controller acknowledges
 
-The priority system guarantees correct ordering:
+### Key Design Decision: Processed State vs Polled State
 
-1. **VM signals InputSemaphore** on raw input arrival
-2. **InputProcess (priority 6)** wakes, reads event, updates sensor state
-3. **InputProcess signals ControllerSemaphore**
-4. **Controllers (priority 4)** wake with correct state
-
-Since InputProcess runs at priority 6 and controllers at priority 4, InputProcess always completes before any controller runs.
-
-### The Fix
-
-Controller loops use `waitForControllerEvent` which waits on ControllerSemaphore:
+**Critical Fix**: `InputSensor>>buttons` now returns processed state from `bitState`, NOT polled current state:
 
 ```smalltalk
-ControlManager>>searchForActiveController
-    "Find a scheduled controller that wants control."
-    | aController |
-    activeController _ nil.
-    activeControllerProcess _ Processor activeProcess.
-    [aController _ scheduledControllers
-        detect: [:c | c isControlWanted and: [c ~~ screenController]]
-        ifNone: [screenController isControlWanted
-                    ifTrue: [screenController]
-                    ifFalse: [nil]].
-    aController isNil]
-        whileTrue: [Sensor waitForControllerEvent].
-    self activeController: aController.
-    Processor terminateActive
-
-ProcessorScheduler>>yield
-    "Give other Processes at the current priority a chance to run."
-    Sensor waitForEvent
+InputSensor>>buttons
+    "Return button state from processed events (bitState), not polled current state.
+     This ensures controllers see button state as of when the event was processed."
+    ^CurrentInputState mouseButtons
 ```
 
-### Supporting Methods
+**Why this matters**:
+- Primitive 199 (`primMouseButtons`) polls the **current** OS state from the queue
+- If user clicks quickly, button may be released by the time controller checks
+- Using `bitState` (updated by InputProcess) gives the state **at event processing time**
+- Combined with the handshake, controllers ALWAYS see correct button state
 
-#### InputState class variables
+### The Handshake Protocol
 
-```smalltalk
-Object subclass: #InputState
-    instanceVariableNames: 'x y bitState ...'
-    classVariableNames: 'BitMax BitMin ControllerSemaphore CtrlKey InputProcess InputSemaphore LockKey LshiftKey RshiftKey '
-    poolDictionaries: ''
-    category: 'System-Support'
+```
+Button State Change Flow:
+═══════════════════════════════════════════════════════════════════
+
+1. User presses yellow button
+   └─► OS event queued, counting semaphore released
+
+2. VM wakes from WaitAny
+   └─► ProcessOneEvent() generates words + sentinel
+   └─► SignalSemaphore(InputSemaphore)
+
+3. InputProcess (priority 6) wakes
+   └─► Processes words until sentinel (type 6)
+   └─► Updates x, y, bitState via nextEvent:with:
+   └─► Detects button change: newBits ~= prevBits
+   └─► Signals ControllerSemaphore
+   └─► Waits on HandshakeSemaphore ◄── BLOCKS HERE
+
+4. Controller (priority 4) wakes
+   └─► Signals HandshakeSemaphore ◄── InputProcess unblocked (but not running)
+   └─► Checks Sensor yellowButtonPressed
+   └─► Returns CurrentInputState mouseButtons = bitState = BUTTON PRESSED ✓
+   └─► Shows popup menu...
+
+5. Eventually controller waits on ControllerSemaphore
+   └─► InputProcess resumes, processes next events
 ```
 
-#### InputState>>install (creates both semaphores)
+### Implementation Details
 
-```smalltalk
-install
-    "Initialize and connect the receiver to the hardware.
-     Terminate the old input process if any."
-    InputProcess == nil ifFalse: [InputProcess terminate].
-    self initState.
-    InputSemaphore _ Semaphore new.
-    ControllerSemaphore _ Semaphore new.
-    InputProcess _ [self run] newProcess.
-    InputProcess priority: Processor lowIOPriority.
-    InputProcess resume.
-    self primInputSemaphore: InputSemaphore
-```
-
-#### InputState>>run (counting semaphore + sentinel + handshake)
+#### InputState>>run (counting semaphore + sentinel + state-change handshake)
 
 ```smalltalk
 run
@@ -219,15 +163,16 @@ run
      Each InputSemaphore wait corresponds to ONE OS event (via counting semaphore).
      Process all words for that event until sentinel (type 6) or 0.
 
-     After button DOWN (type=3) only, use handshake protocol to wake sleeping controller:
-     1. Signal ControllerSemaphore (adds controller to ready queue, no preempt)
-     2. Wait on HandshakeSemaphore (blocks InputProcess, controller runs)
-     3. Controller signals HandshakeSemaphore (InputProcess unblocked, no preempt)
-     4. Controller continues processing (cooperative multitasking)
+     Handshake protocol on button state change:
+     1. Signal ControllerSemaphore (controller added to ready queue)
+     2. Wait on HandshakeSemaphore (InputProcess blocks, controller runs)
+     3. Controller signals HandshakeSemaphore (InputProcess unblocked)
+     4. Controller continues (cooperative multitasking)
 
-     Button UP (type=4) does NOT handshake - controller is busy processing and polls state."
+     Controllers use bitState (processed state) so they see correct button values."
 
-    | word type param |
+    | word type param prevBits newBits |
+    prevBits _ bitState bitAnd: 7.
     [true]
         whileTrue:
             [InputSemaphore wait.
@@ -242,51 +187,57 @@ run
                         ifFalse:
                             [type = 2
                                 ifTrue: [y _ param "Mouse Y"]
-                                ifFalse:
-                                    [self nextEvent: type with: param.
-                                     "After button DOWN only: handshake with controller"
-                                     (type = 3 and: [param >= BitMin and: [param <= (BitMin + 2)]]) ifTrue:
-                                        [ControllerSemaphore signal.
-                                         HandshakeSemaphore wait]]]]]
+                                ifFalse: [self nextEvent: type with: param]]].
+            "Signal controllers if button state changed, then wait for handshake"
+            newBits _ bitState bitAnd: 7.
+            newBits ~= prevBits ifTrue:
+                [prevBits _ newBits.
+                 ControllerSemaphore signal.
+                 HandshakeSemaphore wait]]
 ```
 
-#### InputState class>>controllerSemaphore
+#### InputState>>install (creates all three semaphores)
 
 ```smalltalk
-controllerSemaphore
-    "Answer the semaphore that is signaled by InputProcess after processing events.
-     Used by Processor yield (via Sensor waitForEvent) for true idle suspension.
-     Separate from InputSemaphore to avoid contention with InputProcess."
-    ^ControllerSemaphore
+install
+    "Initialize and connect the receiver to the hardware. Terminate the old input
+    process if any. Dual-semaphore architecture:
+     - InputSemaphore: VM signals on ALL raw input, wakes InputProcess
+     - ControllerSemaphore: InputProcess signals on button changes, wakes controllers
+     - HandshakeSemaphore: Controller signals to acknowledge, InputProcess waits"
+
+    InputProcess == nil ifFalse: [InputProcess terminate].
+    self initState.
+    InputSemaphore _ Semaphore new.
+    ControllerSemaphore _ Semaphore new.
+    HandshakeSemaphore _ Semaphore new.
+    InputProcess _ [self run] newProcess.
+    InputProcess priority: Processor lowIOPriority.
+    InputProcess resume.
+    self primInputSemaphore: InputSemaphore.
+    self primControllerSemaphore: ControllerSemaphore
 ```
 
-#### InputSensor wait methods
+#### InputSensor>>waitForControllerEvent (handshake acknowledgment)
 
 ```smalltalk
-InputSensor>>waitForControllerEvent
+waitForControllerEvent
     "Block until a controller-relevant event (button transition) occurs.
      Used by controller loops (searchForActiveController, controlLoop).
 
-     Handshake protocol with InputProcess:
-     1. InputProcess processes button event, updates sensor state
-     2. InputProcess signals ControllerSemaphore, waits on HandshakeSemaphore
-     3. Controller wakes here, IMMEDIATELY signals HandshakeSemaphore
-     4. Controller continues processing (signal doesn't preempt - cooperative)
-     5. InputProcess is unblocked but won't run until controller waits
+     Handshake protocol:
+     1. InputProcess signals ControllerSemaphore, waits on HandshakeSemaphore
+     2. Controller wakes here, immediately signals HandshakeSemaphore
+     3. Controller continues (cooperative multitasking - signal doesn't preempt)
 
-     IMPORTANT: Return immediately if user input is active."
+     Controllers use bitState (processed state) so they see correct button values.
+     Return immediately if user input is active (button pressed or key held)."
     (self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
     InputState controllerSemaphore wait.
-    "Acknowledge receipt - InputProcess unblocked but we continue (cooperative)"
     InputState handshakeSemaphore signal
-
-InputSensor>>waitForEvent
-    "Block until any input event arrives.
-     Used by general yield callers. VM signals InputSemaphore on raw input."
-    InputState inputSemaphore wait
 ```
 
-### Event Flow Diagram (Counting Semaphore + Sentinel + Handshake)
+### Event Flow Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -323,13 +274,14 @@ InputSensor>>waitForEvent
 │  │  InputProcess (priority 6)       ← runs first due to priority │  │
 │  │         │                                                      │  │
 │  │         ├── InputSemaphore wait                               │  │
-│  │         ├── Inner loop: read words until sentinel (type 6)    │  │
-│  │         │      ├── Update x, y, bitState via nextEvent        │  │
-│  │         │      └── If button event:                           │  │
-│  │         │              ├── ControllerSemaphore signal         │  │
-│  │         │              │   (adds controller to ready, no preempt) │
-│  │         │              └── HandshakeSemaphore wait            │  │
-│  │         │                        │ (BLOCKS - triggers switch)  │  │
+│  │         ├── Process words until sentinel (type 6)             │  │
+│  │         │      └── Update x, y, bitState via nextEvent        │  │
+│  │         │                                                      │  │
+│  │         ├── Compare: newBits _ bitState bitAnd: 7             │  │
+│  │         │   newBits ~= prevBits?                              │  │
+│  │         │      YES: ┌── ControllerSemaphore signal            │  │
+│  │         │           └── HandshakeSemaphore wait ◄── BLOCKS    │  │
+│  │         │                        │                             │  │
 │  └─────────┼────────────────────────┼───────────────────────────┘  │
 │            │                        │                               │
 │            │                        ▼                               │
@@ -337,21 +289,23 @@ InputSensor>>waitForEvent
 │  │  Controller (priority 4)        ← runs (InputProcess blocked) │  │
 │  │         │                                                      │  │
 │  │         ├── (wakes from ControllerSemaphore wait)             │  │
-│  │         ├── HandshakeSemaphore signal                         │  │
-│  │         │   (InputProcess unblocked, but no preemption!)      │  │
-│  │         │   (Smalltalk signal doesn't cause process switch)   │  │
+│  │         ├── HandshakeSemaphore signal ◄── InputProcess freed  │  │
+│  │         │   (but doesn't run - cooperative multitasking)      │  │
 │  │         │                                                      │  │
-│  │         ├── Continue processing with CORRECT button state     │  │
+│  │         ├── Sensor yellowButtonPressed                        │  │
+│  │         │   └── buttons → CurrentInputState mouseButtons      │  │
+│  │         │   └── Returns bitState bitAnd: 7 = CORRECT STATE ✓  │  │
 │  │         │                                                      │  │
-│  │         └── Eventually: ControllerSemaphore wait              │  │
-│  │                   │ (BLOCKS - triggers switch)                 │  │
-│  └─────────┼─────────┼──────────────────────────────────────────┘  │
-│            │         │                                              │
-│            │         ▼                                              │
-│  ┌─────────┼────────────────────────────────────────────────────┐  │
+│  │         ├── Process button event (show popup menu, etc.)      │  │
+│  │         │                                                      │  │
+│  │         └── Eventually: ControllerSemaphore wait ◄── BLOCKS   │  │
+│  └─────────┼─────────────────────────────────────────────────────┘  │
+│            │                                                         │
+│            ▼                                                         │
+│  ┌───────────────────────────────────────────────────────────────┐  │
 │  │  InputProcess resumes           ← (highest priority ready)    │  │
 │  │         │                                                      │  │
-│  │         └── Continue processing remaining words               │  │
+│  │         └── Continue to next InputSemaphore wait              │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -360,27 +314,22 @@ InputSensor>>waitForEvent
 
 1. **Counting semaphore**: One OS event = one semaphore release = one InputSemaphore wait
 2. **Sentinel-based processing**: Type 6 marks end of one OS event's words
-3. **Handshake protocol**: Formal synchronization without priority tricks
-4. **Cooperative multitasking**: Smalltalk `signal` doesn't preempt - only `wait` does
-5. **State consistency**: Controllers always see correct button state (down vs up)
-6. **No missed transitions**: Each button down/up triggers controller wake
-7. **True 0% CPU**: When idle, all processes block on their respective semaphores
+3. **State-change detection**: Handshake only on `(bitState bitAnd: 7)` changes
+4. **Processed state**: `buttons` returns bitState, not polled current state
+5. **Handshake protocol**: Formal synchronization without priority tricks
+6. **Cooperative multitasking**: Smalltalk `signal` doesn't preempt - only `wait` does
+7. **State consistency**: Controllers ALWAYS see correct button state
+8. **True 0% CPU**: When idle, all processes block on their respective semaphores
 
-### Call Sites Automatically Fixed
+### Blue Book Compliance
 
-- `ControlManager>>searchForActiveController` - controller scheduling loop
-- `Controller>>controlLoop` - active controller polling
-- `Rectangle>>fromUser` - interactive rectangle selection
-- `ScrollController>>scroll` - scroll bar handling
-- `StandardSystemView` frame selection - window resize/move
-- Any other existing or future `Processor yield` calls
+**Validated by smalltalk-bluebook-expert**: ✅ **FULLY COMPLIANT**
 
-### Expected Behavior
-
-- **Idle CPU**: 0% (blocked in WaitAny → semaphore waits)
-- **Responsiveness**: Immediate wake on mouse/keyboard/timer events
-- **Reliability**: No missed mouse down/up transitions
-- **Compatibility**: All existing yield callers work without modification
+- All InputSensor protocol messages present and correct
+- Button bit encoding matches Blue Book (red=4, yellow=2, blue=1)
+- All controller and menu code works unchanged
+- Proper Blue Book semaphore protocol usage
+- Non-breaking extension (existing polling code continues to work)
 
 ---
 
@@ -388,26 +337,26 @@ InputSensor>>waitForEvent
 
 ### Smalltalk-80 Source/Smalltalk-80.st
 
-1. **InputState class variables** - Added `ControllerSemaphore`, `HandshakeSemaphore`
-2. **InputState>>install** - Creates all three semaphores (InputSemaphore, ControllerSemaphore, HandshakeSemaphore)
-3. **InputState>>primControllerSemaphore:** - Registers ControllerSemaphore (primitive 160)
-4. **InputState>>run** - Uses counting semaphore + sentinel + handshake protocol
-5. **InputState>>nextEvent:with:** - Updates state (signaling moved to run)
-6. **InputState class>>controllerSemaphore** - Accessor
-7. **InputState class>>handshakeSemaphore** - Accessor for handshake synchronization
-8. **InputState class>>inputSemaphore** - Accessor
-9. **InputSensor>>waitForControllerEvent** - Waits on ControllerSemaphore, signals HandshakeSemaphore
-10. **InputSensor>>waitForEvent** - Waits on InputSemaphore (for general yield)
+1. **InputState class variables** - `ControllerSemaphore`, `HandshakeSemaphore`
+2. **InputState>>install** - Creates all three semaphores
+3. **InputState>>run** - State-change detection with handshake
+4. **InputState>>primControllerSemaphore:** - Registers ControllerSemaphore (primitive 160)
+5. **InputState class>>controllerSemaphore** - Accessor
+6. **InputState class>>handshakeSemaphore** - Accessor
+7. **InputState class>>inputSemaphore** - Accessor
+8. **InputSensor>>buttons** - Returns `CurrentInputState mouseButtons` (processed state)
+9. **InputSensor>>waitForControllerEvent** - Waits + handshake signal
+10. **InputSensor>>waitForEvent** - Waits on InputSemaphore
 11. **ControlManager>>searchForActiveController** - Uses `Sensor waitForControllerEvent`
 12. **ProcessorScheduler>>yield** - Calls `Sensor waitForEvent`
 
 ### VM (C#)
 
-- **SmalltalkEventQueue.cs** - Uses counting Semaphore, ProcessOneEvent adds sentinel (type 6)
-- **VirtualMachine.cs** - `SignalInputSemaphoreIfRegistered` signals InputSemaphore only (ControllerSemaphore signaled by Smalltalk)
-- **IPlatformBridge.cs** - Added `SetControllerSemaphore`, `GetControllerSemaphore`, `ConsumeButtonTransition`
-- **WinFormsDisplayProvider.cs** - Implements controller semaphore registration
-- **InputPrimitives.cs** - Added primitive 160 for controller semaphore registration
+- **SmalltalkEventQueue.cs** - Counting Semaphore, ProcessOneEvent + sentinel, DequeueCompositeEvent
+- **VirtualMachine.cs** - `SignalInputSemaphoreIfRegistered` signals InputSemaphore only
+- **IPlatformBridge.cs** - `SetControllerSemaphore`, `GetControllerSemaphore`, `ConsumeButtonTransition`
+- **WinFormsDisplayProvider.cs** - Controller semaphore registration
+- **InputPrimitives.cs** - Primitive 160 for controller semaphore, primitive 199 for button polling
 - **PrimitiveRegistry.cs** - Registered primitive 160
 
 ---
@@ -421,30 +370,9 @@ After regenerating coldstart bundle:
 3. **Multiple windows**: Open several windows, leave idle → verify 0% CPU
 4. **Responsiveness**: Move mouse while idle → verify immediate wake
 5. **Mouse transitions**: Click buttons → verify no missed down/up events
-6. **Yellow button menu**: Right-click → verify popup menu appears
+6. **Yellow button menu**: Right-click → verify popup menu appears reliably
 7. **Timer events**: Verify timer-based operations still work
-
----
-
-## Rollback Instructions
-
-To revert to original Blue Book yield behavior (will restore ~3% idle CPU and potential missed events):
-
-1. Restore original ProcessorScheduler>>yield:
-```smalltalk
-ProcessorScheduler>>yield
-    "Give other Processes at the current priority a chance to run"
-    | semaphore |
-    semaphore _ Semaphore new.
-    [semaphore signal] fork.
-    semaphore wait
-```
-
-2. Remove ControllerSemaphore from InputState class variables
-3. Remove ControllerSemaphore signal from InputState>>run
-4. Remove InputState class>>controllerSemaphore method
-
-The `InputState class>>inputSemaphore` and original `InputSensor>>waitForEvent` methods can remain.
+8. **Rapid clicking**: Click rapidly → verify all transitions detected
 
 ---
 
@@ -472,4 +400,4 @@ ProcessorScheduler class>>initialize
 
 ### Process Selection
 
-The scheduler always picks the highest priority process with a non-empty ready queue. The dual-semaphore architecture leverages this to ensure correct ordering.
+The scheduler always picks the highest priority process with a non-empty ready queue. The dual-semaphore architecture with handshake leverages this to ensure correct ordering and state consistency.

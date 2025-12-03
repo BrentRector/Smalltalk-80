@@ -25,7 +25,13 @@ The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:i
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 
-**✅ Idle CPU Usage - RESOLVED**: The original Blue Book `Processor yield` created a forked process that signaled immediately, keeping priority 4 always occupied and preventing true idle. **Fix**: Dual-semaphore architecture separates InputSemaphore (for InputProcess) from ControllerSemaphore (for controllers). `ProcessorScheduler>>yield` calls `Sensor waitForEvent`, which blocks on ControllerSemaphore. InputProcess signals ControllerSemaphore after updating sensor state, ensuring controllers see correct button/key state. This enables 0% idle CPU with no missed mouse transitions. See `docs/Architecture/CPU-USAGE-ANALYSIS.md`.
+**✅ Idle CPU Usage - RESOLVED**: The original Blue Book `Processor yield` created a forked process that signaled immediately, keeping priority 4 always occupied and preventing true idle. **Fix**: Dual-semaphore architecture with handshake protocol:
+- **InputSemaphore**: VM signals on raw input; InputProcess waits
+- **ControllerSemaphore**: InputProcess signals on button state CHANGES; controllers wait
+- **HandshakeSemaphore**: Controller signals to acknowledge; InputProcess waits after signaling
+- **Key**: `buttons` returns processed state from `bitState` (not polled current state)
+
+This guarantees controllers ALWAYS see correct button state, enables 0% idle CPU, and eliminates missed mouse transitions. See `docs/Architecture/CPU-USAGE-ANALYSIS.md`.
 
 ## Migration Status
 
@@ -104,10 +110,11 @@ Efficient idle detection using `WaitHandle.WaitAny` for unified multi-source wai
 
 **Key Implementation Details**:
 
-**Dual-Semaphore Architecture**: Separates InputSemaphore (for InputProcess) from ControllerSemaphore (for controllers):
+**Dual-Semaphore Architecture with Handshake**: Separates InputSemaphore (for InputProcess) from ControllerSemaphore (for controllers), with HandshakeSemaphore for formal synchronization:
 
 1. **InputSemaphore** - VM signals when raw input arrives; InputProcess (priority 6) waits
-2. **ControllerSemaphore** - InputProcess signals after updating sensor state; controllers wait
+2. **ControllerSemaphore** - InputProcess signals on button state CHANGES; controllers wait
+3. **HandshakeSemaphore** - Controller signals to acknowledge; InputProcess waits after signaling
 
 ```smalltalk
 ProcessorScheduler>>yield
@@ -115,14 +122,27 @@ ProcessorScheduler>>yield
      Modern integration: block on ControllerSemaphore for true idle suspension."
     Sensor waitForEvent
 
-InputSensor>>waitForEvent
-    "Block until an input event arrives.
-     Returns immediately if button pressed or key held."
+InputSensor>>buttons
+    "Return button state from processed events (bitState), not polled current state.
+     This ensures controllers see button state as of when the event was processed."
+    ^CurrentInputState mouseButtons
+
+InputSensor>>waitForControllerEvent
+    "Block until button transition. Handshake ensures correct state visibility."
     (self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
-    InputState controllerSemaphore wait
+    InputState controllerSemaphore wait.
+    InputState handshakeSemaphore signal
 ```
 
-This guarantees controllers always see correct button/key state (no missed mouse transitions) while achieving 0% idle CPU.
+**Key Design Decision**: `buttons` returns processed state from `bitState` (not polled current state via primitive 199). Combined with the handshake protocol, this guarantees controllers ALWAYS see correct button state with no missed mouse transitions.
+
+**Handshake Protocol**:
+1. InputProcess processes event, updates bitState
+2. If button state changed: signal ControllerSemaphore, wait HandshakeSemaphore
+3. Controller wakes, immediately signals HandshakeSemaphore
+4. Controller continues with correct bitState visible
+
+This achieves 0% idle CPU while ensuring reliable button detection.
 
 **ManualResetEventSlim Pattern**: The original AutoResetEvent caused event loss because it auto-resets when WaitAny returns. The fix uses ManualResetEventSlim with explicit reset:
 
@@ -142,9 +162,10 @@ public void ResetSignalIfEmpty()
 
 **Key Files**:
 - `Smalltalk-80.st` - `ProcessorScheduler>>yield` calls `Sensor waitForEvent`
-- `Smalltalk-80.st` - `InputState` class with `ControllerSemaphore` and `InputSemaphore`
-- `Smalltalk-80.st` - `InputState>>run` signals ControllerSemaphore after processing events
-- `Smalltalk-80.st` - `InputSensor>>waitForEvent` waits on ControllerSemaphore
+- `Smalltalk-80.st` - `InputState` class with `InputSemaphore`, `ControllerSemaphore`, `HandshakeSemaphore`
+- `Smalltalk-80.st` - `InputState>>run` detects button state changes, signals + handshake
+- `Smalltalk-80.st` - `InputSensor>>buttons` returns processed state from `CurrentInputState mouseButtons`
+- `Smalltalk-80.st` - `InputSensor>>waitForControllerEvent` waits on ControllerSemaphore + signals HandshakeSemaphore
 - `VirtualMachine.cs` - InterpreterLoop uses `WaitHandle.WaitAny([eventHandle, timerHandle])`
 - `VirtualMachine.ProcessScheduling.cs` - Extracted process scheduling methods (~330 lines)
 - `SmalltalkEventQueue.cs` - ManualResetEventSlim with ResetSignalIfEmpty()
