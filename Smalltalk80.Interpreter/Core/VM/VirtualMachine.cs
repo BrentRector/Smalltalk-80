@@ -301,6 +301,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // The background process is a sentinel - we should NEVER execute its bytecodes
         _backgroundProcessOOP = FindBackgroundProcess();
         Console.WriteLine($"[InterpreterLoop] Background process OOP: {_backgroundProcessOOP}, platformBridge: {_platformBridge != null}");
+        Console.Out.Flush();
 
         // Counter for periodic shutdown and timer checks (every N bytecodes)
         int periodicCheckCounter = 0;
@@ -326,6 +327,15 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             if (++periodicCheckCounter >= PeriodicCheckInterval)
             {
                 periodicCheckCounter = 0;
+
+                // Log active process periodically (every 1000 bytecodes)
+                if (_platformBridge != null)
+                {
+                    var activeProc = GetActiveProcess();
+                    var activePriority = GetProcessPriority(activeProc);
+                    Console.WriteLine($"[PERIODIC] activeProcess={activeProc}, priority={activePriority}, bgProcess={_backgroundProcessOOP}");
+                    Console.Out.Flush();
+                }
 
                 if (ShutdownToken.IsCancellationRequested)
                 {
