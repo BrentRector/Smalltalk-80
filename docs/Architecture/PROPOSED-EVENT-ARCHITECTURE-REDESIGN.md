@@ -1,9 +1,10 @@
 # Proposed Event Architecture Redesign
 
 **Date**: 2025-12-04
-**Status**: PROPOSAL (v6 - complete specification with detailed implementation plan)
+**Status**: PROPOSAL (v7 - complete specification with rollout plan)
 **Authors**: Collaborative analysis by multiple expert agents
 **Implementation**: Clean-slate refactor (~840 lines, 10 phases)
+**Appendices**: A (Concurrency), B (Blue Book), C (Rollout Notes), D (Timeline), E (Diagrams)
 
 ---
 
@@ -1637,7 +1638,285 @@ InputProcess at priority 6 naturally preempts controllers at priority 4 when sig
 
 ---
 
-## Appendix C: State Diagrams and Configuration
+## Appendix C: Implementation Notes & Rollout Plan
+
+This appendix provides critical implementation guidance, failure mode handling, and proof obligations for maintainers.
+
+### Minimal Path Checklist
+
+Critical changes required to fix the deadlock and preserve 0% idle CPU:
+
+| # | Change | Purpose |
+|---|--------|---------|
+| 1 | Edge-trigger flag with atomic operations (`Interlocked.Exchange`) | Race-free interrupt simulation |
+| 2 | Runnable/draining latch (`_inputProcessRunnableOrDraining`) + end-of-drain primitive | Prevent re-signaling during drains |
+| 3 | Hardened idle path using `ManualResetEventSlim` | Proper wake semantics |
+| 4 | Periodic + method-return checks | Interrupt simulation for tight loops |
+| 5 | Basic diagnostics counters | Observable correctness |
+
+**Everything else (move coalescing, fairness ordering, GC masking) can be phased in after the minimal fix is validated.**
+
+### Ordering Contract
+
+Canonical event ordering for fairness and correctness:
+
+| Priority | Event Class | Coalescing |
+|----------|-------------|------------|
+| 1 (highest) | Discrete transitions (mouse/keyboard down/up) | Never |
+| 2 | Wheel/scroll events | Never |
+| 3 | Pointer moves | May coalesce |
+| 4 | Timers | N/A |
+| 5 (lowest) | Low-space interrupts | N/A |
+
+**Rule**: Transitions are never coalesced or reordered. Moves may be coalesced, but only within batch boundaries and never across transitions.
+
+### Failure Mode Guards
+
+| Failure Mode | Detection | Mitigation |
+|--------------|-----------|------------|
+| Storm detected | `SignalToDrainRatio > 1.5` | Auto-disable backward-branch check; log anomaly |
+| Empty drain wakes > threshold | `EmptyDrainWakes > ε/minute` | Log anomaly, degrade gracefully |
+| Latch stuck true | Latch remains true > T ms with InputSemaphore count = 0 | Watchdog clears latch; log diagnostic snapshot |
+| Focus/capture loss | Platform event | Synthetic cancel event overrides subsequent transitions in same batch |
+| Input during masked interrupts | Large burst during GC | On unmask: re-check `HasPendingEvents()` and force single signal |
+| Backpressure overflow | Queue size > soft cap | Aggressive coalescing; drop intermediate moves (stress profile only) |
+
+### Proof Obligations
+
+Each invariant must be observable via diagnostics:
+
+| Invariant | Proof Mechanism |
+|-----------|-----------------|
+| I1 (Edge signaling) | Enqueue→Signal latency histogram; max latency ≤ Δ |
+| I2 (Drain invariant) | Every `SIGNAL_INPUT` paired with `INPUT_DRAIN_COMPLETE`; count equality |
+| I3 (Counting invariant) | At drain end: `ControllerSemaphore.count == MouseEventQueue.size` |
+| I4 (No spurious wake) | `EmptyDrainWakes` counter ≤ ε/minute |
+| I5 (Idle) | `IdleParks` durations show near-0% CPU; no wake without external cause |
+| I6 (Down/up preservation) | Per-button: `Downs − Ups ∈ {0, 1}`; dump last 10 events on violation |
+| I7 (Fairness) | Keyboard latency histogram independent of pointer load; SLO <10ms 99th percentile |
+
+### Profiles & Config Summary
+
+| Profile | Backward Branch | Method Return | Primitive Return | Move Coalescing | Use Case |
+|---------|-----------------|---------------|------------------|-----------------|----------|
+| **Conservative** | ❌ | ❌ | ❌ | ❌ | Rollback/baseline; idle-only signaling |
+| **Responsive** | ✅ | ✅ | ❌ | ✅ | Recommended for interactive use |
+| **Stress** | ✅ | ✅ | ✅ | Aggressive | Testing, high-frequency input |
+
+Profiles are selectable via environment variable `SMALLTALK_EVENT_PROFILE` or config file.
+
+### Rollback & Recovery
+
+| Mechanism | Purpose |
+|-----------|---------|
+| `EnableInterruptSimulation=false` | Disables periodic checks; falls back to idle-only signaling |
+| Health check | If anomalies exceed thresholds twice in one minute, auto-disable aggressive checks |
+| Crash minimization | On invariant breach in release builds: degrade-and-log instead of assert; dump diagnostic snapshot to file |
+
+---
+
+## Appendix D: Phase-by-Phase Rollout Timeline
+
+This appendix provides a **high-level rollout strategy** separating the **urgent fix** (Phase 1) from **robustness** (Phases 2-4), **optimization** (Phases 5-6), and **maintainability** (Phases 7-10).
+
+> **Note**: For detailed technical steps, file names, and code snippets, see the **Implementation Plan** section in the main body of this document. This appendix focuses on rollout phasing, validation criteria, and ship gates.
+
+### Phase 1: Minimal Fix (Critical Path)
+
+**Goal**: Eliminate deadlock and preserve 0% idle CPU.
+
+**Changes**:
+- Implement edge-trigger flag with atomic ops (`Interlocked.Exchange`)
+- Add `_inputProcessRunnableOrDraining` latch + end-of-drain primitive
+- Harden idle path with `ManualResetEventSlim`
+- Add periodic + method-return checks
+- Basic diagnostics counters
+
+**Validation**:
+- [ ] Popup menus work without deadlock
+- [ ] CPU usage ~0% when idle
+- [ ] No missed events in stress test
+
+**Ship criteria**: All validation passes. This is the urgent fix.
+
+---
+
+### Phase 2: Fairness & Ordering
+
+**Goal**: Ensure balanced delivery across event classes.
+
+**Changes**:
+- Explicit event ordering: transitions → wheel → moves
+- Separate logical queues for keyboard vs pointer
+- Preserve down/up transitions exactly; coalesce only moves
+
+**Validation**:
+- [ ] Keyboard latency histogram shows <10 ms even under pointer bursts
+- [ ] Down/up balance invariant holds (I6)
+
+---
+
+### Phase 3: Interrupt Masking & GC Safety
+
+**Goal**: Prevent unsafe signaling during GC or long primitives.
+
+**Changes**:
+- Add `_interruptsMaskedCounter`
+- On unmask, force consolidated signal if events pending
+- Scheduler hook clears latch on context switch away from InputProcess
+
+**Validation**:
+- [ ] GC under load test: single consolidated wake post-GC
+- [ ] No invariant breaches during long primitive execution
+
+---
+
+### Phase 4: OS Integration Edge Cases
+
+**Goal**: Handle focus/capture loss, suspend/resume gracefully.
+
+**Changes**:
+- Synthetic cancel event on focus/capture loss
+- Resume handler re-arms edge flag and forces signal if events pending
+
+**Validation**:
+- [ ] Popup menus cancel cleanly on ESC or focus loss
+- [ ] First post-resume input delivered correctly
+
+---
+
+### Phase 5: Backpressure & Coalescing
+
+**Goal**: Prevent memory ballooning under extreme load.
+
+**Changes**:
+- Soft cap on pending moves (default 100)
+- Aggressive coalescing/dropping only in "stress" profile
+- Log `CoalescedMoves` and `DroppedMoves` metrics
+
+**Validation**:
+- [ ] Stress test shows bounded queue size
+- [ ] Normal profile preserves UX (no jitter)
+
+---
+
+### Phase 6: Diagnostics Expansion
+
+**Goal**: Make invariants observable and provable.
+
+**Changes**:
+- Latency histograms (enqueue→signal, signal→wake)
+- Per-button down/up counters
+- Rolling trace buffer for last N events
+
+**Validation**:
+- [ ] Proof obligations (I1-I7) verifiable via logs
+- [ ] Storm detection ratio ~1.0 under burst
+
+---
+
+### Phase 7: Profiles & Config
+
+**Goal**: Allow runtime tuning.
+
+**Changes**:
+- Profiles: Conservative, Responsive, Stress
+- Feature toggles for check sites and coalescing
+- Environment variable and config file support
+
+**Validation**:
+- [ ] Switching profiles logs marker; traces show context
+- [ ] Conservative profile matches legacy idle-only behavior
+
+---
+
+### Phase 8: Failure Mode Guards
+
+**Goal**: Degrade gracefully under anomalies.
+
+**Changes**:
+- Auto-disable backward-branch check if spurious wakes exceed threshold
+- Watchdog clears stuck latch after T ms
+- Degrade-and-log instead of assert in release builds
+
+**Validation**:
+- [ ] Health check triggers under synthetic anomaly injection
+- [ ] System continues without crash
+
+---
+
+### Phase 9: Consumer API Standardization
+
+**Goal**: Enforce canonical drain patterns.
+
+**Changes**:
+- Add `Sensor>>hasKeyboardEvent`, `nextKeyboardEvent`, `hasPointerEvent`, `nextPointerEvent`
+- Forbid direct queue peeks outside sanctioned APIs
+- Add `Sensor>>safeWaitAndProcessOne` for legacy migration
+
+**Validation**:
+- [ ] Legacy consumers migrated to APIs
+- [ ] No underflow/overflow mismatches
+
+---
+
+### Phase 10: Regression & Long-Term Tests
+
+**Goal**: Ensure stability across all workloads.
+
+**Tests**:
+- [ ] BlockContextTest returns 1191
+- [ ] Timer/Delay correctness
+- [ ] Keyboard autorepeat preserved
+- [ ] Hover/drag threshold behavior correct
+- [ ] Suspend/resume, focus loss, nested menus
+
+**Validation**:
+- [ ] All invariants hold
+- [ ] CPU overhead <0.1% active, ~0% idle
+
+---
+
+### Rollout Summary
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ URGENT FIX                                                      │
+│ Phase 1: Minimal Fix → Fixes deadlock, preserves 0% idle       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ ROBUSTNESS                                                      │
+│ Phase 2: Fairness & Ordering                                   │
+│ Phase 3: Interrupt Masking & GC Safety                         │
+│ Phase 4: OS Integration Edge Cases                             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ OPTIMIZATION                                                    │
+│ Phase 5: Backpressure & Coalescing                             │
+│ Phase 6: Diagnostics Expansion                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ MAINTAINABILITY                                                 │
+│ Phase 7: Profiles & Config                                     │
+│ Phase 8: Failure Mode Guards                                   │
+│ Phase 9: Consumer API Standardization                          │
+│ Phase 10: Regression & Long-Term Tests                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Appendix E: State Diagrams and Configuration
+
+This appendix provides visual state diagrams and detailed configuration code for the event architecture.
+
+> **Note**: For a summary of configuration profiles, see **Appendix C: Profiles & Config Summary**. This appendix contains the detailed implementation code.
 
 ### VM Interrupt State Machine
 
