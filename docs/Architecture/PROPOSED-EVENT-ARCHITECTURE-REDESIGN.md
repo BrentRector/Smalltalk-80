@@ -1,7 +1,7 @@
 # Proposed Event Architecture Redesign
 
 **Date**: 2025-12-04
-**Status**: PROPOSAL (v2 - with expert feedback integrated)
+**Status**: PROPOSAL (v3 - with nested blocking loop patterns)
 **Authors**: Collaborative analysis by multiple expert agents
 
 ---
@@ -34,6 +34,20 @@ The current event handling architecture has a **critical priority inversion bug*
 
 ---
 
+## Core Guarantees for Nested Blocking Loops
+
+The design must let Smalltalk processes synchronously await controller input without burning CPU, while ensuring the InputProcess can always preempt, drain, and deliver events.
+
+| Guarantee | Description |
+|-----------|-------------|
+| **Preemption** | InputProcess (priority 6) must be able to preempt any active controller process (priority 4) when input arrives |
+| **Deterministic delivery** | Every enqueued input event is translated into exactly one Smalltalk-level event and signaled to controllers without loss or duplication |
+| **Blocking semantics** | Smalltalk code using `waitForControllerEvent` can block on a Semaphore and wake when relevant events exist, without busy-waiting |
+| **No spurious wake storms** | InputSemaphore is edge-triggered; one signal wakes the InputProcess to drain the entire event batch, then it re-arms |
+| **Nest-safe consumption** | Nested loops (popup inside another interaction) see the same consistent event stream and can block without starving the InputProcess |
+
+---
+
 ## Design Principles
 
 ### 1. Edge-Triggered, Idempotent Signaling
@@ -56,11 +70,18 @@ Periodic check (VM thread):
     SignalInputSemaphore()          // One signal per batch
 ```
 
-### 2. Full Queue Drain Per Wake
+### 2. Full Queue Drain Per Wake (InputProcess Drain Invariant)
 
 **Problem**: If InputProcess only processes one event per wake, and multiple events arrive, semaphore counts inflate and create unnecessary context switches.
 
 **Solution**: InputProcess drains the entire queue before waiting again:
+
+**Drain-all policy**: The InputProcess, upon waking, must:
+1. Dequeue all pending OS events
+2. Translate each to Smalltalk Mouse/Keyboard events
+3. Signal ControllerSemaphore once per translated event
+
+**Return-to-wait**: When the queue becomes empty, the InputProcess waits on InputSemaphore. No further VM signaling occurs until the flag is re-armed by new arrivals.
 
 ```smalltalk
 InputState>>run
@@ -71,6 +92,7 @@ InputState>>run
             self processOneEvent.
             self enqueueMouseEventIfNeeded.
             ControllerSemaphore signal].
+        "Queue empty - return to wait; flag will be re-armed by next enqueue"
     ]
 ```
 
@@ -268,6 +290,113 @@ Controller>>eventLoop
 
 ---
 
+## Smalltalk-Level Patterns for Blocking Loops
+
+This section documents canonical patterns for Smalltalk code that needs to block and wait for input events without burning CPU.
+
+### Popup Menu Nested Loop (Canonical Pattern)
+
+The popup menu is the primary example of a nested blocking input loop. The menu appears while another controller is active, and must track mouse movement and detect button release.
+
+**Loop structure**:
+1. **Block**: `waitForControllerEvent` (which internally waits on ControllerSemaphore)
+2. **Drain**: Fetch all available controller events (mouse move, button up/down)
+3. **State update**: Track menu selection highlight and "armed" states
+4. **Exit condition**: On yellow-button up within a highlighted item, exit with selection; otherwise continue to block
+
+**No polling**: Never spin-check `anyButtonPressed` without a blocking wait.
+
+```smalltalk
+PopUpMenu>>startUp: aSymbol
+    "Display and make a selection from the receiver as long as the button
+     denoted by the symbol, aSymbol, is pressed. Answer the current selection.
+     Uses event-driven blocking (0% idle CPU) instead of busy-wait polling."
+
+    self displayAt: Sensor cursorPoint
+        during: [
+            "Wait for initial button press"
+            [self buttonPressed: aSymbol] whileFalse: [
+                Sensor waitForControllerEvent].
+            "Track while button held"
+            [self buttonPressed: aSymbol] whileTrue: [
+                self manageMarker.
+                Sensor waitForControllerEvent]].
+    ^selection
+```
+
+### Other Nested Interactions (Dialogs, Drag Loops, Selection Trackers)
+
+Use the same pattern:
+1. Block on `waitForControllerEvent`
+2. Drain and interpret events into the local state machine
+3. Update visual feedback
+4. Check exit conditions
+
+```smalltalk
+"Drag loop example"
+Controller>>trackDrag
+    | ev |
+    [true] whileTrue: [
+        Sensor waitForControllerEvent.
+        ev := Sensor nextMouseEvent.
+        ev isNil ifTrue: [^self].
+        ev kind = #move ifTrue: [self updateDragTo: ev position].
+        (ev kind = #up and: [ev button = #yellow]) ifTrue: [
+            ^self finalizeDrag]]
+
+"Wait for button release"
+InputSensor>>waitNoButton
+    "Wait for the user to release any mouse button.
+     Uses event-driven blocking (0% CPU) instead of busy-wait polling."
+    [self anyButtonPressed] whileTrue: [self waitForControllerEvent].
+    ^self cursorPoint
+
+"Wait for button press"
+InputSensor>>waitButton
+    "Wait for the user to press any mouse button.
+     Uses event-driven blocking (0% CPU) instead of busy-wait polling."
+    [self anyButtonPressed] whileFalse: [self waitForControllerEvent].
+    ^self cursorPoint
+```
+
+### Avoiding Dual Waits
+
+If your loop sometimes waits on additional semaphores (e.g., timer), multiplex through a single controller event demultiplexer, or use separate waits with clear priority assumptions. The InputProcess must remain the sole producer of controller signals for input.
+
+---
+
+## Reentrancy and Priority Safety
+
+### Priority Discipline
+
+| Process | Priority | Role |
+|---------|----------|------|
+| InputProcess | 6 (lowIOPriority) | Sole producer of controller signals for input |
+| Controllers | 4 (userSchedulingPriority) | Consumers of mouse/keyboard events |
+| Background | 1 (systemRockBottomPriority) | Idle sentinel |
+
+**Rule**: Only the InputProcess should run at priority 6; controller code runs at priority 4 or below. This ensures preemption works and prevents controller code from starving input.
+
+### No Heap Access from UI Thread
+
+The UI thread enqueues raw events and arms the flag; it **never** touches Smalltalk heap or semaphores.
+
+| Thread | Can Access | Cannot Access |
+|--------|------------|---------------|
+| UI (WinForms) | `_eventQueue`, `_inputInterruptPending` flag, `_idleWaitHandle` | Smalltalk heap, Smalltalk semaphores |
+| VM (Smalltalk) | Everything | (owns all state) |
+
+### Idempotent Signaling
+
+Because InputSemaphore is used as an interrupt gate, treat it as **"wake to drain"** rather than "one signal per event." The ControllerSemaphore remains strictly **one signal per event** to preserve counting semantics.
+
+| Semaphore | Signaling Semantics |
+|-----------|---------------------|
+| InputSemaphore | Edge-triggered gate: "wake to drain entire batch" |
+| ControllerSemaphore | Counting: "one signal per translated event" |
+
+---
+
 ## Check Placement Strategy
 
 ### Recommended Check Points
@@ -308,14 +437,18 @@ case Bytecode.Return:
 
 ## Diagnostics and Validation
 
+These diagnostics protect blocking semantics and help identify protocol violations.
+
 ### Counters (for performance monitoring)
 
 ```csharp
 // VM diagnostic counters
 public class EventDiagnostics
 {
-    public long InputInterruptsSignaled;     // VM → InputSemaphore signals
-    public long InputBatchesDrained;         // InputProcess drain cycles
+    // Core flow counters
+    public long InputInterruptsSignaled;     // Edge-trigger signals to InputSemaphore
+    public long InputBatchesDrained;         // Number of full drains by InputProcess
+    public long ControllerSignalsEmitted;    // Signals sent to ControllerSemaphore (must equal translated events)
     public long EventsProcessed;             // Total events through queue
     public long IdleParks;                   // Times VM entered idle
     public long IdleWakes;                   // Times WaitAny returned
@@ -326,6 +459,12 @@ public class EventDiagnostics
     // Anomaly detection
     public long EmptyDrainWakes;             // InputProcess woke but queue empty (bug indicator)
     public long MissedFlagSets;              // HasPendingEvents true but flag false (race indicator)
+    public long ControllerSemaphoreUnderflows; // Consumer wait but no events (mismatch indicator)
+
+    // Latency probes
+    public long LastEnqueueTimestamp;        // Timestamp on enqueue
+    public long LastInputWakeTimestamp;      // Timestamp when InputProcess wakes
+    public long MaxEnqueueToWakeLatency;     // Max observed latency
 }
 ```
 
@@ -346,6 +485,24 @@ TraceEventFlow("SIGNAL_INPUT", excessSignals);
 TraceEventFlow("INPUT_WAKE", queueSize);
 TraceEventFlow("INPUT_DRAIN_COMPLETE", eventsProcessed);
 TraceEventFlow("CTRL_SIGNAL", mouseEventSeq);
+
+// Nested loop audit: trace when controller process blocks and wakes
+TraceEventFlow("CTRL_BLOCK", processId, semaphoreId);
+TraceEventFlow("CTRL_WAKE", processId, semaphoreId, eventsPending);
+```
+
+### Latency Measurement
+
+Timestamp on enqueue and InputProcess wake to ensure consistent preemption under tight VM loops:
+
+```csharp
+// In Enqueue:
+_diagnostics.LastEnqueueTimestamp = Stopwatch.GetTimestamp();
+
+// In InputProcess wake (Smalltalk or VM hook):
+var wakeTime = Stopwatch.GetTimestamp();
+var latency = wakeTime - _diagnostics.LastEnqueueTimestamp;
+_diagnostics.MaxEnqueueToWakeLatency = Math.Max(_diagnostics.MaxEnqueueToWakeLatency, latency);
 ```
 
 ### Assertions (debug builds)
@@ -549,6 +706,29 @@ Debug.Assert(
 
 ---
 
+## Minimal Code Changes Summary
+
+### VM Changes (C#)
+
+| Component | Change |
+|-----------|--------|
+| `VirtualMachine.cs` | Add `_inputInterruptPending` volatile flag |
+| `VirtualMachine.cs` | Add `CheckAndSignalPendingEvents()` with edge semantics |
+| `VirtualMachine.cs` | Call check at periodic counter and two strategic yield points (backward branch, method return) |
+| `VirtualMachine.cs` | Ensure idle path uses single wake-to-signal pattern with full drain by InputProcess |
+| `SmalltalkEventQueue.cs` | Set `_inputInterruptPending = true` on enqueue (via callback or shared reference) |
+
+### Smalltalk Changes
+
+| Component | Change |
+|-----------|--------|
+| `InputSensor>>waitForControllerEvent` | Ensure blocks on ControllerSemaphore (already correct) |
+| `InputState>>run` | Verify drains entire queue per wake (already correct) |
+| `PopUpMenu`, trackers, dialogs | Refactor loops to drain events on wake and avoid busy waiting |
+| Consumer state machines | Document so multiple events per wake are correctly handled and exit conditions are explicit |
+
+---
+
 ## Comparison with Current Implementation
 
 ### Benefits
@@ -632,7 +812,9 @@ InputProcess at priority 6 naturally preempts controllers at priority 4 when sig
 
 ## Conclusion
 
-This refined design addresses all identified gaps:
+This refined design addresses all identified gaps and provides robust support for nested blocking input loops:
+
+### Core Design Achievements
 
 1. ✅ **Edge-triggering**: `_inputInterruptPending` flag ensures idempotent signaling
 2. ✅ **No count inflation**: One signal per batch, InputProcess drains fully
@@ -641,5 +823,12 @@ This refined design addresses all identified gaps:
 5. ✅ **Latency control**: Strategic check points catch tight loops
 6. ✅ **Count invariant**: ControllerSemaphore count == MouseEventQueue size
 7. ✅ **Diagnostics**: Counters, traces, and assertions for validation
+
+### Nested Blocking Loop Support
+
+8. ✅ **Preemption guarantee**: InputProcess (priority 6) preempts controllers (priority 4) on event arrival
+9. ✅ **Blocking semantics**: `waitForControllerEvent` blocks without busy-waiting
+10. ✅ **Nest-safe consumption**: Popup menus, dialogs, and trackers share consistent event stream
+11. ✅ **Priority discipline**: Clear separation of InputProcess (producer) and Controllers (consumers)
 
 **Recommendation**: Proceed with implementation following the phased plan, with checkpoint gates ensuring correctness before performance optimization.
