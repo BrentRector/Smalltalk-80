@@ -1,7 +1,7 @@
 # Proposed Event Architecture Redesign
 
 **Date**: 2025-12-04
-**Status**: PROPOSAL (v3 - with nested blocking loop patterns)
+**Status**: PROPOSAL (v4 - with concurrency hardening and formal invariants)
 **Authors**: Collaborative analysis by multiple expert agents
 
 ---
@@ -48,26 +48,87 @@ The design must let Smalltalk processes synchronously await controller input wit
 
 ---
 
+## Formal Invariants
+
+These are the "canonical truths" that maintainers must rely on. Check them in debug builds.
+
+### I1: Edge Signaling Invariant
+
+For any interval where the producer queue transitions from empty→non-empty at time t, the VM will signal InputSemaphore at least once in (t, t + Δ], with Δ bounded by the largest check latency.
+
+**Enforced by**: Periodic check, backward branch check, method return check
+
+### I2: Drain Invariant
+
+Each InputSemaphore wake is followed by a complete drain of the producer queue before the InputProcess waits again.
+
+**Enforced by**: InputProcess loop structure in `InputState>>run`
+
+### I3: Counting Invariant
+
+ControllerSemaphore.count equals the number of controller events available to consumers; this holds across all nested blocking consumers.
+
+**Enforced by**: InputProcess signals exactly once per translated event; consumers wait once per event consumed
+
+### I4: No-Spurious-Wake Invariant
+
+The number of times InputProcess wakes to find zero events is ≤ ε per minute under normal operation (ε small, e.g., 1).
+
+**Enforced by**: Edge-triggered flag prevents re-signaling during drain
+
+### I5: Idle Invariant
+
+When the active process is the background process and there are no pending events or timers, CPU usage is ~0%; the VM remains parked until the next interrupt.
+
+**Enforced by**: `WaitHandle.WaitAny` in idle path with proper flag guards
+
+---
+
 ## Design Principles
 
 ### 1. Edge-Triggered, Idempotent Signaling
 
 **Problem with level-triggered approach**: Re-signaling InputSemaphore at every periodic check while events are pending causes unnecessary wakeups if InputProcess is already runnable or draining. This inflates semaphore counts and creates wake cycles with no new work.
 
-**Solution**: Use a VM-local flag `_inputInterruptPending` that:
-- Is set to `true` by the UI thread on enqueue (edge-arm)
+**Solution**: Use a VM-local atomic flag `_inputInterruptPendingInt` that:
+- Is set atomically by the UI thread on enqueue (edge-arm)
 - Is checked and cleared atomically by the periodic check
 - Ensures exactly one InputSemaphore signal per event batch
+
+**Gap: volatile bool is not sufficient** for multi-threaded edge semantics if the UI thread and VM thread race; you can get lost edges or double-clears.
+
+**Fix: Use atomic operations** to make the "arm once, clear once" behavior explicit:
 
 ```
 Enqueue (UI thread):
   queue.Add(event)
-  _inputInterruptPending = true  // Edge-arm; idempotent if already true
+  Interlocked.Exchange(ref _inputInterruptPendingInt, 1)  // Edge-arm; atomic
 
 Periodic check (VM thread):
-  if (_inputInterruptPending && HasPendingEvents()):
-    _inputInterruptPending = false  // Clear BEFORE signal
-    SignalInputSemaphore()          // One signal per batch
+  if (HasPendingEvents() && Interlocked.Exchange(ref _inputInterruptPendingInt, 0) == 1):
+    SignalInputSemaphore()  // One signal per batch
+```
+
+This assures one signal per batch regardless of write reordering or concurrent writes; it also prevents the VM thread from clearing a freshly armed edge before signaling.
+
+### 1a. "Already Runnable" Guard
+
+**Gap**: You may re-signal InputSemaphore while the InputProcess is runnable (or mid-drain), causing count inflation and redundant preemption.
+
+**Fix**: Track a VM-local boolean `_inputProcessRunnableOrDraining`. Only signal if it's false.
+- Set `true` immediately before signaling
+- Set `false` when InputProcess parks (after full drain)
+
+The InputProcess calls a primitive at the end of its drain to notify the VM:
+
+```
+VM side:
+  _inputProcessRunnableOrDraining = true  // before signal
+  SignalInputSemaphore()
+
+InputProcess (Smalltalk):
+  "At end of drain, tell VM we are parking again"
+  self primInputDrainComplete  // primitive clears the flag
 ```
 
 ### 2. Full Queue Drain Per Wake (InputProcess Drain Invariant)
@@ -121,41 +182,108 @@ Idle wait:
 **Solution**: Add checks at strategic yield points:
 1. **Periodic counter** (every 1000 bytecodes) - baseline
 2. **Backward branch** (relative jumps to lower IP) - catches tight loops
-3. **Method return** (send/return boundaries) - natural yield point
+3. **After non-trivial primitives** (display, arithmetic bursts)
+4. **After context switch operations** (sends that switch active process)
+
+**Config**: Make each check site enable/disable via flags for tuning.
+
+### 5. Event Batching, Coalescing, and Fairness
+
+#### Mouse Move Coalescing
+
+**Gap**: High-frequency motion floods the queue with redundant moves, bloating ControllerSemaphore counts and increasing wake loops for consumers.
+
+**Fix**: Coalesce consecutive `#move` events:
+- In the producer: if last queued event is a move, update its position instead of enqueueing a new item
+- In the InputProcess drain: collapse multiple moves into the latest point for the same button state before signaling controllers
+
+**Policy**: Maintain ordering of button transitions; moves can be squashed as long as they don't skip over transitions.
+
+#### Batch Signaling Rate Limiting
+
+**Gap**: Very high enqueue rates could make the VM oscillate at the boundary of drains even with edge-triggering.
+
+**Fix**: After signaling InputSemaphore, throttle new signals during the current drain window:
+- Keep `_inputProcessRunnableOrDraining = true` until the drain completes
+- UI thread continues enqueueing, but signals only resume once the InputProcess parks
+
+#### Keyboard Fairness
+
+**Gap**: Keyboard events and pointer events share one ControllerSemaphore but may have different urgency. Pointer move coalescing risks starving keypress delivery.
+
+**Fix**: Use separate logical queues for keyboard and mouse, but one ControllerSemaphore. The InputProcess drain alternates or prioritizes discrete transitions first (down/up) before bulk moves.
+
+### 6. Timer and Input Ordering
+
+**Gap**: Timer signaling can race with input signaling and reorder events in a way that surprises controllers.
+
+**Fix**: Enforce ordering: perform input signaling before timer signaling inside each periodic cycle, or vice versa, but document and assert it.
+
+**Rule**: "User input preempts timers" - input signaling occurs first in each check cycle.
+
+### 7. Low-Space and GC Interactions
+
+#### Interrupt Precedence
+
+**Gap**: Blue Book mentions low-space interrupt; if added later, its signal can starve input or vice versa.
+
+**Fix**: Define a precedence order:
+1. Input (highest urgency for UI responsiveness)
+2. Timer
+3. Low-space
+
+Consider delivering low-space to a dedicated handler at priority 7 so it preempts input only when necessary.
+
+#### GC-Safe Signaling
+
+**Gap**: If GC compacts while input arrives, ensure the InputProcess wake isn't delivered mid-compaction with heap locks held.
+
+**Fix**: Block input signaling during GC critical sections and re-arm the edge flag afterward; then perform a single signal post-GC.
 
 ---
 
 ## Detailed Architecture
 
-### Interrupt Flag Design
+### Interrupt Flag Design (Atomic)
 
 ```csharp
-// VM-local state
-private volatile bool _inputInterruptPending;
+// VM-local state - use int for Interlocked operations
+private int _inputInterruptPendingInt;  // 0 or 1
+private bool _inputProcessRunnableOrDraining;
+private readonly ManualResetEventSlim _idleWake = new ManualResetEventSlim(false);
 
 // UI thread (producer)
 public void EnqueueEvent(SmalltalkEvent evt)
 {
     _eventQueue.Enqueue(evt);
-    _inputInterruptPending = true;  // Edge-arm; idempotent
+    Interlocked.Exchange(ref _inputInterruptPendingInt, 1);  // Edge-arm; atomic
 
     // Preserve idle wake path
     if (_isIdle)
-        _idleWaitHandle.Set();
+        _idleWake.Set();
 }
 
 // VM thread (periodic check)
 private void CheckAndSignalPendingEvents()
 {
-    if (_platformBridge == null)
+    if (_platformBridge == null || !_platformBridge.HasPendingEvents())
         return;
 
-    // Edge-triggered: only signal once per pending batch
-    if (_inputInterruptPending && _platformBridge.HasPendingEvents())
+    // Edge-triggered with "already runnable" guard
+    if (Interlocked.Exchange(ref _inputInterruptPendingInt, 0) == 1
+        && !_inputProcessRunnableOrDraining)
     {
-        _inputInterruptPending = false;  // Clear BEFORE signal
+        _inputProcessRunnableOrDraining = true;  // Latch until drain completes
         SignalInputSemaphoreIfRegistered();
+        _diagnostics.InputInterruptsSignaled++;
     }
+}
+
+// Called by InputProcess via primitive when drain completes
+public void InputDrainComplete()
+{
+    _inputProcessRunnableOrDraining = false;
+    _diagnostics.InputBatchesDrained++;
 }
 ```
 
@@ -195,48 +323,60 @@ Consumer drains MouseEventQueue
 ✅ No deadlock, no wasted wakes, no lost events
 ```
 
-### Idle Path (Corrected)
+### Idle Path (Hardened with ManualResetEventSlim)
 
 ```csharp
 private void EnterIdleWait(SmalltalkOOP backgroundProcess)
 {
     while (true)
     {
-        // Check timers first
+        // Check timers first (input before timer per ordering rule)
+        CheckAndSignalPendingEvents();
         CheckAndSignalExpiredTimer();
 
         // Exit if process switch occurred
         if (GetActiveProcess() != backgroundProcess)
             return;
 
-        // Guard: don't park if interrupt pending
-        if (_inputInterruptPending || _platformBridge.HasPendingEvents())
+        // Guard: don't park if events pending
+        // Use HasPendingEvents() as truth source, atomic flag prevents multiple signals
+        if (_platformBridge.HasPendingEvents())
         {
-            // Signal and continue (don't park with pending work)
-            if (_inputInterruptPending)
+            // Self-heal: if flag is 0 but events pending, re-arm and signal
+            if (Interlocked.Exchange(ref _inputInterruptPendingInt, 0) == 1
+                && !_inputProcessRunnableOrDraining)
             {
-                _inputInterruptPending = false;
+                _inputProcessRunnableOrDraining = true;
                 SignalInputSemaphoreIfRegistered();
             }
             continue;
         }
 
         // Safe to park - no pending work
-        int waitResult = WaitHandle.WaitAny(handles);
+        _isIdle = true;
+        _idleWake.Wait(ShutdownToken);  // Blocks here (0% CPU)
+        _idleWake.Reset();  // Explicit reset for ManualResetEventSlim
+        _isIdle = false;
 
-        if (waitResult == 0)  // Event handle
+        // Single wake for entire batch
+        if (_platformBridge.HasPendingEvents() &&
+            Interlocked.Exchange(ref _inputInterruptPendingInt, 0) == 1 &&
+            !_inputProcessRunnableOrDraining)
         {
-            // Single wake for entire batch
-            if (_inputInterruptPending)
-            {
-                _inputInterruptPending = false;
-                SignalInputSemaphoreIfRegistered();
-            }
+            _inputProcessRunnableOrDraining = true;
+            SignalInputSemaphoreIfRegistered();
         }
-        // ... timer and shutdown handling
+
+        // Timer handling continues in loop...
     }
 }
 ```
+
+**Key changes**:
+- Uses `ManualResetEventSlim` with explicit `Reset()` after wake
+- Atomic flag operations prevent lost edges and double-clears
+- `HasPendingEvents()` is the truth source; flag prevents re-signaling
+- Self-healing guard catches edge cases in release builds
 
 ---
 
@@ -266,8 +406,13 @@ private void EnterIdleWait(SmalltalkOOP backgroundProcess)
 
 ### Consumer Protocol
 
-Consumers MUST treat ControllerSemaphore count as a **wake budget**, not a single wake:
+Consumers MUST treat ControllerSemaphore count as a **wake budget**, not a single wake.
 
+#### Two Canonical Consumer Patterns
+
+**Gap**: Mixing patterns without a contract can cause subtle bugs.
+
+**Pattern 1: Wake-once, process-one** (for state machines that require stepwise transitions):
 ```smalltalk
 Controller>>eventLoop
     [self isActive] whileTrue: [
@@ -276,7 +421,7 @@ Controller>>eventLoop
     ]
 ```
 
-If consumer needs to drain multiple events per iteration:
+**Pattern 2: Wake-once, drain-many** (for trackers/menus):
 ```smalltalk
 Controller>>eventLoop
     [self isActive] whileTrue: [
@@ -287,6 +432,14 @@ Controller>>eventLoop
         ]
     ]
 ```
+
+**Contract**: Consumers must not assume a wake delivers exactly one event; they must confirm queue state explicitly. Use `Sensor hasMouseEvent` and `Sensor nextMouseEvent` as the sanctioned API.
+
+#### Popup Menu State Machine Guards
+
+**Gap**: On yellow-button up, ensure selection resolution is atomic relative to concurrent mouse moves queued after the up.
+
+**Fix**: In the drain, process events in arrival order and resolve selection immediately upon yellow-up; subsequent moves in the same batch must not override selection. Document this in the popup's state machine.
 
 ---
 
@@ -514,19 +667,66 @@ Debug.Assert(
     "InputProcess signaled but queue was empty - interrupt flag race?"
 );
 
-// Edge-trigger correctness
-if (!_inputInterruptPending && _platformBridge.HasPendingEvents() && InputProcessIsBlocked())
-{
-    Debug.Fail("Events pending but flag not set and InputProcess blocked - missed edge");
-    _inputInterruptPending = true;  // Self-heal
-    SignalInputSemaphoreIfRegistered();
-}
-
-// Count invariant
+// Count invariant (I3)
 Debug.Assert(
     ControllerSemaphoreCount == MouseEventQueueSize,
     $"Count mismatch: semaphore={ControllerSemaphoreCount}, queue={MouseEventQueueSize}"
 );
+```
+
+### Promoted Guards (release builds)
+
+These assertions are promoted to corrective paths in release mode:
+
+```csharp
+// Self-healing missed edge guard
+// Promotes assertion to corrective action in release builds
+private void CheckAndHealMissedEdge()
+{
+    if (_platformBridge.HasPendingEvents() &&
+        Interlocked.CompareExchange(ref _inputInterruptPendingInt, 1, 0) == 0 &&
+        InputProcessIsBlocked())
+    {
+        // Edge was missed - self-heal by arming and signaling
+        _diagnostics.MissedFlagSets++;
+        if (!_inputProcessRunnableOrDraining)
+        {
+            _inputProcessRunnableOrDraining = true;
+            SignalInputSemaphoreIfRegistered();
+        }
+    }
+}
+
+// Spurious wake guard
+// If InputProcess wakes to empty queue too often, disable non-essential check sites
+private void TrackSpuriousWake(bool queueWasEmpty)
+{
+    if (queueWasEmpty)
+    {
+        _diagnostics.EmptyDrainWakes++;
+        if (_diagnostics.EmptyDrainWakes > EventConfig.SpuriousWakeThresholdPerMinute)
+        {
+            // Too many spurious wakes - disable aggressive checks
+            EventConfig.EnableBackwardBranchCheck = false;
+            Console.WriteLine("[WARN] Spurious wakes exceeded threshold - disabling backward branch check");
+        }
+    }
+}
+```
+
+### Storm Detector
+
+Detects if signaling is happening during drains (indicates re-signaling bug):
+
+```csharp
+// Storm detection metric
+// If InputInterruptsSignaled / InputBatchesDrained deviates from ~1.0 under burst,
+// you're re-signaling during drains
+public double SignalTodrainRatio =>
+    InputBatchesDrained == 0 ? 0 : (double)InputInterruptsSignaled / InputBatchesDrained;
+
+// Should be close to 1.0; > 1.5 indicates potential storm
+public bool StormDetected => SignalToDrainRatio > 1.5 && InputBatchesDrained > 10;
 ```
 
 ---
@@ -758,36 +958,53 @@ Debug.Assert(
 
 | Thread | Can Access | Cannot Access |
 |--------|------------|---------------|
-| UI (WinForms) | `_eventQueue`, `_inputInterruptPending` flag, `_idleWaitHandle` | Smalltalk heap, Smalltalk semaphores |
+| UI (WinForms) | `_eventQueue`, `_inputInterruptPendingInt` flag, `_idleWake` handle | Smalltalk heap, Smalltalk semaphores |
 | VM (Smalltalk) | Everything | (owns all state) |
 
 ### Atomic Operations
 
 | Operation | Atomicity | Notes |
 |-----------|-----------|-------|
-| `_inputInterruptPending = true` | Volatile write | UI thread only sets true |
-| `_inputInterruptPending = false` | Volatile write | VM thread only sets false |
+| `Interlocked.Exchange(ref _inputInterruptPendingInt, 1)` | Atomic | UI thread arms flag |
+| `Interlocked.Exchange(ref _inputInterruptPendingInt, 0)` | Atomic | VM thread clears flag (returns previous value) |
 | `_eventQueue.Enqueue()` | Thread-safe | ConcurrentQueue |
 | `_eventQueue.TryDequeue()` | Thread-safe | ConcurrentQueue |
 | `SignalSemaphore()` | VM thread only | No cross-thread access |
+| `_idleWake.Set()` | Thread-safe | ManualResetEventSlim |
+| `_idleWake.Reset()` | VM thread only | After wake, before repark |
+
+### PlatformBridge Contract Clarity
+
+**Gap**: `HasPendingEvents()` semantics must be precise: does it reflect the producer queue, the VM-visible queue, or both?
+
+**Definition**:
+- `HasPendingEvents()` checks the producer queue (UI thread queue)
+- `TryDequeue()` drains from a lock-free queue accessible to the VM thread
+- If you have a staging buffer, ensure no time window exists where `HasPendingEvents()` is false while items are in the staging buffer
+
+### Idle Handle Semantics
+
+**Gap**: Multiple `Set()` calls before a `WaitAny()` can stack differently depending on handle type.
+
+**Fix**: Use `ManualResetEventSlim` for wake gating in idle, and explicitly `Reset()` after the VM handles the wake, with the edge flag preventing re-signal loops.
 
 ### Race Condition Analysis
 
 **Scenario**: UI thread enqueues while VM thread checks flag
 
 ```
-UI thread:              VM thread:
-_queue.Enqueue(e)       if (_flag && HasPending())
-_flag = true               _flag = false
-                           Signal()
+UI thread:                              VM thread:
+_queue.Enqueue(e)                       if (HasPending() &&
+Interlocked.Exchange(_flag, 1)             Interlocked.Exchange(_flag, 0) == 1)
+                                               Signal()
 ```
 
-**Result**: Safe. Either:
-1. VM sees flag=true before UI sets it → misses this batch → UI sets flag → next check catches it
-2. VM sees flag=true after UI sets it → processes batch correctly
-3. Flag set racing with clear → worst case: extra wake on next check (harmless)
+**Result**: Safe with Interlocked operations. Either:
+1. VM clears flag before UI sets it → UI sets flag → next check catches it
+2. VM clears flag after UI sets it → returns 1 → signal fires correctly
+3. Both racing → Interlocked guarantees exactly one Exchange returns 1
 
-**Self-healing assertion** catches case where events pile up with flag=false.
+**Self-healing guard** (in release builds) catches case where events pile up with flag=0 and InputProcess blocked.
 
 ---
 
@@ -810,19 +1027,135 @@ InputProcess at priority 6 naturally preempts controllers at priority 4 when sig
 
 ---
 
+## Appendix C: State Diagrams and Configuration
+
+### VM Interrupt State Machine
+
+```
+                  ┌─────────┐
+                  │  IDLE   │◄──────────────────┐
+                  │ (parked)│                   │
+                  └────┬────┘                   │
+                       │ WaitAny returns        │
+                       ▼                        │
+                  ┌─────────┐                   │
+                  │  ARMED  │                   │
+                  │(flag=1) │                   │
+                  └────┬────┘                   │
+                       │ CheckAndSignal         │
+                       │ clears flag            │
+                       ▼                        │
+                  ┌─────────┐                   │
+                  │SIGNALED │                   │
+                  │(runnable│                   │
+                  │ latched)│                   │
+                  └────┬────┘                   │
+                       │ InputProcess           │
+                       │ gains CPU              │
+                       ▼                        │
+                  ┌─────────┐                   │
+                  │DRAINING │                   │
+                  │(full    │                   │
+                  │ drain)  │                   │
+                  └────┬────┘                   │
+                       │ primInputDrainComplete │
+                       │ clears latch           │
+                       └────────────────────────┘
+```
+
+### Popup Menu State Machine
+
+```
+                  ┌──────────────┐
+                  │   DISPLAY    │
+                  │ (show menu)  │
+                  └──────┬───────┘
+                         │
+                         ▼
+                  ┌──────────────┐
+             ┌───►│ WAIT_BUTTON  │◄───┐
+             │    │ (block on    │    │
+             │    │  semaphore)  │    │
+             │    └──────┬───────┘    │
+             │           │ wake       │
+             │           ▼            │
+             │    ┌──────────────┐    │
+             │    │ PROCESS_EVT  │    │
+             │    │ (drain queue)│    │
+             │    └──────┬───────┘    │
+             │           │            │
+             │     ┌─────┴─────┐      │
+             │     │           │      │
+             │     ▼           ▼      │
+             │  #move       #up       │
+             │     │           │      │
+             │     ▼           ▼      │
+             │  UPDATE     RESOLVE    │
+             │  MARKER     SELECTION  │
+             │     │           │      │
+             └─────┘           ▼      │
+                        ┌──────────┐  │
+                        │  DONE    │  │
+                        │ (return) │  │
+                        └──────────┘  │
+                               │      │
+                               │ more │
+                               │events│
+                               └──────┘
+```
+
+### Configuration Constants
+
+Centralize these for tuning and A/B testing:
+
+```csharp
+public static class EventConfig
+{
+    // Check placement
+    public const int PeriodicCheckInterval = 1000;
+    public static bool EnableBackwardBranchCheck = true;
+    public static bool EnableMethodReturnCheck = true;
+    public static bool EnablePrimitiveReturnCheck = false;
+
+    // Coalescing
+    public static bool MoveCoalescingEnabled = false;  // Start conservative
+    public const int MaxCoalescedMoves = 10;
+
+    // Diagnostics
+    public static bool EnableEventTracing = false;
+    public static bool EnableLatencyProbes = false;
+    public const int SpuriousWakeThresholdPerMinute = 5;
+}
+```
+
+### Feature Flags
+
+Gate new checks and coalescing with flags so you can A/B test quickly:
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `EnableBackwardBranchCheck` | true | Check at loop back-edges |
+| `EnableMethodReturnCheck` | true | Check at method returns |
+| `EnablePrimitiveReturnCheck` | false | Check after non-trivial primitives |
+| `MoveCoalescingEnabled` | false | Coalesce consecutive mouse moves |
+| `EnableEventTracing` | false | Emit TRACE_EVENTS output |
+| `EnableLatencyProbes` | false | Track enqueue-to-wake latency |
+
+---
+
 ## Conclusion
 
-This refined design addresses all identified gaps and provides robust support for nested blocking input loops:
+This refined design addresses all identified gaps and provides robust support for nested blocking input loops with concurrency hardening:
 
 ### Core Design Achievements
 
-1. ✅ **Edge-triggering**: `_inputInterruptPending` flag ensures idempotent signaling
-2. ✅ **No count inflation**: One signal per batch, InputProcess drains fully
-3. ✅ **Storm control**: Drain-all policy prevents preemption cascades
-4. ✅ **Idle correctness**: Flag guard prevents bounce on burst events
-5. ✅ **Latency control**: Strategic check points catch tight loops
+1. ✅ **Atomic edge-triggering**: `Interlocked.Exchange` ensures race-free flag operations
+2. ✅ **"Already runnable" guard**: Prevents re-signaling during drains via `_inputProcessRunnableOrDraining` latch
+3. ✅ **No count inflation**: One signal per batch, InputProcess drains fully
+4. ✅ **Storm control**: Drain-all policy prevents preemption cascades
+5. ✅ **Idle correctness**: Flag guard with `HasPendingEvents()` truth source prevents bounce
 6. ✅ **Count invariant**: ControllerSemaphore count == MouseEventQueue size
-7. ✅ **Diagnostics**: Counters, traces, and assertions for validation
+7. ✅ **Diagnostics**: Counters, traces, storm detector, and promoted guards
 
 ### Nested Blocking Loop Support
 
@@ -830,5 +1163,17 @@ This refined design addresses all identified gaps and provides robust support fo
 9. ✅ **Blocking semantics**: `waitForControllerEvent` blocks without busy-waiting
 10. ✅ **Nest-safe consumption**: Popup menus, dialogs, and trackers share consistent event stream
 11. ✅ **Priority discipline**: Clear separation of InputProcess (producer) and Controllers (consumers)
+
+### Concurrency Hardening
+
+12. ✅ **Atomic operations**: `Interlocked.Exchange` for flag arm/clear prevents lost edges
+13. ✅ **ManualResetEventSlim**: Explicit reset after wake prevents signal stacking issues
+14. ✅ **Self-healing guards**: Release builds correct missed edges automatically
+15. ✅ **PlatformBridge contract**: Clear semantics for `HasPendingEvents()` vs `TryDequeue()`
+16. ✅ **GC-safe signaling**: Block input signaling during GC critical sections
+
+### Formal Invariants
+
+17. ✅ **I1-I5 documented**: Edge signaling, drain, counting, no-spurious-wake, and idle invariants
 
 **Recommendation**: Proceed with implementation following the phased plan, with checkpoint gates ensuring correctness before performance optimization.
