@@ -1,7 +1,7 @@
 # Proposed Event Architecture Redesign
 
 **Date**: 2025-12-04
-**Status**: PROPOSAL (v4 - with concurrency hardening and formal invariants)
+**Status**: PROPOSAL (v5 - final refinements, complete specification)
 **Authors**: Collaborative analysis by multiple expert agents
 
 ---
@@ -82,6 +82,18 @@ When the active process is the background process and there are no pending event
 
 **Enforced by**: `WaitHandle.WaitAny` in idle path with proper flag guards
 
+### I6: Down/Up Preservation Invariant
+
+Every button-down has exactly one subsequent button-up, in order. Discrete transitions (button down/up, key down/up) are never coalesced or reordered.
+
+**Enforced by**: Only move events are coalesced; transitions preserved exactly in queue order
+
+### I7: Fairness Invariant
+
+Keyboard events are processed within F milliseconds even under pointer move bursts. No input class starves another.
+
+**Enforced by**: Event class ordering in drain (discrete transitions first, then moves)
+
 ---
 
 ## Design Principles
@@ -130,6 +142,23 @@ InputProcess (Smalltalk):
   "At end of drain, tell VM we are parking again"
   self primInputDrainComplete  // primitive clears the flag
 ```
+
+### 1b. Scheduler Context Switch Hook
+
+**Gap**: If the active process changes between "signal" and "InputProcess starts," a stale latch can keep `_inputProcessRunnableOrDraining` true.
+
+**Fix**: Clear the latch on any scheduler context switch away from InputProcess:
+- When activating a non-InputProcess after InputProcess ran, call `InputDrainComplete()` if InputProcess is parked
+- Add hook in process scheduler's `TransferTo:` or equivalent
+
+### 1c. Controller Priority Discipline
+
+**Gap**: A controller at priority 4 waiting on ControllerSemaphore works fine, but nested child controllers spawned at different priorities could starve.
+
+**Fix**: Document and assert controller priorities:
+- Any process waiting on ControllerSemaphore must have priority ≤6 and typically ==4
+- Keep transient helper processes ≤4
+- Add debug check for priority violations on ControllerSemaphore wait
 
 ### 2. Full Queue Drain Per Wake (InputProcess Drain Invariant)
 
@@ -239,6 +268,96 @@ Consider delivering low-space to a dedicated handler at priority 7 so it preempt
 **Gap**: If GC compacts while input arrives, ensure the InputProcess wake isn't delivered mid-compaction with heap locks held.
 
 **Fix**: Block input signaling during GC critical sections and re-arm the edge flag afterward; then perform a single signal post-GC.
+
+#### Interrupt Masking for Long Primitives
+
+**Gap**: Long-running primitives that hold heap locks need similar protection.
+
+**Fix**: Add a VM `_interruptsMaskedCounter`:
+- While >0, `CheckAndSignalPendingEvents()` only arms the flag (no signal)
+- On exit (counter→0), perform a single consolidated signal if flag is armed
+
+```csharp
+public void MaskInterrupts() => _interruptsMaskedCounter++;
+public void UnmaskInterrupts()
+{
+    if (--_interruptsMaskedCounter == 0 && _inputInterruptPendingInt == 1)
+        CheckAndSignalPendingEvents();  // Consolidated signal
+}
+```
+
+### 8. Event Semantics Consistency
+
+#### Double-Click Timing and Button Chord Handling
+
+**Gap**: Coalescing and batching can reorder or compress transitions; double-click detection needs a stable time base and non-squashed down/up pairs.
+
+**Fix**:
+- Preserve down/up transitions exactly; only coalesce move
+- Add a per-button timing record in InputProcess
+- Controllers read a canonical `event.timestamp` for double-click thresholds
+
+#### Keyboard Autorepeat
+
+**Gap**: OS autorepeat bursts could flood the queue like mouse moves.
+
+**Fix**:
+- Do NOT coalesce key events
+- Ensure repeat sequences are preserved
+- Optional: deliver repeat as discrete events but allow consumers to drain-many
+
+#### Modifier Synchronization (Shift/Ctrl)
+
+**Gap**: Modifier state changes must be visible to mouse event consumers that process subsequent moves in the same batch.
+
+**Fix**: Each event carries a snapshot of modifier state; do not rely on global Sensor state mutating mid-drain.
+
+```smalltalk
+MouseEvent>>modifiers
+    "Return modifier state at time of this event"
+    ^modifierSnapshot
+```
+
+### 9. Ordering and Fairness
+
+#### Event Class Ordering in Drain
+
+Process events in this order to ensure fairness:
+1. **Discrete transitions** (button down/up, key down/up) - highest priority
+2. **Wheel/scroll events**
+3. **Pointer moves** (coalesced) - processed last
+
+Make ordering policy explicit and configurable.
+
+#### Backpressure Under Extreme Load
+
+**Gap**: If the UI thread produces faster than drain, memory could balloon.
+
+**Fix**: Add a soft cap:
+- Beyond N pending moves, coalesce aggressively and drop intermediate moves
+- Log a warning and increment a `coalescedDrops` metric
+- N should be configurable (default: 100)
+
+### 10. OS Integration Edge Cases
+
+#### Window Focus and Capture Loss
+
+**Gap**: Losing window focus or mouse capture during a popup loop can leave a controller waiting forever.
+
+**Fix**:
+- If PlatformBridge reports focus loss or capture loss, enqueue a synthetic "cancel" event
+- Popup menus should listen for cancel and exit cleanly
+- Controller loops should check for cancel in their drain
+
+#### Display Sleep/System Suspend
+
+**Gap**: Idle wake handle can be set while system sleeps; post-resume the flag may be stale.
+
+**Fix**: On resume:
+- Re-evaluate `HasPendingEvents()`
+- Re-arm edge flag if events pending
+- Perform a single signal
+- Clear stale diagnostics counters over time window
 
 ---
 
@@ -516,6 +635,75 @@ InputSensor>>waitButton
 
 If your loop sometimes waits on additional semaphores (e.g., timer), multiplex through a single controller event demultiplexer, or use separate waits with clear priority assumptions. The InputProcess must remain the sole producer of controller signals for input.
 
+### Explicit Event Drain APIs
+
+Consumers choose one of the two canonical patterns and use the proper API; forbid direct queue peeks outside these:
+
+```smalltalk
+"Keyboard events"
+Sensor>>hasKeyboardEvent
+    ^InputState keyboardEventQueue isEmpty not
+
+Sensor>>nextKeyboardEvent
+    ^InputState keyboardEventQueue isEmpty
+        ifTrue: [nil]
+        ifFalse: [InputState keyboardEventQueue next]
+
+"Pointer events"
+Sensor>>hasPointerEvent
+    ^InputState mouseEventQueue isEmpty not
+
+Sensor>>nextPointerEvent
+    ^InputState mouseEventQueue isEmpty
+        ifTrue: [nil]
+        ifFalse: [InputState mouseEventQueue next]
+```
+
+### Popup Cancel and Escape
+
+Popup menus should treat ESC key or loss of focus as cancel:
+
+```smalltalk
+PopUpMenu>>startUp: aSymbol
+    "...existing setup..."
+    self displayAt: Sensor cursorPoint
+        during: [
+            [self buttonPressed: aSymbol] whileFalse: [
+                Sensor waitForControllerEvent.
+                self checkForCancel ifTrue: [^0]].  "Cancel returns 0"
+            [self buttonPressed: aSymbol] whileTrue: [
+                self manageMarker.
+                Sensor waitForControllerEvent.
+                self checkForCancel ifTrue: [^0]]].
+    ^selection
+
+PopUpMenu>>checkForCancel
+    "ESC key or focus loss cancels the menu"
+    Sensor hasKeyboardEvent ifTrue: [
+        | ev |
+        ev := Sensor nextKeyboardEvent.
+        ev keyCode = 27 "ESC" ifTrue: [^true]].
+    Sensor focusLost ifTrue: [^true].
+    ^false
+```
+
+### Drag Threshold and Hover
+
+Standardize movement threshold before starting drags:
+
+```smalltalk
+Controller>>trackPotentialDrag
+    | startPoint |
+    startPoint := Sensor cursorPoint.
+    [Sensor anyButtonPressed] whileTrue: [
+        Sensor waitForControllerEvent.
+        (Sensor cursorPoint - startPoint) r > DragThreshold ifTrue: [
+            ^self startDragFrom: startPoint]].
+    ^self  "Released before threshold - not a drag"
+```
+
+**Hover events**: Derived from move + timer, not a busy loop. Timer fairness rule ensures hover timers don't starve input.
+
 ---
 
 ## Reentrancy and Priority Safety
@@ -618,6 +806,19 @@ public class EventDiagnostics
     public long LastEnqueueTimestamp;        // Timestamp on enqueue
     public long LastInputWakeTimestamp;      // Timestamp when InputProcess wakes
     public long MaxEnqueueToWakeLatency;     // Max observed latency
+    public int[] LatencyHistogram;           // Buckets: <1ms, 1-5ms, 5-20ms, >20ms
+
+    // Button transition accounting (per button: left, middle, right)
+    public long[] ButtonDowns;               // Count of down events per button
+    public long[] ButtonUps;                 // Count of up events per button
+    public long ButtonMismatches;            // ups > downs or vice versa within window
+
+    // Queue occupancy metrics
+    public int PeakMouseQueueSize;           // High water mark for mouse queue
+    public int PeakKeyboardQueueSize;        // High water mark for keyboard queue
+    public long MovingAverageOccupancy;      // Moving average queue size
+    public long CoalescedMoves;              // Count of coalesced move events
+    public long DroppedMoves;                // Count of dropped moves under backpressure
 }
 ```
 
@@ -729,6 +930,30 @@ public double SignalTodrainRatio =>
 public bool StormDetected => SignalToDrainRatio > 1.5 && InputBatchesDrained > 10;
 ```
 
+### Latency SLA Alarms
+
+If enqueue-to-wake latency exceeds configured SLA buckets repeatedly, dump a short trace:
+
+```csharp
+private void CheckLatencySLA(long latencyTicks)
+{
+    var latencyMs = latencyTicks * 1000.0 / Stopwatch.Frequency;
+
+    // Update histogram
+    if (latencyMs < 1) _diagnostics.LatencyHistogram[0]++;
+    else if (latencyMs < 5) _diagnostics.LatencyHistogram[1]++;
+    else if (latencyMs < 20) _diagnostics.LatencyHistogram[2]++;
+    else _diagnostics.LatencyHistogram[3]++;
+
+    // Alarm if >20ms repeatedly
+    if (latencyMs > 20 && _diagnostics.LatencyHistogram[3] > 10)
+    {
+        Console.WriteLine($"[LATENCY ALARM] {latencyMs:F1}ms - dumping trace");
+        DumpRecentEventTrace();
+    }
+}
+```
+
 ---
 
 ## Test Plan
@@ -824,6 +1049,62 @@ public bool StormDetected => SignalToDrainRatio > 1.5 && InputBatchesDrained > 1
 - Timer/Delay mechanism works correctly
 - Keyboard input works correctly
 - Display updates work correctly
+
+### 6. Focus/Capture Loss During Popup
+
+**Objective**: Verify popup menus handle focus loss gracefully
+
+**Procedure**:
+1. Open popup menu with yellow button
+2. Simulate losing focus (click outside window, Alt-Tab)
+3. Verify popup cancels gracefully
+
+**Success criteria**:
+- Popup menu closes with selection = 0 (cancel)
+- No deadlocks or hung processes
+- Controller resumes normal operation
+
+### 7. Mixed Input Burst Test
+
+**Objective**: Verify keyboard events are not delayed behind large move batches
+
+**Procedure**:
+1. Interleave rapid mouse moves with keypresses (1kHz moves, 10Hz keys)
+2. Verify keyboard events are processed promptly
+
+**Success criteria**:
+- Keyboard events processed within F milliseconds (I7 fairness invariant)
+- No keyboard event starvation
+- Event ordering preserved within each class
+
+### 8. Suspend/Resume Test
+
+**Objective**: Verify correct behavior after system suspend/resume
+
+**Procedure**:
+1. Start interpreter with popup menu
+2. Trigger programmatic suspend
+3. Resume system
+4. Verify first event after resume is handled correctly
+
+**Success criteria**:
+- Edge flag is re-armed if events pending
+- Single signal post-resume
+- No missed first event
+
+### 9. GC Under Load Test
+
+**Objective**: Verify interrupt masking during GC prevents reentrancy violations
+
+**Procedure**:
+1. Generate 1-2 kHz mouse moves
+2. Trigger GC during burst
+3. Verify single consolidated input wake post-GC
+
+**Success criteria**:
+- No InputProcess wake during GC critical section
+- Single signal after GC completes
+- No reentrancy violations
 
 ---
 
@@ -1141,6 +1422,44 @@ Gate new checks and coalescing with flags so you can A/B test quickly:
 | `EnableEventTracing` | false | Emit TRACE_EVENTS output |
 | `EnableLatencyProbes` | false | Track enqueue-to-wake latency |
 
+### Configuration Profiles
+
+A single environment variable or INI section switches profiles for rapid A/B testing:
+
+| Profile | Backward Branch | Method Return | Primitive Return | Move Coalescing | Use Case |
+|---------|-----------------|---------------|------------------|-----------------|----------|
+| **Conservative** | ❌ | ❌ | ❌ | ❌ | Maximum compatibility, baseline |
+| **Responsive** | ✅ | ✅ | ❌ | ✅ | Recommended for interactive use |
+| **Stress** | ✅ | ✅ | ✅ | Aggressive | Testing, high-frequency input |
+
+```csharp
+public static void ApplyProfile(string profile)
+{
+    switch (profile.ToLower())
+    {
+        case "conservative":
+            EnableBackwardBranchCheck = false;
+            EnableMethodReturnCheck = false;
+            EnablePrimitiveReturnCheck = false;
+            MoveCoalescingEnabled = false;
+            break;
+        case "responsive":
+            EnableBackwardBranchCheck = true;
+            EnableMethodReturnCheck = true;
+            EnablePrimitiveReturnCheck = false;
+            MoveCoalescingEnabled = true;
+            break;
+        case "stress":
+            EnableBackwardBranchCheck = true;
+            EnableMethodReturnCheck = true;
+            EnablePrimitiveReturnCheck = true;
+            MoveCoalescingEnabled = true;
+            MaxCoalescedMoves = 5;  // Aggressive coalescing
+            break;
+    }
+}
+```
+
 ---
 
 ## Conclusion
@@ -1151,29 +1470,46 @@ This refined design addresses all identified gaps and provides robust support fo
 
 1. ✅ **Atomic edge-triggering**: `Interlocked.Exchange` ensures race-free flag operations
 2. ✅ **"Already runnable" guard**: Prevents re-signaling during drains via `_inputProcessRunnableOrDraining` latch
-3. ✅ **No count inflation**: One signal per batch, InputProcess drains fully
-4. ✅ **Storm control**: Drain-all policy prevents preemption cascades
-5. ✅ **Idle correctness**: Flag guard with `HasPendingEvents()` truth source prevents bounce
-6. ✅ **Count invariant**: ControllerSemaphore count == MouseEventQueue size
-7. ✅ **Diagnostics**: Counters, traces, storm detector, and promoted guards
+3. ✅ **Scheduler context switch hook**: Clears latch on process switch away from InputProcess
+4. ✅ **No count inflation**: One signal per batch, InputProcess drains fully
+5. ✅ **Storm control**: Drain-all policy prevents preemption cascades
+6. ✅ **Idle correctness**: Flag guard with `HasPendingEvents()` truth source prevents bounce
+7. ✅ **Count invariant**: ControllerSemaphore count == MouseEventQueue size
+8. ✅ **Diagnostics**: Counters, traces, storm detector, latency SLA alarms, and promoted guards
 
 ### Nested Blocking Loop Support
 
-8. ✅ **Preemption guarantee**: InputProcess (priority 6) preempts controllers (priority 4) on event arrival
-9. ✅ **Blocking semantics**: `waitForControllerEvent` blocks without busy-waiting
-10. ✅ **Nest-safe consumption**: Popup menus, dialogs, and trackers share consistent event stream
-11. ✅ **Priority discipline**: Clear separation of InputProcess (producer) and Controllers (consumers)
+9. ✅ **Preemption guarantee**: InputProcess (priority 6) preempts controllers (priority 4) on event arrival
+10. ✅ **Blocking semantics**: `waitForControllerEvent` blocks without busy-waiting
+11. ✅ **Nest-safe consumption**: Popup menus, dialogs, and trackers share consistent event stream
+12. ✅ **Priority discipline**: Clear separation of InputProcess (producer) and Controllers (consumers)
+13. ✅ **Cancel semantics**: ESC key and focus loss handled with synthetic cancel events
+14. ✅ **Explicit drain APIs**: `hasKeyboardEvent`/`nextKeyboardEvent`, `hasPointerEvent`/`nextPointerEvent`
 
 ### Concurrency Hardening
 
-12. ✅ **Atomic operations**: `Interlocked.Exchange` for flag arm/clear prevents lost edges
-13. ✅ **ManualResetEventSlim**: Explicit reset after wake prevents signal stacking issues
-14. ✅ **Self-healing guards**: Release builds correct missed edges automatically
-15. ✅ **PlatformBridge contract**: Clear semantics for `HasPendingEvents()` vs `TryDequeue()`
-16. ✅ **GC-safe signaling**: Block input signaling during GC critical sections
+15. ✅ **Atomic operations**: `Interlocked.Exchange` for flag arm/clear prevents lost edges
+16. ✅ **ManualResetEventSlim**: Explicit reset after wake prevents signal stacking issues
+17. ✅ **Self-healing guards**: Release builds correct missed edges automatically
+18. ✅ **PlatformBridge contract**: Clear semantics for `HasPendingEvents()` vs `TryDequeue()`
+19. ✅ **Interrupt masking**: Long primitives and GC block signaling, consolidated signal on unmask
+
+### Event Semantics and Fairness
+
+20. ✅ **Down/up preservation**: Discrete transitions never coalesced (I6)
+21. ✅ **Fairness guarantee**: Keyboard events processed within F ms even under move bursts (I7)
+22. ✅ **Modifier snapshots**: Each event carries modifier state at time of event
+23. ✅ **Event class ordering**: Discrete transitions first, then wheel, then moves
+24. ✅ **Backpressure**: Soft cap with aggressive coalescing under extreme load
+
+### OS Integration
+
+25. ✅ **Focus/capture loss**: Synthetic cancel event triggers popup exit
+26. ✅ **Suspend/resume**: Re-arm edge flag and single signal post-resume
+27. ✅ **Configuration profiles**: Conservative, Responsive, Stress for A/B testing
 
 ### Formal Invariants
 
-17. ✅ **I1-I5 documented**: Edge signaling, drain, counting, no-spurious-wake, and idle invariants
+28. ✅ **I1-I7 documented**: Edge signaling, drain, counting, no-spurious-wake, idle, down/up preservation, and fairness invariants
 
-**Recommendation**: Proceed with implementation following the phased plan, with checkpoint gates ensuring correctness before performance optimization.
+**Recommendation**: Proceed with implementation following the phased plan. Lock down atomic flag ops, add the runnable/draining latch, explicitly order event classes (no coalescing of discrete transitions), handle focus/capture loss with a cancel, and add interrupt masking around GC/long primitives. Then ship with the new invariants and tests covering mixed bursts, focus loss, and suspend/resume.
