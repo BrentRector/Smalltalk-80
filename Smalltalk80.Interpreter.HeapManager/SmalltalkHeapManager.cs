@@ -38,6 +38,10 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     // Verbose debug mode control
     public bool VerboseDebugMode { get; set; } = false;
 
+    // Phase 5: GC callbacks for interrupt masking
+    private Action? _gcBeginCallback;
+    private Action? _gcEndCallback;
+
     public SmalltalkHeapManager(IDiagnosticHub? diagnostics = null)
     {
         _tableManager = new ObjectTableManager();
@@ -80,6 +84,16 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         _classNameFieldIndex = index;
     }
 
+    /// <summary>
+    /// Phase 5: Sets callbacks to be invoked before and after garbage collection.
+    /// Used to mask interrupts during GC to prevent event signaling during critical sections.
+    /// </summary>
+    public void SetGCCallbacks(Action? beginCallback, Action? endCallback)
+    {
+        _gcBeginCallback = beginCallback;
+        _gcEndCallback = endCallback;
+    }
+
     #region Object Allocation
 
     /// <summary>
@@ -115,6 +129,9 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             _gcInProgress = true;
             try
             {
+                // Phase 5: Mask interrupts before GC
+                _gcBeginCallback?.Invoke();
+
                 // Run GC to reclaim unreachable objects and free their table indices
                 _garbageCollector.GarbageCollect();
                 _allocationsSinceLastGC = 0;  // Reset cooldown counter
@@ -122,6 +139,9 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             }
             finally
             {
+                // Phase 5: Unmask interrupts after GC (in finally block to ensure cleanup)
+                _gcEndCallback?.Invoke();
+
                 _gcInProgress = false;
             }
         }

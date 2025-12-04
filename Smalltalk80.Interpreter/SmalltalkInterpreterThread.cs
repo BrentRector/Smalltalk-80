@@ -46,6 +46,15 @@ public class SmalltalkInterpreterThread
             Console.WriteLine("[Smalltalk Thread] Creating virtual machine...");
             _vm = CreateVirtualMachine();
 
+            // STEP 1.25: Initialize event architecture (Phase 2)
+            // Signal EventCallbacksReady when complete to synchronize with UI thread
+            Console.WriteLine("[Smalltalk Thread] Initializing event architecture...");
+            _vm.InitializeEventArchitecture(onComplete: () =>
+            {
+                Console.WriteLine("[Smalltalk Thread] Event callbacks registered - signaling main thread");
+                _context.EventCallbacksReady.Set();
+            });
+
             // STEP 1.5: Initialize ProcessorScheduler with high-priority bootstrap process
             // This ensures all init expressions run at priority 8, preventing preemption
             // when they fork processes (like Delay's timing process also at priority 8)

@@ -257,6 +257,21 @@ public class TestPlatformBridge : IPlatformBridge
         // No-op in test mode - no event signal to reset
     }
 
+    public void SetEventCallback(Action callback)
+    {
+        // No-op in test mode - no event callback needed
+    }
+
+    public void SetIsIdleCallback(Func<bool> callback)
+    {
+        // No-op in test mode - no idle detection needed
+    }
+
+    // Phase 2: No idle wake handle in test mode (no true idle waiting)
+    public WaitHandle? IdleWakeHandle => null;
+
+    public ManualResetEventSlim? IdleWake => null;
+
     // ============================================================================
     // Clipboard
     // ============================================================================

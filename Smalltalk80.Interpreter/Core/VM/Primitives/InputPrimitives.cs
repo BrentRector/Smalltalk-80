@@ -245,4 +245,40 @@ public static class InputOperations
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(buttons));
         }
     }
+
+    /// <summary>Primitive 200: primInputDrainComplete - Clear runnable/draining latch</summary>
+    public class InputDrainComplete : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+
+            // Phase 1: Clear runnable latch to allow next event to signal InputSemaphore
+            if (context.VM != null)
+            {
+                context.VM.InputDrainComplete();
+            }
+
+            return PrimitiveResult.Ok(context.Receiver);
+        }
+    }
+
+    /// <summary>Primitive 201: registerInputProcess - Register InputProcess OOP for context switch hook</summary>
+    public class RegisterInputProcess : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+
+            var processOOP = context.Arguments[0];
+
+            // Phase 4: Register InputProcess OOP for context switch hook
+            if (context.VM != null)
+            {
+                context.VM.SetInputProcessOOP(processOOP);
+            }
+
+            return PrimitiveResult.Ok(context.Receiver);
+        }
+    }
 }

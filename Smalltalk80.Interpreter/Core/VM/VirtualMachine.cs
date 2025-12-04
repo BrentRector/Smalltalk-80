@@ -87,6 +87,23 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     // Cached background process OOP for idle detection (priority 1 sentinel)
     private SmalltalkOOP _backgroundProcessOOP;
 
+    // Event Architecture: Software interrupt simulation (Phase 1)
+    // Edge-triggered atomic flag armed by UI thread when events arrive
+    private int _inputInterruptPendingInt;  // 0 = no interrupt, 1 = pending (use Interlocked)
+
+    // Phase 2: Idle state tracking for conditional IdleWake signaling
+    private volatile bool _isIdle;
+
+    // Runnable/draining latch prevents re-signaling while InputProcess is draining queue
+    // Set to true when signaling InputSemaphore, cleared by primInputDrainComplete (200)
+    private bool _inputProcessRunnableOrDraining;
+
+    // InputProcess OOP for context switch hook (Phase 4)
+    private SmalltalkOOP _inputProcessOOP;
+
+    // Interrupt mask counter for critical sections (Phase 5)
+    private int _interruptsMaskedCounter;
+
     // Blue Book architectural constants are defined in VMConstants.cs
     // All context field indices are now static constants shared across the VM
 
@@ -179,6 +196,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Initialize NLR handler
         _nlrHandler = new NonLocalReturnHandler(metadata.KnownObjects.Nil);
+
+        // Initialize event architecture fields (Phase 1)
+        _inputInterruptPendingInt = 0;
+        _inputProcessRunnableOrDraining = false;
+        _inputProcessOOP = metadata.KnownObjects.Nil;
+        _interruptsMaskedCounter = 0;
     }
 
     /// <summary>
@@ -203,6 +226,39 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _whileTrueSelectorOOP = _selectorCache.LookupSelector("whileTrue:");
         _whileFalseSelectorOOP = _selectorCache.LookupSelector("whileFalse:");
         _conditionalSelectorsInitialized = true;
+    }
+
+    /// <summary>
+    /// Phase 1-3: Initialize event architecture callbacks.
+    /// Wires up atomic interrupt flag arming when UI thread enqueues events.
+    /// Must be called after platform bridge is available.
+    /// </summary>
+    /// <param name="onComplete">Optional callback invoked after initialization completes (Phase 2 synchronization).</param>
+    public void InitializeEventArchitecture(Action? onComplete = null)
+    {
+        if (_platformBridge == null)
+            return;
+
+        // Phase 1: Wire up callback to arm interrupt flag atomically when events arrive
+        _platformBridge.SetEventCallback(() =>
+        {
+            Interlocked.Exchange(ref _inputInterruptPendingInt, 1);
+        });
+
+        // Phase 2: Wire up idle state callback for conditional IdleWake signaling
+        _platformBridge.SetIsIdleCallback(() => _isIdle);
+
+        // Phase 3: Wire up event check callback for strategic check points (loops, returns)
+        _bytecodeInterpreter.SetEventCheckCallback(CheckAndSignalPendingEvents);
+
+        // Wire up GC callbacks for interrupt masking (Phase 5)
+        if (_heapManager is SmalltalkHeapManager heapManager)
+        {
+            heapManager.SetGCCallbacks(MaskInterrupts, UnmaskInterrupts);
+        }
+
+        // Phase 2: Signal caller that event callbacks are ready (prevents race condition)
+        onComplete?.Invoke();
     }
 
     /// <summary>
@@ -365,27 +421,30 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     }
 
     /// <summary>
-    /// Enters idle wait loop - blocks indefinitely until work is available.
+    /// Phase 2: Hardened idle wait loop - blocks indefinitely until work is available.
     /// Only exits when a higher-priority process becomes ready (process switch).
     ///
-    /// KEY DESIGN: No polling. We wait in WaitAny until:
-    /// - UI event arrives → signals input semaphore → process switch
-    /// - Timer expires → signals timer semaphore → process switch
+    /// HARDENED GUARDS:
+    /// 1. Check events/timers FIRST before parking (pre-park guard)
+    /// 2. Set _isIdle flag to enable IdleWake signaling from event queue
+    /// 3. Use WaitAny with IdleWakeHandle for immediate wake on enqueue
+    /// 4. Explicit Reset() of IdleWake after WaitAny returns
+    /// 5. Self-healing: if events pending, don't park (busy-poll instead)
     ///
-    /// CRITICAL: We do NOT poll HasPendingEvents(). Events in queue don't directly
-    /// wake processes - they are consumed by Smalltalk's InputSensor which checks
-    /// the queue in waitForEvent before blocking on the semaphore.
+    /// KEY DESIGN: No polling. We wait in WaitAny until:
+    /// - UI event arrives → signals IdleWake → signals input semaphore → process switch
+    /// - Timer expires → signals timer semaphore → process switch
     /// </summary>
     private void EnterIdleWait(SmalltalkOOP backgroundProcess)
     {
-        var eventHandle = _platformBridge?.EventAvailableHandle;
+        var idleWakeHandle = _platformBridge?.IdleWakeHandle;
         var timerHandle = _timerManager.TimerExpiredHandle;
 
         Console.WriteLine("[IDLE] Entering idle wait (background process active)");
 
         while (true)
         {
-            // Check for expired timer and signal semaphore (with preemption)
+            // PRE-PARK GUARD: Check timers/events FIRST (prevent parking with work pending)
             CheckAndSignalExpiredTimer();
 
             // Check if a process switch occurred (due to timer signal)
@@ -393,32 +452,43 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             if (currentProcess != backgroundProcess)
             {
                 Console.WriteLine("[IDLE] Exiting idle (process switch detected)");
+                _isIdle = false;  // Clear idle flag before exiting
                 return;  // Higher-priority process ready - exit idle
             }
 
-            // Block indefinitely until event, timer, or shutdown
-            // TRUE 0% CPU - kernel-level wait on multiple handles
-            if (eventHandle != null)
+            // SELF-HEALING: Don't park if events are already pending
+            if (_platformBridge?.HasPendingEvents() == true)
+            {
+                SignalInputSemaphoreIfRegistered();
+                continue;  // Skip WaitAny, recheck immediately
+            }
+
+            // PARK: Block indefinitely until event, timer, or shutdown
+            // Set _isIdle flag BEFORE parking to enable IdleWake signaling
+            _isIdle = true;
+
+            if (idleWakeHandle != null)
             {
                 var handles = new WaitHandle[] {
-                    eventHandle,
+                    idleWakeHandle,
                     timerHandle,
                     ShutdownToken.WaitHandle
                 };
 
                 int waitResult = WaitHandle.WaitAny(handles);  // Blocks here (0% CPU)
 
+                // Clear _isIdle flag immediately after wake
+                _isIdle = false;
+
+                // EXPLICIT RESET: ManualResetEventSlim requires manual reset after WaitAny
+                _platformBridge?.IdleWake?.Reset();
+
                 // Handle wake based on which handle was signaled
-                if (waitResult == 0)  // Event handle
+                if (waitResult == 0)  // IdleWake handle
                 {
                     // Event arrived - signal input semaphore ONCE to wake Controller
                     // The Controller will then process all pending events via primitive 95
                     SignalInputSemaphoreIfRegistered();
-
-                    // Force reset the event signal to prevent busy-loop
-                    // New events will re-signal when they arrive
-                    // Events in queue will be consumed by Smalltalk (InputSensor checks queue first)
-                    _platformBridge!.ForceResetEventSignal();
                 }
                 else if (waitResult == 1)  // Timer handle
                 {
@@ -429,12 +499,16 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             }
             else
             {
-                // Fallback for test mode without WaitHandle
+                // Fallback for test mode without IdleWakeHandle
+                _isIdle = false;
                 Thread.Sleep(10);
             }
 
             if (ShutdownToken.IsCancellationRequested)
+            {
+                _isIdle = false;  // Clear idle flag before throwing
                 throw new OperationCanceledException("VM shutdown requested", ShutdownToken);
+            }
         }
     }
 
@@ -460,6 +534,78 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // NOTE: ControllerSemaphore is now signaled by InputProcess in Smalltalk
         // after processing button events, not here. This ensures controllers
         // see the updated button state when they wake.
+    }
+
+    /// <summary>
+    /// Phase 1: Check atomic interrupt flag and signal InputSemaphore if pending.
+    /// Edge-triggered: uses Interlocked.Exchange to atomically consume the flag.
+    /// CRITICAL (Phase 7): Check runnable latch BEFORE consuming flag to prevent loss.
+    /// </summary>
+    private void CheckAndSignalPendingEvents()
+    {
+        // Phase 5: Respect interrupt mask during critical sections (GC, long primitives)
+        if (_interruptsMaskedCounter > 0)
+            return;
+
+        // Phase 7 FIX: Check latch BEFORE consuming flag
+        // If InputProcess is already runnable or draining, don't signal again
+        if (_inputProcessRunnableOrDraining)
+            return;
+
+        // Edge-trigger: atomically check and clear interrupt flag
+        int wasPending = Interlocked.Exchange(ref _inputInterruptPendingInt, 0);
+        if (wasPending == 0)
+            return;  // No interrupt pending
+
+        // Arm runnable latch - InputProcess is now runnable or draining
+        _inputProcessRunnableOrDraining = true;
+
+        // Signal InputSemaphore to wake InputProcess (preempts lower priority)
+        SignalInputSemaphoreIfRegistered();
+    }
+
+    /// <summary>
+    /// Phase 1: Called by primitive 200 (primInputDrainComplete) to clear runnable latch.
+    /// Allows next event to signal InputSemaphore again.
+    /// </summary>
+    public void InputDrainComplete()
+    {
+        _inputProcessRunnableOrDraining = false;
+    }
+
+    /// <summary>
+    /// Phase 4: Register InputProcess OOP for context switch hook.
+    /// Called by primitive 201 (registerInputProcess).
+    /// </summary>
+    public void SetInputProcessOOP(SmalltalkOOP processOOP)
+    {
+        _inputProcessOOP = processOOP;
+    }
+
+    /// <summary>
+    /// Phase 5: Increment interrupt mask counter to prevent event signaling during critical sections.
+    /// Must be paired with UnmaskInterrupts(). Supports nesting.
+    /// </summary>
+    public void MaskInterrupts()
+    {
+        _interruptsMaskedCounter++;
+    }
+
+    /// <summary>
+    /// Phase 5: Decrement interrupt mask counter. When counter reaches zero, signal any pending events.
+    /// </summary>
+    public void UnmaskInterrupts()
+    {
+        if (_interruptsMaskedCounter > 0)
+        {
+            _interruptsMaskedCounter--;
+
+            // When unmasking completely, check for pending events
+            if (_interruptsMaskedCounter == 0)
+            {
+                CheckAndSignalPendingEvents();
+            }
+        }
     }
 
     /// <summary>

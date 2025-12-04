@@ -98,6 +98,12 @@ public readonly struct PrimitiveExecutionContext
     public IPrimitiveContext? LegacyContext { get; }
 
     /// <summary>
+    /// Gets the VirtualMachine instance for event architecture primitives (Phase 1).
+    /// Used by primitives 200 (InputDrainComplete) and 201 (RegisterInputProcess).
+    /// </summary>
+    public VirtualMachine? VM { get; }
+
+    /// <summary>
     /// Creates a new primitive execution context.
     /// </summary>
     public PrimitiveExecutionContext(
@@ -115,7 +121,8 @@ public readonly struct PrimitiveExecutionContext
         VMMetadata? metadata = null,
         ITimerManager? timerManager = null,
         IProcessScheduler? processScheduler = null,
-        IPrimitiveContext? legacyContext = null)
+        IPrimitiveContext? legacyContext = null,
+        VirtualMachine? vm = null)
     {
         Receiver = receiver;
         Arguments = arguments;
@@ -132,6 +139,7 @@ public readonly struct PrimitiveExecutionContext
         TimerManager = timerManager;
         ProcessScheduler = processScheduler;
         LegacyContext = legacyContext;
+        VM = vm;
     }
 
     /// <summary>
@@ -348,7 +356,8 @@ public interface IPrimitiveRegistry
         VMMetadata? metadata = null,
         IStackManager? stackManager = null,
         ITimerManager? timerManager = null,
-        IProcessScheduler? processScheduler = null);
+        IProcessScheduler? processScheduler = null,
+        VirtualMachine? vm = null);
 
     /// <summary>
     /// Checks if a primitive is registered.

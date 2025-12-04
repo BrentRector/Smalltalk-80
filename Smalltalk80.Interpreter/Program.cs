@@ -155,8 +155,11 @@ public static class Program
             smalltalkThread.Name = "Smalltalk Interpreter";
             smalltalkThread.Start();
 
-            // Give Smalltalk thread time to start
-            Thread.Sleep(500);
+            // Phase 2: Wait for event callbacks to be registered before showing window
+            // This prevents race condition where UI events arrive before VM is ready to handle them
+            Console.WriteLine("\n=== Waiting for event architecture to initialize ===");
+            threadContext.EventCallbacksReady.Wait();
+            Console.WriteLine("  Event callbacks registered - safe to show window");
 
             // Show display window
             Console.WriteLine("\n=== Showing Display Window ===");

@@ -44,6 +44,9 @@ public partial class VirtualMachine : IProcessScheduler
         if (schedulerOOP == _metadata.KnownObjects.Nil)
             return false;
 
+        // Phase 4: Get old process before switching (for context switch hook)
+        var oldProcessOOP = GetActiveProcess();
+
         // Get the process's suspended context
         var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
         if (contextOOP == _metadata.KnownObjects.Nil)
@@ -77,10 +80,35 @@ public partial class VirtualMachine : IProcessScheduler
         // Update ProcessorScheduler.activeProcess
         _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, processOOP);
 
+        // Phase 4: Context switch hook - clear latch when InputProcess blocks
+        // If switching away from InputProcess and it's blocked (waiting on semaphore), clear the latch
+        if (_inputProcessOOP != default && _inputProcessOOP != _metadata.KnownObjects.Nil)
+        {
+            if (oldProcessOOP == _inputProcessOOP && processOOP != _inputProcessOOP)
+            {
+                // Switching away from InputProcess - check if it's blocked
+                if (IsProcessBlocked(oldProcessOOP))
+                {
+                    // InputProcess is blocked - clear latch to allow next signal
+                    _inputProcessRunnableOrDraining = false;
+                }
+            }
+        }
+
         // Switch C# execution context
         _contextManager.SetActiveContext(contextOOP);
 
         return true;
+    }
+
+    /// <summary>
+    /// Phase 4: Check if a process is blocked (waiting on a semaphore).
+    /// A process is blocked if its myList field is not nil (it's on a semaphore's wait queue).
+    /// </summary>
+    private bool IsProcessBlocked(SmalltalkOOP processOOP)
+    {
+        var myListOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX);
+        return myListOOP != _metadata.KnownObjects.Nil;
     }
 
     /// <inheritdoc/>

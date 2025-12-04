@@ -116,6 +116,16 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     // VM checks and clears this to signal ControllerSemaphore
     private volatile bool _buttonTransitionPending;
 
+    // Phase 1: Callback to arm VM's atomic interrupt flag when events arrive
+    private Action? _eventArrivedCallback;
+
+    // Phase 2: Idle wake signal for hardened idle path
+    // Signaled when events are enqueued while VM is idle
+    private readonly ManualResetEventSlim _idleWake = new(false);
+
+    // Phase 2: Callback to check if VM is idle (needed for conditional signaling)
+    private Func<bool>? _isIdleCallback;
+
     public SmalltalkEventQueue()
     {
         _events = new ConcurrentQueue<SmalltalkEvent>();
@@ -123,6 +133,34 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
         // Counting semaphore: initial count 0, max count allows many events
         _eventSemaphore = new Semaphore(0, int.MaxValue);
     }
+
+    /// <summary>
+    /// Phase 1: Set callback to arm VM's atomic interrupt flag when events arrive.
+    /// </summary>
+    public void SetEventCallback(Action callback)
+    {
+        _eventArrivedCallback = callback;
+    }
+
+    /// <summary>
+    /// Phase 2: Set callback to check if VM is idle (for conditional IdleWake signaling).
+    /// </summary>
+    public void SetIsIdleCallback(Func<bool> callback)
+    {
+        _isIdleCallback = callback;
+    }
+
+    /// <summary>
+    /// Phase 2: Gets the WaitHandle for idle wake signaling.
+    /// VM waits on this handle when idle; Enqueue() signals it when events arrive.
+    /// </summary>
+    public WaitHandle IdleWakeHandle => _idleWake.WaitHandle;
+
+    /// <summary>
+    /// Phase 2: Gets the ManualResetEventSlim for idle wake signaling.
+    /// Exposed for explicit Reset() after WaitAny returns.
+    /// </summary>
+    public ManualResetEventSlim IdleWake => _idleWake;
 
     /// <summary>
     /// Returns true if a button transition occurred since last check, then clears the flag.
@@ -175,6 +213,15 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
                 _lastYellowButton = evt.YellowButton;
                 _lastBlueButton = evt.BlueButton;
             }
+        }
+
+        // Phase 1: Arm VM's atomic interrupt flag atomically
+        _eventArrivedCallback?.Invoke();
+
+        // Phase 2: Signal idle wake if VM is idle (prevents parking with events pending)
+        if (_isIdleCallback?.Invoke() == true)
+        {
+            _idleWake.Set();
         }
 
         // Increment counting semaphore - one signal per event
@@ -391,13 +438,14 @@ public class SmalltalkEventQueue : IEventWaitHandle, IDisposable
     }
 
     /// <summary>
-    /// Disposes of the event semaphore.
+    /// Disposes of the event semaphore and idle wake signal.
     /// </summary>
     public void Dispose()
     {
         if (!_disposed)
         {
             _eventSemaphore.Dispose();
+            _idleWake.Dispose();
             _disposed = true;
         }
     }

@@ -539,6 +539,20 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         _eventQueue.ForceResetEventSignal();
     }
 
+    public void SetEventCallback(Action callback)
+    {
+        _eventQueue.SetEventCallback(callback);
+    }
+
+    public void SetIsIdleCallback(Func<bool> callback)
+    {
+        _eventQueue.SetIsIdleCallback(callback);
+    }
+
+    public WaitHandle? IdleWakeHandle => _eventQueue.IdleWakeHandle;
+
+    public ManualResetEventSlim? IdleWake => _eventQueue.IdleWake;
+
     public SmalltalkOOP ReadClipboardToStringOOP()
     {
         // Not implemented yet - return value should be provided by Smalltalk thread

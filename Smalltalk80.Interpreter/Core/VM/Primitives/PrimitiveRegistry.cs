@@ -63,7 +63,8 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         VMMetadata? metadata = null,
         IStackManager? stackManager = null,
         ITimerManager? timerManager = null,
-        IProcessScheduler? processScheduler = null)
+        IProcessScheduler? processScheduler = null,
+        VirtualMachine? vm = null)
     {
         if (_primitives.TryGetValue(primitiveNumber, out var primitive))
         {
@@ -85,7 +86,9 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 messageSender: messageSender,
                 metadata: metadata,
                 timerManager: timerManager,
-                processScheduler: processScheduler
+                processScheduler: processScheduler,
+                legacyContext: ctx,
+                vm: vm
             );
 
             var result = primitive.Execute(execContext);
@@ -250,6 +253,10 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(148, new FontPrimitives.StringWidth());
         registry.Register(149, new FontPrimitives.FontAscent());
         registry.Register(150, new FontPrimitives.FontDescent());
+
+        // Event Architecture primitives (200-201) - Phase 1
+        registry.Register(200, new InputOperations.InputDrainComplete());
+        registry.Register(201, new InputOperations.RegisterInputProcess());
 
         // System primitives (112-139)
         registry.Register(112, new SystemOperations.CoreLeft());

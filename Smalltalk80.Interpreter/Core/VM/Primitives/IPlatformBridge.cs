@@ -183,6 +183,31 @@ public interface IPlatformBridge
     /// </summary>
     void ForceResetEventSignal();
 
+    /// <summary>
+    /// Phase 1: Sets callback to arm VM's atomic interrupt flag when events arrive.
+    /// The callback should atomically set the interrupt pending flag using Interlocked.Exchange.
+    /// </summary>
+    /// <param name="callback">Callback to invoke when events are enqueued.</param>
+    void SetEventCallback(Action callback);
+
+    /// <summary>
+    /// Phase 2: Sets callback to check if VM is idle (for conditional IdleWake signaling).
+    /// </summary>
+    /// <param name="callback">Callback that returns true if VM is idle.</param>
+    void SetIsIdleCallback(Func<bool> callback);
+
+    /// <summary>
+    /// Phase 2: Gets the WaitHandle for idle wake signaling.
+    /// VM waits on this handle (via WaitAny) when idle; event queue signals it when events arrive.
+    /// </summary>
+    WaitHandle? IdleWakeHandle { get; }
+
+    /// <summary>
+    /// Phase 2: Gets the ManualResetEventSlim for idle wake signaling.
+    /// Exposed for explicit Reset() after WaitAny returns.
+    /// </summary>
+    ManualResetEventSlim? IdleWake { get; }
+
     // ============================================================================
     // Clipboard (Primitive 104)
     // ============================================================================

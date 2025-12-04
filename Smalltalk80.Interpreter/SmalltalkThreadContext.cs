@@ -66,4 +66,11 @@ public class SmalltalkThreadContext
     /// Cancellation token that the Smalltalk thread checks to know when to stop.
     /// </summary>
     public CancellationToken ShutdownToken => ShutdownTokenSource.Token;
+
+    /// <summary>
+    /// Phase 2: Signaled by Smalltalk thread after InitializeEventArchitecture completes.
+    /// Main thread waits on this before showing window to prevent race condition where
+    /// events arrive before event callbacks are registered.
+    /// </summary>
+    public ManualResetEventSlim EventCallbacksReady { get; } = new(false);
 }

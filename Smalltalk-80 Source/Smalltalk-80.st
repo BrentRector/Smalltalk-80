@@ -22720,6 +22720,13 @@ primInputWord
 
 	<primitive: 95>
 	^nil!
+primInputDrainComplete
+	"Signal VM that InputProcess has drained the queue.
+	 Clears the runnable/draining latch to allow next signal.
+	 Phase 7: Event Architecture Refactor - enables edge-triggered interrupt simulation."
+
+	<primitive: 200>
+	^nil!
 primMousePt
 	"Poll the mouse to find out its position.  Return a Point.  Fail if event-driven 
 	tracking is used instead of polling.  Optional.  See Object documentation 
@@ -22736,9 +22743,9 @@ primSampleInterval: anInteger
 	<primitive: 94>
 	^self primitiveFailed!
 run
-	"Process input events using composite event model with mouse event queue.
-	 Each InputSemaphore wait corresponds to ONE OS event.
-	 Dequeue composite event via primInputWord, update state, enqueue mouse events.
+	"Process input events using edge-triggered interrupt simulation.
+	 Each InputSemaphore wait may correspond to a BATCH of OS events.
+	 Drain the entire queue per wake cycle.
 
 	 Queue protocol on mouse event:
 	 1. Update bitState FIRST (so Sensor queries return correct state)
@@ -22754,8 +22761,9 @@ run
 	[true]
 		whileTrue:
 			[InputSemaphore wait.
-			event _ self primInputWord.
-			event == nil ifFalse:
+
+			"Drain entire queue - process ALL events before returning to wait"
+			[event _ self primInputWord. event notNil] whileTrue:
 				[eventType _ event at: 1.
 				eventType = 1 ifTrue:
 					["Mouse event: update position and buttons, enqueue event"
@@ -22804,7 +22812,10 @@ run
 					isKeyDown _ event at: 7.
 					isKeyDown
 						ifTrue: [self keyAt: keyCode put: 1]
-						ifFalse: [self keyAt: keyCode put: 0]]]]!
+						ifFalse: [self keyAt: keyCode put: 0]]].
+
+			"Signal drain complete - clears runnable latch"
+			self primInputDrainComplete]!
 classifyButtonChange: oldMask to: newMask
 	"Determine which button changed. Returns #red, #yellow, or #blue.
 	 Red=4, Yellow=2, Blue=1"

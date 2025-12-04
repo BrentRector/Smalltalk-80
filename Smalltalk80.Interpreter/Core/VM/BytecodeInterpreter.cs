@@ -22,6 +22,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _specialSelectorOOPs;
 
+    // Phase 3: Event check callback for interrupt simulation at strategic points
+    private Action? _eventCheckCallback;
+
     public BytecodeInterpreter(
         ISmalltalkHeap heapManager,
         IBytecodeContext context,
@@ -36,6 +39,12 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
     /// <inheritdoc />
     public bool VerboseDebug { get; set; }
+
+    /// <inheritdoc />
+    public void SetEventCheckCallback(Action callback)
+    {
+        _eventCheckCallback = callback;
+    }
 
     /// <inheritdoc />
     public void InitializeSelectorCaches(SmalltalkOOP[] arithmeticSelectorOOPs, SmalltalkOOP[] specialSelectorOOPs)
@@ -463,6 +472,12 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
             byte extByte = bytecodes[currentIp++];
             int offset = BytecodeUtil.LongJumpBaseOffset(bytecode) + extByte;
+
+            // Phase 3: Check for pending events on backward branches (loop detection)
+            if (EventConfig.EnableBackwardBranchCheck && offset < 0)
+            {
+                _eventCheckCallback?.Invoke();
+            }
 
             heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
             return true;
@@ -1118,6 +1133,12 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     /// <returns>Always returns false to signal method/block return.</returns>
     private bool HandleReturnFromMessage(SmalltalkOOP returnValue)
     {
+        // Phase 3: Check for pending events on method returns (reduces latency for deep call chains)
+        if (EventConfig.EnableMethodReturnCheck)
+        {
+            _eventCheckCallback?.Invoke();
+        }
+
         // Check if we're in a BlockContext by checking the class
         var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
 
