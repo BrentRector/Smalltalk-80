@@ -115,6 +115,18 @@ To prevent re-signaling while InputProcess is active, track `_inputProcessRunnab
 
 If the active process changes before InputProcess runs, the latch could become stale. Clear it on any scheduler switch away from InputProcess when InputProcess is blocked.
 
+```csharp
+// In TransferTo() or process switch logic:
+private void OnProcessSwitch(SmalltalkOOP fromProcess, SmalltalkOOP toProcess)
+{
+    // If switching away from InputProcess and it's now blocked, clear latch
+    if (fromProcess == _inputProcessOOP && InputProcessIsBlocked())
+    {
+        _inputProcessRunnableOrDraining = false;
+    }
+}
+```
+
 ---
 
 ### Drain Invariant
@@ -189,8 +201,29 @@ Input signaling occurs **before** timer signaling in each check cycle. Precedenc
 
 GC and long primitives must not be interrupted mid-operation. Use `_interruptsMaskedCounter`:
 
-- `MaskInterrupts()`: Increment counter; signals are deferred
-- `UnmaskInterrupts()`: Decrement; if counter reaches 0 and flag is armed, perform one consolidated signal
+```csharp
+private int _interruptsMaskedCounter;
+
+public void MaskInterrupts() => _interruptsMaskedCounter++;
+
+public void UnmaskInterrupts()
+{
+    if (--_interruptsMaskedCounter == 0)
+    {
+        // Consolidated signal for any events that arrived while masked
+        if (_inputInterruptPendingInt == 1)
+            CheckAndSignalPendingEvents();
+    }
+}
+
+// Usage in GC:
+public void CollectGarbage()
+{
+    MaskInterrupts();
+    try { /* ... compaction ... */ }
+    finally { UnmaskInterrupts(); }
+}
+```
 
 This prevents InputProcess wake during heap compaction or other critical sections.
 
@@ -212,8 +245,8 @@ This prevents InputProcess wake during heap compaction or other critical section
 | Scenario | Resolution |
 |----------|------------|
 | Focus/capture loss | Enqueue synthetic "cancel" event; popup menus exit cleanly |
-| System suspend/resume | Re-check `HasPendingEvents()`, re-arm flag, force single signal |
-| Backpressure overflow | Soft cap (default 100 moves); aggressive coalescing, log warning |
+| System suspend/resume | Re-check `HasPendingEvents()`, re-arm flag, force single signal, clear stale diagnostics |
+| Backpressure overflow | Soft cap (default 100 moves); aggressive coalescing, log `DroppedMoves` metric |
 
 ---
 
@@ -408,7 +441,14 @@ Controller>>eventLoop
     ]
 ```
 
-**Contract**: Consumers must not assume a wake delivers exactly one event; they must confirm queue state explicitly. Use `Sensor hasMouseEvent` and `Sensor nextMouseEvent` as the sanctioned API.
+**Contract**: Consumers must not assume a wake delivers exactly one event; they must confirm queue state explicitly.
+
+**Sanctioned APIs** (use only these):
+- `Sensor hasMouseEvent` / `Sensor nextMouseEvent`
+- `Sensor hasKeyboardEvent` / `Sensor nextKeyboardEvent`
+- `Sensor waitForControllerEvent`
+
+**Forbidden**: Direct access to `InputState mouseEventQueue` or `InputState keyboardEventQueue`. All event consumption must go through the sanctioned APIs to maintain count invariant (I3).
 
 #### Popup Menu State Machine Guards
 
@@ -722,7 +762,40 @@ Debug.Assert(ControllerSemaphoreCount == MouseEventQueueSize,
 | Storm detected | `SignalToDrainRatio > 1.5` | Log anomaly, reduce check frequency |
 | Latency SLA breach | `>20ms latency repeated` | Dump recent trace, log alarm |
 
+```csharp
+// Latency SLA monitoring
+private void CheckLatencySLA(long latencyTicks)
+{
+    var latencyMs = latencyTicks * 1000.0 / Stopwatch.Frequency;
+
+    // Update histogram bucket
+    int bucket = latencyMs < 1 ? 0 : latencyMs < 5 ? 1 : latencyMs < 20 ? 2 : 3;
+    _diagnostics.LatencyHistogram[bucket]++;
+
+    // Alarm if >20ms latency occurs repeatedly
+    if (bucket == 3 && _diagnostics.LatencyHistogram[3] > 10)
+    {
+        Console.WriteLine($"[LATENCY ALARM] {latencyMs:F1}ms");
+        DumpRecentEventTrace();
+    }
+}
+```
+
 Guards degrade gracefully rather than crashing, dumping diagnostic snapshots for postmortem.
+
+### Proof Obligations
+
+Each invariant ties to specific diagnostics:
+
+| Invariant | Proof Mechanism |
+|-----------|-----------------|
+| I1 (Edge signaling) | `LatencyHistogram`: max latency ≤ Δ for all buckets |
+| I2 (Drain invariant) | `InputInterruptsSignaled == InputBatchesDrained` over time |
+| I3 (Counting invariant) | At drain end: `ControllerSemaphore.count == MouseEventQueue.size` |
+| I4 (No spurious wake) | `EmptyDrainWakes` ≤ ε/minute |
+| I5 (Idle) | `IdleParks` durations show near-0% CPU |
+| I6 (Down/up preservation) | `ButtonDowns[i] - ButtonUps[i] ∈ {0, 1}` for all buttons |
+| I7 (Fairness) | Keyboard latency histogram independent of pointer load |
 
 ---
 
