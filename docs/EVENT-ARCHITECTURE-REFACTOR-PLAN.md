@@ -1,9 +1,34 @@
 # Clean-Slate Event Architecture Refactor - Implementation Plan
 
-**Status**: Phase 5 - Complete ✅
+**Status**: ⚠️ BLOCKED - Critical Bug Investigation
 **Started**: 2025-12-03
 **Estimated Scope**: ~840 lines of new/modified code across 10 phases
 **Goal**: Fix nested blocking loop deadlock while preserving 0% idle CPU
+
+## 🔴 CRITICAL ISSUE: Crash on Mouse Movement
+
+**Symptom**: Interpreter crashes immediately when mouse moves after Phase 7 implementation
+**Error**: `Instance variable index 4 out of range [0, 0] for object oop=67886 (InputSensor)`
+**Location**: BytecodeInterpreter.cs:84 when executing bytecode 0x04 (push receiver ivar[4])
+
+**Investigation Status**:
+- ✅ Object structure verified correct (InputSensor has 1 ivar, correctly sized)
+- ✅ Bytecode identified: 0x04 belongs to InputState>>keyAt:put: (accesses rshiftState at ivar[4])
+- ✅ No method name collision between InputSensor and InputState classes
+- ❌ **ROOT CAUSE**: Method lookup bug - InputState method being executed with InputSensor receiver
+- 📊 Debug logging added to BytecodeInterpreter.cs to capture method OOP when crash occurs
+
+**Next Steps for Debugging**:
+1. Capture method OOP from crash output (when bytecode 0x04 executes with InputSensor receiver)
+2. Look up method OOP in coldstart.json to confirm it's InputState>>keyAt:put:
+3. Trace message send stack to find why InputState method is invoked on InputSensor receiver
+4. Possible causes:
+   - Method dictionary lookup returning wrong method
+   - Class OOP confusion between InputSensor and InputState
+   - Context receiver slot corruption during message send
+   - Super send or delegation logic error
+
+**Phases 1-7 complete but system non-functional due to crash. Must resolve before proceeding.**
 
 ---
 
@@ -284,6 +309,58 @@ Events are **only signaled when VM is idle**. When a controller (priority 4) blo
 ---
 
 ## Change Log
+
+### 2025-12-04 - DEBUGGING SESSION: Method Lookup Bug Investigation 🔍
+
+**Crash Details**:
+```
+Instance variable index 4 out of range [0, 0] for object oop=67886 (InputSensor)
+at BytecodeInterpreter.cs:84 (push receiver instance variable)
+Stack: GetInstanceVariable -> ExecuteBytecode -> ExecuteBytecodeStep -> InterpreterLoop
+```
+
+**Investigation Findings**:
+
+1. **Verified coldstart.json structure is correct**:
+   - InputSensor class: 1 instance variable (keyboardMap at index 0)
+   - InputState class: 12 instance variables (ivar[4] = rshiftState)
+   - No common selectors between InputSensor and InputState classes
+
+2. **Identified problematic bytecode**:
+   - Bytecode 0x04 = push receiver instance variable at index 4
+   - This bytecode does NOT exist in any InputSensor method
+   - Bytecode 0x04 found in InputState>>keyAt:put: method (accesses rshiftState)
+
+3. **Traced architecture pattern**:
+   ```smalltalk
+   InputSensor>>mousePoint
+       ^self primMousePt!
+
+   InputSensor>>buttons
+       ^CurrentInputState mouseButtons!
+   ```
+   - InputSensor forwards some methods to CurrentInputState (class variable)
+   - CurrentInputState holds an InputState instance
+   - This is intentional delegation pattern, not the bug
+
+4. **Hypothesis: Method Lookup Returns Wrong Method**:
+   - When message sent to Sensor (oop=67886, an InputSensor instance)
+   - VM method lookup finds InputState>>keyAt:put: instead of correct InputSensor method
+   - Results in bytecode 0x04 being executed with wrong receiver
+   - Possible causes:
+     - Method dictionary lookup using wrong class OOP
+     - Class table corruption
+     - Super send logic error
+     - Context receiver slot set incorrectly during message send
+
+5. **Debug logging added**:
+   - BytecodeInterpreter.cs now logs when accessing ivar[4]:
+     - Receiver class name
+     - Receiver OOP and class OOP
+     - Method OOP being executed
+   - This will identify exact method when crash occurs
+
+**Status**: Awaiting crash reproduction with debug logging to capture method OOP and trace root cause.
 
 ### 2025-12-03 - Phase 5 Complete ✅
 - ✅ Added interrupt mask counter field `_interruptsMaskedCounter` to VirtualMachine.cs

@@ -4,17 +4,28 @@
 
 ## Project Status
 
-**Interpreter Status**: ✅ **FULLY OPERATIONAL**
+**Interpreter Status**: ⚠️ **BLOCKED - Critical Bug Investigation**
 
 - **Build**: 0 errors, 0 warnings
 - **Cold Start**: Phases 1-6 all succeed
-- **Init Expressions**: 51/51 succeed (100% success rate)
-- **Comment Expressions**: ✅ **234/234 succeed** (100% success rate)
+- **Init Expressions**: 287/287 succeed (100% success rate)
 - **BlockContext Tests**: ✅ **120/120 tests PASS** (returns 1191)
-- **VM Core**: Fully functional, verified operational
+- **VM Core**: Functional but has method lookup bug
 - **Process Primitives**: ✅ **85-88 working** (suspend, resume, terminate, yield)
-- **System Browser**: ✅ **FULLY FUNCTIONAL** - source retrieval working
-- **Timer/Event System**: ✅ **FULLY OPERATIONAL** - 0% idle CPU via dual-semaphore architecture
+- **System Browser**: Non-functional (crashes before GUI appears)
+- **Timer/Event System**: ⚠️ **CRASHES on mouse movement**
+
+## 🔴 Critical Issue: Method Lookup Bug
+
+**Symptom**: Interpreter crashes immediately when mouse moves after implementing Event Architecture Refactor Phase 7.
+
+**Error**: `Instance variable index 4 out of range [0, 0] for object oop=67886 (InputSensor)`
+
+**Root Cause**: Method lookup is returning InputState methods when receiver is an InputSensor instance. Bytecode 0x04 (push receiver ivar[4]) from InputState>>keyAt:put: being executed with InputSensor receiver (which only has 1 instance variable).
+
+**Status**: Debug logging added to capture method OOP at crash point. Investigation documented in [docs/DEBUGGING-METHOD-LOOKUP-BUG.md](docs/DEBUGGING-METHOD-LOOKUP-BUG.md).
+
+**Next Action**: Capture method OOP from crash, trace message send to identify why method lookup fails.
 
 ## Known Issues
 

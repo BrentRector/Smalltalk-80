@@ -79,6 +79,17 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         if (BytecodeUtil.IsPushIvar(bytecode))
         {
             int index = BytecodeUtil.PushIvarIndex(bytecode);
+
+            // DEBUG: Log when accessing ivar[4] to diagnose crash
+            if (index == 4)
+            {
+                var receiverClass = heapManager.GetClassOOP(receiverOOP);
+                var receiverClassName = heapManager.GetClassName(receiverOOP) ?? "Unknown";
+                Console.WriteLine($"[IVAR4] Accessing ivar[4] in {receiverClassName}");
+                Console.WriteLine($"[IVAR4] Receiver: {receiverOOP}, ReceiverClass: {receiverClass}");
+                Console.WriteLine($"[IVAR4] Method OOP: {methodOOP}");
+            }
+
             var valueOOP = heapManager.GetInstanceVariable(receiverOOP, index);
             context.Push(valueOOP);
             return true;
