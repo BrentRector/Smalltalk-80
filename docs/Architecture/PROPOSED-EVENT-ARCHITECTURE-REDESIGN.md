@@ -640,181 +640,89 @@ case Bytecode.Return:
 
 ## Diagnostics and Validation
 
-These diagnostics protect blocking semantics and help identify protocol violations.
+Diagnostics protect blocking semantics and help identify protocol violations. Split into **Counters** for monitoring and **Guards** for failure recovery.
 
-### Counters (for performance monitoring)
+---
+
+### Counters & Metrics
 
 ```csharp
-// VM diagnostic counters
 public class EventDiagnostics
 {
-    // Core flow counters
-    public long InputInterruptsSignaled;     // Edge-trigger signals to InputSemaphore
-    public long InputBatchesDrained;         // Number of full drains by InputProcess
-    public long ControllerSignalsEmitted;    // Signals sent to ControllerSemaphore (must equal translated events)
-    public long EventsProcessed;             // Total events through queue
-    public long IdleParks;                   // Times VM entered idle
-    public long IdleWakes;                   // Times WaitAny returned
+    // Core flow (for verifying I1-I3)
+    public long InputInterruptsSignaled;      // Edge-trigger signals to InputSemaphore
+    public long InputBatchesDrained;          // Full drains by InputProcess
+    public long ControllerSignalsEmitted;     // Signals to ControllerSemaphore
+    public long EventsProcessed;              // Total events through queue
 
-    // Histogram: events per drain batch
-    public int[] EventsPerBatchHistogram;    // [0]=0 events, [1]=1-5, [2]=6-20, [3]=21+
+    // Idle path (for verifying I5)
+    public long IdleParks;                    // Times VM entered idle
+    public long IdleWakes;                    // Times WaitAny returned
 
-    // Anomaly detection
-    public long EmptyDrainWakes;             // InputProcess woke but queue empty (bug indicator)
-    public long MissedFlagSets;              // HasPendingEvents true but flag false (race indicator)
-    public long ControllerSemaphoreUnderflows; // Consumer wait but no events (mismatch indicator)
+    // Anomaly detection (for verifying I4)
+    public long EmptyDrainWakes;              // InputProcess woke but queue empty
+    public long MissedFlagSets;               // HasPendingEvents true but flag false
 
-    // Latency probes
-    public long LastEnqueueTimestamp;        // Timestamp on enqueue
-    public long LastInputWakeTimestamp;      // Timestamp when InputProcess wakes
-    public long MaxEnqueueToWakeLatency;     // Max observed latency
-    public int[] LatencyHistogram;           // Buckets: <1ms, 1-5ms, 5-20ms, >20ms
+    // Latency (for SLA monitoring)
+    public int[] LatencyHistogram;            // Buckets: <1ms, 1-5ms, 5-20ms, >20ms
+    public long MaxEnqueueToWakeLatency;      // Peak observed latency
 
-    // Button transition accounting (per button: left, middle, right)
-    public long[] ButtonDowns;               // Count of down events per button
-    public long[] ButtonUps;                 // Count of up events per button
-    public long ButtonMismatches;            // ups > downs or vice versa within window
+    // Button balance (for verifying I6)
+    public long[] ButtonDowns;                // Per-button down counts
+    public long[] ButtonUps;                  // Per-button up counts
 
-    // Queue occupancy metrics
-    public int PeakMouseQueueSize;           // High water mark for mouse queue
-    public int PeakKeyboardQueueSize;        // High water mark for keyboard queue
-    public long MovingAverageOccupancy;      // Moving average queue size
-    public long CoalescedMoves;              // Count of coalesced move events
-    public long DroppedMoves;                // Count of dropped moves under backpressure
+    // Queue metrics
+    public int PeakMouseQueueSize;            // High water mark
+    public long CoalescedMoves;               // Coalesced move count
+    public long DroppedMoves;                 // Dropped under backpressure
+
+    // Storm detection
+    public double SignalToDrainRatio =>
+        InputBatchesDrained == 0 ? 0 : (double)InputInterruptsSignaled / InputBatchesDrained;
+    public bool StormDetected => SignalToDrainRatio > 1.5 && InputBatchesDrained > 10;
 }
 ```
 
 ### Trace Hooks
 
-```csharp
-[Conditional("TRACE_EVENTS")]
-private void TraceEventFlow(string event, params object[] args)
-{
-    var timestamp = Stopwatch.GetTimestamp();
-    var priority = GetActiveProcessPriority();
-    Console.WriteLine($"[{timestamp}] P{priority} {event}: {string.Join(", ", args)}");
-}
+Use `[Conditional("TRACE_EVENTS")]` to emit flow traces:
 
-// Usage:
-TraceEventFlow("ENQUEUE", eventType, _inputInterruptPending);
-TraceEventFlow("SIGNAL_INPUT", excessSignals);
-TraceEventFlow("INPUT_WAKE", queueSize);
-TraceEventFlow("INPUT_DRAIN_COMPLETE", eventsProcessed);
-TraceEventFlow("CTRL_SIGNAL", mouseEventSeq);
+| Event | Parameters | Purpose |
+|-------|------------|---------|
+| `ENQUEUE` | eventType, flagState | Track producer activity |
+| `SIGNAL_INPUT` | — | Edge-trigger fired |
+| `INPUT_WAKE` | queueSize | InputProcess gained CPU |
+| `INPUT_DRAIN_COMPLETE` | eventsProcessed | Drain finished |
+| `CTRL_SIGNAL` | eventSeq | ControllerSemaphore signaled |
+| `CTRL_BLOCK` | processId | Controller waiting |
+| `CTRL_WAKE` | processId, eventsPending | Controller resumed |
 
-// Nested loop audit: trace when controller process blocks and wakes
-TraceEventFlow("CTRL_BLOCK", processId, semaphoreId);
-TraceEventFlow("CTRL_WAKE", processId, semaphoreId, eventsPending);
-```
+---
 
-### Latency Measurement
+### Guards & Recovery
 
-Timestamp on enqueue and InputProcess wake to ensure consistent preemption under tight VM loops:
+#### Debug Assertions
 
 ```csharp
-// In Enqueue:
-_diagnostics.LastEnqueueTimestamp = Stopwatch.GetTimestamp();
+// I4: No spurious wakes
+Debug.Assert(!(justSignaledInputSemaphore && queueWasEmpty),
+    "InputProcess signaled but queue was empty");
 
-// In InputProcess wake (Smalltalk or VM hook):
-var wakeTime = Stopwatch.GetTimestamp();
-var latency = wakeTime - _diagnostics.LastEnqueueTimestamp;
-_diagnostics.MaxEnqueueToWakeLatency = Math.Max(_diagnostics.MaxEnqueueToWakeLatency, latency);
+// I3: Count invariant
+Debug.Assert(ControllerSemaphoreCount == MouseEventQueueSize,
+    $"Count mismatch: semaphore={ControllerSemaphoreCount}, queue={MouseEventQueueSize}");
 ```
 
-### Assertions (debug builds)
+#### Self-Healing Guards (Release Builds)
 
-```csharp
-// No double wake loops
-Debug.Assert(
-    !(justSignaledInputSemaphore && queueWasEmpty),
-    "InputProcess signaled but queue was empty - interrupt flag race?"
-);
+| Guard | Trigger | Action |
+|-------|---------|--------|
+| Missed edge | `HasPendingEvents() && flag==0 && InputProcess blocked` | Re-arm flag, signal once |
+| Spurious wakes | `EmptyDrainWakes > threshold/min` | Disable backward-branch check |
+| Storm detected | `SignalToDrainRatio > 1.5` | Log anomaly, reduce check frequency |
+| Latency SLA breach | `>20ms latency repeated` | Dump recent trace, log alarm |
 
-// Count invariant (I3)
-Debug.Assert(
-    ControllerSemaphoreCount == MouseEventQueueSize,
-    $"Count mismatch: semaphore={ControllerSemaphoreCount}, queue={MouseEventQueueSize}"
-);
-```
-
-### Promoted Guards (release builds)
-
-These assertions are promoted to corrective paths in release mode:
-
-```csharp
-// Self-healing missed edge guard
-// Promotes assertion to corrective action in release builds
-private void CheckAndHealMissedEdge()
-{
-    if (_platformBridge.HasPendingEvents() &&
-        Interlocked.CompareExchange(ref _inputInterruptPendingInt, 1, 0) == 0 &&
-        InputProcessIsBlocked())
-    {
-        // Edge was missed - self-heal by arming and signaling
-        _diagnostics.MissedFlagSets++;
-        if (!_inputProcessRunnableOrDraining)
-        {
-            _inputProcessRunnableOrDraining = true;
-            SignalInputSemaphoreIfRegistered();
-        }
-    }
-}
-
-// Spurious wake guard
-// If InputProcess wakes to empty queue too often, disable non-essential check sites
-private void TrackSpuriousWake(bool queueWasEmpty)
-{
-    if (queueWasEmpty)
-    {
-        _diagnostics.EmptyDrainWakes++;
-        if (_diagnostics.EmptyDrainWakes > EventConfig.SpuriousWakeThresholdPerMinute)
-        {
-            // Too many spurious wakes - disable aggressive checks
-            EventConfig.EnableBackwardBranchCheck = false;
-            Console.WriteLine("[WARN] Spurious wakes exceeded threshold - disabling backward branch check");
-        }
-    }
-}
-```
-
-### Storm Detector
-
-Detects if signaling is happening during drains (indicates re-signaling bug):
-
-```csharp
-// Storm detection metric
-// If InputInterruptsSignaled / InputBatchesDrained deviates from ~1.0 under burst,
-// you're re-signaling during drains
-public double SignalTodrainRatio =>
-    InputBatchesDrained == 0 ? 0 : (double)InputInterruptsSignaled / InputBatchesDrained;
-
-// Should be close to 1.0; > 1.5 indicates potential storm
-public bool StormDetected => SignalToDrainRatio > 1.5 && InputBatchesDrained > 10;
-```
-
-### Latency SLA Alarms
-
-If enqueue-to-wake latency exceeds configured SLA buckets repeatedly, dump a short trace:
-
-```csharp
-private void CheckLatencySLA(long latencyTicks)
-{
-    var latencyMs = latencyTicks * 1000.0 / Stopwatch.Frequency;
-
-    // Update histogram
-    if (latencyMs < 1) _diagnostics.LatencyHistogram[0]++;
-    else if (latencyMs < 5) _diagnostics.LatencyHistogram[1]++;
-    else if (latencyMs < 20) _diagnostics.LatencyHistogram[2]++;
-    else _diagnostics.LatencyHistogram[3]++;
-
-    // Alarm if >20ms repeatedly
-    if (latencyMs > 20 && _diagnostics.LatencyHistogram[3] > 10)
-    {
-        Console.WriteLine($"[LATENCY ALARM] {latencyMs:F1}ms - dumping trace");
-        DumpRecentEventTrace();
-    }
-}
-```
+Guards degrade gracefully rather than crashing, dumping diagnostic snapshots for postmortem.
 
 ---
 
