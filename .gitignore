@@ -69,3 +69,4 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+Smalltalk80.Interpreter/test_output.txt
