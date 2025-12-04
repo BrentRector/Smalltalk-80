@@ -1,7 +1,7 @@
 # Proposed Event Architecture Redesign
 
 **Date**: 2025-12-04
-**Status**: PROPOSAL (v7 - complete specification with rollout plan)
+**Status**: PROPOSAL (v8 - streamlined specification)
 **Authors**: Collaborative analysis by multiple expert agents
 **Implementation**: Clean-slate refactor (~840 lines, 10 phases)
 **Appendices**: A (Concurrency), B (Blue Book), C (Rollout Notes), D (Timeline), E (Diagrams)
@@ -10,29 +10,18 @@
 
 ## Executive Summary
 
-The current event handling architecture has a **critical priority inversion bug** that causes deadlocks in nested event consumers (like popup menus). This document proposes a solution based on **software interrupt simulation** with **edge-triggered, idempotent signaling** that matches the Blue Book's hardware interrupt design.
+The current event handling system in our Smalltalk-80 virtual machine suffers from a critical flaw: input events are only signaled when the VM is idle. This design works for simple cases but fails whenever nested consumers—such as popup menus—need to block and wait for input while another controller is active. The result is a priority inversion: the InputProcess never wakes, events accumulate, and the waiting controller deadlocks.
 
-### The Core Problem
+This proposal introduces a clean-slate redesign based on **software interrupt simulation**, modeled after the Blue Book's hardware interrupt semantics. The key innovation is an **edge-triggered, idempotent signaling** mechanism that ensures:
 
-**InputSemaphore is only signaled during idle state**, but nested event consumers (popup menus) need to receive events while a higher-layer controller is active. This creates a deadlock:
+- Input events are delivered promptly even when the VM is busy
+- The InputProcess can always preempt lower-priority tasks to drain the queue
+- Each wake cycle processes all pending events, eliminating missed transitions
+- Idle periods remain at true 0% CPU, preserving efficiency on modern systems
 
-```
-1. Controller (priority 4) shows popup menu
-2. Menu waits on ControllerSemaphore
-3. VM is NOT idle (priority 4 process running)
-4. InputSemaphore NEVER signaled
-5. InputProcess (priority 6) NEVER wakes to process events
-6. ControllerSemaphore NEVER signaled
-7. DEADLOCK - menu waits forever
-```
+The redesign establishes formal invariants for correctness (no lost events, no spurious wakes, preserved down/up transitions, fairness across input classes) and provides a phased rollout plan. Early phases deliver the critical fix for deadlocks and idle CPU usage; later phases add fairness, diagnostics, and OS integration edge-case handling.
 
-### The Solution
-
-**Add periodic event checking during normal execution** with an **edge-triggered interrupt flag** that ensures:
-1. InputProcess can preempt lower-priority processes when events arrive
-2. Signaling is idempotent (no duplicate wakes or count inflation)
-3. InputProcess drains the entire queue per wake cycle
-4. Idle path coalesces burst events into single wake
+By aligning the VM's input architecture with canonical interrupt semantics, this proposal restores responsiveness, eliminates deadlocks, and creates a maintainable foundation for future extensions.
 
 ---
 
@@ -100,266 +89,131 @@ Keyboard events are processed within F milliseconds even under pointer move burs
 
 ## Design Principles
 
-### 1. Edge-Triggered, Idempotent Signaling
+This section groups the design decisions into thematic categories. For canonical code implementations, see **Detailed Architecture** below.
 
-**Problem with level-triggered approach**: Re-signaling InputSemaphore at every periodic check while events are pending causes unnecessary wakeups if InputProcess is already runnable or draining. This inflates semaphore counts and creates wake cycles with no new work.
+---
 
-**Solution**: Use a VM-local atomic flag `_inputInterruptPendingInt` that:
-- Is set atomically by the UI thread on enqueue (edge-arm)
-- Is checked and cleared atomically by the periodic check
-- Ensures exactly one InputSemaphore signal per event batch
+### Concurrency
 
-**Gap: volatile bool is not sufficient** for multi-threaded edge semantics if the UI thread and VM thread race; you can get lost edges or double-clears.
+#### Edge-Triggered Signaling
 
-**Fix: Use atomic operations** to make the "arm once, clear once" behavior explicit:
+Level-triggered signaling (re-signaling while events are pending) causes unnecessary wakeups and count inflation. Instead, use an **edge-triggered** approach:
 
-```
-Enqueue (UI thread):
-  queue.Add(event)
-  Interlocked.Exchange(ref _inputInterruptPendingInt, 1)  // Edge-arm; atomic
+- UI thread atomically arms `_inputInterruptPendingInt = 1` on enqueue
+- VM thread atomically clears and checks: if previous value was 1, signal once
+- `Interlocked.Exchange` guarantees exactly one signal per event batch
 
-Periodic check (VM thread):
-  if (HasPendingEvents() && Interlocked.Exchange(ref _inputInterruptPendingInt, 0) == 1):
-    SignalInputSemaphore()  // One signal per batch
-```
+#### Runnable/Draining Latch
 
-This assures one signal per batch regardless of write reordering or concurrent writes; it also prevents the VM thread from clearing a freshly armed edge before signaling.
+To prevent re-signaling while InputProcess is active, track `_inputProcessRunnableOrDraining`:
 
-### 1a. "Already Runnable" Guard
+- Set `true` immediately before signaling InputSemaphore
+- Cleared by InputProcess via `primInputDrainComplete` at end of drain
+- Also cleared by scheduler hook when switching away from a blocked InputProcess
 
-**Gap**: You may re-signal InputSemaphore while the InputProcess is runnable (or mid-drain), causing count inflation and redundant preemption.
+#### Scheduler Context Switch Hook
 
-**Fix**: Track a VM-local boolean `_inputProcessRunnableOrDraining`. Only signal if it's false.
-- Set `true` immediately before signaling
-- Set `false` when InputProcess parks (after full drain)
+If the active process changes before InputProcess runs, the latch could become stale. Clear it on any scheduler switch away from InputProcess when InputProcess is blocked.
 
-The InputProcess calls a primitive at the end of its drain to notify the VM:
+---
 
-```
-VM side:
-  _inputProcessRunnableOrDraining = true  // before signal
-  SignalInputSemaphore()
+### Drain Invariant
 
-InputProcess (Smalltalk):
-  "At end of drain, tell VM we are parking again"
-  self primInputDrainComplete  // primitive clears the flag
-```
+InputProcess drains the **entire queue** per wake, not one event at a time:
 
-### 1b. Scheduler Context Switch Hook
-
-**Gap**: If the active process changes between "signal" and "InputProcess starts," a stale latch can keep `_inputProcessRunnableOrDraining` true.
-
-**Fix**: Clear the latch on any scheduler context switch away from InputProcess:
-- When activating a non-InputProcess after InputProcess ran, call `InputDrainComplete()` if InputProcess is parked
-- Add hook in process scheduler's `TransferTo:` or equivalent
-
-### 1c. Controller Priority Discipline
-
-**Gap**: A controller at priority 4 waiting on ControllerSemaphore works fine, but nested child controllers spawned at different priorities could starve.
-
-**Fix**: Document and assert controller priorities:
-- Any process waiting on ControllerSemaphore must have priority ≤6 and typically ==4
-- Keep transient helper processes ≤4
-- Add debug check for priority violations on ControllerSemaphore wait
-
-### 2. Full Queue Drain Per Wake (InputProcess Drain Invariant)
-
-**Problem**: If InputProcess only processes one event per wake, and multiple events arrive, semaphore counts inflate and create unnecessary context switches.
-
-**Solution**: InputProcess drains the entire queue before waiting again:
-
-**Drain-all policy**: The InputProcess, upon waking, must:
 1. Dequeue all pending OS events
 2. Translate each to Smalltalk Mouse/Keyboard events
 3. Signal ControllerSemaphore once per translated event
+4. Call `primInputDrainComplete` to clear latch and re-arm for next batch
 
-**Return-to-wait**: When the queue becomes empty, the InputProcess waits on InputSemaphore. No further VM signaling occurs until the flag is re-armed by new arrivals.
+This enforces **I2** (Drain Invariant) and prevents semaphore count inflation.
 
-```smalltalk
-InputState>>run
-    [true] whileTrue: [
-        InputSemaphore wait.
-        "Drain entire queue in one wake cycle"
-        [self primInputWord notNil] whileTrue: [
-            self processOneEvent.
-            self enqueueMouseEventIfNeeded.
-            ControllerSemaphore signal].
-        "Queue empty - return to wait; flag will be re-armed by next enqueue"
-    ]
-```
+---
 
-### 3. Idle Path Coalescing
+### Idle Path
 
-**Problem**: WaitAny() can return multiple times for bursty events, causing bounce between idle and active states.
+The idle path must coalesce burst events into a single wake:
 
-**Solution**: Use the same `_inputInterruptPending` guard in idle path:
+- Park only when: `ActiveProcessPriority == 1 && !HasPendingEvents() && flag == 0`
+- Use `ManualResetEventSlim` with explicit `Reset()` after wake
+- Apply the same edge-triggered guard: one signal per batch
+- Self-healing: if events pending but flag is 0, re-arm and signal
 
-```
-Idle wait:
-  Park only when: ActiveProcessPriority == 1
-                  && !_inputInterruptPending
-                  && !HasPendingEvents()
+See **Detailed Architecture > Idle Path** for the hardened implementation.
 
-  On WaitAny return:
-    if (_inputInterruptPending):
-      _inputInterruptPending = false
-      SignalInputSemaphore()  // One signal, InputProcess drains all
-```
+---
 
-### 4. Strategic Check Placement
+### Strategic Check Placement
 
-**Problem**: 1000-bytecode periodic check may miss tight loops with low bytecode counts per iteration.
+The 1000-bytecode periodic check may miss tight loops. Add checks at:
 
-**Solution**: Add checks at strategic yield points:
-1. **Periodic counter** (every 1000 bytecodes) - baseline
-2. **Backward branch** (relative jumps to lower IP) - catches tight loops
-3. **After non-trivial primitives** (display, arithmetic bursts)
-4. **After context switch operations** (sends that switch active process)
+| Check Point | Purpose |
+|-------------|---------|
+| Periodic counter (every 1000 bytecodes) | Baseline coverage |
+| Backward branch (offset < 0) | Catches tight loops immediately |
+| Method return | Natural yield point |
+| After non-trivial primitives | Optional, for display-heavy code |
 
-**Config**: Make each check site enable/disable via flags for tuning.
+Each check site is gated by a configuration flag for tuning.
 
-### 5. Event Batching, Coalescing, and Fairness
+---
 
-#### Mouse Move Coalescing
+### Event Batching, Coalescing, and Fairness
 
-**Gap**: High-frequency motion floods the queue with redundant moves, bloating ControllerSemaphore counts and increasing wake loops for consumers.
+#### Move Coalescing
 
-**Fix**: Coalesce consecutive `#move` events:
-- In the producer: if last queued event is a move, update its position instead of enqueueing a new item
-- In the InputProcess drain: collapse multiple moves into the latest point for the same button state before signaling controllers
-
-**Policy**: Maintain ordering of button transitions; moves can be squashed as long as they don't skip over transitions.
-
-#### Batch Signaling Rate Limiting
-
-**Gap**: Very high enqueue rates could make the VM oscillate at the boundary of drains even with edge-triggering.
-
-**Fix**: After signaling InputSemaphore, throttle new signals during the current drain window:
-- Keep `_inputProcessRunnableOrDraining = true` until the drain completes
-- UI thread continues enqueueing, but signals only resume once the InputProcess parks
+High-frequency mouse moves can flood the queue. Coalesce consecutive `#move` events by updating the previous move's position instead of enqueueing a new item. **Never coalesce across button transitions.**
 
 #### Keyboard Fairness
 
-**Gap**: Keyboard events and pointer events share one ControllerSemaphore but may have different urgency. Pointer move coalescing risks starving keypress delivery.
+Use separate logical queues for keyboard and pointer events, but one ControllerSemaphore. The drain prioritizes:
+1. Discrete transitions (down/up)
+2. Wheel/scroll events
+3. Pointer moves (coalesced)
 
-**Fix**: Use separate logical queues for keyboard and mouse, but one ControllerSemaphore. The InputProcess drain alternates or prioritizes discrete transitions first (down/up) before bulk moves.
+This enforces **I7** (Fairness Invariant).
 
-### 6. Timer and Input Ordering
+---
 
-**Gap**: Timer signaling can race with input signaling and reorder events in a way that surprises controllers.
+### Timer and Input Ordering
 
-**Fix**: Enforce ordering: perform input signaling before timer signaling inside each periodic cycle, or vice versa, but document and assert it.
+Input signaling occurs **before** timer signaling in each check cycle. Precedence order:
 
-**Rule**: "User input preempts timers" - input signaling occurs first in each check cycle.
+1. **Input** (highest urgency for UI responsiveness)
+2. **Timer**
+3. **Low-space** (if implemented)
 
-### 7. Low-Space and GC Interactions
+---
 
-#### Interrupt Precedence
+### GC and Interrupt Masking
 
-**Gap**: Blue Book mentions low-space interrupt; if added later, its signal can starve input or vice versa.
+GC and long primitives must not be interrupted mid-operation. Use `_interruptsMaskedCounter`:
 
-**Fix**: Define a precedence order:
-1. Input (highest urgency for UI responsiveness)
-2. Timer
-3. Low-space
+- `MaskInterrupts()`: Increment counter; signals are deferred
+- `UnmaskInterrupts()`: Decrement; if counter reaches 0 and flag is armed, perform one consolidated signal
 
-Consider delivering low-space to a dedicated handler at priority 7 so it preempts input only when necessary.
+This prevents InputProcess wake during heap compaction or other critical sections.
 
-#### GC-Safe Signaling
+---
 
-**Gap**: If GC compacts while input arrives, ensure the InputProcess wake isn't delivered mid-compaction with heap locks held.
+### Event Semantics Consistency
 
-**Fix**: Block input signaling during GC critical sections and re-arm the edge flag afterward; then perform a single signal post-GC.
+| Semantic | Rule |
+|----------|------|
+| Down/up transitions | Never coalesced; preserved exactly (I6) |
+| Double-click timing | Per-button timing record; `event.timestamp` for threshold |
+| Keyboard autorepeat | Never coalesced; preserved as discrete events |
+| Modifier state | Each event carries a snapshot; no reliance on global state |
 
-#### Interrupt Masking for Long Primitives
+---
 
-**Gap**: Long-running primitives that hold heap locks need similar protection.
+### OS Integration Edge Cases
 
-**Fix**: Add a VM `_interruptsMaskedCounter`:
-- While >0, `CheckAndSignalPendingEvents()` only arms the flag (no signal)
-- On exit (counter→0), perform a single consolidated signal if flag is armed
-
-```csharp
-public void MaskInterrupts() => _interruptsMaskedCounter++;
-public void UnmaskInterrupts()
-{
-    if (--_interruptsMaskedCounter == 0 && _inputInterruptPendingInt == 1)
-        CheckAndSignalPendingEvents();  // Consolidated signal
-}
-```
-
-### 8. Event Semantics Consistency
-
-#### Double-Click Timing and Button Chord Handling
-
-**Gap**: Coalescing and batching can reorder or compress transitions; double-click detection needs a stable time base and non-squashed down/up pairs.
-
-**Fix**:
-- Preserve down/up transitions exactly; only coalesce move
-- Add a per-button timing record in InputProcess
-- Controllers read a canonical `event.timestamp` for double-click thresholds
-
-#### Keyboard Autorepeat
-
-**Gap**: OS autorepeat bursts could flood the queue like mouse moves.
-
-**Fix**:
-- Do NOT coalesce key events
-- Ensure repeat sequences are preserved
-- Optional: deliver repeat as discrete events but allow consumers to drain-many
-
-#### Modifier Synchronization (Shift/Ctrl)
-
-**Gap**: Modifier state changes must be visible to mouse event consumers that process subsequent moves in the same batch.
-
-**Fix**: Each event carries a snapshot of modifier state; do not rely on global Sensor state mutating mid-drain.
-
-```smalltalk
-MouseEvent>>modifiers
-    "Return modifier state at time of this event"
-    ^modifierSnapshot
-```
-
-### 9. Ordering and Fairness
-
-#### Event Class Ordering in Drain
-
-Process events in this order to ensure fairness:
-1. **Discrete transitions** (button down/up, key down/up) - highest priority
-2. **Wheel/scroll events**
-3. **Pointer moves** (coalesced) - processed last
-
-Make ordering policy explicit and configurable.
-
-#### Backpressure Under Extreme Load
-
-**Gap**: If the UI thread produces faster than drain, memory could balloon.
-
-**Fix**: Add a soft cap:
-- Beyond N pending moves, coalesce aggressively and drop intermediate moves
-- Log a warning and increment a `coalescedDrops` metric
-- N should be configurable (default: 100)
-
-### 10. OS Integration Edge Cases
-
-#### Window Focus and Capture Loss
-
-**Gap**: Losing window focus or mouse capture during a popup loop can leave a controller waiting forever.
-
-**Fix**:
-- If PlatformBridge reports focus loss or capture loss, enqueue a synthetic "cancel" event
-- Popup menus should listen for cancel and exit cleanly
-- Controller loops should check for cancel in their drain
-
-#### Display Sleep/System Suspend
-
-**Gap**: Idle wake handle can be set while system sleeps; post-resume the flag may be stale.
-
-**Fix**: On resume:
-- Re-evaluate `HasPendingEvents()`
-- Re-arm edge flag if events pending
-- Perform a single signal
-- Clear stale diagnostics counters over time window
+| Scenario | Resolution |
+|----------|------------|
+| Focus/capture loss | Enqueue synthetic "cancel" event; popup menus exit cleanly |
+| System suspend/resume | Re-check `HasPendingEvents()`, re-arm flag, force single signal |
+| Backpressure overflow | Soft cap (default 100 moves); aggressive coalescing, log warning |
 
 ---
 
@@ -718,7 +572,13 @@ Controller>>trackPotentialDrag
 | Controllers | 4 (userSchedulingPriority) | Consumers of mouse/keyboard events |
 | Background | 1 (systemRockBottomPriority) | Idle sentinel |
 
-**Rule**: Only the InputProcess should run at priority 6; controller code runs at priority 4 or below. This ensures preemption works and prevents controller code from starving input.
+**Rules**:
+- Only InputProcess runs at priority 6; controller code runs at priority 4 or below
+- Any process waiting on ControllerSemaphore must have priority ≤6 (typically 4)
+- Transient helper processes spawned by controllers must stay ≤4
+- Debug builds assert priority violations on ControllerSemaphore wait
+
+This ensures preemption works and prevents nested controllers from starving each other.
 
 ### No Heap Access from UI Thread
 
