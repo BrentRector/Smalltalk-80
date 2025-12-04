@@ -1,8 +1,9 @@
 # Proposed Event Architecture Redesign
 
 **Date**: 2025-12-04
-**Status**: PROPOSAL (v5 - final refinements, complete specification)
+**Status**: PROPOSAL (v6 - complete specification with detailed implementation plan)
 **Authors**: Collaborative analysis by multiple expert agents
+**Implementation**: Clean-slate refactor (~840 lines, 10 phases)
 
 ---
 
@@ -1139,51 +1140,379 @@ private void CheckLatencySLA(long latencyTicks)
 
 ## Implementation Plan
 
-### Phase 1: Core Infrastructure
+This is a **clean-slate refactor** of the event architecture. No backward compatibility with the current buggy implementation is required. The goal is to implement the complete design as specified in this document.
 
-1. Add `_inputInterruptPending` flag to VirtualMachine
-2. Modify `SmalltalkEventQueue.Enqueue()` to set flag
-3. Add `CheckAndSignalPendingEvents()` with edge-trigger logic
-4. Call from periodic check block
+---
+
+### Phase 1: Core VM Infrastructure
+
+**Goal**: Establish atomic edge-triggered interrupt flag and runnable guard
+
+#### Step 1.1: Add Atomic Interrupt Flag
+- [ ] Add `private int _inputInterruptPendingInt` field to `VirtualMachine.cs` (use int for Interlocked operations)
+- [ ] Add `private bool _inputProcessRunnableOrDraining` latch field
+- [ ] Initialize both fields to 0/false in VM constructor
+
+#### Step 1.2: Update Event Queue Enqueue
+- [ ] In `SmalltalkEventQueue.Enqueue()`, add `Interlocked.Exchange(ref vm._inputInterruptPendingInt, 1)` after queue add
+- [ ] Pass VM reference to SmalltalkEventQueue constructor (or use callback/delegate pattern)
+- [ ] Verify thread safety: UI thread only writes, VM thread only clears
+
+#### Step 1.3: Implement CheckAndSignalPendingEvents
+- [ ] Create `CheckAndSignalPendingEvents()` method in VirtualMachine:
+  ```csharp
+  private void CheckAndSignalPendingEvents()
+  {
+      if (_platformBridge == null || !_platformBridge.HasPendingEvents())
+          return;
+      if (Interlocked.Exchange(ref _inputInterruptPendingInt, 0) == 1
+          && !_inputProcessRunnableOrDraining)
+      {
+          _inputProcessRunnableOrDraining = true;
+          SignalInputSemaphoreIfRegistered();
+          _diagnostics.InputInterruptsSignaled++;
+      }
+  }
+  ```
+- [ ] Call from periodic check in interpreter loop (every 1000 bytecodes)
+
+#### Step 1.4: Implement InputDrainComplete Primitive
+- [ ] Add new primitive (e.g., primitive 199) for `InputDrainComplete`
+- [ ] Implementation: `_inputProcessRunnableOrDraining = false`
+- [ ] Increment `_diagnostics.InputBatchesDrained`
+- [ ] Register in InputPrimitives.cs
+
+**Files**: `VirtualMachine.cs`, `SmalltalkEventQueue.cs`, `InputPrimitives.cs`
+**Estimated lines**: ~60
+
+---
+
+### Phase 2: Idle Path Hardening
+
+**Goal**: Fix idle wait to use ManualResetEventSlim with proper guards
+
+#### Step 2.1: Replace AutoResetEvent
+- [ ] Replace any `AutoResetEvent` for idle wake with `ManualResetEventSlim`
+- [ ] Rename to `_idleWake` for clarity
+- [ ] Add `_isIdle` volatile bool to track idle state
+
+#### Step 2.2: Rewrite EnterIdleWait Loop
+- [ ] Implement the hardened idle loop from "Idle Path (Hardened with ManualResetEventSlim)" section:
+  - Check pending events before parking
+  - Set `_isIdle = true` before Wait
+  - Call `_idleWake.Reset()` explicitly after wake
+  - Set `_isIdle = false` after wake
+  - Apply edge-triggered signal with runnable guard
+- [ ] Add self-healing guard: if `HasPendingEvents()` but flag is 0 and InputProcess blocked, re-arm
+
+#### Step 2.3: Update UI Thread Enqueue
+- [ ] In `EnqueueEvent()`, add: `if (_isIdle) _idleWake.Set()` after arming flag
+- [ ] Ensure Set() is called regardless of flag state (idle wake is separate from interrupt flag)
+
+#### Step 2.4: Remove Legacy Code
+- [ ] Remove `ForceResetEventSignal()` if present (no-op/misleading)
+- [ ] Remove any old polling/busy-wait logic in idle path
+- [ ] Remove any duplicate signaling paths
 
 **Files**: `VirtualMachine.cs`, `SmalltalkEventQueue.cs`
-**Lines changed**: ~30
+**Estimated lines**: ~50
 
-### Phase 2: Idle Path Correction
-
-1. Add flag check before parking in `EnterIdleWait()`
-2. Coalesce wake handling with flag guard
-3. Remove `ForceResetEventSignal()` call (no-op, misleading)
-
-**Files**: `VirtualMachine.cs`
-**Lines changed**: ~15
+---
 
 ### Phase 3: Strategic Check Points
 
-1. Add check at backward branch in bytecode interpreter
-2. Add check at method return
-3. Make check frequency configurable
+**Goal**: Add event checks at backward branches and method returns for tight loop responsiveness
 
-**Files**: `BytecodeInterpreter.cs` or `VirtualMachine.cs`
-**Lines changed**: ~20
+#### Step 3.1: Backward Branch Check
+- [ ] In bytecode dispatch for Jump bytecodes, detect backward branch (offset < 0)
+- [ ] Call `CheckAndSignalPendingEvents()` on backward branch
+- [ ] Gate with `EventConfig.EnableBackwardBranchCheck` flag
 
-### Phase 4: Diagnostics
+#### Step 3.2: Method Return Check
+- [ ] In `HandleReturn()` or equivalent, call `CheckAndSignalPendingEvents()`
+- [ ] Call before context switch operations
+- [ ] Gate with `EventConfig.EnableMethodReturnCheck` flag
 
-1. Add counter infrastructure
-2. Add trace hooks (conditional compilation)
-3. Add debug assertions
+#### Step 3.3: Primitive Return Check (Optional)
+- [ ] After non-trivial primitives (display operations, heavy computation), optionally check
+- [ ] Gate with `EventConfig.EnablePrimitiveReturnCheck` flag (default false)
 
-**Files**: New `EventDiagnostics.cs`, modifications to VM
-**Lines changed**: ~100
+#### Step 3.4: Configuration Infrastructure
+- [ ] Create `EventConfig` static class with:
+  - `PeriodicCheckInterval` (default 1000)
+  - `EnableBackwardBranchCheck` (default true)
+  - `EnableMethodReturnCheck` (default true)
+  - `EnablePrimitiveReturnCheck` (default false)
+- [ ] Add `ApplyProfile()` method for Conservative/Responsive/Stress profiles
 
-### Phase 5: Smalltalk Verification
+**Files**: `VirtualMachine.cs`, new `EventConfig.cs`
+**Estimated lines**: ~80
 
-1. Verify InputProcess drains queue fully
-2. Verify consumers use correct protocol
-3. Fix any consumer code that assumes one-wake-one-event
+---
+
+### Phase 4: Scheduler Context Switch Hook
+
+**Goal**: Clear runnable latch when process switches away from InputProcess
+
+#### Step 4.1: Identify InputProcess OOP
+- [ ] Store InputProcess OOP reference when it's created/registered
+- [ ] Add `private SmalltalkOOP _inputProcessOOP` field
+
+#### Step 4.2: Add Context Switch Hook
+- [ ] In `TransferTo()` or process switch logic, detect switch away from InputProcess
+- [ ] When switching FROM InputProcess TO another process:
+  - If InputProcess is now blocked, call `InputDrainComplete()` to clear latch
+- [ ] Prevent stale latch from blocking future signals
+
+#### Step 4.3: Test Latch Behavior
+- [ ] Verify: after InputProcess drains and waits, latch is false
+- [ ] Verify: if InputProcess preempted mid-drain, latch stays true until explicit clear
+- [ ] Verify: context switch clears stale latches
+
+**Files**: `VirtualMachine.cs`, `VirtualMachine.ProcessScheduling.cs`
+**Estimated lines**: ~30
+
+---
+
+### Phase 5: Interrupt Masking
+
+**Goal**: Prevent signaling during GC and long primitives
+
+#### Step 5.1: Add Interrupt Mask Counter
+- [ ] Add `private int _interruptsMaskedCounter` field to VM
+- [ ] Add `MaskInterrupts()`: increments counter
+- [ ] Add `UnmaskInterrupts()`: decrements counter; if 0 and flag armed, consolidate signal
+
+#### Step 5.2: Wrap GC with Masking
+- [ ] Call `MaskInterrupts()` before GC compaction/critical section
+- [ ] Call `UnmaskInterrupts()` after GC completes
+- [ ] Ensure no InputProcess wake during heap locks
+
+#### Step 5.3: Wrap Long Primitives (Optional)
+- [ ] Identify primitives that hold heap locks (file I/O, display operations)
+- [ ] Wrap with `MaskInterrupts()`/`UnmaskInterrupts()` if needed
+- [ ] Document which primitives are masked
+
+**Files**: `VirtualMachine.cs`, `HeapManager.cs`, potentially primitive files
+**Estimated lines**: ~40
+
+---
+
+### Phase 6: Diagnostics Infrastructure
+
+**Goal**: Add comprehensive monitoring and debugging support
+
+#### Step 6.1: Create EventDiagnostics Class
+- [ ] Create new `EventDiagnostics.cs` with counters:
+  - `InputInterruptsSignaled`, `InputBatchesDrained`
+  - `ControllerSignalsEmitted`, `EventsProcessed`
+  - `IdleParks`, `IdleWakes`
+  - `EmptyDrainWakes`, `MissedFlagSets`
+  - `ButtonDowns[]`, `ButtonUps[]`, `ButtonMismatches`
+  - `PeakMouseQueueSize`, `PeakKeyboardQueueSize`
+  - `CoalescedMoves`, `DroppedMoves`
+- [ ] Add latency histogram: `LatencyHistogram[]` for <1ms, 1-5ms, 5-20ms, >20ms
+- [ ] Add `SignalToDrainRatio` computed property
+- [ ] Add `StormDetected` computed property
+
+#### Step 6.2: Add Trace Hooks
+- [ ] Add `[Conditional("TRACE_EVENTS")] TraceEventFlow()` method
+- [ ] Instrument: ENQUEUE, SIGNAL_INPUT, INPUT_WAKE, INPUT_DRAIN_COMPLETE, CTRL_SIGNAL, CTRL_BLOCK, CTRL_WAKE
+
+#### Step 6.3: Add Debug Assertions
+- [ ] Assert queue not empty on InputProcess wake (I4)
+- [ ] Assert ControllerSemaphore count == MouseEventQueue size (I3)
+- [ ] Assert discrete transitions never coalesced (I6)
+
+#### Step 6.4: Add Self-Healing Guards (Release Builds)
+- [ ] Implement `CheckAndHealMissedEdge()` for release builds
+- [ ] Implement `TrackSpuriousWake()` to disable aggressive checks if spurious wakes exceed threshold
+
+#### Step 6.5: Add Latency SLA Monitoring
+- [ ] Track `LastEnqueueTimestamp`, `LastInputWakeTimestamp`
+- [ ] Compute latency and update histogram
+- [ ] Log alarm if >20ms latency repeated
+
+**Files**: New `EventDiagnostics.cs`, modifications to `VirtualMachine.cs`
+**Estimated lines**: ~200
+
+---
+
+### Phase 7: Smalltalk-Side Implementation
+
+**Goal**: Implement InputProcess drain loop and consumer protocols
+
+#### Step 7.1: InputState Class Updates
+- [ ] Ensure `InputState>>run` drains entire queue per wake:
+  ```smalltalk
+  InputState>>run
+      [true] whileTrue: [
+          InputSemaphore wait.
+          [self primInputWord notNil] whileTrue: [
+              self processOneEvent.
+              self enqueueMouseEventIfNeeded.
+              ControllerSemaphore signal].
+          self primInputDrainComplete]
+  ```
+- [ ] Add `primInputDrainComplete` method calling new primitive
+- [ ] Ensure keyboard and mouse events go to separate logical queues
+
+#### Step 7.2: InputSensor Drain APIs
+- [ ] Implement `hasKeyboardEvent`, `nextKeyboardEvent`
+- [ ] Implement `hasPointerEvent`, `nextPointerEvent`
+- [ ] Ensure `nextMouseEvent` dequeues from MouseEventQueue (not polling bitState)
+
+#### Step 7.3: Sensor Wait Methods
+- [ ] Verify `waitForControllerEvent` blocks on ControllerSemaphore
+- [ ] Implement `waitButton` with blocking (no busy-wait)
+- [ ] Implement `waitNoButton` with blocking (no busy-wait)
+
+#### Step 7.4: PopUpMenu Refactor
+- [ ] Refactor `PopUpMenu>>startUp:` to use event-driven blocking pattern
+- [ ] Implement `checkForCancel` for ESC key and focus loss
+- [ ] Ensure yellow-button up resolves selection atomically
+
+#### Step 7.5: Controller Patterns
+- [ ] Ensure controllers use one of two canonical patterns:
+  - Wake-once, process-one (state machines)
+  - Wake-once, drain-many (trackers/menus)
+- [ ] Add `trackPotentialDrag` with DragThreshold constant
+
+#### Step 7.6: MouseEvent Enhancement
+- [ ] Add `modifierSnapshot` field to MouseEvent objects
+- [ ] Capture modifier state at event creation time
+- [ ] Add `modifiers` accessor method
 
 **Files**: `Smalltalk-80.st`
-**Lines changed**: ~20
+**Estimated lines**: ~150
+
+---
+
+### Phase 8: Event Coalescing and Fairness
+
+**Goal**: Implement move coalescing and event class ordering
+
+#### Step 8.1: Move Coalescing (Optional, Gated)
+- [ ] In producer or InputProcess, detect consecutive `#move` events
+- [ ] Replace previous move with latest position (don't enqueue new item)
+- [ ] Never coalesce across button transitions
+- [ ] Gate with `EventConfig.MoveCoalescingEnabled` (default false)
+
+#### Step 8.2: Event Class Ordering
+- [ ] In InputProcess drain, process events in order:
+  1. Discrete transitions (button down/up, key down/up)
+  2. Wheel/scroll events
+  3. Pointer moves (coalesced)
+- [ ] Use separate sub-queues or priority markers
+
+#### Step 8.3: Backpressure
+- [ ] Add soft cap for pending moves (default: 100)
+- [ ] Beyond cap: aggressive coalescing, drop intermediate moves
+- [ ] Increment `DroppedMoves` metric
+- [ ] Log warning on first drop per window
+
+#### Step 8.4: Keyboard Fairness
+- [ ] Ensure keyboard events not starved by move bursts
+- [ ] If keyboard queue has events, prioritize over moves in same drain cycle
+
+**Files**: `SmalltalkEventQueue.cs`, `Smalltalk-80.st`
+**Estimated lines**: ~80
+
+---
+
+### Phase 9: OS Integration
+
+**Goal**: Handle focus loss, capture loss, suspend/resume
+
+#### Step 9.1: Focus/Capture Loss Events
+- [ ] In PlatformBridge, detect window focus loss
+- [ ] Enqueue synthetic "cancel" event on focus loss
+- [ ] Enqueue synthetic "cancel" event on mouse capture loss
+
+#### Step 9.2: Popup Cancel Handling
+- [ ] Update `PopUpMenu>>checkForCancel` to check `Sensor focusLost`
+- [ ] On cancel, return selection = 0 and exit cleanly
+- [ ] Ensure no deadlock on focus loss mid-popup
+
+#### Step 9.3: Suspend/Resume Handling
+- [ ] On system resume, call `CheckAndHealMissedEdge()`
+- [ ] Re-evaluate `HasPendingEvents()` and re-arm flag if needed
+- [ ] Clear stale diagnostic counters that span suspend window
+
+**Files**: `PlatformBridge` implementations, `VirtualMachine.cs`, `Smalltalk-80.st`
+**Estimated lines**: ~50
+
+---
+
+### Phase 10: Testing and Validation
+
+**Goal**: Execute test plan and validate all invariants
+
+#### Step 10.1: Unit Tests
+- [ ] Test atomic flag operations (race scenarios)
+- [ ] Test runnable guard latch behavior
+- [ ] Test interrupt masking during simulated GC
+- [ ] Test event ordering (discrete before moves)
+
+#### Step 10.2: Integration Tests
+- [ ] Popup menu nested test (no deadlock)
+- [ ] 0% idle CPU test (60-second idle periods)
+- [ ] Burst stress test (1-2 kHz mouse moves for 3 seconds)
+- [ ] Backward-loop latency test (<1ms response)
+
+#### Step 10.3: Regression Tests
+- [ ] BlockContextTest returns 1191
+- [ ] Timer/Delay mechanism works correctly
+- [ ] Keyboard input works correctly
+- [ ] Display updates work correctly
+
+#### Step 10.4: Advanced Tests
+- [ ] Focus/capture loss during popup
+- [ ] Mixed input burst test (keyboard fairness, I7)
+- [ ] Suspend/resume test
+- [ ] GC under load test
+
+#### Step 10.5: Decision Checkpoint Validation
+- [ ] Checkpoint 1 (Correctness): All core criteria pass
+- [ ] Checkpoint 2 (Performance): ~0% idle CPU, no signal storms
+- [ ] Checkpoint 3 (Robustness): <1ms tight loop latency, stress test passes
+
+**Files**: Test scripts, possibly new `EventTests.cs`
+**Estimated lines**: ~100
+
+---
+
+### Implementation Order and Dependencies
+
+```
+Phase 1 (Core Infrastructure)
+    │
+    ├──► Phase 2 (Idle Path) ─────────────┐
+    │                                      │
+    ├──► Phase 3 (Check Points) ──────────┼──► Phase 6 (Diagnostics)
+    │                                      │         │
+    └──► Phase 4 (Scheduler Hook)         │         │
+              │                            │         ▼
+              └──► Phase 5 (Interrupt     │    Phase 10 (Testing)
+                   Masking) ──────────────┘         ▲
+                                                    │
+Phase 7 (Smalltalk) ──────────────────────────────►│
+    │                                               │
+    └──► Phase 8 (Coalescing/Fairness)             │
+              │                                     │
+              └──► Phase 9 (OS Integration) ───────┘
+```
+
+**Recommended implementation sequence**:
+1. Phases 1-4 (core VM changes) - Must be done first, in order
+2. Phase 5 (interrupt masking) - Can parallel with Phase 6
+3. Phase 6 (diagnostics) - Enables debugging of later phases
+4. Phase 7 (Smalltalk) - Core Smalltalk changes
+5. Phase 8 (coalescing) - Optional optimization
+6. Phase 9 (OS integration) - Edge case handling
+7. Phase 10 (testing) - Continuous throughout, final validation
+
+**Total estimated lines**: ~840 lines of new/modified code
 
 ---
 
