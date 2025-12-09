@@ -108,6 +108,10 @@ public class Phase3_ObjectAllocation : IPhase
 
         AllocateSpecialObjects();
 
+        // Section 1.6: Allocate canonical Associations from bundle (v1.0.9+)
+        // CRITICAL: Must happen BEFORE Phase 4 (method compilation) which references Associations by localId
+        AllocateCanonicalAssociations();
+
         // Phase 3.5: Pre-create Associations for Undeclared Variables
         // CRITICAL: This runs BEFORE class pointer fix to ensure all Associations
         // are created before SetClassReferencesForAllObjects() runs.
@@ -203,14 +207,17 @@ public class Phase3_ObjectAllocation : IPhase
         // Initialize SystemDictionary slots with nil (created in Phase 2 but couldn't be initialized until now)
         InitializeSystemDictionaryWithNil(initialNilOOP);
 
-        // Create ProcessorScheduler singleton
+        // Create ProcessorScheduler singleton instance
         var processorSchedulerOOP = _allocator.AllocateFixedObject("ProcessorScheduler");
 
         // CRITICAL: Set the class reference - AllocateFixedObject doesn't set it!
         var processorSchedulerClassOOP = GlobalRegistry.LookupClassOOP("ProcessorScheduler");
         _allocator.SetClassOOP(processorSchedulerOOP, processorSchedulerClassOOP);
 
-        GlobalRegistry.Register("ProcessorScheduler", processorSchedulerOOP);
+        // Register the ProcessorScheduler INSTANCE under "Processor" key (Blue Book semantics)
+        // This will be installed as the "Processor" global in SystemDictionary by Phase 5
+        // The ProcessorScheduler CLASS will be installed as "ProcessorScheduler" global
+        GlobalRegistry.Register("Processor", processorSchedulerOOP);
 
         // Initialize ProcessorScheduler fields that should NOT be nil
         InitializeProcessorSchedulerFields(processorSchedulerOOP, _heapManager.GetNil());
@@ -282,9 +289,10 @@ public class Phase3_ObjectAllocation : IPhase
     /// </summary>
     private void CreateUndeclaredDictionary(SmalltalkOOP nilOOP)
     {
-        // Determine initial capacity based on bundle undeclared count
-        int undeclaredCount = _bundle.Undeclared?.Length ?? 0;
-        int initialCapacity = Math.Max(16, undeclaredCount * 2); // Double capacity for hash table efficiency
+        // v1.0.9: With canonical Associations, all variables are properly declared,
+        // so Undeclared should remain small (only runtime-discovered variables)
+        // Use minimal capacity instead of basing on bundle.Undeclared (which is now handled by associations[])
+        int initialCapacity = 16; // Minimal capacity for runtime-discovered undeclared variables
 
         // Allocate Dictionary with appropriate capacity
         var undeclaredOOP = _allocator.AllocateArray("Dictionary", initialCapacity);
@@ -311,7 +319,8 @@ public class Phase3_ObjectAllocation : IPhase
             _allocator.SetInstanceVariable(undeclaredOOP, tallyIndex, zeroOOP);
         }
 
-        // Register in GlobalRegistry (Association will be created in Phase 3.5)
+        // Register in GlobalRegistry
+        // v1.0.9: AllocateCanonicalAssociations will check GlobalRegistry and use this value
         GlobalRegistry.Register("Undeclared", undeclaredOOP);
 
         // Diagnostic messages removed for cleaner output
@@ -499,6 +508,73 @@ public class Phase3_ObjectAllocation : IPhase
         // NOTE: CharacterTable installation in Character class's classPool is done in Phase 5
         // (same pattern as USTable). Phase 3 Dictionary structures are not fully initialized yet.
         // CharacterRegistry provides the Character objects for Phase 4 literal resolution.
+    }
+
+    #endregion
+
+    #region Canonical Association Allocation
+
+    /// <summary>
+    /// Allocates canonical Association objects from bundle.Associations (v1.0.9+).
+    /// Each Association is created once and registered in AssociationRegistry.
+    /// Phase 4 (method compilation) and Phase 5 (global/classPool installation) will reference
+    /// these SAME Association objects by localId, ensuring variable identity.
+    /// </summary>
+    private void AllocateCanonicalAssociations()
+    {
+        if (_bundle.Associations == null || _bundle.Associations.Length == 0)
+        {
+            // No diagnostic needed - this is normal for pre-v1.0.9 bundles
+            return;
+        }
+
+        foreach (var assocDesc in _bundle.Associations)
+        {
+            // Get the key Symbol
+            var keySymbolOOP = SymbolRegistry.GetSymbolOOP(assocDesc.KeyIndex);
+
+            // Get the key name for checking GlobalRegistry
+            string keyName = _bundle.Symbols[assocDesc.KeyIndex];
+
+            // Get the value:
+            // 1. If valueRef is specified, use it
+            // 2. Otherwise, check if this global was pre-created (e.g., Undeclared, Processor)
+            // 3. Otherwise, default to nil
+            SmalltalkOOP valueOOP;
+            if (assocDesc.ValueRef != null)
+            {
+                valueOOP = _fieldValueResolver.ResolveFieldValue(assocDesc.ValueRef);
+            }
+            else if (GlobalRegistry.TryGet(keyName, out var preCreatedValue))
+            {
+                valueOOP = preCreatedValue;  // Use pre-created object (e.g., Undeclared Dictionary)
+            }
+            else
+            {
+                valueOOP = _heapManager.GetNil();
+            }
+
+            // Allocate Association object
+            var associationOOP = _allocator.AllocateFixedObject("Association");
+
+            // Set Association class reference
+            var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
+            _allocator.SetClassOOP(associationOOP, associationClassOOP);
+
+            // Set instance variables: [0] = key, [1] = value
+            _allocator.SetInstanceVariable(associationOOP, 0, keySymbolOOP);
+            _allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
+
+            // Mark fields as initialized
+            _initializedFields.Add((associationOOP, 0));
+            _initializedFields.Add((associationOOP, 1));
+
+            // Register in AssociationRegistry (canonical identity)
+            AssociationRegistry.Register(keyName, associationOOP, assocDesc.PoolDictionaryName);
+
+            // Register localId → OOP mapping for Phase 4 literal resolution
+            _localIdToObjectId[assocDesc.LocalId] = associationOOP;
+        }
     }
 
     #endregion
@@ -1021,6 +1097,21 @@ public class Phase3_ObjectAllocation : IPhase
     /// </summary>
     private void PreCreateUndeclaredAssociations()
     {
+        // v1.0.9+: Canonical Associations already created in AllocateCanonicalAssociations()
+        // Skip this method to avoid duplicate Association creation
+        if (_bundle.Metadata.Version.StartsWith("1.0.9"))
+        {
+            _diagnostics?.Emit(new DiagnosticMessageEvent
+            {
+                Severity = MessageSeverity.Info,
+                Category = "Phase3",
+                Message = "Bundle v1.0.9+ uses canonical Associations - skipping undeclared Association pre-creation",
+                Timestamp = Stopwatch.GetTimestamp(),
+                InstructionCount = 0
+            });
+            return;
+        }
+
         if (_bundle.Undeclared == null || _bundle.Undeclared.Length == 0)
         {
             _diagnostics?.Emit(new DiagnosticMessageEvent

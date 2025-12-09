@@ -8,6 +8,7 @@ using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
+using Smalltalk80.Interpreter.Core.Utilities;
 using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
@@ -39,13 +40,27 @@ public class SystemDictionaryInstaller(
         // (StringHolder class>>initialize method body is commented out in original source)
         InitializeWorkspaceClassVariable();
 
+        // Install all class variables for all classes (general solution)
+        // This populates each class's classPool Dictionary with Associations for all declared class variables
+        // (with nil initial values - init expressions will set the actual values later)
+        InstallAllClassVariables();
+
         // Log pool dictionaries that will be created by init expressions
         InitializeAllPoolDictionaries();
 
-        // Install Processor -> ProcessorScheduler singleton
-        if (GlobalRegistry.TryGet("ProcessorScheduler", out SmalltalkOOP processorSchedulerOOP))
+        // Install Processor -> ProcessorScheduler singleton instance
+        // The instance was created in Phase 3 and registered under "Processor" (Blue Book semantics)
+        // We retrieve it and install it here as "Processor" global. The ProcessorScheduler CLASS will be
+        // installed as "ProcessorScheduler" global by the class loop below.
+        if (GlobalRegistry.TryGet("Processor", out SmalltalkOOP processorSchedulerOOP))
         {
+            Console.WriteLine($"[Phase 5] Installing Processor global (instance OOP: {processorSchedulerOOP})");
             InstallProcessorGlobal(processorSchedulerOOP);
+            Console.WriteLine($"[Phase 5] Processor global installed successfully");
+        }
+        else
+        {
+            Console.WriteLine("[Phase 5] WARNING: Processor instance not found in GlobalRegistry!");
         }
 
         // Install SystemOrganization -> SystemOrganizer instance
@@ -399,6 +414,126 @@ public class SystemDictionaryInstaller(
         InstallInClassPool(classPoolOOP, associationOOP, "Workspace");
     }
 
+    /// <summary>
+    /// Installs Associations for ALL class variables in ALL classes.
+    /// This is the GENERAL solution that replaces one-off installations.
+    ///
+    /// Each class variable Association is created with nil initial value.
+    /// Init expressions will later set the actual values (e.g., ProcessorScheduler initialize sets SystemRockBottomPriority _ 1).
+    ///
+    /// EXCEPTIONS: CharacterTable, USTable, and Workspace are handled specially because their values
+    /// must be set BEFORE init expressions run (they're created in Phase 3 or need specific initialization).
+    ///
+    /// IMPORTANT: This method checks if an Association already exists in the classPool BEFORE creating a new one,
+    /// to avoid creating garbage objects that fail GC validation.
+    /// </summary>
+    private void InstallAllClassVariables()
+    {
+        Console.WriteLine("[Phase 5] Installing class variables for all classes...");
+        int totalInstalled = 0;
+
+        var nilOOP = context.HeapManager.GetNil();
+
+        foreach (var cls in context.Bundle.Classes)
+        {
+            // Skip metaclasses - their class variables are shared with their base class
+            if (cls.IsMetaclass) continue;
+
+            // Skip if no class variables
+            if (cls.ClassVarNames == null || cls.ClassVarNames.Length == 0) continue;
+
+            // Get the class OOP
+            if (!context.LocalIdToObjectId.TryGetValue(cls.LocalId, out SmalltalkOOP classOOP))
+            {
+                Console.WriteLine($"[Phase 5]   WARNING: Class {cls.LocalId} not found in LocalIdToObjectId");
+                continue;
+            }
+
+            // Get the classPool Dictionary (instance variable 7 per Blue Book)
+            var classPoolOOP = context.Allocator.GetInstanceVariable(classOOP, 7);
+            if (classPoolOOP == nilOOP)
+            {
+                Console.WriteLine($"[Phase 5]   WARNING: Class {cls.LocalId} has nil classPool");
+                continue;
+            }
+
+            string className = context.Bundle.Symbols[cls.NameIndex];
+            int classVarCount = 0;
+
+            // Install each class variable
+            foreach (var classVarSymbolIndex in cls.ClassVarNames)
+            {
+                string classVarName = context.Bundle.Symbols[classVarSymbolIndex];
+
+                // Skip the ONE-OFF variables that are handled specially
+                if (classVarName == "CharacterTable" && className == "Character") continue;
+                if (classVarName == "USTable" && className == "Symbol") continue;
+                if (classVarName == "Workspace" && className == "StringHolder") continue;
+
+                // v1.0.9+: Get canonical Association from Phase 3 allocation
+                // ALL Associations are pre-created in Phase 3 from the bundle's associations[] array
+                // We must NOT create new Associations here - only reuse existing canonical ones
+                if (!AssociationRegistry.TryGet(classVarName, out var associationOOP, poolDictionaryName: null))
+                {
+                    throw new InvalidOperationException(
+                        $"Class variable '{classVarName}' in class '{className}' not found in AssociationRegistry. " +
+                        $"v1.0.9+ bundles must pre-create ALL Associations in Phase 3.");
+                }
+
+                // Set value to nil (will be set to actual value by init expressions later)
+                // Only set if currently nil to avoid overwriting values set by ONE-OFF methods
+                var currentValue = context.Allocator.GetInstanceVariable(associationOOP, 1);
+                if (currentValue == nilOOP)
+                {
+                    context.Allocator.SetInstanceVariable(associationOOP, 1, nilOOP);
+                }
+
+                // Install in classPool using DictionaryOperations
+                // This handles hash-based lookup, tally increment, and collision resolution
+                dictionaryOps.InstallAssociation(classPoolOOP, associationOOP, classVarName);
+
+                classVarCount++;
+                totalInstalled++;
+
+                // Diagnostic: Log Association OOP and value for ProcessorScheduler and Float
+                if (className == "ProcessorScheduler" || className == "Float")
+                {
+                    var assocKey = context.Allocator.GetInstanceVariable(associationOOP, 0);
+                    var assocValue = context.Allocator.GetInstanceVariable(associationOOP, 1);
+                    Console.WriteLine($"[Phase 5]     {classVarName} → Assoc OOP {associationOOP} (key: {assocKey}, value: {assocValue})");
+                }
+            }
+
+            if (classVarCount > 0)
+            {
+                Console.WriteLine($"[Phase 5]   {className}: installed {classVarCount} class variables");
+
+                // Diagnostic: Dump all entries in ProcessorScheduler classPool
+                if (className == "ProcessorScheduler")
+                {
+                    Console.WriteLine($"[Phase 5]   ProcessorScheduler classPool dictionary contents:");
+                    int poolSize = context.Allocator.GetIndexedSize(classPoolOOP);
+                    for (int i = 0; i < poolSize; i++)
+                    {
+                        var entry = context.Allocator.GetIndexedOOP(classPoolOOP, i);
+                        if (entry != nilOOP)
+                        {
+                            var key = context.Allocator.GetInstanceVariable(entry, 0);
+                            var value = context.Allocator.GetInstanceVariable(entry, 1);
+                            string keyName = "<unknown>";
+                            try {
+                                keyName = StringHelper.ExtractString(context.HeapManager, key);
+                            } catch { }
+                            Console.WriteLine($"[Phase 5]     [{i}] Assoc {entry}: {keyName} → {value}");
+                        }
+                    }
+                }
+            }
+        }
+
+        Console.WriteLine($"[Phase 5] Installed {totalInstalled} class variable Associations total");
+    }
+
     private void InitializeAllPoolDictionaries()
     {
         // Discover all unique pool dictionaries from bundle
@@ -428,13 +563,33 @@ public class SystemDictionaryInstaller(
         }
 
         // Discover pool variable names from method literals
+        // Build lookup from association localId to association descriptor for efficient lookup
+        var assocLookup = context.Bundle.Associations.ToDictionary(a => a.LocalId);
+
         foreach (var method in context.Bundle.Methods)
         {
             if (method.Literals == null) continue;
 
             foreach (var literal in method.Literals)
             {
-                if (literal.Type == "association" && literal.Association?.PoolDictionaryName != null)
+                // Handle associationRef literals (v1.0.9+ format)
+                if (literal.Type == "associationRef" && literal.LocalId != null)
+                {
+                    if (assocLookup.TryGetValue(literal.LocalId, out var assocDesc) &&
+                        assocDesc.PoolDictionaryName != null)
+                    {
+                        string poolName = assocDesc.PoolDictionaryName;
+                        string varName = context.Bundle.Symbols[assocDesc.KeyIndex];
+
+                        if (!poolVariables.ContainsKey(poolName))
+                        {
+                            poolVariables[poolName] = new HashSet<string>();
+                        }
+                        poolVariables[poolName].Add(varName);
+                    }
+                }
+                // Handle legacy association literals (pre-v1.0.9 format)
+                else if (literal.Type == "association" && literal.Association?.PoolDictionaryName != null)
                 {
                     string poolName = literal.Association.PoolDictionaryName;
                     string varName = context.Bundle.Symbols[literal.Association.KeyIndex];
@@ -467,11 +622,21 @@ public class SystemDictionaryInstaller(
 
         // Populate with all referenced pool variables (initialized to nil)
         // This is required so that pool variable references can be resolved at runtime
+        // CRITICAL: Must use the SAME Association that's in method literal frames
+        // Phase 3 registered pool variables with composite keys: "varName@poolName"
         var nilOOP = context.HeapManager.GetNil();
         foreach (var varName in variableNames)
         {
-            // Create canonical Association for this pool variable (registered in AssociationRegistry)
-            var assocOOP = associationManager.GetOrCreateCanonical(varName);
+            // Look up the canonical Association using composite key (matches Phase 3 registration)
+            // Pool variables are registered as "varName@poolName" by Phase 3
+            if (!AssociationRegistry.TryGet(varName, out var assocOOP, poolName))
+            {
+                // Fallback: try simple key (for globals that might be in pool dictionaries)
+                if (!AssociationRegistry.TryGet(varName, out assocOOP, poolDictionaryName: null))
+                {
+                    continue; // Skip this variable - not found in registry
+                }
+            }
             context.Allocator.SetInstanceVariable(assocOOP, 1, nilOOP);
 
             // Install in pool dictionary
@@ -518,7 +683,13 @@ public class SystemDictionaryInstaller(
     private void InstallProcessorGlobal(SmalltalkOOP processorSchedulerOOP)
     {
         var associationOOP = associationManager.GetOrCreateCanonical("Processor");
+        Console.WriteLine($"[Phase 5]   Association OOP: {associationOOP}");
+
         context.Allocator.SetInstanceVariable(associationOOP, 1, processorSchedulerOOP);
+
+        var valueOOP = context.Allocator.GetInstanceVariable(associationOOP, 1);
+        Console.WriteLine($"[Phase 5]   Association value set to: {valueOOP}");
+
         InstallInSystemDictionary(associationOOP, "Processor");
     }
 
@@ -642,46 +813,12 @@ public class SystemDictionaryInstaller(
         dictionaryOps.InstallAssociation(systemDictOOP, associationOOP, keyName);
     }
 
+    /// <summary>
+    /// Installs an Association in a classPool Dictionary.
+    /// Delegates to DictionaryOperations for proper hash-based installation and tally management.
+    /// </summary>
     private void InstallInClassPool(SmalltalkOOP classPoolOOP, SmalltalkOOP associationOOP, string keyName)
     {
-        int classPoolSize = context.Allocator.GetIndexedSize(classPoolOOP);
-        var nilOOP = context.HeapManager.GetNil();
-        int emptySlotIndex = -1;
-
-        // Get key from association
-        var keyOOP = context.Allocator.GetInstanceVariable(associationOOP, 0);
-
-        // Search for existing or empty slot
-        for (int i = 0; i < classPoolSize; i++)
-        {
-            var entryOOP = context.Allocator.GetIndexedOOP(classPoolOOP, i);
-
-            if (entryOOP == nilOOP)
-            {
-                if (emptySlotIndex == -1)
-                {
-                    emptySlotIndex = i;
-                }
-                continue;
-            }
-
-            var entryKeyOOP = context.Allocator.GetInstanceVariable(entryOOP, 0);
-            if (entryKeyOOP == keyOOP)
-            {
-                // Update existing
-                context.Allocator.SetInstanceVariable(entryOOP, 1,
-                    context.Allocator.GetInstanceVariable(associationOOP, 1));
-                return;
-            }
-        }
-
-        // Install in empty slot
-        if (emptySlotIndex == -1)
-        {
-            throw new InvalidOperationException(
-                $"Failed to install {keyName} - no empty slots in classPool (size {classPoolSize})");
-        }
-
-        context.Allocator.SetIndexedOOP(classPoolOOP, emptySlotIndex, associationOOP);
+        dictionaryOps.InstallAssociation(classPoolOOP, associationOOP, keyName);
     }
 }

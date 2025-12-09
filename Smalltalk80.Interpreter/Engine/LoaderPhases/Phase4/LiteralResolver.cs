@@ -63,6 +63,7 @@ internal class LiteralResolver(
             "character" => AllocateCharacter(literal.CodePoint!.Value),
             "bytes" => AllocateByteArray(literal.Encoding!, literal.Data!),
             "association" => ResolveVariableLiteral(literal.Association!),
+            "associationRef" => ResolveCanonicalAssociation(literal.LocalId!),
             "array" => AllocateArray(literal.Elements!.Select(l => ResolveLiteralValueAsOOP(l)).ToArray()),
             _ => throw new InvalidOperationException($"Unknown literal type: {literal.Type}")
         };
@@ -214,6 +215,27 @@ internal class LiteralResolver(
         // Use CharacterRegistry to get the canonical Character from CharacterTable
         // CharacterTable is created in Phase 3, before Phase 4 method compilation
         return CharacterRegistry.GetCharacter(codePoint);
+    }
+
+    /// <summary>
+    /// Resolves a canonical Association reference by localId (v1.0.9+).
+    /// Phase 3 pre-allocates all canonical Associations from bundle.Associations[].
+    /// This method retrieves the SAME Association object that Phase 5 will install in
+    /// classPools and Smalltalk globals, ensuring variable identity.
+    /// </summary>
+    /// <param name="localId">The Association's localId (e.g., "assoc:0", "assoc:1").</param>
+    /// <returns>The canonical Association object OOP.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when Association not found.</exception>
+    private SmalltalkOOP ResolveCanonicalAssociation(string localId)
+    {
+        if (!_localIdToObjectId.TryGetValue(localId, out var assocOOP))
+        {
+            throw new InvalidOperationException(
+                $"Canonical Association '{localId}' not found. " +
+                $"Phase 3 should have allocated all Associations from bundle.Associations[].");
+        }
+
+        return assocOOP;
     }
 
     /// <summary>

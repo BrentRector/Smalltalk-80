@@ -5,10 +5,11 @@ namespace Smalltalk80.Interpreter.Core.Schema;
 
 /// <summary>
 /// Root cold start bundle structure.
-/// Matches coldstart-v1.0.8.schema.json root schema.
+/// Matches coldstart-v1.0.9.schema.json root schema.
 /// v1.0.4: BlockContext objects moved to metadata.blockContexts[] (tooling-only, not runtime objects).
 /// v1.0.7: Added Undeclared array - compiler-generated list of unresolved variable references.
 /// v1.0.8: Added PoolDependencyGraph for pool dictionary dependency analysis and topological ordering.
+/// v1.0.9: Added canonical Associations array - ensures ONE Association per unique (key, poolDictionaryName) pair.
 /// </summary>
 public sealed record ColdStartBundle
 {
@@ -37,6 +38,13 @@ public sealed record ColdStartBundle
     /// </summary>
     [JsonPropertyName("classes")]
     public required ClassDescriptor[] Classes { get; init; }
+    /// <summary>
+    /// Array of canonical Association descriptors (v1.0.9+).
+    /// Each unique (key, poolDictionaryName) pair has exactly ONE Association.
+    /// Referenced by localId from method literals, classPools, and Smalltalk globals dictionary.
+    /// </summary>
+    [JsonPropertyName("associations")]
+    public required AssociationDescriptor[] Associations { get; init; }
     /// <summary>
     /// Array of object descriptors defining all objects in the system.
     /// </summary>

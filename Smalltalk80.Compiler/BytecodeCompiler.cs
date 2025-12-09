@@ -3107,38 +3107,18 @@ namespace Smalltalk80.Compiler
                 if (context.variable() != null && context.ASSIGN() != null)
                 {
                     // This is an assignment: variable _ expression
-                    var varName = context.variable().GetText();
-                    
-                    // For assignments to global/class variables, we need an Association in the literals
-                    // BUT we should not visit the variable node itself (to avoid pushing it)
-                    bool needsAssociation = true;
-                    if (environment != null)
-                    {
-                        // Check if it's a local variable (these don't need Associations)
-                        if (environment.Arguments.ContainsKey(varName) ||
-                            environment.Temporaries.ContainsKey(varName) ||
-                            environment.HiddenTemporaries.ContainsKey(varName) ||
-                            environment.InstanceVariables.ContainsKey(varName))
-                        {
-                            needsAssociation = false;
-                        }
-                    }
-                    
-                    // Add literal for the store operation (but don't visit the variable node)
-                    if (needsAssociation)
-                    {
-                        // Always use GlobalVariable for global variables
-                        var literalValue = new GlobalVariable(new Symbol(varName), null);
-                        emitter.AddLiteral(literalValue);
-                    }
-                    
-                    // Now visit only the RHS of the assignment
+                    // DO NOT add GlobalVariable literals here - Phase 2 will add the correct
+                    // literal type (GlobalVariable or PoolVariable) via VariableResolver.
+                    // Adding GlobalVariable here causes duplicate literals when the actual
+                    // variable is a pool variable.
+
+                    // Now visit only the RHS of the assignment to collect its literals
                     if (context.assignmentExpr() != null)
                     {
                         Visit(context.assignmentExpr());
                     }
-                    
-                    // Return without visiting the variable node to prevent it from being pushed
+
+                    // Return without visiting the variable node to prevent selector collection
                     return null;
                 }
                 else
@@ -3200,33 +3180,13 @@ namespace Smalltalk80.Compiler
                     return base.VisitVariable(context);
                 }
                 
-                // Check if it needs an Association in the literal frame
-                // (i.e., it's a class variable, pool variable, or global variable)
-                bool needsAssociation = true;
-                if (environment != null)
-                {
-                    // Check if it's a local variable (argument, temporary, or instance variable)
-                    // These DON'T need Associations
-                    if (environment.Arguments.ContainsKey(name) ||
-                        environment.Temporaries.ContainsKey(name) ||
-                        environment.HiddenTemporaries.ContainsKey(name) ||
-                        environment.InstanceVariables.ContainsKey(name))
-                    {
-                        needsAssociation = false;
-                    }
-                }
-                
-                // If it's a class variable, pool variable, or global variable,
-                // add the appropriate literal for PushLiteralVariable
-                if (needsAssociation)
-                {
-                    // Create GlobalVariable literal
-                    // Pool variables are handled by VariableResolver during resolution phase
-                    object literalValue = new GlobalVariable(new Symbol(name), null);
-                    // Console.WriteLine($"[{literalValue.GetType().Name} created] key={name}");
-                    emitter.AddLiteral(literalValue);
-                }
-                
+                // DO NOT add GlobalVariable/PoolVariable literals here in Phase 1.
+                // Phase 2 (bytecode generation) will add the correct literal type
+                // (GlobalVariable or PoolVariable) via VariableResolver which has access
+                // to pool dictionary information.
+                // Adding GlobalVariable here causes duplicate literals when the actual
+                // variable is a pool variable.
+
                 return base.VisitVariable(context);
             }
             

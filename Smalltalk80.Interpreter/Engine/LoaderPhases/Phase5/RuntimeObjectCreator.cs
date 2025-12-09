@@ -111,47 +111,63 @@ public class RuntimeObjectCreator(
             baseline = 10;
         }
 
-        // Install the DefaultTextStyle in TextConstants pool dictionary
-        var allAssociations = AssociationRegistry.GetAll();
+        // Install the DefaultTextStyle value in ALL Associations that reference it
+        // Per Blue Book model: classes with TextConstants pool find it as pool variable,
+        // classes WITHOUT TextConstants pool find it as global/undeclared.
+        // We must update ALL such Associations to share the same TextStyle value.
 
-        if (allAssociations.TryGetValue("DefaultTextStyle", out SmalltalkOOP defaultTextStyleAssoc))
+        // First, try to find the pool variable Association (DefaultTextStyle@TextConstants)
+        bool foundPoolVar = AssociationRegistry.TryGet("DefaultTextStyle", out SmalltalkOOP poolVarAssoc, "TextConstants");
+
+        // Also try to find the global/undeclared Association (DefaultTextStyle with no pool)
+        bool foundGlobal = AssociationRegistry.TryGet("DefaultTextStyle", out SmalltalkOOP globalAssoc, poolDictionaryName: null);
+
+        if (!foundPoolVar && !foundGlobal)
         {
-            var keySymbolOOP = context.Allocator.GetInstanceVariable(defaultTextStyleAssoc, 0);
+            throw new InvalidOperationException("DefaultTextStyle Association not found in AssociationRegistry (neither pool variable nor global)");
+        }
 
-            // Set the Association's value to the TextStyle object
-            context.Allocator.SetInstanceVariable(defaultTextStyleAssoc, 1, textStyleOOP);
-            context.InitializedFields.Add((defaultTextStyleAssoc, 1));
+        // Update the value in ALL found Associations
+        if (foundPoolVar)
+        {
+            context.Allocator.SetInstanceVariable(poolVarAssoc, 1, textStyleOOP);
+            context.InitializedFields.Add((poolVarAssoc, 1));
+        }
 
-            // Install the Association in TextConstants pool dictionary
-            if (GlobalRegistry.TryGet("TextConstants", out var textConstantsOOP))
+        if (foundGlobal)
+        {
+            context.Allocator.SetInstanceVariable(globalAssoc, 1, textStyleOOP);
+            context.InitializedFields.Add((globalAssoc, 1));
+        }
+
+        // Install in TextConstants pool dictionary (use pool variable Association if available, else global)
+        var primaryAssoc = foundPoolVar ? poolVarAssoc : globalAssoc;
+        var keySymbolOOP = context.Allocator.GetInstanceVariable(primaryAssoc, 0);
+
+        if (GlobalRegistry.TryGet("TextConstants", out var textConstantsOOP))
+        {
+            // Install in TextConstants using dictionary operations
+            dictionaryOps.InstallAssociation(textConstantsOOP, primaryAssoc, "DefaultTextStyle");
+
+            // Remove DefaultTextStyle from Undeclared (with proper hash chain fixup)
+            if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
             {
-                // Install in TextConstants using dictionary operations
-                dictionaryOps.InstallAssociation(textConstantsOOP, defaultTextStyleAssoc, "DefaultTextStyle");
-
-                // Remove DefaultTextStyle from Undeclared (with proper hash chain fixup)
-                if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
-                {
-                    dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, "DefaultTextStyle");
-                }
+                dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, "DefaultTextStyle");
             }
-            else
-            {
-                throw new InvalidOperationException("TextConstants not found in GlobalRegistry during DefaultTextStyle setup");
-            }
-
-            context.Diagnostics?.Emit(new DiagnosticMessageEvent
-            {
-                Severity = MessageSeverity.Info,
-                Category = "Phase5",
-                Message = $"Created DefaultTextStyle (oop={textStyleOOP}) with lineGrid={lineGrid}, baseline={baseline}",
-                Timestamp = Stopwatch.GetTimestamp(),
-                InstructionCount = 0
-            });
         }
         else
         {
-            throw new InvalidOperationException("DefaultTextStyle Association not found in AssociationRegistry");
+            throw new InvalidOperationException("TextConstants not found in GlobalRegistry during DefaultTextStyle setup");
         }
+
+        context.Diagnostics?.Emit(new DiagnosticMessageEvent
+        {
+            Severity = MessageSeverity.Info,
+            Category = "Phase5",
+            Message = $"Created DefaultTextStyle (oop={textStyleOOP}) with lineGrid={lineGrid}, baseline={baseline}",
+            Timestamp = Stopwatch.GetTimestamp(),
+            InstructionCount = 0
+        });
     }
 
     /// <summary>

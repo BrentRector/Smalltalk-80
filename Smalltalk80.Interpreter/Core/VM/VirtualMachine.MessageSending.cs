@@ -99,18 +99,21 @@ public partial class VirtualMachine
         // Get receiver class for diagnostic event
         var recvClass = GetClassName(GetClass(receiverOOP));
 
-        // Emit diagnostic event for super method entry
-        _diagnostics?.Emit(new MethodEntryEvent
+        // Emit diagnostic event for super method entry (conditional on listener subscription)
+        if (_diagnostics?.IsEnabled(DiagnosticEventTypes.MethodEntry) == true)
         {
-            Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-            InstructionCount = _tracer.InstructionCount,
-            ReceiverOOP = receiverOOP,
-            ReceiverClass = recvClass,
-            Selector = selectorName ?? "unknown",
-            Arguments = args,
-            CallDepth = _tracer.SelectorTraceDepth,
-            IsSuper = true
-        });
+            _diagnostics.Emit(new MethodEntryEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                InstructionCount = _tracer.InstructionCount,
+                ReceiverOOP = receiverOOP,
+                ReceiverClass = recvClass,
+                Selector = selectorName ?? "unknown",
+                Arguments = args,
+                CallDepth = _tracer.SelectorTraceDepth,
+                IsSuper = true
+            });
+        }
 
         // Now look up the method starting from the superclass
         var methodInfo = _messageDispatcher.LookupMethod(superclassOOP, selectorName!);
@@ -341,18 +344,21 @@ public partial class VirtualMachine
         // Get receiver class name once for all uses
         var recvClass = GetClassName(classOOP);
 
-        // Emit diagnostic event for method entry
-        _diagnostics?.Emit(new MethodEntryEvent
+        // Emit diagnostic event for method entry (conditional on listener subscription)
+        if (_diagnostics?.IsEnabled(DiagnosticEventTypes.MethodEntry) == true)
         {
-            Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-            InstructionCount = _tracer.InstructionCount,
-            ReceiverOOP = receiverOOP,
-            ReceiverClass = recvClass,
-            Selector = selectorName ?? "unknown",
-            Arguments = args,
-            CallDepth = _tracer.SelectorTraceDepth,
-            IsSuper = false
-        });
+            _diagnostics.Emit(new MethodEntryEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                InstructionCount = _tracer.InstructionCount,
+                ReceiverOOP = receiverOOP,
+                ReceiverClass = recvClass,
+                Selector = selectorName ?? "unknown",
+                Arguments = args,
+                CallDepth = _tracer.SelectorTraceDepth,
+                IsSuper = false
+            });
+        }
 
         // Log ALL message sends during tracing (before primitive check)
         if (_tracer.ShouldTraceSend())

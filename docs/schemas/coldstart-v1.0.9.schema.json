@@ -1,0 +1,587 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/YourOrg/Smalltalk-80/schemas/coldstart/v1.0.9",
+    "title": "Smalltalk-80 ColdStart Image Schema v1.0.9",
+    "description": "Schema for deterministic Smalltalk-80 cold-start bundles. v1.0.9 adds canonical Association objects to ensure global/class/pool variable identity across method literals and dictionaries.",
+    "type": "object",
+    "required": [
+        "metadata",
+        "symbols",
+        "strings",
+        "optimizedSelectors",
+        "classes",
+        "associations",
+        "methods",
+        "initExpressions",
+        "patches"
+    ],
+    "additionalProperties": false,
+    "properties": {
+        "metadata": {
+            "type": "object",
+            "required": [
+                "version",
+                "generator",
+                "generatedAt",
+                "sourceChecksum"
+            ],
+            "properties": {
+                "version": {
+                    "type": "string",
+                    "pattern": "^1\\.0\\.9$"
+                },
+                "generator": {
+                    "type": "string"
+                },
+                "generatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "sourceFile": {
+                    "type": ["string", "null"]
+                },
+                "sourceChecksum": {
+                    "type": "string"
+                },
+                "symbolCount": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "stringCount": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "classCount": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "methodCount": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "associationCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of canonical Association objects (globals, class variables, pool variables)"
+                },
+                "initExpressionCount": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "additionalProperties": true
+        },
+        "symbols": {
+            "type": "array",
+            "description": "Canonical symbol table. All Symbol references use indices into this array.",
+            "items": {
+                "type": "string",
+                "minLength": 1
+            },
+            "minItems": 1
+        },
+        "strings": {
+            "type": "array",
+            "description": "Canonical string table for String literals.",
+            "items": {
+                "type": "string"
+            },
+            "minItems": 0
+        },
+        "optimizedSelectors": {
+            "type": "array",
+            "description": "Most frequently used selectors (up to 32) for bytecode optimization.",
+            "items": {
+                "type": "integer",
+                "minimum": 0
+            },
+            "maxItems": 32,
+            "uniqueItems": true
+        },
+        "classes": {
+            "type": "array",
+            "description": "Class and metaclass definitions.",
+            "items": {
+                "type": "object",
+                "required": [
+                    "localId",
+                    "nameIndex",
+                    "isMetaclass",
+                    "format",
+                    "instVarNames",
+                    "classVarNames",
+                    "poolLocalIds",
+                    "category",
+                    "totalInstanceVarCount",
+                    "fieldLayout"
+                ],
+                "properties": {
+                    "localId": {
+                        "type": "string"
+                    },
+                    "nameIndex": {
+                        "type": "integer",
+                        "description": "Index into symbols[] for class name"
+                    },
+                    "isMetaclass": {
+                        "type": "boolean"
+                    },
+                    "metaclassOfLocalId": {
+                        "type": ["string", "null"]
+                    },
+                    "format": {
+                        "type": "integer",
+                        "description": "16-bit format word encoding object layout"
+                    },
+                    "instVarNames": {
+                        "type": "array",
+                        "description": "Instance variable names as indices into symbols[]",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "classVarNames": {
+                        "type": "array",
+                        "description": "Class variable names as indices into symbols[]",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "poolLocalIds": {
+                        "type": "array",
+                        "description": "Pool dictionary names (not used in v1.0.9 - pool variables use associations[] directly)",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "superNameIndex": {
+                        "type": ["integer", "null"],
+                        "description": "Index into symbols[] for superclass name"
+                    },
+                    "category": {
+                        "type": "string"
+                    },
+                    "commentStringIndex": {
+                        "type": ["integer", "null"]
+                    },
+                    "classSideInitMethodLocalId": {
+                        "type": ["string", "null"]
+                    },
+                    "totalInstanceVarCount": {
+                        "type": "integer",
+                        "description": "Total instance variables including inherited"
+                    },
+                    "fieldLayout": {
+                        "type": "array",
+                        "description": "Precomputed field layout for all instance variables",
+                        "items": {
+                            "type": "object",
+                            "required": ["nameIndex", "slotIndex"],
+                            "properties": {
+                                "nameIndex": {
+                                    "type": "integer"
+                                },
+                                "slotIndex": {
+                                    "type": "integer"
+                                },
+                                "inheritedFrom": {
+                                    "type": ["string", "null"]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "associations": {
+            "type": "array",
+            "description": "Canonical Association objects. Each unique (key, poolDictionaryName) pair has exactly ONE Association. Referenced by localId from method literals, classPools, and Smalltalk globals dictionary. Ensures variable identity: storing to an Association in a method literal updates the same Association in classPools/globals.",
+            "items": {
+                "type": "object",
+                "required": ["localId", "keyIndex", "valueRef"],
+                "properties": {
+                    "localId": {
+                        "type": "string",
+                        "description": "Unique identifier for this canonical Association"
+                    },
+                    "keyIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Index into symbols[] for the Association key (variable name)"
+                    },
+                    "valueRef": {
+                        "oneOf": [
+                            {
+                                "type": "null",
+                                "description": "Association value is nil (will be set by init expressions)"
+                            },
+                            {
+                                "type": "object",
+                                "required": ["type"],
+                                "properties": {
+                                    "type": {
+                                        "enum": ["objectRef", "smallInt", "symbolRef"]
+                                    },
+                                    "localId": {
+                                        "type": "string"
+                                    },
+                                    "value": {
+                                        "type": "integer"
+                                    },
+                                    "index": {
+                                        "type": "integer"
+                                    }
+                                }
+                            }
+                        ],
+                        "description": "Initial value for this Association (usually nil)"
+                    },
+                    "poolDictionaryName": {
+                        "type": ["string", "null"],
+                        "description": "Pool dictionary name for pool variables, null for globals and class variables"
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": ["global", "classVariable", "poolVariable"],
+                        "description": "Category for diagnostic purposes"
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        "methods": {
+            "type": "array",
+            "description": "All compiled methods (class and instance). Method literals reference canonical associations[] by localId.",
+            "items": {
+                "type": "object",
+                "required": [
+                    "localId",
+                    "homeClassLocalId",
+                    "selectorIndex",
+                    "header",
+                    "literals",
+                    "bytecodes"
+                ],
+                "properties": {
+                    "localId": {
+                        "type": "string"
+                    },
+                    "homeClassLocalId": {
+                        "type": "string",
+                        "description": "LocalId of the class this method is defined in"
+                    },
+                    "selectorIndex": {
+                        "type": "integer",
+                        "description": "Index into symbols[] for method selector"
+                    },
+                    "header": {
+                        "$ref": "#/definitions/methodHeader"
+                    },
+                    "literals": {
+                        "type": "array",
+                        "description": "Literal frame. Association literals reference associations[] by localId.",
+                        "items": {
+                            "$ref": "#/definitions/literalValue"
+                        }
+                    },
+                    "bytecodes": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                        }
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        "initExpressions": {
+            "type": "array",
+            "description": "Initialization expressions (DoIts) to execute after cold start phases complete.",
+            "items": {
+                "type": "object",
+                "required": [
+                    "localId",
+                    "header",
+                    "literals",
+                    "bytecodes"
+                ],
+                "properties": {
+                    "localId": {
+                        "type": "string"
+                    },
+                    "header": {
+                        "$ref": "#/definitions/methodHeader"
+                    },
+                    "literals": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/literalValue"
+                        }
+                    },
+                    "bytecodes": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                        }
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        "patches": {
+            "type": "array",
+            "description": "Patch operations to resolve forward references and circular structures.",
+            "items": {
+                "type": "object",
+                "required": [
+                    "patchId",
+                    "target",
+                    "operation",
+                    "value"
+                ],
+                "properties": {
+                    "patchId": {
+                        "type": "string"
+                    },
+                    "target": {
+                        "type": "object",
+                        "required": ["kind"],
+                        "properties": {
+                            "kind": {
+                                "type": "string",
+                                "enum": ["methodLiteral", "classSlot", "metaclassWiring"]
+                            },
+                            "methodLocalId": {
+                                "type": "string"
+                            },
+                            "literalIndex": {
+                                "type": "integer"
+                            },
+                            "classLocalId": {
+                                "type": "string"
+                            },
+                            "slotName": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "operation": {
+                        "type": "string",
+                        "enum": ["setValue", "wireMetaclass"]
+                    },
+                    "value": {
+                        "oneOf": [
+                            {"type": "null"},
+                            {
+                                "type": "object",
+                                "required": ["type"],
+                                "properties": {
+                                    "type": {
+                                        "enum": ["objectRef", "symbolRef", "smallInt"]
+                                    },
+                                    "localId": {"type": "string"},
+                                    "symbolIndex": {"type": "integer"},
+                                    "intValue": {"type": "integer"}
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "literalValue": {
+            "type": "object",
+            "required": ["type"],
+            "description": "Discriminated union for method literal frame entries",
+            "oneOf": [
+                {
+                    "properties": {
+                        "type": {"const": "symbol"},
+                        "index": {"type": "integer", "minimum": 0}
+                    },
+                    "required": ["type", "index"],
+                    "additionalProperties": false
+                },
+                {
+                    "properties": {
+                        "type": {"const": "string"},
+                        "index": {"type": "integer", "minimum": 0}
+                    },
+                    "required": ["type", "index"],
+                    "additionalProperties": false
+                },
+                {
+                    "properties": {
+                        "type": {"const": "smallInt"},
+                        "value": {"type": "integer"}
+                    },
+                    "required": ["type", "value"],
+                    "additionalProperties": false
+                },
+                {
+                    "properties": {
+                        "type": {"const": "largePositiveInteger"},
+                        "value": {"type": "string"}
+                    },
+                    "required": ["type", "value"],
+                    "additionalProperties": false
+                },
+                {
+                    "properties": {
+                        "type": {"const": "largeNegativeInteger"},
+                        "value": {"type": "string"}
+                    },
+                    "required": ["type", "value"],
+                    "additionalProperties": false
+                },
+                {
+                    "properties": {
+                        "type": {"const": "float"},
+                        "value": {"type": "number"}
+                    },
+                    "required": ["type", "value"],
+                    "additionalProperties": false
+                },
+                {
+                    "properties": {
+                        "type": {"const": "associationRef"},
+                        "localId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Reference to canonical Association in associations[] array"
+                        }
+                    },
+                    "required": ["type", "localId"],
+                    "additionalProperties": false,
+                    "description": "Reference to canonical Association object. Used for globals, class variables, and pool variables. Ensures identity: the same Association object appears in method literals AND in Smalltalk/classPool dictionaries."
+                },
+                {
+                    "properties": {
+                        "type": {"const": "array"},
+                        "elements": {
+                            "type": "array",
+                            "items": {"$ref": "#/definitions/literalValue"}
+                        }
+                    },
+                    "required": ["type", "elements"],
+                    "additionalProperties": false
+                },
+                {
+                    "properties": {
+                        "type": {"const": "character"},
+                        "codePoint": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                        }
+                    },
+                    "required": ["type", "codePoint"],
+                    "additionalProperties": false
+                },
+                {
+                    "properties": {
+                        "type": {"const": "bytes"},
+                        "encoding": {
+                            "type": "string",
+                            "enum": ["hex", "base64"]
+                        },
+                        "data": {"type": "string"}
+                    },
+                    "required": ["type", "encoding", "data"],
+                    "additionalProperties": false
+                },
+                {
+                    "description": "Block CompiledMethod (selector=null) stored as literal",
+                    "properties": {
+                        "type": {"const": "compiledMethod"},
+                        "selector": {"type": "null"},
+                        "numArgs": {"type": "integer", "minimum": 0},
+                        "numTemps": {"type": "integer", "minimum": 0},
+                        "maxStack": {"type": "integer", "minimum": 0},
+                        "header": {"$ref": "#/definitions/methodHeader"},
+                        "literals": {
+                            "type": "array",
+                            "items": {"$ref": "#/definitions/literalValue"}
+                        },
+                        "bytecodes": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 255
+                            }
+                        },
+                        "argNames": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "tempNames": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": [
+                        "type", "selector", "numArgs", "numTemps",
+                        "maxStack", "header", "literals", "bytecodes"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "properties": {
+                        "type": {"const": "nil"}
+                    },
+                    "additionalProperties": false
+                }
+            ]
+        },
+        "methodHeader": {
+            "type": "object",
+            "required": [
+                "word",
+                "literalCount",
+                "tempCount",
+                "argCount",
+                "primitiveIndex",
+                "largeContext"
+            ],
+            "description": "Blue Book method header (16-bit word) with expanded fields.",
+            "properties": {
+                "word": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 65535
+                },
+                "literalCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 127
+                },
+                "tempCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 31
+                },
+                "argCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 7
+                },
+                "primitiveIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                },
+                "largeContext": {
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}

@@ -260,6 +260,25 @@ public class InitExpressionCompiler
                 }
                 throw new InvalidOperationException("Association literal missing Association data");
 
+            case "associationRef":
+                // Canonical Association reference - look up by localId in AssociationRegistry
+                if (literalValue.LocalId != null)
+                {
+                    // Extract the key name from the Association descriptor
+                    var assocDesc = _bundle.Associations.FirstOrDefault(a => a.LocalId == literalValue.LocalId);
+                    if (assocDesc != null)
+                    {
+                        string keyName = _bundle.Symbols[assocDesc.KeyIndex];
+                        if (AssociationRegistry.TryGet(keyName, out var assocOOP, assocDesc.PoolDictionaryName))
+                        {
+                            return assocOOP;
+                        }
+                        throw new InvalidOperationException($"Canonical Association '{keyName}' (pool: {assocDesc.PoolDictionaryName}) not found in AssociationRegistry");
+                    }
+                    throw new InvalidOperationException($"Association descriptor not found for localId: {literalValue.LocalId}");
+                }
+                throw new InvalidOperationException("AssociationRef literal missing LocalId");
+
             case "nil":
                 return _heapManager.GetNil();
 

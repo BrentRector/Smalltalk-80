@@ -2,40 +2,14 @@ namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
 /// Configuration for event architecture behavior.
-/// Controls placement and behavior of strategic check points for interrupt simulation.
+/// The interpreter uses cooperative multi-processing. Events are processed
+/// only at explicit yield points (semaphore wait, process suspend, yield, terminate).
+/// There is no proactive interrupt simulation.
 /// </summary>
 public static class EventConfig
 {
     // ============================================================================
-    // Check Point Placement
-    // ============================================================================
-
-    /// <summary>
-    /// Periodic check interval (bytecode count between checks).
-    /// Lower values = more responsive but higher overhead.
-    /// </summary>
-    public const int PeriodicCheckInterval = 1000;
-
-    /// <summary>
-    /// Enable event checks at backward branches (loops).
-    /// Ensures tight loops remain responsive to input interrupts.
-    /// </summary>
-    public static bool EnableBackwardBranchCheck = true;
-
-    /// <summary>
-    /// Enable event checks at method returns.
-    /// Reduces latency for deeply nested call chains.
-    /// </summary>
-    public static bool EnableMethodReturnCheck = true;
-
-    /// <summary>
-    /// Enable event checks after primitive returns.
-    /// Useful for long-running primitives, but adds overhead.
-    /// </summary>
-    public static bool EnablePrimitiveReturnCheck = false;
-
-    // ============================================================================
-    // Event Coalescing (Phase 8)
+    // Event Coalescing
     // ============================================================================
 
     /// <summary>
@@ -51,7 +25,7 @@ public static class EventConfig
     public const int MaxCoalescedMoves = 10;
 
     // ============================================================================
-    // Diagnostics (Phase 6)
+    // Diagnostics
     // ============================================================================
 
     /// <summary>
@@ -70,48 +44,35 @@ public static class EventConfig
 
     /// <summary>
     /// Apply a named configuration profile.
-    /// Profiles allow quick switching between conservative, balanced, and aggressive settings.
     /// </summary>
-    /// <param name="profile">Profile name: "conservative", "responsive", or "stress"</param>
+    /// <param name="profile">Profile name: "conservative", "responsive", "stress", or "debug"</param>
     public static void ApplyProfile(string profile)
     {
         switch (profile.ToLower())
         {
             case "conservative":
-                // Minimal overhead - only periodic checks
-                EnableBackwardBranchCheck = false;
-                EnableMethodReturnCheck = false;
-                EnablePrimitiveReturnCheck = false;
+                // Minimal features
                 MoveCoalescingEnabled = false;
                 EnableEventTracing = false;
                 EnableLatencyProbes = false;
                 break;
 
             case "responsive":
-                // Balanced - backward branches and method returns
-                EnableBackwardBranchCheck = true;
-                EnableMethodReturnCheck = true;
-                EnablePrimitiveReturnCheck = false;
+                // Enable coalescing for better performance
                 MoveCoalescingEnabled = true;
                 EnableEventTracing = false;
                 EnableLatencyProbes = false;
                 break;
 
             case "stress":
-                // Maximum responsiveness - all check points enabled
-                EnableBackwardBranchCheck = true;
-                EnableMethodReturnCheck = true;
-                EnablePrimitiveReturnCheck = true;
+                // Same as responsive (cooperative model)
                 MoveCoalescingEnabled = true;
                 EnableEventTracing = false;
                 EnableLatencyProbes = false;
                 break;
 
             case "debug":
-                // Debugging - responsive with full diagnostics
-                EnableBackwardBranchCheck = true;
-                EnableMethodReturnCheck = true;
-                EnablePrimitiveReturnCheck = false;
+                // Enable diagnostics
                 MoveCoalescingEnabled = false;
                 EnableEventTracing = true;
                 EnableLatencyProbes = true;

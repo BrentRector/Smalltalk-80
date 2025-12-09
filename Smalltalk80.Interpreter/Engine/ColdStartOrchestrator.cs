@@ -158,6 +158,9 @@ public class ColdStartOrchestrator : IColdStartLoader
         {
             phase2.Run();
             LayoutResolver = phase2.LayoutResolver;
+
+            // DIAGNOSTIC: Check Float classPool size after Phase 2
+            CheckFloatClassPoolSize("After Phase 2");
         });
 
         // Phase 3: Object Allocation
@@ -170,6 +173,9 @@ public class ColdStartOrchestrator : IColdStartLoader
         RunPhase(phase3.Name, () =>
         {
             phase3.Run();
+
+            // DIAGNOSTIC: Check Float classPool size after Phase 3
+            CheckFloatClassPoolSize("After Phase 3");
         });
 
         // Phase 4: Method Compilation
@@ -181,6 +187,7 @@ public class ColdStartOrchestrator : IColdStartLoader
             phase4.Run();
             // Store InitExpressionMethods for later use in BuildVMMetadata
             InitExpressionMethods = phase4.InitExpressionMethods;
+            Console.WriteLine($"[Orchestrator] Stored InitExpressionMethods from Phase 4: {InitExpressionMethods}");
         });
 
         // Phase 5: Globals + Patches
@@ -190,6 +197,9 @@ public class ColdStartOrchestrator : IColdStartLoader
         RunPhase(phase5.Name, () =>
         {
             phase5.Run();
+
+            // DIAGNOSTIC: Check Float classPool size after Phase 5
+            CheckFloatClassPoolSize("After Phase 5");
         });
 
         // Phase 6: Validation + GC Verification
@@ -251,7 +261,8 @@ public class ColdStartOrchestrator : IColdStartLoader
         var falseOOP = GlobalRegistry.Get("false");
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
         var displayOOP = GlobalRegistry.Get("Display");
-        var processorSchedulerOOP = GlobalRegistry.Get("ProcessorScheduler");
+        // Get ProcessorScheduler INSTANCE (not class) - registered as "Processor" in Phase 3
+        var processorSchedulerOOP = GlobalRegistry.Get("Processor");
 
         var knownObjects = new KnownObjects(
             nil: nilOOP,
@@ -432,7 +443,12 @@ public class ColdStartOrchestrator : IColdStartLoader
         // Add init expression methods if they exist
         if (InitExpressionMethods != default)
         {
+            Console.WriteLine($"[Phase 6] Adding InitExpressionMethods array as GC root: {InitExpressionMethods}");
             gcRootsList.Add(InitExpressionMethods);
+        }
+        else
+        {
+            Console.WriteLine($"[Phase 6] InitExpressionMethods is default/nil - NOT adding as GC root");
         }
 
         // Set GC roots and get unreachable objects (READ-ONLY - does not collect)
@@ -481,6 +497,28 @@ public class ColdStartOrchestrator : IColdStartLoader
             {
                 Console.WriteLine($"    ... and {byClass.Count - 10} more classes");
             }
+        }
+    }
+
+    /// <summary>
+    /// DIAGNOSTIC: Checks Float classPool size at various stages of cold start.
+    /// </summary>
+    private void CheckFloatClassPoolSize(string stage)
+    {
+        try
+        {
+            if (_localIdToObjectId == null || !_localIdToObjectId.ContainsKey("class:Float"))
+                return;
+
+            var floatClassOOP = _localIdToObjectId["class:Float"];
+            var classPoolOOP = _heapManager.GetInstanceVariable(floatClassOOP, 7); // classPool is instance var 7
+            int poolSize = _heapManager.GetIndexedSize(classPoolOOP);
+
+            Console.WriteLine($"[{stage}] Float classPool size = {poolSize}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{stage}] ERROR checking Float classPool: {ex.Message}");
         }
     }
 }

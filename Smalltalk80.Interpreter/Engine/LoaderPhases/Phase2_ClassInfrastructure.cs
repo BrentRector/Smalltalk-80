@@ -444,6 +444,14 @@ public class Phase2_ClassInfrastructure : IPhase
         // Field [7]: classPool - Dictionary of class variables
         int classVarCount = cls.ClassVarNames?.Length ?? 0;
         var classPoolOOP = AllocateEmptyDictionary(classVarCount);
+
+        // DIAGNOSTIC: Log Float classPool allocation
+        if (className == "Float")
+        {
+            int actualSize = _heapManager.GetIndexedSize(classPoolOOP);
+            Console.WriteLine($"[Phase 2] Float classPool: classVarCount={classVarCount}, allocated size={actualSize}");
+        }
+
         SetAndTrackInstanceVariable(classOOP, 7, classPoolOOP);
 
         // Field [8]: sharedPools - Array of shared pool Dictionaries
@@ -502,6 +510,14 @@ public class Phase2_ClassInfrastructure : IPhase
         // Calculate initial size with ~75% load factor (round up to next power of 2 for efficiency)
         // Minimum size of 4 for classes with 0-3 class variables
         int initialSize = classVarCount == 0 ? 4 : NextPowerOfTwo((int)Math.Ceiling(classVarCount / 0.75));
+
+        // DIAGNOSTIC: Log calculation for Float
+        if (classVarCount == 12)
+        {
+            double rawSize = classVarCount / 0.75;
+            int ceiledSize = (int)Math.Ceiling(classVarCount / 0.75);
+            Console.WriteLine($"[AllocateEmptyDictionary] classVarCount={classVarCount}, rawSize={rawSize:F2}, ceiledSize={ceiledSize}, initialSize={initialSize}");
+        }
 
         if (!GlobalRegistry.TryGet("class:Dictionary", out SmalltalkOOP dictClassOOP))
         {

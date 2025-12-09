@@ -688,8 +688,14 @@ public class Phase6_ValidationAndGC : IPhase
 
         foreach (var kv in AssociationRegistry.GetAll())
         {
-            string symbolName = kv.Key;
+            string registryKey = kv.Key;
             SmalltalkOOP assocOOP = kv.Value;
+
+            // Extract the actual symbol name from the registry key
+            // Registry key format: "symbolName" for globals/class vars, "symbolName@poolName" for pool vars
+            string symbolName = registryKey.Contains('@')
+                ? registryKey.Substring(0, registryKey.IndexOf('@'))
+                : registryKey;
 
             // Validate Association has correct structure
             var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
@@ -836,10 +842,12 @@ public class Phase6_ValidationAndGC : IPhase
             ("Smalltalk", GlobalRegistry.SystemDictionaryOOP)
         };
 
-        // NOTE: We no longer add InitExpressionMethods as a GC root!
-        // With full ProcessorScheduler integration, init expressions run in a Process context.
-        // The GC can trace: Processor (global) → activeProcess → suspendedContext → method
-        // This makes init expression methods naturally reachable during execution.
+        // Add InitExpressionMethods array if it exists (pre-compiled in Phase 4)
+        if (_initExpressionMethods != _heapManager.GetNil())
+        {
+            gcRootsList.Add(("InitExpressionMethods", _initExpressionMethods));
+            Console.WriteLine($"[Phase 6] Added InitExpressionMethods as GC root: {_initExpressionMethods}");
+        }
 
         // Set as GC roots (bulk operation - replaces any previous roots)
         _heapManager.GC.ClearGCRoots();
@@ -872,14 +880,14 @@ public class Phase6_ValidationAndGC : IPhase
 
         // Cold start expects exactly 1 collected object (the placeholder nil from heap manager initialization)
         // After become: swaps the placeholder with the real UndefinedObject, the placeholder becomes unreachable
-        // NOTE: No init expressions compiled during cold start, so no other objects to collect
+        // v1.0.9: Reduced Undeclared dictionary size from 620 to 16 words (all variables are now canonical)
         if (gcStats.CollectedObjects != 1)
         {
             _diagnostics?.Emit(new DiagnosticMessageEvent
             {
                 Severity = MessageSeverity.Error,
                 Category = "Phase6",
-                Message = $"COLD START FAILED: GC collected {gcStats.CollectedObjects} objects! Expected exactly 1 object (placeholder nil after become:).",
+                Message = $"COLD START FAILED: GC collected {gcStats.CollectedObjects} objects! Expected exactly 1 object.",
                 Timestamp = Stopwatch.GetTimestamp(),
                 InstructionCount = 0
             });
@@ -1010,7 +1018,7 @@ public class Phase6_ValidationAndGC : IPhase
 
             throw new InvalidOperationException(
                 $"COLD START BUG: GC collected {gcStats.CollectedObjects} objects. " +
-                $"Expected exactly 1 object (placeholder nil after become:).");
+                $"Expected exactly 1 object.");
         }
 
 // Console.WriteLine($"  ✓ GC Verification passed: {gcStats.LiveObjects} objects reachable, 1 placeholder nil collected as expected");

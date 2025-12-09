@@ -62,8 +62,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// <summary>Gets the total number of instructions executed by this VM instance.</summary>
     public long InstructionCount => _tracer.InstructionCount;
 
-    /// <summary>Resets the instruction counter to zero. Used before executing init expressions.</summary>
-    public void ResetInstructionCount() => _tracer.ResetInstructionCount();
+    /// <summary>Resets instruction counters to zero. Used before executing init expressions and when enabling bytecode tracing.</summary>
+    public void ResetInstructionCount()
+    {
+        _tracer.ResetInstructionCount();
+        _bytecodeInterpreter.ResetInstructionCount();
+    }
 
     // Trampoline state - used to avoid recursive ExecuteBytecodeLoop calls
     // (CallOutcome, CallOutcomeKind, InterpreterStatus moved to Interpreter/ExecutionState.cs)
@@ -157,10 +161,19 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Initialize context manager to register for GC events
         _contextManager.Initialize();
 
+        // Initialize debugger first (needed by StackManager)
+        _debugger = new VMDebugger(
+            heapManager,
+            _contextManager,
+            this, // IBytecodeContext
+            metadata
+        );
+
         _stackManager = new StackManager(
             heapManager,
             metadata,
             this, // IObjectMetadataAccessor
+            _debugger,
             () => _contextManager.ActiveContext,
             () => _tracer.SelectorTraceEnabled,
             () => _tracer.PushTraceCounter,
@@ -177,14 +190,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             heapManager,
             this, // IBytecodeContext
             _runtimeHeapAccess,
-            metadata
-        );
-
-        _debugger = new VMDebugger(
-            heapManager,
-            _contextManager,
-            this, // IBytecodeContext
-            metadata
+            metadata,
+            diagnostics
         );
 
         // Initialize primitive registry with new IPrimitive implementations
@@ -247,9 +254,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Phase 2: Wire up idle state callback for conditional IdleWake signaling
         _platformBridge.SetIsIdleCallback(() => _isIdle);
-
-        // Phase 3: Wire up event check callback for strategic check points (loops, returns)
-        _bytecodeInterpreter.SetEventCheckCallback(CheckAndSignalPendingEvents);
 
         // Wire up GC callbacks for interrupt masking (Phase 5)
         if (_heapManager is SmalltalkHeapManager heapManager)
@@ -440,8 +444,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var idleWakeHandle = _platformBridge?.IdleWakeHandle;
         var timerHandle = _timerManager.TimerExpiredHandle;
 
-        Console.WriteLine("[IDLE] Entering idle wait (background process active)");
-
         while (true)
         {
             // PRE-PARK GUARD: Check timers/events FIRST (prevent parking with work pending)
@@ -451,7 +453,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             var currentProcess = GetActiveProcess();
             if (currentProcess != backgroundProcess)
             {
-                Console.WriteLine("[IDLE] Exiting idle (process switch detected)");
                 _isIdle = false;  // Clear idle flag before exiting
                 return;  // Higher-priority process ready - exit idle
             }
@@ -644,10 +645,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// Executes bytecodes in the current context until a context switch or return.
     /// Returns InterpreterStatus indicating whether to continue or return.
     /// </summary>
+    private long _stepCount = 0;  // DIAGNOSTIC: count calls to ExecuteBytecodeStep
+
     private InterpreterStatus ExecuteBytecodeStep()
     {
-        // if (_verboseDebugMode)
-        //     Console.WriteLine($"\n[ExecuteBytecodeStep] START in context {_contextManager.ActiveContext}");
+        _stepCount++;
 
         // If NLR is pending, continue unwinding instead of executing bytecodes
         if (_nlrHandler.IsPending)
@@ -719,6 +721,19 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         while (ip < bytecodes.Length)
         {
+            // Validate IP is within executable bytecode range
+            // GetMethodBytecodes() excludes the last 3 bytes (source file offset)
+            // If IP is at or beyond bytecodes.Length, it means we've fallen through
+            // past the last executable bytecode (missing RETURN or bad jump)
+            if (ip >= bytecodes.Length)
+            {
+                var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
+                string errorMsg = $"IP out of range: IP={ip} exceeds executable bytecode length={bytecodes.Length} in method {methodLocalId} OOP({methodOOP}). " +
+                                 $"This indicates either a missing RETURN instruction or a malformed jump bytecode.";
+                _debugger.DumpCrashDiagnostics(errorMsg);
+                throw new InvalidOperationException(errorMsg);
+            }
+
             byte bytecode = bytecodes[ip++];
 
             // Update IP
@@ -1106,8 +1121,21 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         while (ip < bytecodes.Length)
         {
+            // DIAGNOSTIC: Validate IP is within executable bytecode range
+            // GetMethodBytecodes() excludes the last 3 bytes (source file offset)
+            // If IP is at or beyond bytecodes.Length, it means we've fallen through
+            // past the last executable bytecode (missing RETURN or bad jump)
+            if (ip >= bytecodes.Length)
+            {
+                var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
+                string errorMsg = $"IP out of range: IP={ip} exceeds executable bytecode length={bytecodes.Length} in method {methodLocalId} OOP({methodOOP}). " +
+                                 $"This indicates either a missing RETURN instruction or a malformed jump bytecode.";
+                _debugger.DumpCrashDiagnostics(errorMsg);
+                throw new InvalidOperationException(errorMsg);
+            }
+
             byte bytecode = bytecodes[ip++];
-            
+
             // DEBUG: Trace first 100 bytecodes when tracing is enabled
             if (_tracer.SelectorTraceEnabled && _tracer.BytecodeInstructionCounter < 100)
             {

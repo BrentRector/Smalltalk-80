@@ -49,4 +49,10 @@ internal interface IVMDebugger
     /// <param name="oop">OOP to format.</param>
     /// <returns>Formatted string representation.</returns>
     string FormatOOPValue(SmalltalkOOP oop);
+
+    /// <summary>
+    /// Dumps comprehensive crash diagnostics including active context, method, IP, bytecode, stack, and sender chain.
+    /// </summary>
+    /// <param name="errorMessage">The error message that triggered the crash.</param>
+    void DumpCrashDiagnostics(string errorMessage);
 }

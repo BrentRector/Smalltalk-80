@@ -51,13 +51,8 @@ public partial class VirtualMachine : IProcessScheduler
         var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
         if (contextOOP == _metadata.KnownObjects.Nil)
         {
-            Console.WriteLine($"[ACTIVATE] ERROR: Process {processOOP} has nil suspendedContext");
             return false;
         }
-
-        // Get process priority for logging
-        var priorityOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX);
-        int priority = priorityOOP.IsSmallInteger ? priorityOOP.AsSmallInteger() : -1;
 
         // Check if this is an unactivated BlockContext (PC is nil)
         // This happens when resuming a newly created process via [block] newProcess
@@ -68,7 +63,6 @@ public partial class VirtualMachine : IProcessScheduler
             var startPC = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
             if (startPC == _metadata.KnownObjects.Nil || !startPC.IsSmallInteger)
             {
-                Console.WriteLine($"[ACTIVATE] ERROR: Process {processOOP} BlockContext has invalid startPC");
                 return false;
             }
 

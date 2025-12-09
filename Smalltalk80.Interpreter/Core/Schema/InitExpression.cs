@@ -35,6 +35,16 @@ public sealed record InitExpression
     [JsonPropertyName("source")]
     public string? Source { get; init; }
     /// <summary>
+    /// Index into sourceFiles array (1 = .sources, 2 = .changes).
+    /// </summary>
+    [JsonPropertyName("fileIndex")]
+    public int? FileIndex { get; init; }
+    /// <summary>
+    /// Byte position in the source file where this expression's source begins.
+    /// </summary>
+    [JsonPropertyName("sourcePosition")]
+    public int? SourcePosition { get; init; }
+    /// <summary>
     /// Optional notes about this expression.
     /// </summary>
     [JsonPropertyName("notes")]

@@ -32,6 +32,84 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     private readonly Dictionary<string, string> _blockToHomeMethod = new(); // Maps block localId → home method localId
     private string? _currentMethodLocalId; // Tracks the current method being processed
 
+    // Canonical Association registry - ensures ONE Association per unique (key, poolDictionaryName) pair
+    private readonly Dictionary<(string key, string? poolDictionaryName), string> _associationRegistry = new();
+    private readonly List<JsonAssociation> _associations = [];
+    private int _associationCounter = 0;
+
+    /// <summary>
+    /// Gets or creates a canonical Association for the given key and optional pool dictionary name.
+    /// Ensures exactly ONE Association object per unique (key, poolDictionaryName) pair across the entire bundle.
+    /// Similar to Symbol canonicalization but for variable Associations.
+    /// </summary>
+    /// <param name="key">Variable name (e.g., "SystemRockBottomPriority", "Display", "Smalltalk")</param>
+    /// <param name="poolDictionaryName">Pool dictionary name for pool variables, null for globals/class variables</param>
+    /// <param name="category">Explicit category ("global", "classVariable", "poolVariable"). If null, uses heuristic based on capitalization.</param>
+    /// <returns>Canonical localId for this Association</returns>
+    public string GetOrCreateCanonicalAssociation(string key, string? poolDictionaryName, string? category = null)
+    {
+        var lookupKey = (key, poolDictionaryName);
+
+        if (_associationRegistry.TryGetValue(lookupKey, out var existingLocalId))
+        {
+            // Association already exists - update category if explicit category provided
+            if (category != null)
+            {
+                var existingAssoc = _associations.FirstOrDefault(a => a.LocalId == existingLocalId);
+                if (existingAssoc != null && existingAssoc.Category != category)
+                {
+                    existingAssoc.Category = category;
+                }
+            }
+            return existingLocalId;
+        }
+
+        // Create new canonical Association
+        string localId = $"assoc:{_associationCounter++}";
+
+        // Determine category (explicit or heuristic)
+        string finalCategory;
+        if (category != null)
+        {
+            // Use explicit category when provided
+            finalCategory = category;
+        }
+        else if (poolDictionaryName != null)
+        {
+            // Pool variables always use "poolVariable" category
+            finalCategory = "poolVariable";
+        }
+        else if (key.Length > 0 && char.IsUpper(key[0]))
+        {
+            // Capitalized names are typically globals (Display, Smalltalk, etc.)
+            finalCategory = "global";
+        }
+        else
+        {
+            // Lowercase or other names are typically class variables
+            finalCategory = "classVariable";
+        }
+
+        _associations.Add(new JsonAssociation
+        {
+            LocalId = localId,
+            Key = key,
+            PoolDictionaryName = poolDictionaryName,
+            Category = finalCategory
+        });
+
+        _associationRegistry[lookupKey] = localId;
+        return localId;
+    }
+
+    private class JsonAssociation
+    {
+        public string LocalId { get; set; } = "";
+        public string Key { get; set; } = "";
+        public string? PoolDictionaryName { get; set; }
+        public string Category { get; set; } = ""; // "global", "classVariable", or "poolVariable"
+    }
+
     // Source file tracking for Blue Book source code retrieval
     private readonly System.Text.StringBuilder _sourcesFileContent = new();
     private readonly Dictionary<string, int> _methodSourcePositions = new(); // Maps method localId → byte position in .sources file
@@ -88,7 +166,12 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
         // Phase 4: Convert methods
         ConvertMethods(ast);
 
-        // Phase 4.5: BlockContext metadata is now generated in GenerateMetadata()
+        // Phase 4.5: Ensure ALL class variables have canonical Associations
+        // This runs AFTER method compilation to ensure we capture ALL class variables,
+        // not just those used in method literals
+        EnsureAllClassVariablesHaveAssociations(ast);
+
+        // Phase 4.6: BlockContext metadata is now generated in GenerateMetadata()
         // (no longer added to objects[] array)
 
         // Phase 5: Convert init expressions
@@ -226,18 +309,18 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                     break;
 
                 case GlobalVariable global:
-                    // GlobalVariable object - extract the key
+                    // GlobalVariable object - extract the key for symbol table
                     symbols.Add(global.Key.Value);
                     break;
-                
+
                 case PoolVariable pool:
-                    // PoolVariable object - extract the key
+                    // PoolVariable object - extract the key for symbol table
                     symbols.Add(pool.Key.Value);
                     break;
 
                 #pragma warning disable CS0618
                 case Association assoc:
-                    // LEGACY: Association object - extract the key
+                    // LEGACY: Association object - extract the key for symbol table
                     symbols.Add(assoc.Key.Value);
                     break;
                 #pragma warning restore CS0618
@@ -934,6 +1017,45 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     }
 
     /// <summary>
+    /// Ensures ALL class variables defined in all classes have canonical Association descriptors.
+    /// This is called AFTER ConvertMethods to ensure we capture class variables that are not
+    /// yet referenced in any method literals but still need Association descriptors for the
+    /// canonical Association system (v1.0.9).
+    ///
+    /// Without this, only class variables used in method literals would get Association descriptors,
+    /// leaving some class variables without Associations, causing runtime errors when they are
+    /// first accessed or assigned.
+    /// </summary>
+    /// <param name="ast">The compilation result containing all class definitions</param>
+    private void EnsureAllClassVariablesHaveAssociations(CompilationResult ast)
+    {
+        int existingCount = _associations.Count;
+
+        foreach (var classNode in ast.Classes)
+        {
+            // Process all class variables for this class
+            foreach (var classVarName in classNode.ClassVariables)
+            {
+                // Call GetOrCreateCanonicalAssociation to ensure this class variable
+                // has an Association descriptor. If it was already created during
+                // method compilation, this will return the existing localId.
+                // If not, it will create a new Association descriptor.
+                // IMPORTANT: Explicitly pass "classVariable" category to override capitalization heuristic
+                // (Float has capitalized class variables like Pi, Sqrt2, etc.)
+                GetOrCreateCanonicalAssociation(classVarName, poolDictionaryName: null, category: "classVariable");
+            }
+        }
+
+        int newCount = _associations.Count;
+        int added = newCount - existingCount;
+
+        if (added > 0)
+        {
+            Console.WriteLine($"[ColdStartJsonGenerator] Added {added} class variable Association(s) not referenced in method literals (total: {newCount})");
+        }
+    }
+
+    /// <summary>
     /// Creates an empty pool dependency graph for schema v1.0.8 compatibility.
     /// This is a placeholder implementation - actual pool variable detection will be implemented later.
     /// </summary>
@@ -1069,15 +1191,22 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                 ["index"] = _symbolTable.GetValueOrDefault(symbol.Value, -1)
             },
 
-            // GlobalVariable object
-            GlobalVariable global => GenerateGlobalLiteral(global),
-            
-            // PoolVariable object
-            PoolVariable pool => GeneratePoolLiteral(pool),
+            // GlobalVariable object - use canonical Association
+            GlobalVariable global => GenerateAssociationRefLiteral(
+                GetOrCreateCanonicalAssociation(global.Key.Value, poolDictionaryName: null, category: "global")),
 
-            // LEGACY: Association object (deprecated)
+            // PoolVariable object - use canonical Association
+            PoolVariable pool => GenerateAssociationRefLiteral(
+                GetOrCreateCanonicalAssociation(pool.Key.Value, pool.PoolDictionaryName, category: "poolVariable")),
+
+            // LEGACY: Association object (deprecated) - use canonical Association
             #pragma warning disable CS0618
-            Association association => GenerateAssociationLiteral(association),
+            Association association => GenerateAssociationRefLiteral(
+                GetOrCreateCanonicalAssociation(
+                    association.Key.Value,
+                    association.PoolDictionaryName,
+                    // Determine category: pool variables have poolDictionaryName, otherwise use heuristic
+                    category: association.PoolDictionaryName != null ? "poolVariable" : null)),
             #pragma warning restore CS0618
 
             // Symbol literal in "#symbolName" format
@@ -1272,52 +1401,20 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
         };
     }
 
-    private Dictionary<string, object> GenerateGlobalLiteral(GlobalVariable global)
+    /// <summary>
+    /// Generates a literal reference to a canonical Association.
+    /// Replaces the old GenerateGlobalLiteral/GeneratePoolLiteral/GenerateAssociationLiteral methods.
+    /// </summary>
+    /// <param name="associationLocalId">The canonical Association localId from GetOrCreateCanonicalAssociation</param>
+    /// <returns>A dictionary representing the associationRef literal in JSON format</returns>
+    private Dictionary<string, object> GenerateAssociationRefLiteral(string associationLocalId)
     {
         return new Dictionary<string, object>
         {
-            ["type"] = "association",
-            ["association"] = new Dictionary<string, object?>
-            {
-                ["keyType"] = "symbol",
-                ["keyIndex"] = _symbolTable.GetValueOrDefault(global.Key.Value, -1),
-                ["valueRef"] = null,
-                ["poolDictionaryName"] = null // GlobalVariable never has pool dictionary
-            }
+            ["type"] = "associationRef",
+            ["localId"] = associationLocalId
         };
     }
-    
-    private Dictionary<string, object> GeneratePoolLiteral(PoolVariable pool)
-    {
-        return new Dictionary<string, object>
-        {
-            ["type"] = "association",
-            ["association"] = new Dictionary<string, object?>
-            {
-                ["keyType"] = "symbol",
-                ["keyIndex"] = _symbolTable.GetValueOrDefault(pool.Key.Value, -1),
-                ["valueRef"] = null,
-                ["poolDictionaryName"] = pool.PoolDictionaryName // PoolVariable always has pool dictionary
-            }
-        };
-    }
-
-    #pragma warning disable CS0618
-    private Dictionary<string, object> GenerateAssociationLiteral(Association assoc)
-    {
-        return new Dictionary<string, object>
-        {
-            ["type"] = "association",
-            ["association"] = new Dictionary<string, object?>
-            {
-                ["keyType"] = "symbol",
-                ["keyIndex"] = _symbolTable.GetValueOrDefault(assoc.Key.Value, -1),
-                ["valueRef"] = null,
-                ["poolDictionaryName"] = assoc.PoolDictionaryName
-            }
-        };
-    }
-    #pragma warning restore CS0618
     
     /// <summary>
     /// Converts initialization expressions from the AST to the cold-start format.
@@ -1328,9 +1425,14 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
 
         foreach (var initExpr in ast.InitializationExpressions)
         {
+            string initLocalId = $"init:{counter:D3}";
+
+            // Write source to .sources file and get position (same as regular methods)
+            int sourcePosition = WriteSourceToFile(initLocalId, initExpr.Source);
+
             var jsonInitExpr = new JsonInitExpr
             {
-                LocalId = $"init:{counter:D3}",
+                LocalId = initLocalId,
                 Header = new MethodHeader
                 {
                     Word = CalculateMethodHeaderWord(
@@ -1350,7 +1452,9 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
                 },
                 Literals = ConvertLiterals(initExpr.Literals),
                 Bytecodes = initExpr.Bytecode,
-                Source = initExpr.Source
+                Source = initExpr.Source,
+                FileIndex = sourcePosition >= 0 ? 1 : null, // FileIndex 1 = .sources file
+                SourcePosition = sourcePosition >= 0 ? sourcePosition : null
             };
 
             _initExprs.Add(jsonInitExpr);
@@ -1531,6 +1635,20 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             };
         }
 
+        // Build associations array (v1.0.9)
+        List<object>? associations = null;
+        if (_associations.Count > 0)
+        {
+            associations = _associations.Select(a => new Dictionary<string, object?>
+            {
+                ["localId"] = a.LocalId,
+                ["keyIndex"] = _symbolTable.GetValueOrDefault(a.Key, -1),
+                ["valueRef"] = null,  // Initial value is nil
+                ["poolDictionaryName"] = a.PoolDictionaryName,
+                ["category"] = a.Category
+            } as object).ToList();
+        }
+
         return new ColdStartBundle
         {
             Metadata = GenerateMetadata(),
@@ -1538,6 +1656,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             Strings = _strings,
             OptimizedSelectors = optimizedSelectors,
             Classes = _classes,
+            Associations = associations,  // v1.0.9: Canonical Associations
             Objects = _objects,
             Methods = _methods,
             InitExpressions = _initExprs,
@@ -1580,7 +1699,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
 
         return new Metadata
         {
-            Version = "1.0.8",
+            Version = "1.0.9",
             Generator = $"Smalltalk80.Compiler v{version}",
             GeneratedAt = DateTime.UtcNow.ToString("O"),
             SourceFile = _sourceFileDescription,
@@ -1591,7 +1710,8 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             MethodCount = _methods.Count,
             ObjectCount = _objects.Count,
             InitExpressionCount = _initExprs.Count,
-            UndeclaredCount = BytecodeCompiler.GetUndeclaredVariables().Count
+            UndeclaredCount = BytecodeCompiler.GetUndeclaredVariables().Count,
+            AssociationCount = _associations.Count
         };
     }
 }
@@ -1605,6 +1725,7 @@ internal sealed record ColdStartBundle
     public required List<string> Strings { get; init; }
     public required List<int> OptimizedSelectors { get; init; }
     public required List<JsonClass> Classes { get; init; }
+    public List<object>? Associations { get; init; }  // v1.0.9: Canonical Associations
     public required List<JsonObject> Objects { get; init; }
     public required List<JsonMethod> Methods { get; init; }
     public required List<JsonInitExpr> InitExpressions { get; init; }
@@ -1655,6 +1776,7 @@ internal sealed record Metadata
     public required int ObjectCount { get; init; }
     public required int InitExpressionCount { get; init; }
     public int? UndeclaredCount { get; init; }
+    public int? AssociationCount { get; init; }  // v1.0.9: Canonical Association count
 }
 
 /// <summary>
@@ -1908,6 +2030,14 @@ internal sealed record JsonInitExpr
     public required List<object> Literals { get; init; }
     public required List<int> Bytecodes { get; init; }
     public string? Source { get; init; }
+    /// <summary>
+    /// Index into sourceFiles array (1 = .sources, 2 = .changes).
+    /// </summary>
+    public int? FileIndex { get; init; }
+    /// <summary>
+    /// Byte position in the source file where this init expression's source begins.
+    /// </summary>
+    public int? SourcePosition { get; init; }
     /// <summary>
     /// v1.0.8: Optional pool variable references in this init expression.
     /// </summary>

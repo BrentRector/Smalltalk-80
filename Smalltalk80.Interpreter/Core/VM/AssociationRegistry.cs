@@ -20,23 +20,71 @@ namespace Smalltalk80.Interpreter.Core.VM
         private static bool _frozen = false;
 
         /// <summary>
+        /// Register a canonical Association object.
+        /// </summary>
+        /// <param name="symbolName">Global/class/pool variable name (e.g., "SystemRockBottomPriority")</param>
+        /// <param name="assocOOP">The canonical Association OOP for this variable</param>
+        /// <param name="poolDictionaryName">Pool dictionary name for pool variables, null otherwise</param>
+        public static void Register(string symbolName, SmalltalkOOP assocOOP, string? poolDictionaryName = null)
+        {
+            if (_frozen)
+                throw new InvalidOperationException(
+                    $"AssociationRegistry.Register() called after freeze. " +
+                    $"Cannot register Association for '{symbolName}' after coldstart completes.");
+
+            // Use composite key for pool variables to distinguish between different pools
+            string key = poolDictionaryName != null
+                ? $"{symbolName}@{poolDictionaryName}"
+                : symbolName;
+
+            if (_registry.ContainsKey(key))
+            {
+                throw new InvalidOperationException(
+                    $"Association '{symbolName}' (pool: {poolDictionaryName ?? "none"}) already registered");
+            }
+
+            _registry[key] = assocOOP;
+        }
+
+        /// <summary>
+        /// Try to get an existing Association by name and optional pool dictionary.
+        /// </summary>
+        /// <param name="symbolName">Global/class/pool variable name</param>
+        /// <param name="assocOOP">Output parameter for the Association OOP if found</param>
+        /// <param name="poolDictionaryName">Pool dictionary name for pool variables, null otherwise</param>
+        /// <returns>True if found, false otherwise</returns>
+        public static bool TryGet(string symbolName, out SmalltalkOOP assocOOP, string? poolDictionaryName = null)
+        {
+            string key = poolDictionaryName != null
+                ? $"{symbolName}@{poolDictionaryName}"
+                : symbolName;
+
+            return _registry.TryGetValue(key, out assocOOP);
+        }
+
+        /// <summary>
         /// Get existing Association or create new one if not found.
         /// </summary>
         /// <param name="symbolName">Global variable name (e.g., "Point", "Smalltalk")</param>
         /// <param name="createAssociation">Factory function to create Association if not found</param>
+        /// <param name="poolDictionaryName">Pool dictionary name for pool variables, null otherwise</param>
         /// <returns>Canonical Association OOP for this symbol</returns>
-        public static SmalltalkOOP GetOrCreate(string symbolName, Func<SmalltalkOOP> createAssociation)
+        public static SmalltalkOOP GetOrCreate(string symbolName, Func<SmalltalkOOP> createAssociation, string? poolDictionaryName = null)
         {
             if (_frozen)
                 throw new InvalidOperationException(
                     $"AssociationRegistry.GetOrCreate() called after freeze. " +
                     $"Cannot create Association for '{symbolName}' after coldstart completes.");
 
-            if (_registry.TryGetValue(symbolName, out var existing))
+            string key = poolDictionaryName != null
+                ? $"{symbolName}@{poolDictionaryName}"
+                : symbolName;
+
+            if (_registry.TryGetValue(key, out var existing))
                 return existing;
 
             var assocOOP = createAssociation();
-            _registry[symbolName] = assocOOP;
+            _registry[key] = assocOOP;
             return assocOOP;
         }
 

@@ -164,7 +164,7 @@ public class SmalltalkInterpreterThread
             }
         }
 
-        // Add init expressions in the explicit order defined in InitExpressionOrdering
+        // Execute all init expressions in explicit order
         foreach (var source in InitExpressionOrdering.GetExecutionOrder())
         {
             if (sourceToIndex.TryGetValue(source, out int idx))
@@ -182,36 +182,41 @@ public class SmalltalkInterpreterThread
         }
 
         // Build comment expression list: ClassName comment: 'text' expressions
+        // Comment expressions disabled for now
         var commentIndices = new List<int>();
-        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
-        {
-            var expr = _context.Bundle.InitExpressions[i];
-            if (expr.Source == null) continue;
-
-            // Include comment: expressions (e.g., "ClassName comment:'text'")
-            if (expr.Source.Contains(" comment:"))
-            {
-                commentIndices.Add(i);
-            }
-        }
+        // for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
+        // {
+        //     var expr = _context.Bundle.InitExpressions[i];
+        //     if (expr.Source == null) continue;
+        //
+        //     // Include comment: expressions (e.g., "ClassName comment:'text'")
+        //     if (expr.Source.Contains(" comment:"))
+        //     {
+        //         commentIndices.Add(i);
+        //     }
+        // }
 
         // Build phase 2 list: Test expressions (run AFTER init expressions)
+        // Test expressions disabled for now
         var phase2Indices = new List<int>();
-        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
+        // for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
+        // {
+        //     var expr = _context.Bundle.InitExpressions[i];
+        //     if (expr.Source == null) continue;
+        //
+        //     // Include GraphicsTest method calls (FloatTest removed - no longer needed)
+        //     if (expr.Source.StartsWith("GraphicsTest "))
+        //     {
+        //         phase2Indices.Add(i);
+        //     }
+        // }
+
+        // Get pre-compiled init expression methods from Phase 4
+        var initMethodsOOP = _context.VMMetadata.InitExpressionMethods;
+        if (initMethodsOOP == _context.HeapManager.GetNil())
         {
-            var expr = _context.Bundle.InitExpressions[i];
-            if (expr.Source == null) continue;
-
-            // Include GraphicsTest method calls (FloatTest removed - no longer needed)
-            if (expr.Source.StartsWith("GraphicsTest "))
-            {
-                phase2Indices.Add(i);
-            }
+            throw new InvalidOperationException("InitExpressionMethods array not found - Phase 4 must complete first");
         }
-
-        // Execute all selected expressions
-        var compiler = new InitExpressionCompiler(
-            _context.HeapManager, _context.Bundle, _context.VMMetadata);
 
         int succeeded = 0;
         int failed = 0;
@@ -221,7 +226,16 @@ public class SmalltalkInterpreterThread
         foreach (int index in phase1Indices)
         {
             var expr = _context.Bundle.InitExpressions[index];
-            var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
+
+            // Get pre-compiled method from Phase 4 array
+            var methodOOP = _context.HeapManager.GetIndexedOOP(initMethodsOOP, index);
+
+            Console.Write($"  {expr.Source}... ");
+
+            var initId = expr.Source ?? $"init[{index}]";
+            var result = executor.ExecuteInitExpression(initId, methodOOP);
+
+            Console.WriteLine($"✓ {result.ElapsedMilliseconds}ms");
 
             if (result.Status == InitStatus.Success)
             {
@@ -278,7 +292,10 @@ public class SmalltalkInterpreterThread
                 var className = expr.Source?.Split(' ')[0] ?? "Unknown";
                 Console.Write($"  {className} comment: ... ");
 
-                var result = executor.ExecuteInitExpressionOnDemand(expr, compiler, verbose: false);
+                // Get pre-compiled method from Phase 4 array
+                var methodOOP = _context.HeapManager.GetIndexedOOP(initMethodsOOP, index);
+                var initId = expr.Source ?? $"init[{index}]";
+                var result = executor.ExecuteInitExpression(initId, methodOOP);
                 totalCommentTimeMs += result.ElapsedMilliseconds;
 
                 if (result.Status == InitStatus.Success)
@@ -336,7 +353,10 @@ public class SmalltalkInterpreterThread
                 }
                 isFirstTest = false;
 
-                var result = executor.ExecuteInitExpressionOnDemand(expr, compiler);
+                // Get pre-compiled method from Phase 4 array
+                var methodOOP = _context.HeapManager.GetIndexedOOP(initMethodsOOP, index);
+                var initId = expr.Source ?? $"init[{index}]";
+                var result = executor.ExecuteInitExpression(initId, methodOOP);
 
                 if (result.Status == InitStatus.Success)
                 {
@@ -878,6 +898,193 @@ public class SmalltalkInterpreterThread
                 heap.SetIndexedOOP(dictionaryOOP, nextIndex, nextObject);
                 heap.SetIndexedOOP(dictionaryOOP, oldIndex, nilOOP);
             }
+        }
+    }
+
+    /// <summary>
+    /// Dumps Float class variables to verify they have initialized values (NOT nil).
+    /// </summary>
+    private void DumpFloatClassVariables()
+    {
+        Console.WriteLine($"\n[DIAGNOSTIC] Float class variables after initialize:");
+
+        try
+        {
+            var heap = _context.HeapManager;
+            var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
+
+            // Find Float class in Smalltalk dictionary
+            var floatSymbol = FindSymbol("Float");
+            if (floatSymbol == heap.GetNil())
+            {
+                Console.WriteLine("  ERROR: 'Float' symbol not found!");
+                return;
+            }
+
+            var floatAssoc = FindAssociationInDictionary(smalltalkOOP, floatSymbol);
+            if (floatAssoc == heap.GetNil())
+            {
+                Console.WriteLine("  ERROR: Float Association not found in Smalltalk!");
+                return;
+            }
+
+            var floatClassOOP = heap.GetInstanceVariable(floatAssoc, VMConstants.ASSOCIATION_VALUE_INDEX);
+            var classPoolOOP = heap.GetInstanceVariable(floatClassOOP, 7); // classPool is instance var 7 in Class (NOT 3!)
+            int poolSize = heap.GetIndexedSize(classPoolOOP);
+
+            Console.WriteLine($"  Float classPool size: {poolSize}");
+
+            // Dump ALL Associations in the classPool
+            Console.WriteLine($"  Dumping all {poolSize} classPool entries:");
+            int nonNilCount = 0;
+            for (int i = 0; i < poolSize; i++)
+            {
+                var entry = heap.GetIndexedOOP(classPoolOOP, i);
+                if (entry != heap.GetNil())
+                {
+                    // It's an Association - get key and value
+                    var keyOOP = heap.GetInstanceVariable(entry, VMConstants.ASSOCIATION_KEY_INDEX);
+                    var valueOOP = heap.GetInstanceVariable(entry, VMConstants.ASSOCIATION_VALUE_INDEX);
+
+                    // Try to get key as string (it's a Symbol) - extract bytes manually
+                    string keyStr = GetSymbolString(keyOOP);
+                    string valueStr = valueOOP == heap.GetNil() ? "nil" :
+                                      valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" :
+                                      $"Object({valueOOP})";
+
+                    Console.WriteLine($"    [{i}] {keyStr} = {valueStr}");
+                    nonNilCount++;
+                }
+            }
+            Console.WriteLine($"  Total non-nil entries: {nonNilCount}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ERROR during diagnostic: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Finds an Association in a dictionary using hash-based probing.
+    /// Returns the Association OOP if found, or nil if not found.
+    /// </summary>
+    private string GetSymbolString(SmalltalkOOP symbolOOP)
+    {
+        var heap = _context.HeapManager;
+        int size = heap.GetIndexedSize(symbolOOP);
+        var bytes = new byte[size];
+        for (int i = 0; i < size; i++)
+        {
+            bytes[i] = heap.GetIndexedByte(symbolOOP, i);
+        }
+        return System.Text.Encoding.Latin1.GetString(bytes);
+    }
+
+    private SmalltalkOOP FindAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbolOOP)
+    {
+        var heap = _context.HeapManager;
+        var nilOOP = heap.GetNil();
+        int dictSize = heap.GetIndexedSize(dictionaryOOP);
+
+        // Use identity hash for symbol lookup
+        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
+        int startLocation = location;
+
+        while (true)
+        {
+            var probe = heap.GetIndexedOOP(dictionaryOOP, location);
+
+            if (probe == nilOOP)
+            {
+                // Not found - reached empty slot
+                return nilOOP;
+            }
+
+            // Check if this Association's key matches
+            var probeKeyOOP = heap.GetInstanceVariable(probe, VMConstants.ASSOCIATION_KEY_INDEX);
+            if (probeKeyOOP == keySymbolOOP)
+            {
+                // Found - return the Association
+                return probe;
+            }
+
+            // Linear probe to next slot
+            location = (location + 1) % dictSize;
+
+            if (location == startLocation)
+            {
+                // Wrapped around - not found
+                return nilOOP;
+            }
+        }
+    }
+
+    private void DumpMethodLiterals(SmalltalkOOP methodOOP, string methodName)
+    {
+        var heap = _context.HeapManager;
+        Console.WriteLine($"\n[LITERALS] {methodName} method literals:");
+
+        try
+        {
+            // Use CompiledMethodView to properly access literals
+            var methodView = new Smalltalk80.Interpreter.Core.VM.Views.CompiledMethodView(
+                methodOOP,
+                heap
+            );
+
+            int litCount = methodView.LiteralCount;
+            Console.WriteLine($"  Literal count: {litCount}");
+
+            for (int i = 0; i < litCount; i++)
+            {
+                var literalOOP = methodView.GetLiteral(i);
+                string desc = DescribeLiteral(literalOOP);
+                Console.WriteLine($"    [{i}] {desc}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ERROR dumping literals: {ex.Message}");
+        }
+    }
+
+    private string DescribeLiteral(SmalltalkOOP oop)
+    {
+        var heap = _context.HeapManager;
+
+        if (oop.IsSmallInteger)
+        {
+            return $"SmallInteger({oop.AsSmallInteger()})";
+        }
+
+        if (oop == heap.GetNil())
+        {
+            return "nil";
+        }
+
+        // Try to identify the object type
+        try
+        {
+            // Check if it's an Association (has 2 instance variables: key and value)
+            var classOOP = heap.GetClassOOP(oop);
+            int instVarCount = heap.GetInstanceVariableCount(oop);
+            int indexedSize = heap.GetIndexedSize(oop);
+
+            if (instVarCount == 2 && indexedSize == 0)
+            {
+                // Likely an Association
+                var keyOOP = heap.GetInstanceVariable(oop, 0);
+                var valueOOP = heap.GetInstanceVariable(oop, 1);
+                string keyStr = GetSymbolString(keyOOP);
+                string valueStr = valueOOP == heap.GetNil() ? "nil" : valueOOP.ToString();
+                return $"Association(key: '{keyStr}', value: {valueStr}) OOP={oop}";
+            }
+
+            return $"Object(instVars: {instVarCount}, indexed: {indexedSize}) OOP={oop}";
+        }
+        catch
+        {
+            return $"Object OOP={oop}";
         }
     }
 }

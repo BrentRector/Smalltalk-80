@@ -155,6 +155,16 @@ public static class Program
             smalltalkThread.Name = "Smalltalk Interpreter";
             smalltalkThread.Start();
 
+            // TEMPORARY: Monitor Smalltalk thread and close window when it completes (for debugging)
+            var monitorThread = new Thread(() =>
+            {
+                smalltalkThread.Join();
+                Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
+                displayProvider.Invoke((Action)(() => displayProvider.Close()));
+            });
+            monitorThread.IsBackground = true;
+            monitorThread.Start();
+
             // Phase 2: Wait for event callbacks to be registered before showing window
             // This prevents race condition where UI events arrive before VM is ready to handle them
             Console.WriteLine("\n=== Waiting for event architecture to initialize ===");
@@ -447,7 +457,8 @@ public static class Program
         var falseOOP = GlobalRegistry.Get("false");
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
         var displayOOP = GlobalRegistry.Get("Display");
-        var processorSchedulerOOP = GlobalRegistry.Get("ProcessorScheduler");
+        // Get ProcessorScheduler INSTANCE (not class) - registered as "Processor" in Phase 3
+        var processorSchedulerOOP = GlobalRegistry.Get("Processor");
 
         var knownObjects = new KnownObjects(
             nil: nilOOP,

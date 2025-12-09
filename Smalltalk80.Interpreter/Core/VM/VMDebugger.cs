@@ -247,39 +247,131 @@ internal sealed class VMDebugger(
     /// <inheritdoc/>
     public void DumpBytecodes(SmalltalkOOP methodOOP, string prefix)
     {
+        // Get executable bytecodes (excludes 3-byte source offset)
         var bytecodes = helpers.GetMethodBytecodes(methodOOP);
-        Console.WriteLine($"{prefix}Bytecode dump ({bytecodes.Length} bytes):");
+        Console.WriteLine($"{prefix}Bytecode dump ({bytecodes.Length} executable bytes):");
+        Console.WriteLine($"{prefix}  Raw hex: {BitConverter.ToString(bytecodes).Replace("-", " ")}");
 
+        // Decode executable bytecodes
         int i = 0;
         while (i < bytecodes.Length && i < 50)
         {
             byte b = bytecodes[i];
             int offset = i;
-            string desc = b switch
-            {
-                0x00 => "PUSH_RECEIVER",
-                0x01 => "PUSH_TRUE",
-                0x02 => "PUSH_FALSE",
-                0x03 => "PUSH_NIL",
-                0x04 => $"STORE_TEMP {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
-                0x05 => $"POP_STORE_TEMP {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
-                0x06 => $"PUSH_LITERAL {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
-                0x10 => $"PUSH_TEMP {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
-                0x11 => $"PUSH_TEMP {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
-                0x20 => $"PUSH_LITERAL {(i + 1 < bytecodes.Length ? bytecodes[++i].ToString() : "?")}",
-                0x5C => "RETURN_STACK_TOP",
-                0x5D => "RETURN_NIL",
-                0x5E => "RETURN_TRUE",
-                0x5F => "RETURN_FALSE",
-                0x87 => "POP_STACK_TOP",
-                >= 0xB0 and <= 0xBF => $"SEND_ARITH (selector={(b - 0xB0)})",
-                >= 0xD0 and <= 0xDF => $"SEND1 (selector={(b - 0xD0)})",
-                >= 0xF0 and <= 0xFF => $"SEND2 (selector={(b - 0xF0)})",
-                _ => $"0x{b:X2}"
-            };
+            string desc;
 
-            Console.WriteLine($"{prefix}  [{offset}] {desc}");
+            // Blue Book bytecode ranges
+            if (b >= 0x00 && b <= 0x0F)
+            {
+                desc = $"PUSH_IVAR_{b}";
+            }
+            else if (b >= 0x10 && b <= 0x1F)
+            {
+                desc = $"PUSH_TEMP_{b - 0x10}";
+            }
+            else if (b >= 0x20 && b <= 0x3F)
+            {
+                desc = $"PUSH_LITERAL_{b - 0x20}";
+            }
+            else if (b >= 0x40 && b <= 0x5F)
+            {
+                desc = $"PUSH_LITERAL_VAR_{b - 0x40}";
+            }
+            else if (b >= 0x60 && b <= 0x67)
+            {
+                desc = $"POP_STORE_IVAR_{b - 0x60}";
+            }
+            else if (b >= 0x68 && b <= 0x6F)
+            {
+                desc = $"POP_STORE_TEMP_{b - 0x68}";
+            }
+            else if (b >= 0x70 && b <= 0x77)
+            {
+                desc = b switch
+                {
+                    0x70 => "PUSH_SELF",
+                    0x71 => "PUSH_TRUE",
+                    0x72 => "PUSH_FALSE",
+                    0x73 => "PUSH_NIL",
+                    0x74 => "PUSH_MINUS_ONE",
+                    0x75 => "PUSH_ZERO",
+                    0x76 => "PUSH_ONE",
+                    0x77 => "PUSH_TWO",
+                    _ => $"PUSH_SPECIAL_{b - 0x70}"
+                };
+            }
+            else if (b >= 0x78 && b <= 0x7F)
+            {
+                desc = b switch
+                {
+                    0x78 => "RETURN_SELF",
+                    0x79 => "RETURN_TRUE",
+                    0x7A => "RETURN_FALSE",
+                    0x7B => "RETURN_NIL",
+                    0x7C => "RETURN_STACK_TOP",
+                    0x7D => "RETURN_STACK_TOP_BLOCK",
+                    _ => $"RETURN_0x{b:X2}"
+                };
+            }
+            else if (b >= 0x80 && b <= 0x87)
+            {
+                desc = b == 0x87 ? "POP_STACK_TOP" : $"EXTENDED_0x{b:X2}";
+            }
+            else if (b >= 0xB0 && b <= 0xBF)
+            {
+                desc = $"SEND_ARITH_{b - 0xB0}";
+            }
+            else if (b >= 0xC0 && b <= 0xCF)
+            {
+                desc = $"SEND_SPECIAL_{b - 0xC0}";
+            }
+            else if (b >= 0xD0 && b <= 0xDF)
+            {
+                desc = $"SEND0_{b - 0xD0}";
+            }
+            else if (b >= 0xE0 && b <= 0xEF)
+            {
+                desc = $"SEND1_{b - 0xE0}";
+            }
+            else if (b >= 0xF0 && b <= 0xFF)
+            {
+                desc = $"SEND2_{b - 0xF0}";
+            }
+            else
+            {
+                desc = "";
+            }
+
+            Console.WriteLine($"{prefix}  [{offset}] 0x{b:X2} {desc}");
             i++;
+        }
+
+        // Now show the source file offset (last 3 bytes of raw bytecode array)
+        try
+        {
+            int indexedSize = heapManager.GetIndexedSize(methodOOP);
+            if (indexedSize > 0)
+            {
+                var bytecodeArrayOOP = heapManager.GetIndexedOOP(methodOOP, indexedSize - 1);
+                int totalByteCount = heapManager.GetIndexedSize(bytecodeArrayOOP);
+
+                if (totalByteCount >= 3)
+                {
+                    // Read last 3 bytes
+                    byte b0 = heapManager.GetIndexedByte(bytecodeArrayOOP, totalByteCount - 3);
+                    byte b1 = heapManager.GetIndexedByte(bytecodeArrayOOP, totalByteCount - 2);
+                    byte b2 = heapManager.GetIndexedByte(bytecodeArrayOOP, totalByteCount - 1);
+
+                    // Blue Book uses little-endian: offset = b0 + (b1 << 8) + (b2 << 16)
+                    int sourceOffset = b0 | (b1 << 8) | (b2 << 16);
+
+                    Console.WriteLine($"{prefix}  Source file offset: {sourceOffset} (0x{sourceOffset:X6}) [bytes: 0x{b0:X2} 0x{b1:X2} 0x{b2:X2}]");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"{prefix}  Source file offset: Error reading - {ex.Message}");
         }
     }
 
@@ -304,5 +396,171 @@ internal sealed class VMDebugger(
         {
             return $"OOP({oop})";
         }
+    }
+
+    /// <inheritdoc/>
+    public void DumpCrashDiagnostics(string errorMessage)
+    {
+        Console.WriteLine($"\n=== CRASH DIAGNOSTICS ===");
+        Console.WriteLine($"Error: {errorMessage}");
+        Console.WriteLine();
+
+        try
+        {
+            var activeContext = contextManager.ActiveContext;
+            var contextClass = heapManager.GetClassOOP(activeContext);
+            var contextClassName = helpers.GetClassName(contextClass) ?? "Unknown";
+            bool isBlockContext = (contextClass == metadata.BlockContextClassOOP);
+
+            Console.WriteLine($"Active Context: OOP({activeContext}), Class: {contextClassName}");
+
+            // Get method OOP
+            SmalltalkOOP methodOOP;
+            if (isBlockContext)
+            {
+                // Traverse to home MethodContext
+                var homeOOP = heapManager.GetInstanceVariable(activeContext, VMConstants.BLOCKCONTEXT_HOME_INDEX);
+                methodOOP = heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
+                Console.WriteLine($"  Home MethodContext: OOP({homeOOP})");
+            }
+            else
+            {
+                methodOOP = heapManager.GetInstanceVariable(activeContext, VMConstants.CONTEXT_METHOD_INDEX);
+            }
+
+            // Get method class and selector
+            try
+            {
+                var methodClass = heapManager.GetInstanceVariable(methodOOP, 0); // homeClass at instance variable 0
+                var methodClassName = helpers.GetClassName(methodClass) ?? "Unknown";
+
+                // Try to get selector name - use localId first (more reliable, works with 0 literals)
+                string selectorName = "unknown";
+
+                // Try GetLocalId which has format "method:ClassName>>selector"
+                var localId = helpers.GetLocalId(methodOOP);
+                if (!string.IsNullOrEmpty(localId) && localId.Contains(">>"))
+                {
+                    int arrowPos = localId.IndexOf(">>");
+                    selectorName = localId.Substring(arrowPos + 2);
+                }
+                else
+                {
+                    // Fall back to reading from literal[0] if method has literals
+                    int indexedSize = heapManager.GetIndexedSize(methodOOP);
+                    int literalCount = indexedSize - 2; // indexed size includes header + literals + bytecode array
+
+                    if (literalCount > 0)
+                    {
+                        try
+                        {
+                            var selectorOOP = helpers.GetMethodLiteral(methodOOP, 1); // selector at literal[0], indexed slot 1
+                            selectorName = helpers.GetSymbolName(selectorOOP) ?? "unknown";
+                        }
+                        catch
+                        {
+                            // Keep "unknown" if literal access fails
+                        }
+                    }
+                }
+
+                Console.WriteLine($"  Method: {methodClassName}>>{selectorName}, OOP({methodOOP})");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  Method: OOP({methodOOP}) - Error getting selector: {ex.Message}");
+            }
+
+            // Get instruction pointer
+            var ipOOP = heapManager.GetInstanceVariable(activeContext, VMConstants.CONTEXT_PC_INDEX);
+            int ip = ipOOP.AsSmallInteger();
+            Console.WriteLine($"  Instruction Pointer (IP): {ip}");
+
+            // Get stack pointer
+            var spOOP = heapManager.GetInstanceVariable(activeContext, VMConstants.CONTEXT_STACKP_INDEX);
+            int sp = spOOP.AsSmallInteger();
+            Console.WriteLine($"  Stack Pointer (SP): {sp}");
+
+            // Show current bytecode
+            try
+            {
+                var bytecodes = helpers.GetMethodBytecodes(methodOOP);
+                if (ip > 0 && ip <= bytecodes.Length)
+                {
+                    byte currentBytecode = bytecodes[ip - 1]; // IP points to NEXT bytecode
+                    Console.WriteLine($"  Current Bytecode: 0x{currentBytecode:X2} at IP={ip - 1}");
+                }
+                else if (ip == 0)
+                {
+                    Console.WriteLine($"  Current Bytecode: <IP at start>");
+                }
+                else
+                {
+                    Console.WriteLine($"  Current Bytecode: <IP beyond bytecode array, length={bytecodes.Length}>");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  Current Bytecode: Error reading - {ex.Message}");
+            }
+
+            // Show method structure
+            try
+            {
+                int indexedSize = heapManager.GetIndexedSize(methodOOP);
+                int literalCount = indexedSize - 2; // indexed size includes header + literals + bytecode array
+                Console.WriteLine($"  Method Structure: indexed size={indexedSize}, literals={literalCount}");
+
+                // Show first few literals
+                int literalsToShow = Math.Min(3, literalCount);
+                for (int i = 0; i < literalsToShow; i++)
+                {
+                    try
+                    {
+                        var literalOOP = helpers.GetMethodLiteral(methodOOP, i + 1); // +1 because indexed slot 0 is header
+                        string literalDesc = DescribeLiteral(literalOOP);
+                        Console.WriteLine($"    Literal[{i}]: {literalDesc}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"    Literal[{i}]: Error - {ex.Message}");
+                    }
+                }
+                if (literalCount > 3)
+                {
+                    Console.WriteLine($"    ... ({literalCount - 3} more literals)");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  Method Structure: Error - {ex.Message}");
+            }
+
+            // Show bytecodes
+            try
+            {
+                Console.WriteLine();
+                DumpBytecodes(methodOOP, "  ");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  Bytecodes: Error - {ex.Message}");
+            }
+
+            // Show stack contents
+            Console.WriteLine();
+            DumpStack("CRASH");
+
+            // Show sender chain
+            Console.WriteLine();
+            DumpSenderChain(activeContext, 10);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"\nError generating crash diagnostics: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
+        }
+
+        Console.WriteLine($"=== END CRASH DIAGNOSTICS ===\n");
     }
 }

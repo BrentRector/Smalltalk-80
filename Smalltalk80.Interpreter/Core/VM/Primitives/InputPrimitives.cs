@@ -218,8 +218,6 @@ public static class InputOperations
     /// </remarks>
     public class MouseButtons : IPrimitive
     {
-        private static bool _lastYellow = false;  // Track for change detection
-
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
@@ -233,13 +231,6 @@ public static class InputOperations
                 if (red) buttons |= 1;      // Bit 0 = red/left
                 if (yellow) buttons |= 2;   // Bit 1 = yellow/middle
                 if (blue) buttons |= 4;     // Bit 2 = blue/right
-
-                // Log when yellow button state changes
-                if (yellow != _lastYellow)
-                {
-                    Console.WriteLine($"[MouseButtons] Yellow button: {_lastYellow} -> {yellow}");
-                    _lastYellow = yellow;
-                }
             }
 
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(buttons));

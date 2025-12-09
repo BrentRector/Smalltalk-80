@@ -99,14 +99,25 @@ public class BytecodeTraceListener : IDiagnosticListener
 {
     public string Name => "BytecodeTrace";
     public IDiagnosticFilter? Filter => null;
+    private int _eventCount = 0;
 
     public void OnEvent(DiagnosticEvent evt)
     {
+        _eventCount++;
+
+        // DIAGNOSTIC: Log first few events
+        if (_eventCount <= 5)
+        {
+            Console.WriteLine($"[BytecodeTraceListener] Received event #{_eventCount}: {evt.GetType().Name}");
+            Console.Out.Flush();
+        }
+
         switch (evt)
         {
             case InstructionEvent e:
                 var operand = e.Operand != null ? $" {e.Operand}" : "";
                 Console.WriteLine($"  @{e.IP:D4} {e.Mnemonic}{operand}");
+                Console.Out.Flush();
                 break;
         }
     }

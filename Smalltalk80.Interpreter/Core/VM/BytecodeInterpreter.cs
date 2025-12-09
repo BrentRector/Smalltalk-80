@@ -2,6 +2,8 @@ using Smalltalk80.Core.Bytecodes;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -15,6 +17,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     private readonly IBytecodeContext context;
     private readonly RuntimeHeapAccessor runtimeHeapAccess;
     private readonly VMMetadata metadata;
+    private readonly IDiagnosticHub? diagnostics;
 
     // Cached selector OOPs for arithmetic bytecodes (0xB0-0xBF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _arithmeticSelectorOOPs;
@@ -22,29 +25,34 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     // Cached selector OOPs for special send bytecodes (0xC0-0xCF) - indexed by bytecode & 0x0F
     private SmalltalkOOP[]? _specialSelectorOOPs;
 
-    // Phase 3: Event check callback for interrupt simulation at strategic points
-    private Action? _eventCheckCallback;
+
+    // Instruction counter for diagnostic events
+    private long _instructionCount;
 
     public BytecodeInterpreter(
         ISmalltalkHeap heapManager,
         IBytecodeContext context,
         RuntimeHeapAccessor runtimeHeapAccess,
-        VMMetadata metadata)
+        VMMetadata metadata,
+        IDiagnosticHub? diagnostics = null)
     {
         this.heapManager = heapManager;
         this.context = context;
         this.runtimeHeapAccess = runtimeHeapAccess;
         this.metadata = metadata;
+        this.diagnostics = diagnostics;
+    }
+
+    /// <summary>
+    /// Resets the instruction counter used for diagnostic event emission.
+    /// </summary>
+    public void ResetInstructionCount()
+    {
+        _instructionCount = 0;
     }
 
     /// <inheritdoc />
     public bool VerboseDebug { get; set; }
-
-    /// <inheritdoc />
-    public void SetEventCheckCallback(Action callback)
-    {
-        _eventCheckCallback = callback;
-    }
 
     /// <inheritdoc />
     public void InitializeSelectorCaches(SmalltalkOOP[] arithmeticSelectorOOPs, SmalltalkOOP[] specialSelectorOOPs)
@@ -56,6 +64,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     /// <inheritdoc />
     public bool ExecuteBytecode(byte bytecode, SmalltalkOOP methodOOP)
     {
+        // Increment instruction count
+        _instructionCount++;
+
         // Check if this is a BlockContext - they retrieve receiver from home MethodContext
         var contextClassOOP = heapManager.GetClassOOP(context.ActiveContext);
         bool isBlockContext = contextClassOOP == metadata.BlockContextClassOOP;
@@ -79,17 +90,6 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         if (BytecodeUtil.IsPushIvar(bytecode))
         {
             int index = BytecodeUtil.PushIvarIndex(bytecode);
-
-            // DEBUG: Log when accessing ivar[4] to diagnose crash
-            if (index == 4)
-            {
-                var receiverClass = heapManager.GetClassOOP(receiverOOP);
-                var receiverClassName = heapManager.GetClassName(receiverOOP) ?? "Unknown";
-                Console.WriteLine($"[IVAR4] Accessing ivar[4] in {receiverClassName}");
-                Console.WriteLine($"[IVAR4] Receiver: {receiverOOP}, ReceiverClass: {receiverClass}");
-                Console.WriteLine($"[IVAR4] Method OOP: {methodOOP}");
-            }
-
             var valueOOP = heapManager.GetInstanceVariable(receiverOOP, index);
             context.Push(valueOOP);
             return true;
@@ -222,12 +222,6 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
             if (instVarCount < 2)
             {
-                Console.WriteLine($"[PUSH_LITERAL_VAR] ERROR: Expected Association or pool variable array, got object with {instVarCount} instance variables");
-                Console.WriteLine($"  literalOOP: {literalOOP}");
-                Console.WriteLine($"  classOOP: {classOOP}");
-                Console.WriteLine($"  methodOOP: {methodOOP}");
-                Console.WriteLine($"  literal index: {index}");
-
                 // This might be a Symbol or other object that should be pushed directly
                 context.Push(literalOOP);
                 return true;
@@ -235,44 +229,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
             // Association has a fixed layout per Smalltalk-80 specification:
             // instance variable 0 = key, instance variable 1 = value
-            var keyOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
             var valueOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-
-            // DEBUG: Check if we're pushing an Association as a value (bug indicator)
-            if (!valueOOP.IsSmallInteger)
-            {
-                var valueClassOOP = heapManager.GetClassOOP(valueOOP);
-                var associationClassOOP2 = runtimeHeapAccess.GetClass("Association");
-                if (valueClassOOP == associationClassOOP2)
-                {
-                    string? keyName = null;
-                    if (!keyOOP.IsSmallInteger)
-                    {
-                        var keyClass = heapManager.GetClassOOP(keyOOP);
-                        var symbolClass = runtimeHeapAccess.GetClass("Symbol");
-                        if (keyClass == symbolClass)
-                        {
-                            keyName = context.GetSymbolName(keyOOP);
-                        }
-                    }
-                    Console.WriteLine($"[PUSH_LITERAL_VAR] WARNING: Association value is another Association!");
-                    Console.WriteLine($"  Outer Association: {literalOOP} key='{keyName ?? keyOOP.ToString()}'");
-                    Console.WriteLine($"  Value (inner Association): {valueOOP}");
-
-                    // Try to get the inner Association's key
-                    var innerKeyOOP = heapManager.GetInstanceVariable(valueOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                    if (!innerKeyOOP.IsSmallInteger)
-                    {
-                        var innerKeyClass = heapManager.GetClassOOP(innerKeyOOP);
-                        var symbolClass2 = runtimeHeapAccess.GetClass("Symbol");
-                        if (innerKeyClass == symbolClass2)
-                        {
-                            var innerKeyName = context.GetSymbolName(innerKeyOOP);
-                            Console.WriteLine($"  Inner Association key: '{innerKeyName}'");
-                        }
-                    }
-                }
-            }
 
             context.Push(valueOOP);
             return true;
@@ -483,12 +440,6 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
             byte extByte = bytecodes[currentIp++];
             int offset = BytecodeUtil.LongJumpBaseOffset(bytecode) + extByte;
-
-            // Phase 3: Check for pending events on backward branches (loop detection)
-            if (EventConfig.EnableBackwardBranchCheck && offset < 0)
-            {
-                _eventCheckCallback?.Invoke();
-            }
 
             heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
             return true;
@@ -748,7 +699,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
             case ExtendedType.LiteralVariable:
                 {
-                    var associationOOP = context.GetMethodLiteral(methodOOP, index + 1);
+                    var associationOOP = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
                     heapManager.SetInstanceVariableWithBarrier(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
                     context.AddAssociationToClassPoolIfNeeded(receiverOOP, associationOOP);
                     return true;
@@ -1144,12 +1095,6 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     /// <returns>Always returns false to signal method/block return.</returns>
     private bool HandleReturnFromMessage(SmalltalkOOP returnValue)
     {
-        // Phase 3: Check for pending events on method returns (reduces latency for deep call chains)
-        if (EventConfig.EnableMethodReturnCheck)
-        {
-            _eventCheckCallback?.Invoke();
-        }
-
         // Check if we're in a BlockContext by checking the class
         var activeClassOOP = heapManager.GetClassOOP(context.ActiveContext);
 
@@ -1183,5 +1128,233 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             context.Push(returnValue);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Generates a human-readable mnemonic and operand string for a bytecode instruction.
+    /// </summary>
+    /// <param name="bytecode">The bytecode opcode.</param>
+    /// <param name="methodOOP">The current method OOP (for looking up literals).</param>
+    /// <param name="ip">The current instruction pointer.</param>
+    /// <returns>A tuple containing the mnemonic and optional operand string.</returns>
+    private (string Mnemonic, string? Operand) GetBytecodeMnemonic(byte bytecode, SmalltalkOOP methodOOP, int ip)
+    {
+        // Push receiver instance variable (0x00-0x0F)
+        if (BytecodeUtil.IsPushIvar(bytecode))
+        {
+            int index = BytecodeUtil.PushIvarIndex(bytecode);
+            return ($"PUSH_IVAR_{index}", null);
+        }
+
+        // Push temporary variable (0x10-0x1F)
+        if (BytecodeUtil.IsPushTemp(bytecode))
+        {
+            int index = BytecodeUtil.PushTempIndex(bytecode);
+            return ($"PUSH_TEMP_{index}", null);
+        }
+
+        // Push literal constant (0x20-0x3F)
+        if (BytecodeUtil.IsPushLiteralConst(bytecode))
+        {
+            int index = BytecodeUtil.PushLiteralConstIndex(bytecode);
+            return ($"PUSH_LITERAL_CONST_{index}", null);
+        }
+
+        // Push literal variable (0x40-0x5F)
+        if (BytecodeUtil.IsPushLiteralVar(bytecode))
+        {
+            int index = BytecodeUtil.PushLiteralVarIndex(bytecode);
+            return ($"PUSH_LITERAL_VAR_{index}", null);
+        }
+
+        // Pop and store receiver variable (0x60-0x67)
+        if (BytecodeUtil.IsPopStoreIvar(bytecode))
+        {
+            int index = BytecodeUtil.PopStoreIvarIndex(bytecode);
+            return ($"POP_STORE_IVAR_{index}", null);
+        }
+
+        // Pop and store temporary variable (0x68-0x6F)
+        if (BytecodeUtil.IsPopStoreTemp(bytecode))
+        {
+            int index = BytecodeUtil.PopStoreTempIndex(bytecode);
+            return ($"POP_STORE_TEMP_{index}", null);
+        }
+
+        // Special constants and returns (0x70-0x7F)
+        switch ((Bytecode)bytecode)
+        {
+            case Bytecode.PUSH_SELF:
+                return ("PUSH_SELF", null);
+            case Bytecode.PUSH_TRUE:
+                return ("PUSH_TRUE", null);
+            case Bytecode.PUSH_FALSE:
+                return ("PUSH_FALSE", null);
+            case Bytecode.PUSH_NIL:
+                return ("PUSH_NIL", null);
+            case Bytecode.PUSH_MINUS_ONE:
+                return ("PUSH_MINUS_ONE", null);
+            case Bytecode.PUSH_ZERO:
+                return ("PUSH_ZERO", null);
+            case Bytecode.PUSH_ONE:
+                return ("PUSH_ONE", null);
+            case Bytecode.PUSH_TWO:
+                return ("PUSH_TWO", null);
+            case Bytecode.RETURN_SELF:
+                return ("RETURN_SELF", null);
+            case Bytecode.RETURN_TRUE:
+                return ("RETURN_TRUE", null);
+            case Bytecode.RETURN_FALSE:
+                return ("RETURN_FALSE", null);
+            case Bytecode.RETURN_NIL:
+                return ("RETURN_NIL", null);
+            case Bytecode.RETURN_TOP_FROM_MESSAGE:
+                return ("RETURN_TOP_FROM_MESSAGE", null);
+            case Bytecode.RETURN_TOP_FROM_BLOCK:
+                return ("RETURN_TOP_FROM_BLOCK", null);
+            case Bytecode.RESERVED_126:
+                return ("RESERVED_126", null);
+            case Bytecode.RESERVED_127:
+                return ("RESERVED_127", null);
+        }
+
+        // Extended bytecodes (0x80-0x88)
+        switch (bytecode)
+        {
+            case 0x80:
+                return ("EXTENDED_PUSH", null);
+            case 0x81:
+                return ("EXTENDED_STORE", null);
+            case 0x82:
+                return ("EXTENDED_POP_STORE", null);
+            case 0x83:
+                return ("SINGLE_EXTENDED_SEND", null);
+            case 0x84:
+                return ("DOUBLE_EXTENDED_SEND", null);
+            case 0x85:
+                return ("SINGLE_EXTENDED_SUPER", null);
+            case 0x86:
+                return ("DOUBLE_EXTENDED_SUPER", null);
+            case 0x87:
+                return ("POP", null);
+            case 0x88:
+                return ("DUP", null);
+        }
+
+        // Push active context (0x89)
+        if (bytecode == (byte)Bytecode.PUSH_ACTIVE_CONTEXT)
+        {
+            return ("PUSH_ACTIVE_CONTEXT", null);
+        }
+
+        // Short unconditional jump (0x90-0x97)
+        if (BytecodeUtil.IsShortJump(bytecode))
+        {
+            int distance = BytecodeUtil.ShortJumpDistance(bytecode);
+            return ("SHORT_JUMP", $"+{distance}");
+        }
+
+        // Short conditional jump on false (0x98-0x9F)
+        if (BytecodeUtil.IsShortJumpFalse(bytecode))
+        {
+            int distance = BytecodeUtil.ShortJumpFalseDistance(bytecode);
+            return ("SHORT_JUMP_FALSE", $"+{distance}");
+        }
+
+        // Long unconditional jump (0xA0-0xA7)
+        if (BytecodeUtil.IsLongJump(bytecode))
+        {
+            return ("LONG_JUMP", null);
+        }
+
+        // Long conditional jump on true (0xA8-0xAB)
+        if (BytecodeUtil.IsLongJumpTrue(bytecode))
+        {
+            return ("LONG_JUMP_TRUE", null);
+        }
+
+        // Long conditional jump on false (0xAC-0xAF)
+        if (BytecodeUtil.IsLongJumpFalse(bytecode))
+        {
+            return ("LONG_JUMP_FALSE", null);
+        }
+
+        // Send arithmetic message (0xB0-0xBF)
+        if (BytecodeUtil.IsSendArithmetic(bytecode))
+        {
+            int selectorIndex = bytecode & 0x0F;
+            string selector = selectorIndex switch
+            {
+                0x00 => "+",
+                0x01 => "-",
+                0x02 => "<",
+                0x03 => ">",
+                0x04 => "<=",
+                0x05 => ">=",
+                0x06 => "=",
+                0x07 => "~=",
+                0x08 => "*",
+                0x09 => "/",
+                0x0A => "\\",
+                0x0B => "@",
+                0x0C => "bitShift:",
+                0x0D => "//",
+                0x0E => "bitAnd:",
+                0x0F => "bitOr:",
+                _ => "?"
+            };
+            return ("SEND_ARITHMETIC", selector);
+        }
+
+        // Send special message (0xC0-0xCF)
+        if (BytecodeUtil.IsSendSpecial(bytecode))
+        {
+            int selectorIndex = bytecode & 0x0F;
+            string selector = selectorIndex switch
+            {
+                0 => "at:",
+                1 => "at:put:",
+                2 => "size",
+                3 => "next",
+                4 => "nextPut:",
+                5 => "atEnd",
+                6 => "==",
+                7 => "class",
+                8 => "blockCopy:",
+                9 => "value",
+                10 => "value:",
+                11 => "do:",
+                12 => "new",
+                13 => "new:",
+                14 => "x",
+                15 => "y",
+                _ => "?"
+            };
+            return ("SEND_SPECIAL", selector);
+        }
+
+        // Send literal selector with 0 args (0xD0-0xDF)
+        if (BytecodeUtil.IsSend0(bytecode))
+        {
+            int selectorIndex = BytecodeUtil.Send0Index(bytecode);
+            return ("SEND_0", $"lit[{selectorIndex}]");
+        }
+
+        // Send literal selector with 1 arg (0xE0-0xEF)
+        if (BytecodeUtil.IsSend1(bytecode))
+        {
+            int selectorIndex = BytecodeUtil.Send1Index(bytecode);
+            return ("SEND_1", $"lit[{selectorIndex}]");
+        }
+
+        // Send literal selector with 2 args (0xF0-0xFF)
+        if (BytecodeUtil.IsSend2(bytecode))
+        {
+            int selectorIndex = BytecodeUtil.Send2Index(bytecode);
+            return ("SEND_2", $"lit[{selectorIndex}]");
+        }
+
+        // Unknown bytecode
+        return ($"UNKNOWN_0x{bytecode:X2}", null);
     }
 }

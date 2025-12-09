@@ -16857,13 +16857,13 @@ associationFor: aClass
 	^Smalltalk associationAt: name!
 associationForClass 
 	^self associationFor: class!
-literals: primitive nArgs: nArgs 
+literals: primitive nArgs: nArgs
+	"Generate literal frame matching standalone compiler format.
+	For extended format (primitive > 0 or nArgs > 4), add encoded SmallInteger.
+	DO NOT add class Association - homeClass slot is used instead."
+
 	(primitive > 0 or: [nArgs > 4])
-		ifTrue: 
-			[self litIndex: nArgs * 256 + primitive.
-			self litIndex: (self associationForClass)]
-		ifFalse: 
-			[supered ifTrue: [self litIndex: (self associationForClass)]].
+		ifTrue: [self litIndex: nArgs * 256 + primitive].
 	^literalStream contents!
 supered
 	^supered!
@@ -17796,9 +17796,11 @@ File class
 
 !File class methodsFor: 'class initialization'!
 initialize
-	"Initialize FilePool with file mode constants."
+	"Initialize FilePool with file mode constants.
+	 Note: Check if FilePool already exists (cold start pre-creates it with canonical Associations)."
 
-	Smalltalk at: #FilePool put: (FilePool _ Dictionary new).
+	(Smalltalk includesKey: #FilePool) ifFalse: [
+		Smalltalk at: #FilePool put: (FilePool _ Dictionary new)].
 	FilePool at: #Read put: 1.
 	FilePool at: #Write put: 2.
 	FilePool at: #Shorten put: 3.
@@ -43040,3 +43042,19 @@ FormDisplayTest class
 
 FormDisplayTest initialize!
 
+
+"Test class for class variable debugging"
+Object subclass: #ClassVarTest
+	instanceVariableNames: ''
+	classVariableNames: 'TestValue'
+	poolDictionaries: ''
+	category: 'Testing'!
+
+!ClassVarTest class methodsFor: 'testing'!
+initializeSet
+	"Set the class variable to a known value"
+	TestValue _ 42!
+
+initializeGet
+	"Get the class variable and return it"
+	^TestValue! !

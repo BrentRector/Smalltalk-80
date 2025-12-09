@@ -700,11 +700,105 @@ public class Phase4_MethodCompilation : IPhase
 
     private void CreateInitExpressionMethods()
     {
-        // NEW APPROACH: Don't compile ANY init expressions during cold start!
-        // They will be compiled on-demand during execution when they're reachable
-        // via Processor.activeProcess. This avoids GC collection issues.
+        // Pre-compile ALL init expressions during cold start Phase 4
+        // This ensures they use the same canonical Association OOPs from Phase 3
+        // that are installed in classPools during Phase 5
 
-        // Set to nil - no pre-compiled init expressions
-        _initExpressionMethods = _heapManager.GetNil();
+        if (_bundle.InitExpressions.Length == 0)
+        {
+            _initExpressionMethods = _heapManager.GetNil();
+            return;
+        }
+
+        // Allocate array to hold init expression CompiledMethod OOPs
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        if (arrayClassOOP == _heapManager.GetNil())
+        {
+            throw new InvalidOperationException("Array class not found in GlobalRegistry during Phase 4");
+        }
+        _initExpressionMethods = _allocator.AllocateArray(
+            arrayClassOOP,
+            _bundle.InitExpressions.Length);
+
+        Console.WriteLine($"[Phase 4] Pre-compiling {_bundle.InitExpressions.Length} init expressions...");
+        Console.WriteLine($"[Phase 4] InitExpressionMethods array OOP: {_initExpressionMethods}");
+
+        for (int i = 0; i < _bundle.InitExpressions.Length; i++)
+        {
+            var expr = _bundle.InitExpressions[i];
+
+            // Compile this init expression using the same LiteralResolver as regular methods
+            var methodOOP = CompileInitExpression(expr);
+
+            // Store in array
+            _allocator.SetIndexedOOP(_initExpressionMethods, i, methodOOP);
+
+            // Register in localId mapping for block ownership resolution
+            if (!string.IsNullOrEmpty(expr.LocalId))
+            {
+                _localIdToObjectId[expr.LocalId] = methodOOP;
+            }
+        }
+
+        Console.WriteLine($"[Phase 4] ✓ Pre-compiled all {_bundle.InitExpressions.Length} init expressions");
+    }
+
+    /// <summary>
+    /// Compiles an init expression into a heap CompiledMethod object.
+    /// Init expressions are similar to methods but have nil homeClass (DoIt semantics).
+    /// Uses ObjectGraphAllocator.AllocateCompiledMethod for consistent structure
+    /// and the same literal resolution as regular methods to ensure canonical Association OOPs.
+    /// </summary>
+    /// <param name="expr">The init expression to compile.</param>
+    /// <returns>The allocated CompiledMethod OOP.</returns>
+    private SmalltalkOOP CompileInitExpression(InitExpression expr)
+    {
+        // Decode bytecodes from JSON object (can be int[] or base64 string)
+        var bytecodes = ClassHierarchyTraversal.DecodeBytecodes(expr.Bytecodes);
+
+        // Resolve literals using LiteralResolver (same as regular methods)
+        var literalOOPs = new SmalltalkOOP[expr.Literals.Length];
+        for (int i = 0; i < expr.Literals.Length; i++)
+        {
+            literalOOPs[i] = _literalResolver.ResolveLiteralValueAsOOP(expr.Literals[i]);
+        }
+
+        // Get CompiledMethod and ByteArray class OOPs
+        var compiledMethodClassOOP = GlobalRegistry.LookupClassOOP("CompiledMethod");
+        if (compiledMethodClassOOP == _heapManager.GetNil())
+        {
+            throw new InvalidOperationException("CompiledMethod class not found in GlobalRegistry");
+        }
+
+        var byteArrayClassOOP = GlobalRegistry.LookupClassOOP("ByteArray");
+        if (byteArrayClassOOP == _heapManager.GetNil())
+        {
+            throw new InvalidOperationException("ByteArray class not found in GlobalRegistry");
+        }
+
+        // Determine homeClass from the expression
+        string homeClassLocalId = ExtractHomeClassFromInitExpression(expr, literalOOPs);
+
+        // Get homeClass OOP (use nil for DoIt expressions)
+        SmalltalkOOP homeClassOOP = _heapManager.GetNil();
+        if (_localIdToObjectId.TryGetValue(homeClassLocalId, out var classOOP))
+        {
+            homeClassOOP = classOOP;
+        }
+
+        // Use ObjectGraphAllocator.AllocateCompiledMethod for consistent structure
+        // This handles the internal layout: fixed slot 0 (homeClass), indexed slots (header, literals, bytecodeArrayOOP)
+        // Pass source position for Blue Book source retrieval (same as regular methods)
+        var methodOOP = _allocator.AllocateCompiledMethod(
+            compiledMethodClassOOP,
+            byteArrayClassOOP,
+            homeClassOOP,
+            expr.Header.Word,
+            literalOOPs,
+            bytecodes,
+            expr.FileIndex,
+            expr.SourcePosition);
+
+        return methodOOP;
     }
 }

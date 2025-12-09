@@ -32,9 +32,7 @@ internal interface IBytecodeInterpreter
     bool VerboseDebug { get; set; }
 
     /// <summary>
-    /// Phase 3: Sets a callback to invoke at strategic check points for event interrupt simulation.
-    /// Called at backward branches, method returns, and (optionally) primitive returns.
+    /// Resets the instruction counter used for diagnostic event emission.
     /// </summary>
-    /// <param name="callback">Callback to invoke for checking pending events.</param>
-    void SetEventCheckCallback(Action callback);
+    void ResetInstructionCount();
 }
