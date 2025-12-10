@@ -174,6 +174,16 @@ public class TestPlatformBridge : IPlatformBridge
         return (_redButton, _yellowButton, _blueButton);
     }
 
+    public int GetButtonState()
+    {
+        // Return button state as packed integer (Blue Book encoding: red=4, yellow=2, blue=1)
+        int buttons = 0;
+        if (_redButton) buttons |= 4;
+        if (_yellowButton) buttons |= 2;
+        if (_blueButton) buttons |= 1;
+        return buttons;
+    }
+
     public void SetCursorPosition(int x, int y)
     {
         // Store simulated cursor position
@@ -188,6 +198,14 @@ public class TestPlatformBridge : IPlatformBridge
             return _inputEvents.Dequeue();
         return 0;
     }
+
+    public bool TryConsumeInputShadowSignal()
+    {
+        // No shadow signaling in test mode - return false
+        return false;
+    }
+
+    public bool HasInputWords => _inputEvents.Count > 0;
 
     public (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? DequeueCompositeEvent()
     {

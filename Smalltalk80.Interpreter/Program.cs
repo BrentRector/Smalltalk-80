@@ -8,7 +8,6 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Engine;
 using Smalltalk80.Interpreter.Engine.InitExecution;
 using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Platform;
 using Smalltalk80.Interpreter.Platform.Windows;
 using Smalltalk80.Interpreter.Shared.Types;
 using ClassHierarchyTraversal = Smalltalk80.Interpreter.Core.ClassHierarchyTraversal;
@@ -111,15 +110,11 @@ public static class Program
             // When beDisplay primitive is called, window size matches Display (no resize needed)
             // Resize flow is tested when user calls: DisplayScreen displayExtent: width@height
 
-            // Create event queue (shared between threads)
-            Console.WriteLine("\n=== Creating Event Queue ===");
-            var eventQueue = new SmalltalkEventQueue();
-
             // Create display window (UI thread object - has heap access for Display bitmap rendering)
             // Window size: 800x600 (matches Smalltalk Display size)
             Console.WriteLine("\n=== Creating Display Window ===");
             Console.WriteLine("  Window size: 800x600 (matches Smalltalk Display)");
-            var displayProvider = new WinFormsDisplayProvider(800, 600, eventQueue, "Smalltalk-80", heapManager, vmMetadata);
+            var displayProvider = new WinFormsDisplayProvider(800, 600, "Smalltalk-80", heapManager, vmMetadata);
             Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity
@@ -139,7 +134,6 @@ public static class Program
                 LayoutResolver = layoutResolver,
                 VMMetadata = vmMetadata,
                 Bundle = bundle,
-                EventQueue = eventQueue,
                 PlatformBridge = displayProvider,  // Smalltalk thread calls methods on UI object
                 Diagnostics = diagnostics,
                 Config = config

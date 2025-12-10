@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-12-03
+**Last Updated**: 2025-12-09
 
 ## Project Status
 
@@ -8,20 +8,23 @@
 
 - **Build**: 0 errors, 0 warnings
 - **Cold Start**: Phases 1-6 all succeed
-- **Init Expressions**: 287/287 succeed (100% success rate)
+- **Init Expressions**: 286/286 succeed (100% success rate)
+- **Classes**: 238 (MouseEvent class removed as dead code)
+- **Methods**: 4747 compiled
 - **BlockContext Tests**: ✅ **120/120 tests PASS** (returns 1191)
 - **VM Core**: Functional but has method lookup bug
 - **Process Primitives**: ✅ **85-88 working** (suspend, resume, terminate, yield)
+- **InputProcess**: ✅ Working - processes mouse/keyboard events correctly
 - **System Browser**: Non-functional (crashes before GUI appears)
-- **Timer/Event System**: ⚠️ **CRASHES on mouse movement**
+- **Timer/Event System**: ⚠️ **CRASHES on mouse movement** (method lookup bug)
 
 ## 🔴 Critical Issue: Method Lookup Bug
 
-**Symptom**: Interpreter crashes immediately when mouse moves after implementing Event Architecture Refactor Phase 7.
+**Symptom**: Interpreter crashes when mouse moves over window.
 
-**Error**: `Instance variable index 4 out of range [0, 0] for object oop=67886 (InputSensor)`
+**Error**: `Instance variable index 15 out of range [0, -1] for object oop=2 (UndefinedObject)`
 
-**Root Cause**: Method lookup is returning InputState methods when receiver is an InputSensor instance. Bytecode 0x04 (push receiver ivar[4]) from InputState>>keyAt:put: being executed with InputSensor receiver (which only has 1 instance variable).
+**Root Cause**: Method lookup is returning wrong methods. A method is being executed with nil as receiver when it expects an object with instance variables.
 
 **Status**: Debug logging added to capture method OOP at crash point. Investigation documented in [docs/DEBUGGING-METHOD-LOOKUP-BUG.md](docs/DEBUGGING-METHOD-LOOKUP-BUG.md).
 
@@ -36,13 +39,9 @@ The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:i
 
 **Parser Token Recognition**: The `--execute` feature currently fails with Parser error "Nothing more expected" at position 1. The Scanner is not properly tokenizing number literals ("4" produces `tokenType: #xDigit` instead of `#number`, and `hereType` remains nil). Root cause under investigation.
 
-**✅ Idle CPU Usage - RESOLVED**: The original Blue Book `Processor yield` created a forked process that signaled immediately, keeping priority 4 always occupied and preventing true idle. **Fix**: Dual-semaphore architecture with mouse event queue:
-- **InputSemaphore**: VM signals on raw input; InputProcess waits
-- **ControllerSemaphore**: InputProcess signals after enqueuing mouse event; controllers wait
-- **MouseEventQueue**: FIFO queue of discrete mouse events (mirrors keyboard queue design)
-- **Key**: Controllers consume events from queue, ensuring no transitions are missed
+**✅ Idle CPU Usage - RESOLVED**: Uses `WaitHandle.WaitAny` for efficient multi-source waiting on both event queue and timer handles.
 
-This guarantees controllers see EVERY mouse event, enables 0% idle CPU, and eliminates missed button transitions. See `docs/Architecture/MOUSE-EVENT-QUEUE.md` for complete design.
+**✅ Atomic Mouse State - IMPLEMENTED**: Primitive 202 (`bitState`) provides atomic button state polling for tight loops (PopUpMenu, etc.). Uses packed `long` with `Interlocked.Read/Exchange` to emulate Blue Book hardware registers. See plan file `wild-tumbling-rabbit.md`.
 
 ## Migration Status
 
@@ -117,88 +116,38 @@ Efficient idle detection using `WaitHandle.WaitAny` for unified multi-source wai
 - ✅ **WaitHandle.WaitAny**: Waits on both event queue and timer handles in single kernel call
 - ✅ **ManualResetEventSlim**: Replaced AutoResetEvent to prevent signal consumption
 - ✅ **Double-Check Reset Pattern**: Safe reset after WaitAny to handle race conditions
-- ✅ **CPU Efficiency**: 0% CPU during idle via mouse event queue architecture
+- ✅ **CPU Efficiency**: 0% CPU during idle
 
-**Key Implementation Details**:
+**Atomic Mouse State (Simulated Hardware Registers)**:
 
-**Mouse Event Queue Architecture**: Queue-based mouse handling that mirrors the keyboard queue design:
-
-1. **InputSemaphore** - VM signals when raw input arrives; InputProcess (priority 6) waits
-2. **ControllerSemaphore** - InputProcess signals after enqueuing mouse event; controllers wait
-3. **MouseEventQueue** - FIFO SharedQueue of discrete MouseEvent objects
-
-```smalltalk
-ProcessorScheduler>>yield
-    "Give other Processes at the current priority a chance to run.
-     Modern integration: block on ControllerSemaphore for true idle suspension."
-    Sensor waitForEvent
-
-InputSensor>>nextMouseEvent
-    "Answer next mouse event or nil if none."
-    ^InputState mouseEventQueue isEmpty
-        ifTrue: [nil]
-        ifFalse: [InputState mouseEventQueue next]
-
-InputSensor>>waitForControllerEvent
-    "Block until a mouse event is available."
-    (self anyButtonPressed or: [self keyboardPressed]) ifTrue: [^self].
-    InputState controllerSemaphore wait
-```
-
-**Key Design Decision**: Controllers consume discrete MouseEvent objects from a FIFO queue instead of polling `bitState`. This guarantees EVERY mouse transition is seen - no events are lost even during rapid clicking or when controllers are busy.
-
-**Queue Protocol**:
-1. InputProcess dequeues OS event, updates bitState for compatibility
-2. InputProcess enqueues MouseEvent to queue
-3. InputProcess signals ControllerSemaphore (no handshake needed)
-4. Controller wakes, dequeues events from MouseEventQueue
-
-This achieves 0% idle CPU with reliable event delivery and no deadlocks.
-
-> **Future Enhancement**: The current single-queue design supports one active controller at a time (classic Smalltalk-80 MVC). A broadcast queue architecture could support multiple simultaneous consumers (monitoring, debugging, multi-view UIs). See "Future Enhancement: Broadcast Queue Architecture" in `docs/Architecture/MOUSE-EVENT-QUEUE.md`.
-
-**Composite Event Model**: Primitive 95 (`primInputWord`) returns a composite event Array instead of packed integer words:
-```smalltalk
-event _ self primInputWord.  "Returns #(eventType x y buttonMask hasTransition keyCode isKeyDown) or nil"
-event == nil ifFalse:
-    [eventType _ event at: 1.
-    eventType = 1 ifTrue:  "Mouse"
-        [x _ event at: 2. y _ event at: 3. newButtons _ event at: 4].
-    eventType = 2 ifTrue:  "Keyboard"
-        [keyCode _ event at: 6. isKeyDown _ event at: 7]]
-```
-This eliminates the inner loop and sentinel parsing from the old word-based format.
-
-**ManualResetEventSlim Pattern**: The original AutoResetEvent caused event loss because it auto-resets when WaitAny returns. The fix uses ManualResetEventSlim with explicit reset:
+The original Blue Book hardware had memory-mapped registers for mouse state. We emulate this with atomic operations:
 
 ```csharp
-// After WaitAny returns, reset signal only if queue is empty
-public void ResetSignalIfEmpty()
-{
-    if (!HasPendingEvents)
-    {
-        _eventSignal.Reset();
-        // Double-check: producer might have added after check but before reset
-        if (HasPendingEvents)
-            _eventSignal.Set();
-    }
-}
+// Packed into single long for atomic read/write
+// Bits 0-15: X, Bits 16-31: Y, Bits 32-34: buttons (red=4, yellow=2, blue=1)
+private long _mouseState;
+
+// UI thread writes atomically
+Interlocked.Exchange(ref _mouseState, PackMouseState(x, y, buttons));
+
+// Smalltalk thread reads atomically (primitive 202)
+int buttons = (int)((Interlocked.Read(ref _mouseState) >> 32) & 0x7);
 ```
 
+**Primitive 202 (bitState)**: Returns button state atomically for tight polling loops (PopUpMenu, etc.). Call chain: `redButtonPressed` → `buttons` → `mouseButtons` → `bitState` → primitive 202.
+
+**Blue Book Input Format**: Primitive 95 returns packed integer words (type << 12 | param):
+- Type 1/2: Mouse X/Y coordinates
+- Type 3: Key down (param = keycode)
+- Type 4: Key up (param = keycode)
+
 **Key Files**:
-- `Smalltalk-80.st` - `ProcessorScheduler>>yield` calls `Sensor waitForEvent`
-- `Smalltalk-80.st` - `InputState` class with `InputSemaphore`, `ControllerSemaphore`, `MouseEventQueue`
-- `Smalltalk-80.st` - `InputState>>run` enqueues MouseEvents to queue
-- `Smalltalk-80.st` - `InputState>>primInputWord` returns composite event Array (primitive 95)
-- `Smalltalk-80.st` - `InputSensor>>nextMouseEvent` dequeues from MouseEventQueue
-- `Smalltalk-80.st` - `InputSensor>>waitForControllerEvent` waits on ControllerSemaphore
-- `SmalltalkEventQueue.cs` - `DequeueCompositeEvent()` returns event data as tuple
-- `InputPrimitives.cs` - Primitive 95 builds composite Array from dequeued event
+- `WinFormsDisplayProvider.cs` - Atomic mouse state via packed `long`, ring buffer for events
+- `InputPrimitives.cs` - Primitives 90-95, 202 (bitState)
+- `InputWordRingBuffer.cs` - Thread-safe ring buffer for Blue Book input words
 - `VirtualMachine.cs` - InterpreterLoop uses `WaitHandle.WaitAny([eventHandle, timerHandle])`
-- `VirtualMachine.ProcessScheduling.cs` - Extracted process scheduling methods (~330 lines)
-- `SmalltalkEventQueue.cs` - ManualResetEventSlim with ResetSignalIfEmpty()
+- `VirtualMachine.ProcessScheduling.cs` - Process scheduling methods (~330 lines)
 - `TimerManager.cs` - Interrupt-driven timer with TimerExpiredHandle
-- `docs/Architecture/MOUSE-EVENT-QUEUE.md` - **Complete queue-based architecture documentation**
 
 See `docs/Architecture/PROPOSED-TIMER-OPTIMIZATION.md` and `docs/Architecture/PROCESS-MANAGEMENT.md` for complete documentation.
 

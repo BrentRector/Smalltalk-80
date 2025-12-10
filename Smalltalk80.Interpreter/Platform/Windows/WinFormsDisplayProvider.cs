@@ -5,7 +5,6 @@ using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Platform;
 using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Platform.Windows;
@@ -14,13 +13,17 @@ namespace Smalltalk80.Interpreter.Platform.Windows;
 /// Windows Forms implementation of display provider and platform bridge.
 /// Provides a monochrome bitmap display with mouse and keyboard input.
 /// Thread-safe: Display updates can occur from Smalltalk thread, rendering occurs on UI thread.
+///
+/// Input Architecture:
+/// - UI thread (WinForms): Enqueues input words to ring buffer, updates current state
+/// - Smalltalk thread: Reads input words via primitive 95, reads state via primitives 90/91
+/// - InputWordRingBuffer: Thread-safe Blue Book format input word queue with shadow counter
 /// </summary>
 public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 {
     private byte[] _displayBuffer;
     private Bitmap _backBuffer;
     private readonly object _bufferLock = new();
-    private readonly SmalltalkEventQueue _eventQueue;
     private readonly ISmalltalkHeap? _heap;
     private readonly VMMetadata? _vmMetadata;
     private bool _disposed = false;
@@ -29,6 +32,59 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     private SmalltalkOOP _inputSemaphore = default;
     // Controller semaphore OOP for button transitions (signaled on button down/up)
     private SmalltalkOOP _controllerSemaphore = default;
+
+    // Thread-safe ring buffer for Blue Book input words
+    // UI thread writes, Smalltalk thread reads via primitive 95
+    private readonly InputWordRingBuffer _inputWordBuffer = new();
+
+    // Atomic mouse state packed into a single long for true atomic read/write.
+    // Emulates hardware registers that the original Blue Book system had.
+    // UI thread writes via Interlocked.Exchange, Smalltalk thread reads via Interlocked.Read.
+    // Format:
+    //   Bits 0-15:   X coordinate (16 bits, supports 0-65535)
+    //   Bits 16-31:  Y coordinate (16 bits, supports 0-65535)
+    //   Bits 32-34:  Button state (3 bits: blue=bit2, yellow=bit1, red=bit0)
+    //   Bits 35-63:  Reserved
+    private long _mouseState;
+
+    // Previous button state for detecting transitions in mouse event handlers
+    private bool _prevRedButton;
+    private bool _prevYellowButton;
+    private bool _prevBlueButton;
+
+    // Previous mouse position for throttling - only enqueue when position changes
+    private int _prevMouseX = -1;
+    private int _prevMouseY = -1;
+
+    // ============================================================================
+    // Atomic Mouse State Helpers (Simulated Hardware Registers)
+    // ============================================================================
+
+    /// <summary>
+    /// Packs mouse X, Y, and button state into a single long for atomic write.
+    /// Called by UI thread when mouse state changes.
+    /// </summary>
+    private static long PackMouseState(int x, int y, int buttons)
+    {
+        return (long)(x & 0xFFFF) | ((long)(y & 0xFFFF) << 16) | ((long)(buttons & 0x7) << 32);
+    }
+
+    /// <summary>
+    /// Unpacks mouse state from atomic long read.
+    /// Called by Smalltalk thread to get coherent mouse state.
+    /// </summary>
+    private static (int x, int y, int buttons) UnpackMouseState(long state)
+    {
+        return (
+            (int)(state & 0xFFFF),
+            (int)((state >> 16) & 0xFFFF),
+            (int)((state >> 32) & 0x7)
+        );
+    }
+
+    // Idle wake signaling for efficient waiting
+    private readonly ManualResetEventSlim _idleWake = new(false);
+    private Func<bool>? _isIdleCallback;
 
     public new int Width { get; private set; }
     public new int Height { get; private set; }
@@ -41,11 +97,10 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     /// </summary>
     public Memory<byte> DisplayBuffer => new Memory<byte>(_displayBuffer);
 
-    public WinFormsDisplayProvider(int width, int height, SmalltalkEventQueue eventQueue, string title = "Smalltalk-80", ISmalltalkHeap? heap = null, VMMetadata? vmMetadata = null)
+    public WinFormsDisplayProvider(int width, int height, string title = "Smalltalk-80", ISmalltalkHeap? heap = null, VMMetadata? vmMetadata = null)
     {
         Width = width;
         Height = height;
-        _eventQueue = eventQueue;
         _heap = heap;
         _vmMetadata = vmMetadata;
 
@@ -285,65 +340,101 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     private void OnMouseDown(object? sender, MouseEventArgs e)
     {
+        Console.WriteLine($"[WinForms] OnMouseDown: button={e.Button} x={e.X} y={e.Y}");
+
         // For MouseDown, the button that triggered the event IS pressed.
         // Combine current button state with the button being pressed.
-        // This handles fast clicks where polling Control.MouseButtons might miss the press.
         var currentButtons = Control.MouseButtons;
 
         bool red = currentButtons.HasFlag(MouseButtons.Left) || e.Button == MouseButtons.Left;
         bool yellow = currentButtons.HasFlag(MouseButtons.Middle) || e.Button == MouseButtons.Middle;
         bool blue = currentButtons.HasFlag(MouseButtons.Right) || e.Button == MouseButtons.Right;
 
-        _eventQueue.Enqueue(new SmalltalkEvent
-        {
-            Type = SmalltalkEventType.Mouse,
-            X = e.X,
-            Y = e.Y,
-            RedButton = red,
-            YellowButton = yellow,
-            BlueButton = blue,
-            Milliseconds = Environment.TickCount64
-        });
+        EnqueueMouseEvent(e.X, e.Y, red, yellow, blue);
     }
 
     private void OnMouseUp(object? sender, MouseEventArgs e)
     {
+        Console.WriteLine($"[WinForms] OnMouseUp: button={e.Button} x={e.X} y={e.Y}");
+
         // For MouseUp, the button that triggered the event is NOT pressed.
-        // Use current button state but ensure the released button is false.
-        // This handles fast clicks where polling Control.MouseButtons might miss the release.
         var currentButtons = Control.MouseButtons;
 
         bool red = currentButtons.HasFlag(MouseButtons.Left) && e.Button != MouseButtons.Left;
         bool yellow = currentButtons.HasFlag(MouseButtons.Middle) && e.Button != MouseButtons.Middle;
         bool blue = currentButtons.HasFlag(MouseButtons.Right) && e.Button != MouseButtons.Right;
 
-        _eventQueue.Enqueue(new SmalltalkEvent
-        {
-            Type = SmalltalkEventType.Mouse,
-            X = e.X,
-            Y = e.Y,
-            RedButton = red,
-            YellowButton = yellow,
-            BlueButton = blue,
-            Milliseconds = Environment.TickCount64
-        });
+        EnqueueMouseEvent(e.X, e.Y, red, yellow, blue);
     }
 
     private void OnMouseMove(object? sender, MouseEventArgs e)
     {
-        // For MouseMove, use current button state as-is (which buttons are held during move)
+        // For MouseMove, use current button state as-is
         var currentButtons = Control.MouseButtons;
 
-        _eventQueue.Enqueue(new SmalltalkEvent
+        EnqueueMouseEvent(e.X, e.Y,
+            currentButtons.HasFlag(MouseButtons.Left),
+            currentButtons.HasFlag(MouseButtons.Middle),
+            currentButtons.HasFlag(MouseButtons.Right));
+    }
+
+    /// <summary>
+    /// Enqueues mouse event to the ring buffer (for Blue Book primitive 95).
+    /// Atomically updates simulated hardware register for primitives 90/202.
+    /// Detects button transitions and generates appropriate key up/down words.
+    /// </summary>
+    private void EnqueueMouseEvent(int x, int y, bool red, bool yellow, bool blue)
+    {
+        // Pack button state: red=bit0, yellow=bit1, blue=bit2
+        // This matches Blue Book encoding where red=4, yellow=2, blue=1 but
+        // the bits are shifted for our internal format
+        int buttons = 0;
+        if (red) buttons |= 4;      // Red = bit 2 (value 4)
+        if (yellow) buttons |= 2;   // Yellow = bit 1 (value 2)
+        if (blue) buttons |= 1;     // Blue = bit 0 (value 1)
+
+        // Atomically update simulated hardware register (for primitives 90/202)
+        Interlocked.Exchange(ref _mouseState, PackMouseState(x, y, buttons));
+
+        // Throttle position events - only enqueue if position actually changed
+        // This prevents mouse movement from flooding the buffer and burying button events
+        bool positionChanged = (x != _prevMouseX || y != _prevMouseY);
+        if (positionChanged)
         {
-            Type = SmalltalkEventType.Mouse,
-            X = e.X,
-            Y = e.Y,
-            RedButton = currentButtons.HasFlag(MouseButtons.Left),
-            YellowButton = currentButtons.HasFlag(MouseButtons.Middle),
-            BlueButton = currentButtons.HasFlag(MouseButtons.Right),
-            Milliseconds = Environment.TickCount64
-        });
+            _inputWordBuffer.EnqueueMousePosition(x, y);
+            _prevMouseX = x;
+            _prevMouseY = y;
+        }
+
+        // Detect and enqueue button transitions
+        // Red button (left mouse = key code 130)
+        if (red && !_prevRedButton)
+            _inputWordBuffer.EnqueueButtonDown(InputWordRingBuffer.ButtonCodeRed);
+        else if (!red && _prevRedButton)
+            _inputWordBuffer.EnqueueButtonUp(InputWordRingBuffer.ButtonCodeRed);
+
+        // Yellow button (middle mouse = key code 129)
+        if (yellow && !_prevYellowButton)
+            _inputWordBuffer.EnqueueButtonDown(InputWordRingBuffer.ButtonCodeYellow);
+        else if (!yellow && _prevYellowButton)
+            _inputWordBuffer.EnqueueButtonUp(InputWordRingBuffer.ButtonCodeYellow);
+
+        // Blue button (right mouse = key code 128)
+        if (blue && !_prevBlueButton)
+            _inputWordBuffer.EnqueueButtonDown(InputWordRingBuffer.ButtonCodeBlue);
+        else if (!blue && _prevBlueButton)
+            _inputWordBuffer.EnqueueButtonUp(InputWordRingBuffer.ButtonCodeBlue);
+
+        // Update previous state
+        _prevRedButton = red;
+        _prevYellowButton = yellow;
+        _prevBlueButton = blue;
+
+        // Signal idle wake if VM is idle
+        if (_isIdleCallback?.Invoke() == true)
+        {
+            _idleWake.Set();
+        }
     }
 
     // ============================================================================
@@ -352,26 +443,14 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        _eventQueue.Enqueue(new SmalltalkEvent
-        {
-            Type = SmalltalkEventType.Keyboard,
-            Character = (char)e.KeyValue,
-            KeyCode = e.KeyValue,
-            IsKeyDown = true,
-            Milliseconds = Environment.TickCount64
-        });
+        // Enqueue to ring buffer (Blue Book format)
+        _inputWordBuffer.EnqueueKeyDown(e.KeyValue);
     }
 
     private void OnKeyUp(object? sender, KeyEventArgs e)
     {
-        _eventQueue.Enqueue(new SmalltalkEvent
-        {
-            Type = SmalltalkEventType.Keyboard,
-            Character = (char)e.KeyValue,
-            KeyCode = e.KeyValue,
-            IsKeyDown = false,
-            Milliseconds = Environment.TickCount64
-        });
+        // Enqueue to ring buffer (Blue Book format)
+        _inputWordBuffer.EnqueueKeyUp(e.KeyValue);
     }
 
     // ============================================================================
@@ -452,12 +531,28 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public (int x, int y) GetMousePosition()
     {
-        return _eventQueue.GetMousePosition();
+        // Atomically read from simulated hardware register
+        long state = Interlocked.Read(ref _mouseState);
+        var (x, y, _) = UnpackMouseState(state);
+        return (x, y);
     }
 
     public (bool red, bool yellow, bool blue) GetMouseButtons()
     {
-        return _eventQueue.GetMouseButtons();
+        // Atomically read from simulated hardware register
+        long state = Interlocked.Read(ref _mouseState);
+        var (_, _, buttons) = UnpackMouseState(state);
+        // Blue Book encoding: red=4, yellow=2, blue=1
+        return ((buttons & 4) != 0, (buttons & 2) != 0, (buttons & 1) != 0);
+    }
+
+    public int GetButtonState()
+    {
+        // Atomically read just the button state from simulated hardware register.
+        // Returns integer with Blue Book encoding: red=4, yellow=2, blue=1.
+        // Used by primitive 202 (bitState).
+        long state = Interlocked.Read(ref _mouseState);
+        return (int)((state >> 32) & 0x7);
     }
 
     public void SetCursorPosition(int x, int y)
@@ -474,17 +569,21 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public int GetInputWord()
     {
-        // Delegate to the event queue which properly formats input words
-        // Smalltalk-80 input word format:
-        // - Bits 0-11: parameter value
-        // - Bits 12-15: event type (1=mouseX, 2=mouseY, 3=keyDown, 4=keyUp)
-        return _eventQueue.GetNextInputWord();
+        // Dequeue from the thread-safe ring buffer (Blue Book format)
+        if (_inputWordBuffer.TryDequeue(out int word))
+            return word;
+        return 0;  // No events available
     }
+
+    public bool TryConsumeInputShadowSignal() => _inputWordBuffer.TryConsumeSignal();
+
+    public bool HasInputWords => _inputWordBuffer.HasWords;
 
     public (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? DequeueCompositeEvent()
     {
-        // Delegate to event queue's composite event dequeue
-        return _eventQueue.DequeueCompositeEvent();
+        // Not used - primitive 95 reads from ring buffer directly
+        // This method exists only for interface compatibility
+        return null;
     }
 
     public void SetSampleInterval(int intervalMs)
@@ -514,44 +613,54 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public bool HasPendingEvents()
     {
-        return _eventQueue.HasPendingEvents;
+        return _inputWordBuffer.HasWords;
     }
 
     public bool ConsumeButtonTransition()
     {
-        return _eventQueue.ConsumeButtonTransition();
+        // Button transitions are now handled via ring buffer key events
+        // This method is kept for interface compatibility but not used
+        return false;
     }
 
     public bool WaitForEvents(int timeoutMs)
     {
-        return _eventQueue.WaitOne(timeoutMs);
+        // Wait on idle wake handle
+        return _idleWake.Wait(timeoutMs);
     }
 
-    public WaitHandle? EventAvailableHandle => _eventQueue.EventAvailableHandle;
+    public WaitHandle? EventAvailableHandle => _idleWake.WaitHandle;
 
     public void ResetEventSignalIfEmpty()
     {
-        _eventQueue.ResetSignalIfEmpty();
+        if (!_inputWordBuffer.HasWords)
+        {
+            _idleWake.Reset();
+            // Double-check: producer might have added after check but before reset
+            if (_inputWordBuffer.HasWords)
+                _idleWake.Set();
+        }
     }
 
     public void ForceResetEventSignal()
     {
-        _eventQueue.ForceResetEventSignal();
+        _idleWake.Reset();
     }
 
     public void SetEventCallback(Action callback)
     {
-        _eventQueue.SetEventCallback(callback);
+        // Wire callback to ring buffer - this is the canonical event source
+        _inputWordBuffer.SetEventCallback(callback);
     }
 
     public void SetIsIdleCallback(Func<bool> callback)
     {
-        _eventQueue.SetIsIdleCallback(callback);
+        _isIdleCallback = callback;
     }
 
-    public WaitHandle? IdleWakeHandle => _eventQueue.IdleWakeHandle;
+    public WaitHandle? IdleWakeHandle => _idleWake.WaitHandle;
 
-    public ManualResetEventSlim? IdleWake => _eventQueue.IdleWake;
+    public ManualResetEventSlim? IdleWake => _idleWake;
 
     public SmalltalkOOP ReadClipboardToStringOOP()
     {
@@ -604,6 +713,7 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
             if (disposing)
             {
                 _backBuffer?.Dispose();
+                _idleWake?.Dispose();
             }
             _disposed = true;
         }

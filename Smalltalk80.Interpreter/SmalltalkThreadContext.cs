@@ -5,7 +5,6 @@ using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.Engine;
 using Smalltalk80.Interpreter.Engine.LoaderPhases;
 using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Platform;
 
 namespace Smalltalk80.Interpreter;
 
@@ -34,11 +33,6 @@ public class SmalltalkThreadContext
     /// The cold start bundle containing init expressions and metadata.
     /// </summary>
     public required ColdStartBundle Bundle { get; init; }
-
-    /// <summary>
-    /// Thread-safe event queue for Windows events -> Smalltalk polling.
-    /// </summary>
-    public required SmalltalkEventQueue EventQueue { get; init; }
 
     /// <summary>
     /// Platform bridge for Smalltalk -> UI communication.

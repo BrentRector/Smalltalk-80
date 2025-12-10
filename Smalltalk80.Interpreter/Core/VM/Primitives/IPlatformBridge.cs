@@ -77,6 +77,14 @@ public interface IPlatformBridge
     (bool red, bool yellow, bool blue) GetMouseButtons();
 
     /// <summary>
+    /// Gets the current button state atomically from simulated hardware register.
+    /// Returns integer with Blue Book encoding: red=4, yellow=2, blue=1.
+    /// Used by primitive 202 (bitState) for tight polling loops.
+    /// </summary>
+    /// <returns>Button state as packed integer.</returns>
+    int GetButtonState();
+
+    /// <summary>
     /// Sets the cursor position on host platform.
     /// </summary>
     /// <param name="x">X coordinate.</param>
@@ -90,6 +98,20 @@ public interface IPlatformBridge
     /// </summary>
     /// <returns>Input event word (packed integer) or 0 if no events.</returns>
     int GetInputWord();
+
+    /// <summary>
+    /// Tries to consume a shadow signal from the input word ring buffer.
+    /// Used by primitive 86 (wait) to check shadow signal count for InputSemaphore.
+    /// The shadow counter mirrors excessSignals but is updated atomically by the UI thread.
+    /// </summary>
+    /// <returns>True if a signal was consumed, false if no signals available.</returns>
+    bool TryConsumeInputShadowSignal();
+
+    /// <summary>
+    /// Checks if there are input words available in the ring buffer.
+    /// Used for diagnostics and idle detection.
+    /// </summary>
+    bool HasInputWords { get; }
 
     /// <summary>
     /// Dequeues the next composite event, returning all event data in one call.

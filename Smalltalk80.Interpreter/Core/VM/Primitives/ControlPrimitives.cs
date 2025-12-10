@@ -298,10 +298,8 @@ public static class ControlPrimitives
     /// Primitive 85: signal - Signals a Semaphore.
     /// Uses IProcessScheduler for all process scheduling operations.
     ///
-    /// CRITICAL: Signal can cause preemption if the woken process has higher priority.
-    /// When preemption occurs, the active context switches MID-PRIMITIVE.
-    /// We must push the return value BEFORE potential preemption so the signaling
-    /// process has it when it resumes. This matches how Wait handles suspension.
+    /// Cooperative scheduling: Signal wakes a waiting process and adds it to the
+    /// ready queue. The signaling process continues until it voluntarily yields.
     /// </summary>
     public class Signal : IPrimitive
     {
@@ -315,36 +313,10 @@ public static class ControlPrimitives
             var scheduler = context.ProcessScheduler;
             if (scheduler == null) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Push result onto current process's stack BEFORE potential preemption.
-            // If preemption occurs, the signaling process will have this value when it resumes.
-            // This is the same pattern as Wait primitive (which pushes before suspending).
-            if (context.StackManager != null)
-            {
-                context.StackManager.Push(context.Receiver);
-            }
-
-            // Save current context to detect if preemption occurred
-            var originalContext = context.GetActiveContext();
-
             // Use the unified signaling method from IProcessScheduler
-            // This handles: wake first waiter, preemption check, or increment excessSignals
-            // If woken process has higher priority, THIS WILL PREEMPT US!
-            scheduler.SignalSemaphoreWithPreemption(context.Receiver);
-
-            // Check if preemption occurred (active context changed)
-            if (context.GetActiveContext() != originalContext)
-            {
-                // Preemption occurred - result already pushed on old (now suspended) context.
-                // PrimitiveRegistry will detect the context change and set _contextSwitchedByPrimitive = true,
-                // so the VM won't push the result again.
-                return PrimitiveResult.Ok(context.Receiver);
-            }
-
-            // No preemption - pop the pre-pushed value since PrimitiveResult.Ok will push it
-            if (context.StackManager != null)
-            {
-                context.StackManager.Pop();
-            }
+            // This handles: wake first waiter and add to ready queue, or increment excessSignals
+            // Cooperative: no preemption, current process continues
+            scheduler.SignalSemaphore(context.Receiver);
 
             return PrimitiveResult.Ok(context.Receiver);
         }
@@ -353,6 +325,11 @@ public static class ControlPrimitives
     /// <summary>
     /// Primitive 86: wait - Waits on a Semaphore.
     /// Uses IProcessScheduler for all process scheduling operations.
+    ///
+    /// Special handling for InputSemaphore: Checks the shadow counter in the
+    /// InputWordRingBuffer before checking the Smalltalk excessSignals field.
+    /// This allows the UI thread to signal the semaphore via atomic operations
+    /// without touching the Smalltalk heap (which would cause race conditions).
     /// </summary>
     public class Wait : IPrimitive
     {
@@ -366,6 +343,9 @@ public static class ControlPrimitives
             var scheduler = context.ProcessScheduler;
             if (scheduler == null) return PrimitiveResult.Fail(context.Metadata!);
 
+            // Note: Shadow signals for InputSemaphore are now transferred to excessSignals
+            // by CheckAndSignalInputEvents() in the interpreter loop, so no special case needed here.
+
             // Get excessSignals field
             SmalltalkOOP excessSignalsOop = context.HeapManager.GetInstanceVariable(
                 context.Receiver, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
@@ -374,11 +354,20 @@ public static class ControlPrimitives
 
             int excessCount = excessSignalsOop.AsSmallInteger();
 
+            // Check if this is the InputSemaphore for logging
+            var inputSemOOP = context.Platform?.GetInputSemaphore() ?? default;
+            bool isInputSemaphore = (inputSemOOP != default && context.Receiver == inputSemOOP);
+            if (isInputSemaphore)
+                Console.WriteLine($"[Prim86 Wait] InputSemaphore excessSignals={excessCount}");
+
             if (excessCount > 0)
             {
                 // Signal available - decrement and continue (no actual wait)
                 context.HeapManager.SetInstanceVariable(context.Receiver, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX,
                     SmalltalkOOP.FromSmallInteger(excessCount - 1));
+                // ALWAYS log when InputProcess consumes a signal - this verifies InputProcess is actually running
+                if (isInputSemaphore)
+                    Console.WriteLine($"[Prim86 Wait] InputSemaphore - CONSUMED signal, now {excessCount - 1}");
                 return PrimitiveResult.Ok(context.Receiver);
             }
             else
@@ -483,6 +472,14 @@ public static class ControlPrimitives
 
             var scheduler = context.ProcessScheduler;
             if (scheduler == null) return PrimitiveResult.Fail(context.Metadata!);
+
+            // Debug: Log suspend calls on priority 6 processes
+            int receiverPriority = scheduler.GetProcessPriority(context.Receiver);
+            if (receiverPriority == 6)
+            {
+                var myList = scheduler.GetProcessMyList(context.Receiver);
+                Console.WriteLine($"[Prim88 Suspend] InputProcess={context.Receiver} myList={myList}");
+            }
 
             SmalltalkOOP activeProcessOop = scheduler.GetActiveProcess();
 

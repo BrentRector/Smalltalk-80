@@ -22,7 +22,7 @@ public partial class VirtualMachine : IProcessScheduler
             return;
 
         // Signal the semaphore - this may wake a process and trigger preemption
-        SignalSemaphoreWithPreemption(semaphoreOOP);
+        SignalSemaphore(semaphoreOOP);
     }
 
     #region IProcessScheduler Implementation
@@ -35,6 +35,107 @@ public partial class VirtualMachine : IProcessScheduler
             return _metadata.KnownObjects.Nil;
 
         return _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+    }
+
+    // Process switch tracing - set to true to debug process/context issues
+    private bool _traceProcessSwitches = false;
+    private int _processSwitchCount = 0;
+
+    /// <summary>
+    /// Dumps the complete state of a context for debugging process switches.
+    /// </summary>
+    private void DumpContextState(string label, SmalltalkOOP contextOOP, SmalltalkOOP processOOP)
+    {
+        if (!_traceProcessSwitches) return;
+
+        var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
+        bool isBlockContext = contextClassOOP == _metadata.BlockContextClassOOP;
+        string contextType = isBlockContext ? "BlockContext" : "MethodContext";
+
+        var pcOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_PC_INDEX);
+        var spOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_STACKP_INDEX);
+        int pc = pcOOP.IsSmallInteger ? pcOOP.AsSmallInteger() : -1;
+        int sp = spOOP.IsSmallInteger ? spOOP.AsSmallInteger() : -1;
+
+        // Get method info
+        SmalltalkOOP methodOOP;
+        int numArgs = 0, numTemps = 0;
+
+        if (isBlockContext)
+        {
+            var methodContextOOP = _contextManager.FindMethodContext(contextOOP);
+            methodOOP = _heapManager.GetInstanceVariable(methodContextOOP, VMConstants.CONTEXT_METHOD_INDEX);
+        }
+        else
+        {
+            methodOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_METHOD_INDEX);
+        }
+
+        string methodSelector = "?";
+        if (methodOOP != _metadata.KnownObjects.Nil)
+        {
+            var header = ParseMethodHeader(methodOOP);
+            numArgs = header.NumArgs;
+            numTemps = header.NumTemps;
+
+            // Get method selector from literal 0 (index 1 in indexed area, after header at 0)
+            int literalCount = header.NumLiterals;
+            if (literalCount > 0)
+            {
+                var selectorOOP = GetMethodLiteral(methodOOP, 1); // slot 1 = literal 0 = selector
+                methodSelector = GetSymbolName(selectorOOP) ?? "?";
+            }
+        }
+
+        int expectedInitialSP = isBlockContext ? 0 : (numArgs + numTemps);
+
+        Console.WriteLine($"[{label}] Process={processOOP}, Context={contextOOP} ({contextType})");
+        Console.WriteLine($"  Selector={methodSelector}, PC={pc}, SP={sp}, expectedInitialSP={expectedInitialSP}, args={numArgs}, temps={numTemps}");
+        Console.WriteLine($"  Method={methodOOP}");
+
+        // Dump stack contents
+        int indexedSize = _heapManager.GetIndexedSize(contextOOP);
+        Console.Write($"  Stack[0..{Math.Min(indexedSize, 8) - 1}]: ");
+        for (int i = 0; i < Math.Min(indexedSize, 8); i++)
+        {
+            var slotOOP = _heapManager.GetIndexedOOP(contextOOP, i);
+            if (slotOOP == _metadata.KnownObjects.Nil)
+                Console.Write("nil ");
+            else if (slotOOP.IsSmallInteger)
+                Console.Write($"{slotOOP.AsSmallInteger()} ");
+            else
+                Console.Write($"{slotOOP} ");
+        }
+        Console.WriteLine();
+
+        // Show sender chain (first 3 levels)
+        var senderOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.CONTEXT_SENDER_INDEX);
+        Console.Write($"  Sender chain: ");
+        int depth = 0;
+        while (senderOOP != _metadata.KnownObjects.Nil && depth < 3)
+        {
+            var senderClassOOP = _heapManager.GetClassOOP(senderOOP);
+            bool senderIsBlock = senderClassOOP == _metadata.BlockContextClassOOP;
+            var senderMethodOOP = senderIsBlock
+                ? _heapManager.GetInstanceVariable(_contextManager.FindMethodContext(senderOOP), VMConstants.CONTEXT_METHOD_INDEX)
+                : _heapManager.GetInstanceVariable(senderOOP, VMConstants.CONTEXT_METHOD_INDEX);
+            string senderSelector = "?";
+            if (senderMethodOOP != _metadata.KnownObjects.Nil)
+            {
+                var header = ParseMethodHeader(senderMethodOOP);
+                if (header.NumLiterals > 0)
+                {
+                    var selOOP = GetMethodLiteral(senderMethodOOP, 1);
+                    senderSelector = GetSymbolName(selOOP) ?? "?";
+                }
+            }
+            var senderPC = _heapManager.GetInstanceVariable(senderOOP, VMConstants.CONTEXT_PC_INDEX);
+            int spc = senderPC.IsSmallInteger ? senderPC.AsSmallInteger() : -1;
+            Console.Write($"{senderOOP}({senderSelector}@{spc}) → ");
+            senderOOP = _heapManager.GetInstanceVariable(senderOOP, VMConstants.CONTEXT_SENDER_INDEX);
+            depth++;
+        }
+        Console.WriteLine(senderOOP == _metadata.KnownObjects.Nil ? "nil" : "...");
     }
 
     /// <inheritdoc/>
@@ -54,6 +155,18 @@ public partial class VirtualMachine : IProcessScheduler
             return false;
         }
 
+        int priority = GetProcessPriority(processOOP);
+        // Trace when InputProcess (priority 6) is activated - ALWAYS log to verify it runs
+        if (priority == 6)
+            Console.WriteLine($"[ActivateProcess] InputProcess={processOOP} (priority {priority}) - reason: {reason}, context={contextOOP}");
+
+        _processSwitchCount++;
+        if (_traceProcessSwitches)
+        {
+            Console.WriteLine($"\n=== ACTIVATE #{_processSwitchCount} ({reason}) ===");
+            DumpContextState("Activating", contextOOP, processOOP);
+        }
+
         // Check if this is an unactivated BlockContext (PC is nil)
         // This happens when resuming a newly created process via [block] newProcess
         var pcOOP = _heapManager.GetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_PC_INDEX);
@@ -69,25 +182,15 @@ public partial class VirtualMachine : IProcessScheduler
             _heapManager.SetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_PC_INDEX, startPC);
             _heapManager.SetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_STACKP_INDEX, SmalltalkOOP.FromSmallInteger(0));
             _heapManager.SetInstanceVariable(contextOOP, VMConstants.BLOCKCONTEXT_CALLER_INDEX, _metadata.KnownObjects.Nil);
+
+            if (_traceProcessSwitches)
+            {
+                Console.WriteLine($"  [BlockContext initialized: PC={startPC.AsSmallInteger()}, SP=0]");
+            }
         }
 
         // Update ProcessorScheduler.activeProcess
         _heapManager.SetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, processOOP);
-
-        // Phase 4: Context switch hook - clear latch when InputProcess blocks
-        // If switching away from InputProcess and it's blocked (waiting on semaphore), clear the latch
-        if (_inputProcessOOP != default && _inputProcessOOP != _metadata.KnownObjects.Nil)
-        {
-            if (oldProcessOOP == _inputProcessOOP && processOOP != _inputProcessOOP)
-            {
-                // Switching away from InputProcess - check if it's blocked
-                if (IsProcessBlocked(oldProcessOOP))
-                {
-                    // InputProcess is blocked - clear latch to allow next signal
-                    _inputProcessRunnableOrDraining = false;
-                }
-            }
-        }
 
         // Switch C# execution context
         _contextManager.SetActiveContext(contextOOP);
@@ -114,6 +217,13 @@ public partial class VirtualMachine : IProcessScheduler
 
         // Save current context to the process's suspendedContext
         var currentContext = _contextManager.ActiveContext;
+
+        if (_traceProcessSwitches)
+        {
+            Console.WriteLine($"\n=== SUSPEND (returnToQueue={returnToQueue}) ===");
+            DumpContextState("Suspending", currentContext, activeProcessOOP);
+        }
+
         _heapManager.SetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, currentContext);
 
         if (returnToQueue)
@@ -150,6 +260,9 @@ public partial class VirtualMachine : IProcessScheduler
         {
             // List is empty
             _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, processOOP);
+            // Trace when priority 6 queue transitions from empty to non-empty
+            if (priority == 6)
+                Console.WriteLine($"[AddToQueue] P6 queue was EMPTY, firstLink now = {processOOP}");
         }
         else
         {
@@ -158,6 +271,13 @@ public partial class VirtualMachine : IProcessScheduler
         }
         _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, processOOP);
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, listOOP);
+
+        // Verify the queue actually has the process after adding
+        if (priority == 6)
+        {
+            var verifyFirst = _heapManager.GetInstanceVariable(listOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+            Console.WriteLine($"[AddToQueue] P6 queue verify: firstLink={verifyFirst}");
+        }
     }
 
     /// <inheritdoc/>
@@ -205,6 +325,9 @@ public partial class VirtualMachine : IProcessScheduler
         _heapManager.SetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
     }
 
+    // Counter to throttle queue dump tracing
+    private int _findProcessCallCount = 0;
+
     /// <inheritdoc/>
     public SmalltalkOOP FindHighestPriorityRunnableProcess()
     {
@@ -215,6 +338,8 @@ public partial class VirtualMachine : IProcessScheduler
         SmalltalkOOP processListsOOP = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_QUIESCENTPROCESSLISTS_INDEX);
         if (processListsOOP == _metadata.KnownObjects.Nil)
             return _metadata.KnownObjects.Nil;
+
+        _findProcessCallCount++;
 
         // Search from highest priority (8) down to lowest (1)
         // Array indices are 0-7 for priorities 1-8
@@ -227,8 +352,12 @@ public partial class VirtualMachine : IProcessScheduler
 
             // Check if list has any processes (firstLink != nil)
             SmalltalkOOP firstLinkOOP = _heapManager.GetInstanceVariable(priorityListOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+
             if (firstLinkOOP != _metadata.KnownObjects.Nil)
             {
+                // Log when InputProcess (priority 6) is selected
+                if (priority == 6)
+                    Console.WriteLine($"[FindHighestPriority] Selected InputProcess={firstLinkOOP} from P6 queue");
                 return firstLinkOOP;
             }
         }
@@ -243,6 +372,11 @@ public partial class VirtualMachine : IProcessScheduler
         if (schedulerOOP == _metadata.KnownObjects.Nil)
             return false;
 
+        // Check for pending input events and signal InputSemaphore if needed.
+        // This is done here (from Smalltalk thread) to avoid cross-thread heap corruption.
+        // The UI thread sets an atomic flag; we check it here and signal safely.
+        CheckAndSignalInputEvents();
+
         // Find highest priority runnable process
         SmalltalkOOP nextProcess = FindHighestPriorityRunnableProcess();
         if (nextProcess == _metadata.KnownObjects.Nil)
@@ -252,6 +386,8 @@ public partial class VirtualMachine : IProcessScheduler
             DumpProcessQueues(schedulerOOP);
             return false;
         }
+
+        int nextPriority = GetProcessPriority(nextProcess);
 
         // Remove the process from its priority queue (it's about to become active)
         SmalltalkOOP myListOOP = _heapManager.GetInstanceVariable(nextProcess, VMConstants.PROCESS_MYLIST_INDEX);
@@ -280,8 +416,12 @@ public partial class VirtualMachine : IProcessScheduler
     }
 
     /// <inheritdoc/>
-    public bool SignalSemaphoreWithPreemption(SmalltalkOOP semaphoreOOP)
+    public bool SignalSemaphore(SmalltalkOOP semaphoreOOP)
     {
+        // Check if this is the InputSemaphore
+        var inputSemOOP = _platformBridge?.GetInputSemaphore() ?? default;
+        bool isInputSemaphore = (inputSemOOP != default && semaphoreOOP == inputSemOOP);
+
         // Semaphore layout: firstLink (0), lastLink (1), excessSignals (2)
         var firstLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
 
@@ -298,8 +438,10 @@ public partial class VirtualMachine : IProcessScheduler
             return false;  // No process woken, no preemption
         }
 
-        // Process is waiting - wake it up
+        // Process is waiting - wake it up (this is the important case to log!)
         var wokenProcessOOP = firstLinkOOP;
+        if (isInputSemaphore)
+            Console.WriteLine($"[SignalSemaphore] WAKING InputProcess={wokenProcessOOP} from InputSemaphore wait list");
 
         // Remove from semaphore's wait list
         var nextLinkOOP = _heapManager.GetInstanceVariable(wokenProcessOOP, VMConstants.LINK_NEXTLINK_INDEX);
@@ -313,28 +455,23 @@ public partial class VirtualMachine : IProcessScheduler
         _heapManager.SetInstanceVariable(wokenProcessOOP, VMConstants.PROCESS_MYLIST_INDEX, _metadata.KnownObjects.Nil);
         _heapManager.SetInstanceVariable(wokenProcessOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
 
-        // Get priorities for preemption check
+        // Blue Book preemption: If woken process has higher priority than active process,
+        // preempt immediately. Otherwise, add to ready queue for later scheduling.
         int wokenPriority = GetProcessPriority(wokenProcessOOP);
         int activePriority = GetProcessPriority(GetActiveProcess());
 
-        // Check for preemption: if woken process has higher priority, switch to it
         if (wokenPriority > activePriority)
         {
-            // Suspend current process and return it to ready queue
+            // Higher priority process - preempt current process!
+            if (isInputSemaphore)
+                Console.WriteLine($"[SignalSemaphore] PREEMPTING current process (priority {activePriority}) for InputProcess (priority {wokenPriority})");
             SuspendActiveProcess(returnToQueue: true);
-
-            // Activate the woken process
             ActivateProcess(wokenProcessOOP, "preemption");
-
-            // NOTE: Do NOT set _contextSwitchedByPrimitive here!
-            // Only the Signal primitive should set it (after pre-pushing result).
-            // When VM signals semaphores directly (e.g., InputSemaphore), the flag
-            // would incorrectly affect the next unrelated primitive call.
             return true;  // Preemption occurred
         }
         else
         {
-            // No preemption needed - just add to ready queue
+            // Equal or lower priority - add to ready queue
             AddProcessToReadyQueue(wokenProcessOOP, wokenPriority);
             return false;  // No preemption
         }
@@ -343,21 +480,46 @@ public partial class VirtualMachine : IProcessScheduler
     /// <inheritdoc/>
     public bool WaitOnSemaphore(SmalltalkOOP semaphoreOOP, SmalltalkOOP processOOP)
     {
+        // Check if this is the InputSemaphore
+        var inputSemOOP = _platformBridge?.GetInputSemaphore() ?? default;
+        bool isInputSemaphore = (inputSemOOP != default && semaphoreOOP == inputSemOOP);
+
+        int priority = GetProcessPriority(processOOP);
+        if (isInputSemaphore)
+            Console.WriteLine($"[WaitOnSemaphore] InputProcess={processOOP} (priority {priority}) WAITING on InputSemaphore");
+
         // Add process to semaphore's wait list (LinkedList>>addLast:)
         var lastLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
+        var firstLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+
+        if (isInputSemaphore)
+            Console.WriteLine($"[WaitOnSemaphore] InputSemaphore BEFORE: firstLink={firstLinkOOP}, lastLink={lastLinkOOP}");
+
         if (lastLinkOOP == _metadata.KnownObjects.Nil)
         {
             // List is empty
             _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, processOOP);
+            if (isInputSemaphore)
+                Console.WriteLine($"[WaitOnSemaphore] Set InputSemaphore.firstLink = {processOOP}");
         }
         else
         {
             // Append to end
+            if (isInputSemaphore)
+                Console.WriteLine($"[WaitOnSemaphore] InputSemaphore lastLink NOT nil - appending to {lastLinkOOP}");
             _heapManager.SetInstanceVariable(lastLinkOOP, VMConstants.LINK_NEXTLINK_INDEX, processOOP);
         }
         _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, processOOP);
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, semaphoreOOP);
         _heapManager.SetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
+
+        // Verify the semaphore's firstLink was set correctly
+        if (isInputSemaphore)
+        {
+            var verifyFirst = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+            var verifyLast = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
+            Console.WriteLine($"[WaitOnSemaphore] VERIFY InputSemaphore AFTER: firstLink={verifyFirst}, lastLink={verifyLast}");
+        }
 
         // Switch to next runnable process
         return SwitchToNextRunnableProcess(processOOP);

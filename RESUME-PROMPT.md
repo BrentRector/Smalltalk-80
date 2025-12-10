@@ -1,111 +1,98 @@
 # Resume Prompt: Smalltalk-80 Interpreter
 
-**Session Date**: 2025-12-01
-**Status**: ✅ System Browser FULLY FUNCTIONAL
+**Session Date**: 2025-12-09
+**Status**: ⚠️ BLOCKED - Method Lookup Bug
 
 ## Current State
 
 ### What's Working
-- ✅ **System Browser**: Fully functional with source code retrieval
-- ✅ **Method Source Display**: All methods including `Cursor>>changed:` display correctly
-- ✅ **MVC Controller Loop**: Running, mouse/keyboard input working
+- ✅ **Build**: 0 errors, 0 warnings
+- ✅ **Cold Start**: Phases 1-6 all succeed
+- ✅ **Init Expressions**: 286/286 (100%)
+- ✅ **InputProcess**: Working - processes mouse/keyboard events correctly
 - ✅ **Process Primitives 85-88**: suspend, resume, terminate, yield
-- ✅ **Init Expressions**: 51/51 passing (100%)
 - ✅ **BlockContext Tests**: 120/120 passing (returns 1191)
-- ✅ **Source File Retrieval**: `CompiledMethod>>getSource` working via `.sources` file
+- ✅ **Primitive 202 (bitState)**: Atomic button state polling for tight loops
 
-### Recent Fixes (This Session)
+### What's Broken
+- ❌ **Method Lookup Bug**: Crashes on mouse movement with "Instance variable index 15 out of range [0, -1] for object oop=2 (UndefinedObject)"
+- ❌ **System Browser**: Non-functional (crashes before GUI appears due to above bug)
 
-1. **SingleCharSymbols Initialization** (`ColdStartJsonGenerator.cs`, `SystemDictionaryInstaller.cs`)
-   - System Browser crashed with "nil ," error when viewing `Cursor>>changed:`
-   - Scanner's `xBinary` method called `Symbol internCharacter:` which returned nil
-   - Root cause: SingleCharSymbols array contained nils because it wasn't populated during cold start
-   - Fix Part 1: Compiler now adds Blue Book canonical binary selectors to symbol table:
-     `+ - * / < > = ~ & | @ , \ ? ! %` (16 characters)
-   - Fix Part 2: Phase 5 `InitializeSingleCharSymbols()` populates array with Symbol OOPs from bundle
+## Recent Changes (This Session)
 
-2. **Source File Line Endings** (`ColdStartJsonGenerator.cs`, `Program.cs`)
-   - Source positions in coldstart.json didn't match .sources file positions
-   - Root cause: CRLF vs LF line ending mismatch
-   - Fix: Normalize line endings to LF, use UTF-8 without BOM
+### Dead Code Cleanup
+Removed incomplete "dual-semaphore architecture" code that was never finished:
+
+**Smalltalk-80.st**:
+- Removed `MouseEvent` class entirely (239 → 238 classes)
+- Removed `InputSensor` methods: `waitForControllerEvent`, `waitForEvent`, `nextMouseEvent`, `peekMouseEvent`, `hasMouseEvent`
+- Removed `InputState` methods: `primControllerSemaphore:`, `primInputDrainComplete`, `controllerSemaphore`, `inputSemaphore`, `mouseEventQueue`
+- Reverted `InputSensor>>buttons` to original: `^self primMouseButtons`
+- Reverted `InputSensor>>primMouseButtons` to original: `^CurrentInputState mouseButtons`
+
+**C# Primitives**:
+- Removed primitives 160, 199, 200, 201 (all dead code)
+- Kept primitive 202 (bitState) - the only useful change
+
+### Atomic Mouse State Architecture
+Primitive 202 (`bitState`) provides atomic button state polling using packed `long`:
+
+```csharp
+// WinFormsDisplayProvider.cs
+private long _mouseState;  // Packed: X | (Y << 16) | (buttons << 32)
+
+// UI thread writes atomically
+Interlocked.Exchange(ref _mouseState, PackMouseState(x, y, buttons));
+
+// Smalltalk thread reads atomically (primitive 202)
+public int GetButtonState()
+{
+    long state = Interlocked.Read(ref _mouseState);
+    return (int)((state >> 32) & 0x7);  // red=4, yellow=2, blue=1
+}
+```
+
+Call chain: `redButtonPressed` → `buttons` → `mouseButtons` → `bitState` → primitive 202
 
 ---
 
-## Architecture Notes
+## The Critical Bug
 
-### SingleCharSymbols (Blue Book Binary Selectors)
-```
-Purpose: Fast lookup of single-character message selectors
-Location: Symbol class variable (classPool)
-Contents: Array of 128 Symbol OOPs indexed by ASCII value
-Blue Book canonical set: + - * / < > = ~ & | @ , \ ? ! %
+**Error**: `Instance variable index 15 out of range [0, -1] for object oop=2 (UndefinedObject)`
 
-Flow:
-1. Compiler adds 16 binary selectors to symbol table
-2. Phase 1 creates Symbol objects in heap
-3. Phase 5 populates SingleCharSymbols array from bundle
-4. Symbol>>internCharacter: uses array for fast lookup
-```
+**Symptom**: Interpreter crashes when mouse moves over window. InputProcess is working correctly (receiving events, signaling semaphores), but something in the controller loop causes method lookup to fail.
 
-### Source Code Retrieval Flow
-```
-Browser → Behavior>>sourceCodeForMethod:at:
-       → CompiledMethod>>getSource
-       → RemoteString>>string
-       → WindowsFileReference>>position: + nextChunk
-       → Source text from .sources file
-```
+**Investigation Status**: Debug logging added. See `docs/DEBUGGING-METHOD-LOOKUP-BUG.md`.
 
-**Key Components**:
-- `.sources` file: Chunk-formatted source (! delimiters, !! escaping)
-- Source positions: Last 3 bytes of CompiledMethod bytecodes
-- `SourceFiles` global: Array of 2 WindowsFileReference objects
-- UTF-8 BOM: Automatically compensated in file primitives
-
-### Block Argument Handling (Blue Book Model)
-```
-1. value: primitive pushes args onto BlockContext stack
-2. Block's first bytecodes are POP_STORE_TEMP
-3. These pop args from stack into temp slots in home MethodContext
-4. initialSP = 0 for BlockContexts (no reserved slots)
-```
-
----
-
-## Known Issues
-
-### 🟡 Control Structure Optimization Disabled
-`BytecodeCompiler.cs` has `TryInlineConditional()` disabled. Blue Book says `ifTrue:`/`ifFalse:` should compile to conditional jumps (no BlockContext). Current workaround: `BlockContext>>removeSelf` delegates to home MethodContext.
-
-### 🟡 --execute Feature
-Parser error on number literals. Scanner produces `tokenType: #xDigit` instead of `#number`.
+**Next Steps**:
+1. Capture method OOP at crash point
+2. Trace message send to identify why lookup returns wrong method
+3. The error suggests a method is being executed with nil receiver when it expects an object with 16+ instance variables
 
 ---
 
 ## Key Files
 
 ### Modified This Session
-- `ColdStartJsonGenerator.cs` - Blue Book binary selectors + line ending normalization
-- `SystemDictionaryInstaller.cs` - `InitializeSingleCharSymbols()` populates array from bundle
-- `BytecodeInterpreter.cs` - Removed NLR debug output
-- `VirtualMachine.cs` - Removed NLR debug output
-- `Smalltalk-80.st` - Reverted Symbol>>initialize to original Blue Book form
+- `Smalltalk-80.st` - Removed dead code, reverted to original InputSensor implementations
+- `InputPrimitives.cs` - Removed primitives 160, 199, 200, 201; kept 202
+- `PrimitiveRegistry.cs` - Removed registrations for dead primitives
 
-### Source Lookup
-- `SystemDictionaryInstaller.cs` - Creates SourceFiles array + SingleCharSymbols
-- `ObjectPrimitives.cs` - `AllocateCompiledMethodInternal` encodes source positions
-- `docs/SOURCE-LOOKUP-ANALYSIS.md` - Complete documentation of source retrieval
+### Input System
+- `WinFormsDisplayProvider.cs` - Atomic mouse state, ring buffer
+- `InputWordRingBuffer.cs` - Thread-safe ring buffer for Blue Book input words
+- `InputPrimitives.cs` - Primitives 90-95, 202
 
-### Block Handling
-- `ControlPrimitives.cs` - Primitive 81 (value*) pushes args to BlockContext stack
-- `BytecodeCompiler.cs` - Emits POP_STORE_TEMP at block start for args
+### Process Scheduling
+- `VirtualMachine.ProcessScheduling.cs` - Process scheduling (~330 lines)
+- `VirtualMachine.cs` - InterpreterLoop with WaitHandle.WaitAny
 
 ---
 
 ## Test Commands
 
 ```bash
-# Standard run
+# Standard run (crashes on mouse movement)
 cd Smalltalk80.Interpreter
 dotnet run
 
@@ -120,7 +107,6 @@ dotnet test
 # Regenerate coldstart after source changes
 cd "Smalltalk-80 Source"
 dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
-cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/* ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
 ```
 
 ---

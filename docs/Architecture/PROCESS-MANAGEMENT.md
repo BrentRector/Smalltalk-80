@@ -1,11 +1,169 @@
 # Process Management Architecture
 
-**Last Updated**: 2025-12-03
+**Last Updated**: 2025-12-08
 **Status**: ✅ COMPLETE - Process scheduling fully operational
 
 ## Overview
 
 This document describes how process management operates in the Smalltalk-80 interpreter, including process scheduling, idle detection, timer-based wakeups, and efficient CPU usage during quiescence.
+
+## Two-Thread Architecture
+
+### The Threading Challenge
+
+Our interpreter runs on a fundamentally different architecture than the original Smalltalk-80 system:
+
+| Aspect | Original Blue Book | Our Implementation |
+|--------|-------------------|-------------------|
+| Execution model | Microcode was the VM | .NET runtime + managed code |
+| Input handling | Hardware interrupt → microcode | WinForms UI thread → C# events |
+| Concurrency | Single execution engine | Two threads (UI + Smalltalk) |
+
+**The Challenge**: The UI thread receives mouse/keyboard events and must "signal" the InputSemaphore to wake InputProcess. But the UI thread **cannot touch the Smalltalk heap** because:
+1. The Smalltalk thread is simultaneously executing bytecodes and modifying the heap
+2. Concurrent heap access would cause data corruption
+3. Semaphore signaling requires modifying `excessSignals` field and wait lists
+
+### Blue Book Insight: Interrupt Handlers Only Increment excessSignals
+
+In the original Blue Book, hardware interrupt handlers were carefully designed to be safe:
+
+1. **Interrupt handler**: ONLY increments the `excessSignals` field (single word write)
+2. **Wait list manipulation**: ONLY happens in primitives 85/86 (signal/wait) - never in interrupts
+3. **Why safe**: Single-word increment is atomic; wait lists are only modified by Smalltalk thread
+
+This design elegantly avoids race conditions because:
+- **Different fields**: Interrupts touch `excessSignals`, primitives touch `firstLink`/`lastLink`
+- **No overlap**: The operations don't interfere with each other
+
+### Shadow Counter Solution
+
+We replicate the Blue Book's safety model using a **shadow counter** architecture:
+
+```
+UI Thread (Producer)                    Smalltalk Thread (Consumer)
+───────────────────                    ─────────────────────────────
+
+Mouse/Key event
+    │
+    ▼
+InputWordRingBuffer.Enqueue()
+    │
+    ├──▶ Write word to ring buffer
+    │
+    └──▶ Interlocked.Increment         ◀── Shadow counter mirrors excessSignals
+         (shadowSignalCount)
+    │
+    ▼
+Set _inputEventPending = 1    ─────────▶ CheckAndSignalInputEvents()
+                                            │
+                                            ▼
+                                       SignalSemaphore(InputSemaphore)
+                                            │
+                                            ▼
+                                       Wake InputProcess (add to ready queue)
+                                            │
+                                            ▼
+                                       InputProcess calls primitive 86 (wait)
+                                            │
+                                            ▼
+                                       TryConsumeInputShadowSignal()
+                                            │
+                                            ├──▶ If shadowCount > 0: decrement and return immediately
+                                            │
+                                            └──▶ If shadowCount == 0: check normal excessSignals
+                                                 │
+                                                 ▼
+                                       Primitive 95 (inputWord)
+                                            │
+                                            ▼
+                                       TryDequeue() from ring buffer
+```
+
+**Key Properties**:
+- UI thread NEVER touches Smalltalk heap (only ring buffer and atomic counter)
+- Smalltalk thread safely manipulates semaphore wait lists via primitives
+- Shadow counter mirrors what `excessSignals` would be in original Blue Book
+- Ring buffer holds Blue Book format input words (type << 12 | param)
+
+### Components
+
+#### InputWordRingBuffer (`Platform/InputWordRingBuffer.cs`)
+
+Thread-safe ring buffer for Blue Book format input words:
+
+```csharp
+public class InputWordRingBuffer
+{
+    // Ring buffer - fixed size, power of 2
+    private readonly int[] _buffer;
+    private volatile int _head, _tail;
+
+    // Shadow counter - mirrors excessSignals behavior
+    private volatile int _shadowSignalCount;
+
+    // Called by UI thread
+    public bool Enqueue(int word)
+    {
+        _buffer[_head] = word;
+        _head = (_head + 1) & _mask;
+        Interlocked.Increment(ref _shadowSignalCount);
+        return true;
+    }
+
+    // Called by Smalltalk thread (primitive 95)
+    public bool TryDequeue(out int word) { ... }
+
+    // Called by Smalltalk thread (primitive 86)
+    public bool TryConsumeSignal() { ... }
+}
+```
+
+**Blue Book Input Word Format**:
+- Bits 0-11: Parameter value (12 bits)
+- Bits 12-15: Event type (4 bits)
+  - Type 1: Mouse X (param = X coordinate)
+  - Type 2: Mouse Y (param = Y coordinate)
+  - Type 3: Key down (param = key code)
+  - Type 4: Key up (param = key code)
+- Mouse buttons encoded as key events:
+  - Blue/Right = 128, Yellow/Middle = 129, Red/Left = 130
+
+#### Modified Primitive 86 (Wait)
+
+Special handling for InputSemaphore to check shadow counter:
+
+```csharp
+// In ControlPrimitives.cs Wait.Execute()
+if (context.Receiver == inputSemaphore)
+{
+    // Check shadow counter first (thread-safe, no heap access)
+    if (context.Platform.TryConsumeInputShadowSignal())
+    {
+        return PrimitiveResult.Ok(context.Receiver);  // No actual wait
+    }
+}
+// Fall through to normal excessSignals check...
+```
+
+#### InterpreterLoop Integration
+
+The main bytecode loop checks for pending input events:
+
+```csharp
+// In VirtualMachine.InterpreterLoop()
+while (true)
+{
+    // "Virtual interrupt" - check for pending input from UI thread
+    CheckAndSignalInputEvents();
+
+    // Execute next bytecode
+    InterpreterStatus status = ExecuteBytecodeStep();
+    // ...
+}
+```
+
+`CheckAndSignalInputEvents()` atomically checks and clears `_inputEventPending`, then signals the InputSemaphore if needed. This wakes InputProcess which then consumes shadow signals via primitive 86.
 
 ## High-Level Components
 
@@ -395,10 +553,15 @@ SmalltalkEventQueue (C#)
 
 ## Related Files
 
+### Architecture Documentation
 - `MOUSE-EVENT-QUEUE.md` - **Current design**: Queue-based mouse event handling
 - `CPU-USAGE-ANALYSIS.md` - Historical: Original handshake-based approach (superseded)
 - `PROPOSED-TIMER-OPTIMIZATION.md` - Timer and WaitAny implementation details
+
+### Core VM Files
 - `VirtualMachine.cs` - InterpreterLoop, idle detection, main bytecode execution
+  - `InterpreterLoop()` - Main bytecode execution with `CheckAndSignalInputEvents()` call
+  - `CheckAndSignalInputEvents()` - "Virtual interrupt" to signal InputSemaphore
 - `VirtualMachine.ProcessScheduling.cs` - Process scheduling methods:
   - `CheckAndSignalExpiredTimer` - Timer expiration handling
   - `AddProcessToReadyQueue` - Add process to priority queue
@@ -406,14 +569,56 @@ SmalltalkEventQueue (C#)
   - `SwitchToNextRunnableProcess` - Context switching on termination
   - `FindHighestPriorityRunnableProcess` - Priority-based process selection
   - `RemoveProcessFromList` - LinkedList manipulation
+  - `SignalSemaphore` - Signal with InputSemaphore tracing
+  - `WaitOnSemaphore` - Wait with InputSemaphore tracing
   - `DumpProcessQueues` - Diagnostic output
+
+### Primitives
 - `ControlPrimitives.cs` - Primitives 85-88 (Signal, Wait, Resume, Suspend)
+  - Primitive 86 (Wait) - Special InputSemaphore handling with shadow counter check
+- `InputPrimitives.cs` - Primitives 90-95, 160, 199-201
+  - Primitive 93 - Register InputSemaphore
+  - Primitive 95 - Get input word from ring buffer
 - `TimePrimitives.cs` - Primitive 100 (signal:atMilliseconds:)
+
+### Platform/Threading
+- `Platform/InputWordRingBuffer.cs` - **NEW**: Thread-safe ring buffer with shadow counter
+  - Blue Book format input words (type << 12 | param)
+  - Atomic shadow counter for cross-thread signaling
+  - `Enqueue()` - UI thread writes, increments shadow counter
+  - `TryDequeue()` - Smalltalk thread reads (primitive 95)
+  - `TryConsumeSignal()` - Smalltalk thread consumes shadow signal (primitive 86)
+- `Platform/Windows/WinFormsDisplayProvider.cs` - UI thread event handlers
+  - Mouse/keyboard events enqueue to ring buffer
+  - Button transition detection for key up/down words
+- `Platform/SmalltalkEventQueue.cs` - Event queue with ManualResetEventSlim
 - `Scheduling/TimerManager.cs` - Interrupt-driven timer with System.Threading.Timer
-- `Platform/SmalltalkEventQueue.cs` - Event queue with ManualResetEventSlim and double-check reset
+- `IPlatformBridge.cs` - Interface for platform operations
+  - `TryConsumeInputShadowSignal()` - Check/consume shadow signal
+  - `HasInputWords` - Check for pending input words
+  - `GetInputWord()` - Dequeue from ring buffer
+
+### Constants
 - `VMConstants.cs` - Process, Semaphore, LinkedList field indices
 
-## Recent Changes (2025-12-03)
+## Recent Changes
+
+### 2025-12-08: Thread-Safe Input Architecture
+
+- **Shadow Counter + Ring Buffer**: Thread-safe input handling between UI and Smalltalk threads
+  - Added `InputWordRingBuffer` class with atomic shadow counter
+  - UI thread writes to ring buffer without touching Smalltalk heap
+  - Modified primitive 86 (wait) to check shadow counter for InputSemaphore
+  - Modified primitive 95 (inputWord) to dequeue from ring buffer
+  - Added `CheckAndSignalInputEvents()` call to interpreter loop
+  - See "Two-Thread Architecture" section above for complete design
+
+- **New Files**:
+  - `Platform/InputWordRingBuffer.cs` - Thread-safe ring buffer with shadow counter
+  - `IPlatformBridge.TryConsumeInputShadowSignal()` - Interface for shadow signal consumption
+  - `IPlatformBridge.HasInputWords` - Check for available input words
+
+### 2025-12-03: Mouse Event Queue Architecture
 
 - **Mouse Event Queue Architecture**: Fixes 0% idle CPU AND missed mouse transitions
   - **InputSemaphore**: VM signals on raw input; InputProcess (priority 6) waits

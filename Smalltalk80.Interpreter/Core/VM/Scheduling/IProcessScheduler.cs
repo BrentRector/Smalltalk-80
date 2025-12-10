@@ -11,7 +11,7 @@ namespace Smalltalk80.Interpreter.Core.VM.Scheduling;
 /// - Process activation/suspension with context switching
 /// - Ready queue management (add/remove processes)
 /// - Priority-based process selection
-/// - Semaphore signaling with preemption
+/// - Cooperative semaphore signaling (no preemption)
 /// </summary>
 public interface IProcessScheduler
 {
@@ -75,13 +75,14 @@ public interface IProcessScheduler
     bool ShouldPreempt(SmalltalkOOP processOOP);
 
     /// <summary>
-    /// Signals a semaphore with preemption handling.
-    /// If processes are waiting, wakes first waiter. If woken process has higher priority, preempts.
+    /// Signals a semaphore.
+    /// If processes are waiting, wakes first waiter and adds it to ready queue.
     /// If no waiters, increments excessSignals.
+    /// Cooperative scheduling: current process continues; woken process runs when current yields.
     /// </summary>
     /// <param name="semaphoreOOP">The semaphore to signal</param>
-    /// <returns>True if preemption occurred (active context changed), false otherwise</returns>
-    bool SignalSemaphoreWithPreemption(SmalltalkOOP semaphoreOOP);
+    /// <returns>False (no preemption in cooperative scheduling)</returns>
+    bool SignalSemaphore(SmalltalkOOP semaphoreOOP);
 
     /// <summary>
     /// Adds a process to a semaphore's wait list and switches to next runnable process.

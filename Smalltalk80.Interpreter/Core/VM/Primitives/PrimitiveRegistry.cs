@@ -254,10 +254,6 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(149, new FontPrimitives.FontAscent());
         registry.Register(150, new FontPrimitives.FontDescent());
 
-        // Event Architecture primitives (200-201) - Phase 1
-        registry.Register(200, new InputOperations.InputDrainComplete());
-        registry.Register(201, new InputOperations.RegisterInputProcess());
-
         // System primitives (112-139)
         registry.Register(112, new SystemOperations.CoreLeft());
         registry.Register(113, new SystemOperations.Quit());
@@ -301,13 +297,9 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(154, new FileOperations.GetFileAttributes());
         registry.Register(155, new FileOperations.FileExists());
 
-        // Controller semaphore (160) - dual-semaphore architecture for input handling
-        // Signaled on button transitions to wake controllers with correct state
-        registry.Register(160, new InputOperations.ControllerSemaphore());
-
-        // Extended input primitives (199)
-        // Primitive 199: mouseButtons - Poll current mouse button state (polling model)
-        registry.Register(199, new InputOperations.MouseButtons());
+        // Primitive 202: bitState - Get button state from simulated hardware register
+        // Enables atomic polling of mouse button state for tight loops (PopUpMenu, etc.)
+        registry.Register(202, new InputOperations.BitState());
 
         return registry;
     }
