@@ -347,10 +347,25 @@ public static class SimpleObjectPrimitives
 
             byte byteValue = context.HeapManager.GetIndexedByte(context.Receiver, index - 1);
 
+            // DIAGNOSTIC: Log when reading period (46) or dash (45) from string
+            if (byteValue == 45 || byteValue == 46)
+            {
+                Console.WriteLine($"[Prim63 StringAt] Reading byte={byteValue} ('{(char)byteValue}') at index={index}");
+            }
+
             // Get Character from CharacterTable (Character class pool variable)
             var characterOOP = GetCharacterForAscii(context, byteValue);
             if (characterOOP == context.HeapManager.GetNil())
                 return PrimitiveResult.Fail(context.Metadata!);
+
+            // DIAGNOSTIC: Verify the Character object's actual value
+            if (byteValue == 45 || byteValue == 46)
+            {
+                // Get the Character's value instance variable to verify correctness
+                var charValue = context.HeapManager.GetInstanceVariable(characterOOP, 0);
+                int actualValue = charValue.IsSmallInteger ? charValue.AsSmallInteger() : -1;
+                Console.WriteLine($"[Prim63 StringAt] Returning Character OOP={characterOOP}, value ivar={actualValue}");
+            }
 
             return PrimitiveResult.Ok(characterOOP);
         }
@@ -409,6 +424,12 @@ public static class SimpleObjectPrimitives
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
             if (index > size) return PrimitiveResult.Fail(context.Metadata!);
+
+            // DIAGNOSTIC: Log when storing period (46) or dash (45) into string
+            if (charValue == 45 || charValue == 46)
+            {
+                Console.WriteLine($"[Prim64 StringAtPut] Storing byte={charValue} ('{(char)charValue}') at index={index}");
+            }
 
             context.HeapManager.SetIndexedByte(context.Receiver, index - 1, (byte)charValue);
             return PrimitiveResult.Ok(characterOOP);
