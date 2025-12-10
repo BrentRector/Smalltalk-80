@@ -2506,8 +2506,10 @@ namespace Smalltalk80.Compiler
             else if (literal.stringConst() != null)
             {
                 var text = literal.stringConst().GetText();
-                // Remove surrounding quotes and unescape doubled quotes ('' -> ')
-                var str = text.Substring(1, text.Length - 2).Replace("''", "'");
+                // Remove surrounding quotes and unescape:
+                // - '' -> ' (quote escaping)
+                // - !! -> ! (file-out format chunk separator escaping)
+                var str = text.Substring(1, text.Length - 2).Replace("''", "'").Replace("!!", "!");
                 emitter.PushLiteralConstant(str);
             }
             else if (literal.symbolConst() != null)
@@ -2584,8 +2586,8 @@ namespace Smalltalk80.Compiler
                 else if (lit.stringConst() != null)
                 {
                     var str = lit.stringConst().GetText();
-                    // Remove quotes
-                    return str.Substring(1, str.Length - 2).Replace("''", "'");
+                    // Remove quotes and unescape ('' -> ', !! -> !)
+                    return str.Substring(1, str.Length - 2).Replace("''", "'").Replace("!!", "!");
                 }
                 else if (lit.symbolConst() != null)
                 {
