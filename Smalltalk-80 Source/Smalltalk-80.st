@@ -11833,9 +11833,11 @@ frameSize
 		ifTrue: [^ LargeFrame]
 		ifFalse: [^ SmallFrame]!
 initialPC
-	"Answer the program counter for the receiver's first bytecode."
+	"Answer the program counter for the receiver's first bytecode.
+	 Our C# implementation separates bytecodes into a hidden ByteArray,
+	 so at:1 accesses the first bytecode (unlike Blue Book's heterogeneous layout)."
 
-	^self numLiterals * BytesPerLiteral + BytesForHeader + 1!
+	^1!
 numArgs
 	"Answer the number of arguments the receiver takes."
 

@@ -193,13 +193,6 @@ public static class SimpleObjectPrimitives
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
             var expectedCM = context.Metadata!.CompiledMethodClassOOP;
 
-            // DIAGNOSTIC: Log class comparison for CompiledMethod
-            var className = context.HeapManager.GetClassName(context.Receiver);
-            if (className == "CompiledMethod" && classOOP != expectedCM)
-            {
-                Console.WriteLine($"[Prim61 at:put: WARNING] Class name is CompiledMethod but OOP mismatch! actual={classOOP}, expected={expectedCM}");
-            }
-
             if (classOOP == expectedCM)
             {
                 // CompiledMethod stores bytecodes in a hidden ByteArray at the last indexed slot
@@ -208,10 +201,7 @@ public static class SimpleObjectPrimitives
                 int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
 
                 if (index < 1 || index > bytecodeCount)
-                {
-                    Console.WriteLine($"[Prim61 at:put:] CompiledMethod bounds fail: receiver={context.Receiver}, index={index}, bytecodeArrayOOP={bytecodeArrayOOP}, bytecodeCount={bytecodeCount}, cmIndexedSize={cmIndexedSize}");
                     return PrimitiveResult.Fail(context.Metadata!);
-                }
 
                 if (!value.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
                 int byteValue = value.AsSmallInteger();
@@ -619,36 +609,15 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2)
-            {
-                Console.WriteLine($"[Prim69 objectAt:put:] FAIL: wrong argument count {context.Arguments.Length}");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
-            if (context.Receiver.IsSmallInteger)
-            {
-                Console.WriteLine($"[Prim69 objectAt:put:] FAIL: receiver is SmallInteger");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
-            if (!context.Arguments[0].IsSmallInteger)
-            {
-                Console.WriteLine($"[Prim69 objectAt:put:] FAIL: index not SmallInteger: {context.Arguments[0]}");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
-            if (index < 1)
-            {
-                Console.WriteLine($"[Prim69 objectAt:put:] FAIL: index < 1: {index}");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+            if (index < 1) return PrimitiveResult.Fail(context.Metadata!);
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-            if (index > size)
-            {
-                var className = context.HeapManager.GetClassName(context.Receiver) ?? $"oop={context.Receiver}";
-                Console.WriteLine($"[Prim69 objectAt:put:] FAIL: index {index} > size {size}, receiver class={className}");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+            if (index > size) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP value = context.Arguments[1];
             context.HeapManager.SetIndexedOOP(context.Receiver, index - 1, value);
@@ -758,13 +727,6 @@ public static class SimpleObjectPrimitives
             // Use CompiledMethodClassOOP from metadata (same OOP that primitives 60/61/62 check against)
             var compiledMethodClassOOP = context.Metadata!.CompiledMethodClassOOP;
 
-            // DIAGNOSTIC: Compare with runtime lookup to verify they're the same
-            var runtimeLookupOOP = context.RuntimeHeapAccess?.GetClass("CompiledMethod");
-            if (runtimeLookupOOP != null && runtimeLookupOOP.Value != compiledMethodClassOOP)
-            {
-                Console.WriteLine($"[Prim79 WARNING] CompiledMethod class OOP mismatch! Metadata={compiledMethodClassOOP}, RuntimeLookup={runtimeLookupOOP.Value}");
-            }
-
             // ByteArray class still needs to be looked up (not in metadata)
             var byteArrayClassOOP = context.RuntimeHeapAccess?.GetClass("ByteArray");
             if (byteArrayClassOOP == null)
@@ -773,9 +735,6 @@ public static class SimpleObjectPrimitives
             // Extract number of literals from header word (bits 0-5, 6 bits, max 63)
             // Blue Book header format: flagBits*4096 + numberTemps*128 + largeFrameBit*64 + numberLiterals
             int numLiterals = headerWord & 0x3F;
-
-            // DIAGNOSTIC: Log primitive 79 invocation details
-            Console.WriteLine($"[Prim79] newMethod:{numberOfBytes} header:{headerWord} -> numLiterals={numLiterals}, classOOP={compiledMethodClassOOP}");
 
             // Create empty literal slots initialized to nil
             // MethodNode>>generate: will fill these via literalAt:put: -> objectAt:put:
@@ -798,12 +757,6 @@ public static class SimpleObjectPrimitives
                 headerWord,
                 literalOOPs,
                 bytecodes);
-
-            // DIAGNOSTIC: Verify the created method structure
-            int createdIndexedSize = context.HeapManager.GetIndexedSize(methodOOP);
-            var createdBytecodeArrayOOP = context.HeapManager.GetIndexedOOP(methodOOP, createdIndexedSize - 1);
-            int createdBytecodeCount = context.HeapManager.GetIndexedSize(createdBytecodeArrayOOP);
-            Console.WriteLine($"[Prim79] Created method oop={methodOOP}: indexedSize={createdIndexedSize}, bytecodeArrayOOP={createdBytecodeArrayOOP}, bytecodeCount={createdBytecodeCount}");
 
             return PrimitiveResult.Ok(methodOOP);
         }
