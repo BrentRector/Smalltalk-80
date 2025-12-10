@@ -371,10 +371,12 @@ public partial class VirtualMachine : IProcessScheduler
         if (schedulerOOP == _metadata.KnownObjects.Nil)
             return false;
 
-        // Check for pending input events and signal InputSemaphore if needed.
-        // This is done here (from Smalltalk thread) to avoid cross-thread heap corruption.
-        // The UI thread sets an atomic flag; we check it here and signal safely.
-        CheckAndSignalInputEvents();
+        // NOTE: Do NOT call CheckAndSignalInputEvents() here!
+        // When this method is called from Wait primitive, the waiting process has already
+        // been added to a semaphore wait list but activeProcess hasn't been updated yet.
+        // If CheckAndSignalInputEvents triggers preemption via SignalSemaphore, it would
+        // call SuspendActiveProcess on a process that's already blocked, corrupting the
+        // linked list state. CheckAndSignalInputEvents is called from InterpreterLoop instead.
 
         // Find highest priority runnable process
         SmalltalkOOP nextProcess = FindHighestPriorityRunnableProcess();
