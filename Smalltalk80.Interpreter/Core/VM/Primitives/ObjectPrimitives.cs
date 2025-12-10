@@ -209,7 +209,7 @@ public static class SimpleObjectPrimitives
 
                 if (index < 1 || index > bytecodeCount)
                 {
-                    Console.WriteLine($"[Prim61 at:put:] CompiledMethod bounds fail: index={index}, bytecodeCount={bytecodeCount}, cmIndexedSize={cmIndexedSize}");
+                    Console.WriteLine($"[Prim61 at:put:] CompiledMethod bounds fail: receiver={context.Receiver}, index={index}, bytecodeArrayOOP={bytecodeArrayOOP}, bytecodeCount={bytecodeCount}, cmIndexedSize={cmIndexedSize}");
                     return PrimitiveResult.Fail(context.Metadata!);
                 }
 
