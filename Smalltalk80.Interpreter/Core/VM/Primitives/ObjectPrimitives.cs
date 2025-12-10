@@ -191,7 +191,16 @@ public static class SimpleObjectPrimitives
 
             // Special handling for CompiledMethod: at:put: sets bytecodes only
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
-            if (classOOP == context.Metadata!.CompiledMethodClassOOP)
+            var expectedCM = context.Metadata!.CompiledMethodClassOOP;
+
+            // DIAGNOSTIC: Log class comparison for CompiledMethod
+            var className = context.HeapManager.GetClassName(context.Receiver);
+            if (className == "CompiledMethod" && classOOP != expectedCM)
+            {
+                Console.WriteLine($"[Prim61 at:put: WARNING] Class name is CompiledMethod but OOP mismatch! actual={classOOP}, expected={expectedCM}");
+            }
+
+            if (classOOP == expectedCM)
             {
                 // CompiledMethod stores bytecodes in a hidden ByteArray at the last indexed slot
                 int cmIndexedSize = context.HeapManager.GetIndexedSize(context.Receiver);
@@ -199,7 +208,10 @@ public static class SimpleObjectPrimitives
                 int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
 
                 if (index < 1 || index > bytecodeCount)
+                {
+                    Console.WriteLine($"[Prim61 at:put:] CompiledMethod bounds fail: index={index}, bytecodeCount={bytecodeCount}, cmIndexedSize={cmIndexedSize}");
                     return PrimitiveResult.Fail(context.Metadata!);
+                }
 
                 if (!value.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
                 int byteValue = value.AsSmallInteger();
@@ -746,6 +758,13 @@ public static class SimpleObjectPrimitives
             // Use CompiledMethodClassOOP from metadata (same OOP that primitives 60/61/62 check against)
             var compiledMethodClassOOP = context.Metadata!.CompiledMethodClassOOP;
 
+            // DIAGNOSTIC: Compare with runtime lookup to verify they're the same
+            var runtimeLookupOOP = context.RuntimeHeapAccess?.GetClass("CompiledMethod");
+            if (runtimeLookupOOP != null && runtimeLookupOOP.Value != compiledMethodClassOOP)
+            {
+                Console.WriteLine($"[Prim79 WARNING] CompiledMethod class OOP mismatch! Metadata={compiledMethodClassOOP}, RuntimeLookup={runtimeLookupOOP.Value}");
+            }
+
             // ByteArray class still needs to be looked up (not in metadata)
             var byteArrayClassOOP = context.RuntimeHeapAccess?.GetClass("ByteArray");
             if (byteArrayClassOOP == null)
@@ -754,6 +773,9 @@ public static class SimpleObjectPrimitives
             // Extract number of literals from header word (bits 0-5, 6 bits, max 63)
             // Blue Book header format: flagBits*4096 + numberTemps*128 + largeFrameBit*64 + numberLiterals
             int numLiterals = headerWord & 0x3F;
+
+            // DIAGNOSTIC: Log primitive 79 invocation details
+            Console.WriteLine($"[Prim79] newMethod:{numberOfBytes} header:{headerWord} -> numLiterals={numLiterals}, classOOP={compiledMethodClassOOP}");
 
             // Create empty literal slots initialized to nil
             // MethodNode>>generate: will fill these via literalAt:put: -> objectAt:put:
