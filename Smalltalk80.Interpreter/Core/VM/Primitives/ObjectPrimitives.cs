@@ -633,9 +633,8 @@ public static class SimpleObjectPrimitives
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
             if (index > size)
             {
-                var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
-                var className = context.RuntimeHeapAccess?.GetClassName(classOOP) ?? $"oop={classOOP}";
-                Console.WriteLine($"[Prim69 objectAt:put:] FAIL: index {index} > size {size}, receiver class={className}, oop={context.Receiver}");
+                var className = context.HeapManager.GetClassName(context.Receiver) ?? $"oop={context.Receiver}";
+                Console.WriteLine($"[Prim69 objectAt:put:] FAIL: index {index} > size {size}, receiver class={className}");
                 return PrimitiveResult.Fail(context.Metadata!);
             }
 
