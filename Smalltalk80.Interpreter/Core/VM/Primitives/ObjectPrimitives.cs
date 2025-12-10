@@ -799,6 +799,12 @@ public static class SimpleObjectPrimitives
                 literalOOPs,
                 bytecodes);
 
+            // DIAGNOSTIC: Verify the created method structure
+            int createdIndexedSize = context.HeapManager.GetIndexedSize(methodOOP);
+            var createdBytecodeArrayOOP = context.HeapManager.GetIndexedOOP(methodOOP, createdIndexedSize - 1);
+            int createdBytecodeCount = context.HeapManager.GetIndexedSize(createdBytecodeArrayOOP);
+            Console.WriteLine($"[Prim79] Created method oop={methodOOP}: indexedSize={createdIndexedSize}, bytecodeArrayOOP={createdBytecodeArrayOOP}, bytecodeCount={createdBytecodeCount}");
+
             return PrimitiveResult.Ok(methodOOP);
         }
     }
