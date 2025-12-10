@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
@@ -75,6 +76,11 @@ public class SystemDictionaryInstaller(
                 InstallClassGlobal(className, classOOP);
             }
         }
+
+        // Install ALL global Associations into SystemDictionary
+        // This ensures that globals like Transcript are installed so that
+        // Smalltalk at:put: finds the existing Association instead of creating a new one
+        InstallAllGlobalAssociations();
 
         // Install SourceFiles as nil to enable decompiler fallback
         // In traditional Smalltalk-80, SourceFiles is an Array of FileStreams for .sources and .changes
@@ -770,6 +776,60 @@ public class SystemDictionaryInstaller(
         var associationOOP = associationManager.GetOrCreateCanonical("SystemOrganization");
         context.Allocator.SetInstanceVariable(associationOOP, 1, systemOrganizerOOP);
         InstallInSystemDictionary(associationOOP, "SystemOrganization");
+    }
+
+    /// <summary>
+    /// Installs ALL global Associations from the bundle into SystemDictionary.
+    /// This ensures that when init expressions run (like TextCollector initialize doing
+    /// "Smalltalk at: #Transcript put: aTextCollector"), the existing Association is found
+    /// instead of creating a new one. Without this, methods that reference global variables
+    /// have a different Association than what's in SystemDictionary.
+    /// </summary>
+    private void InstallAllGlobalAssociations()
+    {
+        // Build set of class names - these are already installed
+        var classNames = new HashSet<string>(
+            context.Bundle.Classes
+                .Where(c => !c.IsMetaclass)
+                .Select(c => context.Bundle.Symbols[c.NameIndex]));
+
+        // Also exclude globals we've already explicitly installed
+        var alreadyInstalled = new HashSet<string>
+        {
+            "Smalltalk", "Processor", "SystemOrganization", "SourceFiles"
+        };
+
+        int installed = 0;
+        foreach (var assoc in context.Bundle.Associations)
+        {
+            // Only process global category Associations
+            if (assoc.Category != "global")
+                continue;
+
+            string keyName = context.Bundle.Symbols[assoc.KeyIndex];
+
+            // Skip class names (already installed with their class value)
+            if (classNames.Contains(keyName))
+                continue;
+
+            // Skip already-installed globals
+            if (alreadyInstalled.Contains(keyName))
+                continue;
+
+            // Get the canonical Association from registry (created in Phase 3)
+            if (!AssociationRegistry.TryGet(keyName, out var associationOOP, poolDictionaryName: null))
+            {
+                // This shouldn't happen - all associations should be pre-created
+                Console.WriteLine($"[Phase 5] WARNING: Global '{keyName}' not found in AssociationRegistry");
+                continue;
+            }
+
+            // Install the Association in SystemDictionary (value stays nil until init expression runs)
+            InstallInSystemDictionary(associationOOP, keyName);
+            installed++;
+        }
+
+        Console.WriteLine($"[Phase 5] Installed {installed} non-class global Associations (e.g., Transcript, Sensor)");
     }
 
     private void InstallClassGlobal(string className, SmalltalkOOP classOOP)
