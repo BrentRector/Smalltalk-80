@@ -472,12 +472,6 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     {
         char c = e.KeyChar;
 
-        // DIAGNOSTIC: Log character input for debugging period/dash issue
-        if (c == '.' || c == '-' || c == 46 || c == 45)
-        {
-            Console.WriteLine($"[OnKeyPress] Received char='{c}' ASCII={(int)c}");
-        }
-
         // Only handle ASCII 0-127
         if (c > 127) return;
 

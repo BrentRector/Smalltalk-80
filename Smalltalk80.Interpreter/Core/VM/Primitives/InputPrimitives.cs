@@ -153,15 +153,6 @@ public static class InputOperations
 
             // Get packed input word from platform (Blue Book format: type<<12 | param)
             int word = context.Platform?.GetInputWord() ?? 0;
-
-            // Debug logging - trace keyboard events only
-            int type = (word >> 12) & 0xF;
-            int param = word & 0xFFF;
-            if (type == 3 || type == 4) // KeyDown or KeyUp
-            {
-                Console.WriteLine($"[Prim95] GetInputWord: type={type} param={param} char='{(char)param}' word=0x{word:X4}");
-            }
-
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(word));
         }
     }

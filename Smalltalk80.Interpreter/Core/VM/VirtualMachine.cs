@@ -266,28 +266,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             var inputSemaphoreOOP = _platformBridge?.GetInputSemaphore() ?? default;
             if (inputSemaphoreOOP != default && inputSemaphoreOOP != _heapManager.GetNil())
             {
-                // Check InputSemaphore state BEFORE signaling
-                var firstLink = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-                var excessBefore = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
-
                 // Blue Book model: one signal per input word in the buffer.
                 // The shadow counter tracks how many words are pending.
                 // We transfer shadow signals to excessSignals here.
-                int transferred = 0;
                 while (_platformBridge!.TryConsumeInputShadowSignal())
                 {
                     SignalSemaphore(inputSemaphoreOOP);
-                    transferred++;
-                }
-
-                // Debug logging - always log when signals are transferred
-                if (transferred > 0)
-                {
-                    var firstLinkAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-                    var excessAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
-                    bool hadWaiter = (firstLink != _heapManager.GetNil());
-                    bool hasWaiter = (firstLinkAfter != _heapManager.GetNil());
-                    Console.WriteLine($"[CheckAndSignal] Transferred {transferred} signals. waiter: {hadWaiter}→{hasWaiter}, excess: {excessBefore}→{excessAfter}");
                 }
             }
             // No longer warn about unregistered InputSemaphore - it's expected during startup
