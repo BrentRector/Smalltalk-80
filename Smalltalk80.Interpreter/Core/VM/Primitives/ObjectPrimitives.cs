@@ -743,11 +743,12 @@ public static class SimpleObjectPrimitives
 
             if (numberOfBytes < 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Get class OOPs
-            var compiledMethodClassOOP = context.RuntimeHeapAccess?.GetClass("CompiledMethod");
-            var byteArrayClassOOP = context.RuntimeHeapAccess?.GetClass("ByteArray");
+            // Use CompiledMethodClassOOP from metadata (same OOP that primitives 60/61/62 check against)
+            var compiledMethodClassOOP = context.Metadata!.CompiledMethodClassOOP;
 
-            if (compiledMethodClassOOP == null || byteArrayClassOOP == null)
+            // ByteArray class still needs to be looked up (not in metadata)
+            var byteArrayClassOOP = context.RuntimeHeapAccess?.GetClass("ByteArray");
+            if (byteArrayClassOOP == null)
                 return PrimitiveResult.Fail(context.Metadata!);
 
             // Extract number of literals from header word (bits 0-5, 6 bits, max 63)
@@ -769,7 +770,7 @@ public static class SimpleObjectPrimitives
             // Use shared helper
             var methodOOP = CompiledMethodHelpers.AllocateCompiledMethodInternal(
                 context.HeapManager,
-                compiledMethodClassOOP.Value,
+                compiledMethodClassOOP,
                 byteArrayClassOOP.Value,
                 context.HeapManager.GetNil(),
                 headerWord,
