@@ -1,112 +1,106 @@
 # Resume Prompt: Smalltalk-80 Interpreter
 
-**Session Date**: 2025-12-09
-**Status**: ⚠️ BLOCKED - Method Lookup Bug
+**Session Date**: 2025-12-10
+**Status**: BLOCKED - Crash on mouse/keyboard input
 
 ## Current State
 
 ### What's Working
-- ✅ **Build**: 0 errors, 0 warnings
-- ✅ **Cold Start**: Phases 1-6 all succeed
-- ✅ **Init Expressions**: 286/286 (100%)
-- ✅ **InputProcess**: Working - processes mouse/keyboard events correctly
-- ✅ **Process Primitives 85-88**: suspend, resume, terminate, yield
-- ✅ **BlockContext Tests**: 120/120 passing (returns 1191)
-- ✅ **Primitive 202 (bitState)**: Atomic button state polling for tight loops
+- Build: 0 errors, 0 warnings
+- Cold Start: Phases 1-6 all succeed
+- Init Expressions: 286/286 (100%)
+- BlockContext Tests: 120/120 passing (returns 1191)
+- Primitive 202 (bitState): Atomic button state polling
+- Interpreter runs stably when IDLE (no mouse/keyboard input)
 
 ### What's Broken
-- ❌ **Method Lookup Bug**: Crashes on mouse movement with "Instance variable index 15 out of range [0, -1] for object oop=2 (UndefinedObject)"
-- ❌ **System Browser**: Non-functional (crashes before GUI appears due to above bug)
-
-## Recent Changes (This Session)
-
-### Dead Code Cleanup
-Removed incomplete "dual-semaphore architecture" code that was never finished:
-
-**Smalltalk-80.st**:
-- Removed `MouseEvent` class entirely (239 → 238 classes)
-- Removed `InputSensor` methods: `waitForControllerEvent`, `waitForEvent`, `nextMouseEvent`, `peekMouseEvent`, `hasMouseEvent`
-- Removed `InputState` methods: `primControllerSemaphore:`, `primInputDrainComplete`, `controllerSemaphore`, `inputSemaphore`, `mouseEventQueue`
-- Reverted `InputSensor>>buttons` to original: `^self primMouseButtons`
-- Reverted `InputSensor>>primMouseButtons` to original: `^CurrentInputState mouseButtons`
-
-**C# Primitives**:
-- Removed primitives 160, 199, 200, 201 (all dead code)
-- Kept primitive 202 (bitState) - the only useful change
-
-### Atomic Mouse State Architecture
-Primitive 202 (`bitState`) provides atomic button state polling using packed `long`:
-
-```csharp
-// WinFormsDisplayProvider.cs
-private long _mouseState;  // Packed: X | (Y << 16) | (buttons << 32)
-
-// UI thread writes atomically
-Interlocked.Exchange(ref _mouseState, PackMouseState(x, y, buttons));
-
-// Smalltalk thread reads atomically (primitive 202)
-public int GetButtonState()
-{
-    long state = Interlocked.Read(ref _mouseState);
-    return (int)((state >> 32) & 0x7);  // red=4, yellow=2, blue=1
-}
-```
-
-Call chain: `redButtonPressed` → `buttons` → `mouseButtons` → `bitState` → primitive 202
+- Crashes when mouse moves or keyboard is used
+- Error: `Instance variable index 15 out of range [0, -1] for object oop=2 (UndefinedObject)`
+- Method `Process>>terminate` executing with nil receiver
 
 ---
 
-## The Critical Bug
+## FALSE PATHS - DO NOT REPEAT THESE INVESTIGATIONS
 
-**Error**: `Instance variable index 15 out of range [0, -1] for object oop=2 (UndefinedObject)`
+### 1. Method Lookup Bug Theory - FALSE
+**Wrong hypothesis**: Method lookup returning wrong method for receiver class.
+**Why it's wrong**: The crash diagnostic shows the CORRECT method (`Process>>terminate`) is found. The problem is the receiver is nil, not that lookup failed.
 
-**Symptom**: Interpreter crashes when mouse moves over window. InputProcess is working correctly (receiving events, signaling semaphores), but something in the controller loop causes method lookup to fail.
+### 2. ProcessorScheduler Receiving terminate - FALSE
+**Wrong hypothesis**: `terminate` message being sent to ProcessorScheduler instead of Process.
+**Why it's wrong**: The diagnostic "Sender chain: [0] Method terminate (recv: ProcessorScheduler)" means ProcessorScheduler is the SENDER (the object whose method contains `activeProcess terminate`), not the receiver. The receiver is nil.
 
-**Investigation Status**: Debug logging added. See `docs/DEBUGGING-METHOD-LOOKUP-BUG.md`.
+### 3. Bytecode 0x0F Analysis - FALSE
+**Wrong hypothesis**: Analyzing what instance variable 15 means and which class has 15+ ivars.
+**Why it's wrong**: The crash happens because receiver is nil (oop=2), so ANY ivar access crashes. The specific index 15 is irrelevant - it's just wherever the method happens to access `self`.
 
-**Next Steps**:
-1. Capture method OOP at crash point
-2. Trace message send to identify why lookup returns wrong method
-3. The error suggests a method is being executed with nil receiver when it expects an object with 16+ instance variables
+### 4. Context Receiver Corruption Theory - UNPROVEN
+**Wrong approach**: Searching for `SetActiveContext` and `CONTEXT_RECEIVER` to find corruption.
+**Why it's unproductive**: Too many call sites, no clear path to the bug. Need a different approach.
+
+### 5. Nil activeProcess in ProcessorScheduler - LIKELY ROOT CAUSE BUT UNPROVEN
+**Hypothesis**: `ProcessorScheduler>>terminateActive` does `activeProcess terminate`, but `activeProcess` ivar is nil.
+**Status**: This is probably correct but we haven't proven WHY activeProcess becomes nil.
+
+---
+
+## What We Actually Know
+
+1. **Crash only happens with input** - Idle screen is stable
+2. **InputProcess IS running** - Logs show `[FindHighestPriority] Selected InputProcess=oop=68942 from P6 queue`
+3. **Signals ARE being transferred** - Logs show `[CheckAndSignal] Transferred N signals`
+4. **The crash method is Process>>terminate** with nil receiver
+5. **The sender is ProcessorScheduler>>terminateActive** which does `activeProcess terminate`
+
+---
+
+## Productive Investigation Directions
+
+1. **Why does activeProcess become nil?**
+   - When is activeProcess set?
+   - What clears it?
+   - Is there a race between process termination and new process activation?
+
+2. **Add defensive check** in `ProcessorScheduler>>terminateActive`:
+   ```smalltalk
+   terminateActive
+       activeProcess == nil ifTrue: [^self].  "Guard against nil"
+       activeProcess terminate
+   ```
+
+3. **Trace activeProcess changes** - Add logging when activeProcess ivar is written
+
+4. **Check process termination flow** - When a process terminates, what updates activeProcess?
 
 ---
 
 ## Key Files
 
-### Modified This Session
-- `Smalltalk-80.st` - Removed dead code, reverted to original InputSensor implementations
-- `InputPrimitives.cs` - Removed primitives 160, 199, 200, 201; kept 202
-- `PrimitiveRegistry.cs` - Removed registrations for dead primitives
-
 ### Input System
-- `WinFormsDisplayProvider.cs` - Atomic mouse state, ring buffer
-- `InputWordRingBuffer.cs` - Thread-safe ring buffer for Blue Book input words
+- `WinFormsDisplayProvider.cs` - Atomic mouse state, ring buffer, keyboard handling
+- `InputWordRingBuffer.cs` - Thread-safe ring buffer
 - `InputPrimitives.cs` - Primitives 90-95, 202
 
 ### Process Scheduling
 - `VirtualMachine.ProcessScheduling.cs` - Process scheduling (~330 lines)
-- `VirtualMachine.cs` - InterpreterLoop with WaitHandle.WaitAny
+- `ControlPrimitives.cs` - Primitives 85-88 (suspend, resume, terminate, yield)
+
+### Smalltalk Source
+- `Smalltalk-80.st` lines 32752-32773: `Process>>terminate`
+- `Smalltalk-80.st` lines 32976-32979: `ProcessorScheduler>>terminateActive`
 
 ---
 
 ## Test Commands
 
 ```bash
-# Standard run (crashes on mouse movement)
+# Standard run (crashes on mouse/keyboard input)
 cd Smalltalk80.Interpreter
 dotnet run
 
 # BlockContext regression test (MUST PASS)
 dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_with_runner.json
 # Expected: Returns 1191 (120 tests pass)
-
-# C# unit tests
-cd Smalltalk80.Interpreter.Tests
-dotnet test
-
-# Regenerate coldstart after source changes
-cd "Smalltalk-80 Source"
-dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
 ```
 
 ---

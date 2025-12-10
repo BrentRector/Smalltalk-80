@@ -113,18 +113,57 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     Console.WriteLine($"  MethodContext receiver: {methodCtxReceiverOOP} ({recvClassName})");
                 }
 
-                // Get method selector (literal at slot 1, slot 0 is header)
+                // Get method identity from Smalltalk heap structures
+                // CompiledMethod layout: ivar[0] = homeClass, indexed[0] = header, indexed[1..N] = literals, indexed[last] = bytecodes
                 try
                 {
-                    var selectorOOP = heapManager.GetIndexedOOP(methodOOP, 1);
-                    int selectorSize = heapManager.GetIndexedSize(selectorOOP);
-                    var selectorBytes = new byte[selectorSize];
-                    for (int i = 0; i < selectorSize; i++)
-                        selectorBytes[i] = heapManager.GetIndexedByte(selectorOOP, i);
-                    string selector = System.Text.Encoding.UTF8.GetString(selectorBytes);
-                    Console.WriteLine($"  Method selector: {selector}");
+                    var homeClassOOP = heapManager.GetInstanceVariable(methodOOP, 0);
+                    // homeClassOOP IS the class (e.g., Process), not an instance of it
+                    // To get its name, read its 'name' instance variable (metadata.ClassNameFieldIndex)
+                    string homeClassName = "?";
+                    try
+                    {
+                        var nameOOP = heapManager.GetInstanceVariable(homeClassOOP, metadata.ClassNameFieldIndex);
+                        int nameSize = heapManager.GetIndexedSize(nameOOP);
+                        var nameBytes = new byte[nameSize];
+                        for (int i = 0; i < nameSize; i++)
+                            nameBytes[i] = heapManager.GetIndexedByte(nameOOP, i);
+                        homeClassName = System.Text.Encoding.UTF8.GetString(nameBytes);
+                    }
+                    catch { homeClassName = heapManager.GetClassName(homeClassOOP); } // fallback
+
+                    // Find selector by scanning the class's methodDictionary for this method
+                    string selector = "<unknown>";
+                    var methodDictOOP = heapManager.GetInstanceVariable(homeClassOOP, VMConstants.BEHAVIOR_METHODDICT_INDEX);
+                    if (methodDictOOP != metadata.KnownObjects.Nil)
+                    {
+                        // MethodDictionary values array is at instance variable 1
+                        var valuesOOP = heapManager.GetInstanceVariable(methodDictOOP, 1);
+                        int valuesSize = heapManager.GetIndexedSize(valuesOOP);
+
+                        for (int i = 0; i < valuesSize; i++)
+                        {
+                            var candidateMethod = heapManager.GetIndexedOOP(valuesOOP, i);
+                            if (candidateMethod == methodOOP)
+                            {
+                                // Found it - now get the key at the same position
+                                // Keys are in the Dictionary's indexed part (inherited from Set)
+                                var keyOOP = heapManager.GetIndexedOOP(methodDictOOP, i);
+                                if (keyOOP != metadata.KnownObjects.Nil)
+                                {
+                                    int keySize = heapManager.GetIndexedSize(keyOOP);
+                                    var keyBytes = new byte[keySize];
+                                    for (int j = 0; j < keySize; j++)
+                                        keyBytes[j] = heapManager.GetIndexedByte(keyOOP, j);
+                                    selector = System.Text.Encoding.UTF8.GetString(keyBytes);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    Console.WriteLine($"  Method: {homeClassName}>>{selector}");
                 }
-                catch { Console.WriteLine("  Method selector: <error reading>"); }
+                catch { Console.WriteLine("  Method: <error reading>"); }
 
                 // Print first 20 bytecodes of the method
                 try
@@ -206,6 +245,16 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     depth++;
                 }
                 Console.WriteLine();
+
+                // Try to identify the actual method being executed
+                // Get method class by looking up the method in the method dictionary
+                try
+                {
+                    var methodClass = heapManager.GetInstanceVariable(methodOOP, 0); // homeClass at slot 0
+                    string methodClassName = heapManager.GetClassName(methodClass);
+                    Console.WriteLine($"  Method's home class: {methodClassName}");
+                }
+                catch { }
             }
 
             var valueOOP = heapManager.GetInstanceVariable(receiverOOP, index);
@@ -348,6 +397,42 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             // Association has a fixed layout per Smalltalk-80 specification:
             // instance variable 0 = key, instance variable 1 = value
             var valueOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+
+            // DEBUG: Log when pushing nil as global variable value
+            if (valueOOP == metadata.KnownObjects.Nil)
+            {
+                // Get the Association key to identify which global is nil
+                var keyOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                string keyName = "?";
+                try
+                {
+                    int keySize = heapManager.GetIndexedSize(keyOOP);
+                    var keyBytes = new byte[keySize];
+                    for (int i = 0; i < keySize; i++)
+                        keyBytes[i] = heapManager.GetIndexedByte(keyOOP, i);
+                    keyName = System.Text.Encoding.UTF8.GetString(keyBytes);
+                }
+                catch { }
+
+                // Only log if it's Processor - this is the suspect
+                if (keyName == "Processor")
+                {
+                    Console.WriteLine($"[NIL GLOBAL] Pushing nil for global '{keyName}' (Association={literalOOP})");
+                    Console.WriteLine($"  Active context: {context.ActiveContext}");
+
+                    // Try to get method info
+                    try
+                    {
+                        var selectorOOP = heapManager.GetIndexedOOP(methodOOP, 1);
+                        int selectorSize = heapManager.GetIndexedSize(selectorOOP);
+                        var selectorBytes = new byte[selectorSize];
+                        for (int i = 0; i < selectorSize; i++)
+                            selectorBytes[i] = heapManager.GetIndexedByte(selectorOOP, i);
+                        Console.WriteLine($"  Method selector: {System.Text.Encoding.UTF8.GetString(selectorBytes)}");
+                    }
+                    catch { }
+                }
+            }
 
             context.Push(valueOOP);
             return true;
@@ -730,6 +815,30 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     if (literalClass == "Association")
                     {
                         var valueOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+
+                        // DEBUG: Check for nil Processor
+                        if (valueOOP == metadata.KnownObjects.Nil)
+                        {
+                            var keyOOP = heapManager.GetInstanceVariable(literalOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                            string keyName = "?";
+                            try
+                            {
+                                int keySize = heapManager.GetIndexedSize(keyOOP);
+                                var keyBytes = new byte[keySize];
+                                for (int i = 0; i < keySize; i++)
+                                    keyBytes[i] = heapManager.GetIndexedByte(keyOOP, i);
+                                keyName = System.Text.Encoding.UTF8.GetString(keyBytes);
+                            }
+                            catch { }
+
+                            if (keyName == "Processor")
+                            {
+                                Console.WriteLine($"[NIL GLOBAL EXTENDED] Pushing nil for global '{keyName}' (Association={literalOOP})");
+                                Console.WriteLine($"  Active context: {context.ActiveContext}");
+                                Console.WriteLine($"  Method: {methodOOP}");
+                            }
+                        }
+
                         context.Push(valueOOP);
                         return true;
                     }

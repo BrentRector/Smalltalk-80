@@ -4,7 +4,7 @@
 
 ## Project Status
 
-**Interpreter Status**: ⚠️ **BLOCKED - Critical Bug Investigation**
+**Interpreter Status**: ✅ **FUNCTIONAL** (with one intermittent race condition)
 
 - **Build**: 0 errors, 0 warnings
 - **Cold Start**: Phases 1-6 all succeed
@@ -12,23 +12,24 @@
 - **Classes**: 238 (MouseEvent class removed as dead code)
 - **Methods**: 4747 compiled
 - **BlockContext Tests**: ✅ **120/120 tests PASS** (returns 1191)
-- **VM Core**: Functional but has method lookup bug
+- **VM Core**: ✅ Functional
 - **Process Primitives**: ✅ **85-88 working** (suspend, resume, terminate, yield)
 - **InputProcess**: ✅ Working - processes mouse/keyboard events correctly
-- **System Browser**: Non-functional (crashes before GUI appears)
-- **Timer/Event System**: ⚠️ **CRASHES on mouse movement** (method lookup bug)
+- **System Browser**: ✅ Functional - opens and displays source code
+- **Transcript**: ✅ Functional - opens without crash
+- **Timer/Event System**: ✅ Working
 
-## 🔴 Critical Issue: Method Lookup Bug
+## ⚠️ Known Issue: Race Condition on Early Mouse Movement
 
-**Symptom**: Interpreter crashes when mouse moves over window.
+**Symptom**: Interpreter crashes if mouse is moved into window **immediately** after it appears. Waiting a few seconds before moving mouse avoids the crash.
 
 **Error**: `Instance variable index 15 out of range [0, -1] for object oop=2 (UndefinedObject)`
 
-**Root Cause**: Method lookup is returning wrong methods. A method is being executed with nil as receiver when it expects an object with instance variables.
+**Analysis**: A MethodContext has nil as its receiver. The ivar[15] access is `emphasis` in StrikeFont. This suggests something isn't fully initialized when InputProcess first handles mouse events during early startup.
 
-**Status**: Debug logging added to capture method OOP at crash point. Investigation documented in [docs/DEBUGGING-METHOD-LOOKUP-BUG.md](docs/DEBUGGING-METHOD-LOOKUP-BUG.md).
+**Workaround**: Wait 2-3 seconds after window appears before moving mouse into it.
 
-**Next Action**: Capture method OOP from crash, trace message send to identify why method lookup fails.
+**Status**: Under investigation. Difficult to reproduce reliably due to timing-dependent nature.
 
 ## Known Issues
 

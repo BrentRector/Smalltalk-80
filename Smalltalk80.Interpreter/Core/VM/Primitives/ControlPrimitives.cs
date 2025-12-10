@@ -298,8 +298,10 @@ public static class ControlPrimitives
     /// Primitive 85: signal - Signals a Semaphore.
     /// Uses IProcessScheduler for all process scheduling operations.
     ///
-    /// Cooperative scheduling: Signal wakes a waiting process and adds it to the
-    /// ready queue. The signaling process continues until it voluntarily yields.
+    /// Preemptive scheduling: If signaling wakes a higher-priority process, the
+    /// current process is preempted and the woken process runs immediately.
+    /// The result must be pushed BEFORE preemption so it's on the stack when
+    /// the current process resumes.
     /// </summary>
     public class Signal : IPrimitive
     {
@@ -313,12 +315,32 @@ public static class ControlPrimitives
             var scheduler = context.ProcessScheduler;
             if (scheduler == null) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Use the unified signaling method from IProcessScheduler
-            // This handles: wake first waiter and add to ready queue, or increment excessSignals
-            // Cooperative: no preemption, current process continues
-            scheduler.SignalSemaphore(context.Receiver);
+            // CRITICAL: Push result onto stack BEFORE signaling.
+            // If SignalSemaphore causes preemption, the current process will be suspended.
+            // When it resumes later, execution continues after the signal call, expecting
+            // the result to be on the stack. Without this, we get stack underflow.
+            if (context.StackManager != null)
+            {
+                context.StackManager.Push(context.Receiver);
+            }
 
-            return PrimitiveResult.Ok(context.Receiver);
+            // Signal the semaphore - may cause preemption if woken process has higher priority
+            bool preempted = scheduler.SignalSemaphore(context.Receiver);
+
+            if (preempted)
+            {
+                // Context switched - result already pushed, signal context switch
+                return PrimitiveResult.Ok(context.Receiver);
+            }
+            else
+            {
+                // No preemption - undo the push since normal return will push result
+                if (context.StackManager != null)
+                {
+                    context.StackManager.Pop();
+                }
+                return PrimitiveResult.Ok(context.Receiver);
+            }
         }
     }
 

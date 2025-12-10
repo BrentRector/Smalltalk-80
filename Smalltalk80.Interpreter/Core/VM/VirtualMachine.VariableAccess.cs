@@ -21,9 +21,9 @@ public partial class VirtualMachine
     // Helper methods for heap access during refactoring
     private byte[] GetMethodBytecodes(SmalltalkOOP methodOOP)
     {
-        // TODO: Implement GetMethodBytecodes - need to access bytecode array from CompiledMethod
         // CompiledMethod structure: [header, literal1, ..., literalN, bytecodeArrayOOP]
         // The last indexed slot contains OOP to ByteArray with bytecodes
+        // Returns ALL bytes including the 3-byte source file offset at the end
         int indexedSize = _heapManager.GetIndexedSize(methodOOP);
         if (indexedSize > 0)
         {

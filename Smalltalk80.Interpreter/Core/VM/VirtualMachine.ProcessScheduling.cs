@@ -34,7 +34,16 @@ public partial class VirtualMachine : IProcessScheduler
         if (schedulerOOP == _metadata.KnownObjects.Nil)
             return _metadata.KnownObjects.Nil;
 
-        return _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+        var activeProcess = _heapManager.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+
+        // Debug: log when activeProcess is nil (should never happen during normal operation)
+        if (activeProcess == _metadata.KnownObjects.Nil)
+        {
+            Console.WriteLine($"[GetActiveProcess] WARNING: activeProcess is nil! Stack trace:");
+            Console.WriteLine(Environment.StackTrace);
+        }
+
+        return activeProcess;
     }
 
     // Process switch tracing - set to true to debug process/context issues

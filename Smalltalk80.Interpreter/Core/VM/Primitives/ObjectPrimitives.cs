@@ -481,18 +481,24 @@ public static class SimpleObjectPrimitives
             int position = positionOOP.AsSmallInteger();
             int readLimit = readLimitOOP.AsSmallInteger();
 
-            if (position > readLimit) return PrimitiveResult.Fail(context.Metadata!);
+            // ReadStream position is 0-based index of LAST read element
+            // So position=0 means "haven't read anything yet, next read is at index 1"
+            // Smalltalk fallback does: collection at: (position _ position + 1)
+            // We must increment FIRST to get the actual read position
+            int readPosition = position + 1;
+
+            if (readPosition > readLimit) return PrimitiveResult.Fail(context.Metadata!);
             if (collectionOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int collectionSize = context.HeapManager.GetIndexedSize(collectionOOP);
-            if (position < 1 || position > collectionSize) return PrimitiveResult.Fail(context.Metadata!);
+            if (readPosition < 1 || readPosition > collectionSize) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Read element from collection
+            // Read element from collection (convert to 0-based index)
             SmalltalkOOP element;
             var format = context.HeapManager.GetObjectFormat(collectionOOP);
             if (format == ObjectFormat.ByteIndexed)
             {
-                byte byteValue = context.HeapManager.GetIndexedByte(collectionOOP, position - 1);
+                byte byteValue = context.HeapManager.GetIndexedByte(collectionOOP, readPosition - 1);
 
                 // For String/Symbol (and subclasses), return Character object from CharacterTable
                 // For other byte arrays (ByteArray, etc.), return SmallInteger
@@ -515,11 +521,11 @@ public static class SimpleObjectPrimitives
             }
             else  // PointerIndexed (Arrays, etc.)
             {
-                element = context.HeapManager.GetIndexedOOP(collectionOOP, position - 1);
+                element = context.HeapManager.GetIndexedOOP(collectionOOP, readPosition - 1);
             }
 
-            // Increment position
-            context.HeapManager.SetInstanceVariable(context.Receiver, 1, SmalltalkOOP.FromSmallInteger(position + 1));
+            // Update position to reflect the read (same as Smalltalk: position _ position + 1)
+            context.HeapManager.SetInstanceVariable(context.Receiver, 1, SmalltalkOOP.FromSmallInteger(readPosition));
 
             return PrimitiveResult.Ok(element);
         }

@@ -129,14 +129,17 @@ public class InputWordRingBuffer
             return false;
         }
 
-        // Debug logging disabled - uncomment to trace input events
-        // int type = (word >> 12) & 0xF;
-        // if (type == 3 || type == 4) // KeyDown or KeyUp (includes mouse buttons)
-        // {
-        //     int param = word & 0xFFF;
-        //     string typeStr = type == 3 ? "KeyDown" : "KeyUp";
-        //     Console.WriteLine($"[RingBuffer] Enqueue: {typeStr} param={param} (word=0x{word:X4}) count={Count} shadow={_shadowSignalCount}");
-        // }
+        // Debug logging - trace keyboard events
+        int type = (word >> 12) & 0xF;
+        if (type == 3 || type == 4) // KeyDown or KeyUp (includes mouse buttons)
+        {
+            int param = word & 0xFFF;
+            if (param < 128) // Only log regular keys, not mouse buttons
+            {
+                string typeStr = type == 3 ? "KeyDown" : "KeyUp";
+                Console.WriteLine($"[RingBuffer] Enqueue: {typeStr} char='{(char)param}' ({param}) word=0x{word:X4} count={Count} shadow={_shadowSignalCount}");
+            }
+        }
 
         // Write word to buffer
         _buffer[head] = word;

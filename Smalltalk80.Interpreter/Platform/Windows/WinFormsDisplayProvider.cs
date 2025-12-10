@@ -122,6 +122,7 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
         DoubleBuffered = true;
+        KeyPreview = true; // Receive keyboard events before child controls
 
         // Event handlers
         Paint += OnPaint;
@@ -130,6 +131,7 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         MouseMove += OnMouseMove;
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
+        KeyPress += OnKeyPress;
     }
 
     /// <summary>
@@ -443,14 +445,82 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        // Enqueue to ring buffer (Blue Book format)
-        _inputWordBuffer.EnqueueKeyDown(e.KeyValue);
+        // Only handle modifier keys - regular keys handled by OnKeyPress
+        int smalltalkCode = MapToSmalltalkCode(e.KeyCode);
+        if (smalltalkCode > 0)
+        {
+            _inputWordBuffer.EnqueueKeyDown(smalltalkCode);
+        }
     }
 
     private void OnKeyUp(object? sender, KeyEventArgs e)
     {
-        // Enqueue to ring buffer (Blue Book format)
-        _inputWordBuffer.EnqueueKeyUp(e.KeyValue);
+        // Only handle modifier keys - regular keys handled by OnKeyPress
+        int smalltalkCode = MapToSmalltalkCode(e.KeyCode);
+        if (smalltalkCode > 0)
+        {
+            _inputWordBuffer.EnqueueKeyUp(smalltalkCode);
+        }
+    }
+
+    /// <summary>
+    /// Handles KeyPress events for printable ASCII characters.
+    /// WinForms KeyPress provides the actual character with shift already applied,
+    /// so we get 'A' when Shift+A is pressed, ';' or ':' correctly, etc.
+    /// </summary>
+    private void OnKeyPress(object? sender, KeyPressEventArgs e)
+    {
+        char c = e.KeyChar;
+
+        // Only handle ASCII 0-127
+        if (c > 127) return;
+
+        // For Ctrl+letter combinations, KeyPress gives control codes (1-26)
+        // Convert back to lowercase letter and let Smalltalk handle with ctrlState
+        if (c >= 1 && c <= 26 && Control.ModifierKeys.HasFlag(Keys.Control))
+        {
+            // Convert control code back to lowercase letter
+            // Ctrl+A = 1 → 'a' = 97, Ctrl+C = 3 → 'c' = 99
+            c = (char)(c + 96);
+        }
+
+        _inputWordBuffer.EnqueueKeyDown((int)c);
+        _inputWordBuffer.EnqueueKeyUp((int)c);
+    }
+
+    /// <summary>
+    /// Maps WinForms modifier key codes to Smalltalk key codes.
+    /// Returns 0 for non-modifier keys (handled by OnKeyPress instead).
+    ///
+    /// Smalltalk codes (from InputState):
+    ///   LshiftKey = 136
+    ///   RshiftKey = 137
+    ///   CtrlKey = 138
+    ///   LockKey = 139 (Caps Lock)
+    /// </summary>
+    private static int MapToSmalltalkCode(Keys key)
+    {
+        // NOTE: We do NOT send shift key events because WinForms KeyPress already
+        // provides the shifted character (e.g., 'W' instead of 'w').
+        // Sending shift events would cause Smalltalk's DefaultKeyboardMap to double-shift.
+        //
+        // We DO send Ctrl events because Smalltalk needs ctrlState for:
+        // - Ctrl+C → User Interrupt
+        // - Ctrl+Shift+C → Emergency Evaluator (but shift state checked via lshiftState)
+        //
+        // For Ctrl+Shift+C, we need to track shift state, so we send shift events
+        // only when Ctrl is also pressed.
+        return key switch
+        {
+            Keys.LShiftKey => Control.ModifierKeys.HasFlag(Keys.Control) ? 136 : 0,
+            Keys.RShiftKey => Control.ModifierKeys.HasFlag(Keys.Control) ? 137 : 0,
+            Keys.ShiftKey => Control.ModifierKeys.HasFlag(Keys.Control) ? 136 : 0,
+            Keys.LControlKey => 138,    // CtrlKey
+            Keys.RControlKey => 138,    // CtrlKey (no separate right ctrl in Smalltalk)
+            Keys.ControlKey => 138,     // Generic ctrl → CtrlKey
+            Keys.Capital => 139,        // LockKey (Caps Lock)
+            _ => 0                      // Not a modifier we care about
+        };
     }
 
     // ============================================================================

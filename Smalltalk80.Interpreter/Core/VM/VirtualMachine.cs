@@ -280,17 +280,15 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                     transferred++;
                 }
 
-                // Debug logging disabled - uncomment to trace input signal transfers
-                // var firstLinkAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-                // var excessAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
-                // _checkAndSignalLogCount++;
-                // bool hadWaiter = (firstLink != _heapManager.GetNil());
-                // bool hasWaiter = (firstLinkAfter != _heapManager.GetNil());
-                // bool shouldLog = hadWaiter || hasWaiter || (firstLink != firstLinkAfter) || (_checkAndSignalLogCount % 50 == 0);
-                // if (shouldLog)
-                // {
-                //     Console.WriteLine($"[CheckAndSignal] #{_checkAndSignalLogCount}: Transferred {transferred} signals. firstLink: {firstLink} → {firstLinkAfter}, excess: {excessBefore} → {excessAfter}");
-                // }
+                // Debug logging - always log when signals are transferred
+                if (transferred > 0)
+                {
+                    var firstLinkAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+                    var excessAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
+                    bool hadWaiter = (firstLink != _heapManager.GetNil());
+                    bool hasWaiter = (firstLinkAfter != _heapManager.GetNil());
+                    Console.WriteLine($"[CheckAndSignal] Transferred {transferred} signals. waiter: {hadWaiter}→{hasWaiter}, excess: {excessBefore}→{excessAfter}");
+                }
             }
             // No longer warn about unregistered InputSemaphore - it's expected during startup
         }
@@ -503,10 +501,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         while (ip < bytecodes.Length)
         {
-            // Validate IP is within executable bytecode range
-            // GetMethodBytecodes() excludes the last 3 bytes (source file offset)
-            // If IP is at or beyond bytecodes.Length, it means we've fallen through
-            // past the last executable bytecode (missing RETURN or bad jump)
+            // Validate IP is within bytecode array
+            // GetMethodBytecodes() returns all bytes including the 3-byte source offset at end
+            // The interpreter should never execute into the source offset bytes
             if (ip >= bytecodes.Length)
             {
                 var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
@@ -903,10 +900,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         while (ip < bytecodes.Length)
         {
-            // DIAGNOSTIC: Validate IP is within executable bytecode range
-            // GetMethodBytecodes() excludes the last 3 bytes (source file offset)
-            // If IP is at or beyond bytecodes.Length, it means we've fallen through
-            // past the last executable bytecode (missing RETURN or bad jump)
+            // DIAGNOSTIC: Validate IP is within bytecode array
+            // GetMethodBytecodes() returns all bytes including the 3-byte source offset at end
+            // The interpreter should never execute into the source offset bytes
             if (ip >= bytecodes.Length)
             {
                 var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
