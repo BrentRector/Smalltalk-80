@@ -627,6 +627,19 @@ public static class SimpleObjectPrimitives
             if (index > size) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP value = context.Arguments[1];
+
+            // DIAGNOSTIC: Track writes to CompiledMethod objects
+            var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
+            if (classOOP == context.Metadata!.CompiledMethodClassOOP)
+            {
+                Console.WriteLine($"[Prim69] CM objectAt:put: receiver={context.Receiver}, index={index}, value={value}, size={size}");
+                // ALERT if writing to the last slot (bytecodeArrayOOP)
+                if (index == size)
+                {
+                    Console.WriteLine($"[Prim69] *** WARNING: Writing to bytecodeArrayOOP slot! ***");
+                }
+            }
+
             context.HeapManager.SetIndexedOOP(context.Receiver, index - 1, value);
             return PrimitiveResult.Ok(value);
         }
