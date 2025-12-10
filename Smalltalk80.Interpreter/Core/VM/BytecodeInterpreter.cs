@@ -1338,8 +1338,19 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             // Validate target is in sender chain (safety check)
             if (!context.IsInSenderChain(targetContextOOP, context.ActiveContext))
             {
+                // Diagnostic: Try to identify the home method
+                string homeMethodInfo = "unknown";
+                try
+                {
+                    var homeMethod = heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
+                    homeMethodInfo = context.GetLocalId(homeMethod) ?? $"method={homeMethod}";
+                }
+                catch { /* ignore */ }
+
+                Console.WriteLine($"[NLR INIT FAIL] BlockContext={context.ActiveContext}, Home={homeOOP}, HomeMethod={homeMethodInfo}");
+
                 throw new InvalidOperationException(
-                    "Non-local return target not in sender chain - block's defining method has already returned");
+                    $"Non-local return target not in sender chain - block's defining method ({homeMethodInfo}) has already returned");
             }
 
             // Initiate non-local return to home's sender

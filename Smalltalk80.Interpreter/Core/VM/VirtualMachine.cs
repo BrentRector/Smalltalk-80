@@ -388,10 +388,17 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         while (true)
         {
-            // Check for pending input events from UI thread and signal InputSemaphore if needed.
-            // This is the "virtual interrupt" that replaces hardware interrupt signaling.
-            // The UI thread sets _inputEventPending; we check and signal safely on Smalltalk thread.
-            CheckAndSignalInputEvents();
+            // CRITICAL: If NLR is pending, continue unwinding BEFORE checking for events.
+            // NLR unwinding must be atomic - we cannot allow process switches in the middle
+            // because the NLR state (_nlrHandler) is VM-global, not per-process.
+            // Process switches via CheckAndSignalInputEvents would corrupt NLR state.
+            if (!_nlrHandler.IsPending)
+            {
+                // Check for pending input events from UI thread and signal InputSemaphore if needed.
+                // This is the "virtual interrupt" that replaces hardware interrupt signaling.
+                // The UI thread sets _inputEventPending; we check and signal safely on Smalltalk thread.
+                CheckAndSignalInputEvents();
+            }
 
             // Execute bytecode - Smalltalk handles all scheduling via primitives
             InterpreterStatus status = ExecuteBytecodeStep();
@@ -639,9 +646,22 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // Check if we ran out of contexts (error case)
             if (senderOOP == _metadata.KnownObjects.Nil)
             {
+                // Diagnostic: Try to identify the target context's method
+                string targetMethodInfo = "unknown";
+                try
+                {
+                    var targetMethod = _heapManager.GetInstanceVariable(_nlrHandler.TargetContext, VMConstants.CONTEXT_METHOD_INDEX);
+                    targetMethodInfo = GetLocalId(targetMethod) ?? $"method={targetMethod}";
+                }
+                catch { /* ignore */ }
+
+                // Diagnostic: Print the current context chain for debugging
+                Console.WriteLine($"[NLR FAILURE] Target context: {_nlrHandler.TargetContext}, Method: {targetMethodInfo}");
+                Console.WriteLine($"[NLR FAILURE] Active context at failure: {returningContext}");
+
                 throw new InvalidOperationException(
                     $"Non-local return target context {_nlrHandler.TargetContext} not found in sender chain. " +
-                    $"Target may have already returned.");
+                    $"Target method: {targetMethodInfo}. Target may have already returned.");
             }
 
             // Continue unwinding
