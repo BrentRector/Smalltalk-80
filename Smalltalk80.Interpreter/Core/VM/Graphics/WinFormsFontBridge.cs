@@ -247,14 +247,6 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
         xTable[charCount] = x; // Sentinel
         xTable[charCount + 1] = x; // Extra sentinel for edge case
 
-        // DIAGNOSTIC: Log xTable positions for period (46) and dash (45)
-        if (minAscii == 0)
-        {
-            Console.WriteLine($"[Font xTable] char 45 '-': x={xTable[45]}, width={widths[45]}");
-            Console.WriteLine($"[Font xTable] char 46 '.': x={xTable[46]}, width={widths[46]}");
-            Console.WriteLine($"[Font xTable] char 47 '/': x={xTable[47]}, width={widths[47]}");
-        }
-
         int strikeLength = x;
         int raster = (strikeLength + 15) / 16;
 
