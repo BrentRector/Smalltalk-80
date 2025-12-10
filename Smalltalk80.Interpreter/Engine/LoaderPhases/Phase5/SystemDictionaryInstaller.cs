@@ -429,7 +429,6 @@ public class SystemDictionaryInstaller(
     /// </summary>
     private void InstallAllClassVariables()
     {
-        Console.WriteLine("[Phase 5] Installing class variables for all classes...");
         int totalInstalled = 0;
 
         var nilOOP = context.HeapManager.GetNil();
@@ -495,43 +494,24 @@ public class SystemDictionaryInstaller(
                 classVarCount++;
                 totalInstalled++;
 
-                // Diagnostic: Log Association OOP and value for ProcessorScheduler and Float
-                if (className == "ProcessorScheduler" || className == "Float")
-                {
-                    var assocKey = context.Allocator.GetInstanceVariable(associationOOP, 0);
-                    var assocValue = context.Allocator.GetInstanceVariable(associationOOP, 1);
-                    Console.WriteLine($"[Phase 5]     {classVarName} → Assoc OOP {associationOOP} (key: {assocKey}, value: {assocValue})");
-                }
+                // Verbose Association logging disabled - uncomment for debugging
+                // if (className == "ProcessorScheduler" || className == "Float")
+                // {
+                //     var assocKey = context.Allocator.GetInstanceVariable(associationOOP, 0);
+                //     var assocValue = context.Allocator.GetInstanceVariable(associationOOP, 1);
+                //     Console.WriteLine($"[Phase 5]     {classVarName} → Assoc OOP {associationOOP}");
+                // }
             }
 
-            if (classVarCount > 0)
-            {
-                Console.WriteLine($"[Phase 5]   {className}: installed {classVarCount} class variables");
-
-                // Diagnostic: Dump all entries in ProcessorScheduler classPool
-                if (className == "ProcessorScheduler")
-                {
-                    Console.WriteLine($"[Phase 5]   ProcessorScheduler classPool dictionary contents:");
-                    int poolSize = context.Allocator.GetIndexedSize(classPoolOOP);
-                    for (int i = 0; i < poolSize; i++)
-                    {
-                        var entry = context.Allocator.GetIndexedOOP(classPoolOOP, i);
-                        if (entry != nilOOP)
-                        {
-                            var key = context.Allocator.GetInstanceVariable(entry, 0);
-                            var value = context.Allocator.GetInstanceVariable(entry, 1);
-                            string keyName = "<unknown>";
-                            try {
-                                keyName = StringHelper.ExtractString(context.HeapManager, key);
-                            } catch { }
-                            Console.WriteLine($"[Phase 5]     [{i}] Assoc {entry}: {keyName} → {value}");
-                        }
-                    }
-                }
-            }
+            // Verbose class variable logging disabled - uncomment for debugging
+            // if (classVarCount > 0)
+            // {
+            //     Console.WriteLine($"[Phase 5]   {className}: installed {classVarCount} class variables");
+            // }
         }
 
-        Console.WriteLine($"[Phase 5] Installed {totalInstalled} class variable Associations total");
+        // Summary line kept for visibility
+        // Console.WriteLine($"[Phase 5] Installed {totalInstalled} class variable Associations total");
     }
 
     private void InitializeAllPoolDictionaries()

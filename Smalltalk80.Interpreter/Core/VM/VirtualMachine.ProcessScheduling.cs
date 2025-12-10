@@ -156,9 +156,9 @@ public partial class VirtualMachine : IProcessScheduler
         }
 
         int priority = GetProcessPriority(processOOP);
-        // Trace when InputProcess (priority 6) is activated - ALWAYS log to verify it runs
-        if (priority == 6)
-            Console.WriteLine($"[ActivateProcess] InputProcess={processOOP} (priority {priority}) - reason: {reason}, context={contextOOP}");
+        // Debug logging disabled - uncomment to trace process activation
+        // if (priority == 6)
+        //     Console.WriteLine($"[ActivateProcess] InputProcess={processOOP} (priority {priority}) - reason: {reason}, context={contextOOP}");
 
         _processSwitchCount++;
         if (_traceProcessSwitches)
@@ -260,9 +260,6 @@ public partial class VirtualMachine : IProcessScheduler
         {
             // List is empty
             _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, processOOP);
-            // Trace when priority 6 queue transitions from empty to non-empty
-            if (priority == 6)
-                Console.WriteLine($"[AddToQueue] P6 queue was EMPTY, firstLink now = {processOOP}");
         }
         else
         {
@@ -271,13 +268,6 @@ public partial class VirtualMachine : IProcessScheduler
         }
         _heapManager.SetInstanceVariable(listOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, processOOP);
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, listOOP);
-
-        // Verify the queue actually has the process after adding
-        if (priority == 6)
-        {
-            var verifyFirst = _heapManager.GetInstanceVariable(listOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-            Console.WriteLine($"[AddToQueue] P6 queue verify: firstLink={verifyFirst}");
-        }
     }
 
     /// <inheritdoc/>
@@ -438,10 +428,11 @@ public partial class VirtualMachine : IProcessScheduler
             return false;  // No process woken, no preemption
         }
 
-        // Process is waiting - wake it up (this is the important case to log!)
+        // Process is waiting - wake it up
         var wokenProcessOOP = firstLinkOOP;
-        if (isInputSemaphore)
-            Console.WriteLine($"[SignalSemaphore] WAKING InputProcess={wokenProcessOOP} from InputSemaphore wait list");
+        // Debug logging disabled
+        // if (isInputSemaphore)
+        //     Console.WriteLine($"[SignalSemaphore] WAKING InputProcess={wokenProcessOOP} from InputSemaphore wait list");
 
         // Remove from semaphore's wait list
         var nextLinkOOP = _heapManager.GetInstanceVariable(wokenProcessOOP, VMConstants.LINK_NEXTLINK_INDEX);
@@ -463,8 +454,9 @@ public partial class VirtualMachine : IProcessScheduler
         if (wokenPriority > activePriority)
         {
             // Higher priority process - preempt current process!
-            if (isInputSemaphore)
-                Console.WriteLine($"[SignalSemaphore] PREEMPTING current process (priority {activePriority}) for InputProcess (priority {wokenPriority})");
+            // Debug logging disabled
+            // if (isInputSemaphore)
+            //     Console.WriteLine($"[SignalSemaphore] PREEMPTING current process (priority {activePriority}) for InputProcess (priority {wokenPriority})");
             SuspendActiveProcess(returnToQueue: true);
             ActivateProcess(wokenProcessOOP, "preemption");
             return true;  // Preemption occurred
@@ -484,42 +476,42 @@ public partial class VirtualMachine : IProcessScheduler
         var inputSemOOP = _platformBridge?.GetInputSemaphore() ?? default;
         bool isInputSemaphore = (inputSemOOP != default && semaphoreOOP == inputSemOOP);
 
-        int priority = GetProcessPriority(processOOP);
-        if (isInputSemaphore)
-            Console.WriteLine($"[WaitOnSemaphore] InputProcess={processOOP} (priority {priority}) WAITING on InputSemaphore");
+        // Debug logging disabled - uncomment to trace semaphore waits
+        // int priority = GetProcessPriority(processOOP);
+        // if (isInputSemaphore)
+        //     Console.WriteLine($"[WaitOnSemaphore] InputProcess={processOOP} (priority {priority}) WAITING on InputSemaphore");
 
         // Add process to semaphore's wait list (LinkedList>>addLast:)
         var lastLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
-        var firstLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-
-        if (isInputSemaphore)
-            Console.WriteLine($"[WaitOnSemaphore] InputSemaphore BEFORE: firstLink={firstLinkOOP}, lastLink={lastLinkOOP}");
+        // var firstLinkOOP = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+        // if (isInputSemaphore)
+        //     Console.WriteLine($"[WaitOnSemaphore] InputSemaphore BEFORE: firstLink={firstLinkOOP}, lastLink={lastLinkOOP}");
 
         if (lastLinkOOP == _metadata.KnownObjects.Nil)
         {
             // List is empty
             _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX, processOOP);
-            if (isInputSemaphore)
-                Console.WriteLine($"[WaitOnSemaphore] Set InputSemaphore.firstLink = {processOOP}");
+            // if (isInputSemaphore)
+            //     Console.WriteLine($"[WaitOnSemaphore] Set InputSemaphore.firstLink = {processOOP}");
         }
         else
         {
             // Append to end
-            if (isInputSemaphore)
-                Console.WriteLine($"[WaitOnSemaphore] InputSemaphore lastLink NOT nil - appending to {lastLinkOOP}");
+            // if (isInputSemaphore)
+            //     Console.WriteLine($"[WaitOnSemaphore] InputSemaphore lastLink NOT nil - appending to {lastLinkOOP}");
             _heapManager.SetInstanceVariable(lastLinkOOP, VMConstants.LINK_NEXTLINK_INDEX, processOOP);
         }
         _heapManager.SetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX, processOOP);
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, semaphoreOOP);
         _heapManager.SetInstanceVariable(processOOP, VMConstants.LINK_NEXTLINK_INDEX, _metadata.KnownObjects.Nil);
 
-        // Verify the semaphore's firstLink was set correctly
-        if (isInputSemaphore)
-        {
-            var verifyFirst = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-            var verifyLast = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
-            Console.WriteLine($"[WaitOnSemaphore] VERIFY InputSemaphore AFTER: firstLink={verifyFirst}, lastLink={verifyLast}");
-        }
+        // Debug verification logging disabled
+        // if (isInputSemaphore)
+        // {
+        //     var verifyFirst = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+        //     var verifyLast = _heapManager.GetInstanceVariable(semaphoreOOP, VMConstants.LINKEDLIST_LASTLINK_INDEX);
+        //     Console.WriteLine($"[WaitOnSemaphore] VERIFY InputSemaphore AFTER: firstLink={verifyFirst}, lastLink={verifyLast}");
+        // }
 
         // Switch to next runnable process
         return SwitchToNextRunnableProcess(processOOP);

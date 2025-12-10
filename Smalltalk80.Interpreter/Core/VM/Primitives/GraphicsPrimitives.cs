@@ -14,8 +14,16 @@ public static class GraphicsOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
-            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Arguments.Length != 0)
+            {
+                Console.WriteLine($"[BitBlt P96] Failed: unexpected arguments (count={context.Arguments.Length})");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+            if (context.Receiver.IsSmallInteger)
+            {
+                Console.WriteLine($"[BitBlt P96] Failed: receiver is SmallInteger ({context.Receiver})");
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
 
             // Try hardware-accelerated BitBlt if available
             if (context.Platform != null)
@@ -54,6 +62,34 @@ public static class GraphicsOperations
                 !sourceYOOP.IsSmallInteger || !clipXOOP.IsSmallInteger || !clipYOOP.IsSmallInteger ||
                 !clipWidthOOP.IsSmallInteger || !clipHeightOOP.IsSmallInteger)
             {
+                // DEBUG: Log all instance variable values
+                Console.WriteLine("[BitBlt P96] Validation failed - All BitBlt ivars:");
+                Console.WriteLine($"  [0] destForm: {destForm}");
+                Console.WriteLine($"  [1] sourceForm: {sourceForm}");
+                Console.WriteLine($"  [2] halftoneForm: {halftoneForm}");
+                Console.WriteLine($"  [3] combinationRule: {combinationRuleOOP}{(combinationRuleOOP.IsSmallInteger ? $" = {combinationRuleOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine($"  [4] destX: {destXOOP}{(destXOOP.IsSmallInteger ? $" = {destXOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine($"  [5] destY: {destYOOP}{(destYOOP.IsSmallInteger ? $" = {destYOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine($"  [6] width: {widthOOP}{(widthOOP.IsSmallInteger ? $" = {widthOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine($"  [7] height: {heightOOP}{(heightOOP.IsSmallInteger ? $" = {heightOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine($"  [8] sourceX: {sourceXOOP}{(sourceXOOP.IsSmallInteger ? $" = {sourceXOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine($"  [9] sourceY: {sourceYOOP}{(sourceYOOP.IsSmallInteger ? $" = {sourceYOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine($"  [10] clipX: {clipXOOP}{(clipXOOP.IsSmallInteger ? $" = {clipXOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine($"  [11] clipY: {clipYOOP}{(clipYOOP.IsSmallInteger ? $" = {clipYOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine($"  [12] clipWidth: {clipWidthOOP}{(clipWidthOOP.IsSmallInteger ? $" = {clipWidthOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine($"  [13] clipHeight: {clipHeightOOP}{(clipHeightOOP.IsSmallInteger ? $" = {clipHeightOOP.AsSmallInteger()}" : " (NOT SmallInt)")}");
+                Console.WriteLine("Failed fields:");
+                if (!combinationRuleOOP.IsSmallInteger) Console.WriteLine($"  combinationRule is not SmallInteger: {combinationRuleOOP}");
+                if (!destXOOP.IsSmallInteger) Console.WriteLine($"  destX is not SmallInteger: {destXOOP}");
+                if (!destYOOP.IsSmallInteger) Console.WriteLine($"  destY is not SmallInteger: {destYOOP}");
+                if (!widthOOP.IsSmallInteger) Console.WriteLine($"  width is not SmallInteger: {widthOOP}");
+                if (!heightOOP.IsSmallInteger) Console.WriteLine($"  height is not SmallInteger: {heightOOP}");
+                if (!sourceXOOP.IsSmallInteger) Console.WriteLine($"  sourceX is not SmallInteger: {sourceXOOP}");
+                if (!sourceYOOP.IsSmallInteger) Console.WriteLine($"  sourceY is not SmallInteger: {sourceYOOP}");
+                if (!clipXOOP.IsSmallInteger) Console.WriteLine($"  clipX is not SmallInteger: {clipXOOP}");
+                if (!clipYOOP.IsSmallInteger) Console.WriteLine($"  clipY is not SmallInteger: {clipYOOP}");
+                if (!clipWidthOOP.IsSmallInteger) Console.WriteLine($"  clipWidth is not SmallInteger: {clipWidthOOP}");
+                if (!clipHeightOOP.IsSmallInteger) Console.WriteLine($"  clipHeight is not SmallInteger: {clipHeightOOP}");
                 return PrimitiveResult.Fail(context.Metadata!);
             }
 
@@ -74,6 +110,7 @@ public static class GraphicsOperations
             // Rules 16+ (like Form paint) require special Smalltalk handling (paintBits)
             if (combinationRule < 0 || combinationRule > 15)
             {
+                Console.WriteLine($"[BitBlt P96] Failed: combinationRule {combinationRule} out of range [0-15]");
                 return PrimitiveResult.Fail(context.Metadata!);
             }
 

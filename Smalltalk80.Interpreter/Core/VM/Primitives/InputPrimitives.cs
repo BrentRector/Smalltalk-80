@@ -104,7 +104,6 @@ public static class InputOperations
             // Register semaphore with platform event system
             if (context.Platform != null)
             {
-                Console.WriteLine($"[Primitive 93] InputSemaphore registered: {semaphoreOOP}");
                 context.Platform.SetInputSemaphore(semaphoreOOP);
             }
 
@@ -155,15 +154,15 @@ public static class InputOperations
             // Get packed input word from platform (Blue Book format: type<<12 | param)
             int word = context.Platform?.GetInputWord() ?? 0;
 
-            // Debug: Log what primitive 95 returns
-            if (word == 0)
-                Console.WriteLine("[Prim95] GetInputWord returned 0 (no event)");
-            else
-            {
-                int type = (word >> 12) & 0xF;
-                int param = word & 0xFFF;
-                Console.WriteLine($"[Prim95] GetInputWord returned type={type} param={param} (word=0x{word:X4})");
-            }
+            // Debug logging disabled - uncomment to trace input events
+            // if (word == 0)
+            //     Console.WriteLine("[Prim95] GetInputWord returned 0 (no event)");
+            // else
+            // {
+            //     int type = (word >> 12) & 0xF;
+            //     int param = word & 0xFFF;
+            //     Console.WriteLine($"[Prim95] GetInputWord returned type={type} param={param} (word=0x{word:X4})");
+            // }
 
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(word));
         }

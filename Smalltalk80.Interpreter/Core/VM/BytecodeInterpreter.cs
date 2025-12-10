@@ -90,6 +90,124 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         if (BytecodeUtil.IsPushIvar(bytecode))
         {
             int index = BytecodeUtil.PushIvarIndex(bytecode);
+
+            // Diagnostic: Catch nil receiver before crash
+            if (receiverOOP == metadata.KnownObjects.Nil)
+            {
+                Console.WriteLine($"\n[CRASH DIAGNOSTIC] Attempting to access ivar[{index}] on nil receiver!");
+                Console.WriteLine($"  Bytecode: 0x{bytecode:X2}");
+                Console.WriteLine($"  Method OOP: {methodOOP}");
+                Console.WriteLine($"  Active context: {context.ActiveContext}");
+                Console.WriteLine($"  Context type: {(isBlockContext ? "BlockContext" : "MethodContext")}");
+
+                // Show the MethodContext's receiver even if nil, to understand the issue
+                var methodCtxOOP = isBlockContext ? context.FindMethodContext(context.ActiveContext) : context.ActiveContext;
+                var methodCtxReceiverOOP = heapManager.GetInstanceVariable(methodCtxOOP, receiverIndex);
+                if (methodCtxReceiverOOP == metadata.KnownObjects.Nil)
+                {
+                    Console.WriteLine($"  MethodContext receiver: nil");
+                }
+                else
+                {
+                    string recvClassName = heapManager.GetClassName(methodCtxReceiverOOP);
+                    Console.WriteLine($"  MethodContext receiver: {methodCtxReceiverOOP} ({recvClassName})");
+                }
+
+                // Get method selector (literal at slot 1, slot 0 is header)
+                try
+                {
+                    var selectorOOP = heapManager.GetIndexedOOP(methodOOP, 1);
+                    int selectorSize = heapManager.GetIndexedSize(selectorOOP);
+                    var selectorBytes = new byte[selectorSize];
+                    for (int i = 0; i < selectorSize; i++)
+                        selectorBytes[i] = heapManager.GetIndexedByte(selectorOOP, i);
+                    string selector = System.Text.Encoding.UTF8.GetString(selectorBytes);
+                    Console.WriteLine($"  Method selector: {selector}");
+                }
+                catch { Console.WriteLine("  Method selector: <error reading>"); }
+
+                // Print first 20 bytecodes of the method
+                try
+                {
+                    // Get bytecode array from CompiledMethod (last indexed slot)
+                    int methodIndexedSize = heapManager.GetIndexedSize(methodOOP);
+                    var bytecodeArrayOOP = heapManager.GetIndexedOOP(methodOOP, methodIndexedSize - 1);
+                    int methodBytecodeSize = heapManager.GetIndexedSize(bytecodeArrayOOP);
+                    Console.Write("  Method bytecodes: [");
+                    int count = Math.Min(methodBytecodeSize, 20);
+                    for (int i = 0; i < count; i++)
+                    {
+                        byte b = heapManager.GetIndexedByte(bytecodeArrayOOP, i);
+                        Console.Write($"0x{b:X2}");
+                        if (i < count - 1) Console.Write(", ");
+                    }
+                    if (methodBytecodeSize > 20) Console.Write(", ...");
+                    Console.WriteLine($"] (total: {methodBytecodeSize} bytes)");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"  Method bytecodes: <error: {ex.Message}>");
+                }
+
+                // Get PC
+                var pcOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.CONTEXT_PC_INDEX);
+                int pc = pcOOP.IsSmallInteger ? pcOOP.AsSmallInteger() : -1;
+                Console.WriteLine($"  PC: {pc}");
+
+                // If BlockContext, show home context info
+                if (isBlockContext)
+                {
+                    var homeCtxOOP = context.FindMethodContext(context.ActiveContext);
+                    Console.WriteLine($"  Home context: {homeCtxOOP}");
+                    var homeReceiverOOP = heapManager.GetInstanceVariable(homeCtxOOP, receiverIndex);
+                    Console.WriteLine($"  Home receiver: {homeReceiverOOP}");
+                    if (homeReceiverOOP != metadata.KnownObjects.Nil)
+                    {
+                        string homeReceiverClass = heapManager.GetClassName(homeReceiverOOP);
+                        Console.WriteLine($"  Home receiver class: {homeReceiverClass}");
+                    }
+                }
+
+                // Dump sender chain
+                Console.WriteLine("  Sender chain:");
+                var senderOOP = heapManager.GetInstanceVariable(context.ActiveContext, VMConstants.CONTEXT_SENDER_INDEX);
+                int depth = 0;
+                while (senderOOP != metadata.KnownObjects.Nil && depth < 10)
+                {
+                    var senderClassOOP = heapManager.GetClassOOP(senderOOP);
+                    bool senderIsBlock = senderClassOOP == metadata.BlockContextClassOOP;
+                    var senderMethodOOP = senderIsBlock
+                        ? heapManager.GetInstanceVariable(context.FindMethodContext(senderOOP), VMConstants.CONTEXT_METHOD_INDEX)
+                        : heapManager.GetInstanceVariable(senderOOP, VMConstants.CONTEXT_METHOD_INDEX);
+
+                    string senderSelector = "?";
+                    if (senderMethodOOP != metadata.KnownObjects.Nil)
+                    {
+                        try
+                        {
+                            var selOOP = heapManager.GetIndexedOOP(senderMethodOOP, 1);
+                            int selSize = heapManager.GetIndexedSize(selOOP);
+                            var selBytes = new byte[selSize];
+                            for (int i = 0; i < selSize; i++)
+                                selBytes[i] = heapManager.GetIndexedByte(selOOP, i);
+                            senderSelector = System.Text.Encoding.UTF8.GetString(selBytes);
+                        }
+                        catch { }
+                    }
+
+                    var senderRecv = senderIsBlock
+                        ? heapManager.GetInstanceVariable(context.FindMethodContext(senderOOP), receiverIndex)
+                        : heapManager.GetInstanceVariable(senderOOP, receiverIndex);
+                    string recvClass = senderRecv == metadata.KnownObjects.Nil ? "nil" : heapManager.GetClassName(senderRecv);
+
+                    Console.WriteLine($"    [{depth}] {(senderIsBlock ? "Block" : "Method")} {senderSelector} (recv: {recvClass})");
+
+                    senderOOP = heapManager.GetInstanceVariable(senderOOP, VMConstants.CONTEXT_SENDER_INDEX);
+                    depth++;
+                }
+                Console.WriteLine();
+            }
+
             var valueOOP = heapManager.GetInstanceVariable(receiverOOP, index);
             context.Push(valueOOP);
             return true;

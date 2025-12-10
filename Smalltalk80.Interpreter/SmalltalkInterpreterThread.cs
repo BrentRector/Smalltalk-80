@@ -607,45 +607,6 @@ public class SmalltalkInterpreterThread
         var nilOOP = _context.HeapManager.GetNil();
         if (firstLinkOOP == nilOOP)
             Console.WriteLine("    WARNING: Background process NOT on priority 1 queue!");
-        else
-        {
-            Console.WriteLine($"    Background process on queue: {firstLinkOOP}");
-            // Debug: Check the process's suspendedContext at creation time
-            var suspCtx = _context.HeapManager.GetInstanceVariable(firstLinkOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-            Console.WriteLine($"    SuspendedContext: {suspCtx}");
-            var ctxClass = _context.HeapManager.GetClassName(suspCtx);
-            Console.WriteLine($"    Context class: {ctxClass}");
-            if (ctxClass == "BlockContext")
-            {
-                var homeCtx = _context.HeapManager.GetInstanceVariable(suspCtx, VMConstants.BLOCKCONTEXT_HOME_INDEX);
-                var startPC = _context.HeapManager.GetInstanceVariable(suspCtx, VMConstants.BLOCKCONTEXT_STARTPC_INDEX);
-                Console.WriteLine($"    Home context: {homeCtx}, startPC: {startPC}");
-                var homeMethod = _context.HeapManager.GetInstanceVariable(homeCtx, VMConstants.CONTEXT_METHOD_INDEX);
-                Console.WriteLine($"    Home method: {homeMethod}");
-                // Get method selector (literal 0 is at indexed slot 1, slot 0 is header)
-                var methodIndexedSize = _context.HeapManager.GetIndexedSize(homeMethod);
-                if (methodIndexedSize >= 2)
-                {
-                    var selectorOOP = _context.HeapManager.GetIndexedOOP(homeMethod, 1);
-                    var selectorName = ExtractSymbolString(selectorOOP);
-                    Console.WriteLine($"    Home method selector: {selectorName}");
-                }
-                // Get bytecodes length
-                var bytecodeArrayOOP = _context.HeapManager.GetIndexedOOP(homeMethod, methodIndexedSize - 1);
-                var bcLength = _context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
-                Console.WriteLine($"    Bytecodes length: {bcLength}, startPC: {(startPC.IsSmallInteger ? startPC.AsSmallInteger() : -1)}");
-                if (startPC.IsSmallInteger && startPC.AsSmallInteger() >= bcLength)
-                    Console.WriteLine($"    *** WARNING: startPC ({startPC.AsSmallInteger()}) >= bytecodes length ({bcLength})! ***");
-                // Also dump actual bytecodes
-                Console.Write($"    Bytecodes: ");
-                for (int i = 0; i < Math.Min(bcLength, 20); i++)
-                {
-                    var b = _context.HeapManager.GetIndexedByte(bytecodeArrayOOP, i);
-                    Console.Write($"{b} ");
-                }
-                Console.WriteLine();
-            }
-        }
 
         // Step 2: ControlManager new → install as ScheduledControllers global
         Console.WriteLine("  Step 2: Creating ControlManager...");
@@ -654,11 +615,7 @@ public class SmalltalkInterpreterThread
         Console.WriteLine($"    ✓ ControlManager created: {controlManagerOOP}");
 
         // Install as Smalltalk global using canonical Association from cold start
-        // The Association for ScheduledControllers was created during method compilation
-        // (since 23 methods reference it) and is in AssociationRegistry and Undeclared.
-        Console.WriteLine("    Installing ScheduledControllers global...");
         InstallScheduledControllersGlobal(controlManagerOOP);
-        Console.WriteLine("    ✓ ControlManager installed as ScheduledControllers global");
 
         // Step 3: Lower bootstrap process priority from 8 to 4 (UserSchedulingPriority)
         // This is CRITICAL: searchForActiveController loops with Processor yield, which only
@@ -712,7 +669,7 @@ public class SmalltalkInterpreterThread
                 "This symbol should have been registered during method compilation.");
         }
 
-        Console.WriteLine($"      Found canonical Association: {associationOOP}");
+        // Console.WriteLine($"      Found canonical Association: {associationOOP}");
 
         // Set the Association's value to the ControlManager instance
         heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, controlManagerOOP);
@@ -769,7 +726,6 @@ public class SmalltalkInterpreterThread
                     }
                 }
 
-                Console.WriteLine($"      Installed at slot {location} (hash={startLocation})");
                 return;
             }
 
@@ -779,7 +735,6 @@ public class SmalltalkInterpreterThread
             {
                 // Replace existing
                 heap.SetIndexedOOP(dictionaryOOP, location, associationOOP);
-                Console.WriteLine($"      Replaced at slot {location}");
                 return;
             }
 
@@ -833,7 +788,6 @@ public class SmalltalkInterpreterThread
 
                 // Fix probe chain
                 FixCollisionsFrom(dictionaryOOP, location);
-                Console.WriteLine($"      Removed from Undeclared at slot {location}");
                 return;
             }
 

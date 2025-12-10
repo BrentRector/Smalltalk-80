@@ -240,9 +240,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _platformBridge?.SetEventCallback(() =>
         {
             // Just set the atomic flag - Smalltalk thread will handle signaling
-            int prev = Interlocked.Exchange(ref _inputEventPending, 1);
-            if (prev == 0)
-                Console.WriteLine("[Callback] _inputEventPending set to 1 (was 0)");
+            Interlocked.Exchange(ref _inputEventPending, 1);
+            // Debug logging disabled
+            // if (prev == 0)
+            //     Console.WriteLine("[Callback] _inputEventPending set to 1 (was 0)");
         });
 
         // Signal caller that initialization is ready
@@ -253,8 +254,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// Check if input events are pending and signal InputSemaphore if so.
     /// Called from Smalltalk thread to safely signal the semaphore.
     /// </summary>
-    // Counter for throttling CheckAndSignal logging
-    private int _checkAndSignalLogCount = 0;
+    // Counter for throttling CheckAndSignal logging (disabled)
+    // private int _checkAndSignalLogCount = 0;
 
     private void CheckAndSignalInputEvents()
     {
@@ -279,19 +280,17 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                     transferred++;
                 }
 
-                // Check InputSemaphore state AFTER signaling
-                var firstLinkAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-                var excessAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
-
-                // Always log when there's a waiter, when state changes, or periodically
-                _checkAndSignalLogCount++;
-                bool hadWaiter = (firstLink != _heapManager.GetNil());
-                bool hasWaiter = (firstLinkAfter != _heapManager.GetNil());
-                bool shouldLog = hadWaiter || hasWaiter || (firstLink != firstLinkAfter) || (_checkAndSignalLogCount % 50 == 0);
-                if (shouldLog)
-                {
-                    Console.WriteLine($"[CheckAndSignal] #{_checkAndSignalLogCount}: Transferred {transferred} signals. firstLink: {firstLink} → {firstLinkAfter}, excess: {excessBefore} → {excessAfter}");
-                }
+                // Debug logging disabled - uncomment to trace input signal transfers
+                // var firstLinkAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
+                // var excessAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
+                // _checkAndSignalLogCount++;
+                // bool hadWaiter = (firstLink != _heapManager.GetNil());
+                // bool hasWaiter = (firstLinkAfter != _heapManager.GetNil());
+                // bool shouldLog = hadWaiter || hasWaiter || (firstLink != firstLinkAfter) || (_checkAndSignalLogCount % 50 == 0);
+                // if (shouldLog)
+                // {
+                //     Console.WriteLine($"[CheckAndSignal] #{_checkAndSignalLogCount}: Transferred {transferred} signals. firstLink: {firstLink} → {firstLinkAfter}, excess: {excessBefore} → {excessAfter}");
+                // }
             }
             // No longer warn about unregistered InputSemaphore - it's expected during startup
         }

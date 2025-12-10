@@ -1085,15 +1085,38 @@ namespace Smalltalk80.Compiler.AST
 
 
         /// <summary>
-        /// Gets class variables for a class.
+        /// Gets class variables for a class, including inherited class variables from superclasses.
+        /// Blue Book: Class variables are inherited - a subclass can access class variables
+        /// declared in any of its superclasses.
         /// </summary>
         private Dictionary<string, object> GetClassVariables(ClassDefinitionNode classNode)
         {
             var classVars = new Dictionary<string, object>();
-            foreach (var varName in classNode.ClassVariables)
+
+            // Walk the class hierarchy to collect inherited class variables
+            string? currentClassName = classNode.Name;
+            while (currentClassName != null)
             {
-                classVars[varName] = new { type = "ClassVariable", name = varName };
+                if (_classes.TryGetValue(currentClassName, out var currentClass))
+                {
+                    // Add this class's class variables (if any)
+                    foreach (var varName in currentClass.ClassVariables)
+                    {
+                        // Only add if not already present (subclass can shadow, though Blue Book discourages this)
+                        if (!classVars.ContainsKey(varName))
+                        {
+                            classVars[varName] = new { type = "ClassVariable", name = varName, declaredInClass = currentClassName };
+                        }
+                    }
+                    // Move to superclass
+                    currentClassName = currentClass.Superclass;
+                }
+                else
+                {
+                    break; // Can't find class definition, stop walking
+                }
             }
+
             return classVars;
         }
 
@@ -1108,18 +1131,42 @@ namespace Smalltalk80.Compiler.AST
         private Dictionary<string, object> GetPoolVariables(ClassDefinitionNode classNode)
         {
             var poolVars = new Dictionary<string, object>();
-            // Console.WriteLine($"[GetPoolVariables] Class: {classNode.Name}, Pool count: {classNode.PoolDictionaries.Count}");
 
-            // For offline compiler: return EMPTY dictionary if class has pools
-            // The count > 0 tells VariableResolver to treat undefined vars as pool variables
-            // Pool dictionary names are passed separately via KnownPoolDictionaryNames
-            if (classNode.PoolDictionaries.Count > 0)
+            // Collect pool dictionaries from the class AND all superclasses
+            // Pool dictionary inheritance: a subclass can access pool variables from ancestor pool dictionaries
+            var allPoolDictionaries = new List<string>();
+
+            // Walk the class hierarchy to collect inherited pool dictionaries
+            string? currentClassName = classNode.Name;
+            while (currentClassName != null)
+            {
+                if (_classes.TryGetValue(currentClassName, out var currentClass))
+                {
+                    // Add this class's pool dictionaries (if any)
+                    if (currentClass.PoolDictionaries.Count > 0)
+                    {
+                        allPoolDictionaries.AddRange(currentClass.PoolDictionaries);
+                    }
+                    // Move to superclass
+                    currentClassName = currentClass.Superclass;
+                }
+                else
+                {
+                    break; // Can't find class definition, stop walking
+                }
+            }
+
+            // Console.WriteLine($"[GetPoolVariables] Class: {classNode.Name}, Pool count (including inherited): {allPoolDictionaries.Count}");
+
+            // For offline compiler: return dictionary with marker if class has any pools (direct or inherited)
+            // The marker tells VariableResolver to treat undefined vars as pool variables
+            if (allPoolDictionaries.Count > 0)
             {
                 // Add a marker entry so PoolVariables.Count > 0 (triggers pool variable resolution)
                 // Use a special key that will never match a real variable name
-                poolVars["__HAS_POOLS__"] = string.Join(",", classNode.PoolDictionaries);
+                poolVars["__HAS_POOLS__"] = string.Join(",", allPoolDictionaries);
             }
-            
+
             return poolVars;
         }
 

@@ -354,20 +354,20 @@ public static class ControlPrimitives
 
             int excessCount = excessSignalsOop.AsSmallInteger();
 
-            // Check if this is the InputSemaphore for logging
-            var inputSemOOP = context.Platform?.GetInputSemaphore() ?? default;
-            bool isInputSemaphore = (inputSemOOP != default && context.Receiver == inputSemOOP);
-            if (isInputSemaphore)
-                Console.WriteLine($"[Prim86 Wait] InputSemaphore excessSignals={excessCount}");
+            // Debug logging disabled - uncomment to trace semaphore operations
+            // var inputSemOOP = context.Platform?.GetInputSemaphore() ?? default;
+            // bool isInputSemaphore = (inputSemOOP != default && context.Receiver == inputSemOOP);
+            // if (isInputSemaphore)
+            //     Console.WriteLine($"[Prim86 Wait] InputSemaphore excessSignals={excessCount}");
 
             if (excessCount > 0)
             {
                 // Signal available - decrement and continue (no actual wait)
                 context.HeapManager.SetInstanceVariable(context.Receiver, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX,
                     SmalltalkOOP.FromSmallInteger(excessCount - 1));
-                // ALWAYS log when InputProcess consumes a signal - this verifies InputProcess is actually running
-                if (isInputSemaphore)
-                    Console.WriteLine($"[Prim86 Wait] InputSemaphore - CONSUMED signal, now {excessCount - 1}");
+                // Debug logging disabled
+                // if (isInputSemaphore)
+                //     Console.WriteLine($"[Prim86 Wait] InputSemaphore - CONSUMED signal, now {excessCount - 1}");
                 return PrimitiveResult.Ok(context.Receiver);
             }
             else
