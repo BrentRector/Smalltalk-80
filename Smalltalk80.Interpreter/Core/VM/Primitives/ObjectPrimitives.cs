@@ -30,6 +30,10 @@ public static class SimpleObjectPrimitives
                 int cmIndexedSize = context.HeapManager.GetIndexedSize(context.Receiver);
                 var bytecodeArrayOOP = context.HeapManager.GetIndexedOOP(context.Receiver, cmIndexedSize - 1);
                 int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
+
+                // DIAGNOSTIC
+                Console.WriteLine($"[Prim62] CM size: receiver={context.Receiver}, cmIndexedSize={cmIndexedSize}, bytecodeArrayOOP={bytecodeArrayOOP}, bytecodeCount={bytecodeCount}");
+
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(bytecodeCount));
             }
 
@@ -199,6 +203,9 @@ public static class SimpleObjectPrimitives
                 int cmIndexedSize = context.HeapManager.GetIndexedSize(context.Receiver);
                 var bytecodeArrayOOP = context.HeapManager.GetIndexedOOP(context.Receiver, cmIndexedSize - 1);
                 int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
+
+                // DIAGNOSTIC
+                Console.WriteLine($"[Prim61] CM at:put: receiver={context.Receiver}, index={index}, cmIndexedSize={cmIndexedSize}, bytecodeArrayOOP={bytecodeArrayOOP}, bytecodeCount={bytecodeCount}");
 
                 if (index < 1 || index > bytecodeCount)
                     return PrimitiveResult.Fail(context.Metadata!);
@@ -757,6 +764,12 @@ public static class SimpleObjectPrimitives
                 headerWord,
                 literalOOPs,
                 bytecodes);
+
+            // DIAGNOSTIC
+            int indexedSize = context.HeapManager.GetIndexedSize(methodOOP);
+            var bytecodeArrayOOP = context.HeapManager.GetIndexedOOP(methodOOP, indexedSize - 1);
+            int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
+            Console.WriteLine($"[Prim79] newMethod:{numberOfBytes} header:{headerWord} -> method={methodOOP}, indexedSize={indexedSize}, bytecodeArrayOOP={bytecodeArrayOOP}, bytecodeCount={bytecodeCount}");
 
             return PrimitiveResult.Ok(methodOOP);
         }
