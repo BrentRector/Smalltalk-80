@@ -597,7 +597,9 @@ public static class SimpleObjectPrimitives
             int position = positionOOP.AsSmallInteger();
             int readLimit = readLimitOOP.AsSmallInteger();
 
-            return PrimitiveResult.FromBool(position > readLimit, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
+            // Blue Book specification: atEnd returns position >= readLimit (NOT >)
+            // This must match the Smalltalk fallback behavior exactly
+            return PrimitiveResult.FromBool(position >= readLimit, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
