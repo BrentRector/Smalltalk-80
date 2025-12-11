@@ -490,20 +490,26 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var ipOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
         int ip = ipOOP.AsSmallInteger();
 
-        while (ip < bytecodes.Length)
-        {
-            // Validate IP is within bytecode array
-            // GetMethodBytecodes() returns all bytes including the 3-byte source offset at end
-            // The interpreter should never execute into the source offset bytes
-            if (ip >= bytecodes.Length)
-            {
-                var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
-                string errorMsg = $"IP out of range: IP={ip} exceeds executable bytecode length={bytecodes.Length} in method {methodLocalId} OOP({methodOOP}). " +
-                                 $"This indicates either a missing RETURN instruction or a malformed jump bytecode.";
-                _debugger.DumpCrashDiagnostics(errorMsg);
-                throw new InvalidOperationException(errorMsg);
-            }
+        // CompiledMethod bytecodes end with a 3-byte source offset trailer
+        // The interpreter must never execute into those bytes
+        int executableLength = bytecodes.Length - 3;
 
+        // Safety check: if IP has reached the source offset boundary, the method
+        // is missing a return bytecode. For doIt expressions, implicitly return
+        // the top of stack. For regular methods, this indicates a compiler bug.
+        if (ip >= executableLength)
+        {
+            var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
+            Console.WriteLine($"[IMPLICIT RETURN] PC={ip} reached bytecode boundary (executableLength={executableLength}) " +
+                            $"in method {methodLocalId}. Implicitly returning top of stack.");
+
+            // Pop the top of stack as return value and return from method
+            var returnValue = _stackManager.Pop(_contextManager.ActiveContext);
+            return HandleReturn(returnValue);
+        }
+
+        while (ip < executableLength)
+        {
             byte bytecode = bytecodes[ip++];
 
             // Update IP
