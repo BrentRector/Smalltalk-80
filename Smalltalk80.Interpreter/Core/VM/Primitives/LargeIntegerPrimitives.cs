@@ -26,7 +26,21 @@ public static class LargeIntegerArithmetic
             bytes[i] = context.HeapManager.GetIndexedByte(largeIntOop, i);
         }
 
-        return new BigInteger(bytes);
+        // Check if it's a LargeNegativeInteger
+        SmalltalkOOP classOOP = context.HeapManager.GetClassOOP(largeIntOop);
+        var negClass = context.RuntimeHeapAccess?.GetClass("LargeNegativeInteger");
+
+        if (negClass != null && classOOP == negClass)
+        {
+            // LargeNegativeInteger: bytes represent absolute value, result should be negative
+            return -new BigInteger(bytes, isUnsigned: true, isBigEndian: false);
+        }
+        else
+        {
+            // LargePositiveInteger: bytes represent a positive number
+            // Must use isUnsigned: true to avoid treating high-bit-set values as negative
+            return new BigInteger(bytes, isUnsigned: true, isBigEndian: false);
+        }
     }
 
     /// <summary>
