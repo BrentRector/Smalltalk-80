@@ -4771,7 +4771,7 @@ BinaryChoiceController comment:
 !BinaryChoiceController methodsFor: 'control defaults'!
 isControlActive
 	model actionTaken ifTrue: [^false].
-	[super isControlActive] whileFalse: [view flash].
+	[super isControlActive] whileFalse: [Processor yield. view flash].
 	^true! !
 
 !BinaryChoiceController methodsFor: 'basic control sequence'!
