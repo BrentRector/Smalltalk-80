@@ -187,23 +187,26 @@ public class InitExpressionExecutor
             // Step 3: Create MethodContext for init expression
             SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
 
-            // DIAGNOSTIC: Verify methodContextOOP is a valid MethodContext before creating Process
-            var mcClassOOP = _heapManager.GetClassOOP(methodContextOOP);
-            var mcClassName = _heapManager.GetClassName(methodContextOOP);
-            if (mcClassOOP != RuntimeSpecialObjects.Instance.MethodContextClass)
-            {
-                throw new InvalidOperationException(
-                    $"ExecuteInitExpression BUG: CreateMethodContextForInitExpression returned non-MethodContext!\n" +
-                    $"  methodContextOOP: {methodContextOOP}\n" +
-                    $"  Its class: {mcClassOOP} ({mcClassName})\n" +
-                    $"  Expected: {RuntimeSpecialObjects.Instance.MethodContextClass} (MethodContext)");
-            }
+            // CRITICAL FIX: Add methodContext as GC root BEFORE creating Process
+            // Without this, AutoGC during Process allocation can collect the methodContext
+            // (since it's not yet reachable from any Smalltalk object), causing the Process
+            // allocation to reuse the same OOP slot - resulting in suspendedContext = self!
+            _heapManager.GC.AddGCRoot(methodContextOOP);
 
-            // Step 4: Create Process with this context
-            // Priority 8 (TimingPriority) prevents preemption when init expressions
-            // fork processes at priority 8 (e.g., Delay's timing process).
-            // Since 8 > 8 is false, no preemption occurs.
-            SmalltalkOOP processOOP = CreateProcess(methodContextOOP, priority: 8);
+            SmalltalkOOP processOOP;
+            try
+            {
+                // Step 4: Create Process with this context
+                // Priority 8 (TimingPriority) prevents preemption when init expressions
+                // fork processes at priority 8 (e.g., Delay's timing process).
+                // Since 8 > 8 is false, no preemption occurs.
+                processOOP = CreateProcess(methodContextOOP, priority: 8);
+            }
+            finally
+            {
+                // Remove the temporary GC root - methodContext is now reachable via Process.suspendedContext
+                _heapManager.GC.RemoveGCRoot(methodContextOOP);
+            }
 
             // Step 5: Execute via primitive 87 (resume)
             SmalltalkOOP resultOOP;
