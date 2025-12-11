@@ -5766,14 +5766,21 @@ arguments: argNodes
 numberOfArguments
 	^arguments size!
 returnLast
+	| lastStmt newNode |
 	Transcript show: 'returnLast: returns='; print: self returns; cr.
 	Transcript show: 'statements size='; print: statements size; cr.
 	Transcript show: 'statements last class='; print: statements last class; cr.
 	self returns
 		ifFalse:
 			[returns _ true.
-			statements at: statements size put: statements last asReturnNode.
-			Transcript show: 'After replace, statements last class='; print: statements last class; cr]!
+			lastStmt _ statements last.
+			Transcript show: 'lastStmt class='; print: lastStmt class; cr.
+			newNode _ lastStmt asReturnNode.
+			Transcript show: 'newNode class='; print: newNode class; cr.
+			Transcript show: 'newNode isNil='; print: newNode isNil; cr.
+			statements at: statements size put: newNode.
+			Transcript show: 'After at:put:, statements last='; print: statements last; cr.
+			Transcript show: 'After at:put:, statements last class='; print: statements last class; cr]!
 returnSelfIfNoOther
 	self returns
 		ifFalse: 
