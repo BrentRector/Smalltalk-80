@@ -372,6 +372,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         while (true)
         {
+            // Check for shutdown signal from main thread (window closed)
+            if (ShutdownToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException("Shutdown requested", ShutdownToken);
+            }
+
             // CRITICAL: If NLR is pending, continue unwinding BEFORE checking for events.
             // NLR unwinding must be atomic - we cannot allow process switches in the middle
             // because the NLR state (_nlrHandler) is VM-global, not per-process.
