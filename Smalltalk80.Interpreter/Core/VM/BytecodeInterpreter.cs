@@ -1175,11 +1175,13 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
         // Fast path for at: (index 0) - indexed access
         // NOTE: Skip ByteIndexed (Strings/Symbols) - they need to return Character objects, not SmallIntegers
+        // NOTE: Skip CompiledMethod - at: accesses bytecodes, not indexed slots (uses hidden ByteArray)
         if (selectorIndex == 0 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
         {
             var format = heapManager.GetObjectFormat(receiverOOP);
-            // Only apply fast path to non-ByteIndexed objects
-            if (format != ObjectFormat.ByteIndexed)
+            var classOOP = heapManager.GetClassOOP(receiverOOP);
+            // Only apply fast path to non-ByteIndexed and non-CompiledMethod objects
+            if (format != ObjectFormat.ByteIndexed && classOOP != metadata.CompiledMethodClassOOP)
             {
                 int index = args[0].AsSmallInteger();
                 int size = heapManager.GetIndexedSize(receiverOOP);
@@ -1205,11 +1207,13 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
         // Fast path for at:put: (index 1) - indexed store
         // NOTE: Skip ByteIndexed (Strings/Symbols) - they expect Character arguments, not SmallIntegers
+        // NOTE: Skip CompiledMethod - at:put: sets bytecodes, not indexed slots (uses hidden ByteArray)
         if (selectorIndex == 1 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
         {
             var format = heapManager.GetObjectFormat(receiverOOP);
-            // Only apply fast path to non-ByteIndexed objects
-            if (format != ObjectFormat.ByteIndexed)
+            var classOOP = heapManager.GetClassOOP(receiverOOP);
+            // Only apply fast path to non-ByteIndexed and non-CompiledMethod objects
+            if (format != ObjectFormat.ByteIndexed && classOOP != metadata.CompiledMethodClassOOP)
             {
                 int index = args[0].AsSmallInteger();
                 var value = args[1];

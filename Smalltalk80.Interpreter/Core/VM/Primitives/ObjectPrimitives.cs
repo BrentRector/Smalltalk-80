@@ -30,10 +30,6 @@ public static class SimpleObjectPrimitives
                 int cmIndexedSize = context.HeapManager.GetIndexedSize(context.Receiver);
                 var bytecodeArrayOOP = context.HeapManager.GetIndexedOOP(context.Receiver, cmIndexedSize - 1);
                 int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
-
-                // DIAGNOSTIC
-                Console.WriteLine($"[Prim62] CM size: receiver={context.Receiver}, cmIndexedSize={cmIndexedSize}, bytecodeArrayOOP={bytecodeArrayOOP}, bytecodeCount={bytecodeCount}");
-
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(bytecodeCount));
             }
 
@@ -63,12 +59,6 @@ public static class SimpleObjectPrimitives
                 // This deviation from canonical behavior is necessary for dictionary indexing.
                 int value = context.Receiver.AsSmallInteger();
                 hashValue = value & 0x3FFFFFFF;
-
-                // DIAGNOSTIC: Log hash operations for small integers (especially negative)
-                if (value < 0 || value <= 2)
-                {
-                    Console.WriteLine($"[Primitive 75 Hash] SmallInteger {value} -> hash {hashValue}");
-                }
             }
             else
             {
@@ -203,9 +193,6 @@ public static class SimpleObjectPrimitives
                 int cmIndexedSize = context.HeapManager.GetIndexedSize(context.Receiver);
                 var bytecodeArrayOOP = context.HeapManager.GetIndexedOOP(context.Receiver, cmIndexedSize - 1);
                 int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
-
-                // DIAGNOSTIC
-                Console.WriteLine($"[Prim61] CM at:put: receiver={context.Receiver}, index={index}, cmIndexedSize={cmIndexedSize}, bytecodeArrayOOP={bytecodeArrayOOP}, bytecodeCount={bytecodeCount}");
 
                 if (index < 1 || index > bytecodeCount)
                     return PrimitiveResult.Fail(context.Metadata!);
@@ -627,19 +614,6 @@ public static class SimpleObjectPrimitives
             if (index > size) return PrimitiveResult.Fail(context.Metadata!);
 
             SmalltalkOOP value = context.Arguments[1];
-
-            // DIAGNOSTIC: Track writes to CompiledMethod objects
-            var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
-            if (classOOP == context.Metadata!.CompiledMethodClassOOP)
-            {
-                Console.WriteLine($"[Prim69] CM objectAt:put: receiver={context.Receiver}, index={index}, value={value}, size={size}");
-                // ALERT if writing to the last slot (bytecodeArrayOOP)
-                if (index == size)
-                {
-                    Console.WriteLine($"[Prim69] *** WARNING: Writing to bytecodeArrayOOP slot! ***");
-                }
-            }
-
             context.HeapManager.SetIndexedOOP(context.Receiver, index - 1, value);
             return PrimitiveResult.Ok(value);
         }
@@ -777,12 +751,6 @@ public static class SimpleObjectPrimitives
                 headerWord,
                 literalOOPs,
                 bytecodes);
-
-            // DIAGNOSTIC
-            int indexedSize = context.HeapManager.GetIndexedSize(methodOOP);
-            var bytecodeArrayOOP = context.HeapManager.GetIndexedOOP(methodOOP, indexedSize - 1);
-            int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
-            Console.WriteLine($"[Prim79] newMethod:{numberOfBytes} header:{headerWord} -> method={methodOOP}, indexedSize={indexedSize}, bytecodeArrayOOP={bytecodeArrayOOP}, bytecodeCount={bytecodeCount}");
 
             return PrimitiveResult.Ok(methodOOP);
         }
