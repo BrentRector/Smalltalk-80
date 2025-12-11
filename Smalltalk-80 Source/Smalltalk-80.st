@@ -3707,7 +3707,10 @@ init  "Behavior init."
 	SelectorsOfCopiedMethods _ IdentityDictionary new.
 		"selector -> Array of classes"
 	SelectorsOfDirectedMethods _ IdentityDictionary new
-		"selector -> Array of classes"! !Object subclass: #Benchmark
+		"selector -> Array of classes"! !
+
+Behavior init!
+Object subclass: #Benchmark
 	instanceVariableNames: 'dummy verboseTranscript reporting reportStream fromList '
 	classVariableNames: 'Outputs StandardTests '
 	poolDictionaries: ''
