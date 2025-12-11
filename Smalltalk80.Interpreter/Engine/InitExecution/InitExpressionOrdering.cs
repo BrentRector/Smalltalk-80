@@ -17,7 +17,6 @@ public static class InitExpressionOrdering
             "Character initialize",
             "Float initialize",
             "SmallInteger initialize",
-            "Behavior init",  // Initialize SelectorsOfConflictMethods etc. - after basic types
             "BinaryChoiceView initialize",
             "ClassOrganizer initialize",
             "CompiledMethod initialize",

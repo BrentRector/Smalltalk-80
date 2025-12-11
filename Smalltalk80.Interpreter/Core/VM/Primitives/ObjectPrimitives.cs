@@ -535,20 +535,24 @@ public static class SimpleObjectPrimitives
             if (collectionOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int collectionSize = context.HeapManager.GetIndexedSize(collectionOOP);
-            if (position < 1 || position > collectionSize) return PrimitiveResult.Fail(context.Metadata!);
+            // Smalltalk semantics: increment position FIRST, then write at new position
+            // So we write at (position + 1) in 1-based terms = position in 0-based terms
+            // position < 0 means invalid; position >= collectionSize means past the end
+            if (position < 0 || position >= collectionSize) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Write element to collection
+            // Write element to collection at 0-based index 'position'
+            // (which is 1-based index position+1, matching Smalltalk's increment-then-write)
             var format = context.HeapManager.GetObjectFormat(collectionOOP);
             if (format == ObjectFormat.ByteIndexed)
             {
                 if (!value.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
                 int byteValue = value.AsSmallInteger();
                 if (byteValue < 0 || byteValue > 255) return PrimitiveResult.Fail(context.Metadata!);
-                context.HeapManager.SetIndexedByte(collectionOOP, position - 1, (byte)byteValue);
+                context.HeapManager.SetIndexedByte(collectionOOP, position, (byte)byteValue);
             }
             else
             {
-                context.HeapManager.SetIndexedOOP(collectionOOP, position - 1, value);
+                context.HeapManager.SetIndexedOOP(collectionOOP, position, value);
             }
 
             // Increment position
