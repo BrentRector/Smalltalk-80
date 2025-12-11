@@ -30,6 +30,25 @@ public static class LargeIntegerArithmetic
     }
 
     /// <summary>
+    /// Converts a SmallInteger or LargeInteger to BigInteger.
+    /// Returns null if the argument is neither SmallInteger nor LargeInteger.
+    /// </summary>
+    private static BigInteger? ToIntegerValue(PrimitiveExecutionContext context, SmalltalkOOP oop)
+    {
+        if (oop.IsSmallInteger)
+        {
+            return oop.AsSmallInteger();
+        }
+
+        if (IsLargeInteger(context, oop))
+        {
+            return ToBigInteger(context, oop);
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Creates a LargeInteger object from a BigInteger.
     /// Returns SmallInteger if value fits in 30-bit range.
     /// </summary>
@@ -117,12 +136,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            BigInteger result = left + right;
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            BigInteger result = leftValue.Value + rightValue.Value;
 
             return PrimitiveResult.Ok(FromBigInteger(context, result));
         }
@@ -134,12 +157,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            BigInteger result = left - right;
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            BigInteger result = leftValue.Value - rightValue.Value;
 
             return PrimitiveResult.Ok(FromBigInteger(context, result));
         }
@@ -151,12 +178,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left < right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            return PrimitiveResult.FromBool(leftValue.Value < rightValue.Value, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -166,12 +197,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left > right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            return PrimitiveResult.FromBool(leftValue.Value > rightValue.Value, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -181,12 +216,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left <= right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            return PrimitiveResult.FromBool(leftValue.Value <= rightValue.Value, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -196,12 +235,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left >= right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            return PrimitiveResult.FromBool(leftValue.Value >= rightValue.Value, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -211,12 +254,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left == right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            return PrimitiveResult.FromBool(leftValue.Value == rightValue.Value, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -226,12 +273,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            return PrimitiveResult.FromBool(left != right, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            return PrimitiveResult.FromBool(leftValue.Value != rightValue.Value, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -241,12 +292,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            BigInteger result = left * right;
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            BigInteger result = leftValue.Value * rightValue.Value;
 
             return PrimitiveResult.Ok(FromBigInteger(context, result));
         }
@@ -258,11 +313,17 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger dividend = ToBigInteger(context, context.Receiver);
-            BigInteger divisor = ToBigInteger(context, context.Arguments[0]);
+            BigInteger? dividendValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? divisorValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (dividendValue == null || divisorValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            BigInteger dividend = dividendValue.Value;
+            BigInteger divisor = divisorValue.Value;
 
             if (divisor == BigInteger.Zero) return PrimitiveResult.Fail(context.Metadata!);
 
@@ -279,11 +340,17 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger dividend = ToBigInteger(context, context.Receiver);
-            BigInteger divisor = ToBigInteger(context, context.Arguments[0]);
+            BigInteger? dividendValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? divisorValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (dividendValue == null || divisorValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            BigInteger dividend = dividendValue.Value;
+            BigInteger divisor = divisorValue.Value;
 
             if (divisor == BigInteger.Zero) return PrimitiveResult.Fail(context.Metadata!);
 
@@ -302,11 +369,17 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger dividend = ToBigInteger(context, context.Receiver);
-            BigInteger divisor = ToBigInteger(context, context.Arguments[0]);
+            BigInteger? dividendValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? divisorValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (dividendValue == null || divisorValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            BigInteger dividend = dividendValue.Value;
+            BigInteger divisor = divisorValue.Value;
 
             if (divisor == BigInteger.Zero) return PrimitiveResult.Fail(context.Metadata!);
 
@@ -325,11 +398,17 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger dividend = ToBigInteger(context, context.Receiver);
-            BigInteger divisor = ToBigInteger(context, context.Arguments[0]);
+            BigInteger? dividendValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? divisorValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (dividendValue == null || divisorValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            BigInteger dividend = dividendValue.Value;
+            BigInteger divisor = divisorValue.Value;
 
             if (divisor == BigInteger.Zero) return PrimitiveResult.Fail(context.Metadata!);
 
@@ -346,12 +425,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            BigInteger result = left & right;
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            BigInteger result = leftValue.Value & rightValue.Value;
 
             return PrimitiveResult.Ok(FromBigInteger(context, result));
         }
@@ -363,12 +446,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            BigInteger result = left | right;
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            BigInteger result = leftValue.Value | rightValue.Value;
 
             return PrimitiveResult.Ok(FromBigInteger(context, result));
         }
@@ -380,12 +467,16 @@ public static class LargeIntegerArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!IsLargeInteger(context, context.Receiver) || !IsLargeInteger(context, context.Arguments[0]))
+            if (!IsLargeInteger(context, context.Receiver))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            BigInteger left = ToBigInteger(context, context.Receiver);
-            BigInteger right = ToBigInteger(context, context.Arguments[0]);
-            BigInteger result = left ^ right;
+            BigInteger? leftValue = ToIntegerValue(context, context.Receiver);
+            BigInteger? rightValue = ToIntegerValue(context, context.Arguments[0]);
+
+            if (leftValue == null || rightValue == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            BigInteger result = leftValue.Value ^ rightValue.Value;
 
             return PrimitiveResult.Ok(FromBigInteger(context, result));
         }
