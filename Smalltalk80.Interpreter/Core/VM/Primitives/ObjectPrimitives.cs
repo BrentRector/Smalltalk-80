@@ -534,6 +534,12 @@ public static class SimpleObjectPrimitives
             if (position > writeLimit) return PrimitiveResult.Fail(context.Metadata!);
             if (collectionOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
+            // CompiledMethod has custom at:put: that writes to a separate ByteArray.
+            // We must fail here so the Smalltalk fallback uses at:put: correctly.
+            var collectionClass = context.HeapManager.GetClassOOP(collectionOOP);
+            if (collectionClass == context.Metadata!.CompiledMethodClassOOP)
+                return PrimitiveResult.Fail(context.Metadata!);
+
             int collectionSize = context.HeapManager.GetIndexedSize(collectionOOP);
             // Smalltalk semantics: increment position FIRST, then write at new position
             // So we write at (position + 1) in 1-based terms = position in 0-based terms
