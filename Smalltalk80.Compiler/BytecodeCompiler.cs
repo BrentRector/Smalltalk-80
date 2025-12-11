@@ -2215,15 +2215,16 @@ namespace Smalltalk80.Compiler
                 argSlotIndices.Add(allocator.GetSlotIndex(argName));
             }
 
-            // Blue Book bytecode pattern: blockCopy: + LONG_JUMP + block body
+            // Blue Book bytecode pattern: LdThisContext + push nargs + blockCopy: + LONG_JUMP + block body
             // Primitive 80 calculates initialIP = PC + 2 (skips 2-byte Blue Book LONG_JUMP)
             // Block body comes AFTER the blockCopy: send and jump
 
-            // STEP 1: Emit blockCopy: send (Blue Book compliant - 1 argument: nargs)
-            // NOTE: blockCopy: is a SPECIAL operation - it operates on the active context, NOT a receiver from stack
-            // The VM's ExecuteSendSpecial handles it specially WITHOUT popping a receiver
-            emitter.PushSmallInteger(argCount); // Only arg: block argument count
-            emitter.EmitByte(0xC8); // SEND_SPECIAL_BLOCKCOPY ← Primitive executes here
+            // STEP 1: Emit blockCopy: send (Blue Book compliant - matches Smalltalk compiler)
+            // The Smalltalk compiler emits: LdThisContext, push nargs, send blockCopy:
+            // The VM's ExecuteSendSpecial pops both the argument (nargs) and receiver (thisContext)
+            emitter.PushActiveContext();         // Push thisContext as receiver (0x89)
+            emitter.PushSmallInteger(argCount);  // Push block argument count
+            emitter.EmitByte(0xC8);              // SEND_SPECIAL_BLOCKCOPY ← Primitive executes here
 
             // STEP 2: Emit 2-byte Blue Book LONG_JUMP to skip over block body
             // Blue Book format: opcode (0xA0-0xA7) + 1 extension byte

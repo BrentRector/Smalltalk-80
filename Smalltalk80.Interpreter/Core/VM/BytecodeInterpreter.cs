@@ -1137,9 +1137,10 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         // Handle blockCopy: BEFORE popping arguments - it's a context primitive, not a message send
         if (selectorIndex == 8) // blockCopy:
         {
-            // blockCopy: is unique - it operates on the active context, not a receiver on the stack
-            // BLUE BOOK: Accepts 1 argument (nargs) - block args stored via STORE_TEMP bytecodes
-            var nargsOOP = context.Pop(); // Only arg: block argument count
+            // Both the Smalltalk compiler and C# compiler emit: LdThisContext, push nargs, send blockCopy:
+            // So we need to pop the argument AND the receiver (thisContext) that was pushed.
+            var nargsOOP = context.Pop(); // Pop argument: block argument count
+            context.Pop();                 // Pop receiver: thisContext (discarded - we use ActiveContext)
 
             if (!nargsOOP.IsSmallInteger)
             {
