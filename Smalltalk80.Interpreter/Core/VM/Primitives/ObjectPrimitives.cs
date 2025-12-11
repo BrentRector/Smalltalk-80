@@ -194,6 +194,9 @@ public static class SimpleObjectPrimitives
                 var bytecodeArrayOOP = context.HeapManager.GetIndexedOOP(context.Receiver, cmIndexedSize - 1);
                 int bytecodeCount = context.HeapManager.GetIndexedSize(bytecodeArrayOOP);
 
+                // DIAGNOSTIC: Log bytecode stores
+                Console.WriteLine($"[Prim61-CM] at:{index} put:{value} (bytecodeCount={bytecodeCount})");
+
                 if (index < 1 || index > bytecodeCount)
                     return PrimitiveResult.Fail(context.Metadata!);
 
