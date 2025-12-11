@@ -11837,12 +11837,14 @@ initialPC
 
 	^self numLiterals * BytesPerLiteral + BytesForHeader + 1!
 numArgs
-	"Answer the number of arguments the receiver takes."
+	"Answer the number of arguments the receiver takes.
+	NOTE: Our C# compiler puts the extension literal at the LAST position,
+	not at numLiterals-1 like the Blue Book (which reserves last slot for class Association)."
 
 	| flags |
 	(flags _ self flags) <= 4 ifTrue: [^flags].
 	flags < 7 ifTrue: [^0].
-	^((self literalAt: self numLiterals - 1)
+	^((self literalAt: self numLiterals)
 		bitShift: -8)
 		bitAnd: 31!
 numLiterals
@@ -11869,11 +11871,13 @@ numTempsField
 	^self header // 128 bitAnd: 31!
 primitive
 	"Answer the primitive index associated with the receiver.  Zero indicates
-	that there is either no primitive or just a quick primitive."
+	that there is either no primitive or just a quick primitive.
+	NOTE: Our C# compiler puts the extension literal at the LAST position,
+	not at numLiterals-1 like the Blue Book (which reserves last slot for class Association)."
 
 	self flags < 7
 		ifTrue: [^0]
-		ifFalse: [^(self literalAt: self numLiterals - 1) bitAnd: 255	]!
+		ifFalse: [^(self literalAt: self numLiterals) bitAnd: 255	]!
 returnField
 	"Answer the index of the instance variable returned by a quick
 	return method."
