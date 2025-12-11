@@ -53,50 +53,8 @@ public class InitExpressionExecutor
     /// </summary>
     private SmalltalkOOP ResumeProcess(SmalltalkOOP processOOP)
     {
-        // Get the suspended context from the Process (instance variable 1: suspendedContext)
+        // Get the suspended context from the Process
         var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-
-        // DIAGNOSTIC: Validate that we got a valid MethodContext, not something else
-        var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
-        var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
-        var blockContextClassOOP = _metadata.BlockContextClassOOP;
-
-        if (contextClassOOP != methodContextClassOOP && contextClassOOP != blockContextClassOOP)
-        {
-            // Dump Process fields and context info for debugging
-            var ivar0 = _heapManager.GetInstanceVariable(processOOP, 0);  // nextLink
-            var ivar1 = _heapManager.GetInstanceVariable(processOOP, 1);  // suspendedContext
-            var ivar2 = _heapManager.GetInstanceVariable(processOOP, 2);  // priority
-            var ivar3 = _heapManager.GetInstanceVariable(processOOP, 3);  // myList
-            var processClassOOP = _heapManager.GetClassOOP(processOOP);
-
-            // Get class name for context
-            string contextClassName = "unknown";
-            try
-            {
-                var contextClassNameOOP = _heapManager.GetInstanceVariable(contextClassOOP, 6); // name field
-                int nameSize = _heapManager.GetIndexedSize(contextClassNameOOP);
-                var nameBytes = new byte[nameSize];
-                for (int i = 0; i < nameSize; i++)
-                    nameBytes[i] = _heapManager.GetIndexedByte(contextClassNameOOP, i);
-                contextClassName = System.Text.Encoding.UTF8.GetString(nameBytes);
-            }
-            catch { /* ignore */ }
-
-            throw new InvalidOperationException(
-                $"ResumeProcess BUG: Process.suspendedContext is not a MethodContext or BlockContext!\n" +
-                $"  processOOP: {processOOP}\n" +
-                $"  processClassOOP: {processClassOOP}\n" +
-                $"  contextOOP (from ivar[1]): {contextOOP}\n" +
-                $"  contextClassOOP: {contextClassOOP} ({contextClassName})\n" +
-                $"  expectedClass: {methodContextClassOOP} (MethodContext) or {blockContextClassOOP} (BlockContext)\n" +
-                $"  Process ivar[0] (nextLink): {ivar0}\n" +
-                $"  Process ivar[1] (suspendedContext): {ivar1}\n" +
-                $"  Process ivar[2] (priority): {ivar2}\n" +
-                $"  Process ivar[3] (myList): {ivar3}\n" +
-                $"  PROCESS_SUSPENDEDCONTEXT_INDEX: {VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX}");
-        }
-
         return _vm.ExecuteExistingContext(contextOOP);
     }
 
@@ -184,31 +142,29 @@ public class InitExpressionExecutor
             // Step 2: Prepare canonical receiver
             SmalltalkOOP receiverOOP = GetCanonicalReceiverForDoIt();
 
-            // Step 3: Create MethodContext for init expression
+            // GC-SAFE ALLOCATION ORDER:
+            // Objects are created in order such that each is rooted before the next allocation.
+            // This avoids the need for temporary GC roots.
+            //
+            // Step 3: Create Process with nil suspendedContext (GC during allocation is safe -
+            // the Process being created won't be collected)
+            SmalltalkOOP processOOP = CreateProcessWithNilContext(priority: 8);
+
+            // Step 4: Set Process as activeProcess - now it's rooted via ProcessorScheduler
+            // (SetInstanceVariable doesn't allocate, so no GC can run here)
+            var schedulerOOP = _metadata.ProcessorScheduler;
+            _heapManager.SetInstanceVariable(schedulerOOP,
+                VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, processOOP);
+
+            // Step 5: Create MethodContext (GC during allocation won't collect Process - it's rooted)
             SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
 
-            // CRITICAL FIX: Add methodContext as GC root BEFORE creating Process
-            // Without this, AutoGC during Process allocation can collect the methodContext
-            // (since it's not yet reachable from any Smalltalk object), causing the Process
-            // allocation to reuse the same OOP slot - resulting in suspendedContext = self!
-            _heapManager.GC.AddGCRoot(methodContextOOP);
+            // Step 6: Wire Process.suspendedContext = methodContext
+            // (SetInstanceVariable doesn't allocate, so no GC can run here)
+            _heapManager.SetInstanceVariable(processOOP,
+                VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, methodContextOOP);
 
-            SmalltalkOOP processOOP;
-            try
-            {
-                // Step 4: Create Process with this context
-                // Priority 8 (TimingPriority) prevents preemption when init expressions
-                // fork processes at priority 8 (e.g., Delay's timing process).
-                // Since 8 > 8 is false, no preemption occurs.
-                processOOP = CreateProcess(methodContextOOP, priority: 8);
-            }
-            finally
-            {
-                // Remove the temporary GC root - methodContext is now reachable via Process.suspendedContext
-                _heapManager.GC.RemoveGCRoot(methodContextOOP);
-            }
-
-            // Step 5: Execute via primitive 87 (resume)
+            // Step 7: Execute
             SmalltalkOOP resultOOP;
             try
             {
@@ -859,7 +815,11 @@ public class InitExpressionExecutor
         return System.Text.Encoding.UTF8.GetString(bytes);
     }
 
-    private SmalltalkOOP CreateProcess(SmalltalkOOP suspendedContextOOP, int priority)
+    /// <summary>
+    /// Creates a Process with nil suspendedContext.
+    /// Used in GC-safe allocation order: create Process first, root it, then create context.
+    /// </summary>
+    private SmalltalkOOP CreateProcessWithNilContext(int priority)
     {
         // Get Process class OOP - lookup from live heap
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
@@ -879,34 +839,11 @@ public class InitExpressionExecutor
         var processOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
         _heapManager.SetClassOOP(processOOP, processClassOOP);
 
-        // DIAGNOSTIC: Verify suspendedContextOOP is different from processOOP
-        if (suspendedContextOOP == processOOP)
-        {
-            throw new InvalidOperationException(
-                $"CreateProcess BUG: suspendedContextOOP equals processOOP!\n" +
-                $"  processOOP: {processOOP}\n" +
-                $"  suspendedContextOOP: {suspendedContextOOP}\n" +
-                $"  This means the MethodContext was somehow allocated with the same OOP as the Process.");
-        }
-
-        // Set instance variables using fixed indices from VMConstants
-        // IMPORTANT: Also set nextLink to nil for proper initialization
+        // Set instance variables - suspendedContext is nil, will be set later
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_NEXTLINK_INDEX, _heapManager.GetNil());
-        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, suspendedContextOOP);
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, _heapManager.GetNil());
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX, SmalltalkOOP.FromSmallInteger(priority));
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _heapManager.GetNil());
-
-        // DIAGNOSTIC: Verify the write succeeded
-        var readBack = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
-        if (readBack != suspendedContextOOP)
-        {
-            throw new InvalidOperationException(
-                $"CreateProcess BUG: Write verification failed!\n" +
-                $"  processOOP: {processOOP}\n" +
-                $"  Wrote suspendedContextOOP: {suspendedContextOOP}\n" +
-                $"  Read back: {readBack}\n" +
-                $"  PROCESS_SUSPENDEDCONTEXT_INDEX: {VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX}");
-        }
 
         return processOOP;
     }
