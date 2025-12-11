@@ -504,7 +504,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                             $"in method {methodLocalId}. Implicitly returning top of stack.");
 
             // Pop the top of stack as return value and return from method
-            var returnValue = _stackManager.Pop(_contextManager.ActiveContext);
+            var returnValue = _stackManager.Pop();
             return HandleReturn(returnValue);
         }
 
