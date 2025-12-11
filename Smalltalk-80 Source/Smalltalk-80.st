@@ -5805,12 +5805,9 @@ emitForEvaluatedEffect: stack on: aStream
 		ifFalse: 
 			[self emitExceptLast: stack on: aStream.
 			statements last emitForEffect: stack on: aStream]!
-emitForEvaluatedValue: stack on: aStream
-	"For doIt expressions without explicit return, use emitForReturn to include EndMethod bytecode"
+emitForEvaluatedValue: stack on: aStream 
 	self emitExceptLast: stack on: aStream.
-	self returns
-		ifTrue: [statements last emitForValue: stack on: aStream]
-		ifFalse: [statements last emitForReturn: stack on: aStream]!
+	statements last emitForValue: stack on: aStream!
 emitForValue: stack on: aStream 
 	| arg blockStack | 
 	aStream nextPut: LdThisContext.
@@ -5842,12 +5839,9 @@ sizeForEvaluatedEffect: encoder
 	self returns ifTrue: [^self sizeForEvaluatedValue: encoder].
 	^(self sizeExceptLast: encoder)
 		+ (statements last sizeForEffect: encoder)!
-sizeForEvaluatedValue: encoder
-	"For doIt expressions without explicit return, use sizeForReturn to include EndMethod bytecode"
+sizeForEvaluatedValue: encoder 
 	^(self sizeExceptLast: encoder)
-		+ (self returns
-			ifTrue: [statements last sizeForValue: encoder]
-			ifFalse: [statements last sizeForReturn: encoder])!
+		+ (statements last sizeForValue: encoder)!
 sizeForValue: encoder 
 	nArgsNode _ encoder encodeLiteral: arguments size.
 	remoteCopyNode _ encoder encodeSelector: #blockCopy:.
