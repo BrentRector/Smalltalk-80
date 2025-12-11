@@ -56,24 +56,44 @@ public class InitExpressionExecutor
         // Get the suspended context from the Process (instance variable 1: suspendedContext)
         var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
 
-        // DIAGNOSTIC: Validate that we got a context, not the process itself
-        if (contextOOP == processOOP)
+        // DIAGNOSTIC: Validate that we got a valid MethodContext, not something else
+        var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
+        var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
+        var blockContextClassOOP = _metadata.BlockContextClassOOP;
+
+        if (contextClassOOP != methodContextClassOOP && contextClassOOP != blockContextClassOOP)
         {
-            // Dump Process fields for debugging
+            // Dump Process fields and context info for debugging
             var ivar0 = _heapManager.GetInstanceVariable(processOOP, 0);  // nextLink
             var ivar1 = _heapManager.GetInstanceVariable(processOOP, 1);  // suspendedContext
             var ivar2 = _heapManager.GetInstanceVariable(processOOP, 2);  // priority
             var ivar3 = _heapManager.GetInstanceVariable(processOOP, 3);  // myList
-            var processClass = _heapManager.GetClassOOP(processOOP);
+            var processClassOOP = _heapManager.GetClassOOP(processOOP);
+
+            // Get class name for context
+            string contextClassName = "unknown";
+            try
+            {
+                var contextClassNameOOP = _heapManager.GetInstanceVariable(contextClassOOP, 6); // name field
+                int nameSize = _heapManager.GetIndexedSize(contextClassNameOOP);
+                var nameBytes = new byte[nameSize];
+                for (int i = 0; i < nameSize; i++)
+                    nameBytes[i] = _heapManager.GetIndexedByte(contextClassNameOOP, i);
+                contextClassName = System.Text.Encoding.UTF8.GetString(nameBytes);
+            }
+            catch { /* ignore */ }
 
             throw new InvalidOperationException(
-                $"ResumeProcess BUG: Process.suspendedContext points to the Process itself!\n" +
+                $"ResumeProcess BUG: Process.suspendedContext is not a MethodContext or BlockContext!\n" +
                 $"  processOOP: {processOOP}\n" +
-                $"  processClass: {processClass}\n" +
-                $"  ivar[0] (nextLink): {ivar0}\n" +
-                $"  ivar[1] (suspendedContext): {ivar1}\n" +
-                $"  ivar[2] (priority): {ivar2}\n" +
-                $"  ivar[3] (myList): {ivar3}\n" +
+                $"  processClassOOP: {processClassOOP}\n" +
+                $"  contextOOP (from ivar[1]): {contextOOP}\n" +
+                $"  contextClassOOP: {contextClassOOP} ({contextClassName})\n" +
+                $"  expectedClass: {methodContextClassOOP} (MethodContext) or {blockContextClassOOP} (BlockContext)\n" +
+                $"  Process ivar[0] (nextLink): {ivar0}\n" +
+                $"  Process ivar[1] (suspendedContext): {ivar1}\n" +
+                $"  Process ivar[2] (priority): {ivar2}\n" +
+                $"  Process ivar[3] (myList): {ivar3}\n" +
                 $"  PROCESS_SUSPENDEDCONTEXT_INDEX: {VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX}");
         }
 
