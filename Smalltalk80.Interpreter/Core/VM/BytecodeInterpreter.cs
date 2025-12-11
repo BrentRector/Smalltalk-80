@@ -61,6 +61,25 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         _specialSelectorOOPs = specialSelectorOOPs;
     }
 
+    /// <summary>
+    /// Validates that a jump target is within the executable bytecode area.
+    /// CompiledMethod bytecodes end with a 3-byte source offset trailer that must not be executed.
+    /// </summary>
+    /// <param name="targetIp">The target instruction pointer after the jump</param>
+    /// <param name="bytecodes">The method's bytecode array</param>
+    /// <param name="jumpType">Description of jump type for error messages</param>
+    /// <exception cref="InvalidOperationException">If jump target is outside executable area</exception>
+    private void ValidateJumpTarget(int targetIp, byte[] bytecodes, string jumpType)
+    {
+        int executableLength = bytecodes.Length - 3;  // Exclude 3-byte source offset trailer
+        if (targetIp < 0 || targetIp > executableLength)
+        {
+            throw new InvalidOperationException(
+                $"[INVALID JUMP] {jumpType}: target IP={targetIp} is outside executable bytecode area [0, {executableLength}). " +
+                $"Bytecode array length={bytecodes.Length}. This indicates a compiler bug or corrupted method.");
+        }
+    }
+
     /// <inheritdoc />
     public bool ExecuteBytecode(byte bytecode, SmalltalkOOP methodOOP)
     {
@@ -615,7 +634,10 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             int ipIndex = VMConstants.CONTEXT_PC_INDEX;
             var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
             int currentIp = ipOOP.AsSmallInteger();
-            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
+            int targetIp = currentIp + distance;
+            byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
+            ValidateJumpTarget(targetIp, bytecodes, "Short unconditional jump");
+            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(targetIp));
             return true;
         }
 
@@ -632,7 +654,10 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             var valueOOP = context.Pop();
             if (valueOOP == metadata.KnownObjects.False)
             {
-                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
+                int targetIp = currentIp + distance;
+                byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
+                ValidateJumpTarget(targetIp, bytecodes, "Short conditional jump on false");
+                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(targetIp));
             }
             return true;
         }
@@ -649,8 +674,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
             byte extByte = bytecodes[currentIp++];
             int offset = BytecodeUtil.LongJumpBaseOffset(bytecode) + extByte;
-
-            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
+            int targetIp = currentIp + offset;
+            ValidateJumpTarget(targetIp, bytecodes, "Long unconditional jump");
+            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(targetIp));
             return true;
         }
 
@@ -671,7 +697,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             var valueOOP = context.Pop();
             if (valueOOP == metadata.KnownObjects.True)
             {
-                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
+                int targetIp = currentIp + offset;
+                ValidateJumpTarget(targetIp, bytecodes, "Long conditional jump on true");
+                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(targetIp));
             }
             return true;
         }
@@ -693,7 +721,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             var valueOOP = context.Pop();
             if (valueOOP == metadata.KnownObjects.False)
             {
-                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
+                int targetIp = currentIp + offset;
+                ValidateJumpTarget(targetIp, bytecodes, "Long conditional jump on false");
+                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(targetIp));
             }
             return true;
         }
