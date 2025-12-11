@@ -37,9 +37,15 @@ public static class TimeOperations
             int size = context.HeapManager.GetIndexedSize(byteArrayOOP);
             if (size < 4) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Get current Unix timestamp and convert to Smalltalk epoch
-            long unixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            long smalltalkSeconds = unixSeconds + SmalltalkEpochOffset;
+            // Get current LOCAL time and convert to Smalltalk epoch.
+            // The Smalltalk code has hardcoded timezone parameters for California (Pacific, UTC-8)
+            // that subtract 8 hours. To compensate, we add 8 hours to local time so that
+            // after Smalltalk's subtraction, the result is correct local time.
+            DateTime localNow = DateTime.Now;
+            DateTime smalltalkEpoch = new DateTime(1901, 1, 1, 0, 0, 0, DateTimeKind.Local);
+            long smalltalkSeconds = (long)(localNow - smalltalkEpoch).TotalSeconds;
+            // Add 8 hours to compensate for Smalltalk's Pacific timezone subtraction
+            smalltalkSeconds += 8 * 3600;
 
             // Store as 32-bit unsigned in little-endian order
             uint seconds32 = (uint)(smalltalkSeconds & 0xFFFFFFFF);
