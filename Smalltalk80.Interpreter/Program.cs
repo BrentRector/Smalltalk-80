@@ -149,12 +149,17 @@ public static class Program
             smalltalkThread.Name = "Smalltalk Interpreter";
             smalltalkThread.Start();
 
-            // TEMPORARY: Monitor Smalltalk thread and close window when it completes (for debugging)
+            // Monitor Smalltalk thread and close window when it completes (for --execute mode)
+            // This ensures the window closes when the expression finishes executing
             var monitorThread = new Thread(() =>
             {
                 smalltalkThread.Join();
-                Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
-                displayProvider.Invoke((Action)(() => displayProvider.Close()));
+                // Only close window if it's still open (not already closed by user)
+                if (!displayProvider.IsDisposed && displayProvider.IsHandleCreated)
+                {
+                    Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
+                    displayProvider.Invoke((Action)(() => displayProvider.Close()));
+                }
             });
             monitorThread.IsBackground = true;
             monitorThread.Start();
