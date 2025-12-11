@@ -438,6 +438,23 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var contextClassOOP = _heapManager.GetClassOOP(_contextManager.ActiveContext);
         bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
 
+        // DIAGNOSTIC: Validate ActiveContext is actually a MethodContext or BlockContext
+        // This check will catch bugs where Process or other objects get set as ActiveContext
+        if (!isBlockContext)
+        {
+            // Check if it's a MethodContext (not BlockContext and not Process/other)
+            var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
+            if (contextClassOOP != methodContextClassOOP)
+            {
+                var contextClassName = GetClassName(contextClassOOP);
+                throw new InvalidOperationException(
+                    $"ExecuteBytecodeStep: ActiveContext is not a MethodContext or BlockContext!\n" +
+                    $"  ActiveContext: {_contextManager.ActiveContext}\n" +
+                    $"  Context class: {contextClassName} (expected MethodContext or BlockContext)\n" +
+                    $"  This is a bug - something incorrectly set ActiveContext to a non-context object.");
+            }
+        }
+
         SmalltalkOOP methodOOP;
         SmalltalkOOP receiverOOP;
 
