@@ -388,6 +388,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 // This is the "virtual interrupt" that replaces hardware interrupt signaling.
                 // The UI thread sets _inputEventPending; we check and signal safely on Smalltalk thread.
                 CheckAndSignalInputEvents();
+
+                // Check for expired timer (Delay mechanism) and signal TimingSemaphore if needed.
+                // This enables Delay>>wait to work - when the timer fires, we signal the semaphore
+                // which wakes the Delay timing process at high priority.
+                CheckAndSignalExpiredTimer();
             }
 
             // Execute bytecode - Smalltalk handles all scheduling via primitives

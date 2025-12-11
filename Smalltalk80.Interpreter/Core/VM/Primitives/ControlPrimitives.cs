@@ -459,14 +459,27 @@ public static class ControlPrimitives
             // Check if resumed process has higher priority - if so, preempt
             if (scheduler.ShouldPreempt(context.Receiver))
             {
+                // CRITICAL: Push result onto stack BEFORE preemption.
+                // When the current process resumes later, execution continues after
+                // the resume call, expecting the result to be on the stack.
+                // Without this, we get stack underflow.
+                if (context.StackManager != null)
+                {
+                    context.StackManager.Push(context.Receiver);
+                }
+
                 // Preempt: suspend current process and switch to resumed process
                 scheduler.SuspendActiveProcess(returnToQueue: true);
                 if (!scheduler.ActivateProcess(context.Receiver, "resume"))
                 {
-                    // Activation failed - this shouldn't happen since we validated above,
-                    // but handle it gracefully by failing the primitive
+                    // Activation failed - undo the push and fail
+                    if (context.StackManager != null)
+                        context.StackManager.Pop();
                     return PrimitiveResult.Fail(context.Metadata!);
                 }
+
+                // Context switched - result already pushed, return success
+                return PrimitiveResult.Ok(context.Receiver);
             }
             else
             {
