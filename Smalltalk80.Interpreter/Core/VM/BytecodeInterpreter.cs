@@ -1210,15 +1210,21 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         }
 
         // Fast path for at: (index 0) - indexed access
-        // NOTE: Skip ByteIndexed (Strings/Symbols) - they need to return Character objects, not SmallIntegers
-        // NOTE: Skip CompiledMethod - at: accesses bytecodes, not indexed slots (uses hidden ByteArray)
+        // WHITELIST APPROACH: Only allow classes that use direct indexed storage without override logic.
+        // Many classes override at: with custom behavior (OrderedCollection uses firstIndex offset,
+        // Dictionary uses hashing, Interval computes values, String returns Characters, etc.)
+        // Safe classes: Array, ByteArray, WordArray, DisplayBitmap
         if (selectorIndex == 0 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
         {
-            var format = heapManager.GetObjectFormat(receiverOOP);
             var classOOP = heapManager.GetClassOOP(receiverOOP);
-            // Only apply fast path to non-ByteIndexed and non-CompiledMethod objects
-            if (format != ObjectFormat.ByteIndexed && classOOP != metadata.CompiledMethodClassOOP)
+
+            // WHITELIST: Only these classes have direct indexed storage
+            if (classOOP == metadata.ArrayClassOOP ||
+                classOOP == metadata.ByteArrayClassOOP ||
+                classOOP == metadata.WordArrayClassOOP ||
+                classOOP == metadata.DisplayBitmapClassOOP)
             {
+                var format = heapManager.GetObjectFormat(receiverOOP);
                 int index = args[0].AsSmallInteger();
                 int size = heapManager.GetIndexedSize(receiverOOP);
                 if (index >= 1 && index <= size)
@@ -1229,6 +1235,11 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                         ushort w = heapManager.GetIndexedWord(receiverOOP, index - 1);
                         value = SmalltalkOOP.FromSmallInteger(w);
                     }
+                    else if (format == ObjectFormat.ByteIndexed)
+                    {
+                        byte b = heapManager.GetIndexedByte(receiverOOP, index - 1);
+                        value = SmalltalkOOP.FromSmallInteger(b);
+                    }
                     else
                     {
                         value = heapManager.GetIndexedOOP(receiverOOP, index - 1);
@@ -1238,23 +1249,25 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 }
                 // Out of bounds - fall through to message send for error handling
             }
-            // ByteIndexed (String/Symbol) - fall through to message send to get Character objects
+            // Not in whitelist - fall through to message send
         }
 
         // Fast path for at:put: (index 1) - indexed store
-        // NOTE: Skip ByteIndexed (Strings/Symbols) - they expect Character arguments, not SmallIntegers
-        // NOTE: Skip CompiledMethod - at:put: sets bytecodes, not indexed slots (uses hidden ByteArray)
-        // NOTE: Skip OrderedCollection - uses firstIndex offset, so user index 1 != physical index 0
+        // WHITELIST APPROACH: Only allow classes that use direct indexed storage without override logic.
+        // Many classes override at:put: with custom behavior (OrderedCollection uses firstIndex offset,
+        // Dictionary uses hashing, SortedCollection signals error, Symbol is immutable, etc.)
+        // Safe classes: Array, ByteArray, WordArray, DisplayBitmap
         if (selectorIndex == 1 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
         {
-            var format = heapManager.GetObjectFormat(receiverOOP);
             var classOOP = heapManager.GetClassOOP(receiverOOP);
 
-            // Only apply fast path to non-ByteIndexed, non-CompiledMethod, non-OrderedCollection objects
-            if (format != ObjectFormat.ByteIndexed &&
-                classOOP != metadata.CompiledMethodClassOOP &&
-                classOOP != metadata.OrderedCollectionClassOOP)
+            // WHITELIST: Only these classes have direct indexed storage
+            if (classOOP == metadata.ArrayClassOOP ||
+                classOOP == metadata.ByteArrayClassOOP ||
+                classOOP == metadata.WordArrayClassOOP ||
+                classOOP == metadata.DisplayBitmapClassOOP)
             {
+                var format = heapManager.GetObjectFormat(receiverOOP);
                 int index = args[0].AsSmallInteger();
                 var value = args[1];
                 int size = heapManager.GetIndexedSize(receiverOOP);
@@ -1274,6 +1287,19 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                         else
                             success = false;
                     }
+                    else if (format == ObjectFormat.ByteIndexed)
+                    {
+                        if (value.IsSmallInteger)
+                        {
+                            int byteValue = value.AsSmallInteger();
+                            if (byteValue >= 0 && byteValue <= 255)
+                                heapManager.SetIndexedByte(receiverOOP, index - 1, (byte)byteValue);
+                            else
+                                success = false;
+                        }
+                        else
+                            success = false;
+                    }
                     else
                     {
                         heapManager.SetIndexedOOP(receiverOOP, index - 1, value);
@@ -1286,7 +1312,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 }
                 // Out of bounds or type error - fall through to message send
             }
-            // ByteIndexed (String/Symbol) - fall through to message send to handle Character conversion
+            // Not in whitelist - fall through to message send
         }
 
         // NOTE: No fast path for size (index 2) - many classes override size

@@ -31,6 +31,9 @@ public record VMMetadata
     public required SmalltalkOOP SymbolClassOOP { get; init; }
     public required SmalltalkOOP StringClassOOP { get; init; }
     public required SmalltalkOOP ArrayClassOOP { get; init; }
+    public required SmalltalkOOP ByteArrayClassOOP { get; init; }
+    public required SmalltalkOOP WordArrayClassOOP { get; init; }
+    public required SmalltalkOOP DisplayBitmapClassOOP { get; init; }
     public required SmalltalkOOP CompiledMethodClassOOP { get; init; }
     public required SmalltalkOOP SmallIntegerClassOOP { get; init; }
     public required SmalltalkOOP BlockContextClassOOP { get; init; }
