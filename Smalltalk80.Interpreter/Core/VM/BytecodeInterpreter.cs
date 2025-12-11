@@ -1218,6 +1218,13 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         {
             var format = heapManager.GetObjectFormat(receiverOOP);
             var classOOP = heapManager.GetClassOOP(receiverOOP);
+
+            // DIAGNOSTIC: Log all at:put: calls to trace what's happening
+            if (classOOP == metadata.CompiledMethodClassOOP)
+            {
+                Console.WriteLine($"[FastPath-atPut] CM receiver={receiverOOP}, index={args[0]}, value={args[1]} -> SKIPPING fast path");
+            }
+
             // Only apply fast path to non-ByteIndexed and non-CompiledMethod objects
             if (format != ObjectFormat.ByteIndexed && classOOP != metadata.CompiledMethodClassOOP)
             {
