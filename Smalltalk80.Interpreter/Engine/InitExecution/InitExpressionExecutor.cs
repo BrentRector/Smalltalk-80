@@ -55,6 +55,28 @@ public class InitExpressionExecutor
     {
         // Get the suspended context from the Process (instance variable 1: suspendedContext)
         var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+
+        // DIAGNOSTIC: Validate that we got a context, not the process itself
+        if (contextOOP == processOOP)
+        {
+            // Dump Process fields for debugging
+            var ivar0 = _heapManager.GetInstanceVariable(processOOP, 0);  // nextLink
+            var ivar1 = _heapManager.GetInstanceVariable(processOOP, 1);  // suspendedContext
+            var ivar2 = _heapManager.GetInstanceVariable(processOOP, 2);  // priority
+            var ivar3 = _heapManager.GetInstanceVariable(processOOP, 3);  // myList
+            var processClass = _heapManager.GetClassOOP(processOOP);
+
+            throw new InvalidOperationException(
+                $"ResumeProcess BUG: Process.suspendedContext points to the Process itself!\n" +
+                $"  processOOP: {processOOP}\n" +
+                $"  processClass: {processClass}\n" +
+                $"  ivar[0] (nextLink): {ivar0}\n" +
+                $"  ivar[1] (suspendedContext): {ivar1}\n" +
+                $"  ivar[2] (priority): {ivar2}\n" +
+                $"  ivar[3] (myList): {ivar3}\n" +
+                $"  PROCESS_SUSPENDEDCONTEXT_INDEX: {VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX}");
+        }
+
         return _vm.ExecuteExistingContext(contextOOP);
     }
 
