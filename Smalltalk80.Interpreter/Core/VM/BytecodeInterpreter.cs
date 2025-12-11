@@ -1244,13 +1244,16 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         // Fast path for at:put: (index 1) - indexed store
         // NOTE: Skip ByteIndexed (Strings/Symbols) - they expect Character arguments, not SmallIntegers
         // NOTE: Skip CompiledMethod - at:put: sets bytecodes, not indexed slots (uses hidden ByteArray)
+        // NOTE: Skip OrderedCollection - uses firstIndex offset, so user index 1 != physical index 0
         if (selectorIndex == 1 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
         {
             var format = heapManager.GetObjectFormat(receiverOOP);
             var classOOP = heapManager.GetClassOOP(receiverOOP);
 
-            // Only apply fast path to non-ByteIndexed and non-CompiledMethod objects
-            if (format != ObjectFormat.ByteIndexed && classOOP != metadata.CompiledMethodClassOOP)
+            // Only apply fast path to non-ByteIndexed, non-CompiledMethod, non-OrderedCollection objects
+            if (format != ObjectFormat.ByteIndexed &&
+                classOOP != metadata.CompiledMethodClassOOP &&
+                classOOP != metadata.OrderedCollectionClassOOP)
             {
                 int index = args[0].AsSmallInteger();
                 var value = args[1];

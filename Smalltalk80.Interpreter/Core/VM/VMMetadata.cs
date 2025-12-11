@@ -34,6 +34,7 @@ public record VMMetadata
     public required SmalltalkOOP CompiledMethodClassOOP { get; init; }
     public required SmalltalkOOP SmallIntegerClassOOP { get; init; }
     public required SmalltalkOOP BlockContextClassOOP { get; init; }
+    public required SmalltalkOOP OrderedCollectionClassOOP { get; init; }
 
     // Well-known objects for fast VM access (Nil, True, False, Smalltalk)
     public required KnownObjects KnownObjects { get; init; }

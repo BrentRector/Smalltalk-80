@@ -290,6 +290,7 @@ public class ColdStartOrchestrator : IColdStartLoader
             CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
             BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
+            OrderedCollectionClassOOP = GlobalRegistry.Get("class:OrderedCollection"),
             KnownObjects = knownObjects,
             ProcessorScheduler = processorSchedulerOOP,
             InitExpressionMethods = InitExpressionMethods

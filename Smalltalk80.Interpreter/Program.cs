@@ -480,6 +480,7 @@ public static class Program
             CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
             BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
+            OrderedCollectionClassOOP = GlobalRegistry.Get("class:OrderedCollection"),
             KnownObjects = knownObjects,
             ProcessorScheduler = processorSchedulerOOP,
             InitExpressionMethods = loader.InitExpressionMethods
