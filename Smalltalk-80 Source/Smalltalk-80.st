@@ -5766,10 +5766,14 @@ arguments: argNodes
 numberOfArguments
 	^arguments size!
 returnLast
+	Transcript show: 'returnLast: returns='; print: self returns; cr.
+	Transcript show: 'statements size='; print: statements size; cr.
+	Transcript show: 'statements last class='; print: statements last class; cr.
 	self returns
-		ifFalse: 
+		ifFalse:
 			[returns _ true.
-			statements at: statements size put: statements last asReturnNode]!
+			statements at: statements size put: statements last asReturnNode.
+			Transcript show: 'After replace, statements last class='; print: statements last class; cr]!
 returnSelfIfNoOther
 	self returns
 		ifFalse: 
