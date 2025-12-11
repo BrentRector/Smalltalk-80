@@ -28788,16 +28788,24 @@ at: anInteger
 	(anInteger < 1 or: [anInteger + firstIndex - 1 > lastIndex])
 		ifTrue: [self errorNoSuchElement]
 		ifFalse: [^super at: anInteger + firstIndex - 1]!
-at: anInteger put: anObject 
+at: anInteger put: anObject
 	"Put anObject at element index anInteger.
-	at:put: can not be used to append, front or back, to an ordered collection; 
+	at:put: can not be used to append, front or back, to an ordered collection;
 	 it is used by a knowledgeable client to replace an element"
 
-	| index |
+	| index actualIndex |
 	index _ anInteger truncated.
-	(index < 1 or: [index + firstIndex - 1 > lastIndex])
+	actualIndex _ index + firstIndex - 1.
+	Transcript show: 'OC at:put: index='; print: index;
+		show: ' firstIndex='; print: firstIndex;
+		show: ' lastIndex='; print: lastIndex;
+		show: ' actualIndex='; print: actualIndex; cr.
+	Transcript show: 'OC at:put: anObject class='; print: anObject class; cr.
+	(index < 1 or: [actualIndex > lastIndex])
 		ifTrue: [self errorNoSuchElement]
-		ifFalse: [^super at: index + firstIndex - 1 put: anObject]!
+		ifFalse: [
+			Transcript show: 'OC at:put: calling super at:'; print: actualIndex; show: ' put:'; cr.
+			^super at: actualIndex put: anObject]!
 before: oldObject 
 	"Answer the element before oldObject.  If the receiver does not contain oldObject
 	or if the receiver contains no elements before oldObject, create an error message."
