@@ -597,6 +597,32 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     }
 
     /// <summary>
+    /// Validates that the given OOP is a valid context (MethodContext or BlockContext).
+    /// Returns true if valid, throws if invalid (for diagnostic purposes).
+    /// </summary>
+    private void ValidateContextOOP(SmalltalkOOP contextOOP, string contextDescription)
+    {
+        if (contextOOP == _metadata.KnownObjects.Nil)
+            return; // nil is valid for sender of top-level context
+
+        var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
+        var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
+        var blockContextClassOOP = _metadata.BlockContextClassOOP;
+
+        if (contextClassOOP != methodContextClassOOP && contextClassOOP != blockContextClassOOP)
+        {
+            var contextClassName = _heapManager.GetClassName(contextOOP);
+            throw new InvalidOperationException(
+                $"ValidateContextOOP FAILED: {contextDescription} is not a MethodContext or BlockContext!\n" +
+                $"  contextOOP: {contextOOP}\n" +
+                $"  Context class: {contextClassName}\n" +
+                $"  Expected: MethodContext ({methodContextClassOOP}) or BlockContext ({blockContextClassOOP})\n" +
+                $"  ActiveContext: {_contextManager.ActiveContext}\n" +
+                $"  This indicates context corruption.");
+        }
+    }
+
+    /// <summary>
     /// Handles a method/block return. Switches back to sender context.
     /// Handles non-local returns by unwinding contexts until reaching target.
     /// Returns InterpreterStatus indicating whether to continue or complete.
@@ -636,6 +662,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 }
 
                 // Switch to sender and push NLR value
+                ValidateContextOOP(senderOOP, "NLR target sender");
                 _contextManager.SetActiveContext(senderOOP);
                 _contextManager.AddContextToPool(returningContext);
                 Push(nlrValue);
@@ -644,6 +671,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
             // Not the target - continue unwinding (don't push value)
             senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
+            ValidateContextOOP(senderOOP, "NLR unwinding sender");
             // if (_verboseDebugMode)
             //     Console.WriteLine($"[HandleReturn NLR] Unwinding through {_contextManager.ActiveContext}, next sender={senderOOP}");
 
@@ -818,6 +846,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         // Switch to sender context and push return value
+        ValidateContextOOP(senderOOP, "normal return sender");
         _contextManager.SetActiveContext(senderOOP);
         _contextManager.AddContextToPool(returningContext);
         Push(returnValue);

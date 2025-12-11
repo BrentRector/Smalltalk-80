@@ -164,6 +164,24 @@ public partial class VirtualMachine : IProcessScheduler
             return false;
         }
 
+        // DIAGNOSTIC: Validate that contextOOP is actually a MethodContext or BlockContext
+        // This catches corruption where a Process's suspendedContext points to another Process
+        var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
+        var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
+        var blockContextClassOOP = _metadata.BlockContextClassOOP;
+        if (contextClassOOP != methodContextClassOOP && contextClassOOP != blockContextClassOOP)
+        {
+            var contextClassName = _heapManager.GetClassName(contextOOP);
+            var processClassName = _heapManager.GetClassName(processOOP);
+            throw new InvalidOperationException(
+                $"ActivateProcess BUG: Process.suspendedContext is not a MethodContext or BlockContext!\n" +
+                $"  processOOP: {processOOP} ({processClassName})\n" +
+                $"  contextOOP (suspendedContext): {contextOOP} ({contextClassName})\n" +
+                $"  expectedClass: {methodContextClassOOP} (MethodContext) or {blockContextClassOOP} (BlockContext)\n" +
+                $"  reason: {reason}\n" +
+                $"  This means the Process's suspendedContext field was corrupted.");
+        }
+
         int priority = GetProcessPriority(processOOP);
         // Debug logging disabled - uncomment to trace process activation
         // if (priority == 6)
