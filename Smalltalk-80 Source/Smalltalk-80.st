@@ -5766,21 +5766,10 @@ arguments: argNodes
 numberOfArguments
 	^arguments size!
 returnLast
-	| lastStmt newNode |
-	Transcript show: 'returnLast: returns='; print: self returns; cr.
-	Transcript show: 'statements size='; print: statements size; cr.
-	Transcript show: 'statements last class='; print: statements last class; cr.
 	self returns
 		ifFalse:
 			[returns _ true.
-			lastStmt _ statements last.
-			Transcript show: 'lastStmt class='; print: lastStmt class; cr.
-			newNode _ lastStmt asReturnNode.
-			Transcript show: 'newNode class='; print: newNode class; cr.
-			Transcript show: 'newNode isNil='; print: newNode isNil; cr.
-			statements at: statements size put: newNode.
-			Transcript show: 'After at:put:, statements last='; print: statements last; cr.
-			Transcript show: 'After at:put:, statements last class='; print: statements last class; cr]!
+			statements at: statements size put: statements last asReturnNode]!
 returnSelfIfNoOther
 	self returns
 		ifFalse: 
@@ -28793,19 +28782,11 @@ at: anInteger put: anObject
 	at:put: can not be used to append, front or back, to an ordered collection;
 	 it is used by a knowledgeable client to replace an element"
 
-	| index actualIndex |
+	| index |
 	index _ anInteger truncated.
-	actualIndex _ index + firstIndex - 1.
-	Transcript show: 'OC at:put: index='; print: index;
-		show: ' firstIndex='; print: firstIndex;
-		show: ' lastIndex='; print: lastIndex;
-		show: ' actualIndex='; print: actualIndex; cr.
-	Transcript show: 'OC at:put: anObject class='; print: anObject class; cr.
-	(index < 1 or: [actualIndex > lastIndex])
+	(index < 1 or: [index + firstIndex - 1 > lastIndex])
 		ifTrue: [self errorNoSuchElement]
-		ifFalse: [
-			Transcript show: 'OC at:put: calling super at:'; print: actualIndex; show: ' put:'; cr.
-			^super at: actualIndex put: anObject]!
+		ifFalse: [^super at: index + firstIndex - 1 put: anObject]!
 before: oldObject 
 	"Answer the element before oldObject.  If the receiver does not contain oldObject
 	or if the receiver contains no elements before oldObject, create an error message."
