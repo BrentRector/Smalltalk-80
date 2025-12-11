@@ -171,6 +171,12 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     // Get bytecode array from CompiledMethod (last indexed slot)
                     int methodIndexedSize = heapManager.GetIndexedSize(methodOOP);
                     var bytecodeArrayOOP = heapManager.GetIndexedOOP(methodOOP, methodIndexedSize - 1);
+
+                    // Diagnostic: Show the bytecodeArrayOOP to check for corruption
+                    string bytecodeArrayClass = "?";
+                    try { bytecodeArrayClass = heapManager.GetClassName(bytecodeArrayOOP); } catch { }
+                    Console.WriteLine($"  CM indexedSize={methodIndexedSize}, bytecodeArrayOOP={bytecodeArrayOOP} (class: {bytecodeArrayClass})");
+
                     int methodBytecodeSize = heapManager.GetIndexedSize(bytecodeArrayOOP);
                     Console.Write("  Method bytecodes: [");
                     int count = Math.Min(methodBytecodeSize, 20);
