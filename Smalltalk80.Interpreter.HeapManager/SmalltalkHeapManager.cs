@@ -683,6 +683,14 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             throw new ArgumentOutOfRangeException(nameof(index),
                 $"Indexed OOP index {index} out of range [0, {indexedSize - 1}]");
 
+        // WATCHPOINT: Detect writes of SmallInteger(0) to indexed slots
+        if (value == SmalltalkOOP.FromSmallInteger(0))
+        {
+            var oldValue = oopArray[offset + index];
+            Console.WriteLine($"[WATCHPOINT] Writing SmallInteger(0) to indexed slot {index}! oldValue={oldValue}, indexedSize={indexedSize}, ivars={entry.InstanceVariableCountExplicit}");
+            Console.WriteLine(new System.Diagnostics.StackTrace().ToString());
+        }
+
         oopArray[offset + index] = value;
     }
 
