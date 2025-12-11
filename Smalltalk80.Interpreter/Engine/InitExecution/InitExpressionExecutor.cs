@@ -187,6 +187,18 @@ public class InitExpressionExecutor
             // Step 3: Create MethodContext for init expression
             SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
 
+            // DIAGNOSTIC: Verify methodContextOOP is a valid MethodContext before creating Process
+            var mcClassOOP = _heapManager.GetClassOOP(methodContextOOP);
+            var mcClassName = _heapManager.GetClassName(methodContextOOP);
+            if (mcClassOOP != RuntimeSpecialObjects.Instance.MethodContextClass)
+            {
+                throw new InvalidOperationException(
+                    $"ExecuteInitExpression BUG: CreateMethodContextForInitExpression returned non-MethodContext!\n" +
+                    $"  methodContextOOP: {methodContextOOP}\n" +
+                    $"  Its class: {mcClassOOP} ({mcClassName})\n" +
+                    $"  Expected: {RuntimeSpecialObjects.Instance.MethodContextClass} (MethodContext)");
+            }
+
             // Step 4: Create Process with this context
             // Priority 8 (TimingPriority) prevents preemption when init expressions
             // fork processes at priority 8 (e.g., Delay's timing process).
@@ -864,10 +876,34 @@ public class InitExpressionExecutor
         var processOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
         _heapManager.SetClassOOP(processOOP, processClassOOP);
 
+        // DIAGNOSTIC: Verify suspendedContextOOP is different from processOOP
+        if (suspendedContextOOP == processOOP)
+        {
+            throw new InvalidOperationException(
+                $"CreateProcess BUG: suspendedContextOOP equals processOOP!\n" +
+                $"  processOOP: {processOOP}\n" +
+                $"  suspendedContextOOP: {suspendedContextOOP}\n" +
+                $"  This means the MethodContext was somehow allocated with the same OOP as the Process.");
+        }
+
         // Set instance variables using fixed indices from VMConstants
+        // IMPORTANT: Also set nextLink to nil for proper initialization
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_NEXTLINK_INDEX, _heapManager.GetNil());
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, suspendedContextOOP);
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX, SmalltalkOOP.FromSmallInteger(priority));
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _heapManager.GetNil());
+
+        // DIAGNOSTIC: Verify the write succeeded
+        var readBack = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+        if (readBack != suspendedContextOOP)
+        {
+            throw new InvalidOperationException(
+                $"CreateProcess BUG: Write verification failed!\n" +
+                $"  processOOP: {processOOP}\n" +
+                $"  Wrote suspendedContextOOP: {suspendedContextOOP}\n" +
+                $"  Read back: {readBack}\n" +
+                $"  PROCESS_SUSPENDEDCONTEXT_INDEX: {VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX}");
+        }
 
         return processOOP;
     }
