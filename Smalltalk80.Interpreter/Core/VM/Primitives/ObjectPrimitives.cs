@@ -59,12 +59,6 @@ public static class SimpleObjectPrimitives
                 // This deviation from canonical behavior is necessary for dictionary indexing.
                 int value = context.Receiver.AsSmallInteger();
                 hashValue = value & 0x3FFFFFFF;
-
-                // DIAGNOSTIC: Log hash operations for small integers (especially negative)
-                if (value < 0 || value <= 2)
-                {
-                    Console.WriteLine($"[Primitive 75 Hash] SmallInteger {value} -> hash {hashValue}");
-                }
             }
             else
             {
@@ -191,7 +185,9 @@ public static class SimpleObjectPrimitives
 
             // Special handling for CompiledMethod: at:put: sets bytecodes only
             var classOOP = context.HeapManager.GetClassOOP(context.Receiver);
-            if (classOOP == context.Metadata!.CompiledMethodClassOOP)
+            var expectedCM = context.Metadata!.CompiledMethodClassOOP;
+
+            if (classOOP == expectedCM)
             {
                 // CompiledMethod stores bytecodes in a hidden ByteArray at the last indexed slot
                 int cmIndexedSize = context.HeapManager.GetIndexedSize(context.Receiver);
@@ -315,35 +311,15 @@ public static class SimpleObjectPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 1)
-            {
-                Console.WriteLine($"[Primitive 63] FAIL: Wrong number of arguments ({context.Arguments.Length})");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
-            if (context.Receiver.IsSmallInteger)
-            {
-                Console.WriteLine($"[Primitive 63] FAIL: Receiver is SmallInteger ({context.Receiver})");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
-            if (!context.Arguments[0].IsSmallInteger)
-            {
-                Console.WriteLine($"[Primitive 63] FAIL: Index is not SmallInteger ({context.Arguments[0]})");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+            if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int index = context.Arguments[0].AsSmallInteger();
-            if (index < 1)
-            {
-                Console.WriteLine($"[Primitive 63] FAIL: Index < 1 ({index})");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+            if (index < 1) return PrimitiveResult.Fail(context.Metadata!);
 
             int size = context.HeapManager.GetIndexedSize(context.Receiver);
-            if (index > size)
-            {
-                Console.WriteLine($"[Primitive 63] FAIL: Index {index} > size {size}");
-                return PrimitiveResult.Fail(context.Metadata!);
-            }
+            if (index > size) return PrimitiveResult.Fail(context.Metadata!);
 
             byte byteValue = context.HeapManager.GetIndexedByte(context.Receiver, index - 1);
 
@@ -555,21 +531,31 @@ public static class SimpleObjectPrimitives
             if (position > writeLimit) return PrimitiveResult.Fail(context.Metadata!);
             if (collectionOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            int collectionSize = context.HeapManager.GetIndexedSize(collectionOOP);
-            if (position < 1 || position > collectionSize) return PrimitiveResult.Fail(context.Metadata!);
+            // CompiledMethod has custom at:put: that writes to a separate ByteArray.
+            // We must fail here so the Smalltalk fallback uses at:put: correctly.
+            var collectionClass = context.HeapManager.GetClassOOP(collectionOOP);
+            if (collectionClass == context.Metadata!.CompiledMethodClassOOP)
+                return PrimitiveResult.Fail(context.Metadata!);
 
-            // Write element to collection
+            int collectionSize = context.HeapManager.GetIndexedSize(collectionOOP);
+            // Smalltalk semantics: increment position FIRST, then write at new position
+            // So we write at (position + 1) in 1-based terms = position in 0-based terms
+            // position < 0 means invalid; position >= collectionSize means past the end
+            if (position < 0 || position >= collectionSize) return PrimitiveResult.Fail(context.Metadata!);
+
+            // Write element to collection at 0-based index 'position'
+            // (which is 1-based index position+1, matching Smalltalk's increment-then-write)
             var format = context.HeapManager.GetObjectFormat(collectionOOP);
             if (format == ObjectFormat.ByteIndexed)
             {
                 if (!value.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
                 int byteValue = value.AsSmallInteger();
                 if (byteValue < 0 || byteValue > 255) return PrimitiveResult.Fail(context.Metadata!);
-                context.HeapManager.SetIndexedByte(collectionOOP, position - 1, (byte)byteValue);
+                context.HeapManager.SetIndexedByte(collectionOOP, position, (byte)byteValue);
             }
             else
             {
-                context.HeapManager.SetIndexedOOP(collectionOOP, position - 1, value);
+                context.HeapManager.SetIndexedOOP(collectionOOP, position, value);
             }
 
             // Increment position
@@ -597,7 +583,9 @@ public static class SimpleObjectPrimitives
             int position = positionOOP.AsSmallInteger();
             int readLimit = readLimitOOP.AsSmallInteger();
 
-            return PrimitiveResult.FromBool(position > readLimit, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
+            // Blue Book specification: atEnd returns position >= readLimit (NOT >)
+            // This must match the Smalltalk fallback behavior exactly
+            return PrimitiveResult.FromBool(position >= readLimit, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
 
@@ -740,12 +728,26 @@ public static class SimpleObjectPrimitives
 
             if (numberOfBytes < 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Get class OOPs
-            var compiledMethodClassOOP = context.RuntimeHeapAccess?.GetClass("CompiledMethod");
-            var byteArrayClassOOP = context.RuntimeHeapAccess?.GetClass("ByteArray");
+            // Use CompiledMethodClassOOP from metadata (same OOP that primitives 60/61/62 check against)
+            var compiledMethodClassOOP = context.Metadata!.CompiledMethodClassOOP;
 
-            if (compiledMethodClassOOP == null || byteArrayClassOOP == null)
+            // ByteArray class still needs to be looked up (not in metadata)
+            var byteArrayClassOOP = context.RuntimeHeapAccess?.GetClass("ByteArray");
+            if (byteArrayClassOOP == null)
                 return PrimitiveResult.Fail(context.Metadata!);
+
+            // Extract number of literals from header word (bits 0-5, 6 bits, max 63)
+            // Blue Book header format: flagBits*4096 + numberTemps*128 + largeFrameBit*64 + numberLiterals
+            int numLiterals = headerWord & 0x3F;
+
+            // Create empty literal slots initialized to nil
+            // MethodNode>>generate: will fill these via literalAt:put: -> objectAt:put:
+            var nilOOP = context.HeapManager.GetNil();
+            var literalOOPs = new SmalltalkOOP[numLiterals];
+            for (int i = 0; i < numLiterals; i++)
+            {
+                literalOOPs[i] = nilOOP;
+            }
 
             // Create bytecode array
             byte[] bytecodes = new byte[numberOfBytes];
@@ -753,11 +755,11 @@ public static class SimpleObjectPrimitives
             // Use shared helper
             var methodOOP = CompiledMethodHelpers.AllocateCompiledMethodInternal(
                 context.HeapManager,
-                compiledMethodClassOOP.Value,
+                compiledMethodClassOOP,
                 byteArrayClassOOP.Value,
                 context.HeapManager.GetNil(),
                 headerWord,
-                Array.Empty<SmalltalkOOP>(),
+                literalOOPs,
                 bytecodes);
 
             return PrimitiveResult.Ok(methodOOP);

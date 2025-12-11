@@ -164,6 +164,24 @@ public partial class VirtualMachine : IProcessScheduler
             return false;
         }
 
+        // DIAGNOSTIC: Validate that contextOOP is actually a MethodContext or BlockContext
+        // This catches corruption where a Process's suspendedContext points to another Process
+        var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
+        var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
+        var blockContextClassOOP = _metadata.BlockContextClassOOP;
+        if (contextClassOOP != methodContextClassOOP && contextClassOOP != blockContextClassOOP)
+        {
+            var contextClassName = _heapManager.GetClassName(contextOOP);
+            var processClassName = _heapManager.GetClassName(processOOP);
+            throw new InvalidOperationException(
+                $"ActivateProcess BUG: Process.suspendedContext is not a MethodContext or BlockContext!\n" +
+                $"  processOOP: {processOOP} ({processClassName})\n" +
+                $"  contextOOP (suspendedContext): {contextOOP} ({contextClassName})\n" +
+                $"  expectedClass: {methodContextClassOOP} (MethodContext) or {blockContextClassOOP} (BlockContext)\n" +
+                $"  reason: {reason}\n" +
+                $"  This means the Process's suspendedContext field was corrupted.");
+        }
+
         int priority = GetProcessPriority(processOOP);
         // Debug logging disabled - uncomment to trace process activation
         // if (priority == 6)
@@ -371,10 +389,12 @@ public partial class VirtualMachine : IProcessScheduler
         if (schedulerOOP == _metadata.KnownObjects.Nil)
             return false;
 
-        // Check for pending input events and signal InputSemaphore if needed.
-        // This is done here (from Smalltalk thread) to avoid cross-thread heap corruption.
-        // The UI thread sets an atomic flag; we check it here and signal safely.
-        CheckAndSignalInputEvents();
+        // NOTE: Do NOT call CheckAndSignalInputEvents() here!
+        // When this method is called from Wait primitive, the waiting process has already
+        // been added to a semaphore wait list but activeProcess hasn't been updated yet.
+        // If CheckAndSignalInputEvents triggers preemption via SignalSemaphore, it would
+        // call SuspendActiveProcess on a process that's already blocked, corrupting the
+        // linked list state. CheckAndSignalInputEvents is called from InterpreterLoop instead.
 
         // Find highest priority runnable process
         SmalltalkOOP nextProcess = FindHighestPriorityRunnableProcess();

@@ -149,12 +149,17 @@ public static class Program
             smalltalkThread.Name = "Smalltalk Interpreter";
             smalltalkThread.Start();
 
-            // TEMPORARY: Monitor Smalltalk thread and close window when it completes (for debugging)
+            // Monitor Smalltalk thread and close window when it completes (for --execute mode)
+            // This ensures the window closes when the expression finishes executing
             var monitorThread = new Thread(() =>
             {
                 smalltalkThread.Join();
-                Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
-                displayProvider.Invoke((Action)(() => displayProvider.Close()));
+                // Only close window if it's still open (not already closed by user)
+                if (!displayProvider.IsDisposed && displayProvider.IsHandleCreated)
+                {
+                    Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
+                    displayProvider.Invoke((Action)(() => displayProvider.Close()));
+                }
             });
             monitorThread.IsBackground = true;
             monitorThread.Start();
@@ -477,9 +482,13 @@ public static class Program
             SymbolClassOOP = GlobalRegistry.Get("class:Symbol"),
             StringClassOOP = GlobalRegistry.Get("class:String"),
             ArrayClassOOP = GlobalRegistry.Get("class:Array"),
+            ByteArrayClassOOP = GlobalRegistry.Get("class:ByteArray"),
+            WordArrayClassOOP = GlobalRegistry.Get("class:WordArray"),
+            DisplayBitmapClassOOP = GlobalRegistry.Get("class:DisplayBitmap"),
             CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
             BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
+            OrderedCollectionClassOOP = GlobalRegistry.Get("class:OrderedCollection"),
             KnownObjects = knownObjects,
             ProcessorScheduler = processorSchedulerOOP,
             InitExpressionMethods = loader.InitExpressionMethods

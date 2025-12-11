@@ -266,28 +266,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             var inputSemaphoreOOP = _platformBridge?.GetInputSemaphore() ?? default;
             if (inputSemaphoreOOP != default && inputSemaphoreOOP != _heapManager.GetNil())
             {
-                // Check InputSemaphore state BEFORE signaling
-                var firstLink = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-                var excessBefore = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
-
                 // Blue Book model: one signal per input word in the buffer.
                 // The shadow counter tracks how many words are pending.
                 // We transfer shadow signals to excessSignals here.
-                int transferred = 0;
                 while (_platformBridge!.TryConsumeInputShadowSignal())
                 {
                     SignalSemaphore(inputSemaphoreOOP);
-                    transferred++;
-                }
-
-                // Debug logging - always log when signals are transferred
-                if (transferred > 0)
-                {
-                    var firstLinkAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.LINKEDLIST_FIRSTLINK_INDEX);
-                    var excessAfter = _heapManager.GetInstanceVariable(inputSemaphoreOOP, VMConstants.SEMAPHORE_EXCESSSIGNALS_INDEX);
-                    bool hadWaiter = (firstLink != _heapManager.GetNil());
-                    bool hasWaiter = (firstLinkAfter != _heapManager.GetNil());
-                    Console.WriteLine($"[CheckAndSignal] Transferred {transferred} signals. waiter: {hadWaiter}→{hasWaiter}, excess: {excessBefore}→{excessAfter}");
                 }
             }
             // No longer warn about unregistered InputSemaphore - it's expected during startup
@@ -388,10 +372,23 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         while (true)
         {
-            // Check for pending input events from UI thread and signal InputSemaphore if needed.
-            // This is the "virtual interrupt" that replaces hardware interrupt signaling.
-            // The UI thread sets _inputEventPending; we check and signal safely on Smalltalk thread.
-            CheckAndSignalInputEvents();
+            // Check for shutdown signal from main thread (window closed)
+            if (ShutdownToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException("Shutdown requested", ShutdownToken);
+            }
+
+            // CRITICAL: If NLR is pending, continue unwinding BEFORE checking for events.
+            // NLR unwinding must be atomic - we cannot allow process switches in the middle
+            // because the NLR state (_nlrHandler) is VM-global, not per-process.
+            // Process switches via CheckAndSignalInputEvents would corrupt NLR state.
+            if (!_nlrHandler.IsPending)
+            {
+                // Check for pending input events from UI thread and signal InputSemaphore if needed.
+                // This is the "virtual interrupt" that replaces hardware interrupt signaling.
+                // The UI thread sets _inputEventPending; we check and signal safely on Smalltalk thread.
+                CheckAndSignalInputEvents();
+            }
 
             // Execute bytecode - Smalltalk handles all scheduling via primitives
             InterpreterStatus status = ExecuteBytecodeStep();
@@ -447,6 +444,23 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var contextClassOOP = _heapManager.GetClassOOP(_contextManager.ActiveContext);
         bool isBlockContext = (contextClassOOP == _metadata.BlockContextClassOOP);
 
+        // DIAGNOSTIC: Validate ActiveContext is actually a MethodContext or BlockContext
+        // This check will catch bugs where Process or other objects get set as ActiveContext
+        if (!isBlockContext)
+        {
+            // Check if it's a MethodContext (not BlockContext and not Process/other)
+            var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
+            if (contextClassOOP != methodContextClassOOP)
+            {
+                var contextClassName = GetClassName(contextClassOOP);
+                throw new InvalidOperationException(
+                    $"ExecuteBytecodeStep: ActiveContext is not a MethodContext or BlockContext!\n" +
+                    $"  ActiveContext: {_contextManager.ActiveContext}\n" +
+                    $"  Context class: {contextClassName} (expected MethodContext or BlockContext)\n" +
+                    $"  This is a bug - something incorrectly set ActiveContext to a non-context object.");
+            }
+        }
+
         SmalltalkOOP methodOOP;
         SmalltalkOOP receiverOOP;
 
@@ -499,20 +513,26 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         var ipOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, ipIndex);
         int ip = ipOOP.AsSmallInteger();
 
-        while (ip < bytecodes.Length)
-        {
-            // Validate IP is within bytecode array
-            // GetMethodBytecodes() returns all bytes including the 3-byte source offset at end
-            // The interpreter should never execute into the source offset bytes
-            if (ip >= bytecodes.Length)
-            {
-                var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
-                string errorMsg = $"IP out of range: IP={ip} exceeds executable bytecode length={bytecodes.Length} in method {methodLocalId} OOP({methodOOP}). " +
-                                 $"This indicates either a missing RETURN instruction or a malformed jump bytecode.";
-                _debugger.DumpCrashDiagnostics(errorMsg);
-                throw new InvalidOperationException(errorMsg);
-            }
+        // CompiledMethod bytecodes end with a 3-byte source offset trailer
+        // The interpreter must never execute into those bytes
+        int executableLength = bytecodes.Length - 3;
 
+        // Safety check: if IP has reached the source offset boundary, the method
+        // is missing a return bytecode. For doIt expressions, implicitly return
+        // the top of stack. For regular methods, this indicates a compiler bug.
+        if (ip >= executableLength)
+        {
+            var methodLocalId = GetLocalId(methodOOP) ?? "unknown";
+            Console.WriteLine($"[IMPLICIT RETURN] PC={ip} reached bytecode boundary (executableLength={executableLength}) " +
+                            $"in method {methodLocalId}. Implicitly returning top of stack.");
+
+            // Pop the top of stack as return value and return from method
+            var returnValue = _stackManager.Pop();
+            return HandleReturn(returnValue);
+        }
+
+        while (ip < executableLength)
+        {
             byte bytecode = bytecodes[ip++];
 
             // Update IP
@@ -583,6 +603,32 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     }
 
     /// <summary>
+    /// Validates that the given OOP is a valid context (MethodContext or BlockContext).
+    /// Returns true if valid, throws if invalid (for diagnostic purposes).
+    /// </summary>
+    private void ValidateContextOOP(SmalltalkOOP contextOOP, string contextDescription)
+    {
+        if (contextOOP == _metadata.KnownObjects.Nil)
+            return; // nil is valid for sender of top-level context
+
+        var contextClassOOP = _heapManager.GetClassOOP(contextOOP);
+        var methodContextClassOOP = RuntimeSpecialObjects.Instance.MethodContextClass;
+        var blockContextClassOOP = _metadata.BlockContextClassOOP;
+
+        if (contextClassOOP != methodContextClassOOP && contextClassOOP != blockContextClassOOP)
+        {
+            var contextClassName = _heapManager.GetClassName(contextOOP);
+            throw new InvalidOperationException(
+                $"ValidateContextOOP FAILED: {contextDescription} is not a MethodContext or BlockContext!\n" +
+                $"  contextOOP: {contextOOP}\n" +
+                $"  Context class: {contextClassName}\n" +
+                $"  Expected: MethodContext ({methodContextClassOOP}) or BlockContext ({blockContextClassOOP})\n" +
+                $"  ActiveContext: {_contextManager.ActiveContext}\n" +
+                $"  This indicates context corruption.");
+        }
+    }
+
+    /// <summary>
     /// Handles a method/block return. Switches back to sender context.
     /// Handles non-local returns by unwinding contexts until reaching target.
     /// Returns InterpreterStatus indicating whether to continue or complete.
@@ -622,6 +668,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 }
 
                 // Switch to sender and push NLR value
+                ValidateContextOOP(senderOOP, "NLR target sender");
                 _contextManager.SetActiveContext(senderOOP);
                 _contextManager.AddContextToPool(returningContext);
                 Push(nlrValue);
@@ -630,6 +677,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
             // Not the target - continue unwinding (don't push value)
             senderOOP = _heapManager.GetInstanceVariable(_contextManager.ActiveContext, senderIndex);
+            ValidateContextOOP(senderOOP, "NLR unwinding sender");
             // if (_verboseDebugMode)
             //     Console.WriteLine($"[HandleReturn NLR] Unwinding through {_contextManager.ActiveContext}, next sender={senderOOP}");
 
@@ -639,9 +687,22 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             // Check if we ran out of contexts (error case)
             if (senderOOP == _metadata.KnownObjects.Nil)
             {
+                // Diagnostic: Try to identify the target context's method
+                string targetMethodInfo = "unknown";
+                try
+                {
+                    var targetMethod = _heapManager.GetInstanceVariable(_nlrHandler.TargetContext, VMConstants.CONTEXT_METHOD_INDEX);
+                    targetMethodInfo = GetLocalId(targetMethod) ?? $"method={targetMethod}";
+                }
+                catch { /* ignore */ }
+
+                // Diagnostic: Print the current context chain for debugging
+                Console.WriteLine($"[NLR FAILURE] Target context: {_nlrHandler.TargetContext}, Method: {targetMethodInfo}");
+                Console.WriteLine($"[NLR FAILURE] Active context at failure: {returningContext}");
+
                 throw new InvalidOperationException(
                     $"Non-local return target context {_nlrHandler.TargetContext} not found in sender chain. " +
-                    $"Target may have already returned.");
+                    $"Target method: {targetMethodInfo}. Target may have already returned.");
             }
 
             // Continue unwinding
@@ -791,6 +852,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         // Switch to sender context and push return value
+        ValidateContextOOP(senderOOP, "normal return sender");
         _contextManager.SetActiveContext(senderOOP);
         _contextManager.AddContextToPool(returningContext);
         Push(returnValue);

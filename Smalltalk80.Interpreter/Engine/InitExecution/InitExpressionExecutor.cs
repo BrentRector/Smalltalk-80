@@ -53,7 +53,7 @@ public class InitExpressionExecutor
     /// </summary>
     private SmalltalkOOP ResumeProcess(SmalltalkOOP processOOP)
     {
-        // Get the suspended context from the Process (instance variable 1: suspendedContext)
+        // Get the suspended context from the Process
         var contextOOP = _heapManager.GetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
         return _vm.ExecuteExistingContext(contextOOP);
     }
@@ -142,16 +142,29 @@ public class InitExpressionExecutor
             // Step 2: Prepare canonical receiver
             SmalltalkOOP receiverOOP = GetCanonicalReceiverForDoIt();
 
-            // Step 3: Create MethodContext for init expression
+            // GC-SAFE ALLOCATION ORDER:
+            // Objects are created in order such that each is rooted before the next allocation.
+            // This avoids the need for temporary GC roots.
+            //
+            // Step 3: Create Process with nil suspendedContext (GC during allocation is safe -
+            // the Process being created won't be collected)
+            SmalltalkOOP processOOP = CreateProcessWithNilContext(priority: 8);
+
+            // Step 4: Set Process as activeProcess - now it's rooted via ProcessorScheduler
+            // (SetInstanceVariable doesn't allocate, so no GC can run here)
+            var schedulerOOP = _metadata.ProcessorScheduler;
+            _heapManager.SetInstanceVariable(schedulerOOP,
+                VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, processOOP);
+
+            // Step 5: Create MethodContext (GC during allocation won't collect Process - it's rooted)
             SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
 
-            // Step 4: Create Process with this context
-            // Priority 8 (TimingPriority) prevents preemption when init expressions
-            // fork processes at priority 8 (e.g., Delay's timing process).
-            // Since 8 > 8 is false, no preemption occurs.
-            SmalltalkOOP processOOP = CreateProcess(methodContextOOP, priority: 8);
+            // Step 6: Wire Process.suspendedContext = methodContext
+            // (SetInstanceVariable doesn't allocate, so no GC can run here)
+            _heapManager.SetInstanceVariable(processOOP,
+                VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, methodContextOOP);
 
-            // Step 5: Execute via primitive 87 (resume)
+            // Step 7: Execute
             SmalltalkOOP resultOOP;
             try
             {
@@ -802,7 +815,11 @@ public class InitExpressionExecutor
         return System.Text.Encoding.UTF8.GetString(bytes);
     }
 
-    private SmalltalkOOP CreateProcess(SmalltalkOOP suspendedContextOOP, int priority)
+    /// <summary>
+    /// Creates a Process with nil suspendedContext.
+    /// Used in GC-safe allocation order: create Process first, root it, then create context.
+    /// </summary>
+    private SmalltalkOOP CreateProcessWithNilContext(int priority)
     {
         // Get Process class OOP - lookup from live heap
         var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
@@ -822,8 +839,9 @@ public class InitExpressionExecutor
         var processOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, PROCESS_INSTANCE_VAR_COUNT, indexedSize: 0);
         _heapManager.SetClassOOP(processOOP, processClassOOP);
 
-        // Set instance variables using fixed indices from VMConstants
-        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, suspendedContextOOP);
+        // Set instance variables - suspendedContext is nil, will be set later
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_NEXTLINK_INDEX, _heapManager.GetNil());
+        _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, _heapManager.GetNil());
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_PRIORITY_INDEX, SmalltalkOOP.FromSmallInteger(priority));
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _heapManager.GetNil());
 

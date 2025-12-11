@@ -31,9 +31,13 @@ public record VMMetadata
     public required SmalltalkOOP SymbolClassOOP { get; init; }
     public required SmalltalkOOP StringClassOOP { get; init; }
     public required SmalltalkOOP ArrayClassOOP { get; init; }
+    public required SmalltalkOOP ByteArrayClassOOP { get; init; }
+    public required SmalltalkOOP WordArrayClassOOP { get; init; }
+    public required SmalltalkOOP DisplayBitmapClassOOP { get; init; }
     public required SmalltalkOOP CompiledMethodClassOOP { get; init; }
     public required SmalltalkOOP SmallIntegerClassOOP { get; init; }
     public required SmalltalkOOP BlockContextClassOOP { get; init; }
+    public required SmalltalkOOP OrderedCollectionClassOOP { get; init; }
 
     // Well-known objects for fast VM access (Nil, True, False, Smalltalk)
     public required KnownObjects KnownObjects { get; init; }

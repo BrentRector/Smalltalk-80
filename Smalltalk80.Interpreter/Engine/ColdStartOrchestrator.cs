@@ -287,9 +287,13 @@ public class ColdStartOrchestrator : IColdStartLoader
             SymbolClassOOP = GlobalRegistry.Get("class:Symbol"),
             StringClassOOP = GlobalRegistry.Get("class:String"),
             ArrayClassOOP = GlobalRegistry.Get("class:Array"),
+            ByteArrayClassOOP = GlobalRegistry.Get("class:ByteArray"),
+            WordArrayClassOOP = GlobalRegistry.Get("class:WordArray"),
+            DisplayBitmapClassOOP = GlobalRegistry.Get("class:DisplayBitmap"),
             CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
             BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
+            OrderedCollectionClassOOP = GlobalRegistry.Get("class:OrderedCollection"),
             KnownObjects = knownObjects,
             ProcessorScheduler = processorSchedulerOOP,
             InitExpressionMethods = InitExpressionMethods

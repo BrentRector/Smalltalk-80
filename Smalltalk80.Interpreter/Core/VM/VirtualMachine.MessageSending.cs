@@ -338,7 +338,8 @@ public partial class VirtualMachine
             Console.WriteLine($"  Instruction count: {_tracer.InstructionCount}");
             Console.WriteLine("\nSmalltalk Context Chain:");
             _debugger.DumpSenderChain(_contextManager.ActiveContext, 20);
-            throw new InvalidOperationException($"Smalltalk notify:at: from {recvClassName}: stopping before GUI access");
+            // Let Smalltalk's error handling proceed - CodeController>>notify:at: should highlight the error
+            Console.WriteLine("\n[Continuing with Smalltalk error handling...]\n");
         }
 
         // Get receiver class name once for all uses

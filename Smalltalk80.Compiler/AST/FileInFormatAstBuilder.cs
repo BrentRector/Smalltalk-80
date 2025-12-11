@@ -1044,7 +1044,10 @@ namespace Smalltalk80.Compiler.AST
         {
             if (text.Length >= 2 && text[0] == '\'' && text[^1] == '\'')
             {
-                return text[1..^1].Replace("''", "'");
+                // Handle both Smalltalk string escapes:
+                // - '' represents a single ' (quote escaping)
+                // - !! represents a single ! (file-out format chunk separator escaping)
+                return text[1..^1].Replace("''", "'").Replace("!!", "!");
             }
             return text;
         }

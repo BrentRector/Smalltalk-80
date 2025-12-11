@@ -425,6 +425,18 @@ AssociationRegistry.Freeze();
 
 Runtime code uses only the Smalltalk heap via `IRuntimeHeapAccessor`.
 
+### Init Expression Execution
+
+After cold start phases complete, init expressions execute to initialize the system. Each expression runs as a method activation with GC-safe allocation order:
+
+1. Create Process with nil `suspendedContext`
+2. Set as `ProcessorScheduler.activeProcess` (roots it via SystemDictionary → Processor)
+3. Create MethodContext (safe - Process is rooted)
+4. Wire `Process.suspendedContext = MethodContext`
+5. Execute
+
+This order ensures GC during any allocation step won't collect unrooted objects. See `COLD-START-DESIGN-AND-IMPLEMENTATION.md` for detailed design.
+
 ---
 
 ## Diagnostics System

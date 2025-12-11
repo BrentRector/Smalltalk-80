@@ -61,6 +61,25 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         _specialSelectorOOPs = specialSelectorOOPs;
     }
 
+    /// <summary>
+    /// Validates that a jump target is within the executable bytecode area.
+    /// CompiledMethod bytecodes end with a 3-byte source offset trailer that must not be executed.
+    /// </summary>
+    /// <param name="targetIp">The target instruction pointer after the jump</param>
+    /// <param name="bytecodes">The method's bytecode array</param>
+    /// <param name="jumpType">Description of jump type for error messages</param>
+    /// <exception cref="InvalidOperationException">If jump target is outside executable area</exception>
+    private void ValidateJumpTarget(int targetIp, byte[] bytecodes, string jumpType)
+    {
+        int executableLength = bytecodes.Length - 3;  // Exclude 3-byte source offset trailer
+        if (targetIp < 0 || targetIp > executableLength)
+        {
+            throw new InvalidOperationException(
+                $"[INVALID JUMP] {jumpType}: target IP={targetIp} is outside executable bytecode area [0, {executableLength}). " +
+                $"Bytecode array length={bytecodes.Length}. This indicates a compiler bug or corrupted method.");
+        }
+    }
+
     /// <inheritdoc />
     public bool ExecuteBytecode(byte bytecode, SmalltalkOOP methodOOP)
     {
@@ -171,6 +190,12 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     // Get bytecode array from CompiledMethod (last indexed slot)
                     int methodIndexedSize = heapManager.GetIndexedSize(methodOOP);
                     var bytecodeArrayOOP = heapManager.GetIndexedOOP(methodOOP, methodIndexedSize - 1);
+
+                    // Diagnostic: Show the bytecodeArrayOOP to check for corruption
+                    string bytecodeArrayClass = "?";
+                    try { bytecodeArrayClass = heapManager.GetClassName(bytecodeArrayOOP); } catch { }
+                    Console.WriteLine($"  CM indexedSize={methodIndexedSize}, bytecodeArrayOOP={bytecodeArrayOOP} (class: {bytecodeArrayClass})");
+
                     int methodBytecodeSize = heapManager.GetIndexedSize(bytecodeArrayOOP);
                     Console.Write("  Method bytecodes: [");
                     int count = Math.Min(methodBytecodeSize, 20);
@@ -609,7 +634,10 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             int ipIndex = VMConstants.CONTEXT_PC_INDEX;
             var ipOOP = heapManager.GetInstanceVariable(context.ActiveContext, ipIndex);
             int currentIp = ipOOP.AsSmallInteger();
-            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
+            int targetIp = currentIp + distance;
+            byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
+            ValidateJumpTarget(targetIp, bytecodes, "Short unconditional jump");
+            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(targetIp));
             return true;
         }
 
@@ -626,7 +654,10 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             var valueOOP = context.Pop();
             if (valueOOP == metadata.KnownObjects.False)
             {
-                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + distance));
+                int targetIp = currentIp + distance;
+                byte[] bytecodes = context.GetMethodBytecodes(methodOOP);
+                ValidateJumpTarget(targetIp, bytecodes, "Short conditional jump on false");
+                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(targetIp));
             }
             return true;
         }
@@ -643,8 +674,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
             byte extByte = bytecodes[currentIp++];
             int offset = BytecodeUtil.LongJumpBaseOffset(bytecode) + extByte;
-
-            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
+            int targetIp = currentIp + offset;
+            ValidateJumpTarget(targetIp, bytecodes, "Long unconditional jump");
+            heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(targetIp));
             return true;
         }
 
@@ -665,7 +697,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             var valueOOP = context.Pop();
             if (valueOOP == metadata.KnownObjects.True)
             {
-                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
+                int targetIp = currentIp + offset;
+                ValidateJumpTarget(targetIp, bytecodes, "Long conditional jump on true");
+                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(targetIp));
             }
             return true;
         }
@@ -687,7 +721,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             var valueOOP = context.Pop();
             if (valueOOP == metadata.KnownObjects.False)
             {
-                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(currentIp + offset));
+                int targetIp = currentIp + offset;
+                ValidateJumpTarget(targetIp, bytecodes, "Long conditional jump on false");
+                heapManager.SetInstanceVariable(context.ActiveContext, ipIndex, SmalltalkOOP.FromSmallInteger(targetIp));
             }
             return true;
         }
@@ -1174,13 +1210,21 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         }
 
         // Fast path for at: (index 0) - indexed access
-        // NOTE: Skip ByteIndexed (Strings/Symbols) - they need to return Character objects, not SmallIntegers
+        // WHITELIST APPROACH: Only allow classes that use direct indexed storage without override logic.
+        // Many classes override at: with custom behavior (OrderedCollection uses firstIndex offset,
+        // Dictionary uses hashing, Interval computes values, String returns Characters, etc.)
+        // Safe classes: Array, ByteArray, WordArray, DisplayBitmap
         if (selectorIndex == 0 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
         {
-            var format = heapManager.GetObjectFormat(receiverOOP);
-            // Only apply fast path to non-ByteIndexed objects
-            if (format != ObjectFormat.ByteIndexed)
+            var classOOP = heapManager.GetClassOOP(receiverOOP);
+
+            // WHITELIST: Only these classes have direct indexed storage
+            if (classOOP == metadata.ArrayClassOOP ||
+                classOOP == metadata.ByteArrayClassOOP ||
+                classOOP == metadata.WordArrayClassOOP ||
+                classOOP == metadata.DisplayBitmapClassOOP)
             {
+                var format = heapManager.GetObjectFormat(receiverOOP);
                 int index = args[0].AsSmallInteger();
                 int size = heapManager.GetIndexedSize(receiverOOP);
                 if (index >= 1 && index <= size)
@@ -1191,6 +1235,11 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                         ushort w = heapManager.GetIndexedWord(receiverOOP, index - 1);
                         value = SmalltalkOOP.FromSmallInteger(w);
                     }
+                    else if (format == ObjectFormat.ByteIndexed)
+                    {
+                        byte b = heapManager.GetIndexedByte(receiverOOP, index - 1);
+                        value = SmalltalkOOP.FromSmallInteger(b);
+                    }
                     else
                     {
                         value = heapManager.GetIndexedOOP(receiverOOP, index - 1);
@@ -1200,17 +1249,25 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 }
                 // Out of bounds - fall through to message send for error handling
             }
-            // ByteIndexed (String/Symbol) - fall through to message send to get Character objects
+            // Not in whitelist - fall through to message send
         }
 
         // Fast path for at:put: (index 1) - indexed store
-        // NOTE: Skip ByteIndexed (Strings/Symbols) - they expect Character arguments, not SmallIntegers
+        // WHITELIST APPROACH: Only allow classes that use direct indexed storage without override logic.
+        // Many classes override at:put: with custom behavior (OrderedCollection uses firstIndex offset,
+        // Dictionary uses hashing, SortedCollection signals error, Symbol is immutable, etc.)
+        // Safe classes: Array, ByteArray, WordArray, DisplayBitmap
         if (selectorIndex == 1 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
         {
-            var format = heapManager.GetObjectFormat(receiverOOP);
-            // Only apply fast path to non-ByteIndexed objects
-            if (format != ObjectFormat.ByteIndexed)
+            var classOOP = heapManager.GetClassOOP(receiverOOP);
+
+            // WHITELIST: Only these classes have direct indexed storage
+            if (classOOP == metadata.ArrayClassOOP ||
+                classOOP == metadata.ByteArrayClassOOP ||
+                classOOP == metadata.WordArrayClassOOP ||
+                classOOP == metadata.DisplayBitmapClassOOP)
             {
+                var format = heapManager.GetObjectFormat(receiverOOP);
                 int index = args[0].AsSmallInteger();
                 var value = args[1];
                 int size = heapManager.GetIndexedSize(receiverOOP);
@@ -1230,6 +1287,19 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                         else
                             success = false;
                     }
+                    else if (format == ObjectFormat.ByteIndexed)
+                    {
+                        if (value.IsSmallInteger)
+                        {
+                            int byteValue = value.AsSmallInteger();
+                            if (byteValue >= 0 && byteValue <= 255)
+                                heapManager.SetIndexedByte(receiverOOP, index - 1, (byte)byteValue);
+                            else
+                                success = false;
+                        }
+                        else
+                            success = false;
+                    }
                     else
                     {
                         heapManager.SetIndexedOOP(receiverOOP, index - 1, value);
@@ -1242,7 +1312,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 }
                 // Out of bounds or type error - fall through to message send
             }
-            // ByteIndexed (String/Symbol) - fall through to message send to handle Character conversion
+            // Not in whitelist - fall through to message send
         }
 
         // NOTE: No fast path for size (index 2) - many classes override size
@@ -1338,8 +1408,19 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             // Validate target is in sender chain (safety check)
             if (!context.IsInSenderChain(targetContextOOP, context.ActiveContext))
             {
+                // Diagnostic: Try to identify the home method
+                string homeMethodInfo = "unknown";
+                try
+                {
+                    var homeMethod = heapManager.GetInstanceVariable(homeOOP, VMConstants.CONTEXT_METHOD_INDEX);
+                    homeMethodInfo = context.GetLocalId(homeMethod) ?? $"method={homeMethod}";
+                }
+                catch { /* ignore */ }
+
+                Console.WriteLine($"[NLR INIT FAIL] BlockContext={context.ActiveContext}, Home={homeOOP}, HomeMethod={homeMethodInfo}");
+
                 throw new InvalidOperationException(
-                    "Non-local return target not in sender chain - block's defining method has already returned");
+                    $"Non-local return target not in sender chain - block's defining method ({homeMethodInfo}) has already returned");
             }
 
             // Initiate non-local return to home's sender

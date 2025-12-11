@@ -13,6 +13,7 @@ public static class InitExpressionOrdering
     {
         return new List<string>
         {
+            "Behavior init",  // Must run early - initializes SelectorsOfConflictMethods etc.
             "Character initialize",
             "Float initialize",
             "SmallInteger initialize",

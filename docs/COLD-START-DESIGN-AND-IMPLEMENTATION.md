@@ -659,6 +659,104 @@ All phases executed successfully and all objects reachable from GC roots.
 
 ---
 
+## Init Expression Execution (Post-Cold Start)
+
+After the 15 cold start phases complete, init expressions execute to initialize class variables, set up globals, and configure the runtime system. Each init expression is a pre-compiled DoIt that runs as an ordinary method activation.
+
+### GC-Safe Allocation Order
+
+**Critical Design**: Init expression execution must create both a Process and a MethodContext. Since either allocation could trigger AutoGC, we must ensure objects are rooted before subsequent allocations.
+
+**The Problem**: If we create objects in the wrong order:
+1. Create MethodContext (allocates on heap)
+2. Create Process (allocates on heap) ← AutoGC might run here!
+3. Wire Process.suspendedContext = MethodContext
+
+If AutoGC runs during step 2, the MethodContext from step 1 is **NOT rooted** (only held in a C# local variable). GC collects it, and its OOP gets reused - potentially for the Process being created! This causes Process.suspendedContext to point to **itself** (circular reference), corrupting the process state.
+
+**The Solution**: GC-safe allocation order ensures each object is rooted before the next allocation:
+
+```csharp
+// Step 1: Create Process with nil suspendedContext
+// (GC during allocation is safe - the Process being created won't be collected)
+SmalltalkOOP processOOP = CreateProcessWithNilContext(priority: 8);
+
+// Step 2: Set Process as activeProcess - now it's rooted via ProcessorScheduler
+// (SetInstanceVariable doesn't allocate, so no GC can run here)
+_heapManager.SetInstanceVariable(schedulerOOP,
+    VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX, processOOP);
+
+// Step 3: Create MethodContext
+// (GC during allocation won't collect Process - it's rooted via ProcessorScheduler)
+SmalltalkOOP methodContextOOP = CreateMethodContextForInitExpression(compiledMethodOOP, receiverOOP);
+
+// Step 4: Wire Process.suspendedContext = methodContext
+// (SetInstanceVariable doesn't allocate, so no GC can run here)
+_heapManager.SetInstanceVariable(processOOP,
+    VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, methodContextOOP);
+
+// Step 5: Execute
+```
+
+**Key Insight**: The Process is the **first/activeProcess** during init expression execution. Setting it as `ProcessorScheduler.activeProcess` provides a natural GC root through the existing Smalltalk object graph (SystemDictionary → Processor → activeProcess).
+
+### Root Chain During Init Execution
+
+```
+SystemDictionary (GC root)
+  └── Processor (ProcessorScheduler singleton)
+       └── activeProcess (Process)
+            └── suspendedContext (MethodContext)
+                 └── method (CompiledMethod)
+                 └── receiver (Smalltalk global)
+                 └── indexed slots (temp frame, stack)
+```
+
+### CreateProcessWithNilContext Helper
+
+```csharp
+private SmalltalkOOP CreateProcessWithNilContext(int priority)
+{
+    // Process has 4 instance variables: nextLink, suspendedContext, priority, myList
+    var processOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, 4, indexedSize: 0);
+    _heapManager.SetClassOOP(processOOP, processClassOOP);
+
+    // Set instance variables - suspendedContext is nil, will be set later
+    _heapManager.SetInstanceVariable(processOOP, PROCESS_NEXTLINK_INDEX, nil);
+    _heapManager.SetInstanceVariable(processOOP, PROCESS_SUSPENDEDCONTEXT_INDEX, nil);  // ← nil!
+    _heapManager.SetInstanceVariable(processOOP, PROCESS_PRIORITY_INDEX, SmallInteger(priority));
+    _heapManager.SetInstanceVariable(processOOP, PROCESS_MYLIST_INDEX, nil);
+
+    return processOOP;
+}
+```
+
+### Why Not Use AddGCRoot?
+
+An alternative approach is to explicitly add the MethodContext as a temporary GC root:
+
+```csharp
+// Alternative (NOT recommended):
+SmalltalkOOP methodContextOOP = CreateMethodContext(...);
+_heapManager.AddGCRoot(methodContextOOP);  // Temporary root
+SmalltalkOOP processOOP = CreateProcess(...);  // Safe now
+_heapManager.RemoveGCRoot(methodContextOOP);
+```
+
+**Why GC-safe allocation order is better:**
+1. **Natural rooting**: Uses existing Smalltalk object graph rather than special C# machinery
+2. **Blue Book compliance**: Follows how Smalltalk-80 actually works (activeProcess is always rooted)
+3. **Simpler**: No need to manage temporary roots
+4. **Safer**: Can't forget to remove temporary roots
+5. **Semantic correctness**: The Process IS the activeProcess during execution
+
+### Files Involved
+
+- `InitExpressionExecutor.cs` - Main init expression execution logic
+- `VMConstants.cs` - Process and ProcessorScheduler field indices
+
+---
+
 ## Garbage Collection Integration
 
 ### Perfect GC Achievement
