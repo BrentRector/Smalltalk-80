@@ -1478,6 +1478,10 @@ readOnly
     "Set to read-only mode - no-op for basic implementation"
     ^self!
 
+readWrite
+    "Set to read-write mode - no-op for basic implementation"
+    ^self!
+
 readWriteShorten
     "Set to read-write mode - no-op for basic implementation"
     ^self!
