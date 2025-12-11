@@ -680,6 +680,11 @@ readPageNumber: aPageNumber
     dataEnd _ 0.
     ^file read: self!
 
+readOrAddPageNumber: aPageNumber
+    "Answer a page for the given page number, creating it if needed.
+    Delegates to the file to create a new page with proper initialization."
+    ^file readOrAddPageNumber: aPageNumber!
+
 write
     "Write this page to its file."
     ^file write: self! !
