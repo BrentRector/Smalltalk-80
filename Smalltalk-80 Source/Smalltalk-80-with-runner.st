@@ -1483,6 +1483,10 @@ readOnly
     "Set to read-only mode - no-op for basic implementation"
     ^self!
 
+readWrite
+    "Set to read-write mode - no-op for basic implementation"
+    ^self!
+
 readWriteShorten
     "Set to read-write mode - no-op for basic implementation"
     ^self!
@@ -3712,7 +3716,10 @@ init  "Behavior init."
 	SelectorsOfCopiedMethods _ IdentityDictionary new.
 		"selector -> Array of classes"
 	SelectorsOfDirectedMethods _ IdentityDictionary new
-		"selector -> Array of classes"! !Object subclass: #Benchmark
+		"selector -> Array of classes"! !
+
+Behavior init!
+Object subclass: #Benchmark
 	instanceVariableNames: 'dummy verboseTranscript reporting reportStream fromList '
 	classVariableNames: 'Outputs StandardTests '
 	poolDictionaries: ''
@@ -5765,7 +5772,7 @@ numberOfArguments
 	^arguments size!
 returnLast
 	self returns
-		ifFalse: 
+		ifFalse:
 			[returns _ true.
 			statements at: statements size put: statements last asReturnNode]!
 returnSelfIfNoOther
@@ -11838,9 +11845,11 @@ frameSize
 		ifTrue: [^ LargeFrame]
 		ifFalse: [^ SmallFrame]!
 initialPC
-	"Answer the program counter for the receiver's first bytecode."
+	"Answer the program counter for the receiver's first bytecode.
+	 Our C# implementation separates bytecodes into a hidden ByteArray,
+	 so at:1 accesses the first bytecode (unlike Blue Book's heterogeneous layout)."
 
-	^self numLiterals * BytesPerLiteral + BytesForHeader + 1!
+	^1!
 numArgs
 	"Answer the number of arguments the receiver takes.
 	NOTE: Our C# compiler puts the extension literal at the LAST position,
@@ -17811,7 +17820,10 @@ initialize
 	FilePool at: #Read put: 1.
 	FilePool at: #Write put: 2.
 	FilePool at: #Shorten put: 3.
-	FilePool at: #Disk put: WindowsFileDirectory default! !
+
+	"Install Disk as GLOBAL variable (not just pool variable) since it's a system-wide
+	 resource used by many classes that don't have FilePool in their poolDictionaries."
+	Smalltalk at: #Disk put: WindowsFileDirectory default! !
 
 !File class methodsFor: 'documentation'!
 documentation
@@ -28777,9 +28789,9 @@ at: anInteger
 	(anInteger < 1 or: [anInteger + firstIndex - 1 > lastIndex])
 		ifTrue: [self errorNoSuchElement]
 		ifFalse: [^super at: anInteger + firstIndex - 1]!
-at: anInteger put: anObject 
+at: anInteger put: anObject
 	"Put anObject at element index anInteger.
-	at:put: can not be used to append, front or back, to an ordered collection; 
+	at:put: can not be used to append, front or back, to an ordered collection;
 	 it is used by a knowledgeable client to replace an element"
 
 	| index |

@@ -17820,7 +17820,10 @@ initialize
 	FilePool at: #Read put: 1.
 	FilePool at: #Write put: 2.
 	FilePool at: #Shorten put: 3.
-	FilePool at: #Disk put: WindowsFileDirectory default! !
+
+	"Install Disk as GLOBAL variable (not just pool variable) since it's a system-wide
+	 resource used by many classes that don't have FilePool in their poolDictionaries."
+	Smalltalk at: #Disk put: WindowsFileDirectory default! !
 
 !File class methodsFor: 'documentation'!
 documentation
