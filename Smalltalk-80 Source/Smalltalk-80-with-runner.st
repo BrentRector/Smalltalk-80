@@ -670,7 +670,10 @@ fromFileStream: aStream
         position _ position + 1].
 
     "Update data end"
-    dataEnd _ sourceData size! !
+    dataEnd _ sourceData size.
+
+    "Close handle to flush BufferedStream and write data to disk"
+    self close! !
 
 !WindowsFilePage methodsFor: 'nonhomogeneous accessing'!
 
@@ -679,6 +682,11 @@ readPageNumber: aPageNumber
     self pageNumber: aPageNumber.
     dataEnd _ 0.
     ^file read: self!
+
+readOrAddPageNumber: aPageNumber
+    "Answer a page for the given page number, creating it if needed.
+    Delegates to the file to create a new page with proper initialization."
+    ^file readOrAddPageNumber: aPageNumber!
 
 write
     "Write this page to its file."
@@ -1476,6 +1484,10 @@ nextChunkPut: aString
 
 readOnly
     "Set to read-only mode - no-op for basic implementation"
+    ^self!
+
+readWrite
+    "Set to read-write mode - no-op for basic implementation"
     ^self!
 
 readWriteShorten
@@ -3707,7 +3719,10 @@ init  "Behavior init."
 	SelectorsOfCopiedMethods _ IdentityDictionary new.
 		"selector -> Array of classes"
 	SelectorsOfDirectedMethods _ IdentityDictionary new
-		"selector -> Array of classes"! !Object subclass: #Benchmark
+		"selector -> Array of classes"! !
+
+Behavior init!
+Object subclass: #Benchmark
 	instanceVariableNames: 'dummy verboseTranscript reporting reportStream fromList '
 	classVariableNames: 'Outputs StandardTests '
 	poolDictionaries: ''
@@ -4766,7 +4781,7 @@ BinaryChoiceController comment:
 !BinaryChoiceController methodsFor: 'control defaults'!
 isControlActive
 	model actionTaken ifTrue: [^false].
-	[super isControlActive] whileFalse: [view flash].
+	[super isControlActive] whileFalse: [Processor yield. view flash].
 	^true! !
 
 !BinaryChoiceController methodsFor: 'basic control sequence'!
@@ -5760,7 +5775,7 @@ numberOfArguments
 	^arguments size!
 returnLast
 	self returns
-		ifFalse: 
+		ifFalse:
 			[returns _ true.
 			statements at: statements size put: statements last asReturnNode]!
 returnSelfIfNoOther
@@ -11833,16 +11848,20 @@ frameSize
 		ifTrue: [^ LargeFrame]
 		ifFalse: [^ SmallFrame]!
 initialPC
-	"Answer the program counter for the receiver's first bytecode."
+	"Answer the program counter for the receiver's first bytecode.
+	 Our C# implementation separates bytecodes into a hidden ByteArray,
+	 so at:1 accesses the first bytecode (unlike Blue Book's heterogeneous layout)."
 
-	^self numLiterals * BytesPerLiteral + BytesForHeader + 1!
+	^1!
 numArgs
-	"Answer the number of arguments the receiver takes."
+	"Answer the number of arguments the receiver takes.
+	NOTE: Our C# compiler puts the extension literal at the LAST position,
+	not at numLiterals-1 like the Blue Book (which reserves last slot for class Association)."
 
 	| flags |
 	(flags _ self flags) <= 4 ifTrue: [^flags].
 	flags < 7 ifTrue: [^0].
-	^((self literalAt: self numLiterals - 1)
+	^((self literalAt: self numLiterals)
 		bitShift: -8)
 		bitAnd: 31!
 numLiterals
@@ -11869,11 +11888,13 @@ numTempsField
 	^self header // 128 bitAnd: 31!
 primitive
 	"Answer the primitive index associated with the receiver.  Zero indicates
-	that there is either no primitive or just a quick primitive."
+	that there is either no primitive or just a quick primitive.
+	NOTE: Our C# compiler puts the extension literal at the LAST position,
+	not at numLiterals-1 like the Blue Book (which reserves last slot for class Association)."
 
 	self flags < 7
 		ifTrue: [^0]
-		ifFalse: [^(self literalAt: self numLiterals - 1) bitAnd: 255	]!
+		ifFalse: [^(self literalAt: self numLiterals) bitAnd: 255	]!
 returnField
 	"Answer the index of the instance variable returned by a quick
 	return method."
@@ -17802,7 +17823,10 @@ initialize
 	FilePool at: #Read put: 1.
 	FilePool at: #Write put: 2.
 	FilePool at: #Shorten put: 3.
-	FilePool at: #Disk put: WindowsFileDirectory default! !
+
+	"Install Disk as GLOBAL variable (not just pool variable) since it's a system-wide
+	 resource used by many classes that don't have FilePool in their poolDictionaries."
+	Smalltalk at: #Disk put: WindowsFileDirectory default! !
 
 !File class methodsFor: 'documentation'!
 documentation
@@ -21272,7 +21296,7 @@ dragForm
 			[[sensor anyButtonPressed
 				or: [sensor keyboardPressed
 				or: [self viewHasCursor not]]]
-				whileFalse: []].
+				whileFalse: [Processor yield]].
 			^ self cursorPoint]
 		ifFalse:
 			[^Cursor blank showWhile:
@@ -28768,9 +28792,9 @@ at: anInteger
 	(anInteger < 1 or: [anInteger + firstIndex - 1 > lastIndex])
 		ifTrue: [self errorNoSuchElement]
 		ifFalse: [^super at: anInteger + firstIndex - 1]!
-at: anInteger put: anObject 
+at: anInteger put: anObject
 	"Put anObject at element index anInteger.
-	at:put: can not be used to append, front or back, to an ordered collection; 
+	at:put: can not be used to append, front or back, to an ordered collection;
 	 it is used by a knowledgeable client to replace an element"
 
 	| index |
@@ -32481,7 +32505,7 @@ startUp: aSymbol
 
 	self displayAt: Sensor cursorPoint
 		during: [Sensor cursorPoint: marker center.
-				[self buttonPressed: aSymbol] whileFalse: [].
+				[self buttonPressed: aSymbol] whileFalse: [Processor yield].
 				[self buttonPressed: aSymbol] whileTrue: [self manageMarker]].
 	^selection!
 startUp: aSymbol withHeading: aText
@@ -32491,7 +32515,7 @@ startUp: aSymbol withHeading: aText
 	self displayAt: Sensor cursorPoint withHeading: aText
 		during: [Sensor cursorPoint: marker center.
 				[self buttonPressed: aSymbol]
-					whileFalse: [(frame containsPoint: Sensor cursorPoint) ifFalse: [Display flash: frame]].
+					whileFalse: [Processor yield. (frame containsPoint: Sensor cursorPoint) ifFalse: [Display flash: frame]].
 				[self buttonPressed: aSymbol]
 					whileTrue: [self manageMarker]].
 	^selection!
@@ -32501,7 +32525,7 @@ startUpAndWaitForSelectionAt: aPoint
 
 	self displayAt: aPoint
 		during: [[(Sensor anyButtonPressed and: [frame inside containsPoint: Sensor cursorPoint])]
-					whileFalse: [].
+					whileFalse: [Processor yield].
 				[self buttonPressed: #anyButton]
 					whileTrue: [self manageMarker]].
 	^selection!
@@ -33092,7 +33116,7 @@ hiddenBackgroundProcess
 	"Install a default background process which is invisible."
 
 	self background:
-		[[true] whileTrue: []]!
+		[[true] whileTrue: [Processor yield]]!
 sweepHandBackgroundProcess
 	"Install the default background process which shows a sweeping circle
 	of Xor-ed bits on the screen."

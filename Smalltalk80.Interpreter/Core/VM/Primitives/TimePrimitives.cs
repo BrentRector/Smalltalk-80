@@ -37,7 +37,8 @@ public static class TimeOperations
             int size = context.HeapManager.GetIndexedSize(byteArrayOOP);
             if (size < 4) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Get current Unix timestamp and convert to Smalltalk epoch
+            // Get current UTC time and convert to Smalltalk epoch.
+            // The Smalltalk code handles timezone conversion (hardcoded for California/Pacific).
             long unixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             long smalltalkSeconds = unixSeconds + SmalltalkEpochOffset;
 

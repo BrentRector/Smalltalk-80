@@ -338,6 +338,16 @@ No changes needed.
 
 ## Change Log
 
+- **2025-12-12**: "For effect" optimization implemented
+  - Single-arm conditionals (`ifTrue:`, `ifFalse:`) now support "for effect" compilation
+  - FOR VALUE pattern: `<cond> BFP <block> JMP PUSH_NIL` (leaves value on stack)
+  - FOR EFFECT pattern: `<cond> BFP <block>` (shortcut - nothing on stack)
+  - Added `InlineResult` enum to track inline compilation mode
+  - `forValue` parameter threaded through compilation chain
+  - Block body compilation respects `forValue` for correct stack behavior
+  - Matches Smalltalk runtime compiler's `MessageNode>>emitIf:on:value:` behavior
+  - Enables proper decompilation of methods with nested conditionals
+
 - **2025-12-01**: Phase 3 completed
   - Conditional optimization enabled for: `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:ifTrue:`, `and:`, `or:`
   - Added conditional jump methods to BytecodeEmitter (placeholders + patching)

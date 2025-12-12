@@ -37,6 +37,10 @@ public class SystemDictionaryInstaller(
         // Initialize SingleCharSymbols class variable
         InitializeSingleCharSymbols();
 
+        // Initialize SpecialSelectors class variable in SystemDictionary
+        // Required for Decompiler, InstructionStream, and other bytecode analysis tools
+        InitializeSpecialSelectorsClassVariable();
+
         // Initialize Workspace class variable in StringHolder
         // (StringHolder class>>initialize method body is commented out in original source)
         InitializeWorkspaceClassVariable();
@@ -382,6 +386,87 @@ public class SystemDictionaryInstaller(
         InstallInClassPool(classPoolOOP, associationOOP, "SingleCharSymbols");
     }
 
+    /// <summary>
+    /// Initializes the SpecialSelectors class variable of SystemDictionary.
+    /// This array is required by InstructionStream>>interpretNextInstructionFor:,
+    /// Decompiler, and other bytecode analysis tools.
+    ///
+    /// Format: #(selector1 nargs1 selector2 nargs2 ...) with 32 selector/nargs pairs.
+    /// Indices 1-16: Arithmetic selectors (bytecodes 176-191)
+    /// Indices 17-32: Special selectors (bytecodes 192-207)
+    /// </summary>
+    private void InitializeSpecialSelectorsClassVariable()
+    {
+        // Get SystemDictionary class's classPool
+        var systemDictionaryClassOOP = GlobalRegistry.LookupClassOOP("SystemDictionary");
+        if (systemDictionaryClassOOP == context.HeapManager.GetNil())
+        {
+            throw new InvalidOperationException("SystemDictionary class not found during SpecialSelectors installation");
+        }
+
+        var classPoolOOP = context.Allocator.GetInstanceVariable(systemDictionaryClassOOP, 7);
+        if (classPoolOOP == context.HeapManager.GetNil())
+        {
+            throw new InvalidOperationException("SystemDictionary classPool is nil during SpecialSelectors installation");
+        }
+
+        // Define the 32 special selectors and their argument counts
+        // Blue Book bytecodes 176-191 (arithmetic) and 192-207 (special)
+        var selectorData = new (string selector, int nargs)[]
+        {
+            // Arithmetic selectors (indices 1-16, bytecodes 176-191)
+            ("+", 1), ("-", 1), ("<", 1), (">", 1),
+            ("<=", 1), (">=", 1), ("=", 1), ("~=", 1),
+            ("*", 1), ("/", 1), ("\\\\", 1), ("@", 1),  // Note: \\ in C# is \\\\
+            ("bitAnd:", 1), ("bitOr:", 1), ("bitShift:", 1), ("//", 1),
+
+            // Special selectors (indices 17-32, bytecodes 192-207)
+            ("at:", 1), ("at:put:", 2), ("size", 0), ("next", 0),
+            ("nextPut:", 1), ("atEnd", 0), ("==", 1), ("class", 0),
+            ("blockCopy:", 1), ("value", 0), ("value:", 1), ("do:", 1),
+            ("new", 0), ("new:", 1), ("x", 0), ("y", 0)
+        };
+
+        // Create Array with 64 elements (32 selector/nargs pairs)
+        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
+        var arrayOOP = context.Allocator.AllocateArray(arrayClassOOP, 64);
+
+        var symbolService = new SymbolService(context.Bundle);
+
+        for (int i = 0; i < selectorData.Length; i++)
+        {
+            var (selector, nargs) = selectorData[i];
+
+            // Get or create the selector symbol
+            // Note: \\\\ in the array represents \\ in Smalltalk (mod operator)
+            string actualSelector = selector == "\\\\" ? "\\" : selector;
+
+            SmalltalkOOP selectorOOP;
+            if (symbolService.TryGetSymbolOOP(actualSelector, out var existingSymbolOOP))
+            {
+                selectorOOP = existingSymbolOOP;
+            }
+            else
+            {
+                // Selector not in symbol table - this shouldn't happen for standard selectors
+                throw new InvalidOperationException($"Special selector '{actualSelector}' not found in symbol table");
+            }
+
+            // Array layout: [selector1, nargs1, selector2, nargs2, ...]
+            // At index i: selector at position i*2, nargs at position i*2+1
+            context.Allocator.SetIndexedOOP(arrayOOP, i * 2, selectorOOP);
+            context.Allocator.SetIndexedOOP(arrayOOP, i * 2 + 1, SmalltalkOOP.FromSmallInteger(nargs));
+        }
+
+        // Create Association for SpecialSelectors and install in classPool
+        var specialSelectorsAssocOOP = associationManager.GetOrCreateCanonical("SpecialSelectors");
+        context.Allocator.SetInstanceVariable(specialSelectorsAssocOOP, 1, arrayOOP);
+
+        InstallInClassPool(classPoolOOP, specialSelectorsAssocOOP, "SpecialSelectors");
+
+        Console.WriteLine($"[Phase 5] Initialized SpecialSelectors array with 32 selector/nargs pairs");
+    }
+
     private void InitializeWorkspaceClassVariable()
     {
         // Workspace is a CLASS VARIABLE of StringHolder
@@ -474,6 +559,7 @@ public class SystemDictionaryInstaller(
                 if (classVarName == "CharacterTable" && className == "Character") continue;
                 if (classVarName == "USTable" && className == "Symbol") continue;
                 if (classVarName == "Workspace" && className == "StringHolder") continue;
+                if (classVarName == "SpecialSelectors" && className == "SystemDictionary") continue;
 
                 // v1.0.9+: Get canonical Association from Phase 3 allocation
                 // ALL Associations are pre-created in Phase 3 from the bundle's associations[] array
