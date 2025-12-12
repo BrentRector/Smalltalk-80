@@ -1356,6 +1356,8 @@ namespace Smalltalk80.Compiler
         /// This optimization replaces message sends with conditional jump bytecodes,
         /// avoiding BlockContext creation for simple control flow.
         /// </summary>
+        /// <param name="selector">The message selector to check for inlining</param>
+        /// <param name="keywordParts">The keyword parts containing block arguments</param>
         /// <param name="leaveOnStack">If false, uses Smalltalk "for effect" optimization:
         /// skip JMP+PUSH_NIL for single-arm conditionals when result isn't used</param>
         private bool TryInlineConditional(string selector, Smalltalk80Parser.KeywordPartContext[] keywordParts, bool leaveOnStack = true)
