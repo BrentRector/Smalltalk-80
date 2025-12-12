@@ -690,10 +690,13 @@ namespace Smalltalk80.Compiler
                 if (cascadeExpr != null)
                 {
 //Console.WriteLine($"[BYTECODE] CompileAssignmentExpr: About to compile cascadeExpr");
-                    CompileCascadeExpr(cascadeExpr, leaveOnStack);
+                    CompileCascadeExpr(cascadeExpr);
 //Console.WriteLine($"[BYTECODE] CompileAssignmentExpr: After CompileCascadeExpr, bytecode count: {emitter.GetBytecodes().Length}");
-                    // leaveOnStack is now handled inside CompileCascadeExpr/CompileMessageExpr
-                    // for conditionals. Non-conditional expressions are handled there too.
+                    if (!leaveOnStack)
+                    {
+//Console.WriteLine($"[BYTECODE] CompileAssignmentExpr: Popping result (leaveOnStack=false)");
+                        emitter.Pop();
+                    }
                 }
                 else
                 {
@@ -702,25 +705,22 @@ namespace Smalltalk80.Compiler
             }
         }
         
-        private void CompileCascadeExpr(Smalltalk80Parser.CascadeExprContext expr, bool leaveOnStack = true)
+        private void CompileCascadeExpr(Smalltalk80Parser.CascadeExprContext expr)
         {
             // Clean cascade compilation following Blue Book specification.
             // Key insight: Decompose into "cascade receiver" (all but last message)
             // and "final message" (only the last message), rather than threading
             // flags through nested method calls.
-            //
-            // leaveOnStack parameter enables Smalltalk compiler "for effect" optimization:
-            // when false, conditionals skip JMP+PUSH_NIL to match Smalltalk bytecode patterns.
 
             var messageExpr = expr.messageExpr();
             var messageParts = expr.messagePart();
 
-            // No cascade - compile normally, passing leaveOnStack for conditional optimization
+            // No cascade - compile normally
             if (messageParts == null || messageParts.Length == 0)
             {
                 if (messageExpr != null)
                 {
-                    CompileMessageExpr(messageExpr, leaveOnStack);
+                    CompileMessageExpr(messageExpr);
                 }
                 return;
             }
@@ -730,7 +730,7 @@ namespace Smalltalk80.Compiler
             {
                 // Simple case: "receiver; msg1; msg2"
                 // The receiver IS the cascade receiver
-                CompileMessageExpr(messageExpr, true); // Receiver always needed
+                CompileMessageExpr(messageExpr);
 
                 // Process all cascaded messages
                 for (int i = 0; i < messageParts.Length; i++)
@@ -748,11 +748,6 @@ namespace Smalltalk80.Compiler
                     {
                         emitter.Pop();
                     }
-                }
-                // Pop final result if not needed
-                if (!leaveOnStack)
-                {
-                    emitter.Pop();
                 }
                 return;
             }
@@ -786,12 +781,6 @@ namespace Smalltalk80.Compiler
 
                 // Compile the cascade message
                 CompileMessagePart(messageParts[i]);
-            }
-
-            // Pop final result if not needed
-            if (!leaveOnStack)
-            {
-                emitter.Pop();
             }
         }
 
@@ -1069,10 +1058,7 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Compiles a message expression (no cascade logic - cascade is handled by CompileCascadeExpr).
         /// </summary>
-        /// <param name="expr">The message expression to compile</param>
-        /// <param name="leaveOnStack">If false, conditionals use "for effect" optimization
-        /// (skip JMP+PUSH_NIL) to match Smalltalk compiler bytecode patterns</param>
-        private void CompileMessageExpr(Smalltalk80Parser.MessageExprContext expr, bool leaveOnStack = true)
+        private void CompileMessageExpr(Smalltalk80Parser.MessageExprContext expr)
         {
             // Grammar: messageExpr = binaryExpr keywordMessage?
             var binaryExpr = expr.binaryExpr();
@@ -1101,13 +1087,7 @@ namespace Smalltalk80.Compiler
             {
                 // Super send only if: receiver is super AND no unary/binary messages
                 bool receiverIsSuper = DetermineIfKeywordReceiverIsSuper(binaryExpr);
-                CompileKeywordMessage(keywordMessage, receiverIsSuper, leaveOnStack);
-            }
-            else if (!leaveOnStack)
-            {
-                // No keyword message, but caller doesn't want result on stack
-                // Pop the binary expression result
-                emitter.Pop();
+                CompileKeywordMessage(keywordMessage, receiverIsSuper);
             }
         }
 
@@ -1269,9 +1249,9 @@ namespace Smalltalk80.Compiler
             }
         }
         
-        private void CompileKeywordMessage(Smalltalk80Parser.KeywordMessageContext msg, bool isSuper = false, bool leaveOnStack = true)
+        private void CompileKeywordMessage(Smalltalk80Parser.KeywordMessageContext msg, bool isSuper = false)
         {
-//Console.WriteLine($"[BYTECODE] CompileKeywordMessage called, isSuper={isSuper}, leaveOnStack={leaveOnStack}");
+//Console.WriteLine($"[BYTECODE] CompileKeywordMessage called, isSuper={isSuper}");
             var keywordParts = msg.keywordPart();
             var keywords = new List<string>();
 
@@ -1285,8 +1265,7 @@ namespace Smalltalk80.Compiler
 //Console.WriteLine($"[BYTECODE] CompileKeywordMessage: selector='{selector}'");
 
             // Check if this is a conditional message that can be inlined
-            // Pass leaveOnStack for "for effect" optimization (skip JMP+PUSH_NIL when false)
-            if (!isSuper && TryInlineConditional(selector, keywordParts, leaveOnStack))
+            if (!isSuper && TryInlineConditional(selector, keywordParts))
             {
 //Console.WriteLine($"[BYTECODE] CompileKeywordMessage: Successfully inlined conditional");
                 return; // Successfully inlined
@@ -1356,28 +1335,23 @@ namespace Smalltalk80.Compiler
         /// This optimization replaces message sends with conditional jump bytecodes,
         /// avoiding BlockContext creation for simple control flow.
         /// </summary>
-        /// <param name="selector">The message selector to check for inlining</param>
-        /// <param name="keywordParts">The keyword parts containing block arguments</param>
-        /// <param name="leaveOnStack">If false, uses Smalltalk "for effect" optimization:
-        /// skip JMP+PUSH_NIL for single-arm conditionals when result isn't used</param>
-        private bool TryInlineConditional(string selector, Smalltalk80Parser.KeywordPartContext[] keywordParts, bool leaveOnStack = true)
+        private bool TryInlineConditional(string selector, Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             // Only inline specific selectors
-            // Pass leaveOnStack to if* methods for "for effect" optimization
             switch (selector)
             {
                 case "ifTrue:":
-                    return TryInlineIfTrue(keywordParts, leaveOnStack);
+                    return TryInlineIfTrue(keywordParts);
                 case "ifFalse:":
-                    return TryInlineIfFalse(keywordParts, leaveOnStack);
+                    return TryInlineIfFalse(keywordParts);
                 case "ifTrue:ifFalse:":
-                    return TryInlineIfTrueIfFalse(keywordParts, leaveOnStack);
+                    return TryInlineIfTrueIfFalse(keywordParts);
                 case "ifFalse:ifTrue:":
-                    return TryInlineIfFalseIfTrue(keywordParts, leaveOnStack);
+                    return TryInlineIfFalseIfTrue(keywordParts);
                 case "and:":
-                    return TryInlineAnd(keywordParts, leaveOnStack);
+                    return TryInlineAnd(keywordParts);
                 case "or:":
-                    return TryInlineOr(keywordParts, leaveOnStack);
+                    return TryInlineOr(keywordParts);
                 case "whileTrue:":
                     return TryInlineWhileTrue(keywordParts);
                 case "whileFalse:":
@@ -1539,19 +1513,14 @@ namespace Smalltalk80.Compiler
         /// <summary>
         /// Inlines: condition ifTrue: [trueBlock]
         /// Two-pass approach: calculate sizes first, then emit optimal jumps.
-        ///
-        /// For value (leaveOnStack=true):
+        /// Pattern: condition already on stack
         ///   BFP (short or long)
         ///   trueBlock body
         ///   JMP (short or long) over nil  -- ONLY if block doesn't return
         ///   PUSH_NIL
-        ///
-        /// For effect (leaveOnStack=false) - Smalltalk compiler shortcut:
-        ///   BFP to end
-        ///   trueBlock body (for effect)
-        /// No JMP, no PUSH_NIL - matches Smalltalk compiler pattern.
+        /// Matches Smalltalk compiler behavior: skip JMP when block ends with return.
         /// </summary>
-        private bool TryInlineIfTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts, bool leaveOnStack = true)
+        private bool TryInlineIfTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             if (keywordParts.Length != 1) return false;
             if (!CanInlineBlock(keywordParts[0], out var trueBlock)) return false;
@@ -1562,23 +1531,6 @@ namespace Smalltalk80.Compiler
             // PASS 1: Calculate sizes
             int trueBlockSize = CalculateBlockBodySize(trueBlock!);
 
-            if (!leaveOnStack)
-            {
-                // FOR EFFECT: Compile block for value, then pop result
-                // Pattern: BFP-end → trueBlock → POP (if no return)
-                // Note: This differs from Smalltalk which compiles block for effect,
-                // but is semantically equivalent. The size calculation assumes for-value.
-                int popSize = blockReturns ? 0 : 1;
-                emitter.EmitJumpOnFalse(trueBlockSize + popSize);
-                CompileInlineBlockBody(trueBlock!);
-                if (!blockReturns)
-                {
-                    emitter.Pop();
-                }
-                return true;
-            }
-
-            // FOR VALUE: Full pattern with nil for false case
             // Calculate jump offsets:
             // If block returns, no JMP needed (execution exits method from block)
             // If block doesn't return, need JMP to skip PUSH_NIL
@@ -1608,19 +1560,13 @@ namespace Smalltalk80.Compiler
         /// Inlines: condition ifFalse: [falseBlock]
         /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Pattern: condition already on stack
-        ///
-        /// For value (leaveOnStack=true):
         ///   BTP (always 2 bytes)
         ///   falseBlock body
         ///   JMP (short or long) over nil  -- ONLY if block doesn't return
         ///   PUSH_NIL
-        ///
-        /// For effect (leaveOnStack=false) - Smalltalk compiler shortcut:
-        ///   BTP to end
-        ///   falseBlock body (for effect)
-        /// No JMP, no PUSH_NIL - matches Smalltalk compiler pattern.
+        /// Matches Smalltalk compiler behavior: skip JMP when block ends with return.
         /// </summary>
-        private bool TryInlineIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts, bool leaveOnStack = true)
+        private bool TryInlineIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             if (keywordParts.Length != 1) return false;
             if (!CanInlineBlock(keywordParts[0], out var falseBlock)) return false;
@@ -1631,23 +1577,6 @@ namespace Smalltalk80.Compiler
             // PASS 1: Calculate sizes
             int falseBlockSize = CalculateBlockBodySize(falseBlock!);
 
-            if (!leaveOnStack)
-            {
-                // FOR EFFECT: Smalltalk compiler shortcut
-                // Pattern: BTP-end → falseBlock → POP (if no return)
-                // BTP offset must include POP when block doesn't return
-                int popSize = blockReturns ? 0 : 1;
-                emitter.EmitJumpOnTrue(falseBlockSize + popSize);
-                CompileInlineBlockBody(falseBlock!);
-                // Pop the block result since we don't need it
-                if (!blockReturns)
-                {
-                    emitter.Pop();
-                }
-                return true;
-            }
-
-            // FOR VALUE: Full pattern with nil for true case
             // Calculate jump offsets:
             // If block returns, no JMP needed (execution exits method from block)
             // If block doesn't return, need JMP to skip PUSH_NIL
@@ -1681,28 +1610,23 @@ namespace Smalltalk80.Compiler
         ///   trueBlock body
         ///   JMP (short or long) to end  -- ONLY if trueBlock doesn't return
         ///   falseBlock body
-        ///   POP (only if leaveOnStack=false and neither block returns)
         /// Matches Smalltalk compiler behavior: skip JMP when block ends with return.
         /// </summary>
-        private bool TryInlineIfTrueIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts, bool leaveOnStack = true)
+        private bool TryInlineIfTrueIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             if (keywordParts.Length != 2) return false;
             if (!CanInlineBlock(keywordParts[0], out var trueBlock)) return false;
             if (!CanInlineBlock(keywordParts[1], out var falseBlock)) return false;
 
-            // Check if blocks end with returns (affects code generation)
+            // Check if trueBlock ends with a return (affects code generation)
             bool trueBlockReturns = BlockEndsWithReturn(trueBlock!);
-            bool falseBlockReturns = BlockEndsWithReturn(falseBlock!);
 
             // PASS 1: Calculate sizes
             int trueBlockSize = CalculateBlockBodySize(trueBlock!);
             int falseBlockSize = CalculateBlockBodySize(falseBlock!);
 
-            // For effect: add POP after falseBlock if neither block returns
-            int popSize = (!leaveOnStack && !falseBlockReturns) ? 1 : 0;
-
             // Calculate jump sizes - skip JMP if trueBlock returns
-            int skipFalseJumpSize = trueBlockReturns ? 0 : BytecodeEmitter.SizeForwardJump(falseBlockSize + popSize);
+            int skipFalseJumpSize = trueBlockReturns ? 0 : BytecodeEmitter.SizeForwardJump(falseBlockSize);
             int bfpOffset = trueBlockSize + skipFalseJumpSize;
 
             // PASS 2: Emit with optimal jumps
@@ -1711,21 +1635,15 @@ namespace Smalltalk80.Compiler
             // Compile true block body inline
             CompileInlineBlockBody(trueBlock!);
 
-            // Emit: unconditional jump over false block (and POP if for effect)
+            // Emit: unconditional jump over false block
             // Skip if trueBlock ends with return - JMP would be unreachable dead code
             if (!trueBlockReturns)
             {
-                emitter.EmitForwardJump(falseBlockSize + popSize);
+                emitter.EmitForwardJump(falseBlockSize);
             }
 
             // Compile false block body inline
             CompileInlineBlockBody(falseBlock!);
-
-            // For effect: pop the result if neither block returns
-            if (!leaveOnStack && !falseBlockReturns)
-            {
-                emitter.Pop();
-            }
 
             return true;
         }
@@ -1734,33 +1652,24 @@ namespace Smalltalk80.Compiler
         /// Inlines: condition ifFalse: [falseBlock] ifTrue: [trueBlock]
         /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Same as ifTrue:ifFalse: but with reversed block order.
-        ///   BTP (short or long) to trueBlock
-        ///   falseBlock body
-        ///   JMP (short or long) to end  -- ONLY if falseBlock doesn't return
-        ///   trueBlock body
-        ///   POP (only if leaveOnStack=false and neither block returns)
         /// Matches Smalltalk compiler behavior: skip JMP when block ends with return.
         /// </summary>
-        private bool TryInlineIfFalseIfTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts, bool leaveOnStack = true)
+        private bool TryInlineIfFalseIfTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             if (keywordParts.Length != 2) return false;
             if (!CanInlineBlock(keywordParts[0], out var falseBlock)) return false;
             if (!CanInlineBlock(keywordParts[1], out var trueBlock)) return false;
 
-            // Check if blocks end with returns (affects code generation)
+            // Check if falseBlock ends with a return (affects code generation)
             // Note: falseBlock comes first in bytecode order for ifFalse:ifTrue:
             bool falseBlockReturns = BlockEndsWithReturn(falseBlock!);
-            bool trueBlockReturns = BlockEndsWithReturn(trueBlock!);
 
             // PASS 1: Calculate sizes
             int falseBlockSize = CalculateBlockBodySize(falseBlock!);
             int trueBlockSize = CalculateBlockBodySize(trueBlock!);
 
-            // For effect: add POP after trueBlock if neither block returns
-            int popSize = (!leaveOnStack && !trueBlockReturns) ? 1 : 0;
-
             // Calculate jump sizes - skip JMP if falseBlock returns
-            int skipTrueJumpSize = falseBlockReturns ? 0 : BytecodeEmitter.SizeForwardJump(trueBlockSize + popSize);
+            int skipTrueJumpSize = falseBlockReturns ? 0 : BytecodeEmitter.SizeForwardJump(trueBlockSize);
             int btpOffset = falseBlockSize + skipTrueJumpSize;
 
             // PASS 2: Emit with optimal jumps
@@ -1769,21 +1678,15 @@ namespace Smalltalk80.Compiler
             // Compile false block body inline (condition was false)
             CompileInlineBlockBody(falseBlock!);
 
-            // Emit: unconditional jump over true block (and POP if for effect)
+            // Emit: unconditional jump over true block
             // Skip if falseBlock ends with return - JMP would be unreachable dead code
             if (!falseBlockReturns)
             {
-                emitter.EmitForwardJump(trueBlockSize + popSize);
+                emitter.EmitForwardJump(trueBlockSize);
             }
 
             // Compile true block body inline
             CompileInlineBlockBody(trueBlock!);
-
-            // For effect: pop the result if neither block returns
-            if (!leaveOnStack && !trueBlockReturns)
-            {
-                emitter.Pop();
-            }
 
             return true;
         }
@@ -1792,38 +1695,15 @@ namespace Smalltalk80.Compiler
         /// Inlines: condition and: [block]
         /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Short-circuit: if condition is false, return false without evaluating block.
-        ///
-        /// For value (leaveOnStack=true):
-        ///   BFP -> block -> JMP -> PUSH_FALSE
-        ///
-        /// For effect (leaveOnStack=false):
-        ///   BFP-to-end -> block -> POP
         /// </summary>
-        private bool TryInlineAnd(Smalltalk80Parser.KeywordPartContext[] keywordParts, bool leaveOnStack = true)
+        private bool TryInlineAnd(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             if (keywordParts.Length != 1) return false;
             if (!CanInlineBlock(keywordParts[0], out var block)) return false;
 
-            // Check if block ends with a return
-            bool blockReturns = BlockEndsWithReturn(block!);
-
             // PASS 1: Calculate sizes
             int blockSize = CalculateBlockBodySize(block!);
 
-            if (!leaveOnStack)
-            {
-                // FOR EFFECT: Skip block if condition false, otherwise eval block and pop
-                int popSize = blockReturns ? 0 : 1;
-                emitter.EmitJumpOnFalse(blockSize + popSize);
-                CompileInlineBlockBody(block!);
-                if (!blockReturns)
-                {
-                    emitter.Pop();
-                }
-                return true;
-            }
-
-            // FOR VALUE: Full pattern with false for short-circuit case
             // Calculate jump offsets:
             // Pattern: BFP -> <block> -> JMP -> PUSH_FALSE
             // BFP should land ON PUSH_FALSE (skip block + JMP)
@@ -1849,38 +1729,15 @@ namespace Smalltalk80.Compiler
         /// Inlines: condition or: [block]
         /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Short-circuit: if condition is true, return true without evaluating block.
-        ///
-        /// For value (leaveOnStack=true):
-        ///   BTP -> block -> JMP -> PUSH_TRUE
-        ///
-        /// For effect (leaveOnStack=false):
-        ///   BTP-to-end -> block -> POP
         /// </summary>
-        private bool TryInlineOr(Smalltalk80Parser.KeywordPartContext[] keywordParts, bool leaveOnStack = true)
+        private bool TryInlineOr(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             if (keywordParts.Length != 1) return false;
             if (!CanInlineBlock(keywordParts[0], out var block)) return false;
 
-            // Check if block ends with a return
-            bool blockReturns = BlockEndsWithReturn(block!);
-
             // PASS 1: Calculate sizes
             int blockSize = CalculateBlockBodySize(block!);
 
-            if (!leaveOnStack)
-            {
-                // FOR EFFECT: Skip block if condition true, otherwise eval block and pop
-                int popSize = blockReturns ? 0 : 1;
-                emitter.EmitJumpOnTrue(blockSize + popSize);
-                CompileInlineBlockBody(block!);
-                if (!blockReturns)
-                {
-                    emitter.Pop();
-                }
-                return true;
-            }
-
-            // FOR VALUE: Full pattern with true for short-circuit case
             // Calculate jump offsets:
             // Pattern: BTP -> <block> -> JMP -> PUSH_TRUE
             // BTP should land ON PUSH_TRUE (skip block + JMP)
