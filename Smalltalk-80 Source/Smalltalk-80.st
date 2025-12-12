@@ -647,9 +647,7 @@ asFileStream: aStream
     sourceData _ self dataString.
     bufferSize _ self dataSize.
 
-    "Initialize the stream with file contents.
-    Use 'on:' to set writeLimit to buffer size, then manually set position and readLimit.
-    This allows writing to new/empty files."
+    "Initialize the stream with file contents"
     binary
         ifTrue: [
             aStream
@@ -661,10 +659,10 @@ asFileStream: aStream
             destData _ String new: bufferSize.
             sz > 0 ifTrue: [
                 destData replaceFrom: 1 to: sz withByteArray: sourceData startingAt: offset + 1].
-            "Use on: to set writeLimit=bufferSize, then fix readLimit for current content"
-            aStream on: destData.
-            aStream instVarAt: 2 put: 0.   "position _ 0"
-            aStream instVarAt: 3 put: sz]! "readLimit _ sz"
+            "Use on:from:to: then manually set writeLimit to buffer capacity.
+            on:from:to: sets writeLimit=sz, but we need writeLimit=bufferSize for writing."
+            aStream on: destData from: 1 to: sz.
+            aStream instVarAt: 4 put: bufferSize]!
 
 fromFileStream: aStream
     "Copy data from aStream back to file. Called by FileStream>>flush."
