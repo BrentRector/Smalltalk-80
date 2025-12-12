@@ -378,12 +378,15 @@ The compiler automatically uses special bytecodes for:
 - Frequently used selectors (0xC0-0xCF)
 - This reduces literal frame usage and bytecode size
 
-### Conditional Optimization (DISABLED)
-The compiler does NOT inline `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`:
-- These are ordinary message sends per Blue Book specification
-- Blocks are compiled as literals
-- Control flow happens via polymorphic dispatch on True/False classes
-- Note: Compiler has `TryInlineConditional` method that always returns false
+### Conditional Optimization (ENABLED)
+The compiler inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:ifTrue:`, `and:`, and `or:`:
+- These control structures use conditional jump bytecodes (0x98-0x9F, 0xA8-0xAF)
+- Zero-argument blocks are compiled inline (no BlockContext created)
+- Supports both "for value" and "for effect" compilation patterns:
+  - **For value**: `<cond> BFP <block> JMP PUSH_NIL` - leaves nil when condition false
+  - **For effect**: `<cond> BFP <block>` - shortcut pattern, nothing on stack
+- Two-arm conditionals (`ifTrue:ifFalse:`) always leave a value on stack
+- Note: `whileTrue:` and `whileFalse:` are NOT yet inlined (receiver is a block)
 
 ## Implementation Notes
 

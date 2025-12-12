@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-12-09
+**Last Updated**: 2025-12-12
 
 ## Project Status
 
@@ -35,6 +35,13 @@
 
 **✅ Control Structure Optimization - IMPLEMENTED**
 The C# compiler now inlines `ifTrue:`, `ifFalse:`, `ifTrue:ifFalse:`, `ifFalse:ifTrue:`, `and:`, and `or:` using Blue Book conditional jump bytecodes. No BlockContext is created for zero-argument blocks in these control structures.
+
+**"For Value" vs "For Effect" Compilation** (2025-12-12):
+Single-arm conditionals (`ifTrue:`, `ifFalse:`) support two bytecode patterns:
+- **For value** (result needed): `<cond> BFP <block> JMP PUSH_NIL` - always leaves value on stack
+- **For effect** (statement position): `<cond> BFP <block>` - shortcut pattern, nothing on stack
+
+This matches the Smalltalk runtime compiler's behavior (`MessageNode>>emitIf:on:value:`) and enables proper decompilation of methods with nested conditionals.
 
 **Remaining**: `whileTrue:` and `whileFalse:` are NOT yet inlined (receiver is a block, requires special handling).
 
