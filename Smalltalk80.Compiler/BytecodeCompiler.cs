@@ -1403,6 +1403,24 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
+        /// Checks if a block's last statement is a return statement.
+        /// Used to optimize conditional code generation - skip unreachable JMP after returns.
+        /// This matches the Smalltalk compiler's behavior (see MessageNode>>emitIf:on:value:).
+        /// </summary>
+        private bool BlockEndsWithReturn(Smalltalk80Parser.BlockContext block)
+        {
+            var statements = block.statements();
+            if (statements == null) return false;
+
+            var stmtList = statements.statement();
+            if (stmtList == null || stmtList.Length == 0) return false;
+
+            // Check if the last statement is a return statement
+            var lastStmt = stmtList[stmtList.Length - 1];
+            return lastStmt.returnStatement() != null;
+        }
+
+        /// <summary>
         /// Compiles a block's statements inline (without BlockContext wrapper).
         /// The last expression value is left on the stack.
         /// </summary>
@@ -1498,21 +1516,25 @@ namespace Smalltalk80.Compiler
         /// Pattern: condition already on stack
         ///   BFP (short or long)
         ///   trueBlock body
-        ///   JMP (short or long) over nil
+        ///   JMP (short or long) over nil  -- ONLY if block doesn't return
         ///   PUSH_NIL
+        /// Matches Smalltalk compiler behavior: skip JMP when block ends with return.
         /// </summary>
         private bool TryInlineIfTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             if (keywordParts.Length != 1) return false;
             if (!CanInlineBlock(keywordParts[0], out var trueBlock)) return false;
 
+            // Check if block ends with a return (affects code generation)
+            bool blockReturns = BlockEndsWithReturn(trueBlock!);
+
             // PASS 1: Calculate sizes
             int trueBlockSize = CalculateBlockBodySize(trueBlock!);
 
             // Calculate jump offsets:
-            // Pattern: BFP -> <trueBlock> -> JMP -> PUSH_NIL
-            // BFP should land ON PUSH_NIL (skip trueBlock + JMP)
-            int skipNilJumpSize = BytecodeEmitter.SizeForwardJump(1); // JMP skips 1 byte (pushNil)
+            // If block returns, no JMP needed (execution exits method from block)
+            // If block doesn't return, need JMP to skip PUSH_NIL
+            int skipNilJumpSize = blockReturns ? 0 : BytecodeEmitter.SizeForwardJump(1);
             int bfpOffset = trueBlockSize + skipNilJumpSize; // Land on PUSH_NIL
 
             // PASS 2: Emit with optimal jumps
@@ -1522,7 +1544,11 @@ namespace Smalltalk80.Compiler
             CompileInlineBlockBody(trueBlock!);
 
             // Emit: unconditional jump over nil (for false case)
-            emitter.EmitForwardJump(1); // Skip 1 byte (pushNil)
+            // Skip if block ends with return - JMP would be unreachable dead code
+            if (!blockReturns)
+            {
+                emitter.EmitForwardJump(1); // Skip 1 byte (pushNil)
+            }
 
             // False case: push nil (ifTrue: returns nil when condition is false)
             emitter.PushNil();
@@ -1536,21 +1562,25 @@ namespace Smalltalk80.Compiler
         /// Pattern: condition already on stack
         ///   BTP (always 2 bytes)
         ///   falseBlock body
-        ///   JMP (short or long) over nil
+        ///   JMP (short or long) over nil  -- ONLY if block doesn't return
         ///   PUSH_NIL
+        /// Matches Smalltalk compiler behavior: skip JMP when block ends with return.
         /// </summary>
         private bool TryInlineIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
             if (keywordParts.Length != 1) return false;
             if (!CanInlineBlock(keywordParts[0], out var falseBlock)) return false;
 
+            // Check if block ends with a return (affects code generation)
+            bool blockReturns = BlockEndsWithReturn(falseBlock!);
+
             // PASS 1: Calculate sizes
             int falseBlockSize = CalculateBlockBodySize(falseBlock!);
 
             // Calculate jump offsets:
-            // Pattern: BTP -> <falseBlock> -> JMP -> PUSH_NIL
-            // BTP should land ON PUSH_NIL (skip falseBlock + JMP)
-            int skipNilJumpSize = BytecodeEmitter.SizeForwardJump(1);
+            // If block returns, no JMP needed (execution exits method from block)
+            // If block doesn't return, need JMP to skip PUSH_NIL
+            int skipNilJumpSize = blockReturns ? 0 : BytecodeEmitter.SizeForwardJump(1);
             int btpOffset = falseBlockSize + skipNilJumpSize; // Land on PUSH_NIL
 
             // PASS 2: Emit with optimal jumps
@@ -1560,7 +1590,11 @@ namespace Smalltalk80.Compiler
             CompileInlineBlockBody(falseBlock!);
 
             // Emit: unconditional jump over nil
-            emitter.EmitForwardJump(1); // Skip 1 byte (pushNil)
+            // Skip if block ends with return - JMP would be unreachable dead code
+            if (!blockReturns)
+            {
+                emitter.EmitForwardJump(1); // Skip 1 byte (pushNil)
+            }
 
             // True case: push nil (ifFalse: returns nil when condition is true)
             emitter.PushNil();
@@ -1574,8 +1608,9 @@ namespace Smalltalk80.Compiler
         /// Pattern: condition already on stack
         ///   BFP (short or long) to falseBlock
         ///   trueBlock body
-        ///   JMP (short or long) to end
+        ///   JMP (short or long) to end  -- ONLY if trueBlock doesn't return
         ///   falseBlock body
+        /// Matches Smalltalk compiler behavior: skip JMP when block ends with return.
         /// </summary>
         private bool TryInlineIfTrueIfFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
@@ -1583,12 +1618,15 @@ namespace Smalltalk80.Compiler
             if (!CanInlineBlock(keywordParts[0], out var trueBlock)) return false;
             if (!CanInlineBlock(keywordParts[1], out var falseBlock)) return false;
 
+            // Check if trueBlock ends with a return (affects code generation)
+            bool trueBlockReturns = BlockEndsWithReturn(trueBlock!);
+
             // PASS 1: Calculate sizes
             int trueBlockSize = CalculateBlockBodySize(trueBlock!);
             int falseBlockSize = CalculateBlockBodySize(falseBlock!);
 
-            // Calculate jump sizes iteratively (sizes depend on each other)
-            int skipFalseJumpSize = BytecodeEmitter.SizeForwardJump(falseBlockSize);
+            // Calculate jump sizes - skip JMP if trueBlock returns
+            int skipFalseJumpSize = trueBlockReturns ? 0 : BytecodeEmitter.SizeForwardJump(falseBlockSize);
             int bfpOffset = trueBlockSize + skipFalseJumpSize;
 
             // PASS 2: Emit with optimal jumps
@@ -1598,7 +1636,11 @@ namespace Smalltalk80.Compiler
             CompileInlineBlockBody(trueBlock!);
 
             // Emit: unconditional jump over false block
-            emitter.EmitForwardJump(falseBlockSize);
+            // Skip if trueBlock ends with return - JMP would be unreachable dead code
+            if (!trueBlockReturns)
+            {
+                emitter.EmitForwardJump(falseBlockSize);
+            }
 
             // Compile false block body inline
             CompileInlineBlockBody(falseBlock!);
@@ -1610,6 +1652,7 @@ namespace Smalltalk80.Compiler
         /// Inlines: condition ifFalse: [falseBlock] ifTrue: [trueBlock]
         /// Two-pass approach: calculate sizes first, then emit optimal jumps.
         /// Same as ifTrue:ifFalse: but with reversed block order.
+        /// Matches Smalltalk compiler behavior: skip JMP when block ends with return.
         /// </summary>
         private bool TryInlineIfFalseIfTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts)
         {
@@ -1617,13 +1660,16 @@ namespace Smalltalk80.Compiler
             if (!CanInlineBlock(keywordParts[0], out var falseBlock)) return false;
             if (!CanInlineBlock(keywordParts[1], out var trueBlock)) return false;
 
+            // Check if falseBlock ends with a return (affects code generation)
+            // Note: falseBlock comes first in bytecode order for ifFalse:ifTrue:
+            bool falseBlockReturns = BlockEndsWithReturn(falseBlock!);
+
             // PASS 1: Calculate sizes
             int falseBlockSize = CalculateBlockBodySize(falseBlock!);
             int trueBlockSize = CalculateBlockBodySize(trueBlock!);
 
-            // Calculate jump sizes
-            // BTP always 2 bytes in Blue Book
-            int skipTrueJumpSize = BytecodeEmitter.SizeForwardJump(trueBlockSize);
+            // Calculate jump sizes - skip JMP if falseBlock returns
+            int skipTrueJumpSize = falseBlockReturns ? 0 : BytecodeEmitter.SizeForwardJump(trueBlockSize);
             int btpOffset = falseBlockSize + skipTrueJumpSize;
 
             // PASS 2: Emit with optimal jumps
@@ -1633,7 +1679,11 @@ namespace Smalltalk80.Compiler
             CompileInlineBlockBody(falseBlock!);
 
             // Emit: unconditional jump over true block
-            emitter.EmitForwardJump(trueBlockSize);
+            // Skip if falseBlock ends with return - JMP would be unreachable dead code
+            if (!falseBlockReturns)
+            {
+                emitter.EmitForwardJump(trueBlockSize);
+            }
 
             // Compile true block body inline
             CompileInlineBlockBody(trueBlock!);
