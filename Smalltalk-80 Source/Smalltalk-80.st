@@ -525,8 +525,12 @@ size
     ^cachedSize _ self primSize: fileHandle!
 
 dataSize
-    "Answer the maximum data size. For Windows files, this is the file size."
-    ^self size!
+    "Answer the maximum data size for buffering.
+    Returns at least 8KB for new/empty files to allow writing."
+    | sz |
+    sz _ self size.
+    sz = 0 ifTrue: [^8192].  "Default buffer for new files"
+    ^sz!
 
 headerSize
     "Answer the header size. Windows files have no header."
@@ -634,15 +638,18 @@ close
 asFileStream: aStream
     "Initialize aStream to access my data. Called by FileStream>>on:.
     This is the CRITICAL method for FileStream integration."
-    | contents sz offset sourceData |
+    | contents sz offset sourceData bufferSize |
 
     "Open file and read contents"
     self openForRead.
     sz _ self size.
     offset _ self headerSize.
     sourceData _ self dataString.
+    bufferSize _ self dataSize.
 
-    "Initialize the stream with file contents"
+    "Initialize the stream with file contents.
+    Use 'on:' to set writeLimit to buffer size, then manually set position and readLimit.
+    This allows writing to new/empty files."
     binary
         ifTrue: [
             aStream
@@ -651,9 +658,13 @@ asFileStream: aStream
                 to: offset + sz]
         ifFalse: [
             | destData |
-            destData _ String new: self dataSize.
-            destData replaceFrom: 1 to: sz withByteArray: sourceData startingAt: offset + 1.
-            aStream on: destData from: 1 to: sz]!
+            destData _ String new: bufferSize.
+            sz > 0 ifTrue: [
+                destData replaceFrom: 1 to: sz withByteArray: sourceData startingAt: offset + 1].
+            "Use on: to set writeLimit=bufferSize, then fix readLimit for current content"
+            aStream on: destData.
+            aStream instVarAt: 2 put: 0.   "position _ 0"
+            aStream instVarAt: 3 put: sz]! "readLimit _ sz"
 
 fromFileStream: aStream
     "Copy data from aStream back to file. Called by FileStream>>flush."
