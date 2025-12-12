@@ -670,7 +670,10 @@ fromFileStream: aStream
         position _ position + 1].
 
     "Update data end"
-    dataEnd _ sourceData size! !
+    dataEnd _ sourceData size.
+
+    "Close handle to flush BufferedStream and write data to disk"
+    self close! !
 
 !WindowsFilePage methodsFor: 'nonhomogeneous accessing'!
 
