@@ -21290,7 +21290,7 @@ dragForm
 			[[sensor anyButtonPressed
 				or: [sensor keyboardPressed
 				or: [self viewHasCursor not]]]
-				whileFalse: []].
+				whileFalse: [Processor yield]].
 			^ self cursorPoint]
 		ifFalse:
 			[^Cursor blank showWhile:
@@ -32499,7 +32499,7 @@ startUp: aSymbol
 
 	self displayAt: Sensor cursorPoint
 		during: [Sensor cursorPoint: marker center.
-				[self buttonPressed: aSymbol] whileFalse: [].
+				[self buttonPressed: aSymbol] whileFalse: [Processor yield].
 				[self buttonPressed: aSymbol] whileTrue: [self manageMarker]].
 	^selection!
 startUp: aSymbol withHeading: aText
@@ -32509,7 +32509,7 @@ startUp: aSymbol withHeading: aText
 	self displayAt: Sensor cursorPoint withHeading: aText
 		during: [Sensor cursorPoint: marker center.
 				[self buttonPressed: aSymbol]
-					whileFalse: [(frame containsPoint: Sensor cursorPoint) ifFalse: [Display flash: frame]].
+					whileFalse: [Processor yield. (frame containsPoint: Sensor cursorPoint) ifFalse: [Display flash: frame]].
 				[self buttonPressed: aSymbol]
 					whileTrue: [self manageMarker]].
 	^selection!
@@ -32519,7 +32519,7 @@ startUpAndWaitForSelectionAt: aPoint
 
 	self displayAt: aPoint
 		during: [[(Sensor anyButtonPressed and: [frame inside containsPoint: Sensor cursorPoint])]
-					whileFalse: [].
+					whileFalse: [Processor yield].
 				[self buttonPressed: #anyButton]
 					whileTrue: [self manageMarker]].
 	^selection!
@@ -33110,7 +33110,7 @@ hiddenBackgroundProcess
 	"Install a default background process which is invisible."
 
 	self background:
-		[[true] whileTrue: []]!
+		[[true] whileTrue: [Processor yield]]!
 sweepHandBackgroundProcess
 	"Install the default background process which shows a sweeping circle
 	of Xor-ed bits on the screen."
