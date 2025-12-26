@@ -88,7 +88,7 @@ public class IntegrationTests : CompilerTestBase
         
         // Should have block creations
         bytecodes = (JArray)blockComp!["bytecodes"]!;
-        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 200);
         Assert.That(blockCount, Is.GreaterThan(0), "Should have blocks");
     }
     
@@ -119,7 +119,7 @@ public class IntegrationTests : CompilerTestBase
         
         // Should have block for loop body
         bytecodes = (JArray)toDo!["bytecodes"]!;
-        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
+        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
         Assert.That(hasBlock, Is.True, "to:do: should have block");
         
         // Test early returns

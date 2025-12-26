@@ -37,18 +37,18 @@ public class ControlStructureInliningTests : CompilerTestBase
     // Short jump bytecode ranges
     private const byte SHORT_UNCONDITIONAL_JUMP_BASE = 0x90;
     private const byte SHORT_UNCONDITIONAL_JUMP_MAX = 0x97;
-    private const byte SHORT_JUMP_ON_FALSE_BASE = 0xF0;
-    private const byte SHORT_JUMP_ON_FALSE_MAX = 0xFF;
+    private const byte SHORT_JUMP_ON_FALSE_BASE = 0x98;  // Blue Book: 0x98-0x9F for BFP offsets 1-8
+    private const byte SHORT_JUMP_ON_FALSE_MAX = 0x9F;
 
-    // Push constants
-    private const byte PUSH_TRUE = 0x78;
-    private const byte PUSH_FALSE = 0x79;
-    private const byte PUSH_NIL = 0x77;
+    // Push constants (Blue Book correct values)
     private const byte PUSH_SELF = 0x70;
+    private const byte PUSH_TRUE = 0x71;
+    private const byte PUSH_FALSE = 0x72;
+    private const byte PUSH_NIL = 0x73;
 
     // Return bytecodes
-    private const byte RETURN_TOP = 0x7C;
     private const byte RETURN_SELF = 0x78;
+    private const byte RETURN_TOP = 0x7C;
 
     #endregion
 

@@ -19,9 +19,9 @@ testEmptyBlock
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // Block creation uses bytecode 143
+        // Blue Book inline blocks use 0xC8 (200) SEND_SPECIAL_BLOCKCOPY
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         // Should send value message
         var literals = (JArray)method["literals"]!;
@@ -40,7 +40,7 @@ testBlockReturn
         
         // Block creation, block returns 42
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         // Block should contain push 42 and block return (125)
         var literals = (JArray)method["literals"]!;
@@ -59,7 +59,7 @@ testBlockParameter
         
         // Block with one parameter
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         // Should send value: message
         var literals = (JArray)method["literals"]!;
@@ -78,7 +78,7 @@ testMultipleBlockParams
         
         // Block with two parameters
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         // Should send value:value: message
         var literals = (JArray)method["literals"]!;
@@ -97,7 +97,7 @@ testBlockTemps
         
         // Block with temporary variable
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         // Block temporaries are handled within the block context
         var literals = (JArray)method["literals"]!;
@@ -116,7 +116,7 @@ testBlockParamsAndTemps
         
         // Block with both parameter and temporary
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
     }
     
     [Test]
@@ -129,10 +129,10 @@ testNestedBlocks
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // Should have two block creations for nested blocks
+        // Should have two blockCopy: sends for nested blocks
         var bytecodes = (JArray)method["bytecodes"]!;
-        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
-        Assert.That(blockCount, Is.EqualTo(2), "Should have two block creations");
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 200);
+        Assert.That(blockCount, Is.EqualTo(2), "Should have two blockCopy: sends");
     }
     
     [Test]
@@ -149,7 +149,7 @@ testBlockContext
         
         // Block captures outer variable
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         // Block should access outer temporary variable
         var literals = (JArray)method["literals"]!;
@@ -169,7 +169,7 @@ testNonLocalReturn
         
         // Non-local return uses bytecode 124 (return top of stack)
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         // Should have both method return and potential block return
         var returnCount = bytecodes.Select(t => (int)t).Count(b => b == 124 || b == 125);
@@ -190,7 +190,7 @@ testBlockValue
         
         // Store block in temp, send value
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         Assert.That(bytecodes.Select(t => (int)t).Contains(104), Is.True, "Should store block in temp");
     }
     
@@ -208,7 +208,7 @@ testBlockValueWith
         
         // Store block, push args, send value:value:
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         var literals = (JArray)method["literals"]!;
         Assert.That(literals.Any(l => l["value"]?.ToString() == "value:value:"), Is.True);
@@ -226,7 +226,7 @@ testBlockInCollection
         
         // Block passed to collect:
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         var literals = (JArray)method["literals"]!;
         Assert.That(literals.Any(l => l["value"]?.ToString() == "collect:"), Is.True);
@@ -249,7 +249,7 @@ testComplexBlock
         
         // Complex block with nested blocks for ifTrue:ifFalse:
         var bytecodes = (JArray)method["bytecodes"]!;
-        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 200);
         Assert.That(blockCount, Is.GreaterThanOrEqualTo(3), "Should have main block and conditional blocks");
     }
     
@@ -265,7 +265,7 @@ testBlockWithSend
         
         // Block contains self send
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         var literals = (JArray)method["literals"]!;
         Assert.That(literals.Any(l => l["value"]?.ToString() == "size"), Is.True);
@@ -287,8 +287,8 @@ testBlockAssignment
         
         // Multiple block assignments
         var bytecodes = (JArray)method["bytecodes"]!;
-        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
-        Assert.That(blockCount, Is.EqualTo(2), "Should have two block creations");
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 200);
+        Assert.That(blockCount, Is.EqualTo(2), "Should have two blockCopy: sends");
     }
     
     [Test]
@@ -308,10 +308,10 @@ testBlockRecursion
         
         // Recursive block with self-reference
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         // Should have nested blocks for conditionals
-        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 200);
         Assert.That(blockCount, Is.GreaterThanOrEqualTo(3), "Should have main block and conditional blocks");
     }
     
@@ -331,7 +331,7 @@ testBlockCopyingValue
         
         // Block captures variable reference, not value
         var bytecodes = (JArray)method["bytecodes"]!;
-        Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True, "Should contain block creation");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
         
         // Should access temporary variable
         Assert.That(bytecodes.Select(t => (int)t).Contains(104), Is.True, "Should store in temp");

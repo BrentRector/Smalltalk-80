@@ -175,7 +175,7 @@ testToDo
         
         // Block should be created for the loop body
         var bytecodes = (JArray)method["bytecodes"]!;
-        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
+        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
         Assert.That(hasBlock, Is.True, "Should create block for to:do:");
     }
     
@@ -211,7 +211,7 @@ testAnd
         var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should create a block for the second condition
-        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
+        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
         Assert.That(hasBlock, Is.True, "Should create block for and:");
     }
     
@@ -229,7 +229,7 @@ testOr
         var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should create a block for the second condition
-        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
+        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
         Assert.That(hasBlock, Is.True, "Should create block for or:");
     }
     
@@ -247,7 +247,7 @@ testShortCircuitAnd
         var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should have block creation
-        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
+        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
         Assert.That(hasBlock, Is.True, "Should create block even if not evaluated");
     }
     
@@ -265,7 +265,7 @@ testShortCircuitOr
         var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should have block creation
-        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 143);
+        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
         Assert.That(hasBlock, Is.True, "Should create block even if not evaluated");
     }
     
@@ -283,7 +283,7 @@ testComplexCondition
         var bytecodes = (JArray)method["bytecodes"]!;
         
         // Should have multiple blocks
-        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 200);
         Assert.That(blockCount, Is.GreaterThanOrEqualTo(2), "Should have multiple blocks");
     }
     

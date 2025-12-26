@@ -146,12 +146,12 @@ testMultipleParams: param1 with: param2 and: param3
         var source = WrapInTestClass(@"
 testSelf
     ^self");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // Push receiver (self) is bytecode 112, return top
-        AssertBytecode(method, 112, 124);
+
+        // Blue Book optimization: ^self compiles to RETURN_SELF (0x78 = 120)
+        AssertBytecode(method, 120);
     }
     
     [Test]
@@ -176,13 +176,13 @@ testSelfCall
         var source = WrapInTestClass(@"
 testSuper
     ^super");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // Push receiver (super uses same bytecode as self for push)
-        // The difference is in the send bytecode
-        AssertBytecode(method, 112, 124);
+
+        // super by itself is just self (super behavior is in the send bytecode)
+        // Blue Book optimization: ^super (like ^self) compiles to RETURN_SELF (0x78 = 120)
+        AssertBytecode(method, 120);
     }
     
     [Test]

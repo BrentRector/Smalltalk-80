@@ -83,7 +83,7 @@ testDeepBlockNesting
         
         // Should have multiple nested blocks
         var bytecodes = (JArray)method["bytecodes"]!;
-        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 200);
         Assert.That(blockCount, Is.EqualTo(4), "Should have 4 nested blocks");
     }
     
@@ -194,7 +194,7 @@ testEmptyBlocks
         
         // Should handle empty blocks correctly
         var bytecodes = (JArray)method["bytecodes"]!;
-        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 143);
+        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 200);
         Assert.That(blockCount, Is.EqualTo(2), "Should have two empty blocks");
     }
     

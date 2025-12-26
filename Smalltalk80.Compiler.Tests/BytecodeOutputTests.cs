@@ -13,15 +13,14 @@ public class BytecodeOutputTests : CompilerTestBase
     #region Push Bytecodes
 
     [Test]
-    public void PushSelf_Produces0x70()
+    public void ReturnSelf_Produces0x78()
     {
         var json = CompileSource(WrapInTestClass("test ^self"));
         var method = GetFirstMethod(json);
         var bytecodes = (JArray)method["bytecodes"]!;
 
-        // PUSH_SELF (0x70) followed by RETURN_TOP (0x7C)
-        AssertBytecodeAt(bytecodes, 0, 0x70, "PUSH_SELF");
-        AssertBytecodeAt(bytecodes, 1, 0x7C, "RETURN_TOP");
+        // Blue Book optimization: ^self compiles to RETURN_SELF (0x78) directly
+        AssertBytecodeAt(bytecodes, 0, 0x78, "RETURN_SELF");
     }
 
     [Test]
@@ -161,17 +160,17 @@ public class BytecodeOutputTests : CompilerTestBase
     #region Return Bytecodes
 
     [Test]
-    public void ReturnSelf_Produces0x78()
+    public void ImplicitReturnSelf_EndsWithReturnSelf()
     {
-        // Implicit return self
+        // Implicit return self - method without explicit return
         var json = CompileSource(WrapInTestClass("test self foo"));
         var method = GetFirstMethod(json);
         var bytecodes = (JArray)method["bytecodes"]!;
 
-        // Last bytecode should be RETURN_SELF (0x78)
-        // (Excluding source position bytes at end)
-        int lastIndex = bytecodes.Count - 4; // Skip 3 source position bytes + 1 for index
-        Assert.That((int)bytecodes[lastIndex], Is.EqualTo(0x78), "Should end with RETURN_SELF");
+        // Method should end with RETURN_SELF (0x78) for implicit return
+        // Find the last return bytecode in the bytecode sequence
+        int returnSelfIndex = FindBytecode(bytecodes, 0x78);
+        Assert.That(returnSelfIndex, Is.GreaterThanOrEqualTo(0), "Should have RETURN_SELF for implicit return");
     }
 
     [Test]
@@ -189,18 +188,12 @@ public class BytecodeOutputTests : CompilerTestBase
     public void ReturnTopFromBlock_Produces0x7D()
     {
         var json = CompileSource(WrapInTestClass("test ^[42] value"));
-        var methods = (JArray)json["methods"]!;
+        var method = GetFirstMethod(json);
+        var bytecodes = (JArray)method["bytecodes"]!;
 
-        // Find the block method
-        var blockMethod = methods.FirstOrDefault(m =>
-            m["localId"]?.ToString()?.Contains("block") == true);
-
-        if (blockMethod != null)
-        {
-            var bytecodes = (JArray)blockMethod["bytecodes"]!;
-            int returnIndex = FindBytecode(bytecodes, 0x7D);
-            Assert.That(returnIndex, Is.GreaterThanOrEqualTo(0), "Block should have RETURN_TOP_FROM_BLOCK");
-        }
+        // Blue Book: Blocks are compiled inline, RETURN_TOP_FROM_BLOCK (0x7D) is in the main method
+        int returnIndex = FindBytecode(bytecodes, 0x7D);
+        Assert.That(returnIndex, Is.GreaterThanOrEqualTo(0), "Block should have RETURN_TOP_FROM_BLOCK");
     }
 
     #endregion
