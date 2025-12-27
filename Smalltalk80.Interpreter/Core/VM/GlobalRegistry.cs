@@ -73,9 +73,17 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Looks up a class object OOP by class name.
+    /// THROWS after Freeze() - runtime code must use VMMetadata class OOPs or query heap.
     /// </summary>
     public static SmalltalkOOP LookupClassOOP(string className)
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"GlobalRegistry.LookupClassOOP() called after freeze. " +
+                $"Runtime code must use VMMetadata class OOPs or query heap directly. Attempted to lookup: '{className}'");
+        }
+
         if (_globals.TryGetValue($"class:{className}", out var oop))
             return oop;
 
@@ -100,17 +108,31 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Gets a global object OOP by name.
+    /// THROWS after Freeze() - runtime code must use VMMetadata.KnownObjects or query heap.
     /// </summary>
     public static SmalltalkOOP Get(string name)
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"GlobalRegistry.Get() called after freeze. " +
+                $"Runtime code must use VMMetadata.KnownObjects or query heap directly. Attempted to get: '{name}'");
+        }
         return _globals[name];
     }
 
     /// <summary>
     /// Tries to get a global object OOP by name.
+    /// THROWS after Freeze() - runtime code must use VMMetadata.KnownObjects or query heap.
     /// </summary>
     public static bool TryGet(string name, out SmalltalkOOP oop)
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"GlobalRegistry.TryGet() called after freeze. " +
+                $"Runtime code must use VMMetadata.KnownObjects or query heap directly. Attempted to get: '{name}'");
+        }
         return _globals.TryGetValue(name, out oop);
     }
 
@@ -132,9 +154,17 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Gets a generic object from the registry with type casting.
+    /// THROWS after Freeze() - runtime code must use VMMetadata or heap.
     /// </summary>
     public static T? GetObject<T>(string name) where T : class
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"GlobalRegistry.GetObject() called after freeze. " +
+                $"Runtime code must use VMMetadata or query heap directly. Attempted to get: '{name}'");
+        }
+
         if (_objects.TryGetValue(name, out var obj))
         {
             return obj as T;
@@ -144,9 +174,17 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Tries to get a generic object from the registry.
+    /// THROWS after Freeze() - runtime code must use VMMetadata or heap.
     /// </summary>
     public static bool TryGetObject<T>(string name, out T? value) where T : class
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"GlobalRegistry.TryGetObject() called after freeze. " +
+                $"Runtime code must use VMMetadata or query heap directly. Attempted to get: '{name}'");
+        }
+
         if (_objects.TryGetValue(name, out var obj) && obj is T typed)
         {
             value = typed;
@@ -158,9 +196,16 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Returns all registered globals as an enumerable of key-value pairs.
+    /// THROWS after Freeze() - cold start structure not available at runtime.
     /// </summary>
     public static IEnumerable<KeyValuePair<string, SmalltalkOOP>> GetAll()
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"GlobalRegistry.GetAll() called after freeze. " +
+                $"Cold start structure not available at runtime.");
+        }
         return _globals;
     }
 

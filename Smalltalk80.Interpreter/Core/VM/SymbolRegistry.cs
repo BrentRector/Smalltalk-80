@@ -46,9 +46,17 @@ public static class SymbolRegistry
 
     /// <summary>
     /// Gets the SmalltalkOOP for a symbol by its index.
+    /// THROWS after Freeze() - runtime code must use USTable in heap.
     /// </summary>
     public static SmalltalkOOP GetSymbolOOP(int symbolIndex)
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"SymbolRegistry.GetSymbolOOP() called after freeze. " +
+                $"Runtime code must access symbols via USTable in heap. Attempted to get symbol index: {symbolIndex}");
+        }
+
         if (!_symbolIndexToOOP.TryGetValue(symbolIndex, out var symbolOOP))
         {
             throw new KeyNotFoundException(
@@ -60,9 +68,16 @@ public static class SymbolRegistry
 
     /// <summary>
     /// Returns all registered symbols as (index, symbolOOP) pairs.
+    /// THROWS after Freeze() - cold start structure not available at runtime.
     /// </summary>
     public static IEnumerable<(int Index, SmalltalkOOP SymbolOOP)> AllSymbols()
     {
+        if (_isFrozen)
+        {
+            throw new InvalidOperationException(
+                $"SymbolRegistry.AllSymbols() called after freeze. " +
+                $"Cold start structure not available at runtime.");
+        }
         return _symbolIndexToOOP.Select(kvp => (kvp.Key, kvp.Value));
     }
 
