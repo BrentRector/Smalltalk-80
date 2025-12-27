@@ -102,19 +102,24 @@ public static class Program
 
             Console.WriteLine("Cold start completed successfully!");
 
-            // Build VM metadata (needed by Smalltalk thread)
-            var vmMetadata = BuildVMMetadata(layoutResolver, loader);
+            // Get VM metadata (built by orchestrator as final step of cold start)
+            var vmMetadata = loader.VMMetadata
+                ?? throw new InvalidOperationException("VMMetadata is null after cold start");
 
-            // NOTE: Window and Display both use 800x600
-            // Smalltalk Display object is 800x600 (created during cold start)
+            // NOTE: Window and Display both use default dimensions
+            // Smalltalk Display object is created during cold start with same dimensions
             // When beDisplay primitive is called, window size matches Display (no resize needed)
             // Resize flow is tested when user calls: DisplayScreen displayExtent: width@height
 
             // Create display window (UI thread object - has heap access for Display bitmap rendering)
-            // Window size: 800x600 (matches Smalltalk Display size)
             Console.WriteLine("\n=== Creating Display Window ===");
-            Console.WriteLine("  Window size: 800x600 (matches Smalltalk Display)");
-            var displayProvider = new WinFormsDisplayProvider(800, 600, "Smalltalk-80", heapManager, vmMetadata);
+            Console.WriteLine($"  Window size: {InterpreterConstants.DefaultDisplayWidth}x{InterpreterConstants.DefaultDisplayHeight} (matches Smalltalk Display)");
+            var displayProvider = new WinFormsDisplayProvider(
+                InterpreterConstants.DefaultDisplayWidth,
+                InterpreterConstants.DefaultDisplayHeight,
+                "Smalltalk-80",
+                heapManager,
+                vmMetadata);
             Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity
@@ -155,10 +160,22 @@ public static class Program
             {
                 smalltalkThread.Join();
                 // Only close window if it's still open (not already closed by user)
-                if (!displayProvider.IsDisposed && displayProvider.IsHandleCreated)
+                // Use try-catch to handle race condition where window may be disposed between check and Invoke
+                try
                 {
-                    Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
-                    displayProvider.Invoke((Action)(() => displayProvider.Close()));
+                    if (!displayProvider.IsDisposed && displayProvider.IsHandleCreated)
+                    {
+                        Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
+                        displayProvider.Invoke((Action)(() => displayProvider.Close()));
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Window was disposed between check and Invoke - expected during shutdown
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("cross-thread") || ex.Message.Contains("disposed"))
+                {
+                    // Window handle invalidated - expected during shutdown
                 }
             });
             monitorThread.IsBackground = true;
@@ -174,6 +191,11 @@ public static class Program
             Console.WriteLine("\n=== Showing Display Window ===");
             displayProvider.Show();
 
+            // Signal Smalltalk thread that window is displayed
+            // This replaces the old Thread.Sleep with proper synchronization
+            threadContext.WindowDisplayed.Set();
+            Console.WriteLine("  Window displayed signal sent");
+
             // Run WinForms event loop (blocks until window closes)
             Console.WriteLine("\n=== Entering GUI Event Loop ===");
             Console.WriteLine("Display window is visible. Close window to exit.\n");
@@ -186,8 +208,9 @@ public static class Program
             // Wait for Smalltalk thread to finish (with timeout)
             if (!smalltalkThread.Join(TimeSpan.FromSeconds(5)))
             {
-                Console.WriteLine("Warning: Smalltalk thread did not shut down cleanly");
-                smalltalkThread.Interrupt();
+                // Thread.Interrupt() is deprecated and dangerous - just log warning
+                // The cancellation token should have signaled the thread to stop
+                Console.WriteLine("Warning: Smalltalk thread did not shut down cleanly within 5 seconds");
             }
 
             // Report profiling statistics if enabled
@@ -213,286 +236,6 @@ public static class Program
             return loader.Allocator.GetIndexedOOP(methodOOP, literalIndex + 1); // +1 to skip header
         }
         return loader.Allocator.GetNil();
-    }
-
-    /// <summary>
-    /// Resolves a literal value to a SmalltalkOOP (from InitExpressionExecutor).
-    /// </summary>
-    private static SmalltalkOOP ResolveLiteralValueAsOOP(
-        LiteralValue literal,
-        ColdStartBundle bundle,
-        ObjectGraphAllocator allocator,
-        IReadOnlyDictionary<string, SmalltalkOOP> localIdToObjectId)
-    {
-        return literal.Type switch
-        {
-            "symbol" => SymbolRegistry.GetSymbolOOP(literal.Index!.Value),
-            "string" => allocator.AllocateString(bundle.Strings[literal.Index!.Value]),
-            "smallInt" => SmalltalkOOP.FromSmallInteger(GetIntValue(literal.Value!)),
-            "float" => allocator.AllocateFloat(GetFloatValue(literal.Value!)),
-            "nil" => allocator.GetNil(),
-            "true" => GlobalRegistry.Get("true"),
-            "false" => GlobalRegistry.Get("false"),
-            "objectRef" => localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP1)
-                ? objOOP1
-                : throw new InvalidOperationException($"objectRef not found: '{literal.LocalId}'"),
-            "compiledMethod" => localIdToObjectId.TryGetValue(literal.LocalId ?? "", out SmalltalkOOP objOOP2)
-                ? objOOP2
-                : throw new InvalidOperationException($"compiledMethod not found: '{literal.LocalId}'"),
-            "character" => AllocateCharacter(literal.CodePoint!.Value, allocator),
-            "bytes" => AllocateByteArray(literal.Encoding!, literal.Data!, allocator),
-            "association" => ResolveAssociation(literal.Association!, bundle, allocator, localIdToObjectId),
-            "array" => AllocateArray(literal.Elements!.Select(l => ResolveLiteralValueAsOOP(l, bundle, allocator, localIdToObjectId)).ToArray(), allocator),
-            _ => throw new InvalidOperationException($"Unknown literal type: {literal.Type}")
-        };
-    }
-
-    private static SmalltalkOOP AllocateCharacter(int codePoint, ObjectGraphAllocator allocator)
-    {
-        var characterOOP = allocator.AllocateFixedObject("Character");
-        var codePointOOP = SmalltalkOOP.FromSmallInteger(codePoint);
-        allocator.SetInstanceVariable(characterOOP, 0, codePointOOP);
-        return characterOOP;
-    }
-
-    private static SmalltalkOOP AllocateByteArray(string encoding, string data, ObjectGraphAllocator allocator)
-    {
-        byte[] bytes = encoding.ToLower() switch
-        {
-            "base64" => Convert.FromBase64String(data),
-            "hex" => ConvertHexStringToBytes(data),
-            _ => throw new InvalidOperationException($"Unsupported byte array encoding: {encoding}")
-        };
-        return allocator.AllocateByteArray("ByteArray", bytes);
-    }
-
-    private static SmalltalkOOP AllocateArray(SmalltalkOOP[] elementOOPs, ObjectGraphAllocator allocator)
-    {
-        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        var arrayOOP = allocator.AllocateArray(arrayClassOOP, elementOOPs.Length);
-        for (int i = 0; i < elementOOPs.Length; i++)
-        {
-            allocator.SetIndexedOOP(arrayOOP, i, elementOOPs[i]);
-        }
-        return arrayOOP;
-    }
-
-    private static SmalltalkOOP ResolveAssociation(
-        AssociationLiteral assoc,
-        ColdStartBundle bundle,
-        ObjectGraphAllocator allocator,
-        IReadOnlyDictionary<string, SmalltalkOOP> localIdToObjectId)
-    {
-        var keyOOP = SymbolRegistry.GetSymbolOOP(assoc.KeyIndex);
-        string keyName = bundle.Symbols[assoc.KeyIndex];
-
-        if (assoc.ValueRef?.LocalId == null)
-        {
-            if (GlobalRegistry.TryGet($"class:{keyName}", out SmalltalkOOP classOop))
-            {
-                var sysDictOOP = GlobalRegistry.SystemDictionaryOOP;
-                int sysDictSize = allocator.GetIndexedSize(sysDictOOP);
-
-                for (int i = 0; i < sysDictSize; i++)
-                {
-                    var assocOOP = allocator.GetIndexedOOP(sysDictOOP, i);
-                    if (assocOOP == allocator.GetNil()) continue;
-
-                    var assocKeyOOP = allocator.GetInstanceVariable(assocOOP, 0);
-                    if (assocKeyOOP == keyOOP)
-                    {
-                        return assocOOP;
-                    }
-                }
-            }
-        }
-
-        var valueOOP = assoc.ValueRef?.LocalId != null
-            ? localIdToObjectId[assoc.ValueRef.LocalId]
-            : allocator.GetNil();
-
-        var associationOOP = allocator.AllocateFixedObject("Association");
-        allocator.SetInstanceVariable(associationOOP, 0, keyOOP);
-        allocator.SetInstanceVariable(associationOOP, 1, valueOOP);
-        return associationOOP;
-    }
-
-    private static byte[] ConvertHexStringToBytes(string hex)
-    {
-        hex = hex.Replace(" ", "").Replace("-", "").Replace(":", "");
-        if (hex.Length % 2 != 0)
-            throw new InvalidOperationException("Hex string must have even number of characters");
-
-        byte[] bytes = new byte[hex.Length / 2];
-        for (int i = 0; i < bytes.Length; i++)
-        {
-            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-        }
-        return bytes;
-    }
-
-    private static int GetIntValue(object value)
-    {
-        return value switch
-        {
-            System.Text.Json.JsonElement e => e.GetInt32(),
-            int i => i,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to int")
-        };
-    }
-
-    private static double GetFloatValue(object value)
-    {
-        return value switch
-        {
-            System.Text.Json.JsonElement e => e.GetDouble(),
-            double d => d,
-            float f => f,
-            _ => throw new InvalidOperationException($"Cannot convert {value.GetType()} to double")
-        };
-    }
-
-    /// <summary>
-    /// Formats a return value OOP for display.
-    /// </summary>
-    private static string FormatReturnValue(ISmalltalkHeap heapManager, ColdStartBundle bundle, SmalltalkOOP returnOOP)
-    {
-        if (returnOOP.IsSmallInteger)
-            return $"SmallInteger({returnOOP.AsSmallInteger()})";
-
-        if (returnOOP == heapManager.GetNil())
-            return "nil";
-
-        if (returnOOP == GlobalRegistry.Get("true"))
-            return "true";
-
-        if (returnOOP == GlobalRegistry.Get("false"))
-            return "false";
-
-        try
-        {
-            // Get the class OOP, then get the class name from it
-            var classOOP = heapManager.GetClassOOP(returnOOP);
-            var className = heapManager.GetClassName(classOOP);
-
-            // GetClassName returns the actual class name, never "UnknownClass"
-            return $"{className} (OOP={returnOOP})";
-        }
-        catch (Exception ex)
-        {
-            // Even if there's an error, try to get some useful info
-            try
-            {
-                var classOOP = heapManager.GetClassOOP(returnOOP);
-                return $"<class={classOOP}> (OOP={returnOOP})";
-            }
-            catch
-            {
-                return $"<error: {ex.Message}> (OOP={returnOOP})";
-            }
-        }
-    }
-
-    /// <summary>
-    /// Dumps verbose debugging information when an init expression fails.
-    /// </summary>
-    private static void DumpInitExpressionDebugInfo(
-        InitExpression initExpr,
-        byte[] bytecodes,
-        SmalltalkOOP[] literalOOPs,
-        InitResult result,
-        ISmalltalkHeap heapManager,
-        ColdStartBundle bundle)
-    {
-        Console.WriteLine("\n=== VERBOSE DEBUG OUTPUT ===");
-
-        // 1. Source code
-        Console.WriteLine($"\nSource Code:");
-        Console.WriteLine($"  {initExpr.Source ?? "<no source>"}");
-
-        // 2. Error details
-        Console.WriteLine($"\nError:");
-        Console.WriteLine($"  Status: {result.Status}");
-        if (result.Diagnostic?.Message != null)
-        {
-            Console.WriteLine($"  Message: {result.Diagnostic.Message}");
-        }
-
-        // 3. Literals
-        Console.WriteLine($"\nLiterals ({literalOOPs.Length}):");
-        for (int i = 0; i < literalOOPs.Length; i++)
-        {
-            Console.WriteLine($"  [{i}] = {FormatReturnValue(heapManager, bundle, literalOOPs[i])}");
-        }
-
-        // 4. Bytecode disassembly (symbolic form)
-        var disassembly = BytecodeDisassembler.Disassemble(
-            bytecodes,
-            literalOOPs,
-            oop => FormatReturnValue(heapManager, bundle, oop),
-            []  // No additional optimized selectors needed
-        );
-        int instructionCount = disassembly.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
-        Console.WriteLine($"\nBytecode ({bytecodes.Length} bytes, {instructionCount} instructions):");
-        Console.Write(disassembly);
-
-        // 5. Stack trace (if available)
-        if (result.Diagnostic?.StackTrace != null)
-        {
-            Console.WriteLine($"\nStack Trace:");
-            Console.WriteLine($"  {result.Diagnostic.StackTrace}");
-        }
-
-        Console.WriteLine("\n=== END DEBUG OUTPUT ===");
-    }
-
-    private static VMMetadata BuildVMMetadata(LayoutResolver layoutResolver, ColdStartOrchestrator loader)
-    {
-        int thisClassIdx = layoutResolver.GetFieldIndex("class:Metaclass", "thisClass");
-
-        // Get special objects from GlobalRegistry (allocated during cold start phases)
-        var nilOOP = loader.Allocator.GetNil();
-        var trueOOP = GlobalRegistry.Get("true");
-        var falseOOP = GlobalRegistry.Get("false");
-        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
-        var displayOOP = GlobalRegistry.Get("Display");
-        // Get ProcessorScheduler INSTANCE (not class) - registered as "Processor" in Phase 3
-        var processorSchedulerOOP = GlobalRegistry.Get("Processor");
-
-        var knownObjects = new KnownObjects(
-            nil: nilOOP,
-            @true: trueOOP,
-            @false: falseOOP,
-            smalltalk: smalltalkOOP,
-            display: displayOOP
-        );
-
-        return new VMMetadata
-        {
-            ClassNameFieldIndex = layoutResolver.GetFieldIndex("class:Class", "name"),
-            ClassSuperclassFieldIndex = layoutResolver.GetFieldIndex("class:Class", "superclass"),
-            ClassMethodDictFieldIndex = layoutResolver.GetFieldIndex("class:Class", "methodDict"),
-            ClassFormatFieldIndex = layoutResolver.GetFieldIndex("class:Class", "format"),
-            MetaclassThisClassFieldIndex = thisClassIdx,
-            MethodDictTallyFieldIndex = layoutResolver.GetFieldIndex("class:MethodDictionary", "tally"),
-            MethodDictKeysFieldIndex = layoutResolver.GetFieldIndex("class:MethodDictionary", "keys"),
-            MethodDictValuesFieldIndex = layoutResolver.GetFieldIndex("class:MethodDictionary", "values"),
-            ClassClassOOP = GlobalRegistry.Get("class:Class"),
-            MetaclassClassOOP = GlobalRegistry.Get("class:Metaclass"),
-            SymbolClassOOP = GlobalRegistry.Get("class:Symbol"),
-            StringClassOOP = GlobalRegistry.Get("class:String"),
-            ArrayClassOOP = GlobalRegistry.Get("class:Array"),
-            ByteArrayClassOOP = GlobalRegistry.Get("class:ByteArray"),
-            WordArrayClassOOP = GlobalRegistry.Get("class:WordArray"),
-            DisplayBitmapClassOOP = GlobalRegistry.Get("class:DisplayBitmap"),
-            CompiledMethodClassOOP = GlobalRegistry.Get("class:CompiledMethod"),
-            SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
-            BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
-            OrderedCollectionClassOOP = GlobalRegistry.Get("class:OrderedCollection"),
-            KnownObjects = knownObjects,
-            ProcessorScheduler = processorSchedulerOOP,
-            InitExpressionMethods = loader.InitExpressionMethods
-        };
     }
 
     /// <summary>

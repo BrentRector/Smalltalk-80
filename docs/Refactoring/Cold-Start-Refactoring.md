@@ -1,8 +1,44 @@
 # Cold Start Phase Architecture Analysis
 
-**Date**: 2025-11-19
+**Date**: 2025-11-19 (Updated: 2025-12-27)
 **Author**: Claude Code Analysis
-**Status**: Analysis Complete
+**Status**: Partially Implemented
+
+---
+
+## Current Implementation Status (2025-12-27)
+
+### ✅ Completed
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **RuntimeDictionaryService** | ✅ Complete | `Core/VM/RuntimeDictionaryService.cs` - Runtime-safe dictionary operations using only ISmalltalkHeap |
+| **Phase 3 → RuntimeDictionaryService** | ✅ Complete | Phase 3 DictionaryInstaller now uses RuntimeDictionaryService directly |
+| **Phase 4 → RuntimeDictionaryService** | ✅ Complete | Phase 4 MethodDictionaryInstaller uses RuntimeDictionaryService directly |
+| **Phase 5 → RuntimeDictionaryService** | ✅ Complete | Phase 5 now directly uses RuntimeDictionaryService, eliminating wrapper |
+| **Engine/Services/DictionaryService.cs** | ✅ Deleted | All phases now use RuntimeDictionaryService directly |
+| **Phase5/DictionaryOperations.cs** | ✅ Deleted | Wrapper class removed - was just delegating to RuntimeDictionaryService |
+| **IDictionaryOperations interface** | ✅ Removed | Interface removed from Phase5/Interfaces.cs |
+| **Canonical global lookup** | ✅ Complete | IRuntimeHeapAccessor.LookupGlobalAssociation implements SystemDictionary → Undeclared chain |
+| **VMConstants for Association** | ✅ Complete | ASSOCIATION_KEY_INDEX, ASSOCIATION_VALUE_INDEX, DICTIONARY_TALLY_INDEX |
+| **InstallInIdentityDictionary** | ✅ Complete | RuntimeDictionaryService supports MethodDictionary installation |
+
+### 📋 Cold-Start Specific Services (By Design)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **Engine/Services/SymbolService** | ✅ Appropriate | Cold-start symbol lookup via SymbolRegistry (disposed after Phase 6) |
+| **Engine/Services/FieldValueService** | ✅ Appropriate | JSON bundle parsing - not heap-based, cold-start specific |
+
+> **Note**: SymbolService and FieldValueService are NOT candidates for runtime migration.
+> They work with ColdStartBundle schema, not heap operations. See analysis in INTERPRETER_CODE_QUALITY_REVIEW.md.
+
+### ❌ Remaining Work (Low Priority)
+
+| Item | Priority | Notes |
+|------|----------|-------|
+| Consolidate Phase5/FieldValueResolver | Low | May duplicate FieldValueService |
+| Phase 5 sub-orchestrator simplification | Low | Still has 9 helper files |
 
 ---
 
@@ -212,21 +248,18 @@ Phase 5 → Phase 6:
 
 **Analysis**: Phase 3's implementation is more complete. Phase 5's is a subset. These could be unified.
 
-### 4.2 Dictionary Operations - Duplicate Implementations
+### 4.2 Dictionary Operations - ✅ RESOLVED
 
-**Phase 3 Implementation**: `/home/user/Smalltalk-80/Smalltalk80.Interpreter/Engine/LoaderPhases/Phase3/DictionaryInstaller.cs`
-- `InstallInSystemDictionary()` (lines 44-94)
-- `InstallInDictionary()` (lines 117-181)
-- `GetSymbolHash()` (lines 102-108)
-- `AllocateAssociation()` (lines 27-36)
+**Status**: Duplication eliminated. Both phases now use `RuntimeDictionaryService`.
 
-**Phase 5 Implementation**: `/home/user/Smalltalk-80/Smalltalk80.Interpreter/Engine/LoaderPhases/Phase5/DictionaryOperations.cs`
-- `InstallAssociation()` (lines 20-97)
-- `RemoveAssociation()` (lines 103-154)
-- `GetSymbolHash()` (lines 159-162)
-- `FixCollisionsFrom()` (lines 168-217)
+**Previous State** (now deleted):
+- Phase 3: `DictionaryInstaller.cs` had InstallInSystemDictionary, InstallInDictionary, GetSymbolHash
+- Phase 5: `DictionaryOperations.cs` had InstallAssociation, RemoveAssociation, FixCollisionsFrom
 
-**Analysis**: Nearly identical hash-based dictionary algorithms. Phase 5 adds removal and collision fixing. Should be a single shared service.
+**Current State**:
+- `Core/VM/RuntimeDictionaryService.cs` - Single implementation used by all phases
+- Phase 3/DictionaryInstaller.cs now delegates to RuntimeDictionaryService
+- Phase5/DictionaryOperations.cs - **Deleted**
 
 ### 4.3 Symbol Interning - Multiple Implementations
 
@@ -424,14 +457,14 @@ Some data is processed multiple times:
 
 **Analysis**: While some multiple passes are necessary (e.g., for forward references), others could be eliminated with better organization.
 
-### 6.5 Phase 5 Decomposition Complexity
+### 6.5 Phase 5 Decomposition Complexity - Partially Resolved
 
-Phase 5 has its own sub-orchestrator and 10 helper files:
+Phase 5 has its own sub-orchestrator and helper files (reduced from 10 to 9 after DictionaryOperations deletion):
 
 ```
 Phase5/
   Phase5Orchestrator.cs
-  Interfaces.cs
+  Interfaces.cs              (IDictionaryOperations removed)
   DataTypes.cs
   PatchApplier.cs
   USTableBuilder.cs
@@ -439,13 +472,17 @@ Phase5/
   RuntimeObjectCreator.cs
   FieldValueResolver.cs
   AssociationManager.cs
-  DictionaryOperations.cs
+  DictionaryOperations.cs    ← DELETED (uses RuntimeDictionaryService)
 ```
 
-**Consequences**:
-- Adds navigation complexity
-- Creates mini-architecture within architecture
-- Suggests this phase is too complex
+**Improvements Made**:
+- DictionaryOperations.cs deleted - functionality moved to RuntimeDictionaryService
+- IDictionaryOperations interface removed from Interfaces.cs
+- All phases now use unified RuntimeDictionaryService
+
+**Remaining Complexity**:
+- Still has 9 helper files
+- Sub-orchestrator pattern still exists
 
 ### 6.6 Validation Hook Under-utilization
 
@@ -789,19 +826,19 @@ After each step:
 
 ### Helper Files with Duplication
 
-| File | Duplicate Of |
-|------|--------------|
-| `Phase3/FieldValueResolver.cs` | Phase5/FieldValueResolver.cs |
-| `Phase3/DictionaryInstaller.cs` | Phase5/DictionaryOperations.cs |
+| File | Duplicate Of | Status |
+|------|--------------|--------|
+| `Phase3/FieldValueResolver.cs` | Phase5/FieldValueResolver.cs | Remaining |
+| `Phase3/DictionaryInstaller.cs` | ~~Phase5/DictionaryOperations.cs~~ | ✅ Resolved - Phase5 file deleted |
 
 ### Duplication Locations
 
-| Pattern | Files | Lines |
-|---------|-------|-------|
-| InternSymbol | Phase1:317-341, Phase2:624-636, Phase3/FVR:86-98, Phase4/LR | ~50 each |
-| Dictionary hash | Phase3/DI:102-108, Phase5/DO:159-162 | ~7 each |
-| Install in dict | Phase3/DI:117-181, Phase5/DO:20-97 | ~65 each |
-| SetAndTrack | Phase2:574-578, Phase3:910-914 | ~5 each |
+| Pattern | Files | Lines | Status |
+|---------|-------|-------|--------|
+| InternSymbol | Phase1:317-341, Phase2:624-636, Phase3/FVR:86-98, Phase4/LR | ~50 each | Remaining |
+| Dictionary hash | ~~Phase3/DI:102-108, Phase5/DO:159-162~~ | ~~7 each~~ | ✅ Resolved |
+| Install in dict | ~~Phase3/DI:117-181, Phase5/DO:20-97~~ | ~~65 each~~ | ✅ Resolved |
+| SetAndTrack | Phase2:574-578, Phase3:910-914 | ~5 each | Remaining |
 
 ---
 

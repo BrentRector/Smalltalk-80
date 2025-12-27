@@ -71,12 +71,12 @@ public class Phase3_ObjectAllocation : IPhase
         // Initialize services and helper classes
         var symbolService = new SymbolService(bundle);
         var fieldValueService = new FieldValueService(bundle, symbolService);
-        var dictionaryService = new DictionaryService(allocator, bundle);
+        var dictService = new RuntimeDictionaryService(heapManager);
 
         _fieldValueResolver = new FieldValueResolver(allocator, bundle, localIdToObjectId, diagnostics, fieldValueService);
         _dictionaryInstaller = new DictionaryInstaller(
-            localIdToObjectId, initializedFields,
-            _fieldValueResolver.InternSymbol, dictionaryService);
+            allocator, dictService, localIdToObjectId, initializedFields,
+            _fieldValueResolver.InternSymbol);
     }
 
     /// <summary>
@@ -102,7 +102,7 @@ public class Phase3_ObjectAllocation : IPhase
         // Section 1: Allocation (ALL object creation happens here)
         AllocateSentinelObjects();
 
-        // Section 1.5: Create CharacterTable with 256 unique Character objects
+        // Section 1.5: Create CharacterTable with CHARACTER_TABLE_SIZE unique Character objects
         // CRITICAL: Must happen BEFORE Phase 4 (method compilation) which resolves Character literals
         CreateCharacterTable();
 
@@ -451,12 +451,12 @@ public class Phase3_ObjectAllocation : IPhase
     #region CharacterTable Creation
 
     /// <summary>
-    /// Creates the CharacterTable with 256 unique Character objects.
+    /// Creates the CharacterTable with CHARACTER_TABLE_SIZE unique Character objects.
     /// Blue Book specification: Characters are unique and stored in class variable CharacterTable.
     ///
     /// This method:
-    /// 1. Creates an Array of 256 slots for CharacterTable
-    /// 2. Creates 256 Character objects with values 0-255
+    /// 1. Creates an Array of CHARACTER_TABLE_SIZE slots for CharacterTable
+    /// 2. Creates CHARACTER_TABLE_SIZE Character objects with values 0-255
     /// 3. Registers each Character in CharacterRegistry for Phase 4 literal resolution
     /// 4. Sets the CharacterTable class variable on Character class
     ///
@@ -473,8 +473,8 @@ public class Phase3_ObjectAllocation : IPhase
         // Get Array class OOP for the CharacterTable array
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
 
-        // Create Array of 256 slots for CharacterTable
-        var characterTableOOP = _allocator.AllocateArray(arrayClassOOP, 256);
+        // Create Array of CHARACTER_TABLE_SIZE slots for CharacterTable
+        var characterTableOOP = _allocator.AllocateArray(arrayClassOOP, VMConstants.CHARACTER_TABLE_SIZE);
 
         // Get the index of Character's 'value' instance variable
         int valueIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Character", "value", _bundle);
@@ -483,8 +483,8 @@ public class Phase3_ObjectAllocation : IPhase
             throw new InvalidOperationException("Character class must have 'value' instance variable");
         }
 
-        // Create 256 Character objects
-        for (int codePoint = 0; codePoint < 256; codePoint++)
+        // Create CHARACTER_TABLE_SIZE Character objects
+        for (int codePoint = 0; codePoint < VMConstants.CHARACTER_TABLE_SIZE; codePoint++)
         {
             // Allocate Character object
             var characterOOP = _allocator.AllocateFixedObject("Character");

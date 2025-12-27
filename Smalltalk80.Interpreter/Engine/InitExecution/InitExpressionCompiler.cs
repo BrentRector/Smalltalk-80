@@ -19,6 +19,7 @@ public class InitExpressionCompiler
     private readonly ISmalltalkHeap _heapManager;
     private readonly ColdStartBundle _bundle;
     private readonly VMMetadata _metadata;
+    private readonly IRuntimeHeapAccessor _runtimeHeapAccess;
 
     public InitExpressionCompiler(
         ISmalltalkHeap heapManager,
@@ -28,6 +29,7 @@ public class InitExpressionCompiler
         _heapManager = heapManager ?? throw new ArgumentNullException(nameof(heapManager));
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
         _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
+        _runtimeHeapAccess = new RuntimeHeapAccessor(heapManager, metadata);
     }
 
     /// <summary>
@@ -42,17 +44,17 @@ public class InitExpressionCompiler
         // Determine homeClass from the resolved literals
         string homeClassLocalId = ExtractHomeClassFromInitExpression(expr, literalOOPs);
 
-        // Get required class OOPs (runtime-safe lookups)
-        var compiledMethodClassOOP = LookupGlobal("CompiledMethod");
-        var byteArrayClassOOP = LookupGlobal("ByteArray");
+        // Get required class OOPs using hash-based lookup
+        var compiledMethodClassOOP = _runtimeHeapAccess.GetClass("CompiledMethod");
+        var byteArrayClassOOP = _runtimeHeapAccess.GetClass("ByteArray");
 
         if (compiledMethodClassOOP == _heapManager.GetNil())
             throw new InvalidOperationException("CompiledMethod class not found");
         if (byteArrayClassOOP == _heapManager.GetNil())
             throw new InvalidOperationException("ByteArray class not found");
 
-        // Get homeClass OOP (runtime-safe lookup)
-        var homeClassOOP = LookupGlobal(homeClassLocalId.Replace("meta:", ""));
+        // Get homeClass OOP using hash-based lookup
+        var homeClassOOP = _runtimeHeapAccess.GetClass(homeClassLocalId.Replace("meta:", ""));
         if (homeClassOOP == _heapManager.GetNil())
             throw new InvalidOperationException($"Home class not found: {homeClassLocalId}");
 
@@ -235,7 +237,7 @@ public class InitExpressionCompiler
                 if (literalValue.Index.HasValue)
                 {
                     string symbolText = _bundle.Symbols[literalValue.Index.Value];
-                    return FindSymbol(symbolText);
+                    return _runtimeHeapAccess.InternSymbol(symbolText);
                 }
                 throw new InvalidOperationException("Symbol literal missing Index");
 
@@ -254,7 +256,7 @@ public class InitExpressionCompiler
                 {
                     string keySymbolText = _bundle.Symbols[literalValue.Association.KeyIndex];
                     var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
-                    var keySymbolOOP = FindSymbol(keySymbolText);
+                    var keySymbolOOP = _runtimeHeapAccess.InternSymbol(keySymbolText);
                     var assocOOP = FindAssociation(smalltalkOOP, keySymbolOOP);
                     return assocOOP;
                 }
@@ -305,103 +307,43 @@ public class InitExpressionCompiler
     }
 
     /// <summary>
-    /// Finds a symbol OOP by name from the existing heap.
-    /// </summary>
-    private SmalltalkOOP FindSymbol(string symbolText)
-    {
-        foreach (var (index, symbolOOP) in SymbolRegistry.AllSymbols())
-        {
-            var symbolString = ReadSymbolString(symbolOOP);
-            if (symbolString == symbolText)
-            {
-                return symbolOOP;
-            }
-        }
-
-        return _heapManager.GetNil();
-    }
-
-    /// <summary>
-    /// Reads a Symbol object's string value from the heap.
-    /// </summary>
-    private string ReadSymbolString(SmalltalkOOP symbolOOP)
-    {
-        int size = _heapManager.GetIndexedSize(symbolOOP);
-        var bytes = new byte[size];
-
-        for (int i = 0; i < size; i++)
-        {
-            bytes[i] = _heapManager.GetIndexedByte(symbolOOP, i);
-        }
-
-        return System.Text.Encoding.UTF8.GetString(bytes);
-    }
-
-    /// <summary>
-    /// Finds an Association in the SystemDictionary by key symbol.
+    /// Finds an Association in the SystemDictionary by key symbol using hash-based lookup.
+    /// Implements Smalltalk-80 Dictionary>>findKeyOrNil: semantics with linear probing.
     /// </summary>
     private SmalltalkOOP FindAssociation(SmalltalkOOP systemDictOOP, SmalltalkOOP keySymbolOOP)
     {
         int size = _heapManager.GetIndexedSize(systemDictOOP);
-        string targetSymbol = ReadSymbolString(keySymbolOOP);
+        if (size == 0) return _heapManager.GetNil();
 
-        for (int i = 0; i < size; i++)
+        var nilOOP = _heapManager.GetNil();
+
+        // Hash-based lookup: start at hash slot, linear probe until found or nil
+        int startIndex = IdentityHashUtility.ComputeDictionaryHashIndex(keySymbolOOP, size);
+        int index = startIndex;
+
+        do
         {
-            var assocOOP = _heapManager.GetIndexedOOP(systemDictOOP, i);
-            if (assocOOP == _heapManager.GetNil())
-                continue;
+            var assocOOP = _heapManager.GetIndexedOOP(systemDictOOP, index);
 
-            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            // Empty slot - key not in dictionary
+            if (assocOOP == nilOOP)
+                return nilOOP;
 
-            // Compare by string to handle symbol identity issues
-            if (keyOOP != _heapManager.GetNil() && !keyOOP.IsSmallInteger)
+            // Get the key from the Association
+            if (!assocOOP.IsSmallInteger)
             {
-                string keyString = ReadSymbolString(keyOOP);
-                if (keyString == targetSymbol)
+                var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                if (keyOOP == keySymbolOOP)  // Identity comparison for Symbols
                 {
-                    return assocOOP;
+                    return assocOOP;  // Return the Association itself, not the value
                 }
             }
 
-            if (keyOOP == keySymbolOOP)
-            {
-                return assocOOP;
-            }
-        }
+            // Linear probe to next slot
+            index = (index + 1) % size;
+        } while (index != startIndex);
 
-        return _heapManager.GetNil();
-    }
-
-    /// <summary>
-    /// Looks up a global variable in the SystemDictionary (runtime-safe).
-    /// </summary>
-    private SmalltalkOOP LookupGlobal(string globalName)
-    {
-        var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
-        int size = _heapManager.GetIndexedSize(smalltalkOOP);
-
-        // Find the symbol OOP for the global name
-        var symbolOOP = FindSymbol(globalName);
-        if (symbolOOP == _heapManager.GetNil())
-        {
-            return _heapManager.GetNil();
-        }
-
-        // Search SystemDictionary for Association with this key
-        for (int i = 0; i < size; i++)
-        {
-            var assocOOP = _heapManager.GetIndexedOOP(smalltalkOOP, i);
-            if (assocOOP == _heapManager.GetNil())
-                continue;
-
-            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            if (keyOOP == symbolOOP)
-            {
-                return _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-            }
-        }
-
-        return _heapManager.GetNil();
+        return nilOOP;  // Wrapped around - not found
     }
 
     /// <summary>
@@ -429,8 +371,8 @@ public class InitExpressionCompiler
         // Allocate WordIndexed object with 4 words for IEEE 754 double
         var floatOOP = _heapManager.AllocateObject(ObjectFormat.WordIndexed, fixedSlots: 0, indexedSize: 4);
 
-        // Set Float class
-        var floatClassOOP = LookupGlobal("Float");
+        // Set Float class using hash-based lookup
+        var floatClassOOP = _runtimeHeapAccess.GetClass("Float");
         if (floatClassOOP != _heapManager.GetNil())
         {
             _heapManager.SetClassOOP(floatOOP, floatClassOOP);
@@ -461,8 +403,8 @@ public class InitExpressionCompiler
         // Allocate ByteIndexed object for the string bytes
         var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots: 0, indexedSize: bytes.Length);
 
-        // Set String class
-        var stringClassOOP = LookupGlobal("String");
+        // Set String class using hash-based lookup
+        var stringClassOOP = _runtimeHeapAccess.GetClass("String");
         if (stringClassOOP != _heapManager.GetNil())
         {
             _heapManager.SetClassOOP(stringOOP, stringClassOOP);

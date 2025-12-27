@@ -21,7 +21,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 public class SystemDictionaryInstaller(
     Phase5Context context,
     IAssociationManager associationManager,
-    IDictionaryOperations dictionaryOps) : ISystemDictionaryInstaller
+    RuntimeDictionaryService dictService) : ISystemDictionaryInstaller
 {
     public void InstallGlobals(SmalltalkOOP ustableOOP)
     {
@@ -579,9 +579,9 @@ public class SystemDictionaryInstaller(
                     context.Allocator.SetInstanceVariable(associationOOP, 1, nilOOP);
                 }
 
-                // Install in classPool using DictionaryOperations
-                // This handles hash-based lookup, tally increment, and collision resolution
-                dictionaryOps.InstallAssociation(classPoolOOP, associationOOP, classVarName);
+                // Install in classPool - handles hash-based lookup, tally increment, and collision resolution
+                var keySymbolOOP = context.Allocator.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                dictService.InstallAssociation(classPoolOOP, associationOOP, keySymbolOOP);
 
                 classVarCount++;
                 totalInstalled++;
@@ -712,7 +712,8 @@ public class SystemDictionaryInstaller(
             context.Allocator.SetInstanceVariable(assocOOP, 1, nilOOP);
 
             // Install in pool dictionary
-            dictionaryOps.InstallAssociation(poolDictOOP, assocOOP, varName);
+            var assocKeySymbolOOP = context.Allocator.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            dictService.InstallAssociation(poolDictOOP, assocOOP, assocKeySymbolOOP);
         }
 
         // Install pool dictionary in SystemDictionary as a global
@@ -723,8 +724,8 @@ public class SystemDictionaryInstaller(
         // Remove pool dictionary Association from Undeclared (with proper hash chain fixup)
         if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
         {
-            var keySymbolOOP = context.Allocator.GetInstanceVariable(poolAssocOOP, 0);
-            dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, poolName);
+            var keySymbolOOP = context.Allocator.GetInstanceVariable(poolAssocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            dictService.RemoveAssociation(undeclaredOOP, keySymbolOOP);
         }
 
     }
@@ -928,23 +929,23 @@ public class SystemDictionaryInstaller(
     private void InstallInSystemDictionary(SmalltalkOOP associationOOP, string keyName)
     {
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-        var keySymbolOOP = context.Allocator.GetInstanceVariable(associationOOP, 0);
+        var keySymbolOOP = context.Allocator.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
 
         // Remove from Undeclared if present
         if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
         {
-            dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, keyName);
+            dictService.RemoveAssociation(undeclaredOOP, keySymbolOOP);
         }
 
-        dictionaryOps.InstallAssociation(systemDictOOP, associationOOP, keyName);
+        dictService.InstallAssociation(systemDictOOP, associationOOP, keySymbolOOP);
     }
 
     /// <summary>
     /// Installs an Association in a classPool Dictionary.
-    /// Delegates to DictionaryOperations for proper hash-based installation and tally management.
     /// </summary>
     private void InstallInClassPool(SmalltalkOOP classPoolOOP, SmalltalkOOP associationOOP, string keyName)
     {
-        dictionaryOps.InstallAssociation(classPoolOOP, associationOOP, keyName);
+        var keySymbolOOP = context.Allocator.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+        dictService.InstallAssociation(classPoolOOP, associationOOP, keySymbolOOP);
     }
 }

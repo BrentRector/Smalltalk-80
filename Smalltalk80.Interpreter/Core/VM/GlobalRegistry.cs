@@ -8,49 +8,65 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// Tracks singleton objects, system objects, and class objects by name.
 /// CRITICAL: Stores SmalltalkOOP values, NEVER object table indices.
 ///
-/// ARCHITECTURAL ENFORCEMENT: After Freeze() is called, all write operations
-/// (Register, RegisterClass, Set) will throw exceptions. Runtime code must access
-/// the Smalltalk heap directly, not these cold start proxy structures.
+/// LIFECYCLE:
+/// 1. During Phases 1-5: Register/RegisterClass/Set populate the registry
+/// 2. After Phase 5: MakeImmutable() - reads allowed, writes throw
+/// 3. After Phase 6: Dispose() - all access throws, data cleared
+///
+/// Runtime code must use VMMetadata.KnownObjects or query the Smalltalk heap directly.
 /// </summary>
 public static class GlobalRegistry
 {
-    private static readonly Dictionary<string, SmalltalkOOP> _globals = new();
-    private static readonly Dictionary<string, object> _objects = new();
-    private static bool _isFrozen = false;
+    private static Dictionary<string, SmalltalkOOP>? _globals = new();
+    private static Dictionary<string, object>? _objects = new();
+    private static bool _isImmutable = false;
+    private static bool _isDisposed = false;
 
-    // Well-known singleton OOPs
+    // Well-known singleton OOPs (remain accessible after immutable, cleared after dispose)
     public static SmalltalkOOP NilOOP { get; private set; }
     public static SmalltalkOOP TrueOOP { get; private set; }
     public static SmalltalkOOP FalseOOP { get; private set; }
     public static SmalltalkOOP SystemDictionaryOOP { get; private set; }
 
     /// <summary>
-    /// Freezes the registry to prevent runtime modifications.
-    /// Call this at the end of cold start (after Loader.Run()).
-    /// Once frozen, Register/RegisterClass/Set will throw exceptions.
-    /// Read-only operations (Get, TryGet) remain allowed.
+    /// Makes the registry immutable (read-only).
+    /// Call this after the last phase that needs to write.
+    /// After this, Register/RegisterClass/Set throw but reads are still allowed.
     /// </summary>
-    public static void Freeze()
+    public static void MakeImmutable()
     {
-        _isFrozen = true;
-        // Console.WriteLine($"[GlobalRegistry] Frozen with {_globals.Count} global entries, {_objects.Count} object entries");
+        _isImmutable = true;
+    }
+
+    /// <summary>
+    /// Disposes the registry, blocking all access and releasing memory.
+    /// Call this at the end of cold start (after Phase 6).
+    /// After this, ALL operations throw ObjectDisposedException.
+    /// </summary>
+    public static void Dispose()
+    {
+        _isDisposed = true;
+        _globals?.Clear();
+        _globals = null;
+        _objects?.Clear();
+        _objects = null;
+        NilOOP = default;
+        TrueOOP = default;
+        FalseOOP = default;
+        SystemDictionaryOOP = default;
     }
 
     /// <summary>
     /// Registers a well-known global object OOP.
     /// Used during cold start to track special objects (nil, true, false, etc).
-    /// THROWS after Freeze() - only for cold start use.
+    /// THROWS after MakeImmutable() - only for cold start use.
     /// </summary>
     public static void Register(string name, SmalltalkOOP oop)
     {
-        if (_isFrozen)
-        {
-            throw new InvalidOperationException(
-                $"GlobalRegistry.Register() called after freeze. " +
-                $"Runtime code must access heap directly. Attempted to register: '{name}'");
-        }
+        ThrowIfDisposed();
+        ThrowIfImmutable("Register", name);
 
-        _globals[name] = oop;
+        _globals![name] = oop;
 
         // Update well-known properties
         switch (name)
@@ -73,10 +89,14 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Looks up a class object OOP by class name.
+    /// Allowed during cold start phases.
+    /// THROWS after Dispose() - runtime code must use VMMetadata class OOPs or query heap.
     /// </summary>
     public static SmalltalkOOP LookupClassOOP(string className)
     {
-        if (_globals.TryGetValue($"class:{className}", out var oop))
+        ThrowIfDisposed();
+
+        if (_globals!.TryGetValue($"class:{className}", out var oop))
             return oop;
 
         throw new KeyNotFoundException($"Class not found: {className}");
@@ -84,58 +104,60 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Registers a class object by name.
-    /// THROWS after Freeze() - only for cold start use.
+    /// THROWS after MakeImmutable() - only for cold start use.
     /// </summary>
     public static void RegisterClass(string className, SmalltalkOOP oop)
     {
-        if (_isFrozen)
-        {
-            throw new InvalidOperationException(
-                $"GlobalRegistry.RegisterClass() called after freeze. " +
-                $"Runtime code must access heap directly. Attempted to register: '{className}'");
-        }
+        ThrowIfDisposed();
+        ThrowIfImmutable("RegisterClass", className);
 
-        _globals[$"class:{className}"] = oop;
+        _globals![$"class:{className}"] = oop;
     }
 
     /// <summary>
     /// Gets a global object OOP by name.
+    /// Allowed during cold start phases.
+    /// THROWS after Dispose() - runtime code must use VMMetadata.KnownObjects or query heap.
     /// </summary>
     public static SmalltalkOOP Get(string name)
     {
-        return _globals[name];
+        ThrowIfDisposed();
+        return _globals![name];
     }
 
     /// <summary>
     /// Tries to get a global object OOP by name.
+    /// Allowed during cold start phases.
+    /// THROWS after Dispose() - runtime code must use VMMetadata.KnownObjects or query heap.
     /// </summary>
     public static bool TryGet(string name, out SmalltalkOOP oop)
     {
-        return _globals.TryGetValue(name, out oop);
+        ThrowIfDisposed();
+        return _globals!.TryGetValue(name, out oop);
     }
 
     /// <summary>
     /// Sets a generic object in the registry (for non-OOP data like maps, lists, etc.)
-    /// THROWS after Freeze() - only for cold start use.
+    /// THROWS after MakeImmutable() - only for cold start use.
     /// </summary>
     public static void Set(string name, object value)
     {
-        if (_isFrozen)
-        {
-            throw new InvalidOperationException(
-                $"GlobalRegistry.Set() called after freeze. " +
-                $"Runtime code must access heap directly. Attempted to set: '{name}'");
-        }
+        ThrowIfDisposed();
+        ThrowIfImmutable("Set", name);
 
-        _objects[name] = value;
+        _objects![name] = value;
     }
 
     /// <summary>
     /// Gets a generic object from the registry with type casting.
+    /// Allowed during cold start phases.
+    /// THROWS after Dispose() - runtime code must use VMMetadata or heap.
     /// </summary>
     public static T? GetObject<T>(string name) where T : class
     {
-        if (_objects.TryGetValue(name, out var obj))
+        ThrowIfDisposed();
+
+        if (_objects!.TryGetValue(name, out var obj))
         {
             return obj as T;
         }
@@ -144,10 +166,14 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Tries to get a generic object from the registry.
+    /// Allowed during cold start phases.
+    /// THROWS after Dispose() - runtime code must use VMMetadata or heap.
     /// </summary>
     public static bool TryGetObject<T>(string name, out T? value) where T : class
     {
-        if (_objects.TryGetValue(name, out var obj) && obj is T typed)
+        ThrowIfDisposed();
+
+        if (_objects!.TryGetValue(name, out var obj) && obj is T typed)
         {
             value = typed;
             return true;
@@ -158,10 +184,13 @@ public static class GlobalRegistry
 
     /// <summary>
     /// Returns all registered globals as an enumerable of key-value pairs.
+    /// Allowed during cold start phases.
+    /// THROWS after Dispose() - cold start structure not available at runtime.
     /// </summary>
     public static IEnumerable<KeyValuePair<string, SmalltalkOOP>> GetAll()
     {
-        return _globals;
+        ThrowIfDisposed();
+        return _globals!;
     }
 
     /// <summary>
@@ -169,12 +198,34 @@ public static class GlobalRegistry
     /// </summary>
     public static void Clear()
     {
-        _globals.Clear();
-        _objects.Clear();
+        _globals?.Clear();
+        _globals = new();
+        _objects?.Clear();
+        _objects = new();
         NilOOP = default;
         TrueOOP = default;
         FalseOOP = default;
         SystemDictionaryOOP = default;
-        _isFrozen = false;
+        _isImmutable = false;
+        _isDisposed = false;
+    }
+
+    private static void ThrowIfDisposed()
+    {
+        if (_isDisposed)
+        {
+            throw new ObjectDisposedException(nameof(GlobalRegistry),
+                "GlobalRegistry has been disposed. Runtime code must use VMMetadata.KnownObjects or query the Smalltalk heap directly.");
+        }
+    }
+
+    private static void ThrowIfImmutable(string operation, string name)
+    {
+        if (_isImmutable)
+        {
+            throw new InvalidOperationException(
+                $"GlobalRegistry.{operation}() called after MakeImmutable(). " +
+                $"Write operations only allowed during cold start. Attempted: '{name}'");
+        }
     }
 }

@@ -83,6 +83,12 @@ public class ColdStartOrchestrator : IColdStartLoader
     public SmalltalkOOP InitExpressionMethods { get; private set; }
 
     /// <summary>
+    /// Gets the VM metadata (available after Run() completes).
+    /// Built as the final step of cold start, before registries are disposed.
+    /// </summary>
+    public VMMetadata? VMMetadata { get; private set; }
+
+    /// <summary>
     /// Initializes a new instance of the ColdStartOrchestrator class.
     /// </summary>
     /// <param name="bundle">The cold start bundle containing the Smalltalk image data.</param>
@@ -145,9 +151,8 @@ public class ColdStartOrchestrator : IColdStartLoader
         RunPhase(phase1.Name, () =>
         {
             phase1.Run();
-
-            // Freeze symbol registry - no more symbol registration after this point
-            SymbolRegistry.Freeze();
+            // Phase 1 calls SymbolRegistry.MakeImmutable() - reads allowed, writes throw
+            // Dispose() is called after Phase 6 to block all access
         });
 
         // Phase 2: Class Infrastructure
@@ -211,8 +216,16 @@ public class ColdStartOrchestrator : IColdStartLoader
             phase6.Run();
         });
 
-            // Freeze global registry - no more registrations after this point
-            GlobalRegistry.Freeze();
+            // Make GlobalRegistry immutable (SymbolRegistry was made immutable in Phase 1,
+            // AssociationRegistry was made immutable in Phase 5)
+            GlobalRegistry.MakeImmutable();
+
+            // Build VM metadata as the final step - extracts needed OOPs from registries
+            VMMetadata = BuildVMMetadata();
+
+            // Dispose all cold start registries - no further access allowed
+            // This is the final barrier: runtime code cannot use cold start structures
+            DisposeRegistries();
 
             _diagnostics?.Emit(new DiagnosticMessageEvent
             {
@@ -294,12 +307,25 @@ public class ColdStartOrchestrator : IColdStartLoader
             SmallIntegerClassOOP = GlobalRegistry.Get("class:SmallInteger"),
             BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
             OrderedCollectionClassOOP = GlobalRegistry.Get("class:OrderedCollection"),
+            ProcessClassOOP = GlobalRegistry.Get("class:Process"),
             KnownObjects = knownObjects,
             ProcessorScheduler = processorSchedulerOOP,
             InitExpressionMethods = InitExpressionMethods
         };
 
         return metadata;
+    }
+
+    /// <summary>
+    /// Disposes all cold start registries, blocking further access.
+    /// MUST be called AFTER BuildVMMetadata() extracts the needed OOPs.
+    /// After this, all registry access throws ObjectDisposedException.
+    /// </summary>
+    public static void DisposeRegistries()
+    {
+        SymbolRegistry.Dispose();
+        GlobalRegistry.Dispose();
+        AssociationRegistry.Dispose();
     }
 
     /// <summary>

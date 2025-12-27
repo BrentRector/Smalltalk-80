@@ -62,4 +62,34 @@ public interface IRuntimeHeapAccessor
     /// <param name="fieldName">The field name to find.</param>
     /// <returns>The zero-based field index, or -1 if not found.</returns>
     int GetFieldIndex(SmalltalkOOP classOOP, string fieldName);
+
+    /// <summary>
+    /// Looks up a global variable following the canonical Smalltalk-80 lookup chain:
+    /// 1. Search SystemDictionary (Smalltalk)
+    /// 2. If not found, search Undeclared
+    /// 3. If found in Undeclared and migrate=true, move it to SystemDictionary
+    /// 4. If not found anywhere, return nil
+    /// </summary>
+    /// <param name="globalName">The global variable name to find.</param>
+    /// <param name="migrate">If true, migrate from Undeclared to SystemDictionary when found there.</param>
+    /// <returns>The Association OOP, or nil if not found.</returns>
+    SmalltalkOOP LookupGlobalAssociation(string globalName, bool migrate = false);
+
+    /// <summary>
+    /// Looks up a global variable's value following the canonical lookup chain.
+    /// Convenience wrapper around LookupGlobalAssociation that extracts the value.
+    /// </summary>
+    /// <param name="globalName">The global variable name to find.</param>
+    /// <returns>The value OOP, or nil if not found.</returns>
+    SmalltalkOOP LookupGlobalValue(string globalName);
+
+    /// <summary>
+    /// Sets a global variable's value, creating the Association if necessary.
+    /// Follows the canonical lookup chain: SystemDictionary → Undeclared → create new.
+    /// If found in Undeclared, migrates to SystemDictionary.
+    /// </summary>
+    /// <param name="globalName">The global variable name.</param>
+    /// <param name="valueOOP">The value to set.</param>
+    /// <returns>The Association OOP (existing or newly created).</returns>
+    SmalltalkOOP SetGlobalValue(string globalName, SmalltalkOOP valueOOP);
 }

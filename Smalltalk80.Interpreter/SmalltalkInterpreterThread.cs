@@ -37,11 +37,6 @@ public class SmalltalkInterpreterThread
         {
             Console.WriteLine("\n[Smalltalk Thread] Starting...");
 
-            // TESTING: Wait for UI thread to show window before executing init expressions
-            // This allows us to observe the window resize when DisplayScreen initialize runs
-            Console.WriteLine("[Smalltalk Thread] Waiting for window to be displayed...");
-            Thread.Sleep(1000);  // Wait 1 second for window to be fully shown
-
             // STEP 1: Create VM
             Console.WriteLine("[Smalltalk Thread] Creating virtual machine...");
             _vm = CreateVirtualMachine();
@@ -54,6 +49,16 @@ public class SmalltalkInterpreterThread
                 Console.WriteLine("[Smalltalk Thread] Event callbacks registered - signaling main thread");
                 _context.EventCallbacksReady.Set();
             });
+
+            // STEP 1.3: Wait for window to be displayed before proceeding
+            // This ensures graphics operations will work during init expressions
+            // Uses proper synchronization instead of Thread.Sleep
+            Console.WriteLine("[Smalltalk Thread] Waiting for window to be displayed...");
+            if (!_context.WindowDisplayed.Wait(TimeSpan.FromSeconds(10)))
+            {
+                throw new TimeoutException("Window was not displayed within 10 seconds");
+            }
+            Console.WriteLine("[Smalltalk Thread] Window displayed - proceeding");
 
             // STEP 1.5: Initialize ProcessorScheduler with high-priority bootstrap process
             // This ensures all init expressions run at priority 8, preventing preemption
@@ -91,7 +96,9 @@ public class SmalltalkInterpreterThread
         {
             Console.Error.WriteLine($"\n[Smalltalk Thread] Fatal error: {ex.Message}");
             Console.Error.WriteLine($"Stack trace:\n{ex.StackTrace}");
-            Environment.Exit(1);
+            // Re-throw to propagate to main thread, allowing proper cleanup
+            // instead of abruptly terminating with Environment.Exit(1)
+            throw;
         }
     }
 
@@ -114,288 +121,14 @@ public class SmalltalkInterpreterThread
 
     private void ExecuteInitExpressions()
     {
-        if (_context.Bundle.InitExpressions.Length == 0)
-        {
-            Console.WriteLine("  No init expressions found");
-            return;
-        }
-
-        Console.WriteLine("\n=== Init Expression Execution ===");
-
-        var executor = new InitExpressionExecutor(
+        var runner = new InitExpressionRunner(
             _context.HeapManager,
             _vm!,
             _context.VMMetadata,
             _context.Diagnostics,
-            InitPolicy.ContinueAndCollect,
-            defaultTimeoutMs: 5000
+            _context.Bundle.InitExpressions
         );
-
-        // Essential init expressions (always run, even with --skip-init-expressions)
-        var essentialList = new HashSet<string>
-        {
-            "Character initialize",
-            "SmallInteger initialize",
-            "Float initialize",
-            "InputSensor initialize",
-            "InputSensor install",
-            "InputSensor initSensor",
-            "BlockContextTest validate",
-        };
-
-        // Skip list (requires features not yet implemented)
-        var skipList = new HashSet<string>
-        {
-            // FormMenuView initialize now enabled - file I/O primitives implemented
-        };
-
-        // Build phase lists using explicit ordering from InitExpressionOrdering
-        var phase1Indices = new List<int>();
-        var skippedIndices = new List<(int index, string reason)>();
-
-        // Build source-to-index map for the bundle
-        var sourceToIndex = new Dictionary<string, int>();
-        for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
-        {
-            var source = _context.Bundle.InitExpressions[i].Source;
-            if (source != null)
-            {
-                sourceToIndex[source] = i;
-            }
-        }
-
-        // Execute all init expressions in explicit order
-        foreach (var source in InitExpressionOrdering.GetExecutionOrder())
-        {
-            if (sourceToIndex.TryGetValue(source, out int idx))
-            {
-                // Check skip list
-                if (skipList.Contains(source) && !essentialList.Contains(source))
-                {
-                    skippedIndices.Add((idx, "Requires features not yet available"));
-                }
-                else
-                {
-                    phase1Indices.Add(idx);
-                }
-            }
-        }
-
-        // Build comment expression list: ClassName comment: 'text' expressions
-        // Comment expressions disabled for now
-        var commentIndices = new List<int>();
-        // for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
-        // {
-        //     var expr = _context.Bundle.InitExpressions[i];
-        //     if (expr.Source == null) continue;
-        //
-        //     // Include comment: expressions (e.g., "ClassName comment:'text'")
-        //     if (expr.Source.Contains(" comment:"))
-        //     {
-        //         commentIndices.Add(i);
-        //     }
-        // }
-
-        // Build phase 2 list: Test expressions (run AFTER init expressions)
-        // Test expressions disabled for now
-        var phase2Indices = new List<int>();
-        // for (int i = 0; i < _context.Bundle.InitExpressions.Length; i++)
-        // {
-        //     var expr = _context.Bundle.InitExpressions[i];
-        //     if (expr.Source == null) continue;
-        //
-        //     // Include GraphicsTest method calls (FloatTest removed - no longer needed)
-        //     if (expr.Source.StartsWith("GraphicsTest "))
-        //     {
-        //         phase2Indices.Add(i);
-        //     }
-        // }
-
-        // Get pre-compiled init expression methods from Phase 4
-        var initMethodsOOP = _context.VMMetadata.InitExpressionMethods;
-        if (initMethodsOOP == _context.HeapManager.GetNil())
-        {
-            throw new InvalidOperationException("InitExpressionMethods array not found - Phase 4 must complete first");
-        }
-
-        int succeeded = 0;
-        int failed = 0;
-
-        // PHASE 1: Execute init expressions
-        Console.WriteLine("\n--- Phase 1: Initialize expressions ---");
-        foreach (int index in phase1Indices)
-        {
-            var expr = _context.Bundle.InitExpressions[index];
-
-            // Get pre-compiled method from Phase 4 array
-            var methodOOP = _context.HeapManager.GetIndexedOOP(initMethodsOOP, index);
-
-            Console.Write($"  {expr.Source}... ");
-
-            var initId = expr.Source ?? $"init[{index}]";
-            var result = executor.ExecuteInitExpression(initId, methodOOP);
-
-            Console.WriteLine($"✓ {result.ElapsedMilliseconds}ms");
-
-            if (result.Status == InitStatus.Success)
-            {
-                succeeded++;
-
-                // Display return value for test runners and diagnostic tests
-                if (expr.Source != null && result.ReturnValueOop?.IsSmallInteger == true)
-                {
-                    var returnOOP = result.ReturnValueOop.Value;
-                    int testResult = returnOOP.AsSmallInteger();
-
-                    // Show results for Diag* tests (individual variable tests)
-                    if (expr.Source.StartsWith("Diag"))
-                    {
-                        Console.WriteLine($"    Returned: {testResult}");
-                    }
-                    // Show results for test runners
-                    else if (expr.Source.Contains("TestRunner"))
-                    {
-                        Console.WriteLine($"\n  ✓✓✓ TEST RESULT: {testResult} ✓✓✓");
-
-                        // BlockContextTestRunner: 120 tests × 9 + 111 = 1191
-                        if (expr.Source.Contains("BlockContextTestRunner") && testResult == 1191)
-                        {
-                            Console.WriteLine($"  ✓✓✓ ALL 120 BLOCK CONTEXT TESTS PASSED ✓✓✓\n");
-                        }
-                    }
-                }
-            }
-            else
-            {
-                failed++;
-                Console.WriteLine($"    ❌ Failed: {expr.Source}");
-                Console.WriteLine($"       Status: {result.Status}");
-                if (result.Diagnostic?.Message != null)
-                {
-                    Console.WriteLine($"       Error: {result.Diagnostic.Message}");
-                }
-            }
-        }
-
-        // Execute comment expressions (ClassName comment: 'text') - show abbreviated progress
-        if (commentIndices.Count > 0)
-        {
-            Console.WriteLine($"\n--- Comment expressions ({commentIndices.Count} total) ---");
-            int commentSucceeded = 0;
-            int commentFailed = 0;
-            long totalCommentTimeMs = 0;
-            foreach (int index in commentIndices)
-            {
-                var expr = _context.Bundle.InitExpressions[index];
-
-                // Extract class name from "ClassName comment: 'text'"
-                var className = expr.Source?.Split(' ')[0] ?? "Unknown";
-                Console.Write($"  {className} comment: ... ");
-
-                // Get pre-compiled method from Phase 4 array
-                var methodOOP = _context.HeapManager.GetIndexedOOP(initMethodsOOP, index);
-                var initId = expr.Source ?? $"init[{index}]";
-                var result = executor.ExecuteInitExpression(initId, methodOOP);
-                totalCommentTimeMs += result.ElapsedMilliseconds;
-
-                if (result.Status == InitStatus.Success)
-                {
-                    Console.WriteLine($"✓ {result.ElapsedMilliseconds}ms");
-                    commentSucceeded++;
-                    succeeded++;
-                }
-                else
-                {
-                    Console.WriteLine($"❌ {result.ElapsedMilliseconds}ms");
-                    commentFailed++;
-                    failed++;
-                }
-            }
-            Console.WriteLine($"  Comment expressions: {commentSucceeded}/{commentIndices.Count} succeeded in {totalCommentTimeMs / 1000.0:F1}s total");
-        }
-
-        // Run GC after all initialization to show stats
-        Console.WriteLine($"\n=== Running GC after all initialization ===");
-        var gcRoots = _context.HeapManager.GC.GetGCRoots();
-        Console.WriteLine($"  GC Roots: {gcRoots.Length}");
-        var gcStats = _context.HeapManager.GC.GarbageCollect();
-        Console.WriteLine($"  {gcStats.GetSummary()}");
-        if (gcStats.CollectedObjects > 0 && gcStats.CollectedObjects <= 20)
-        {
-            Console.WriteLine($"  Collected objects by class:");
-            foreach (var (oop, format, size, className) in gcStats.CollectedObjectDetails.Take(20))
-            {
-                Console.WriteLine($"    OOP({oop}): {className} ({format}, {size} words)");
-            }
-        }
-
-        // Display cumulative GC statistics and reset for next phase
-        var cumulativeStats = _context.HeapManager.GC.GetAndResetCumulativeStatistics();
-        Console.WriteLine($"  {cumulativeStats.GetSummary()}");
-
-        // File primitive diagnostics (disabled - enable for performance debugging)
-        // FilePrimitiveDiagnostics.PrintReport();
-
-        // PHASE 2: Execute Test expressions (GraphicsTest, etc.)
-        if (phase2Indices.Count > 0)
-        {
-            Console.WriteLine($"\n--- Phase 2: Test expressions ---");
-            bool isFirstTest = true;
-            foreach (int index in phase2Indices)
-            {
-                var expr = _context.Bundle.InitExpressions[index];
-
-                // Add 5-second delay between graphics tests to allow viewing each result
-                if (!isFirstTest)
-                {
-                    Console.WriteLine("  [Waiting 5 seconds before next test...]");
-                    Thread.Sleep(5000);
-                }
-                isFirstTest = false;
-
-                // Get pre-compiled method from Phase 4 array
-                var methodOOP = _context.HeapManager.GetIndexedOOP(initMethodsOOP, index);
-                var initId = expr.Source ?? $"init[{index}]";
-                var result = executor.ExecuteInitExpression(initId, methodOOP);
-
-                if (result.Status == InitStatus.Success)
-                {
-                    succeeded++;
-                }
-                else
-                {
-                    failed++;
-                    Console.WriteLine($"    ❌ Failed: {expr.Source}");
-                    Console.WriteLine($"       Status: {result.Status}");
-                    if (result.Diagnostic?.Message != null)
-                    {
-                        Console.WriteLine($"       Error: {result.Diagnostic.Message}");
-                    }
-                }
-            }
-        }
-
-        // Report skipped expressions
-        if (skippedIndices.Count > 0)
-        {
-            Console.WriteLine($"\n  Skipped {skippedIndices.Count} expressions:");
-            foreach (var (index, reason) in skippedIndices.Take(5))
-            {
-                var expr = _context.Bundle.InitExpressions[index];
-                Console.WriteLine($"    - {expr.Source}: {reason}");
-            }
-            if (skippedIndices.Count > 5)
-            {
-                Console.WriteLine($"    ... and {skippedIndices.Count - 5} more");
-            }
-        }
-
-        Console.WriteLine($"\n=== Init Expression Execution Complete ===");
-        Console.WriteLine($"  {succeeded} succeeded, {failed} failed, {skippedIndices.Count} skipped");
-        if (phase2Indices.Count > 0)
-        {
-            Console.WriteLine($"  Phase 1: {phase1Indices.Count} init expressions, Phase 2: {phase2Indices.Count} test expressions");
-        }
+        runner.Execute();
     }
 
     private void ExecuteUserExpression()
@@ -480,89 +213,16 @@ public class SmalltalkInterpreterThread
 
     /// <summary>
     /// Looks up a global variable in the Smalltalk dictionary at runtime.
-    /// This is the runtime-safe way to access globals (not using GlobalRegistry).
+    /// Uses the canonical Smalltalk-80 lookup chain: SystemDictionary → Undeclared.
     /// </summary>
     private SmalltalkOOP LookupGlobal(string globalName)
     {
-        // Get Smalltalk global dictionary from VMMetadata (runtime-safe)
-        var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
-
-        // Search for the global by name
-        int size = _context.HeapManager.GetIndexedSize(smalltalkOOP);
-
-        // Find the symbol OOP for the global name
-        var symbolOOP = FindSymbol(globalName);
-        if (symbolOOP == _context.HeapManager.GetNil())
+        var valueOOP = _vm!.RuntimeHeapAccess.LookupGlobalValue(globalName);
+        if (valueOOP == _context.HeapManager.GetNil())
         {
-            throw new InvalidOperationException($"Global '{globalName}' not found - symbol does not exist");
+            throw new InvalidOperationException($"Global '{globalName}' not found");
         }
-
-        // Search dictionary for association with this key
-        for (int i = 0; i < size; i++)
-        {
-            var assocOOP = _context.HeapManager.GetIndexedOOP(smalltalkOOP, i);
-            if (assocOOP == _context.HeapManager.GetNil())
-                continue;
-
-            // Association has key at instance variable 0
-            var keyOOP = _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            if (keyOOP == symbolOOP)
-            {
-                // Return value at instance variable 1
-                return _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-            }
-        }
-
-        throw new InvalidOperationException($"Global '{globalName}' not found in Smalltalk dictionary");
-    }
-
-    /// <summary>
-    /// Finds a symbol OOP by searching through Smalltalk dictionary keys at runtime.
-    /// This finds symbols used as global names (classes, global variables).
-    /// Runtime-safe: only accesses heap via ISmalltalkHeap interface.
-    /// </summary>
-    private SmalltalkOOP FindSymbol(string symbolText)
-    {
-        var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
-        int size = _context.HeapManager.GetIndexedSize(smalltalkOOP);
-
-        // Linear search through all associations in the Smalltalk dictionary
-        for (int i = 0; i < size; i++)
-        {
-            var assocOOP = _context.HeapManager.GetIndexedOOP(smalltalkOOP, i);
-            if (assocOOP == _context.HeapManager.GetNil())
-                continue;
-
-            // Get key (Symbol) from the association
-            var keyOOP = _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            if (keyOOP == _context.HeapManager.GetNil())
-                continue;
-
-            // Check if this Symbol matches the text we're looking for
-            var keyString = ExtractSymbolString(keyOOP);
-            if (keyString == symbolText)
-            {
-                return keyOOP;
-            }
-        }
-
-        return _context.HeapManager.GetNil();
-    }
-
-    /// <summary>
-    /// Extracts the string value from a Symbol OOP.
-    /// </summary>
-    private string ExtractSymbolString(SmalltalkOOP symbolOOP)
-    {
-        int size = _context.HeapManager.GetIndexedSize(symbolOOP);
-        var bytes = new byte[size];
-
-        for (int i = 0; i < size; i++)
-        {
-            bytes[i] = _context.HeapManager.GetIndexedByte(symbolOOP, i);
-        }
-
-        return System.Text.Encoding.UTF8.GetString(bytes);
+        return valueOOP;
     }
 
     private string GetClassName(SmalltalkOOP classOOP)
@@ -649,211 +309,23 @@ public class SmalltalkInterpreterThread
     }
 
     /// <summary>
-    /// Installs ScheduledControllers global using the canonical Association from cold start.
-    /// This follows the same pattern as SystemDictionaryInstaller:
-    /// 1. Get canonical Association from AssociationRegistry
-    /// 2. Set its value to the ControlManager instance
-    /// 3. Install in SystemDictionary using hash-based insertion
+    /// Installs ScheduledControllers global at runtime.
+    /// Uses the canonical Smalltalk-80 lookup chain: SystemDictionary → Undeclared → create new.
+    /// The canonical Association was created during cold start and installed in SystemDictionary.
+    /// Method literals point to this same Association object.
     /// </summary>
     private void InstallScheduledControllersGlobal(SmalltalkOOP controlManagerOOP)
     {
         const string globalName = "ScheduledControllers";
-        var heap = _context.HeapManager;
 
-        // Get canonical Association from AssociationRegistry (created during method compilation)
-        var allAssociations = AssociationRegistry.GetAll();
-        if (!allAssociations.TryGetValue(globalName, out var associationOOP))
-        {
-            throw new InvalidOperationException(
-                $"Canonical Association for '{globalName}' not found in AssociationRegistry. " +
-                "This symbol should have been registered during method compilation.");
-        }
-
-        // Console.WriteLine($"      Found canonical Association: {associationOOP}");
-
-        // Set the Association's value to the ControlManager instance
-        heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, controlManagerOOP);
-
-        // Get the key symbol from the Association for hash calculation
-        var keySymbolOOP = heap.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-
-        // Install in SystemDictionary using hash-based insertion
-        var systemDictOOP = _context.VMMetadata.KnownObjects.Smalltalk;
-        InstallAssociationInDictionary(systemDictOOP, associationOOP, keySymbolOOP, globalName);
-
-        // Remove from Undeclared dictionary (proper migration)
-        if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
-        {
-            RemoveFromDictionary(undeclaredOOP, keySymbolOOP, globalName);
-        }
+        // Use the canonical global lookup and set API
+        // This handles: SystemDictionary lookup → Undeclared fallback → migration → creation
+        _vm!.RuntimeHeapAccess.SetGlobalValue(globalName, controlManagerOOP);
+        Console.WriteLine($"    ✓ Installed {globalName} global with ControlManager");
     }
 
-    /// <summary>
-    /// Installs an Association in a dictionary using hash-based slot finding.
-    /// Runtime version of DictionaryOperations.InstallAssociation.
-    /// </summary>
-    private void InstallAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP,
-        SmalltalkOOP keySymbolOOP, string keyName)
-    {
-        var heap = _context.HeapManager;
-        int dictSize = heap.GetIndexedSize(dictionaryOOP);
-        var nilOOP = heap.GetNil();
-
-        // Use identity hash for symbol lookup
-        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
-
-        // Probe for nil slot or matching key (linear probing)
-        int startLocation = location;
-        bool incrementTally = true;
-
-        while (true)
-        {
-            var probe = heap.GetIndexedOOP(dictionaryOOP, location);
-
-            if (probe == nilOOP)
-            {
-                // Found empty slot - install association
-                heap.SetIndexedOOP(dictionaryOOP, location, associationOOP);
-
-                // Increment tally
-                if (incrementTally)
-                {
-                    var currentTallyOOP = heap.GetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX);
-                    if (currentTallyOOP.IsSmallInteger)
-                    {
-                        int newTally = currentTallyOOP.AsSmallInteger() + 1;
-                        heap.SetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(newTally));
-                    }
-                }
-
-                return;
-            }
-
-            // Check if Association with same key already exists
-            var probeKeyOOP = heap.GetInstanceVariable(probe, 0);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                // Replace existing
-                heap.SetIndexedOOP(dictionaryOOP, location, associationOOP);
-                return;
-            }
-
-            // Linear probe
-            location = (location + 1) % dictSize;
-
-            if (location == startLocation)
-            {
-                throw new InvalidOperationException(
-                    $"Dictionary is full - cannot install '{keyName}' association");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Removes an Association from a dictionary (for Undeclared cleanup).
-    /// Runtime version of DictionaryOperations.RemoveAssociation.
-    /// </summary>
-    private void RemoveFromDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbolOOP, string keyName)
-    {
-        var heap = _context.HeapManager;
-        var nilOOP = heap.GetNil();
-        int dictSize = heap.GetIndexedSize(dictionaryOOP);
-
-        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
-        int startLocation = location;
-
-        while (true)
-        {
-            var probe = heap.GetIndexedOOP(dictionaryOOP, location);
-
-            if (probe == nilOOP)
-            {
-                // Not found
-                return;
-            }
-
-            var probeKeyOOP = heap.GetInstanceVariable(probe, 0);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                // Found - remove
-                heap.SetIndexedOOP(dictionaryOOP, location, nilOOP);
-
-                // Decrement tally
-                var tallyOOP = heap.GetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX);
-                if (tallyOOP.IsSmallInteger)
-                {
-                    int tally = tallyOOP.AsSmallInteger();
-                    heap.SetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(tally - 1));
-                }
-
-                // Fix probe chain
-                FixCollisionsFrom(dictionaryOOP, location);
-                return;
-            }
-
-            location = (location + 1) % dictSize;
-
-            if (location == startLocation)
-            {
-                return; // Not found after full scan
-            }
-        }
-    }
-
-    /// <summary>
-    /// Repairs the linear probing chain after removing an entry.
-    /// Runtime version of DictionaryOperations.FixCollisionsFrom.
-    /// </summary>
-    private void FixCollisionsFrom(SmalltalkOOP dictionaryOOP, int startIndex)
-    {
-        var heap = _context.HeapManager;
-        var nilOOP = heap.GetNil();
-        int dictSize = heap.GetIndexedSize(dictionaryOOP);
-        int oldIndex = startIndex;
-
-        while (true)
-        {
-            oldIndex = (oldIndex + 1) % dictSize;
-            var nextObject = heap.GetIndexedOOP(dictionaryOOP, oldIndex);
-
-            if (nextObject == nilOOP)
-                break;
-
-            // Find where this Association SHOULD be
-            var keyOOP = heap.GetInstanceVariable(nextObject, 0);
-            int nextIndex = IdentityHashUtility.ComputeHashIndex(keyOOP, dictSize);
-
-            // Linear probe to find correct slot
-            int probeCount = 0;
-            while (true)
-            {
-                var probe = heap.GetIndexedOOP(dictionaryOOP, nextIndex);
-
-                if (probe == nilOOP || probe == nextObject)
-                    break;
-
-                var probeKeyOOP = heap.GetInstanceVariable(probe, 0);
-                if (probeKeyOOP == keyOOP)
-                    break;
-
-                nextIndex = (nextIndex + 1) % dictSize;
-                probeCount++;
-
-                if (probeCount >= dictSize)
-                {
-                    throw new InvalidOperationException(
-                        "FixCollisionsFrom: Cannot find slot for Association during rehash");
-                }
-            }
-
-            // Move if displaced
-            if (nextIndex != oldIndex)
-            {
-                heap.SetIndexedOOP(dictionaryOOP, nextIndex, nextObject);
-                heap.SetIndexedOOP(dictionaryOOP, oldIndex, nilOOP);
-            }
-        }
-    }
+    // NOTE: Dictionary operations are now in RuntimeDictionaryService
+    // Use _vm.RuntimeHeapAccess for canonical global lookup operations
 
     /// <summary>
     /// Dumps Float class variables to verify they have initialized values (NOT nil).
@@ -865,25 +337,16 @@ public class SmalltalkInterpreterThread
         try
         {
             var heap = _context.HeapManager;
-            var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
 
-            // Find Float class in Smalltalk dictionary
-            var floatSymbol = FindSymbol("Float");
-            if (floatSymbol == heap.GetNil())
+            // Find Float class using runtime heap access
+            var floatClassOOP = _vm!.RuntimeHeapAccess.GetClass("Float");
+            if (floatClassOOP == heap.GetNil())
             {
-                Console.WriteLine("  ERROR: 'Float' symbol not found!");
+                Console.WriteLine("  ERROR: Float class not found!");
                 return;
             }
 
-            var floatAssoc = FindAssociationInDictionary(smalltalkOOP, floatSymbol);
-            if (floatAssoc == heap.GetNil())
-            {
-                Console.WriteLine("  ERROR: Float Association not found in Smalltalk!");
-                return;
-            }
-
-            var floatClassOOP = heap.GetInstanceVariable(floatAssoc, VMConstants.ASSOCIATION_VALUE_INDEX);
-            var classPoolOOP = heap.GetInstanceVariable(floatClassOOP, 7); // classPool is instance var 7 in Class (NOT 3!)
+            var classPoolOOP = heap.GetInstanceVariable(floatClassOOP, VMConstants.CLASS_CLASSPOOL_INDEX);
             int poolSize = heap.GetIndexedSize(classPoolOOP);
 
             Console.WriteLine($"  Float classPool size: {poolSize}");
@@ -900,8 +363,7 @@ public class SmalltalkInterpreterThread
                     var keyOOP = heap.GetInstanceVariable(entry, VMConstants.ASSOCIATION_KEY_INDEX);
                     var valueOOP = heap.GetInstanceVariable(entry, VMConstants.ASSOCIATION_VALUE_INDEX);
 
-                    // Try to get key as string (it's a Symbol) - extract bytes manually
-                    string keyStr = GetSymbolString(keyOOP);
+                    string keyStr = heap.GetClassName(keyOOP); // Symbols have their text as "class name"
                     string valueStr = valueOOP == heap.GetNil() ? "nil" :
                                       valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" :
                                       $"Object({valueOOP})";
@@ -915,61 +377,6 @@ public class SmalltalkInterpreterThread
         catch (Exception ex)
         {
             Console.WriteLine($"  ERROR during diagnostic: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Finds an Association in a dictionary using hash-based probing.
-    /// Returns the Association OOP if found, or nil if not found.
-    /// </summary>
-    private string GetSymbolString(SmalltalkOOP symbolOOP)
-    {
-        var heap = _context.HeapManager;
-        int size = heap.GetIndexedSize(symbolOOP);
-        var bytes = new byte[size];
-        for (int i = 0; i < size; i++)
-        {
-            bytes[i] = heap.GetIndexedByte(symbolOOP, i);
-        }
-        return System.Text.Encoding.Latin1.GetString(bytes);
-    }
-
-    private SmalltalkOOP FindAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbolOOP)
-    {
-        var heap = _context.HeapManager;
-        var nilOOP = heap.GetNil();
-        int dictSize = heap.GetIndexedSize(dictionaryOOP);
-
-        // Use identity hash for symbol lookup
-        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
-        int startLocation = location;
-
-        while (true)
-        {
-            var probe = heap.GetIndexedOOP(dictionaryOOP, location);
-
-            if (probe == nilOOP)
-            {
-                // Not found - reached empty slot
-                return nilOOP;
-            }
-
-            // Check if this Association's key matches
-            var probeKeyOOP = heap.GetInstanceVariable(probe, VMConstants.ASSOCIATION_KEY_INDEX);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                // Found - return the Association
-                return probe;
-            }
-
-            // Linear probe to next slot
-            location = (location + 1) % dictSize;
-
-            if (location == startLocation)
-            {
-                // Wrapped around - not found
-                return nilOOP;
-            }
         }
     }
 
@@ -1027,9 +434,9 @@ public class SmalltalkInterpreterThread
             if (instVarCount == 2 && indexedSize == 0)
             {
                 // Likely an Association
-                var keyOOP = heap.GetInstanceVariable(oop, 0);
-                var valueOOP = heap.GetInstanceVariable(oop, 1);
-                string keyStr = GetSymbolString(keyOOP);
+                var keyOOP = heap.GetInstanceVariable(oop, VMConstants.ASSOCIATION_KEY_INDEX);
+                var valueOOP = heap.GetInstanceVariable(oop, VMConstants.ASSOCIATION_VALUE_INDEX);
+                string keyStr = heap.GetClassName(keyOOP); // Use heap method for symbol string
                 string valueStr = valueOOP == heap.GetNil() ? "nil" : valueOOP.ToString();
                 return $"Association(key: '{keyStr}', value: {valueStr}) OOP={oop}";
             }
