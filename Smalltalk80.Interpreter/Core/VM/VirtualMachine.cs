@@ -1127,15 +1127,88 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
 
     /// <summary>
-    /// Gets the local ID for an object (used for blockOwnerMap lookup).
-    /// Uses the reverse mapping built during cold start and stored in VMMetadata.
+    /// Gets a human-readable identifier for a method OOP by looking up its class and selector.
+    /// Computes this at runtime from the heap, handling both cold-start and runtime-created methods.
+    /// Returns "method:ClassName>>selector" format, or null if not found.
     /// </summary>
-    private string? GetLocalId(SmalltalkOOP objectOOP)
+    private string? GetLocalId(SmalltalkOOP methodOOP)
     {
-        if (_metadata.ObjectIdToLocalId?.TryGetValue(objectOOP, out string? localId) == true)
+        // For non-method objects or nil, return null
+        if (methodOOP == _heapManager.GetNil() || methodOOP.IsSmallInteger)
+            return null;
+
+        // Check if it's a CompiledMethod
+        var classOOP = _heapManager.GetClassOOP(methodOOP);
+        if (classOOP != _metadata.CompiledMethodClassOOP)
+            return null;
+
+        // Walk SystemDictionary to find which class owns this method
+        var systemDictOOP = _metadata.KnownObjects.Smalltalk;
+        int dictSize = _heapManager.GetIndexedSize(systemDictOOP);
+        var nilOOP = _heapManager.GetNil();
+
+        for (int i = 0; i < dictSize; i++)
         {
-            return localId;
+            var assocOOP = _heapManager.GetIndexedOOP(systemDictOOP, i);
+            if (assocOOP == nilOOP) continue;
+
+            var valueOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+            if (valueOOP == nilOOP || valueOOP.IsSmallInteger) continue;
+
+            // Check if this is a class (has methodDict)
+            var result = FindMethodInClass(valueOOP, methodOOP);
+            if (result != null) return result;
+
+            // Also check the metaclass
+            var metaclassOOP = _heapManager.GetClassOOP(valueOOP);
+            result = FindMethodInClass(metaclassOOP, methodOOP);
+            if (result != null) return result;
         }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Checks if a class's methodDict contains the given method, returning "method:ClassName>>selector" if found.
+    /// </summary>
+    private string? FindMethodInClass(SmalltalkOOP classOOP, SmalltalkOOP targetMethodOOP)
+    {
+        try
+        {
+            var nilOOP = _heapManager.GetNil();
+
+            // Get methodDict from class
+            var methodDictOOP = _heapManager.GetInstanceVariable(classOOP, _metadata.ClassMethodDictFieldIndex);
+            if (methodDictOOP == nilOOP || methodDictOOP.IsSmallInteger)
+                return null;
+
+            // Get keys and values arrays from MethodDictionary
+            var keysOOP = _heapManager.GetInstanceVariable(methodDictOOP, _metadata.MethodDictKeysFieldIndex);
+            var valuesOOP = _heapManager.GetInstanceVariable(methodDictOOP, _metadata.MethodDictValuesFieldIndex);
+            if (keysOOP == nilOOP || valuesOOP == nilOOP)
+                return null;
+
+            int keysSize = _heapManager.GetIndexedSize(keysOOP);
+            int valuesSize = _heapManager.GetIndexedSize(valuesOOP);
+
+            for (int j = 0; j < keysSize && j < valuesSize; j++)
+            {
+                var valueOOP = _heapManager.GetIndexedOOP(valuesOOP, j);
+                if (valueOOP == targetMethodOOP)
+                {
+                    // Found it - get the selector
+                    var selectorOOP = _heapManager.GetIndexedOOP(keysOOP, j);
+                    string selector = _heapManager.ReadSymbolString(selectorOOP);
+                    string className = _heapManager.GetClassName(classOOP);
+                    return $"method:{className}>>{selector}";
+                }
+            }
+        }
+        catch
+        {
+            // Not a valid class structure, skip
+        }
+
         return null;
     }
 

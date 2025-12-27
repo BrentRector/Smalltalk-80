@@ -206,9 +206,6 @@ public class Phase4_MethodCompilation : IPhase
         // Store blockOwnerMap in GlobalRegistry for runtime access
         GlobalRegistry.Set("blockOwnerMap", blockOwnerMap);
 
-        // Build reverse mapping for runtime access: objectId -> localId
-        var objectIdToLocalId = new Dictionary<SmalltalkOOP, string>();
-
         // Method dictionaries should already exist from Phase6 object allocation
         // Phase8 creates CompiledMethod objects in TWO PASSES to handle block references
 
@@ -228,7 +225,6 @@ public class Phase4_MethodCompilation : IPhase
             var methodOOP = CreateCompiledMethod(method, placeholderLiterals, bytecodes, compiledMethodClassOOP, byteArrayClassOOP);
 
             _localIdToObjectId[method.LocalId] = methodOOP;
-            objectIdToLocalId[methodOOP] = method.LocalId;
             methodsCreated++;
 
             // Emit typed event for detail listeners
@@ -274,9 +270,6 @@ public class Phase4_MethodCompilation : IPhase
                 }
             }
         }
-
-        // Store the reverse mapping in GlobalRegistry for runtime access
-        GlobalRegistry.Set("objectIdToLocalId", objectIdToLocalId);
 
         // VALIDATION PASS: Verify Association canonicalization
         ValidateAssociationCanonicalization();
