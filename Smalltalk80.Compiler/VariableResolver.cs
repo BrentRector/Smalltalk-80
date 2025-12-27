@@ -330,7 +330,7 @@ namespace Smalltalk80.Compiler
             HashSet<string> wellKnownGlobals =
             [
                 "Smalltalk", "Processor", "Display", "Transcript",
-                "Sensor", "ScheduledControllers", "Undeclared"
+                "Sensor", "ScheduledControllers", "Undeclared", "Disk"
             ];
             
             if (wellKnownGlobals.Contains(varName))
