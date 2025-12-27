@@ -14,7 +14,7 @@ Write-Host "=== Compiling Smalltalk source with test files ===" -ForegroundColor
 
 Push-Location $sourceDir
 try {
-    dotnet run --project $compilerProj -- Smalltalk-80.st Tests/BlockContextTest.st Tests/BlockContextTestRunner.st
+    dotnet run --project $compilerProj -- Smalltalk-80.st BlockContextTest.st Tests/BlockContextTestRunner.st
     if ($LASTEXITCODE -ne 0) {
         throw "Compiler failed with exit code $LASTEXITCODE"
     }
