@@ -69,17 +69,16 @@ testBlockParameter
         var source = WrapInTestClass(@"
 testMultipleBlockParams
     ^[:x :y | x + y] value: 3 value: 4");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // Block with two parameters
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
-        
-        // Should send value:value: message
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "value:value:"), Is.True);
+
+        // Should send value:value: message (not a special selector, so in literals)
+        Assert.That(LiteralContainsSymbol(json, method, "value:value:"), Is.True, "Should have value:value: in literals");
     }
     
     [Test]
@@ -197,16 +196,16 @@ testBlockValueWith
     | block |
     block := [:x :y | x + y].
     ^block value: 3 value: 4");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // Store block, push args, send value:value:
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
-        
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "value:value:"), Is.True);
+
+        // value:value: is not a special selector, so it should be in literals
+        Assert.That(LiteralContainsSymbol(json, method, "value:value:"), Is.True, "Should have value:value: in literals");
     }
     
     [Test]
@@ -215,16 +214,16 @@ testBlockValueWith
         var source = WrapInTestClass(@"
 testBlockInCollection
     ^#(1 2 3) collect: [:each | each * 2]");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // Block passed to collect:
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Select(t => (int)t).Contains(200), Is.True, "Should contain blockCopy: send");
-        
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "collect:"), Is.True);
+
+        // collect: is not a special selector, so it should be in literals
+        Assert.That(LiteralContainsSymbol(json, method, "collect:"), Is.True, "Should have collect: in literals");
     }
     
     [Test]

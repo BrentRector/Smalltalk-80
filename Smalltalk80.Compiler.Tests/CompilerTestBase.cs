@@ -182,15 +182,58 @@ Object subclass: #{className}
     /// </summary>
     protected void AssertBytecodeAt(JArray bytecodes, int index, int expected, string description = "")
     {
-        Assert.That(bytecodes.Count, Is.GreaterThan(index), 
+        Assert.That(bytecodes.Count, Is.GreaterThan(index),
             $"Bytecode array too short, expected at least {index + 1} bytes");
-        
+
         var actual = (int)bytecodes[index];
-        var message = string.IsNullOrEmpty(description) 
-            ? $"Bytecode at index {index}" 
+        var message = string.IsNullOrEmpty(description)
+            ? $"Bytecode at index {index}"
             : $"Bytecode at index {index} ({description})";
-            
-        Assert.That(actual, Is.EqualTo(expected), 
+
+        Assert.That(actual, Is.EqualTo(expected),
             $"{message}: expected {expected} but got {actual}");
+    }
+
+    /// <summary>
+    /// Checks if a symbol with the given name exists in the method's literals.
+    /// Symbols in literals are stored as {type: "symbol", index: N} where N points to the symbols array.
+    /// </summary>
+    protected bool LiteralContainsSymbol(JObject json, JObject method, string symbolName)
+    {
+        var symbols = (JArray)json["symbols"]!;
+        var literals = method["literals"] as JArray;
+
+        if (literals == null) return false;
+
+        foreach (var literal in literals)
+        {
+            if (literal["type"]?.ToString() == "symbol")
+            {
+                var index = literal["index"]?.Value<int>() ?? -1;
+                if (index >= 0 && index < symbols.Count)
+                {
+                    if (symbols[index]?.ToString() == symbolName)
+                        return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the selector name for a method from the selectorIndex and symbols array.
+    /// </summary>
+    protected string? GetMethodSelector(JObject json, JObject method)
+    {
+        var symbols = (JArray)json["symbols"]!;
+        var selectorIndex = method["selectorIndex"]?.Value<int>() ?? -1;
+
+        if (selectorIndex >= 0 && selectorIndex < symbols.Count)
+        {
+            return symbols[selectorIndex]?.ToString();
+        }
+
+        return null;
     }
 }

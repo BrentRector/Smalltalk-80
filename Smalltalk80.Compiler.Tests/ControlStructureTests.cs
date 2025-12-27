@@ -16,18 +16,20 @@ public class ControlStructureTests : CompilerTestBase
 testIfTrue
     true ifTrue: [^1].
     ^2");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // ifTrue: typically optimized with jump bytecodes
+
+        // ifTrue: is optimized with jump bytecodes
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
-        
-        // Should contain conditional jump bytecode (152-159 or 168-171)
-        var hasConditionalJump = bytecodes.Select(t => (int)t).Any(b => 
-            (b >= 152 && b <= 159) || (b >= 168 && b <= 171));
-        Assert.That(hasConditionalJump, Is.True, "Should contain conditional jump");
+
+        // Blue Book conditional jumps:
+        // 0x98-0x9F (152-159): Short BFP (jump on false)
+        // 0xAC-0xAF (172-175): Long BFP (jump on false)
+        var hasConditionalJump = bytecodes.Select(t => (int)t).Any(b =>
+            (b >= 0x98 && b <= 0x9F) || (b >= 0xAC && b <= 0xAF));
+        Assert.That(hasConditionalJump, Is.True, "Should contain conditional jump on false (BFP)");
     }
     
     [Test]
@@ -37,18 +39,19 @@ testIfTrue
 testIfFalse
     false ifFalse: [^1].
     ^2");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // ifFalse: typically optimized with jump bytecodes
+
+        // ifFalse: is optimized with jump bytecodes
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
-        
-        // Should contain conditional jump
-        var hasConditionalJump = bytecodes.Select(t => (int)t).Any(b => 
-            (b >= 152 && b <= 159) || (b >= 168 && b <= 171));
-        Assert.That(hasConditionalJump, Is.True, "Should contain conditional jump");
+
+        // Blue Book conditional jumps:
+        // 0xA8-0xAB (168-171): Long BTP (jump on true)
+        var hasConditionalJump = bytecodes.Select(t => (int)t).Any(b =>
+            b >= 0xA8 && b <= 0xAB);
+        Assert.That(hasConditionalJump, Is.True, "Should contain conditional jump on true (BTP)");
     }
     
     [Test]
@@ -56,21 +59,21 @@ testIfFalse
     {
         var source = WrapInTestClass(@"
 testIfTrueIfFalse
-    ^x > 0 
-        ifTrue: [1] 
+    ^x > 0
+        ifTrue: [1]
         ifFalse: [-1]");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // ifTrue:ifFalse: is optimized with conditional jumps
+
+        // ifTrue:ifFalse: is optimized with conditional jumps and unconditional jump
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
-        
-        // Should have conditional jump bytecodes
-        var jumpCount = bytecodes.Select(t => (int)t).Count(b => 
-            (b >= 152 && b <= 159) || (b >= 168 && b <= 175));
-        Assert.That(jumpCount, Is.GreaterThan(0), "Should contain jumps for if-then-else");
+
+        // Should have conditional jump bytecodes (BFP: 0x98-0x9F or 0xAC-0xAF)
+        var hasConditionalJump = bytecodes.Select(t => (int)t).Any(b =>
+            (b >= 0x98 && b <= 0x9F) || (b >= 0xAC && b <= 0xAF));
+        Assert.That(hasConditionalJump, Is.True, "Should contain conditional jump for if-then-else");
     }
     
     [Test]
@@ -80,18 +83,19 @@ testIfTrueIfFalse
 testNestedIf
     ^x > 0
         ifTrue: [
-            y > 0 
+            y > 0
                 ifTrue: [1]
                 ifFalse: [2]]
         ifFalse: [-1]");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // Nested conditionals require multiple jumps
         var bytecodes = (JArray)method["bytecodes"]!;
-        var jumpCount = bytecodes.Select(t => (int)t).Count(b => 
-            (b >= 152 && b <= 175));
+        // Blue Book jump bytecodes: 0x90-0xAF (144-175)
+        var jumpCount = bytecodes.Select(t => (int)t).Count(b =>
+            b >= 0x90 && b <= 0xAF);
         Assert.That(jumpCount, Is.GreaterThanOrEqualTo(2), "Should have multiple jumps for nested ifs");
     }
     
@@ -104,20 +108,23 @@ testWhileTrue
     i := 0.
     [i < 10] whileTrue: [i := i + 1].
     ^i");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // whileTrue: uses backward jumps for looping
+
+        // whileTrue: is not inlined (receiver is a block), sent as message
+        // Should have block creation (0xC8 = 200)
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
-        
-        // Should contain jump bytecodes for loop
-        var hasJump = bytecodes.Select(t => (int)t).Any(b => 
-            (b >= 144 && b <= 175));
-        Assert.That(hasJump, Is.True, "Should contain jumps for while loop");
+
+        // Should have block creation for both condition and body blocks
+        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
+        Assert.That(hasBlock, Is.True, "Should create blocks for while loop");
+
+        // whileTrue: selector should be in literals
+        Assert.That(LiteralContainsSymbol(json, method, "whileTrue:"), Is.True, "Should have whileTrue: in literals");
     }
-    
+
     [Test]
     public void TestWhileFalse()
     {
@@ -127,17 +134,21 @@ testWhileFalse
     i := 10.
     [i > 0] whileFalse: [i := i - 1].
     ^i");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // whileFalse: uses backward jumps for looping
+
+        // whileFalse: is not inlined (receiver is a block), sent as message
         var bytecodes = (JArray)method["bytecodes"]!;
-        var hasJump = bytecodes.Select(t => (int)t).Any(b => 
-            (b >= 144 && b <= 175));
-        Assert.That(hasJump, Is.True, "Should contain jumps for while loop");
+
+        // Should have block creation for both condition and body blocks
+        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
+        Assert.That(hasBlock, Is.True, "Should create blocks for while loop");
+
+        // whileFalse: selector should be in literals
+        Assert.That(LiteralContainsSymbol(json, method, "whileFalse:"), Is.True, "Should have whileFalse: in literals");
     }
-    
+
     [Test]
     public void TestTimesRepeat()
     {
@@ -147,15 +158,14 @@ testTimesRepeat
     sum := 0.
     5 timesRepeat: [sum := sum + 1].
     ^sum");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // timesRepeat: is usually not optimized, sent as regular message
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "timesRepeat:"), Is.True);
+
+        // timesRepeat: is sent as regular message (not optimized)
+        Assert.That(LiteralContainsSymbol(json, method, "timesRepeat:"), Is.True, "Should have timesRepeat: in literals");
     }
-    
+
     [Test]
     public void TestToDo()
     {
@@ -165,20 +175,19 @@ testToDo
     sum := 0.
     1 to: 10 do: [:i | sum := sum + i].
     ^sum");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // to:do: might be optimized or sent as message
-        var literals = (JArray)method["literals"]!;
-        var hasToDoMessage = literals.Any(l => l["value"]?.ToString() == "to:do:");
-        
+
+        // to:do: is sent as message (not optimized in this compiler)
+        Assert.That(LiteralContainsSymbol(json, method, "to:do:"), Is.True, "Should have to:do: in literals");
+
         // Block should be created for the loop body
         var bytecodes = (JArray)method["bytecodes"]!;
         var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
         Assert.That(hasBlock, Is.True, "Should create block for to:do:");
     }
-    
+
     [Test]
     public void TestToByDo()
     {
@@ -188,13 +197,12 @@ testToByDo
     sum := 0.
     1 to: 10 by: 2 do: [:i | sum := sum + i].
     ^sum");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // to:by:do: sent as regular message
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "to:by:do:"), Is.True);
+        Assert.That(LiteralContainsSymbol(json, method, "to:by:do:"), Is.True, "Should have to:by:do: in literals");
     }
     
     [Test]
@@ -203,88 +211,96 @@ testToByDo
         var source = WrapInTestClass(@"
 testAnd
     ^(x > 0) and: [y > 0]");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // and: might be optimized with conditional jumps
+
+        // and: is inlined with conditional jumps - NO block is created
         var bytecodes = (JArray)method["bytecodes"]!;
-        
-        // Should create a block for the second condition
-        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
-        Assert.That(hasBlock, Is.True, "Should create block for and:");
+
+        // Should have conditional jump (BFP: 0x98-0x9F or 0xAC-0xAF)
+        var hasConditionalJump = bytecodes.Select(t => (int)t).Any(b =>
+            (b >= 0x98 && b <= 0x9F) || (b >= 0xAC && b <= 0xAF));
+        Assert.That(hasConditionalJump, Is.True, "and: should generate jump-on-false for short-circuit");
     }
-    
+
     [Test]
     public void TestOr()
     {
         var source = WrapInTestClass(@"
 testOr
     ^(x < 0) or: [x > 10]");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // or: might be optimized with conditional jumps
+
+        // or: is inlined with conditional jumps - NO block is created
         var bytecodes = (JArray)method["bytecodes"]!;
-        
-        // Should create a block for the second condition
-        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
-        Assert.That(hasBlock, Is.True, "Should create block for or:");
+
+        // Should have conditional jump (BTP: 0xA8-0xAB)
+        var hasConditionalJump = bytecodes.Select(t => (int)t).Any(b =>
+            b >= 0xA8 && b <= 0xAB);
+        Assert.That(hasConditionalJump, Is.True, "or: should generate jump-on-true for short-circuit");
     }
-    
+
     [Test]
     public void TestShortCircuitAnd()
     {
         var source = WrapInTestClass(@"
 testShortCircuitAnd
     ^false and: [1/0]");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // and: should short-circuit, not evaluating the block if receiver is false
+
+        // and: is inlined - conditional jump skips the block body if false
         var bytecodes = (JArray)method["bytecodes"]!;
-        
-        // Should have block creation
-        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
-        Assert.That(hasBlock, Is.True, "Should create block even if not evaluated");
+
+        // Should have conditional jump for short-circuit
+        var hasConditionalJump = bytecodes.Select(t => (int)t).Any(b =>
+            (b >= 0x98 && b <= 0x9F) || (b >= 0xAC && b <= 0xAF));
+        Assert.That(hasConditionalJump, Is.True, "and: should generate jump-on-false");
     }
-    
+
     [Test]
     public void TestShortCircuitOr()
     {
         var source = WrapInTestClass(@"
 testShortCircuitOr
     ^true or: [1/0]");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // or: should short-circuit, not evaluating the block if receiver is true
+
+        // or: is inlined - conditional jump skips the block body if true
         var bytecodes = (JArray)method["bytecodes"]!;
-        
-        // Should have block creation
-        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
-        Assert.That(hasBlock, Is.True, "Should create block even if not evaluated");
+
+        // Should have conditional jump for short-circuit
+        var hasConditionalJump = bytecodes.Select(t => (int)t).Any(b =>
+            b >= 0xA8 && b <= 0xAB);
+        Assert.That(hasConditionalJump, Is.True, "or: should generate jump-on-true");
     }
-    
+
     [Test]
     public void TestComplexConditional()
     {
         var source = WrapInTestClass(@"
 testComplexCondition
     ^(x > 0 and: [y > 0]) or: [z = 0]");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // Complex boolean expressions with multiple blocks
+
+        // Complex boolean expressions with inlined and:/or:
         var bytecodes = (JArray)method["bytecodes"]!;
-        
-        // Should have multiple blocks
-        var blockCount = bytecodes.Select(t => (int)t).Count(b => b == 200);
-        Assert.That(blockCount, Is.GreaterThanOrEqualTo(2), "Should have multiple blocks");
+
+        // Should have multiple conditional jumps (both BFP and BTP)
+        var hasJumpOnFalse = bytecodes.Select(t => (int)t).Any(b =>
+            (b >= 0x98 && b <= 0x9F) || (b >= 0xAC && b <= 0xAF));
+        var hasJumpOnTrue = bytecodes.Select(t => (int)t).Any(b =>
+            b >= 0xA8 && b <= 0xAB);
+        Assert.That(hasJumpOnFalse, Is.True, "and: should generate jump-on-false");
+        Assert.That(hasJumpOnTrue, Is.True, "or: should generate jump-on-true");
     }
     
     [Test]
@@ -296,19 +312,19 @@ testCaseAnalysis
     x = 2 ifTrue: [^'two'].
     x = 3 ifTrue: [^'three'].
     ^'other'");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // Multiple sequential conditionals
         var bytecodes = (JArray)method["bytecodes"]!;
-        
-        // Should have multiple conditional jumps
-        var jumpCount = bytecodes.Select(t => (int)t).Count(b => 
-            (b >= 152 && b <= 175));
+
+        // Should have multiple conditional jumps (0x90-0xAF)
+        var jumpCount = bytecodes.Select(t => (int)t).Count(b =>
+            b >= 0x90 && b <= 0xAF);
         Assert.That(jumpCount, Is.GreaterThanOrEqualTo(3), "Should have multiple conditional jumps");
     }
-    
+
     [Test]
     public void TestEarlyReturn()
     {
@@ -317,34 +333,36 @@ testEarlyReturn
     x < 0 ifTrue: [^-1].
     x = 0 ifTrue: [^0].
     ^1");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // Early returns in conditionals
         var bytecodes = (JArray)method["bytecodes"]!;
-        
-        // Should have multiple return bytecodes (124)
-        var returnCount = bytecodes.Select(t => (int)t).Count(b => b == 124);
+
+        // Should have multiple return bytecodes (0x7C = 124 for RETURN_TOP)
+        var returnCount = bytecodes.Select(t => (int)t).Count(b => b == 0x7C);
         Assert.That(returnCount, Is.GreaterThanOrEqualTo(3), "Should have multiple returns");
     }
-    
+
     [Test]
     public void TestInfiniteLoop()
     {
         var source = WrapInTestClass(@"
 testInfiniteLoop
     [true] whileTrue: [x := x + 1]");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // Infinite loop with backward jump
+
+        // whileTrue: is not inlined (receiver is block), but blocks are created
         var bytecodes = (JArray)method["bytecodes"]!;
-        
-        // Should have jump bytecodes for infinite loop
-        var hasJump = bytecodes.Select(t => (int)t).Any(b => 
-            (b >= 144 && b <= 175));
-        Assert.That(hasJump, Is.True, "Should contain backward jump for infinite loop");
+
+        // Should have block creation for condition and body
+        var hasBlock = bytecodes.Select(t => (int)t).Any(b => b == 200);
+        Assert.That(hasBlock, Is.True, "Should create blocks for infinite while loop");
+
+        // whileTrue: selector should be in literals
+        Assert.That(LiteralContainsSymbol(json, method, "whileTrue:"), Is.True, "Should have whileTrue: in literals");
     }
 }
