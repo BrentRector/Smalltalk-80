@@ -236,4 +236,37 @@ Object subclass: #{className}
 
         return null;
     }
+
+    /// <summary>
+    /// Gets the class name from the nameIndex and symbols array.
+    /// </summary>
+    protected string? GetClassName(JObject json, JObject classObj)
+    {
+        var symbols = (JArray)json["symbols"]!;
+        var nameIndex = classObj["nameIndex"]?.Value<int>() ?? -1;
+
+        if (nameIndex >= 0 && nameIndex < symbols.Count)
+        {
+            return symbols[nameIndex]?.ToString();
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Finds a class by name in the classes array.
+    /// </summary>
+    protected JObject? FindClassByName(JObject json, string className)
+    {
+        var classes = json["classes"] as JArray;
+        if (classes == null) return null;
+
+        foreach (var cls in classes.Cast<JObject>())
+        {
+            if (GetClassName(json, cls) == className)
+                return cls;
+        }
+
+        return null;
+    }
 }

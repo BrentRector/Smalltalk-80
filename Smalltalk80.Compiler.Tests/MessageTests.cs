@@ -53,15 +53,17 @@ testBinaryMessage
         var source = WrapInTestClass(@"
 testKeywordMessage
     ^Array new: 10");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // Push Array, push 10, send new:, return top
-        // new: may be in literals or may use extended send bytecode
+        // new: is a 1-argument keyword message:
+        // - Bytecodes 0xE0-0xEF (224-239): Send Literal Selector With 1 Argument
+        // - Or extended send bytecode 0x83 (131)
         var bytecodes = (JArray)method["bytecodes"]!;
         var hasNewSelector = LiteralContainsSymbol(json, method, "new:") ||
-            bytecodes.Select(t => (int)t).Any(b => b >= 208 && b <= 223);  // SEND_1_ARG range
+            bytecodes.Select(t => (int)t).Any(b => (b >= 224 && b <= 239) || b == 131);
         Assert.That(hasNewSelector, Is.True, "Should have new: selector or send bytecode");
     }
     
@@ -121,8 +123,11 @@ testBinaryPrecedence
         Assert.That(bytecodes, Is.Not.Null);
         
         // The + should be evaluated before new:
+        // new: is a 1-argument keyword message:
+        // - Bytecodes 0xE0-0xEF (224-239): Send Literal Selector With 1 Argument
+        // - Or extended send bytecode 0x83 (131)
         var hasNewSelector = LiteralContainsSymbol(json, method, "new:") ||
-            bytecodes.Select(t => (int)t).Any(b => b >= 208 && b <= 223);  // SEND_1_ARG range
+            bytecodes.Select(t => (int)t).Any(b => (b >= 224 && b <= 239) || b == 131);
         Assert.That(hasNewSelector, Is.True, "Should have new: selector or send bytecode");
     }
     
