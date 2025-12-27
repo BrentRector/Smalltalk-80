@@ -16,6 +16,15 @@ namespace Smalltalk80.Compiler
     public class VariableResolver
     {
         /// <summary>
+        /// Well-known system globals that should never be treated as pool variables.
+        /// These are created during cold start and should always be resolved as globals.
+        /// </summary>
+        private static readonly HashSet<string> WellKnownGlobals =
+        [
+            "Smalltalk", "Processor", "Display", "Transcript",
+            "Sensor", "ScheduledControllers", "Undeclared", "Disk"
+        ];
+        /// <summary>
         /// Categories of variables in Smalltalk-80.
         /// </summary>
         public enum VariableType
@@ -63,26 +72,17 @@ namespace Smalltalk80.Compiler
         /// <exception cref="InvalidOperationException">Thrown if variable not found in any scope</exception>
         public ResolutionResult ResolveVariable(string varName, CompilationEnvironment context, TempFrameAllocator? allocator = null)
         {
-            // Console.WriteLine($"[RESOLVE] Resolving variable: {varName}, PoolVars.Count={context.PoolVariables.Count}");
-            if (varName == "FilePool")
-            {
-                // Console.WriteLine($"[FILEPOOL START] Starting resolution for FilePool");
-            }
-            
             // Step 1: Check pseudo-variables first (highest priority, cannot be shadowed)
             var pseudoResult = TryResolvePseudoVariable(varName);
             if (pseudoResult.HasValue)
             {
-                // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Returned at Step 1 (pseudo-var)");
                 return pseudoResult.Value;
             }
-            // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Passed Step 1");
 
             // Step 2-5: Try to resolve as temp variable using allocator (if provided)
             // This is the unified temp frame approach for method args/temps and block temps
             int slotIndex = -1;
             bool allocatorHasVar = allocator != null && allocator.TryGetSlotIndex(varName, out slotIndex);
-            // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] After Step 2-5 check, allocatorHasVar={allocatorHasVar}");
 
             if (allocatorHasVar)
             {
@@ -227,10 +227,8 @@ namespace Smalltalk80.Compiler
             }
 
             // Step 7: Check instance variables
-            // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Checking Step 7 (instance vars)");
             if (context.InstanceVariables.TryGetValue(varName, out int fieldIndex))
             {
-                // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Returned at Step 7 (instance var)");
                 return new ResolutionResult(
                     VariableType.InstanceVariable,
                     fieldIndex,
@@ -238,13 +236,10 @@ namespace Smalltalk80.Compiler
                     varName
                 );
             }
-            // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Passed Step 7");
 
             // Step 8: Check class variables
-            // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Checking Step 8 (class vars)");
             if (context.ClassVariables.ContainsKey(varName))
             {
-                // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Returned at Step 8 (class var)");
                 // Class variables are resolved via literal associations
                 // The actual literal index will be added by the caller
                 return new ResolutionResult(
@@ -254,18 +249,15 @@ namespace Smalltalk80.Compiler
                     varName
                 );
             }
-            // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Passed Step 8");
 
             // Step 9: Check pool dictionary variables
-            // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Checking Step 9 (pool vars), PoolVariables.Count={context.PoolVariables.Count}");
             if (context.PoolVariables.TryGetValue(varName, out object? poolDictName))
             {
-                // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Returned at Step 9 (found in PoolVariables)");
                 // Pool variables are resolved via literal associations
                 // The actual literal index will be added by the caller
                 // Extract the pool dictionary name from the stored value
                 string? poolDictionaryName = poolDictName as string;
-                
+
                 return new ResolutionResult(
                     VariableType.PoolVariable,
                     -1,  // Literal index assigned by caller
@@ -274,15 +266,11 @@ namespace Smalltalk80.Compiler
                     poolDictionaryName
                 );
             }
-            // if (varName == "FilePool") Console.WriteLine($"[FILEPOOL] Passed Step 9");
 
             // Step 10: Check if this is a defined class name (before treating as pool variable)
             // Class names should be treated as globals, not pool variables
             if (context.KnownClassNames != null && context.KnownClassNames.Contains(varName))
             {
-                // This is a known class name - treat as global variable
-                // Console.WriteLine($"[CLASS NAME] Variable '{varName}' resolved as global (known class name)");
-                
                 return new ResolutionResult(
                     VariableType.Global,
                     -1,  // Literal index assigned by caller
@@ -290,52 +278,22 @@ namespace Smalltalk80.Compiler
                     varName
                 );
             }
-            
+
             // Step 10b: Check if this is a pool dictionary name (before treating as pool variable)
             // Pool dictionary names (like 'FilePool') are global variables containing Dictionary instances
-            // They should be treated as globals, not as pool variables
-            if (varName == "FilePool")
+            if (context.KnownPoolDictionaryNames != null && context.KnownPoolDictionaryNames.Contains(varName))
             {
-                // Console.WriteLine($"[FILEPOOL DEBUG] Resolving 'FilePool', KnownPoolDictionaryNames is {(context.KnownPoolDictionaryNames == null ? "NULL" : $"set with {context.KnownPoolDictionaryNames.Count} names")}");
-            }
-            if (context.KnownPoolDictionaryNames != null)
-            {
-                if (varName == "FilePool")
-                {
-                    // Console.WriteLine($"[FILEPOOL DEBUG] Checking 'FilePool' against {context.KnownPoolDictionaryNames.Count} pool dict names: [{string.Join(", ", context.KnownPoolDictionaryNames)}]");
-                }
-                if (context.KnownPoolDictionaryNames.Contains(varName))
-                {
-                    // This is a pool dictionary name - treat as global variable
-                    // Console.WriteLine($"[POOL DICT NAME] Variable '{varName}' resolved as global (pool dictionary name)");
-                    
-                    return new ResolutionResult(
-                        VariableType.Global,
-                        -1,  // Literal index assigned by caller
-                        true,  // Pool dictionary names are assignable (e.g., FilePool _ Dictionary new)
-                        varName
-                    );
-                }
+                return new ResolutionResult(
+                    VariableType.Global,
+                    -1,  // Literal index assigned by caller
+                    true,  // Pool dictionary names are assignable (e.g., FilePool _ Dictionary new)
+                    varName
+                );
             }
 
-            // Console.WriteLine($"[POOL VAR DEBUG] Variable '{varName}' falling through to Step 11");
-
-            if (varName == "DefaultTab")
-            {
-                // Console.WriteLine($"[DEFAULT_TAB DEBUG] At Step 11, PoolVariables.ContainsKey('__HAS_POOLS__')={context.PoolVariables.ContainsKey("__HAS_POOLS__")}");
-            }
-            
             // Step 10c: Check for well-known system globals that should never be pool variables
-            // These are created during cold start and should always be treated as globals
-            HashSet<string> wellKnownGlobals =
-            [
-                "Smalltalk", "Processor", "Display", "Transcript",
-                "Sensor", "ScheduledControllers", "Undeclared", "Disk"
-            ];
-            
-            if (wellKnownGlobals.Contains(varName))
+            if (WellKnownGlobals.Contains(varName))
             {
-                // Console.WriteLine($"[WELL-KNOWN GLOBAL] Variable '{varName}' is a well-known system global");
                 return new ResolutionResult(
                     VariableType.Global,
                     -1,  // Literal index assigned by caller
@@ -343,7 +301,7 @@ namespace Smalltalk80.Compiler
                     varName
                 );
             }
-            
+
             // Step 11: Check if class has pool dictionaries and assume undefined variables are pool variables
             // For offline compiler: if the class declares pool dictionaries, undefined variables
             // should be treated as pool variable references (they'll be resolved at runtime)
@@ -354,12 +312,10 @@ namespace Smalltalk80.Compiler
                 // Extract pool dictionary names from the marker
                 string poolNames = poolNamesObj as string ?? "";
                 string[] pools = poolNames.Split(',', StringSplitOptions.RemoveEmptyEntries);
-                
+
                 // Check if this variable is actually a pool dictionary name itself
                 if (pools.Contains(varName))
                 {
-                    // This is a pool dictionary name - treat as global, not pool variable
-                    // Console.WriteLine($"[POOL DICT REFERENCE] Variable '{varName}' is a pool dictionary name, treating as global");
                     return new ResolutionResult(
                         VariableType.Global,
                         -1,  // Literal index assigned by caller
@@ -367,15 +323,13 @@ namespace Smalltalk80.Compiler
                         varName
                     );
                 }
-                
+
                 if (pools.Length > 0)
                 {
                     // Assume the variable is from the first pool dictionary
                     // (In reality, it could be from any of them, but we don't know at compile time)
                     string assumedPoolDict = pools[0];
-                    
-                    // Console.WriteLine($"[POOL VAR ASSUMPTION] Variable '{varName}' assumed to be pool variable from '{assumedPoolDict}' (class has {pools.Length} pool(s): {poolNames})");
-                    
+
                     return new ResolutionResult(
                         VariableType.PoolVariable,
                         -1,  // Literal index assigned by caller
@@ -385,10 +339,9 @@ namespace Smalltalk80.Compiler
                     );
                 }
             }
-            
+
             // Step 12: Fallback - assume global variable (will be resolved at runtime)
             // Global variables are stored as Associations in Smalltalk dictionary
-            // Console.WriteLine($"[GLOBAL FALLBACK] Variable '{varName}' assumed to be global (no pool dictionaries)");
             return new ResolutionResult(
                 VariableType.Global,
                 -1,  // Literal index assigned by caller

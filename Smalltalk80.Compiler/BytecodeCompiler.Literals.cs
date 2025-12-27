@@ -14,7 +14,23 @@ namespace Smalltalk80.Compiler
         /// Parses a Smalltalk number literal, supporting radix notation (e.g., 8r377, 16rFF),
         /// decimal notation, floating point, and scaled decimals.
         /// </summary>
-        private bool TryParseSmalltalkNumber(string text, out object? value)
+        /// <remarks>
+        /// Smalltalk supports radix notation for integers in any base from 2 to 36:
+        /// <list type="bullet">
+        ///   <item><description><c>2r1010</c> = 10 (binary)</description></item>
+        ///   <item><description><c>8r377</c> = 255 (octal)</description></item>
+        ///   <item><description><c>16rFF</c> = 255 (hexadecimal)</description></item>
+        ///   <item><description><c>36rZ</c> = 35 (base 36)</description></item>
+        /// </list>
+        /// Format: [radix]r[digits] where radix is 2-36 and digits use 0-9 and A-Z.
+        ///
+        /// Scaled decimals use the format: [mantissa]s[scale]
+        /// Example: <c>123s2</c> = 1.23 (divide by 10^2)
+        /// </remarks>
+        /// <param name="text">The number literal text to parse.</param>
+        /// <param name="value">The parsed value (int or double) if successful.</param>
+        /// <returns>True if parsing succeeded, false otherwise.</returns>
+        private static bool TryParseSmalltalkNumber(string text, out object? value)
         {
             value = null;
 
@@ -33,8 +49,9 @@ namespace Smalltalk80.Compiler
                         value = result;
                         return true;
                     }
-                    catch
+                    catch (Exception ex) when (ex is FormatException or OverflowException or ArgumentException)
                     {
+                        // Invalid digit for the specified radix, or number too large
                         return false;
                     }
                 }

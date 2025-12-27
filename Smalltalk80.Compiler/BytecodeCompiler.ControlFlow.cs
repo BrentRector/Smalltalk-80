@@ -36,10 +36,9 @@ namespace Smalltalk80.Compiler
                 "ifFalse:ifTrue:" => TryInlineIfFalseIfTrue(keywordParts, forValue),
                 "and:" => TryInlineAnd(keywordParts, forValue),
                 "or:" => TryInlineOr(keywordParts, forValue),
-                "whileTrue:" => TryInlineWhileTrue(keywordParts) ? InlineResult.InlinedForValue : InlineResult.NotInlined,
-                "whileFalse:" => TryInlineWhileFalse(keywordParts) ? InlineResult.InlinedForValue : InlineResult.NotInlined,
-                "whileTrue" => TryInlineWhileTrueNoArg(keywordParts) ? InlineResult.InlinedForValue : InlineResult.NotInlined,
-                "whileFalse" => TryInlineWhileFalseNoArg(keywordParts) ? InlineResult.InlinedForValue : InlineResult.NotInlined,
+                // Note: whileTrue:/whileFalse: are handled specially in CompileMessageExpr via TryInlineWhileLoop
+                // because the receiver is a block (not a boolean). These cases return NotInlined here.
+                "whileTrue:" or "whileFalse:" or "whileTrue" or "whileFalse" => InlineResult.NotInlined,
                 _ => InlineResult.NotInlined
             };
 
@@ -465,24 +464,5 @@ namespace Smalltalk80.Compiler
             return argNodes is not { Count: > 0 };
         }
 
-        /// <summary>
-        /// Stub - whileTrue: is handled by TryInlineWhileLoop in CompileMessageExpr
-        /// </summary>
-        private bool TryInlineWhileTrue(Smalltalk80Parser.KeywordPartContext[] keywordParts) => false;
-
-        /// <summary>
-        /// Stub - whileFalse: is handled by TryInlineWhileLoop in CompileMessageExpr
-        /// </summary>
-        private bool TryInlineWhileFalse(Smalltalk80Parser.KeywordPartContext[] keywordParts) => false;
-
-        /// <summary>
-        /// Stub - whileTrue (no arg) is handled in CompileUnaryExpr
-        /// </summary>
-        private bool TryInlineWhileTrueNoArg(Smalltalk80Parser.KeywordPartContext[] keywordParts) => false;
-
-        /// <summary>
-        /// Stub - whileFalse (no arg) is handled in CompileUnaryExpr
-        /// </summary>
-        private bool TryInlineWhileFalseNoArg(Smalltalk80Parser.KeywordPartContext[] keywordParts) => false;
     }
 }

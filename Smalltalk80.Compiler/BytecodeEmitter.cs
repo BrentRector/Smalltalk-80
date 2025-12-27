@@ -6,8 +6,9 @@ namespace Smalltalk80.Compiler
 {
     /// <summary>
     /// Bytecode emitter that generates Blue Book bytecodes.
+    /// Sealed for potential JIT optimization benefits.
     /// </summary>
-    public class BytecodeEmitter
+    public sealed class BytecodeEmitter
     {
         private readonly List<byte> bytecodes = new();
 

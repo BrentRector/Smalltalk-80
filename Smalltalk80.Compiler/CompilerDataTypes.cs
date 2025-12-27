@@ -115,30 +115,15 @@ namespace Smalltalk80.Compiler
     
     /// <summary>
     /// Represents a Smalltalk symbol.
+    /// Records provide value equality and immutability by default.
     /// </summary>
-    public class Symbol
+    /// <param name="Value">The symbol's string value (without the # prefix).</param>
+    public sealed record Symbol(string Value)
     {
-        public string Value { get; }
-        
-        public Symbol(string value)
-        {
-            Value = value;
-        }
-        
-        public override bool Equals(object? obj)
-        {
-            return obj is Symbol other && Value == other.Value;
-        }
-        
-        public override int GetHashCode()
-        {
-            return Value.GetHashCode();
-        }
-        
-        public override string ToString()
-        {
-            return $"#{Value}";
-        }
+        /// <summary>
+        /// Returns the Smalltalk representation of the symbol (e.g., #foo).
+        /// </summary>
+        public override string ToString() => $"#{Value}";
     }
     
     /// <summary>
@@ -201,55 +186,26 @@ namespace Smalltalk80.Compiler
     /// Pool variables are NOT stored as Associations - they're binding metadata
     /// that tells the VM which pool dictionary to search and what key to look up.
     /// At runtime, the VM creates a 2-element Array: (#PoolDictionaryName, #Key).
+    /// Records provide value equality and immutability by default.
     /// </summary>
-    public class PoolVariable
+    /// <param name="Key">The key (variable name as a Symbol).</param>
+    /// <param name="PoolDictionaryName">The pool dictionary name (e.g., "TextConstants").</param>
+    public sealed record PoolVariable(Symbol Key, string PoolDictionaryName)
     {
         /// <summary>
-        /// The key (variable name as a Symbol).
-        /// </summary>
-        public Symbol Key { get; }
-        
-        /// <summary>
-        /// The pool dictionary name (e.g., "TextConstants").
-        /// </summary>
-        public string PoolDictionaryName { get; }
-        
-        /// <summary>
-        /// Initializes a new instance of the PoolVariable class.
-        /// </summary>
-        /// <param name="key">The key (variable name as a Symbol).</param>
-        /// <param name="poolDictionaryName">The pool dictionary name.</param>
-        public PoolVariable(Symbol key, string poolDictionaryName)
-        {
-            Key = key;
-            PoolDictionaryName = poolDictionaryName;
-        }
-        
-        /// <summary>
-        /// Initializes a new instance of the PoolVariable class with a string key.
+        /// Creates a PoolVariable with a string key (convenience constructor).
         /// </summary>
         /// <param name="keyName">The key as a string (will be converted to Symbol).</param>
         /// <param name="poolDictionaryName">The pool dictionary name.</param>
         public PoolVariable(string keyName, string poolDictionaryName)
+            : this(new Symbol(keyName), poolDictionaryName)
         {
-            Key = new Symbol(keyName);
-            PoolDictionaryName = poolDictionaryName;
         }
-        
-        public override bool Equals(object? obj)
-        {
-            return obj is PoolVariable other && Key.Equals(other.Key) && PoolDictionaryName == other.PoolDictionaryName;
-        }
-        
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Key.GetHashCode(), PoolDictionaryName.GetHashCode());
-        }
-        
-        public override string ToString()
-        {
-            return $"PoolVariable(key: {Key}, poolDictionary: {PoolDictionaryName})";
-        }
+
+        /// <summary>
+        /// Returns a string representation of the pool variable.
+        /// </summary>
+        public override string ToString() => $"PoolVariable(key: {Key}, poolDictionary: {PoolDictionaryName})";
     }
     
     /// <summary>
