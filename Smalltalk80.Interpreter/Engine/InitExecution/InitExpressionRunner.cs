@@ -1,5 +1,6 @@
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
+using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
@@ -16,8 +17,8 @@ public class InitExpressionRunner
     private readonly SmalltalkHeapManager _heapManager;
     private readonly VirtualMachine _vm;
     private readonly VMMetadata _metadata;
-    private readonly DiagnosticsConfig _diagnostics;
-    private readonly Core.Schema.InitExpressionSpec[] _initExpressions;
+    private readonly IDiagnosticHub? _diagnostics;
+    private readonly InitExpression[] _initExpressions;
     private readonly SmalltalkOOP _initMethodsOOP;
     private readonly InitExpressionExecutor _executor;
 
@@ -50,8 +51,8 @@ public class InitExpressionRunner
         SmalltalkHeapManager heapManager,
         VirtualMachine vm,
         VMMetadata metadata,
-        DiagnosticsConfig diagnostics,
-        Core.Schema.InitExpressionSpec[] initExpressions)
+        IDiagnosticHub? diagnostics,
+        InitExpression[] initExpressions)
     {
         _heapManager = heapManager;
         _vm = vm;
@@ -59,13 +60,14 @@ public class InitExpressionRunner
         _diagnostics = diagnostics;
         _initExpressions = initExpressions;
 
+        // Note: 5000ms default timeout - see InterpreterConstants.DefaultInitExpressionTimeoutMs
         _executor = new InitExpressionExecutor(
             heapManager,
             vm,
             metadata,
             diagnostics,
             InitPolicy.ContinueAndCollect,
-            defaultTimeoutMs: InterpreterConstants.DefaultInitExpressionTimeoutMs
+            defaultTimeoutMs: 5000
         );
 
         _initMethodsOOP = metadata.InitExpressionMethods;
@@ -175,7 +177,7 @@ public class InitExpressionRunner
         }
     }
 
-    private void DisplayReturnValue(Core.Schema.InitExpressionSpec expr, InitExpressionResult result)
+    private void DisplayReturnValue(InitExpression expr, InitResult result)
     {
         if (expr.Source == null || result.ReturnValueOop?.IsSmallInteger != true)
             return;
@@ -201,7 +203,7 @@ public class InitExpressionRunner
         }
     }
 
-    private static void ReportFailure(Core.Schema.InitExpressionSpec expr, InitExpressionResult result)
+    private static void ReportFailure(InitExpression expr, InitResult result)
     {
         Console.WriteLine($"    ❌ Failed: {expr.Source}");
         Console.WriteLine($"       Status: {result.Status}");
