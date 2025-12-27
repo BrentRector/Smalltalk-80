@@ -425,7 +425,7 @@ public class InitExpressionExecutor
         // Check Delay class's semaphore waiting lists
         // Note: Delay's class variables are: AccessProtect, ActiveDelay, SuspendedDelays, TimingSemaphore
         // There is NO TimerProcess variable - the process is created by forkAt: but not stored
-        var delayClassOOP = LookupGlobal(smalltalkOOP, "Delay");
+        var delayClassOOP = _vm.RuntimeHeapAccess.GetClass("Delay");
         if (verbose)
             Console.WriteLine($"    [DEBUG] Delay class lookup: {(delayClassOOP != _metadata.KnownObjects.Nil ? delayClassOOP.ToString() : "nil")}");
 
@@ -456,7 +456,7 @@ public class InitExpressionExecutor
 
         // Check InputState class's InputSemaphore
         // Note: InputProcess and InputSemaphore are in InputState, not InputSensor!
-        var inputStateClassOOP = LookupGlobal(smalltalkOOP, "InputState");
+        var inputStateClassOOP = _vm.RuntimeHeapAccess.GetClass("InputState");
         if (verbose)
             Console.WriteLine($"    [DEBUG] InputState class lookup: {(inputStateClassOOP != _metadata.KnownObjects.Nil ? inputStateClassOOP.ToString() : "nil")}");
 
@@ -690,10 +690,8 @@ public class InitExpressionExecutor
 
     private SmalltalkOOP CreateMethodContextForInitExpression(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP)
     {
-        // Get MethodContext class OOP - lookup from live heap
-        // Find MethodContext class by querying Smalltalk dictionary
-        var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
-        var methodContextClassOOP = LookupGlobal(smalltalkOOP, "MethodContext");
+        // Get MethodContext class OOP - lookup from live heap using hash-based lookup
+        var methodContextClassOOP = _vm.RuntimeHeapAccess.GetClass("MethodContext");
         if (methodContextClassOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("MethodContext class not found in Smalltalk dictionary");
@@ -732,38 +730,6 @@ public class InitExpressionExecutor
         }
 
         return contextOOP;
-    }
-
-    /// <summary>
-    /// Looks up a global variable in the SystemDictionary.
-    /// Uses direct string comparison instead of symbol OOP matching.
-    /// </summary>
-    private SmalltalkOOP LookupGlobal(SmalltalkOOP systemDictOOP, string globalName)
-    {
-        // SystemDictionary is an array of Associations
-        int size = _heapManager.GetIndexedSize(systemDictOOP);
-
-        for (int i = 0; i < size; i++)
-        {
-            var assocOOP = _heapManager.GetIndexedOOP(systemDictOOP, i);
-            if (assocOOP == _heapManager.GetNil())
-                continue;
-
-            // Association has key at instance variable 0 (a Symbol)
-            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
-            if (keyOOP == _heapManager.GetNil())
-                continue;
-
-            // Compare key symbol's string content with target name
-            var keyString = ReadSymbolString(keyOOP);
-            if (keyString == globalName)
-            {
-                // Return value at instance variable 1
-                return _heapManager.GetInstanceVariable(assocOOP, 1);
-            }
-        }
-
-        return _metadata.KnownObjects.Nil;
     }
 
     /// <summary>

@@ -208,9 +208,10 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     }
 
     /// <summary>
-    /// Looks up a key in a Smalltalk Dictionary object.
+    /// Looks up a key in a Smalltalk Dictionary object using hash-based lookup.
     /// Dictionary is a PointerIndexed subclass of Set with no additional instance variables.
     /// It stores Association objects directly in indexed slots (NOT in separate keys/values arrays).
+    /// Implements Smalltalk-80 Dictionary>>findKeyOrNil: semantics with linear probing.
     /// </summary>
     private SmalltalkOOP DictionaryLookup(SmalltalkOOP dictOOP, SmalltalkOOP keyOOP)
     {
@@ -218,29 +219,41 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
         //   Instance variable 0: tally (SmallInteger count of entries, inherited from Set)
         //   Indexed slots 0..N: Association objects (PointerIndexed)
 
-        // Search through Dictionary's indexed slots for matching key
         int size = _heapManager.GetIndexedSize(dictOOP);
+        if (size == 0) return metadata.KnownObjects.Nil;
+
         var nilOOP = metadata.KnownObjects.Nil;
 
-        for (int i = 0; i < size; i++)
+        // Hash-based lookup: start at hash slot, linear probe until found or nil
+        int startIndex = IdentityHashUtility.ComputeDictionaryHashIndex(keyOOP, size);
+        int index = startIndex;
+
+        do
         {
-            var associationOOP = _heapManager.GetIndexedOOP(dictOOP, i);
+            var associationOOP = _heapManager.GetIndexedOOP(dictOOP, index);
 
-            // Skip nil slots (empty hash table slots)
-            if (associationOOP == nilOOP || associationOOP.IsSmallInteger)
-                continue;
+            // Empty slot - key not in dictionary
+            if (associationOOP == nilOOP)
+                return nilOOP;
 
-            // Get the key from the Association (instance variable 0)
-            var assocKeyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-
-            if (assocKeyOOP == keyOOP)  // Identity comparison for Symbols
+            // Skip non-Association entries (shouldn't happen, but defensive)
+            if (!associationOOP.IsSmallInteger)
             {
-                // Return the value from the Association (instance variable 1)
-                return _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-            }
-        }
+                // Get the key from the Association (instance variable 0)
+                var assocKeyOOP = _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
 
-        return metadata.KnownObjects.Nil;  // Not found
+                if (assocKeyOOP == keyOOP)  // Identity comparison for Symbols
+                {
+                    // Return the value from the Association (instance variable 1)
+                    return _heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                }
+            }
+
+            // Linear probe to next slot
+            index = (index + 1) % size;
+        } while (index != startIndex);
+
+        return nilOOP;  // Wrapped around - not found
     }
 
     /// <summary>

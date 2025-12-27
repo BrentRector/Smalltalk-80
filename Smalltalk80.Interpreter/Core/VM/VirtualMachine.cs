@@ -117,6 +117,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// <summary>Gets the context manager for runtime context management.</summary>
     public IContextManager ContextManager => _contextManager;
 
+    /// <summary>Gets the runtime heap accessor for hash-based dictionary lookups and symbol interning.</summary>
+    public IRuntimeHeapAccessor RuntimeHeapAccess => _runtimeHeapAccess;
+
     public VirtualMachine(ISmalltalkHeap heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, IDiagnosticHub? diagnostics = null)
     {
         _heapManager = heapManager;

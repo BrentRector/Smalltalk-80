@@ -481,39 +481,69 @@ public class SmalltalkInterpreterThread
     /// <summary>
     /// Looks up a global variable in the Smalltalk dictionary at runtime.
     /// This is the runtime-safe way to access globals (not using GlobalRegistry).
+    /// Uses hash-based lookup for O(1) average case performance.
     /// </summary>
     private SmalltalkOOP LookupGlobal(string globalName)
     {
         // Get Smalltalk global dictionary from VMMetadata (runtime-safe)
         var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
 
-        // Search for the global by name
-        int size = _context.HeapManager.GetIndexedSize(smalltalkOOP);
-
-        // Find the symbol OOP for the global name
+        // Find the symbol OOP for the global name (linear search through dictionary)
         var symbolOOP = FindSymbol(globalName);
         if (symbolOOP == _context.HeapManager.GetNil())
         {
             throw new InvalidOperationException($"Global '{globalName}' not found - symbol does not exist");
         }
 
-        // Search dictionary for association with this key
-        for (int i = 0; i < size; i++)
+        // Use hash-based dictionary lookup now that we have the symbol OOP
+        var valueOOP = HashBasedDictionaryLookup(smalltalkOOP, symbolOOP);
+        if (valueOOP == _context.HeapManager.GetNil())
         {
-            var assocOOP = _context.HeapManager.GetIndexedOOP(smalltalkOOP, i);
-            if (assocOOP == _context.HeapManager.GetNil())
-                continue;
-
-            // Association has key at instance variable 0
-            var keyOOP = _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            if (keyOOP == symbolOOP)
-            {
-                // Return value at instance variable 1
-                return _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-            }
+            throw new InvalidOperationException($"Global '{globalName}' not found in Smalltalk dictionary");
         }
 
-        throw new InvalidOperationException($"Global '{globalName}' not found in Smalltalk dictionary");
+        return valueOOP;
+    }
+
+    /// <summary>
+    /// Hash-based dictionary lookup using Smalltalk-80 Dictionary>>findKeyOrNil: semantics.
+    /// Uses identity hash of the key OOP and linear probing.
+    /// </summary>
+    private SmalltalkOOP HashBasedDictionaryLookup(SmalltalkOOP dictOOP, SmalltalkOOP keyOOP)
+    {
+        var heap = _context.HeapManager;
+        int size = heap.GetIndexedSize(dictOOP);
+        if (size == 0) return heap.GetNil();
+
+        var nilOOP = heap.GetNil();
+
+        // Hash-based lookup: start at hash slot, linear probe until found or nil
+        int startIndex = IdentityHashUtility.ComputeDictionaryHashIndex(keyOOP, size);
+        int index = startIndex;
+
+        do
+        {
+            var associationOOP = heap.GetIndexedOOP(dictOOP, index);
+
+            // Empty slot - key not in dictionary
+            if (associationOOP == nilOOP)
+                return nilOOP;
+
+            // Get the key from the Association
+            if (!associationOOP.IsSmallInteger)
+            {
+                var assocKeyOOP = heap.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                if (assocKeyOOP == keyOOP)  // Identity comparison for Symbols
+                {
+                    return heap.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                }
+            }
+
+            // Linear probe to next slot
+            index = (index + 1) % size;
+        } while (index != startIndex);
+
+        return nilOOP;  // Wrapped around - not found
     }
 
     /// <summary>
