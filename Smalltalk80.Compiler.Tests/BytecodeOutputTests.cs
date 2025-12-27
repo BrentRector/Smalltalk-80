@@ -24,33 +24,36 @@ public class BytecodeOutputTests : CompilerTestBase
     }
 
     [Test]
-    public void PushTrue_Produces0x71()
+    public void ReturnTrue_Produces0x79()
     {
+        // Blue Book optimization: ^true compiles to RETURN_TRUE (0x79)
         var json = CompileSource(WrapInTestClass("test ^true"));
         var method = GetFirstMethod(json);
         var bytecodes = (JArray)method["bytecodes"]!;
 
-        AssertBytecodeAt(bytecodes, 0, 0x71, "PUSH_TRUE");
+        AssertBytecodeAt(bytecodes, 0, 0x79, "RETURN_TRUE");
     }
 
     [Test]
-    public void PushFalse_Produces0x72()
+    public void ReturnFalse_Produces0x7A()
     {
+        // Blue Book optimization: ^false compiles to RETURN_FALSE (0x7A)
         var json = CompileSource(WrapInTestClass("test ^false"));
         var method = GetFirstMethod(json);
         var bytecodes = (JArray)method["bytecodes"]!;
 
-        AssertBytecodeAt(bytecodes, 0, 0x72, "PUSH_FALSE");
+        AssertBytecodeAt(bytecodes, 0, 0x7A, "RETURN_FALSE");
     }
 
     [Test]
-    public void PushNil_Produces0x73()
+    public void ReturnNil_Produces0x7B()
     {
+        // Blue Book optimization: ^nil compiles to RETURN_NIL (0x7B)
         var json = CompileSource(WrapInTestClass("test ^nil"));
         var method = GetFirstMethod(json);
         var bytecodes = (JArray)method["bytecodes"]!;
 
-        AssertBytecodeAt(bytecodes, 0, 0x73, "PUSH_NIL");
+        AssertBytecodeAt(bytecodes, 0, 0x7B, "RETURN_NIL");
     }
 
     [Test]
