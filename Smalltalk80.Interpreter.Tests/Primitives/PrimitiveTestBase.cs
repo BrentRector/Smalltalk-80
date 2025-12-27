@@ -65,6 +65,7 @@ public abstract class PrimitiveTestBase
         var smallIntegerClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
         var blockContextClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
         var orderedCollectionClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var processClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
 
         return new VMMetadata
         {
@@ -103,7 +104,8 @@ public abstract class PrimitiveTestBase
             CompiledMethodClassOOP = compiledMethodClassOOP,
             SmallIntegerClassOOP = smallIntegerClassOOP,
             BlockContextClassOOP = blockContextClassOOP,
-            OrderedCollectionClassOOP = orderedCollectionClassOOP
+            OrderedCollectionClassOOP = orderedCollectionClassOOP,
+            ProcessClassOOP = processClassOOP
         };
     }
 
@@ -316,7 +318,8 @@ public abstract class PrimitiveTestBase
             CompiledMethodClassOOP = ObjectOOP(15),
             SmallIntegerClassOOP = ObjectOOP(16),
             BlockContextClassOOP = ObjectOOP(17),
-            OrderedCollectionClassOOP = ObjectOOP(21)
+            OrderedCollectionClassOOP = ObjectOOP(21),
+            ProcessClassOOP = ObjectOOP(22)
         };
     }
 }
