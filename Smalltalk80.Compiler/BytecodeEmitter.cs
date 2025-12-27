@@ -1064,15 +1064,6 @@ namespace Smalltalk80.Compiler
             }
         }
 
-        /// <summary>
-        /// Backward compatibility wrapper.
-        /// </summary>
-        [Obsolete("Use EmitSuperSend() instead. This wrapper method is deprecated and will be removed in a future version.")]
-        public void SendSuperMessage(string selector, int argCount)
-        {
-            EmitSuperSend(selector, argCount);
-        }
-
         // ============================================================================
         // SIZING MODE - Two-pass compilation support (with nesting)
         // ============================================================================

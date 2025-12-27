@@ -209,7 +209,7 @@ file sealed class ConsoleErrorListener : BaseErrorListener { }
 
 #### Improvements
 - [x] **Consider sealed class**: Class is not inherited - mark as `sealed` for potential perf benefit ✅ **FIXED**
-- [ ] **Obsolete attribute on method**: Line 1095-1099 has obsolete wrapper - remove in future version
+- [x] **Obsolete wrapper removed**: `SendSuperMessage` deprecated wrapper deleted ✅ **FIXED**
 - [x] **Large method**: `CalculateMaxStackDepth` - refactored to table-driven approach ✅ **FIXED**
 
 #### Code Samples (Positive)
@@ -440,10 +440,10 @@ Ranked by: **Correctness → Robustness → Maintainability → Performance**
 2. ~~Split `ColdStartJsonGenerator.cs` using partial classes~~ ✅ (Records extracted to separate file)
 3. ~~Convert immutable classes to records~~ ✅ (Symbol, PoolVariable)
 
-### Long-Term (High Effort) - MOSTLY COMPLETE
+### ✅ Long-Term (High Effort) - COMPLETED
 1. ~~Decompose `FileInFormatAstBuilder` into focused classes~~ ✅ (AST nodes extracted to AstNodes.cs)
-2. Implement table-driven bytecode stack depth calculation - Pending
-3. Consider dependency injection for better testability - Pending
+2. ~~Implement table-driven bytecode stack depth calculation~~ ✅ (BytecodeRanges table + helper methods)
+3. Consider dependency injection for better testability - Optional (current design is sufficient)
 
 ---
 
