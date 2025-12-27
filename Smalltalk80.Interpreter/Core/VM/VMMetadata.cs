@@ -46,4 +46,7 @@ public record VMMetadata
     // Special objects that need VM access (GC roots)
     public required SmalltalkOOP ProcessorScheduler { get; init; }
     public SmalltalkOOP InitExpressionMethods { get; init; } // Optional, set during Phase 8b
+
+    // Diagnostic metadata (optional, for tracing/debugging)
+    public Dictionary<SmalltalkOOP, string>? ObjectIdToLocalId { get; init; }
 }

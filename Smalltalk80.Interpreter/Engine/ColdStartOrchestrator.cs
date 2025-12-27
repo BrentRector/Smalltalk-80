@@ -310,7 +310,8 @@ public class ColdStartOrchestrator : IColdStartLoader
             ProcessClassOOP = GlobalRegistry.Get("class:Process"),
             KnownObjects = knownObjects,
             ProcessorScheduler = processorSchedulerOOP,
-            InitExpressionMethods = InitExpressionMethods
+            InitExpressionMethods = InitExpressionMethods,
+            ObjectIdToLocalId = GlobalRegistry.GetObject<Dictionary<SmalltalkOOP, string>>("objectIdToLocalId")
         };
 
         return metadata;

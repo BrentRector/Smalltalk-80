@@ -1128,13 +1128,11 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     /// <summary>
     /// Gets the local ID for an object (used for blockOwnerMap lookup).
-    /// Uses the reverse mapping built during Phase8.
+    /// Uses the reverse mapping built during cold start and stored in VMMetadata.
     /// </summary>
     private string? GetLocalId(SmalltalkOOP objectOOP)
     {
-        // NOTE: objectIdToLocalId is VM metadata (not Smalltalk data), so GlobalRegistry access is correct
-        var objectIdToLocalId = GlobalRegistry.GetObject<Dictionary<SmalltalkOOP, string>>("objectIdToLocalId");
-        if (objectIdToLocalId?.TryGetValue(objectOOP, out string? localId) == true)
+        if (_metadata.ObjectIdToLocalId?.TryGetValue(objectOOP, out string? localId) == true)
         {
             return localId;
         }
