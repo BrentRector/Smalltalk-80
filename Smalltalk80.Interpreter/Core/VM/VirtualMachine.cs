@@ -1198,7 +1198,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 {
                     // Found it - get the selector
                     var selectorOOP = _heapManager.GetIndexedOOP(keysOOP, j);
-                    string selector = _heapManager.ReadSymbolString(selectorOOP);
+                    string selector = ExtractSymbolString(selectorOOP);
                     string className = _heapManager.GetClassName(classOOP);
                     return $"method:{className}>>{selector}";
                 }
@@ -1210,6 +1210,20 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Extracts the string content from a Symbol OOP.
+    /// </summary>
+    private string ExtractSymbolString(SmalltalkOOP symbolOOP)
+    {
+        int size = _heapManager.GetIndexedSize(symbolOOP);
+        var bytes = new byte[size];
+        for (int i = 0; i < size; i++)
+        {
+            bytes[i] = _heapManager.GetIndexedByte(symbolOOP, i);
+        }
+        return System.Text.Encoding.Latin1.GetString(bytes);
     }
 
     /// <summary>
