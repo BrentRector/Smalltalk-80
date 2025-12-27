@@ -17,7 +17,7 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase5;
 public class RuntimeObjectCreator(
     Phase5Context context,
     IAssociationManager associationManager,
-    IDictionaryOperations dictionaryOps) : IRuntimeObjectCreator
+    RuntimeDictionaryService dictService) : IRuntimeObjectCreator
 {
     /// <summary>
     /// Creates the DefaultTextStyle object with properly initialized StrikeFonts.
@@ -146,13 +146,13 @@ public class RuntimeObjectCreator(
 
         if (GlobalRegistry.TryGet("TextConstants", out var textConstantsOOP))
         {
-            // Install in TextConstants using dictionary operations
-            dictionaryOps.InstallAssociation(textConstantsOOP, primaryAssoc, "DefaultTextStyle");
+            // Install in TextConstants
+            dictService.InstallAssociation(textConstantsOOP, primaryAssoc, keySymbolOOP);
 
             // Remove DefaultTextStyle from Undeclared (with proper hash chain fixup)
             if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
             {
-                dictionaryOps.RemoveAssociation(undeclaredOOP, keySymbolOOP, "DefaultTextStyle");
+                dictService.RemoveAssociation(undeclaredOOP, keySymbolOOP);
             }
         }
         else
@@ -272,7 +272,8 @@ public class RuntimeObjectCreator(
 
         // Install in SystemDictionary
         var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
-        dictionaryOps.InstallAssociation(systemDictOOP, associationOOP, "Display");
+        var displayKeyOOP = context.Allocator.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+        dictService.InstallAssociation(systemDictOOP, associationOOP, displayKeyOOP);
 
         GlobalRegistry.Register("Display", displayScreenOOP);
 
