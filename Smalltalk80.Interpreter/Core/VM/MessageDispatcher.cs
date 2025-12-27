@@ -1,6 +1,5 @@
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
-using Constants = Smalltalk80.Interpreter.InterpreterConstants;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -16,13 +15,19 @@ internal class MessageDispatcher(
     IObjectMetadataAccessor helpers,
     VMMetadata metadata) : IMessageDispatcher
 {
+    /// <summary>
+    /// Maximum inheritance chain depth for method lookup.
+    /// Prevents infinite loops in circular class hierarchies.
+    /// </summary>
+    private const int MaxInheritanceDepth = 20;
+
     /// <inheritdoc />
     public MethodLookupResult? LookupMethod(SmalltalkOOP classOOP, string selectorName)
     {
         var currentClassOOP = classOOP;
         int depth = 0;
 
-        while (currentClassOOP != metadata.KnownObjects.Nil && depth < Constants.MaxInheritanceDepth)
+        while (currentClassOOP != metadata.KnownObjects.Nil && depth < MaxInheritanceDepth)
         {
             // Validate the class OOP before trying to get its name
             if (!heapManager.IsValidOOP(currentClassOOP))
