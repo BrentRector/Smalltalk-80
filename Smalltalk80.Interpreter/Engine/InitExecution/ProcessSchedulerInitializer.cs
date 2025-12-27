@@ -1,4 +1,3 @@
-using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
@@ -64,11 +63,11 @@ public class ProcessSchedulerInitializer
     /// </summary>
     private SmalltalkOOP CreateInitialProcess(int priority)
     {
-        // Get Process class
-        var processClassOOP = LookupGlobal("Process");
+        // Get Process class from VMMetadata (not from GlobalRegistry which is disposed)
+        var processClassOOP = _metadata.ProcessClassOOP;
         if (processClassOOP == _heapManager.GetNil())
         {
-            throw new InvalidOperationException("Process class not found in Smalltalk dictionary");
+            throw new InvalidOperationException("Process class not found in VMMetadata");
         }
 
         // Create Process object (4 instance variables: nextLink, suspendedContext, priority, myList)
@@ -84,70 +83,5 @@ public class ProcessSchedulerInitializer
         _heapManager.SetInstanceVariable(processOOP, VMConstants.PROCESS_MYLIST_INDEX, _heapManager.GetNil());
 
         return processOOP;
-    }
-
-    /// <summary>
-    /// Looks up a global variable in the SystemDictionary.
-    /// </summary>
-    private SmalltalkOOP LookupGlobal(string globalName)
-    {
-        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
-        int size = _heapManager.GetIndexedSize(smalltalkOOP);
-
-        // Find the symbol OOP for the global name
-        var symbolOOP = FindSymbol(globalName);
-        if (symbolOOP == _heapManager.GetNil())
-        {
-            return _heapManager.GetNil();
-        }
-
-        // Search SystemDictionary for Association with this key
-        for (int i = 0; i < size; i++)
-        {
-            var assocOOP = _heapManager.GetIndexedOOP(smalltalkOOP, i);
-            if (assocOOP == _heapManager.GetNil())
-                continue;
-
-            var keyOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            if (keyOOP == symbolOOP)
-            {
-                return _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-            }
-        }
-
-        return _heapManager.GetNil();
-    }
-
-    /// <summary>
-    /// Finds a symbol OOP by searching through all registered symbols.
-    /// </summary>
-    private SmalltalkOOP FindSymbol(string symbolText)
-    {
-        foreach (var (index, symbolOOP) in SymbolRegistry.AllSymbols())
-        {
-            var symbolString = ReadSymbolString(symbolOOP);
-            if (symbolString == symbolText)
-            {
-                return symbolOOP;
-            }
-        }
-
-        return _heapManager.GetNil();
-    }
-
-    /// <summary>
-    /// Reads a Symbol object's string value from the heap.
-    /// </summary>
-    private string ReadSymbolString(SmalltalkOOP symbolOOP)
-    {
-        int size = _heapManager.GetIndexedSize(symbolOOP);
-        var bytes = new byte[size];
-
-        for (int i = 0; i < size; i++)
-        {
-            bytes[i] = _heapManager.GetIndexedByte(symbolOOP, i);
-        }
-
-        return System.Text.Encoding.UTF8.GetString(bytes);
     }
 }

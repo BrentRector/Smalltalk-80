@@ -13,17 +13,6 @@ public interface IFieldValueResolver
 }
 
 /// <summary>
-/// Hash-based dictionary operations matching Smalltalk-80 semantics.
-/// </summary>
-public interface IDictionaryOperations
-{
-    void InstallAssociation(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string keyName);
-    void RemoveAssociation(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbolOOP, string keyName);
-    int GetSymbolHash(SmalltalkOOP symbolOOP);
-    void FixCollisionsFrom(SmalltalkOOP dictionaryOOP, int startIndex);
-}
-
-/// <summary>
 /// Manages Association creation and canonical identity.
 /// </summary>
 public interface IAssociationManager

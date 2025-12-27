@@ -1,8 +1,44 @@
 # Cold Start Phase Architecture Analysis
 
-**Date**: 2025-11-19
+**Date**: 2025-11-19 (Updated: 2025-12-27)
 **Author**: Claude Code Analysis
-**Status**: Analysis Complete
+**Status**: Partially Implemented
+
+---
+
+## Current Implementation Status (2025-12-27)
+
+### ✅ Completed
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **RuntimeDictionaryService** | ✅ Complete | `Core/VM/RuntimeDictionaryService.cs` - Runtime-safe dictionary operations using only ISmalltalkHeap |
+| **Phase 3 → RuntimeDictionaryService** | ✅ Complete | Phase 3 DictionaryInstaller now uses RuntimeDictionaryService directly |
+| **Phase 4 → RuntimeDictionaryService** | ✅ Complete | Phase 4 MethodDictionaryInstaller uses RuntimeDictionaryService directly |
+| **Phase 5 → RuntimeDictionaryService** | ✅ Complete | Phase 5 now directly uses RuntimeDictionaryService, eliminating wrapper |
+| **Engine/Services/DictionaryService.cs** | ✅ Deleted | All phases now use RuntimeDictionaryService directly |
+| **Phase5/DictionaryOperations.cs** | ✅ Deleted | Wrapper class removed - was just delegating to RuntimeDictionaryService |
+| **IDictionaryOperations interface** | ✅ Removed | Interface removed from Phase5/Interfaces.cs |
+| **Canonical global lookup** | ✅ Complete | IRuntimeHeapAccessor.LookupGlobalAssociation implements SystemDictionary → Undeclared chain |
+| **VMConstants for Association** | ✅ Complete | ASSOCIATION_KEY_INDEX, ASSOCIATION_VALUE_INDEX, DICTIONARY_TALLY_INDEX |
+| **InstallInIdentityDictionary** | ✅ Complete | RuntimeDictionaryService supports MethodDictionary installation |
+
+### 📋 Cold-Start Specific Services (By Design)
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **Engine/Services/SymbolService** | ✅ Appropriate | Cold-start symbol lookup via SymbolRegistry (disposed after Phase 6) |
+| **Engine/Services/FieldValueService** | ✅ Appropriate | JSON bundle parsing - not heap-based, cold-start specific |
+
+> **Note**: SymbolService and FieldValueService are NOT candidates for runtime migration.
+> They work with ColdStartBundle schema, not heap operations. See analysis in INTERPRETER_CODE_QUALITY_REVIEW.md.
+
+### ❌ Remaining Work (Low Priority)
+
+| Item | Priority | Notes |
+|------|----------|-------|
+| Consolidate Phase5/FieldValueResolver | Low | May duplicate FieldValueService |
+| Phase 5 sub-orchestrator simplification | Low | Still has 9 helper files |
 
 ---
 

@@ -2,83 +2,105 @@ using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core;
-using Smalltalk80.Interpreter.Core.Schema;
-using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase3;
 
 /// <summary>
 /// Handles hash-based dictionary operations for Phase 3 object allocation.
-/// Implements Association installation in SystemDictionary and other dictionaries
-/// using the same algorithms as Smalltalk-80 Dictionary>>findKeyOrNil:.
+/// Uses RuntimeDictionaryService for hash-based operations and ObjectGraphAllocator for object creation.
 /// </summary>
 internal class DictionaryInstaller(
+    ObjectGraphAllocator allocator,
+    RuntimeDictionaryService dictService,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
     HashSet<(SmalltalkOOP oop, int slot)> initializedFields,
-    Func<string, SmalltalkOOP> symbolInternerFunc,
-    DictionaryService dictionaryService)
+    Func<string, SmalltalkOOP> symbolInternerFunc)
 {
     /// <summary>
     /// Allocates an Association object (key-value pair) using ObjectGraphAllocator.
     /// </summary>
-    /// <param name="keyOOP">The symbol key for the Association.</param>
-    /// <param name="valueOOP">The value for the Association.</param>
-    /// <returns>The newly allocated Association OOP.</returns>
     public SmalltalkOOP AllocateAssociation(SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
     {
-        return dictionaryService.AllocateAssociation(keyOOP, valueOOP);
+        var associationOOP = allocator.AllocateFixedObject("Association");
+
+        // Set Association class reference
+        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
+        allocator.SetClassOOP(associationOOP, associationClassOOP);
+
+        // Set instance variables using VMConstants
+        allocator.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX, keyOOP);
+        allocator.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
+
+        return associationOOP;
     }
 
     /// <summary>
     /// Installs an association in SystemDictionary using hash-based slot finding.
-    /// CRITICAL: Must use same algorithm as Dictionary>>findKeyOrNil: so runtime lookups work!
+    /// Delegates to RuntimeDictionaryService.
     /// </summary>
-    /// <param name="associationOOP">The Association to install.</param>
-    /// <param name="name">The key name for diagnostics.</param>
     public void InstallInSystemDictionary(SmalltalkOOP associationOOP, string name)
     {
-        dictionaryService.InstallInSystemDictionary(associationOOP, name);
+        var systemDictOOP = GlobalRegistry.SystemDictionaryOOP;
+        var keySymbolOOP = allocator.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+        dictService.InstallAssociation(systemDictOOP, associationOOP, keySymbolOOP);
     }
 
     /// <summary>
     /// Gets the identity hash of a symbol using Primitive 75 semantics.
-    /// Symbol>>hash returns half the object pointer - an IDENTITY hash based on OOP.
     /// </summary>
-    /// <param name="symbolOOP">The symbol OOP to hash.</param>
-    /// <returns>The identity hash value.</returns>
     public int GetSymbolHash(SmalltalkOOP symbolOOP)
     {
-        return dictionaryService.GetSymbolHash(symbolOOP);
+        return IdentityHashUtility.ComputeIdentityHash(symbolOOP);
     }
 
     /// <summary>
-    /// Installs an Association in any Dictionary object (including pool dictionaries and Undeclared).
-    /// Uses hash-based lookup to match Dictionary>>findKeyOrNil: algorithm.
+    /// Installs an Association in any Dictionary object.
+    /// Delegates to RuntimeDictionaryService.
     /// </summary>
-    /// <param name="dictionaryOOP">The dictionary to install into.</param>
-    /// <param name="associationOOP">The Association to install.</param>
-    /// <param name="name">The key name for diagnostics.</param>
     public void InstallInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP, string name)
     {
-        dictionaryService.InstallInDictionary(dictionaryOOP, associationOOP, name);
+        var keySymbolOOP = allocator.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+        dictService.InstallAssociation(dictionaryOOP, associationOOP, keySymbolOOP);
     }
 
     /// <summary>
     /// Finds an Association by key in all allocated objects and updates its value.
-    /// Searches through all objects looking for Association instances with matching key.
+    /// This is a cold-start specific operation that searches through all objects.
     /// </summary>
-    /// <param name="keyName">The key name to search for.</param>
-    /// <param name="newValueOOP">The new value to set.</param>
-    /// <returns>True if Association was found and updated, false otherwise.</returns>
     public bool FindAndUpdateAssociationValue(string keyName, SmalltalkOOP newValueOOP)
     {
-        var result = dictionaryService.FindAndUpdateAssociationValue(
-            keyName, newValueOOP, localIdToObjectId, symbolInternerFunc);
+        var keySymbol = symbolInternerFunc(keyName);
+        var associationClassOOP = GlobalRegistry.LookupClassOOP("Association");
 
-        if (result.HasValue)
+        // Search through all allocated objects
+        foreach (var kvp in localIdToObjectId)
         {
-            initializedFields.Add(result.Value);
-            return true;
+            var objectOOP = kvp.Value;
+
+            try
+            {
+                // Check if this is an Association object
+                var classOOP = allocator.GetClassOOP(objectOOP);
+                if (classOOP == associationClassOOP)
+                {
+                    // Get the key
+                    var assocKeyOOP = allocator.GetInstanceVariable(objectOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+
+                    // Check if key matches
+                    if (assocKeyOOP == keySymbol)
+                    {
+                        // Update the value
+                        allocator.SetInstanceVariable(objectOOP, VMConstants.ASSOCIATION_VALUE_INDEX, newValueOOP);
+                        initializedFields.Add((objectOOP, VMConstants.ASSOCIATION_VALUE_INDEX));
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                // Skip objects that don't have the expected structure
+                continue;
+            }
         }
 
         return false;

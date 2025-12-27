@@ -18,21 +18,21 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
 /// <param name="allocator">The object graph allocator for creating objects.</param>
 /// <param name="localIdToObjectId">Mapping from local IDs to allocated object OOPs.</param>
 /// <param name="symbolService">The symbol service for symbol lookups.</param>
-/// <param name="dictionaryService">The dictionary service for hash-based dictionary operations.</param>
+/// <param name="dictService">The runtime dictionary service for hash-based dictionary operations.</param>
 /// <param name="diagnostics">Optional diagnostic hub for logging.</param>
 internal class MethodDictionaryInstaller(
     ColdStartBundle bundle,
     ObjectGraphAllocator allocator,
     Dictionary<string, SmalltalkOOP> localIdToObjectId,
     SymbolService symbolService,
-    DictionaryService dictionaryService,
+    RuntimeDictionaryService dictService,
     IDiagnosticHub? diagnostics = null)
 {
     private readonly ColdStartBundle _bundle = bundle;
     private readonly ObjectGraphAllocator _allocator = allocator;
     private readonly Dictionary<string, SmalltalkOOP> _localIdToObjectId = localIdToObjectId;
     private readonly SymbolService _symbolService = symbolService;
-    private readonly DictionaryService _dictionaryService = dictionaryService;
+    private readonly RuntimeDictionaryService _dictService = dictService;
     private readonly IDiagnosticHub? _diagnostics = diagnostics;
 
     /// <summary>
@@ -202,14 +202,14 @@ internal class MethodDictionaryInstaller(
 
     /// <summary>
     /// Installs a method into a method dictionary using IdentityDictionary structure.
-    /// Delegates to DictionaryService for hash-based placement.
+    /// Delegates to RuntimeDictionaryService for hash-based placement.
     /// </summary>
     /// <param name="methodDictOOP">The method dictionary to install into.</param>
     /// <param name="selectorSymbolOOP">The selector symbol OOP.</param>
     /// <param name="methodOOP">The compiled method OOP to install.</param>
     public void InstallMethodInDictionary(SmalltalkOOP methodDictOOP, SmalltalkOOP selectorSymbolOOP, SmalltalkOOP methodOOP)
     {
-        _dictionaryService.InstallInIdentityDictionary(methodDictOOP, selectorSymbolOOP, methodOOP, selectorSymbolOOP.ToString());
+        _dictService.InstallInIdentityDictionary(methodDictOOP, selectorSymbolOOP, methodOOP);
     }
 
     /// <summary>

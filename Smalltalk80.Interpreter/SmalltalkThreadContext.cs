@@ -67,4 +67,11 @@ public class SmalltalkThreadContext
     /// events arrive before event callbacks are registered.
     /// </summary>
     public ManualResetEventSlim EventCallbacksReady { get; } = new(false);
+
+    /// <summary>
+    /// Signaled by main thread after window has been displayed.
+    /// Smalltalk thread waits on this before executing init expressions to ensure
+    /// window is ready for graphics operations.
+    /// </summary>
+    public ManualResetEventSlim WindowDisplayed { get; } = new(false);
 }

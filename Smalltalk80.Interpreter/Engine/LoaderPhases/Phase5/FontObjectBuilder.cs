@@ -54,7 +54,7 @@ public class FontObjectBuilder
         var nameOOP = CreateString(fontData.Name);
         SetInstanceVarByName(strikeFontOOP, "StrikeFont", "name", nameOOP);
 
-        // Create stopConditions array (256 entries, all nil)
+        // Create stopConditions array (STOP_CONDITIONS_SIZE entries, all nil)
         var stopConditionsOOP = CreateStopConditionsArray();
         SetInstanceVarByName(strikeFontOOP, "StrikeFont", "stopConditions", stopConditionsOOP);
 
@@ -214,17 +214,17 @@ public class FontObjectBuilder
 
     /// <summary>
     /// Creates the stopConditions array for CharacterScanner.
-    /// Needs 258 entries for indices 1-258 (Smalltalk 1-based).
-    /// EndOfRun = 257, CrossedX = 258 are used as sentinel indices.
+    /// Needs STOP_CONDITIONS_SIZE entries for indices 1-258 (Smalltalk 1-based).
+    /// EndOfRun = STOP_CONDITIONS_END_OF_RUN, CrossedX = STOP_CONDITIONS_CROSSED_X are sentinel indices.
     /// </summary>
     private SmalltalkOOP CreateStopConditionsArray()
     {
         var nilOOP = _context.HeapManager.GetNil();
-        var arrayOOP = _context.Allocator.AllocateArray("Array", 258);
+        var arrayOOP = _context.Allocator.AllocateArray("Array", VMConstants.STOP_CONDITIONS_SIZE);
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
         _context.Allocator.SetClassOOP(arrayOOP, arrayClassOOP);
 
-        for (int i = 0; i < 258; i++)
+        for (int i = 0; i < VMConstants.STOP_CONDITIONS_SIZE; i++)
         {
             _context.Allocator.SetIndexedOOP(arrayOOP, i, nilOOP);
         }

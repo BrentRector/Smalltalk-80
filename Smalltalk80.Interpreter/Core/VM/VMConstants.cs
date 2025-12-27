@@ -124,9 +124,30 @@ public static class VMConstants
     public const int METHOD_DICTIONARY_VALUE_ARRAY_INDEX = 1;   // Array of CompiledMethods
 
     // ========================================================================
+    // Class field indices (Blue Book)
+    // ========================================================================
+    // Class inherits from: Behavior → ClassDescription
+    // Class adds: 'name classPool sharedPools'
+    // Complete layout:
+    //   Instance variable 0: superclass (from Behavior)
+    //   Instance variable 1: methodDict (from Behavior)
+    //   Instance variable 2: format (from Behavior)
+    //   Instance variable 3: subclasses (from Behavior)
+    //   Instance variable 4: instanceVariables (from ClassDescription)
+    //   Instance variable 5: organization (from ClassDescription)
+    //   Instance variable 6: name (Class field) - Symbol
+    //   Instance variable 7: classPool (Class field) - Dictionary of class variables
+    //   Instance variable 8: sharedPools (Class field) - Array of pool dictionaries
+
+    public const int CLASS_NAME_INDEX = 6;            // Symbol naming the class
+    public const int CLASS_CLASSPOOL_INDEX = 7;       // Dictionary of class variables
+    public const int CLASS_SHAREDPOOLS_INDEX = 8;     // Array of pool dictionaries
+
+    // ========================================================================
     // Metaclass field indices
     // ========================================================================
-    // Metaclass inherits from: Behavior → ClassDescription → Class
+    // Metaclass inherits from: Behavior → ClassDescription
+    // Note: Metaclass does NOT inherit from Class - it's a parallel hierarchy
     // Metaclass adds: 'thisClass'
     // Complete layout:
     //   Instance variable 0: superclass (from Behavior)
@@ -173,4 +194,19 @@ public static class VMConstants
     // Link instanceVariableNames: 'nextLink'
     // Process, Semaphore signal queues, etc. inherit from Link
     public const int LINK_NEXTLINK_INDEX = 0;
+
+    // ========================================================================
+    // CharacterTable and CharacterScanner constants
+    // ========================================================================
+    // CharacterTable is an Array of 256 unique Character objects (ASCII 0-255)
+    // Used by Character class for identity-based character comparison
+
+    public const int CHARACTER_TABLE_SIZE = 256;
+
+    // StopConditions array for CharacterScanner
+    // Needs 258 entries for Smalltalk 1-based indices 1-258
+    // EndOfRun = 257, CrossedX = 258 are sentinel indices
+    public const int STOP_CONDITIONS_SIZE = 258;
+    public const int STOP_CONDITIONS_END_OF_RUN = 257;   // Smalltalk 1-based index
+    public const int STOP_CONDITIONS_CROSSED_X = 258;    // Smalltalk 1-based index
 }

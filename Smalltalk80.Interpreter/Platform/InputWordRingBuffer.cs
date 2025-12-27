@@ -55,6 +55,10 @@ public class InputWordRingBuffer
     // Decremented by Smalltalk thread when primitive 86 consumes a signal
     private volatile int _shadowSignalCount;
 
+    // Diagnostic counter for dropped events (buffer overflow)
+    // Atomically incremented when Enqueue fails due to full buffer
+    private long _droppedEventCount;
+
     // Callback invoked when words are enqueued (to signal VM's interrupt flag)
     private Action? _eventCallback;
 
@@ -93,6 +97,12 @@ public class InputWordRingBuffer
     public int ShadowSignalCount => _shadowSignalCount;
 
     /// <summary>
+    /// Gets the total count of dropped events due to buffer overflow.
+    /// Useful for diagnostics to detect if input events are being lost.
+    /// </summary>
+    public long DroppedEventCount => Interlocked.Read(ref _droppedEventCount);
+
+    /// <summary>
     /// Gets whether there are input words available to dequeue.
     /// </summary>
     public bool HasWords => _head != _tail;
@@ -125,7 +135,8 @@ public class InputWordRingBuffer
         if (nextHead == _tail)
         {
             // Buffer full - drop the word (same as original hardware behavior)
-            Console.WriteLine("[InputWordRingBuffer] WARNING: Buffer full, dropping input word");
+            long totalDropped = Interlocked.Increment(ref _droppedEventCount);
+            Console.WriteLine($"[InputWordRingBuffer] WARNING: Buffer full, dropping input word (total dropped: {totalDropped})");
             return false;
         }
 

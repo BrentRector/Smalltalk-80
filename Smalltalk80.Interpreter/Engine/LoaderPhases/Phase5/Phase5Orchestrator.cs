@@ -52,13 +52,13 @@ public class Phase5Orchestrator : IPhase
         // Create shared services
         var fieldValueResolver = new FieldValueResolver(_context);
         var associationManager = new AssociationManager(_context);
-        var dictionaryOps = new DictionaryOperations(_context);
+        var dictService = new RuntimeDictionaryService(heapManager);
 
         // Create main components
         _patchApplier = new PatchApplier(_context, fieldValueResolver);
         _ustableBuilder = new USTableBuilder(_context);
-        _systemDictInstaller = new SystemDictionaryInstaller(_context, associationManager, dictionaryOps);
-        _runtimeObjectCreator = new RuntimeObjectCreator(_context, associationManager, dictionaryOps);
+        _systemDictInstaller = new SystemDictionaryInstaller(_context, associationManager, dictService);
+        _runtimeObjectCreator = new RuntimeObjectCreator(_context, associationManager, dictService);
     }
 
     public IReadOnlyList<string> ValidatePreconditions() => new List<string>();
@@ -81,7 +81,8 @@ public class Phase5Orchestrator : IPhase
         _runtimeObjectCreator.CreateDefaultTextStyle();
         _runtimeObjectCreator.CreateDisplay();
 
-        // Freeze AssociationRegistry after all globals installed
-        AssociationRegistry.Freeze();
+        // Make AssociationRegistry immutable - no more registrations, but reads still allowed
+        // Dispose() is called by ColdStartOrchestrator after Phase 6 to block all access
+        AssociationRegistry.MakeImmutable();
     }
 }

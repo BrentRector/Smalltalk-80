@@ -26,6 +26,7 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     private readonly object _bufferLock = new();
     private readonly ISmalltalkHeap? _heap;
     private readonly VMMetadata? _vmMetadata;
+    private readonly IRuntimeHeapAccessor? _runtimeHeapAccess;
     private bool _disposed = false;
 
     // Input semaphore OOP for event notification (signaled on raw input)
@@ -103,6 +104,9 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         Height = height;
         _heap = heap;
         _vmMetadata = vmMetadata;
+        _runtimeHeapAccess = (heap != null && vmMetadata != null)
+            ? new RuntimeHeapAccessor(heap, vmMetadata)
+            : null;
 
         Console.WriteLine($"[WinForms] Creating window: {width}x{height}");
 
@@ -186,14 +190,17 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     /// </summary>
     private void CopyDisplayFromHeap()
     {
-        if (_heap == null || _vmMetadata == null)
+        if (_heap == null || _vmMetadata == null || _runtimeHeapAccess == null)
             return;
 
         try
         {
-            // Look up Display global
+            // Look up Display global using hash-based lookup
             var smalltalkOOP = _vmMetadata.KnownObjects.Smalltalk;
-            var displayOOP = LookupGlobal(smalltalkOOP, "Display");
+            var displaySymbolOOP = _runtimeHeapAccess.InternSymbol("Display");
+            if (displaySymbolOOP == _heap.GetNil())
+                return;
+            var displayOOP = HashBasedDictionaryLookup(smalltalkOOP, displaySymbolOOP);
             if (displayOOP == _heap.GetNil())
                 return;
 
@@ -225,46 +232,62 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
                 }
             }
         }
-        catch
+        catch (ObjectDisposedException)
         {
-            // Silently ignore errors
+            // Expected during shutdown - window disposed while paint in progress
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("cross-thread") || ex.Message.Contains("disposed"))
+        {
+            // Expected during shutdown - cross-thread operation on disposed control
+        }
+        catch (Exception ex)
+        {
+            // Log unexpected errors for debugging - don't silently swallow
+            System.Diagnostics.Debug.WriteLine($"[WinForms] CopyDisplayFromHeap failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
-    private SmalltalkOOP LookupGlobal(SmalltalkOOP smalltalkDictOOP, string globalName)
+    /// <summary>
+    /// Hash-based dictionary lookup using Smalltalk-80 Dictionary>>findKeyOrNil: semantics.
+    /// Uses identity hash of the key OOP and linear probing.
+    /// </summary>
+    private SmalltalkOOP HashBasedDictionaryLookup(SmalltalkOOP dictOOP, SmalltalkOOP keyOOP)
     {
-        if (_heap == null || _vmMetadata == null)
-            return _heap?.GetNil() ?? default;
+        if (_heap == null)
+            return default;
 
-        int dictSize = _heap.GetIndexedSize(smalltalkDictOOP);
-        for (int i = 0; i < dictSize; i++)
+        int size = _heap.GetIndexedSize(dictOOP);
+        if (size == 0) return _heap.GetNil();
+
+        var nilOOP = _heap.GetNil();
+
+        // Hash-based lookup: start at hash slot, linear probe until found or nil
+        int startIndex = IdentityHashUtility.ComputeDictionaryHashIndex(keyOOP, size);
+        int index = startIndex;
+
+        do
         {
-            var assocOOP = _heap.GetIndexedOOP(smalltalkDictOOP, i);
-            if (assocOOP == _heap.GetNil())
-                continue;
+            var associationOOP = _heap.GetIndexedOOP(dictOOP, index);
 
-            // Get key (Symbol)
-            var keyOOP = _heap.GetInstanceVariable(assocOOP, 0); // Association key
-            if (keyOOP == _heap.GetNil())
-                continue;
+            // Empty slot - key not in dictionary
+            if (associationOOP == nilOOP)
+                return nilOOP;
 
-            // Extract symbol string
-            int symbolSize = _heap.GetIndexedSize(keyOOP);
-            var symbolBytes = new byte[symbolSize];
-            for (int j = 0; j < symbolSize; j++)
+            // Get the key from the Association
+            if (!associationOOP.IsSmallInteger)
             {
-                symbolBytes[j] = _heap.GetIndexedByte(keyOOP, j);
+                var assocKeyOOP = _heap.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+                if (assocKeyOOP == keyOOP)  // Identity comparison for Symbols
+                {
+                    return _heap.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+                }
             }
-            string symbolText = System.Text.Encoding.UTF8.GetString(symbolBytes);
 
-            if (symbolText == globalName)
-            {
-                // Return value
-                return _heap.GetInstanceVariable(assocOOP, 1); // Association value
-            }
-        }
+            // Linear probe to next slot
+            index = (index + 1) % size;
+        } while (index != startIndex);
 
-        return _heap.GetNil();
+        return nilOOP;  // Wrapped around - not found
     }
 
     /// <summary>
