@@ -38,16 +38,17 @@ VSTest version 17.14.1 (x64)
 
 Starting test execution, please wait...
 A total of 1 test files matched the specified pattern.
-  Failed TestBlockContext [11 ms]
+  Failed And_WithZeroArgBlock_GeneratesJumpOnFalse [12 ms]
   Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "value"), Is.True)
-  Expected: True
-  But was:  False
+     and: with zero-arg block should not generate and: message send
+Assert.That(ContainsMessageSendFor(json, method, "and:"), Is.False)
+  Expected: False
+  But was:  True
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestBlockContext() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 156
+     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.And_WithZeroArgBlock_GeneratesJumpOnFalse() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 332
 
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestBlockContext() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 156
+1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.And_WithZeroArgBlock_GeneratesJumpOnFalse() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 332
 
 
   Standard Output Messages:
@@ -58,16 +59,17 @@ A total of 1 test files matched the specified pattern.
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestBlockInCollection [7 ms]
+  Failed IfFalse_WithZeroArgBlock_GeneratesJumpOnTrue [1 ms]
   Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "collect:"), Is.True)
-  Expected: True
-  But was:  False
+     ifFalse: with zero-arg block should not generate ifFalse: message send
+Assert.That(ContainsMessageSendFor(json, method, "ifFalse:"), Is.False)
+  Expected: False
+  But was:  True
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestBlockInCollection() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 232
+     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfFalse_WithZeroArgBlock_GeneratesJumpOnTrue() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 225
 
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestBlockInCollection() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 232
+1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfFalse_WithZeroArgBlock_GeneratesJumpOnTrue() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 225
 
 
   Standard Output Messages:
@@ -78,17 +80,17 @@ A total of 1 test files matched the specified pattern.
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestBlockRecursion [2 ms]
+  Failed IfFalseIfTrue_WithZeroArgBlocks_GeneratesJumps [1 ms]
   Error Message:
-     Should have main block and conditional blocks
-Assert.That(blockCount, Is.GreaterThanOrEqualTo(3))
-  Expected: greater than or equal to 3
-  But was:  1
+     ifFalse:ifTrue: with zero-arg blocks should not generate message send
+Assert.That(ContainsMessageSendFor(json, method, "ifFalse:ifTrue:"), Is.False)
+  Expected: False
+  But was:  True
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestBlockRecursion() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 315
+     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfFalseIfTrue_WithZeroArgBlocks_GeneratesJumps() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 307
 
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestBlockRecursion() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 315
+1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfFalseIfTrue_WithZeroArgBlocks_GeneratesJumps() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 307
 
 
   Standard Output Messages:
@@ -99,16 +101,17 @@ Assert.That(blockCount, Is.GreaterThanOrEqualTo(3))
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestBlockValueWithArgs [1 ms]
+  Failed IfTrue_WithBlockTemporary_CompilesCorrectly [1 ms]
   Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "value:value:"), Is.True)
-  Expected: True
-  But was:  False
+     ifTrue: with zero-arg block (even with temps) should not generate message send
+Assert.That(ContainsMessageSendFor(json, method, "ifTrue:"), Is.False)
+  Expected: False
+  But was:  True
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestBlockValueWithArgs() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 214
+     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrue_WithBlockTemporary_CompilesCorrectly() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 517
 
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestBlockValueWithArgs() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 214
+1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrue_WithBlockTemporary_CompilesCorrectly() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 517
 
 
   Standard Output Messages:
@@ -119,17 +122,17 @@ Assert.That(blockCount, Is.GreaterThanOrEqualTo(3))
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestBlockWithComplexExpression [2 ms]
+  Failed IfTrue_WithZeroArgBlock_GeneratesJumpOnFalse [1 ms]
   Error Message:
-     Should have main block and conditional blocks
-Assert.That(blockCount, Is.GreaterThanOrEqualTo(3))
-  Expected: greater than or equal to 3
-  But was:  1
+     ifTrue: with zero-arg block should not generate ifTrue: message send
+Assert.That(ContainsMessageSendFor(json, method, "ifTrue:"), Is.False)
+  Expected: False
+  But was:  True
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithComplexExpression() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 253
+     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrue_WithZeroArgBlock_GeneratesJumpOnFalse() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 158
 
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithComplexExpression() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 253
+1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrue_WithZeroArgBlock_GeneratesJumpOnFalse() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 158
 
 
   Standard Output Messages:
@@ -140,16 +143,17 @@ Assert.That(blockCount, Is.GreaterThanOrEqualTo(3))
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestBlockWithMethodCall [1 ms]
+  Failed IfTrueIfFalse_WithZeroArgBlocks_GeneratesJumps [1 ms]
   Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "size"), Is.True)
-  Expected: True
-  But was:  False
+     ifTrue:ifFalse: with zero-arg blocks should not generate message send
+Assert.That(ContainsMessageSendFor(json, method, "ifTrue:ifFalse:"), Is.False)
+  Expected: False
+  But was:  True
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithMethodCall() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 271
+     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrueIfFalse_WithZeroArgBlocks_GeneratesJumps() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 262
 
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithMethodCall() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 271
+1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrueIfFalse_WithZeroArgBlocks_GeneratesJumps() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 262
 
 
   Standard Output Messages:
@@ -160,16 +164,17 @@ Assert.That(blockCount, Is.GreaterThanOrEqualTo(3))
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestBlockWithMultipleParameters [1 ms]
+  Failed Or_WithZeroArgBlock_GeneratesJumpOnTrue [1 ms]
   Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "value:value:"), Is.True)
-  Expected: True
-  But was:  False
+     or: with zero-arg block should not generate or: message send
+Assert.That(ContainsMessageSendFor(json, method, "or:"), Is.False)
+  Expected: False
+  But was:  True
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithMultipleParameters() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 85
+     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.Or_WithZeroArgBlock_GeneratesJumpOnTrue() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 390
 
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithMultipleParameters() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 85
+1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.Or_WithZeroArgBlock_GeneratesJumpOnTrue() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 390
 
 
   Standard Output Messages:
@@ -180,535 +185,17 @@ Assert.That(blockCount, Is.GreaterThanOrEqualTo(3))
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestBlockWithParameter [1 ms]
+  Failed TestInfiniteLoop [1 ms]
   Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "value:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithParameter() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 66
-
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithParameter() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 66
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestBlockWithReturn [1 ms]
-  Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "value"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithReturn() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 47
-
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithReturn() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 47
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestBlockWithTemporaries [1 ms]
-  Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "value"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithTemporaries() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 104
-
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestBlockWithTemporaries() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 104
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestEmptyBlock [1 ms]
-  Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "value"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.BlockTests.TestEmptyBlock() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 28
-
-1)    at Smalltalk80.Compiler.Tests.BlockTests.TestEmptyBlock() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BlockTests.cs:line 28
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-line 10:0 extraneous input '<primitive: 60>' expecting {<EOF>, MINUS, '#', '!', LEFT_BRACKET, LEFT_PAREN, '{', NUMBER, STRING, CHAR_LITERAL, SEPARATOR_LINE, IDENTIFIER, QUOTED_SYMBOL}
-  Failed MethodHeader_LargeContext_WhenNeeded [1 ms]
-  Error Message:
-     Assert.That((bool)header["largeContext"]!, Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.BytecodeOutputTests.MethodHeader_LargeContext_WhenNeeded() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 458
-
-1)    at Smalltalk80.Compiler.Tests.BytecodeOutputTests.MethodHeader_LargeContext_WhenNeeded() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 458
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed MethodHeader_PrimitiveNumber [3 ms]
-  Error Message:
-   System.InvalidOperationException : Parsing failed with 1 syntax errors.
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.CompilerTestBase.CompileSource(String source) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 34
-   at Smalltalk80.Compiler.Tests.BytecodeOutputTests.MethodHeader_PrimitiveNumber() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 464
-   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
-   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
-
-  Standard Error Messages:
- line 10:0 extraneous input '<primitive: 60>' expecting {<EOF>, MINUS, '#', '!', LEFT_BRACKET, LEFT_PAREN, '{', NUMBER, STRING, CHAR_LITERAL, SEPARATOR_LINE, IDENTIFIER, QUOTED_SYMBOL}
-
-  Failed NestedBlocks_ProducesCorrectStructure [1 ms]
-  Error Message:
-     Should have 2 block methods
-Assert.That(blockMethods.Count, Is.EqualTo(2))
-  Expected: 2
-  But was:  0
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.BytecodeOutputTests.NestedBlocks_ProducesCorrectStructure() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 500
-
-1)    at Smalltalk80.Compiler.Tests.BytecodeOutputTests.NestedBlocks_ProducesCorrectStructure() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 500
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed PushFalse_Produces0x72 [< 1 ms]
-  Error Message:
-     Bytecode at index 0 (PUSH_FALSE): expected 114 but got 122
-Assert.That(actual, Is.EqualTo(expected))
-  Expected: 114
-  But was:  122
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecodeAt(JArray bytecodes, Int32 index, Int32 expected, String description) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 193
-   at Smalltalk80.Compiler.Tests.BytecodeOutputTests.PushFalse_Produces0x72() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 43
-
-1)    at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecodeAt(JArray bytecodes, Int32 index, Int32 expected, String description) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 193
-   at Smalltalk80.Compiler.Tests.BytecodeOutputTests.PushFalse_Produces0x72() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 43
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed PushNil_Produces0x73 [< 1 ms]
-  Error Message:
-     Bytecode at index 0 (PUSH_NIL): expected 115 but got 123
-Assert.That(actual, Is.EqualTo(expected))
-  Expected: 115
-  But was:  123
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecodeAt(JArray bytecodes, Int32 index, Int32 expected, String description) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 193
-   at Smalltalk80.Compiler.Tests.BytecodeOutputTests.PushNil_Produces0x73() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 53
-
-1)    at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecodeAt(JArray bytecodes, Int32 index, Int32 expected, String description) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 193
-   at Smalltalk80.Compiler.Tests.BytecodeOutputTests.PushNil_Produces0x73() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 53
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed PushTrue_Produces0x71 [< 1 ms]
-  Error Message:
-     Bytecode at index 0 (PUSH_TRUE): expected 113 but got 121
-Assert.That(actual, Is.EqualTo(expected))
-  Expected: 113
-  But was:  121
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecodeAt(JArray bytecodes, Int32 index, Int32 expected, String description) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 193
-   at Smalltalk80.Compiler.Tests.BytecodeOutputTests.PushTrue_Produces0x71() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 33
-
-1)    at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecodeAt(JArray bytecodes, Int32 index, Int32 expected, String description) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 193
-   at Smalltalk80.Compiler.Tests.BytecodeOutputTests.PushTrue_Produces0x71() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\BytecodeOutputTests.cs:line 33
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed And_WithNonBlock_FallsBackToMessageSend [1 ms]
-  Error Message:
-     and: with non-block argument should generate and: message send
-Assert.That(ContainsMessageSendFor(method, "and:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.And_WithNonBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 360
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.And_WithNonBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 360
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed And_WithOneArgBlock_FallsBackToMessageSend [1 ms]
-  Error Message:
-     and: with one-arg block should generate and: message send
-Assert.That(ContainsMessageSendFor(method, "and:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.And_WithOneArgBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 369
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.And_WithOneArgBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 369
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed IfFalse_WithOneArgBlock_FallsBackToMessageSend [1 ms]
-  Error Message:
-     ifFalse: with one-arg block should generate ifFalse: message send
-Assert.That(ContainsMessageSendFor(method, "ifFalse:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfFalse_WithOneArgBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 239
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfFalse_WithOneArgBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 239
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed IfFalseIfTrue_WithNonBlockArgs_FallsBackToMessageSend [< 1 ms]
-  Error Message:
-     ifFalse:ifTrue: with non-block args should generate message send
-Assert.That(ContainsMessageSendFor(method, "ifFalse:ifTrue:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfFalseIfTrue_WithNonBlockArgs_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 311
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfFalseIfTrue_WithNonBlockArgs_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 311
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed IfTrue_WithNonBlockArgument_FallsBackToMessageSend [< 1 ms]
-  Error Message:
-     ifTrue: with non-block argument should generate message send
-Assert.That(ContainsMessageSendFor(method, "ifTrue:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrue_WithNonBlockArgument_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 195
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrue_WithNonBlockArgument_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 195
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed IfTrue_WithOneArgBlock_FallsBackToMessageSend [1 ms]
-  Error Message:
-     ifTrue: with one-arg block should generate ifTrue: message send
-Assert.That(ContainsMessageSendFor(method, "ifTrue:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrue_WithOneArgBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 186
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrue_WithOneArgBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 186
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed IfTrue_WithVariableAsArgument_FallsBackToMessageSend [< 1 ms]
-  Error Message:
-     ifTrue: with variable as argument should generate message send
-Assert.That(ContainsMessageSendFor(method, "ifTrue:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrue_WithVariableAsArgument_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 204
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrue_WithVariableAsArgument_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 204
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed IfTrueIfFalse_WithFalseArgNonBlock_FallsBackToMessageSend [1 ms]
-  Error Message:
-     ifTrue:ifFalse: with non-block second arg should generate message send
-Assert.That(ContainsMessageSendFor(method, "ifTrue:ifFalse:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrueIfFalse_WithFalseArgNonBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 275
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrueIfFalse_WithFalseArgNonBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 275
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed IfTrueIfFalse_WithTrueArgNonBlock_FallsBackToMessageSend [< 1 ms]
-  Error Message:
-     ifTrue:ifFalse: with non-block first arg should generate message send
-Assert.That(ContainsMessageSendFor(method, "ifTrue:ifFalse:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrueIfFalse_WithTrueArgNonBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 266
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrueIfFalse_WithTrueArgNonBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 266
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed IfTrueIfFalse_WithTrueBlockHavingArgs_FallsBackToMessageSend [1 ms]
-  Error Message:
-     ifTrue:ifFalse: with true block having args should generate message send
-Assert.That(ContainsMessageSendFor(method, "ifTrue:ifFalse:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrueIfFalse_WithTrueBlockHavingArgs_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 284
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.IfTrueIfFalse_WithTrueBlockHavingArgs_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 284
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed Or_WithNonBlock_FallsBackToMessageSend [< 1 ms]
-  Error Message:
-     or: with non-block argument should generate or: message send
-Assert.That(ContainsMessageSendFor(method, "or:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.Or_WithNonBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 404
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.Or_WithNonBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 404
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed Or_WithOneArgBlock_FallsBackToMessageSend [1 ms]
-  Error Message:
-     or: with one-arg block should generate or: message send
-Assert.That(ContainsMessageSendFor(method, "or:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.Or_WithOneArgBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 413
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.Or_WithOneArgBlock_FallsBackToMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 413
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed WhileFalse_NotYetInlined_GeneratesMessageSend [1 ms]
-  Error Message:
-     whileFalse: should generate message send (inlining not yet implemented)
-Assert.That(ContainsMessageSendFor(method, "whileFalse:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.WhileFalse_NotYetInlined_GeneratesMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 723
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.WhileFalse_NotYetInlined_GeneratesMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 723
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed WhileTrue_NotYetInlined_GeneratesMessageSend [< 1 ms]
-  Error Message:
-     whileTrue: should generate message send (inlining not yet implemented)
-Assert.That(ContainsMessageSendFor(method, "whileTrue:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.WhileTrue_NotYetInlined_GeneratesMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 714
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureInliningTests.WhileTrue_NotYetInlined_GeneratesMessageSend() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureInliningTests.cs:line 714
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestAnd [1 ms]
-  Error Message:
-     Should create block for and:
+     Should create blocks for infinite while loop
 Assert.That(hasBlock, Is.True)
   Expected: True
   But was:  False
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureTests.TestAnd() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 215
+     at Smalltalk80.Compiler.Tests.ControlStructureTests.TestInfiniteLoop() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 363
 
-1)    at Smalltalk80.Compiler.Tests.ControlStructureTests.TestAnd() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 215
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestComplexConditional [5 ms]
-  Error Message:
-     Should have multiple blocks
-Assert.That(blockCount, Is.GreaterThanOrEqualTo(2))
-  Expected: greater than or equal to 2
-  But was:  0
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureTests.TestComplexConditional() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 287
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureTests.TestComplexConditional() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 287
+1)    at Smalltalk80.Compiler.Tests.ControlStructureTests.TestInfiniteLoop() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 363
 
 
   Standard Output Messages:
@@ -719,17 +206,17 @@ Assert.That(blockCount, Is.GreaterThanOrEqualTo(2))
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestOr [1 ms]
+  Failed TestWhileFalse [1 ms]
   Error Message:
-     Should create block for or:
+     Should create blocks for while loop
 Assert.That(hasBlock, Is.True)
   Expected: True
   But was:  False
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureTests.TestOr() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 233
+     at Smalltalk80.Compiler.Tests.ControlStructureTests.TestWhileFalse() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 146
 
-1)    at Smalltalk80.Compiler.Tests.ControlStructureTests.TestOr() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 233
+1)    at Smalltalk80.Compiler.Tests.ControlStructureTests.TestWhileFalse() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 146
 
 
   Standard Output Messages:
@@ -740,38 +227,17 @@ Assert.That(hasBlock, Is.True)
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestShortCircuitAnd [1 ms]
+  Failed TestWhileTrue [1 ms]
   Error Message:
-     Should create block even if not evaluated
+     Should create blocks for while loop
 Assert.That(hasBlock, Is.True)
   Expected: True
   But was:  False
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureTests.TestShortCircuitAnd() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 251
+     at Smalltalk80.Compiler.Tests.ControlStructureTests.TestWhileTrue() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 122
 
-1)    at Smalltalk80.Compiler.Tests.ControlStructureTests.TestShortCircuitAnd() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 251
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestShortCircuitOr [1 ms]
-  Error Message:
-     Should create block even if not evaluated
-Assert.That(hasBlock, Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureTests.TestShortCircuitOr() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 269
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureTests.TestShortCircuitOr() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 269
+1)    at Smalltalk80.Compiler.Tests.ControlStructureTests.TestWhileTrue() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 122
 
 
   Standard Output Messages:
@@ -782,117 +248,7 @@ Assert.That(hasBlock, Is.True)
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestTimesRepeat [< 1 ms]
-  Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "timesRepeat:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureTests.TestTimesRepeat() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 156
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureTests.TestTimesRepeat() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 156
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestToByDo [1 ms]
-  Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "to:by:do:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.ControlStructureTests.TestToByDo() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 197
-
-1)    at Smalltalk80.Compiler.Tests.ControlStructureTests.TestToByDo() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\ControlStructureTests.cs:line 197
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestBlockWithoutValue [1 ms]
-  Error Message:
-     Should create block
-Assert.That(bytecodes.Select(t => (int)t).Contains(143), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestBlockWithoutValue() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 290
-
-1)    at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestBlockWithoutValue() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 290
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestEmptyBlockInConditional [1 ms]
-  Error Message:
-     Should have two empty blocks
-Assert.That(blockCount, Is.EqualTo(2))
-  Expected: 2
-  But was:  0
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestEmptyBlockInConditional() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 198
-
-1)    at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestEmptyBlockInConditional() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 198
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestEmptyMethod [3 ms]
-  Error Message:
-     Bytecode mismatch:
-Expected: [120]
-Actual:   [112, 120]
-
-Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
-  Expected is <System.Int32[1]>, actual is <System.Int32[2]>
-  Values differ at index [0]
-  Expected: 120
-  But was:  112
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecode(JObject method, Int32[] expectedBytecodes) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 87
-   at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestEmptyMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 23
-
-1)    at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecode(JObject method, Int32[] expectedBytecodes) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 87
-   at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestEmptyMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 23
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestLargeLiteralPool [4 ms]
+  Failed TestLargeLiteralPool [5 ms]
   Error Message:
      Should use extended literal access
 Assert.That(hasExtended, Is.True)
@@ -900,9 +256,9 @@ Assert.That(hasExtended, Is.True)
   But was:  False
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestLargeLiteralPool() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 131
+     at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestLargeLiteralPool() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 142
 
-1)    at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestLargeLiteralPool() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 131
+1)    at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestLargeLiteralPool() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 142
 
 
   Standard Output Messages:
@@ -913,104 +269,7 @@ Assert.That(hasExtended, Is.True)
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 3)
 
 
-  Failed TestLargeTempCount [1 ms]
-  Error Message:
-   System.ArgumentNullException : Value cannot be null. (Parameter 'value')
-  Stack Trace:
-     at Newtonsoft.Json.Linq.JToken.EnsureValue(JToken value)
-   at Newtonsoft.Json.Linq.JToken.op_Explicit(JToken value)
-   at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestLargeTempCount() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 152
-   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
-   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestManyArguments [< 1 ms]
-  Error Message:
-   System.ArgumentNullException : Value cannot be null. (Parameter 'value')
-  Stack Trace:
-     at Newtonsoft.Json.Linq.JToken.EnsureValue(JToken value)
-   at Newtonsoft.Json.Linq.JToken.op_Explicit(JToken value)
-   at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestManyArguments() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 51
-   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
-   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestParenthesizedReceiver [3 ms]
-  Error Message:
-     Should have negated message
-Assert.That(hasNegated, Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestParenthesizedReceiver() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 240
-
-1)    at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestParenthesizedReceiver() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 240
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestSpecialCharactersInString [1 ms]
-  Error Message:
-     Assert.That(stringLiteral, Is.Not.Null)
-  Expected: not null
-  But was:  null
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestSpecialCharactersInString() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 176
-
-1)    at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestSpecialCharactersInString() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 176
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestVeryLongSelector [< 1 ms]
-  Error Message:
-     Assert.That(method["selector"]?.ToString(), Is.EqualTo("thisIsAVeryLongMethodNameToTestHowTheCompilerHandlesLongSelectorsInTheSystem"))
-  Expected: "thisIsAVeryLongMethodNameToTestHowTheCompilerHandlesLongSelectorsInTheSystem"
-  But was:  null
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestVeryLongSelector() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 36
-
-1)    at Smalltalk80.Compiler.Tests.EdgeCaseTests.TestVeryLongSelector() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\EdgeCaseTests.cs:line 36
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestCompileComplexExpressions [5 ms]
+  Failed TestCompileComplexExpressions [6 ms]
   Error Message:
      Assert.That(complexClass["name"]?.ToString(), Is.EqualTo("ComplexExpressions"))
   Expected: "ComplexExpressions"
@@ -1029,14 +288,14 @@ Assert.That(hasNegated, Is.True)
  [AST] Pass 2 complete: 10 methods compiled
 
 
-  Failed TestCompileControlStructures [4 ms]
+  Failed TestCompileControlStructures [6 ms]
   Error Message:
    System.ArgumentNullException : Value cannot be null. (Parameter 'source')
   Stack Trace:
      at System.Linq.ThrowHelper.ThrowArgumentNullException(ExceptionArgument argument)
    at System.Linq.Enumerable.TryGetFirst[TSource](IEnumerable`1 source, Func`2 predicate, Boolean& found)
    at System.Linq.Enumerable.FirstOrDefault[TSource](IEnumerable`1 source, Func`2 predicate)
-   at Smalltalk80.Compiler.Tests.IntegrationTests.TestCompileControlStructures() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\IntegrationTests.cs:line 106
+   at Smalltalk80.Compiler.Tests.IntegrationTests.TestCompileControlStructures() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\IntegrationTests.cs:line 108
    at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
 
@@ -1067,29 +326,11 @@ Assert.That(classes.Count, Is.EqualTo(1))
  [AST] Pass 2 complete: 8 methods compiled
 
 
-  Failed TestLargeMethodCompilation [2 ms]
-  Error Message:
-   System.ArgumentNullException : Value cannot be null. (Parameter 'value')
-  Stack Trace:
-     at Newtonsoft.Json.Linq.JToken.EnsureValue(JToken value)
-   at Newtonsoft.Json.Linq.JToken.op_Explicit(JToken value)
-   at Smalltalk80.Compiler.Tests.IntegrationTests.TestLargeMethodCompilation() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\IntegrationTests.cs:line 250
-   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
-   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestMethodCategories [1 ms]
+  Failed TestMethodCategories [2 ms]
   Error Message:
    System.NullReferenceException : Object reference not set to an instance of an object.
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.IntegrationTests.TestMethodCategories() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\IntegrationTests.cs:line 147
+     at Smalltalk80.Compiler.Tests.IntegrationTests.TestMethodCategories() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\IntegrationTests.cs:line 149
    at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
 
@@ -1104,7 +345,7 @@ Assert.That(classes.Count, Is.EqualTo(1))
   Error Message:
    System.NullReferenceException : Object reference not set to an instance of an object.
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.IntegrationTests.TestPrimitiveMethodCompilation() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\IntegrationTests.cs:line 211
+     at Smalltalk80.Compiler.Tests.IntegrationTests.TestPrimitiveMethodCompilation() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\IntegrationTests.cs:line 213
    at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
    at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
 
@@ -1115,28 +356,7 @@ Assert.That(classes.Count, Is.EqualTo(1))
  [AST] Pass 2 complete: 3 methods compiled
 
 
-  Failed TestUnicodeSupport [1 ms]
-  Error Message:
-     Should preserve Unicode characters
-Assert.That(hasUnicode, Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.IntegrationTests.TestUnicodeSupport() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\IntegrationTests.cs:line 283
-
-1)    at Smalltalk80.Compiler.Tests.IntegrationTests.TestUnicodeSupport() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\IntegrationTests.cs:line 283
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestCharacter [1 ms]
+  Failed TestCharacter [3 ms]
   Error Message:
      Character value mismatch at index 0
 Assert.That(actual["value"]?.ToString(), Is.EqualTo(str.Substring(1)))
@@ -1159,65 +379,9 @@ Assert.That(actual["value"]?.ToString(), Is.EqualTo(str.Substring(1)))
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestFalse [< 1 ms]
-  Error Message:
-     Bytecode mismatch:
-Expected: [114, 124]
-Actual:   [122]
-
-Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
-  Expected is <System.Int32[2]>, actual is <System.Int32[1]>
-  Values differ at index [0]
-  Expected: 114
-  But was:  122
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecode(JObject method, Int32[] expectedBytecodes) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 87
-   at Smalltalk80.Compiler.Tests.LiteralTests.TestFalse() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\LiteralTests.cs:line 230
-
-1)    at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecode(JObject method, Int32[] expectedBytecodes) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 87
-   at Smalltalk80.Compiler.Tests.LiteralTests.TestFalse() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\LiteralTests.cs:line 230
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
 line 12:4 no viable alternative at input '!TestClassmethodsFor:'testing'!testSpecialInteger-1^'
 line 12:4 mismatched input '^' expecting '!'
-  Failed TestNil [< 1 ms]
-  Error Message:
-     Bytecode mismatch:
-Expected: [115, 124]
-Actual:   [123]
-
-Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
-  Expected is <System.Int32[2]>, actual is <System.Int32[1]>
-  Values differ at index [0]
-  Expected: 115
-  But was:  123
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecode(JObject method, Int32[] expectedBytecodes) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 87
-   at Smalltalk80.Compiler.Tests.LiteralTests.TestNil() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\LiteralTests.cs:line 244
-
-1)    at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecode(JObject method, Int32[] expectedBytecodes) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 87
-   at Smalltalk80.Compiler.Tests.LiteralTests.TestNil() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\LiteralTests.cs:line 244
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestSpecialCharacter [< 1 ms]
+  Failed TestSpecialCharacter [1 ms]
   Error Message:
      Character value mismatch at index 0
 Assert.That(actual["value"]?.ToString(), Is.EqualTo(str.Substring(1)))
@@ -1240,7 +404,7 @@ Assert.That(actual["value"]?.ToString(), Is.EqualTo(str.Substring(1)))
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestSpecialIntegers [1 ms]
+  Failed TestSpecialIntegers [5 ms]
   Error Message:
    System.InvalidOperationException : Parsing failed with 2 syntax errors.
   Stack Trace:
@@ -1253,64 +417,16 @@ Assert.That(actual["value"]?.ToString(), Is.EqualTo(str.Substring(1)))
  line 12:4 no viable alternative at input '!TestClassmethodsFor:'testing'!testSpecialInteger-1^'
  line 12:4 mismatched input '^' expecting '!'
 
-  Failed TestTrue [< 1 ms]
+  Failed TestKeywordMessage [1 ms]
   Error Message:
-     Bytecode mismatch:
-Expected: [113, 124]
-Actual:   [121]
-
-Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
-  Expected is <System.Int32[2]>, actual is <System.Int32[1]>
-  Values differ at index [0]
-  Expected: 113
-  But was:  121
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecode(JObject method, Int32[] expectedBytecodes) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 87
-   at Smalltalk80.Compiler.Tests.LiteralTests.TestTrue() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\LiteralTests.cs:line 216
-
-1)    at Smalltalk80.Compiler.Tests.CompilerTestBase.AssertBytecode(JObject method, Int32[] expectedBytecodes) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\CompilerTestBase.cs:line 87
-   at Smalltalk80.Compiler.Tests.LiteralTests.TestTrue() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\LiteralTests.cs:line 216
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestComplexMessageChain [1 ms]
-  Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "negated"), Is.True)
+     Assert.That(LiteralContainsSymbol(json, method, "new:"), Is.True)
   Expected: True
   But was:  False
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.MessageTests.TestComplexMessageChain() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 280
+     at Smalltalk80.Compiler.Tests.MessageTests.TestKeywordMessage() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 62
 
-1)    at Smalltalk80.Compiler.Tests.MessageTests.TestComplexMessageChain() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 280
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestKeywordMessage [< 1 ms]
-  Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "new:"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.MessageTests.TestKeywordMessage() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 65
-
-1)    at Smalltalk80.Compiler.Tests.MessageTests.TestKeywordMessage() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 65
+1)    at Smalltalk80.Compiler.Tests.MessageTests.TestKeywordMessage() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 62
 
 
   Standard Output Messages:
@@ -1323,14 +439,14 @@ Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
 
   Failed TestMessagePrecedenceBinaryBeforeKeyword [1 ms]
   Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "new:"), Is.True)
+     Assert.That(LiteralContainsSymbol(json, method, "new:"), Is.True)
   Expected: True
   But was:  False
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.MessageTests.TestMessagePrecedenceBinaryBeforeKeyword() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 133
+     at Smalltalk80.Compiler.Tests.MessageTests.TestMessagePrecedenceBinaryBeforeKeyword() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 120
 
-1)    at Smalltalk80.Compiler.Tests.MessageTests.TestMessagePrecedenceBinaryBeforeKeyword() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 133
+1)    at Smalltalk80.Compiler.Tests.MessageTests.TestMessagePrecedenceBinaryBeforeKeyword() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 120
 
 
   Standard Output Messages:
@@ -1341,16 +457,16 @@ Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 3)
 
 
-  Failed TestMultipleKeywordMessage [1 ms]
+  Failed TestMultipleKeywordMessage [< 1 ms]
   Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "at:put:"), Is.True)
+     Assert.That(LiteralContainsSymbol(json, method, "at:put:"), Is.True)
   Expected: True
   But was:  False
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.MessageTests.TestMultipleKeywordMessage() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 80
+     at Smalltalk80.Compiler.Tests.MessageTests.TestMultipleKeywordMessage() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 77
 
-1)    at Smalltalk80.Compiler.Tests.MessageTests.TestMultipleKeywordMessage() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 80
+1)    at Smalltalk80.Compiler.Tests.MessageTests.TestMultipleKeywordMessage() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 77
 
 
   Standard Output Messages:
@@ -1363,34 +479,14 @@ Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
 
   Failed TestSpecialSelectorAt [1 ms]
   Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "at:"), Is.True)
+     Assert.That(LiteralContainsSymbol(json, method, "at:"), Is.True)
   Expected: True
   But was:  False
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.MessageTests.TestSpecialSelectorAt() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 246
+     at Smalltalk80.Compiler.Tests.MessageTests.TestSpecialSelectorAt() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 232
 
-1)    at Smalltalk80.Compiler.Tests.MessageTests.TestSpecialSelectorAt() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 246
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestSpecialSelectorSize [1 ms]
-  Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "size"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.MessageTests.TestSpecialSelectorSize() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 261
-
-1)    at Smalltalk80.Compiler.Tests.MessageTests.TestSpecialSelectorSize() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 261
+1)    at Smalltalk80.Compiler.Tests.MessageTests.TestSpecialSelectorAt() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 232
 
 
   Standard Output Messages:
@@ -1401,130 +497,16 @@ Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestUnaryMessage [< 1 ms]
-  Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "negated"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.MessageTests.TestUnaryMessage() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 29
-
-1)    at Smalltalk80.Compiler.Tests.MessageTests.TestUnaryMessage() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MessageTests.cs:line 29
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestBinaryMethod [< 1 ms]
-  Error Message:
-     Assert.That(method["selector"]?.ToString(), Is.EqualTo("+"))
-  Expected: "+"
-  But was:  null
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.MethodTests.TestBinaryMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 273
-
-1)    at Smalltalk80.Compiler.Tests.MethodTests.TestBinaryMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 273
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestKeywordMethod [< 1 ms]
-  Error Message:
-     Assert.That(method["selector"]?.ToString(), Is.EqualTo("at:put:"))
-  Expected: "at:put:"
-  But was:  null
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.MethodTests.TestKeywordMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 287
-
-1)    at Smalltalk80.Compiler.Tests.MethodTests.TestKeywordMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 287
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestLongMethod [1 ms]
-  Error Message:
-   System.ArgumentNullException : Value cannot be null. (Parameter 'value')
-  Stack Trace:
-     at Newtonsoft.Json.Linq.JToken.EnsureValue(JToken value)
-   at Newtonsoft.Json.Linq.JToken.op_Explicit(JToken value)
-   at Smalltalk80.Compiler.Tests.MethodTests.TestLongMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 242
-   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
-   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestMethodWithParameters [3 ms]
-  Error Message:
-   System.ArgumentNullException : Value cannot be null. (Parameter 'value')
-  Stack Trace:
-     at Newtonsoft.Json.Linq.JToken.EnsureValue(JToken value)
-   at Newtonsoft.Json.Linq.JToken.op_Explicit(JToken value)
-   at Smalltalk80.Compiler.Tests.MethodTests.TestMethodWithParameters() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 136
-   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
-   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestMethodWithTemporaries [< 1 ms]
-  Error Message:
-   System.ArgumentNullException : Value cannot be null. (Parameter 'value')
-  Stack Trace:
-     at Newtonsoft.Json.Linq.JToken.EnsureValue(JToken value)
-   at Newtonsoft.Json.Linq.JToken.op_Explicit(JToken value)
-   at Smalltalk80.Compiler.Tests.MethodTests.TestMethodWithTemporaries() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 117
-   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
-   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestPrimitiveMethod [< 1 ms]
+  Failed TestPrimitiveMethod [1 ms]
   Error Message:
      Assert.That(method["primitive"], Is.Not.Null)
   Expected: not null
   But was:  null
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.MethodTests.TestPrimitiveMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 157
+     at Smalltalk80.Compiler.Tests.MethodTests.TestPrimitiveMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 160
 
-1)    at Smalltalk80.Compiler.Tests.MethodTests.TestPrimitiveMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 157
+1)    at Smalltalk80.Compiler.Tests.MethodTests.TestPrimitiveMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 160
 
 
   Standard Output Messages:
@@ -1542,69 +524,9 @@ Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
   But was:  null
 
   Stack Trace:
-     at Smalltalk80.Compiler.Tests.MethodTests.TestPrimitiveWithoutFallback() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 176
+     at Smalltalk80.Compiler.Tests.MethodTests.TestPrimitiveWithoutFallback() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 179
 
-1)    at Smalltalk80.Compiler.Tests.MethodTests.TestPrimitiveWithoutFallback() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 176
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestRecursiveMethod [1 ms]
-  Error Message:
-     Assert.That(literals.Any(l => l["value"]?.ToString() == "factorial"), Is.True)
-  Expected: True
-  But was:  False
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.MethodTests.TestRecursiveMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 304
-
-1)    at Smalltalk80.Compiler.Tests.MethodTests.TestRecursiveMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 304
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestSimpleReturn [< 1 ms]
-  Error Message:
-     Assert.That(method["selector"]?.ToString(), Is.EqualTo("testSimpleReturn"))
-  Expected: "testSimpleReturn"
-  But was:  null
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.MethodTests.TestSimpleReturn() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 26
-
-1)    at Smalltalk80.Compiler.Tests.MethodTests.TestSimpleReturn() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 26
-
-
-  Standard Output Messages:
- [AST] Pass 1: Collecting class definitions...
- [AST] Pass 1 complete: 1 classes collected
- [AST] Pass 2: Compiling methods...
- [AST] Pass 2 complete: 1 methods compiled
- [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
-
-
-  Failed TestUnaryMethod [1 ms]
-  Error Message:
-     Assert.That(method["selector"]?.ToString(), Is.EqualTo("negated"))
-  Expected: "negated"
-  But was:  null
-
-  Stack Trace:
-     at Smalltalk80.Compiler.Tests.MethodTests.TestUnaryMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 259
-
-1)    at Smalltalk80.Compiler.Tests.MethodTests.TestUnaryMethod() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 259
+1)    at Smalltalk80.Compiler.Tests.MethodTests.TestPrimitiveWithoutFallback() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\MethodTests.cs:line 179
 
 
   Standard Output Messages:
@@ -1645,7 +567,7 @@ Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
 1)    at Smalltalk80.Compiler.Tests.VariableResolverTests.Resolve_MethodArgFromNestedBlock_ReturnsMethodArgument() in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Compiler.Tests\VariableResolverTests.cs:line 363
 
 
-  Failed TestBlockParameter [2 ms]
+  Failed TestBlockParameter [1 ms]
   Error Message:
      Should contain block creation
 Assert.That(bytecodes.Select(t => (int)t).Any(b => b == 143), Is.True)
@@ -1666,7 +588,7 @@ Assert.That(bytecodes.Select(t => (int)t).Any(b => b == 143), Is.True)
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestBlockTemporary [3 ms]
+  Failed TestBlockTemporary [1 ms]
   Error Message:
      Should contain block creation
 Assert.That(bytecodes.Select(t => (int)t).Any(b => b == 143), Is.True)
@@ -1687,7 +609,7 @@ Assert.That(bytecodes.Select(t => (int)t).Any(b => b == 143), Is.True)
  [ColdStartJsonGenerator] Added 2 class variable Association(s) not referenced in method literals (total: 2)
 
 
-  Failed TestSuper [< 1 ms]
+  Failed TestSuper [2 ms]
   Error Message:
      Bytecode mismatch:
 Expected: [120]
@@ -1716,4 +638,4 @@ Assert.That(actualBytes, Is.EqualTo(expectedBytecodes))
 
 
 
-Failed!  - Failed:    82, Passed:   380, Skipped:     6, Total:   468, Duration: 446 ms - Smalltalk80.Compiler.Tests.dll (net9.0)
+Failed!  - Failed:    30, Passed:   432, Skipped:     6, Total:   468, Duration: 528 ms - Smalltalk80.Compiler.Tests.dll (net9.0)
