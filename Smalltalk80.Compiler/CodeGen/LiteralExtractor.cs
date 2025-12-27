@@ -170,7 +170,8 @@ public sealed class LiteralExtractor
         output.AppendLine("    /// </summary>");
         output.AppendLine("    public static readonly string[] Symbols = {");
 
-        var sortedSymbols = _symbols.OrderBy(s => s, StringComparer.Ordinal).ToList();
+        var sortedSymbols = _symbols.ToList();
+        sortedSymbols.Sort(StringComparer.Ordinal);
         for (int i = 0; i < sortedSymbols.Count; i++)
         {
             var symbol = sortedSymbols[i];
@@ -189,7 +190,8 @@ public sealed class LiteralExtractor
         output.AppendLine("    /// </summary>");
         output.AppendLine("    public static readonly string[] Strings = {");
 
-        var sortedStrings = _strings.OrderBy(s => s, StringComparer.Ordinal).ToList();
+        var sortedStrings = _strings.ToList();
+        sortedStrings.Sort(StringComparer.Ordinal);
         for (int i = 0; i < sortedStrings.Count; i++)
         {
             var str = sortedStrings[i];

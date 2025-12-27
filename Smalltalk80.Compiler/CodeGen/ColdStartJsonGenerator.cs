@@ -283,8 +283,9 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
             symbols.Add(s);
         }
 
-        // Sort symbols for deterministic output
-        var sortedSymbols = symbols.OrderBy(s => s).ToList();
+        // Sort symbols for deterministic output (in-place sort avoids intermediate allocation)
+        var sortedSymbols = symbols.ToList();
+        sortedSymbols.Sort(StringComparer.Ordinal);
 
         // Build the symbol table with indices
         for (int i = 0; i < sortedSymbols.Count; i++)
