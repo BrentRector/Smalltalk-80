@@ -801,8 +801,8 @@ ColdStartOrchestrator (orchestrates 6 phases)
 ├── Phase 4: Method Compilation
 │   ├── LiteralResolver (resolve method literals)
 │   └── Bytecode generation for each method
-├── Phase 5: Globals & Patches (10 helper files)
-│   ├── DictionaryOperations (hash operations)
+├── Phase 5: Globals & Patches (9 helper files)
+│   ├── RuntimeDictionaryService (hash operations) ← Shared with Phases 3, 4
 │   ├── FieldValueResolver (value resolution)
 │   ├── PatchApplier (apply forward reference patches)
 │   ├── SystemDictionaryInstaller (install globals)
@@ -936,12 +936,14 @@ ColdStartOrchestrator (orchestrates 6 phases)
 
 **Helper Classes**:
 - `PatchApplier` - Apply forward reference patches
-- `DictionaryOperations` - Hash-based dict ops (more complete than Phase 3)
+- `RuntimeDictionaryService` - Unified hash-based dict ops (shared with Phases 3, 4)
 - `SystemDictionaryInstaller` - Install globals
 - `USTableBuilder` - Build symbol table
 - `RuntimeObjectCreator` - Create Display, etc.
 - `FieldValueResolver` - Value resolution
 - `AssociationManager` - Association tracking
+
+**Deleted** (2025-12-27): ~~DictionaryOperations~~ - Replaced by RuntimeDictionaryService
 
 **Output State**:
 - All globals installed
@@ -1010,7 +1012,7 @@ Phase 4: Methods (needs objects + symbols)
     ↓ (methods compiled)
 Phase 5: Globals (needs methods + objects)
     ├─ PatchApplier (patches methods/objects)
-    ├─ DictionaryOperations (uses symbols)
+    ├─ RuntimeDictionaryService (uses symbols) ← Shared service
     ├─ SystemDictionaryInstaller (uses classes/objects)
     └─ USTableBuilder (uses symbols)
     ↓ (globals installed, registries frozen)
@@ -1030,11 +1032,11 @@ Phase 6: Validation (validates everything above)
    - Should be unified into single service
    - **TEST IMPACT**: Must test both implementations match
 
-2. **DictionaryOperations** (Phase 3 vs Phase 5)
-   - Phase 3: DictionaryInstaller (hash, install, allocate)
-   - Phase 5: DictionaryOperations (hash, install, remove, fixCollisions)
-   - Identical hash algorithms
-   - **TEST IMPACT**: Hash correctness critical for symbol tables
+2. **DictionaryOperations** ✅ RESOLVED (2025-12-27)
+   - ~~Phase 3: DictionaryInstaller~~ → Uses RuntimeDictionaryService
+   - ~~Phase 5: DictionaryOperations~~ → **Deleted** (uses RuntimeDictionaryService)
+   - Now unified: `Core/VM/RuntimeDictionaryService.cs`
+   - **TEST IMPACT**: Test RuntimeDictionaryService hash correctness
 
 3. **Symbol Interning** (4 separate implementations)
    - Phase 1 creates new symbols
@@ -1048,9 +1050,9 @@ Phase 6: Validation (validates everything above)
 **Hybrid Approach**: Keep phases, extract shared services
 
 ```csharp
-// NEW: Shared services
+// Shared services (RuntimeDictionaryService implemented 2025-12-27)
 ISymbolService              // Intern/lookup symbols
-IDictionaryService          // Hash-based dictionary ops
+RuntimeDictionaryService    // ✅ Hash-based dictionary ops (IMPLEMENTED)
 IFieldValueService          // Resolve all value types
 IObjectTrackingService      // SetAndTrackInstanceVariable
 IValidationService          // Common validation patterns
@@ -1413,11 +1415,11 @@ Tests/
 
 ---
 
-### 7.5 Cold Start Service Extraction (Planned)
+### 7.5 Cold Start Service Extraction (Partially Complete)
 
-**When Tests Should Cover**:
+**Status** (2025-12-27):
+- ✅ RuntimeDictionaryService - **IMPLEMENTED** (replaces DictionaryService plan)
 - SymbolService (when extracted)
-- DictionaryService (when extracted)
 - FieldValueService (when extracted)
 - ObjectTrackingService (when extracted)
 - ValidationService (when extracted)
@@ -1594,17 +1596,20 @@ public class SymbolServiceTests
     public void InternMultipleSymbols_EachUnique() { }
 }
 
-[When DictionaryService Extracted]
-public class DictionaryServiceTests
+// RuntimeDictionaryService IMPLEMENTED (2025-12-27)
+public class RuntimeDictionaryServiceTests
 {
     [Fact]
     public void InstallAssociation_CorrectHashProbing() { }
-    
+
     [Fact]
     public void RemoveAssociation_FixesCollisions() { }
-    
+
     [Fact]
     public void GetSymbolHash_ConsistentAcrossPhases() { }
+
+    [Fact]
+    public void LookupGlobalAssociation_SystemDictionaryThenUndeclared() { }
 }
 ```
 
