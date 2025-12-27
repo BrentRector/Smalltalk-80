@@ -6,7 +6,9 @@ using System.Text.Json.Serialization;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using Antlr4.Runtime.Misc;
+using Smalltalk80.Compiler.BytecodeGen;
 using Smalltalk80.Compiler.Generated;
+using Smalltalk80.Compiler.Model;
 
 namespace Smalltalk80.Compiler.AST
 {
@@ -15,7 +17,7 @@ namespace Smalltalk80.Compiler.AST
     /// Processes the file-out format and builds a complete AST that generates
     /// the expected JSON format for the interpreter.
     /// </summary>
-    public class FileInFormatAstBuilder : Smalltalk80ParserBaseVisitor<object?>
+    public partial class FileInFormatAstBuilder : Smalltalk80ParserBaseVisitor<object?>
     {
         private readonly ITokenStream _tokenStream;
         private readonly CompilationResult _result;
@@ -90,18 +92,12 @@ namespace Smalltalk80.Compiler.AST
                 }
             }
             _result.InitializationExpressions = uniqueExpressions.Values.ToList();
-            
-            if (_initExpressions.Count > uniqueExpressions.Count)
-            {
-                Console.WriteLine($"[AST] Deduplicated initialization expressions: {_initExpressions.Count} -> {uniqueExpressions.Count} (removed {_initExpressions.Count - uniqueExpressions.Count} duplicates)");
-            }
-            
+
             return _result;
         }
 
         public override object? VisitClassDefChunk(Smalltalk80Parser.ClassDefChunkContext context)
         {
-            // Console.WriteLine("[AST] DEBUG: VisitClassDefChunk called");
             var classHeader = context.classHeader();
             var classBody = context.classBody();
 
@@ -214,8 +210,6 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitMethodCategoryChunk(Smalltalk80Parser.MethodCategoryChunkContext context)
         {
-            // Console.WriteLine($"[AST] DEBUG: VisitMethodCategoryChunk called, collectingClassesOnly={_collectingClassesOnly}");
-
             // Skip method compilation during pass 1 (class collection phase)
             if (_collectingClassesOnly)
                 return null;
@@ -237,13 +231,7 @@ namespace Smalltalk80.Compiler.AST
             
             // Check if this is a class-side method category using the cls token
             bool isClassSide = context.cls != null;
-            
-            // DEBUG: Report class-side method detection
-            if (isClassSide)
-            {
-                // Console.WriteLine($"[AST] Found class-side method category: {_currentClass} class methodsFor: '{_currentCategory}'");
-            }
-            
+
             // Set the metaclass flag for this entire category
             _isMetaclass = isClassSide;
 
@@ -325,7 +313,6 @@ namespace Smalltalk80.Compiler.AST
 
         public override object? VisitExpressionChunk(Smalltalk80Parser.ExpressionChunkContext context)
         {
-            // Console.WriteLine($"[AST] DEBUG: VisitExpressionChunk called with: {context.GetText()}");
             // Skip init expression compilation during pass 1 (class collection phase)
             if (_collectingClassesOnly)
                 return null;
@@ -400,11 +387,9 @@ namespace Smalltalk80.Compiler.AST
                 if (_classes.ContainsKey(_currentClass))
                 {
                     poolNode = _classes[_currentClass];
-                    // Console.WriteLine($"[POOL DEBUG] Class method in '{_currentClass}', using instance-side class for pools");
                 }
             }
             var poolVars = GetPoolVariables(poolNode);
-            // Console.WriteLine($"[POOL DEBUG] Pool vars for {_currentClass}: {poolVars.Count} dictionaries");
 
             // Collect all known class names for proper variable resolution
             var knownClassNames = new HashSet<string>(_classes.Keys);
@@ -420,12 +405,6 @@ namespace Smalltalk80.Compiler.AST
                         knownPoolDictionaryNames.Add(poolName);
                     }
                 }
-            }
-            
-            // Debug: Show pool dictionary names when compiling File class methods
-            if (_currentClass != null && _currentClass.Contains("File") && _isMetaclass)
-            {
-                // Console.WriteLine($"[POOL DICT] Compiling {_currentClass} (metaclass={_isMetaclass}) method, collected {knownPoolDictionaryNames.Count} pool dict names: [{string.Join(", ", knownPoolDictionaryNames.OrderBy(x => x))}]");
             }
             
             // Compile the method using BytecodeCompiler
@@ -1159,8 +1138,6 @@ namespace Smalltalk80.Compiler.AST
                 }
             }
 
-            // Console.WriteLine($"[GetPoolVariables] Class: {classNode.Name}, Pool count (including inherited): {allPoolDictionaries.Count}");
-
             // For offline compiler: return dictionary with marker if class has any pools (direct or inherited)
             // The marker tells VariableResolver to treat undefined vars as pool variables
             if (allPoolDictionaries.Count > 0)
@@ -1334,289 +1311,5 @@ namespace Smalltalk80.Compiler.AST
             }
             return result;
         }
-    }
-
-    // AST Node Classes
-    public class CompilationResult
-    {
-        [JsonPropertyName("$schema")]
-        public string? Schema { get; set; }
-        
-        [JsonPropertyName("description")]
-        public string? Description { get; set; }
-
-        [JsonPropertyName("classes")]
-        public List<ClassDefinitionNode> Classes { get; set; } = new();
-
-        [JsonPropertyName("initializationExpressions")]
-        public List<InitializationExpression> InitializationExpressions { get; set; } = new();
-    }
-
-    public class ClassDefinitionNode
-    {
-        [JsonPropertyName("name")]
-        public string Name { get; set; } = "";
-
-        [JsonPropertyName("superclass")]
-        public string Superclass { get; set; } = "";
-
-        [JsonPropertyName("subclassKind")]
-        public string SubclassKind { get; set; } = "subclass:";  // Default to fixed pointer
-
-        [JsonPropertyName("instanceVariables")]
-        public List<string> InstanceVariables { get; set; } = new();
-
-        /// <summary>
-        /// Total count of all instance variables including inherited ones.
-        /// Used for format word calculation.
-        /// </summary>
-        [JsonIgnore]
-        public int TotalInstanceVariableCount { get; set; }
-
-        [JsonPropertyName("classVariables")]
-        public List<string> ClassVariables { get; set; } = new();
-
-        [JsonPropertyName("poolDictionaries")]
-        public List<string> PoolDictionaries { get; set; } = new();
-
-        [JsonPropertyName("category")]
-        public string Category { get; set; } = "";
-
-        [JsonPropertyName("comment")]
-        public string? Comment { get; set; }
-
-        [JsonPropertyName("methods")]
-        public List<MethodDefinitionNode> Methods { get; set; } = new();
-
-        [JsonPropertyName("classMethods")]
-        public List<MethodDefinitionNode> ClassMethods { get; set; } = new();
-    }
-
-    public class MethodDefinitionNode
-    {
-        [JsonPropertyName("class")]
-        public string Class { get; set; } = "";
-
-        [JsonPropertyName("selector")]
-        public string Selector { get; set; } = "";
-
-        [JsonPropertyName("category")]
-        public string? Category { get; set; }
-
-        [JsonPropertyName("source")]
-        public string? Source { get; set; }
-
-        [JsonPropertyName("bytecode")]
-        public List<int> Bytecode { get; set; } = new();
-
-        [JsonPropertyName("literals")]
-        public List<object> Literals { get; set; } = new();
-
-        [JsonPropertyName("primitiveIndex")]
-        public int PrimitiveIndex { get; set; }
-
-        [JsonPropertyName("numArgs")]
-        public int NumArgs { get; set; }
-
-        [JsonPropertyName("numTemps")]
-        public int NumTemps { get; set; }
-
-        [JsonPropertyName("stackDepth")]
-        public int StackDepth { get; set; }
-
-        [JsonPropertyName("isClassMethod")]
-        public bool IsClassMethod { get; set; }
-
-        [JsonPropertyName("argNames")]
-        public List<string> ArgNames { get; set; } = new();
-
-        [JsonPropertyName("tempNames")]
-        public List<string> TempNames { get; set; } = new();
-
-        [JsonPropertyName("isQuickReturnSelf")]
-        public bool IsQuickReturnSelf { get; set; }
-
-        [JsonPropertyName("quickReturnFieldIndex")]
-        public int QuickReturnFieldIndex { get; set; } = -1;
-    }
-
-    public class InitializationExpression
-    {
-        [JsonPropertyName("bytecode")]
-        public List<int> Bytecode { get; set; } = new();
-
-        [JsonPropertyName("literals")]
-        public List<object> Literals { get; set; } = new();
-
-        [JsonPropertyName("numTemps")]
-        public int NumTemps { get; set; }
-
-        [JsonPropertyName("stackDepth")]
-        public int StackDepth { get; set; }
-
-        [JsonPropertyName("source")]
-        public string Source { get; set; } = "";
-
-        [JsonPropertyName("receiver")]
-        public string? Receiver { get; set; }
-
-        [JsonPropertyName("selector")]
-        public string? Selector { get; set; }
-    }
-
-    // Expression nodes
-    [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
-    [JsonDerivedType(typeof(AssignmentExpressionNode), "assignment")]
-    [JsonDerivedType(typeof(CascadeExpressionNode), "cascade")]
-    [JsonDerivedType(typeof(MessageExpressionNode), "message")]
-    [JsonDerivedType(typeof(VariableNode), "variable")]
-    [JsonDerivedType(typeof(BlockNode), "block")]
-    [JsonDerivedType(typeof(DynamicArrayNode), "dynamicArray")]
-    [JsonDerivedType(typeof(IntegerLiteralNode), "integerLiteral")]
-    [JsonDerivedType(typeof(FloatLiteralNode), "floatLiteral")]
-    [JsonDerivedType(typeof(StringLiteralNode), "stringLiteral")]
-    [JsonDerivedType(typeof(SymbolLiteralNode), "symbolLiteral")]
-    [JsonDerivedType(typeof(CharacterLiteralNode), "characterLiteral")]
-    [JsonDerivedType(typeof(ArrayLiteralNode), "arrayLiteral")]
-    [JsonDerivedType(typeof(ByteArrayLiteralNode), "byteArrayLiteral")]
-    public abstract class ExpressionNode { }
-
-    public class AssignmentExpressionNode : ExpressionNode
-    {
-        [JsonPropertyName("variable")]
-        public string Variable { get; set; } = "";
-
-        [JsonPropertyName("value")]
-        public ExpressionNode? Value { get; set; }
-    }
-
-    public class CascadeExpressionNode : ExpressionNode
-    {
-        [JsonPropertyName("receiver")]
-        public ExpressionNode? Receiver { get; set; }
-
-        [JsonPropertyName("messages")]
-        public List<MessageNode> Messages { get; set; } = new();
-    }
-
-    public class MessageExpressionNode : ExpressionNode
-    {
-        [JsonPropertyName("receiver")]
-        public ExpressionNode? Receiver { get; set; }
-
-        [JsonPropertyName("message")]
-        public MessageNode? Message { get; set; }
-    }
-
-    public class VariableNode : ExpressionNode
-    {
-        [JsonPropertyName("name")]
-        public string Name { get; set; } = "";
-    }
-
-    public class BlockNode : ExpressionNode
-    {
-        [JsonPropertyName("parameters")]
-        public List<string> Parameters { get; set; } = new();
-
-        [JsonPropertyName("temporaries")]
-        public List<string> Temporaries { get; set; } = new();
-
-        [JsonPropertyName("statements")]
-        public List<StatementNode> Statements { get; set; } = new();
-    }
-
-    public class DynamicArrayNode : ExpressionNode
-    {
-        [JsonPropertyName("elements")]
-        public List<ExpressionNode> Elements { get; set; } = new();
-    }
-
-    // Message nodes
-    [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
-    [JsonDerivedType(typeof(UnaryMessageNode), "unary")]
-    [JsonDerivedType(typeof(BinaryMessageNode), "binary")]
-    [JsonDerivedType(typeof(KeywordMessageNode), "keyword")]
-    public abstract class MessageNode
-    {
-        [JsonPropertyName("selector")]
-        public string Selector { get; set; } = "";
-    }
-
-    public class UnaryMessageNode : MessageNode { }
-
-    public class BinaryMessageNode : MessageNode
-    {
-        [JsonPropertyName("argument")]
-        public ExpressionNode? Argument { get; set; }
-    }
-
-    public class KeywordMessageNode : MessageNode
-    {
-        [JsonPropertyName("arguments")]
-        public List<ExpressionNode> Arguments { get; set; } = new();
-    }
-
-    // Statement nodes
-    [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
-    [JsonDerivedType(typeof(ExpressionStatementNode), "expression")]
-    [JsonDerivedType(typeof(ReturnStatementNode), "return")]
-    public abstract class StatementNode { }
-
-    public class ExpressionStatementNode : StatementNode
-    {
-        [JsonPropertyName("expression")]
-        public ExpressionNode? Expression { get; set; }
-    }
-
-    public class ReturnStatementNode : StatementNode
-    {
-        [JsonPropertyName("expression")]
-        public ExpressionNode? Expression { get; set; }
-    }
-
-    // Literal nodes
-    public abstract class LiteralNode : ExpressionNode { }
-
-    public class IntegerLiteralNode : LiteralNode
-    {
-        [JsonPropertyName("value")]
-        public int Value { get; set; }
-    }
-
-    public class FloatLiteralNode : LiteralNode
-    {
-        [JsonPropertyName("value")]
-        public double Value { get; set; }
-    }
-
-    public class StringLiteralNode : LiteralNode
-    {
-        [JsonPropertyName("value")]
-        public string Value { get; set; } = "";
-    }
-
-    public class SymbolLiteralNode : LiteralNode
-    {
-        [JsonPropertyName("value")]
-        public string Value { get; set; } = "";
-    }
-
-    public class CharacterLiteralNode : LiteralNode
-    {
-        [JsonPropertyName("value")]
-        public char Value { get; set; }
-    }
-
-    public class ArrayLiteralNode : LiteralNode
-    {
-        [JsonPropertyName("elements")]
-        public List<LiteralNode> Elements { get; set; } = new();
-    }
-
-    public class ByteArrayLiteralNode : LiteralNode
-    {
-        [JsonPropertyName("bytes")]
-        public List<byte> Bytes { get; set; } = new();
     }
 }

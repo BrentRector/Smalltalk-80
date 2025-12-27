@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using Smalltalk80.Compiler.Analysis;
 using Smalltalk80.Compiler.Generated;
+using Smalltalk80.Compiler.Model;
 
-namespace Smalltalk80.Compiler
+namespace Smalltalk80.Compiler.BytecodeGen
 {
     /// <summary>
     /// Message expression compilation methods for the BytecodeCompiler.

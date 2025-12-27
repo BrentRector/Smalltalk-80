@@ -5,9 +5,11 @@ using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Compiler.Generated;
 using Smalltalk80.Compiler.Analysis;
+using Smalltalk80.Compiler.Infrastructure;
+using Smalltalk80.Compiler.Model;
 using Smalltalk80.Core.Bytecodes;
 
-namespace Smalltalk80.Compiler
+namespace Smalltalk80.Compiler.BytecodeGen
 {
     /// <summary>
     /// Result of attempting to inline a conditional message.
@@ -24,42 +26,163 @@ namespace Smalltalk80.Compiler
     }
 
     /// <summary>
+    /// Collects undeclared variable references during compilation.
+    /// Thread-safe for use across multiple compiler instances.
+    /// </summary>
+    public sealed class UndeclaredVariableCollector
+    {
+        private readonly object _lock = new();
+        private readonly Dictionary<string, List<string>> _variables = [];
+
+        /// <summary>
+        /// Records an undeclared variable reference.
+        /// </summary>
+        /// <param name="varName">The undeclared variable name.</param>
+        /// <param name="methodIdentifier">The method where the reference occurred.</param>
+        public void Record(string varName, string methodIdentifier)
+        {
+            lock (_lock)
+            {
+                if (!_variables.TryGetValue(varName, out var list))
+                {
+                    list = [];
+                    _variables[varName] = list;
+                }
+                list.Add(methodIdentifier);
+            }
+        }
+
+        /// <summary>
+        /// Gets a read-only view of all recorded undeclared variables.
+        /// </summary>
+        public IReadOnlyDictionary<string, List<string>> GetAll()
+        {
+            lock (_lock)
+            {
+                return new Dictionary<string, List<string>>(_variables);
+            }
+        }
+
+        /// <summary>
+        /// Clears all recorded undeclared variables.
+        /// </summary>
+        public void Clear()
+        {
+            lock (_lock)
+            {
+                _variables.Clear();
+            }
+        }
+    }
+
+    /// <summary>
     /// Compiles Smalltalk-80 AST nodes to Blue Book bytecode.
     /// Uses visitor pattern to traverse AST and emit bytecodes.
     /// </summary>
     public partial class BytecodeCompiler : IBytecodeCompiler
     {
-        private CompilationEnvironment environment = null!;
-        private BytecodeEmitter emitter = null!;
-        private readonly VariableResolver resolver = new();
-        private TempFrameAllocator allocator = null!;
-        private string selector = "";
-        private int primitiveNumber = 0;
-        private bool hasPrimitive = false;
-        private string currentMethodIdentifier = "";
-        private Dictionary<IParseTree, TailCallInfo>? tailCalls = null;
-        private int methodStartLabel = -1;
+        private CompilationEnvironment? _environment;
+        private BytecodeEmitter? _emitter;
+        private readonly VariableResolver _resolver = new();
+        private TempFrameAllocator? _allocator;
+        private string _selector = "";
+        private int _primitiveNumber;
+        private bool _hasPrimitive;
+        private string _currentMethodIdentifier = "";
+        private Dictionary<IParseTree, TailCallInfo>? _tailCalls;
+        private int _methodStartLabel = -1;
 
-        private static readonly Dictionary<string, List<string>> _undeclaredVariables = [];
+        // Instance-based collector (preferred for thread safety)
+        private readonly UndeclaredVariableCollector _undeclaredCollector;
+
+        // Static collector for backward compatibility
+        private static readonly UndeclaredVariableCollector s_defaultCollector = new();
 
         /// <summary>
-        /// Get read-only view of undeclared variables.
+        /// Creates a new BytecodeCompiler with a dedicated undeclared variable collector.
         /// </summary>
-        public static IReadOnlyDictionary<string, List<string>> GetUndeclaredVariables() => _undeclaredVariables;
+        public BytecodeCompiler() : this(s_defaultCollector) { }
 
         /// <summary>
-        /// Clear undeclared variables registry.
+        /// Creates a new BytecodeCompiler with a custom undeclared variable collector.
+        /// Use this constructor for thread-safe parallel compilation.
         /// </summary>
-        public static void ClearUndeclaredVariables() => _undeclaredVariables.Clear();
+        /// <param name="collector">The collector to use for undeclared variables.</param>
+        public BytecodeCompiler(UndeclaredVariableCollector collector)
+        {
+            _undeclaredCollector = collector ?? throw new ArgumentNullException(nameof(collector));
+        }
+
+        /// <summary>
+        /// Gets a read-only view of undeclared variables from the default (static) collector.
+        /// For thread-safe access, use an instance with a dedicated collector.
+        /// </summary>
+        public static IReadOnlyDictionary<string, List<string>> GetUndeclaredVariables() => s_defaultCollector.GetAll();
+
+        /// <summary>
+        /// Clears the default (static) undeclared variables registry.
+        /// For thread-safe access, use an instance with a dedicated collector.
+        /// </summary>
+        public static void ClearUndeclaredVariables() => s_defaultCollector.Clear();
 
         private void RecordUndeclaredVariable(string varName, string methodIdentifier)
         {
-            if (!_undeclaredVariables.TryGetValue(varName, out var list))
-            {
-                list = [];
-                _undeclaredVariables[varName] = list;
-            }
-            list.Add(methodIdentifier);
+            _undeclaredCollector.Record(varName, methodIdentifier);
+        }
+
+        // Property accessors for null-checked fields
+        private CompilationEnvironment environment
+        {
+            get => _environment ?? throw new InvalidOperationException("Compiler not initialized");
+            set => _environment = value;
+        }
+
+        private BytecodeEmitter emitter
+        {
+            get => _emitter ?? throw new InvalidOperationException("Compiler not initialized");
+            set => _emitter = value;
+        }
+
+        private TempFrameAllocator allocator
+        {
+            get => _allocator ?? throw new InvalidOperationException("Compiler not initialized");
+            set => _allocator = value;
+        }
+
+        private string selector
+        {
+            get => _selector;
+            set => _selector = value;
+        }
+
+        private int primitiveNumber
+        {
+            get => _primitiveNumber;
+            set => _primitiveNumber = value;
+        }
+
+        private bool hasPrimitive
+        {
+            get => _hasPrimitive;
+            set => _hasPrimitive = value;
+        }
+
+        private string currentMethodIdentifier
+        {
+            get => _currentMethodIdentifier;
+            set => _currentMethodIdentifier = value;
+        }
+
+        private Dictionary<IParseTree, TailCallInfo>? tailCalls
+        {
+            get => _tailCalls;
+            set => _tailCalls = value;
+        }
+
+        private int methodStartLabel
+        {
+            get => _methodStartLabel;
+            set => _methodStartLabel = value;
         }
 
         /// <summary>
@@ -238,11 +361,6 @@ namespace Smalltalk80.Compiler
                 QuickReturnFieldIndex = quickReturnFieldIndex,
                 VariableSlotMap = allocator.GetAllAllocatedVariables()
             };
-
-            if (selector == "hasInterned:ifTrue:" && compiledMethod.VariableSlotMap is { Count: > 0 })
-            {
-                Console.WriteLine($"[VAR SLOTS] {selector}: {string.Join(", ", compiledMethod.VariableSlotMap.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
-            }
 
             return compiledMethod;
         }
@@ -546,7 +664,7 @@ namespace Smalltalk80.Compiler
 
         private void PushVariable(string name)
         {
-            var result = resolver.ResolveVariable(name, environment, allocator);
+            var result = _resolver.ResolveVariable(name, environment, allocator);
 
             switch (result.Type)
             {
@@ -605,7 +723,7 @@ namespace Smalltalk80.Compiler
 
         private void StoreVariable(string name, bool leaveOnStack)
         {
-            var result = resolver.ResolveVariable(name, environment, allocator);
+            var result = _resolver.ResolveVariable(name, environment, allocator);
 
             if (!result.IsAssignable)
             {
@@ -785,8 +903,22 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
-        /// Helper class to collect literals in first pass.
+        /// Visitor that pre-collects literals from the AST during first pass.
         /// </summary>
+        /// <remarks>
+        /// This class ensures optimal literal frame layout by collecting all literals
+        /// before bytecode emission. The two-pass approach is necessary because:
+        /// <list type="bullet">
+        ///   <item><description>Selectors must be placed at low literal indices (0-31) for optimal
+        ///   single-byte send bytecodes (Blue Book bytecodes 0xD0-0xFF)</description></item>
+        ///   <item><description>Other literals (constants, associations) follow selectors</description></item>
+        ///   <item><description>The literal index in bytecodes must be known before emission</description></item>
+        /// </list>
+        ///
+        /// The collector walks the entire method AST, registering all selectors, literals,
+        /// and variable references (globals, class variables, pool variables) that will
+        /// need literal frame entries.
+        /// </remarks>
         private class LiteralCollector : Smalltalk80ParserBaseVisitor<object?>
         {
             private readonly BytecodeEmitter emitter;
@@ -795,6 +927,12 @@ namespace Smalltalk80.Compiler
 
             private static readonly Dictionary<string, (int bytecode, int args)> SpecialSelectors = BytecodeEmitter.SpecialSelectors;
 
+            /// <summary>
+            /// Creates a new literal collector for pre-pass literal discovery.
+            /// </summary>
+            /// <param name="compiler">The compiler instance for context.</param>
+            /// <param name="emitter">The emitter to register literals with.</param>
+            /// <param name="environment">Optional compilation environment for variable resolution.</param>
             public LiteralCollector(BytecodeCompiler compiler, BytecodeEmitter emitter, CompilationEnvironment? environment = null)
             {
                 this.compiler = compiler;

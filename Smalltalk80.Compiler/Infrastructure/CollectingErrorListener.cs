@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using Antlr4.Runtime;
 
-namespace Smalltalk80.Compiler
+namespace Smalltalk80.Compiler.Infrastructure
 {
     /// <summary>
     /// Custom error listener to collect parse errors.

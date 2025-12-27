@@ -1,4 +1,4 @@
-namespace Smalltalk80.Compiler;
+namespace Smalltalk80.Compiler.Infrastructure;
 
 /// <summary>
 /// Compiler options and feature flags for controlling bytecode generation.

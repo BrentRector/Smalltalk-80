@@ -70,3 +70,6 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 Smalltalk80.Interpreter/test_output.txt
+
+# Compiler backup files
+Smalltalk80.Compiler/Generated.sav/

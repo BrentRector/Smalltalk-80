@@ -5,8 +5,11 @@ using System.Linq;
 using System.Text.Json;
 using Antlr4.Runtime;
 using Smalltalk80.Compiler.AST;
+using Smalltalk80.Compiler.BytecodeGen;
 using Smalltalk80.Compiler.CodeGen;
 using Smalltalk80.Compiler.Generated;
+using Smalltalk80.Compiler.Infrastructure;
+using Smalltalk80.Compiler.Model;
 
 namespace Smalltalk80.Compiler;
 
@@ -96,7 +99,7 @@ file sealed class Program
 
             // Parse all input files and merge the ASTs
             Console.WriteLine("Parsing Smalltalk source files...");
-            CompilationResult mergedResult = null!;
+            CompilationResult? mergedResult = null;
 
             for (int i = 0; i < inputFiles.Count; i++)
             {
@@ -104,7 +107,7 @@ file sealed class Program
                 Console.WriteLine($"  Parsing {Path.GetFileName(inputFile)}...");
                 var result = ParseSmalltalkSource(inputFile);
 
-                if (i == 0)
+                if (mergedResult == null)
                 {
                     // First file: use as base
                     mergedResult = result;
@@ -121,6 +124,11 @@ file sealed class Program
                         mergedResult.InitializationExpressions.Add(initExpr);
                     }
                 }
+            }
+
+            if (mergedResult == null)
+            {
+                throw new InvalidOperationException("No input files were processed successfully");
             }
 
             Console.WriteLine($"  Total classes: {mergedResult.Classes.Count}");
@@ -260,7 +268,7 @@ file sealed class ConsoleErrorListener : BaseErrorListener
     public ConsoleErrorListener(string fileName, string sourceText)
     {
         _fileName = Path.GetFileName(fileName);
-        _sourceLines = sourceText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        _sourceLines = sourceText.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
     }
 
     /// <summary>
