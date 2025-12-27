@@ -119,8 +119,8 @@ namespace Smalltalk80.Interpreter.Engine.LoaderPhases
             // Update symbol count in report (already set in Loader constructor, but verify)
             _report.Metrics.SymbolCount = _bundle.Symbols.Length;
 
-            // Freeze symbol registry after all symbols registered
-            SymbolRegistry.Freeze();
+            // Note: SymbolRegistry.Freeze() is called by ColdStartOrchestrator after Phase 6
+            // Phases 2-6 need to read symbols from the registry
         }
 
         #region Preflight Validation

@@ -145,9 +145,8 @@ public class ColdStartOrchestrator : IColdStartLoader
         RunPhase(phase1.Name, () =>
         {
             phase1.Run();
-
-            // Freeze symbol registry - no more symbol registration after this point
-            SymbolRegistry.Freeze();
+            // Note: SymbolRegistry.Freeze() moved to after Phase 6 (with GlobalRegistry.Freeze())
+            // Phases 2-6 need to read symbols from the registry
         });
 
         // Phase 2: Class Infrastructure
@@ -211,7 +210,9 @@ public class ColdStartOrchestrator : IColdStartLoader
             phase6.Run();
         });
 
-            // Freeze global registry - no more registrations after this point
+            // Freeze cold start registries - no access allowed after this point
+            // Runtime code must use VMMetadata and query the Smalltalk heap directly
+            SymbolRegistry.Freeze();
             GlobalRegistry.Freeze();
 
             _diagnostics?.Emit(new DiagnosticMessageEvent
