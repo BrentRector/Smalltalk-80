@@ -15,7 +15,7 @@ namespace Smalltalk80.Interpreter.Engine.InitExecution;
 /// </summary>
 public class InitExpressionRunner
 {
-    private readonly SmalltalkHeapManager _heapManager;
+    private readonly ISmalltalkHeap _heapManager;
     private readonly VirtualMachine _vm;
     private readonly VMMetadata _metadata;
     private readonly IDiagnosticHub? _diagnostics;
@@ -49,7 +49,7 @@ public class InitExpressionRunner
     ];
 
     public InitExpressionRunner(
-        SmalltalkHeapManager heapManager,
+        ISmalltalkHeap heapManager,
         VirtualMachine vm,
         VMMetadata metadata,
         IDiagnosticHub? diagnostics,
