@@ -71,12 +71,12 @@ public class Phase3_ObjectAllocation : IPhase
         // Initialize services and helper classes
         var symbolService = new SymbolService(bundle);
         var fieldValueService = new FieldValueService(bundle, symbolService);
-        var dictionaryService = new DictionaryService(allocator, bundle);
+        var dictService = new RuntimeDictionaryService(heapManager);
 
         _fieldValueResolver = new FieldValueResolver(allocator, bundle, localIdToObjectId, diagnostics, fieldValueService);
         _dictionaryInstaller = new DictionaryInstaller(
-            localIdToObjectId, initializedFields,
-            _fieldValueResolver.InternSymbol, dictionaryService);
+            allocator, dictService, localIdToObjectId, initializedFields,
+            _fieldValueResolver.InternSymbol);
     }
 
     /// <summary>

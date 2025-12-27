@@ -7,7 +7,6 @@ using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
 using Smalltalk80.Interpreter.Engine.LoaderPhases.Phase4;
-using Smalltalk80.Interpreter.Engine.Services;
 
 namespace Smalltalk80.Interpreter.Engine.LoaderPhases;
 
@@ -91,9 +90,9 @@ public class Phase4_MethodCompilation : IPhase
         // Initialize services and helper classes
         _symbolService = new SymbolService(bundle);
         var fieldValueService = new FieldValueService(bundle, _symbolService);
-        var dictionaryService = new DictionaryService(allocator, bundle);
-        _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId, _symbolService, fieldValueService, dictionaryService);
-        _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, _symbolService, dictionaryService, diagnostics);
+        var dictService = new RuntimeDictionaryService(heapManager);
+        _literalResolver = new LiteralResolver(bundle, allocator, localIdToObjectId, _symbolService, fieldValueService);
+        _dictionaryInstaller = new MethodDictionaryInstaller(bundle, allocator, localIdToObjectId, _symbolService, dictService, diagnostics);
     }
 
     /// <summary>

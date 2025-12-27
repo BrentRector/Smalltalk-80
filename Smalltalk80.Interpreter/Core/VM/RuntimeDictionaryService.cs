@@ -223,6 +223,85 @@ public class RuntimeDictionaryService
         }
     }
 
+    /// <summary>
+    /// Installs a key-value pair in an IdentityDictionary using hash-based slot finding.
+    /// IdentityDictionary structure: [0] = tally (inherited from Set), [1] = valueArray, indexed fields = keys.
+    /// Uses same algorithm as IdentityDictionary>>findKeyOrNil: so runtime lookups work.
+    /// </summary>
+    /// <param name="dictOOP">The IdentityDictionary to install into.</param>
+    /// <param name="keyOOP">The key OOP (stored directly in indexed slots).</param>
+    /// <param name="valueOOP">The value OOP (stored in parallel valueArray).</param>
+    public void InstallInIdentityDictionary(SmalltalkOOP dictOOP, SmalltalkOOP keyOOP, SmalltalkOOP valueOOP)
+    {
+        // IdentityDictionary: tally (slot 0, inherited from Set), valueArray (slot 1), indexed fields = keys
+        var tallyOOP = _heap.GetInstanceVariable(dictOOP, VMConstants.IDENTITY_DICTIONARY_TALLY_INDEX);
+        var valuesArrayOOP = _heap.GetInstanceVariable(dictOOP, VMConstants.IDENTITY_DICTIONARY_VALUE_ARRAY_INDEX);
+
+        if (valuesArrayOOP == _nilOOP)
+        {
+            throw new InvalidOperationException("IdentityDictionary has nil valueArray");
+        }
+
+        int dictionarySize = _heap.GetIndexedSize(dictOOP);
+        int valuesArraySize = _heap.GetIndexedSize(valuesArrayOOP);
+
+        if (dictionarySize != valuesArraySize)
+        {
+            throw new InvalidOperationException($"IdentityDictionary has mismatched sizes: keys={dictionarySize}, values={valuesArraySize}");
+        }
+
+        // Hash using identity hash
+        int hashIndex = IdentityHashUtility.ComputeHashIndex(keyOOP, dictionarySize);
+
+        // Linear probe from hash position to find empty slot or matching key
+        int targetIndex = -1;
+        int probeCount = 0;
+        int index = hashIndex;
+
+        while (probeCount < dictionarySize)
+        {
+            var existingKeyOOP = _heap.GetIndexedOOP(dictOOP, index);
+
+            if (existingKeyOOP == _nilOOP)
+            {
+                // Empty slot found
+                targetIndex = index;
+                break;
+            }
+            else if (existingKeyOOP == keyOOP)
+            {
+                // Existing entry for this key - replace it
+                targetIndex = index;
+                break;
+            }
+
+            // Linear probe: move to next slot, wrap around
+            index = (index + 1) % dictionarySize;
+            probeCount++;
+        }
+
+        if (targetIndex == -1)
+        {
+            throw new InvalidOperationException($"IdentityDictionary is full after {probeCount} probes");
+        }
+
+        // Check if this is a new entry (for tally update)
+        var existingKeyAtTarget = _heap.GetIndexedOOP(dictOOP, targetIndex);
+        bool isNewEntry = existingKeyAtTarget == _nilOOP;
+
+        // Install key and value
+        _heap.SetIndexedOOP(dictOOP, targetIndex, keyOOP);
+        _heap.SetIndexedOOP(valuesArrayOOP, targetIndex, valueOOP);
+
+        // Update tally if we used a new slot
+        if (isNewEntry)
+        {
+            int currentTally = tallyOOP.IsSmallInteger ? tallyOOP.AsSmallInteger() : 0;
+            _heap.SetInstanceVariable(dictOOP, VMConstants.IDENTITY_DICTIONARY_TALLY_INDEX,
+                SmalltalkOOP.FromSmallInteger(currentTally + 1));
+        }
+    }
+
     #endregion
 
     #region Collision Chain Repair
