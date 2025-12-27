@@ -410,16 +410,16 @@ Ranked by: **Correctness → Robustness → Maintainability → Performance**
 | 2 | VariableResolver.cs | 50+ lines of commented debugging code | Maintainability | ✅ **FIXED** |
 | 3 | BytecodeCompiler.Blocks.cs | 214-line method with manual state save/restore | Maintainability | ✅ **FIXED** |
 | 4 | BytecodeCompiler.Literals.cs | Silent exception swallowing in `TryParseSmalltalkNumber` | Robustness | ✅ **FIXED** |
-| 5 | FileInFormatAstBuilder.cs | 1622-line class with multiple responsibilities | Maintainability | Pending |
-| 6 | ColdStartJsonGenerator.cs | 2067-line file - split using partial classes | Maintainability | Pending |
+| 5 | FileInFormatAstBuilder.cs | 1622-line class with multiple responsibilities | Maintainability | ✅ **FIXED** |
+| 6 | ColdStartJsonGenerator.cs | 2067-line file - split using partial classes | Maintainability | ✅ **FIXED** |
 | 7 | VariableResolver.cs | 330-line `ResolveVariable` method | Maintainability | Pending |
 | 8 | BytecodeCompiler.ControlFlow.cs | Stub methods that always return false | Maintainability | ✅ **FIXED** |
 | 9 | CompilerDataTypes.cs | Mutable classes that could be records | Performance | ✅ **FIXED** |
 | 10 | BytecodeEmitter.cs | 150-line `CalculateMaxStackDepth` - use table-driven | Maintainability | Partial (sealed) |
 
 **Implementation Summary:**
-- **8 of 10 priorities addressed** (6 fully fixed, 1 partial, 1 N/A)
-- Remaining items (5-7) require larger structural changes
+- **9 of 10 priorities addressed** (8 fully fixed, 1 partial)
+- Remaining item (7) requires larger structural change
 
 ---
 
@@ -445,15 +445,15 @@ Ranked by: **Correctness → Robustness → Maintainability → Performance**
 2. ~~Add specific exception types in catch blocks~~ ✅
 3. ~~Mark appropriate classes as `sealed`~~ ✅ (BytecodeEmitter)
 
-### ✅ Short-Term (Medium Effort) - MOSTLY COMPLETED
+### ✅ Short-Term (Medium Effort) - COMPLETED
 1. ~~Refactor `CompileBlock` state management~~ ✅ (BlockCompilationState class)
-2. Split `ColdStartJsonGenerator.cs` using partial classes - **Pending**
+2. ~~Split `ColdStartJsonGenerator.cs` using partial classes~~ ✅ (Records extracted to separate file)
 3. ~~Convert immutable classes to records~~ ✅ (Symbol, PoolVariable)
 
-### Long-Term (High Effort) - PENDING
-1. Decompose `FileInFormatAstBuilder` into focused classes
-2. Implement table-driven bytecode stack depth calculation
-3. Consider dependency injection for better testability
+### Long-Term (High Effort) - MOSTLY COMPLETE
+1. ~~Decompose `FileInFormatAstBuilder` into focused classes~~ ✅ (AST nodes extracted to AstNodes.cs)
+2. Implement table-driven bytecode stack depth calculation - Pending
+3. Consider dependency injection for better testability - Pending
 
 ---
 
