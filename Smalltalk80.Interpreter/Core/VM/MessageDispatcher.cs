@@ -1,8 +1,6 @@
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 
-using static Smalltalk80.Interpreter.InterpreterConstants;
-
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
@@ -23,7 +21,7 @@ internal class MessageDispatcher(
         var currentClassOOP = classOOP;
         int depth = 0;
 
-        while (currentClassOOP != metadata.KnownObjects.Nil && depth < MaxInheritanceDepth)
+        while (currentClassOOP != metadata.KnownObjects.Nil && depth < Interpreter.InterpreterConstants.MaxInheritanceDepth)
         {
             // Validate the class OOP before trying to get its name
             if (!heapManager.IsValidOOP(currentClassOOP))
