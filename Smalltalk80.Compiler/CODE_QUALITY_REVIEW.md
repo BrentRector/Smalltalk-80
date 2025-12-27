@@ -503,4 +503,227 @@ This section evaluates XML documentation comments and inline code comments for e
 
 ---
 
+## File and Folder Structure Review
+
+### Current Structure Analysis
+
+```
+Smalltalk80.Compiler/
+├── ANTLR4/                          # ANTLR4 JAR file
+│   └── ANTLR4/                      # ⚠️ Redundant nested folder
+├── AST/                             # AST-related files
+│   ├── AstNodes.cs
+│   └── FileInFormatAstBuilder.cs
+├── Analysis/                        # Static analysis tools
+│   ├── TailCallInfo.cs
+│   ├── TailRecursionAnalyzer.cs
+│   └── TempFrameAllocator.cs
+├── CodeGen/                         # Code generation
+│   ├── ColdStartDataGenerator.cs
+│   ├── ColdStartJsonGenerator.cs
+│   ├── ColdStartJsonGenerator.Records.cs
+│   ├── LayoutGenerator.cs
+│   └── LiteralExtractor.cs
+├── Generated/                       # ANTLR-generated code
+├── Generated.sav/                   # ⚠️ Backup files (should not be tracked)
+├── Grammar/                         # ANTLR4 grammar files
+├── Tests/                           # Test files
+├── BytecodeCompiler*.cs             # Partial class files (5 files)
+├── BytecodeEmitter.cs
+├── CollectingErrorListener.cs
+├── CompilationEnvironment.cs
+├── CompilerDataTypes.cs
+├── CompilerOptions.cs
+├── IBytecodeCompiler.cs
+├── Program.cs
+└── VariableResolver.cs
+```
+
+### Structure Assessment
+
+| Aspect | Rating | Notes |
+|--------|--------|-------|
+| **Folder naming** | ⭐⭐⭐⭐☆ | Consistent, clear purpose (AST, Analysis, CodeGen, Generated, Grammar) |
+| **File naming** | ⭐⭐⭐⭐☆ | Follows C# conventions, matches class names |
+| **Logical grouping** | ⭐⭐⭐☆☆ | Root-level files are mixed concerns |
+| **Namespace alignment** | ⭐⭐⭐⭐⭐ | Namespaces match folder structure exactly |
+| **Partial class organization** | ⭐⭐⭐⭐⭐ | `BytecodeCompiler.*.cs` pattern is clear and consistent |
+
+### Issues Identified
+
+#### 🔴 Critical: Remove/Fix
+1. **`ANTLR4/ANTLR4/` nested duplication** - Contains duplicate `antlr-4.13.2-complete.jar`
+2. **`Generated.sav/` backup folder** - Should not be in source control (`.gitignore`)
+
+#### 🟡 Moderate: Recommended Changes
+3. **Root-level file sprawl** - 10 `.cs` files at root level mixing different concerns:
+   - Core compiler: `BytecodeCompiler*.cs`, `BytecodeEmitter.cs`, `VariableResolver.cs`
+   - Data types: `CompilationEnvironment.cs`, `CompilerDataTypes.cs`, `CompilerOptions.cs`
+   - Infrastructure: `CollectingErrorListener.cs`, `IBytecodeCompiler.cs`
+   - Entry point: `Program.cs`
+
+4. **`CompilerDataTypes.cs` is a "junk drawer"** - Contains 4 unrelated types:
+   - `CompiledMethodData` (compilation result)
+   - `Symbol` (literal type)
+   - `GlobalVariable` (literal type)
+   - `PoolVariable` (literal type)
+
+#### 🟢 Minor: Consider for Consistency
+5. **`FileInFormatAstBuilder.cs`** - Name reflects Smalltalk "file-in" format but may be unclear to newcomers
+
+---
+
+### Recommended Restructuring
+
+#### Phase 1: Cleanup (Low Risk, High Impact)
+
+| Action | Files | Rationale |
+|--------|-------|-----------|
+| Delete `ANTLR4/ANTLR4/` | Nested folder | Remove duplicate JAR file |
+| Add `Generated.sav/` to `.gitignore` | Or delete entirely | Backup files shouldn't be tracked |
+
+#### Phase 2: Introduce `Bytecode/` Folder (Medium Risk)
+
+Move core bytecode compilation to dedicated folder:
+
+```
+Bytecode/
+├── BytecodeCompiler.cs
+├── BytecodeCompiler.Blocks.cs
+├── BytecodeCompiler.ControlFlow.cs
+├── BytecodeCompiler.Literals.cs
+├── BytecodeCompiler.Messages.cs
+├── BytecodeEmitter.cs
+└── VariableResolver.cs
+```
+
+**Namespace change**: `Smalltalk80.Compiler` → `Smalltalk80.Compiler.Bytecode`
+
+**Risk**: Requires updating `using` statements in consuming code.
+
+#### Phase 3: Introduce `Model/` Folder (Medium Risk)
+
+Extract data types to dedicated folder:
+
+```
+Model/
+├── CompiledMethodData.cs       # Extract from CompilerDataTypes.cs
+├── CompilationEnvironment.cs   # Move from root
+├── GlobalVariable.cs           # Extract from CompilerDataTypes.cs
+├── PoolVariable.cs             # Extract from CompilerDataTypes.cs
+├── Symbol.cs                   # Extract from CompilerDataTypes.cs
+└── ScopeType.cs                # Extract from CompilationEnvironment.cs
+```
+
+**Namespace change**: `Smalltalk80.Compiler` → `Smalltalk80.Compiler.Model`
+
+#### Phase 4: Introduce `Infrastructure/` Folder (Low Risk)
+
+```
+Infrastructure/
+├── CollectingErrorListener.cs
+├── CompilerOptions.cs
+└── IBytecodeCompiler.cs
+```
+
+### Proposed Final Structure
+
+```
+Smalltalk80.Compiler/
+├── Analysis/                        # Static analysis (unchanged)
+├── AST/                             # AST building (unchanged)
+├── Bytecode/                        # NEW: Core bytecode compilation
+│   ├── BytecodeCompiler*.cs
+│   ├── BytecodeEmitter.cs
+│   └── VariableResolver.cs
+├── CodeGen/                         # Bundle generation (unchanged)
+├── Generated/                       # ANTLR-generated (unchanged)
+├── Grammar/                         # Grammar files (unchanged)
+├── Infrastructure/                  # NEW: Support code
+│   ├── CollectingErrorListener.cs
+│   ├── CompilerOptions.cs
+│   └── IBytecodeCompiler.cs
+├── Model/                           # NEW: Data types
+│   ├── CompiledMethodData.cs
+│   ├── CompilationEnvironment.cs
+│   ├── GlobalVariable.cs
+│   ├── PoolVariable.cs
+│   ├── ScopeType.cs
+│   └── Symbol.cs
+├── Tools/                           # Rename from ANTLR4
+│   └── antlr-4.13.2-complete.jar
+└── Program.cs                       # CLI entry point
+```
+
+---
+
+## Class and Method Naming Review
+
+### Current Naming Assessment
+
+| Aspect | Rating | Notes |
+|--------|--------|-------|
+| **Class naming** | ⭐⭐⭐⭐⭐ | Clear, descriptive, follows .NET conventions |
+| **Method naming** | ⭐⭐⭐⭐☆ | Generally good, some long names |
+| **Consistency** | ⭐⭐⭐⭐☆ | Mostly consistent patterns |
+| **Domain terminology** | ⭐⭐⭐⭐⭐ | Excellent Blue Book alignment |
+
+### 🟢 Naming Strengths
+
+1. **Blue Book alignment**: `BytecodeCompiler`, `BytecodeEmitter`, `TempFrameAllocator` match specification terminology
+2. **Clear responsibility**: `VariableResolver`, `TailRecursionAnalyzer`, `LiteralExtractor`
+3. **Partial class naming**: `BytecodeCompiler.Blocks.cs` pattern clearly indicates content
+
+### 🟡 Distant Future: Potential Naming Improvements
+
+> **Note**: These are low-priority suggestions for a future major version. Current names are functional and changing them would break existing code.
+
+#### File/Class Renames
+
+| Current | Suggested | Rationale |
+|---------|-----------|-----------|
+| `FileInFormatAstBuilder` | `ChunkFormatParser` or `SmalltalkSourceParser` | "File-in format" is Smalltalk jargon; "chunk format" is the technical term |
+| `ColdStartDataGenerator` | `BundleDataCollector` | Clarifies it collects data for the bundle |
+| `CompilerDataTypes.cs` | Split into individual files | One class per file convention |
+| `CollectingErrorListener` | `ParseErrorCollector` | More descriptive of ANTLR role |
+
+#### Method Renames (BytecodeCompiler)
+
+| Current | Suggested | Rationale |
+|---------|-----------|-----------|
+| `CompileMethodFromTree` | `CompileMethod` | "FromTree" is implementation detail |
+| `CompileExpressionFromTree` | `CompileExpression` | "FromTree" is implementation detail |
+| `TryInlineAnd` | `TryInlineAndBlock` | Clarifies this handles `and:` block inlining |
+| `TryInlineOr` | `TryInlineOrBlock` | Clarifies this handles `or:` block inlining |
+
+#### Type Renames
+
+| Current | Suggested | Rationale |
+|---------|-----------|-----------|
+| `CompiledMethodData` | `MethodCompilationResult` | Aligns with `CompilationResult` pattern |
+| `GlobalVariable` | `GlobalAssociation` | Blue Book: globals are Associations in SystemDictionary |
+| `InlineResult` (enum) | `ControlFlowInlineResult` | More specific context |
+
+### Naming Conventions Reference
+
+The codebase follows these conventions consistently:
+
+| Pattern | Example | Usage |
+|---------|---------|-------|
+| `*Compiler` | `BytecodeCompiler` | Classes that compile/transform |
+| `*Emitter` | `BytecodeEmitter` | Classes that emit/output |
+| `*Analyzer` | `TailRecursionAnalyzer` | Classes that analyze |
+| `*Generator` | `ColdStartJsonGenerator` | Classes that generate output |
+| `*Resolver` | `VariableResolver` | Classes that resolve references |
+| `*Allocator` | `TempFrameAllocator` | Classes that allocate resources |
+| `*Extractor` | `LiteralExtractor` | Classes that extract data |
+| `*Node` | `ClassDefinitionNode` | AST node types |
+| `*Info` | `TailCallInfo` | Data holder records |
+| `Try*` | `TryInlineIfTrue` | Methods that attempt and return bool |
+| `Compile*` | `CompileBlock` | Methods that compile constructs |
+| `Emit*` | `EmitPushReceiver` | Methods that emit bytecodes |
+| `Visit*` | `VisitExpression` | ANTLR visitor methods |
+
+---
+
 *This review was generated following the constraints specified: no changes to Generated/ folder, preserve public API signatures, C# 13/.NET 9.0 compatibility, and JSON cold-start bundle format compatibility.*
