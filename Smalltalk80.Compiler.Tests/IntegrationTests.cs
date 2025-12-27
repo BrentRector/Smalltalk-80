@@ -13,14 +13,16 @@ public class IntegrationTests : CompilerTestBase
     public void TestCompileSimpleClass()
     {
         var json = CompileFile("SimpleClass.st");
-        
-        // Verify class structure
+
+        // Verify class structure (may include both instance and class side)
         var classes = (JArray)json["classes"]!;
-        Assert.That(classes.Count, Is.EqualTo(1), "Should have one class");
-        
-        var simpleClass = (JObject)classes[0];
-        Assert.That(simpleClass["name"]?.ToString(), Is.EqualTo("SimpleClass"));
-        Assert.That(simpleClass["superclass"]?.ToString(), Is.EqualTo("Object"));
+        Assert.That(classes.Count, Is.GreaterThanOrEqualTo(1), "Should have at least one class");
+
+        // Find SimpleClass by name (classes[0] might be metaclass)
+        var simpleClass = classes.Cast<JObject>().FirstOrDefault(c =>
+            c["name"]?.ToString() == "SimpleClass");
+        Assert.That(simpleClass, Is.Not.Null, "Should have SimpleClass");
+        Assert.That(simpleClass!["superclass"]?.ToString(), Is.EqualTo("Object"));
         
         // Verify instance variables
         var instanceVars = (JArray)simpleClass["instanceVariables"]!;
@@ -50,11 +52,12 @@ public class IntegrationTests : CompilerTestBase
     public void TestCompileComplexExpressions()
     {
         var json = CompileFile("ComplexExpressions.st");
-        
+
         var classes = (JArray)json["classes"]!;
-        var complexClass = (JObject)classes[0];
-        
-        Assert.That(complexClass["name"]?.ToString(), Is.EqualTo("ComplexExpressions"));
+        // Find ComplexExpressions by name (classes[0] might be metaclass)
+        var complexClass = classes.Cast<JObject>().FirstOrDefault(c =>
+            c["name"]?.ToString() == "ComplexExpressions");
+        Assert.That(complexClass, Is.Not.Null, "Should have ComplexExpressions class");
         
         var methods = (JArray)complexClass["methods"]!;
         
@@ -98,11 +101,14 @@ public class IntegrationTests : CompilerTestBase
     public void TestCompileControlStructures()
     {
         var json = CompileFile("ControlStructures.st");
-        
+
         var classes = (JArray)json["classes"]!;
-        var controlClass = (JObject)classes[0];
-        
-        var methods = (JArray)controlClass["methods"]!;
+        // Find ControlStructures by name (classes[0] might be metaclass)
+        var controlClass = classes.Cast<JObject>().FirstOrDefault(c =>
+            c["name"]?.ToString() == "ControlStructures");
+        Assert.That(controlClass, Is.Not.Null, "Should have ControlStructures class");
+
+        var methods = (JArray)controlClass!["methods"]!;
         
         // Test whileTrue loop
         var whileTrue = methods.FirstOrDefault(m => 
@@ -139,10 +145,14 @@ public class IntegrationTests : CompilerTestBase
     public void TestMethodCategories()
     {
         var json = CompileFile("SimpleClass.st");
-        
+
         var classes = (JArray)json["classes"]!;
-        var simpleClass = (JObject)classes[0];
-        var methods = (JArray)simpleClass["methods"]!;
+        // Find SimpleClass by name (classes[0] might be metaclass)
+        var simpleClass = classes.Cast<JObject>().FirstOrDefault(c =>
+            c["name"]?.ToString() == "SimpleClass");
+        Assert.That(simpleClass, Is.Not.Null, "Should have SimpleClass");
+
+        var methods = (JArray)simpleClass!["methods"]!;
         
         // Methods should be organized by category
         var categories = new HashSet<string>();
@@ -206,19 +216,22 @@ size
         
         var json = CompileSource(source);
         var classes = (JArray)json["classes"]!;
-        var testClass = (JObject)classes[0];
-        var methods = (JArray)testClass["methods"]!;
-        
+        // Find PrimitiveTest by name (classes[0] might be metaclass)
+        var testClass = classes.Cast<JObject>().FirstOrDefault(c =>
+            c["name"]?.ToString() == "PrimitiveTest");
+        Assert.That(testClass, Is.Not.Null, "Should have PrimitiveTest class");
+
+        var methods = (JArray)testClass!["methods"]!;
+
         // Check each primitive method
         foreach (var method in methods)
         {
-            var primitive = method["primitive"];
-            Assert.That(primitive, Is.Not.Null, 
-                $"Method {method["selector"]} should have primitive");
-            
-            var primNum = (int)primitive!;
-            Assert.That(primNum, Is.GreaterThan(0), "Primitive number should be positive");
-            
+            // Check primitive number - stored in header["primitiveIndex"] for Blue Book format
+            var header = method["header"] as JObject;
+            var primitiveIndex = header?["primitiveIndex"]?.Value<int>() ?? (int?)method["primitive"] ?? 0;
+            Assert.That(primitiveIndex, Is.GreaterThan(0),
+                $"Method {method["selector"]} should have primitive > 0");
+
             // Should have fallback code
             var bytecodes = (JArray)method["bytecodes"]!;
             Assert.That(bytecodes.Count, Is.GreaterThan(0), "Should have fallback bytecode");

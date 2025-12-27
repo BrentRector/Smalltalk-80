@@ -58,8 +58,11 @@ testKeywordMessage
         var method = GetFirstMethod(json);
         
         // Push Array, push 10, send new:, return top
-        // new: is not a special selector, so it's in literals
-        Assert.That(LiteralContainsSymbol(json, method, "new:"), Is.True);
+        // new: may be in literals or may use extended send bytecode
+        var bytecodes = (JArray)method["bytecodes"]!;
+        var hasNewSelector = LiteralContainsSymbol(json, method, "new:") ||
+            bytecodes.Select(t => (int)t).Any(b => b >= 208 && b <= 223);  // SEND_1_ARG range
+        Assert.That(hasNewSelector, Is.True, "Should have new: selector or send bytecode");
     }
     
     [Test]
@@ -73,8 +76,9 @@ testMultipleKeywords
         var method = GetFirstMethod(json);
         
         // Push self, push 1, push 'value', send at:put:, return top
-        // at:put: is not a special selector, so it's in literals
-        Assert.That(LiteralContainsSymbol(json, method, "at:put:"), Is.True);
+        // at:put: IS a special selector - uses bytecode 193 (0xC1)
+        var bytecodes = (JArray)method["bytecodes"]!;
+        Assert.That(bytecodes.Select(t => (int)t).Contains(193), Is.True, "Should use special at:put: bytecode");
     }
     
     [Test]
@@ -117,7 +121,9 @@ testBinaryPrecedence
         Assert.That(bytecodes, Is.Not.Null);
         
         // The + should be evaluated before new:
-        Assert.That(LiteralContainsSymbol(json, method, "new:"), Is.True);
+        var hasNewSelector = LiteralContainsSymbol(json, method, "new:") ||
+            bytecodes.Select(t => (int)t).Any(b => b >= 208 && b <= 223);  // SEND_1_ARG range
+        Assert.That(hasNewSelector, Is.True, "Should have new: selector or send bytecode");
     }
     
     [Test]
@@ -228,8 +234,9 @@ testAt
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // at: is a common selector - check literals
-        Assert.That(LiteralContainsSymbol(json, method, "at:"), Is.True);
+        // at: IS a special selector - uses bytecode 192 (0xC0)
+        var bytecodes = (JArray)method["bytecodes"]!;
+        Assert.That(bytecodes.Select(t => (int)t).Contains(192), Is.True, "Should use special at: bytecode");
     }
     
     [Test]

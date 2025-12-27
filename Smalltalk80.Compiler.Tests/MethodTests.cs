@@ -156,29 +156,31 @@ testPrimitive
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // Check primitive number
-        Assert.That(method["primitive"], Is.Not.Null);
-        Assert.That((int)method["primitive"]!, Is.EqualTo(1));
-        
+        // Check primitive number - stored in header["primitiveIndex"] for Blue Book format
+        var header = method["header"] as JObject;
+        var primitiveIndex = header?["primitiveIndex"]?.Value<int>() ?? (int?)method["primitive"] ?? 0;
+        Assert.That(primitiveIndex, Is.EqualTo(1), "Should have primitive 1");
+
         // Should have fallback code
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Count, Is.GreaterThan(0), "Should have fallback bytecode");
     }
-    
+
     [Test]
     public void TestPrimitiveWithoutFallback()
     {
         var source = WrapInTestClass(@"
 testPrimitiveNoFallback
     <primitive: 60>");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // Check primitive number
-        Assert.That(method["primitive"], Is.Not.Null);
-        Assert.That((int)method["primitive"]!, Is.EqualTo(60));
-        
+
+        // Check primitive number - stored in header["primitiveIndex"] for Blue Book format
+        var header = method["header"] as JObject;
+        var primitiveIndex = header?["primitiveIndex"]?.Value<int>() ?? (int?)method["primitive"] ?? 0;
+        Assert.That(primitiveIndex, Is.EqualTo(60), "Should have primitive 60");
+
         // Might have minimal bytecode or just return self
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
