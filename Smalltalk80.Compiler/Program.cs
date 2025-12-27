@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using Antlr4.Runtime;
 using Smalltalk80.Compiler.AST;
-using Smalltalk80.Compiler.Bytecode;
+using Smalltalk80.Compiler.BytecodeGen;
 using Smalltalk80.Compiler.CodeGen;
 using Smalltalk80.Compiler.Generated;
 using Smalltalk80.Compiler.Infrastructure;

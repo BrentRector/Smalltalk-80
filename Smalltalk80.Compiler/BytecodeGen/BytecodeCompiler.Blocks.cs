@@ -6,7 +6,7 @@ using Smalltalk80.Compiler.Generated;
 using Smalltalk80.Compiler.Model;
 using Smalltalk80.Core.Bytecodes;
 
-namespace Smalltalk80.Compiler.Bytecode
+namespace Smalltalk80.Compiler.BytecodeGen
 {
     /// <summary>
     /// Block and dynamic array compilation methods for the BytecodeCompiler.

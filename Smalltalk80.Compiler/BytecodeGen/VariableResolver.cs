@@ -4,7 +4,7 @@ using System.Linq;
 using Smalltalk80.Compiler.Analysis;
 using Smalltalk80.Compiler.Model;
 
-namespace Smalltalk80.Compiler.Bytecode
+namespace Smalltalk80.Compiler.BytecodeGen
 {
     /// <summary>
     /// Unified variable resolution for Smalltalk-80 compiler.

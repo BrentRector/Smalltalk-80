@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Smalltalk80.Compiler.Generated;
 using Smalltalk80.Compiler.Model;
 
-namespace Smalltalk80.Compiler.Bytecode
+namespace Smalltalk80.Compiler.BytecodeGen
 {
     /// <summary>
     /// Literal compilation methods for the BytecodeCompiler.

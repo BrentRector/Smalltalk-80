@@ -9,7 +9,7 @@ using Smalltalk80.Compiler.Infrastructure;
 using Smalltalk80.Compiler.Model;
 using Smalltalk80.Core.Bytecodes;
 
-namespace Smalltalk80.Compiler.Bytecode
+namespace Smalltalk80.Compiler.BytecodeGen
 {
     /// <summary>
     /// Result of attempting to inline a conditional message.

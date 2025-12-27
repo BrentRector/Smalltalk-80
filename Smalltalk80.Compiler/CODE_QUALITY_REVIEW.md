@@ -518,7 +518,7 @@ Smalltalk80.Compiler/
 ├── AST/                             # AST-related files
 │   ├── AstNodes.cs
 │   └── FileInFormatAstBuilder.cs
-├── Bytecode/                        # Core bytecode compilation
+├── BytecodeGen/                     # Core bytecode compilation
 │   ├── BytecodeCompiler.cs
 │   ├── BytecodeCompiler.Blocks.cs
 │   ├── BytecodeCompiler.ControlFlow.cs
@@ -557,9 +557,9 @@ Smalltalk80.Compiler/
 
 | Aspect | Rating | Notes |
 |--------|--------|-------|
-| **Folder naming** | ⭐⭐⭐⭐⭐ | Consistent, clear purpose (AST, Analysis, Bytecode, CodeGen, Infrastructure, Model) |
+| **Folder naming** | ⭐⭐⭐⭐⭐ | Consistent, clear purpose (AST, Analysis, BytecodeGen, CodeGen, Infrastructure, Model) |
 | **File naming** | ⭐⭐⭐⭐⭐ | Follows C# conventions, one class per file |
-| **Logical grouping** | ⭐⭐⭐⭐⭐ | Clear separation: Bytecode/, Model/, Infrastructure/ |
+| **Logical grouping** | ⭐⭐⭐⭐⭐ | Clear separation: BytecodeGen/, Model/, Infrastructure/ |
 | **Namespace alignment** | ⭐⭐⭐⭐⭐ | Namespaces match folder structure exactly |
 | **Partial class organization** | ⭐⭐⭐⭐⭐ | `BytecodeCompiler.*.cs` pattern is clear and consistent |
 
@@ -570,7 +570,7 @@ Smalltalk80.Compiler/
 2. ~~**`Generated.sav/` backup folder**~~ ✅ Added to `.gitignore`
 
 #### ✅ Moderate: Recommended Changes - COMPLETED
-3. ~~**Root-level file sprawl**~~ ✅ Organized into `Bytecode/`, `Model/`, `Infrastructure/` folders
+3. ~~**Root-level file sprawl**~~ ✅ Organized into `BytecodeGen/`, `Model/`, `Infrastructure/` folders
 4. ~~**`CompilerDataTypes.cs` is a "junk drawer"**~~ ✅ Split into individual files in `Model/`
 
 #### 🟢 Minor: Consider for Consistency
@@ -587,12 +587,12 @@ Smalltalk80.Compiler/
 | Delete `ANTLR4/ANTLR4/` | Nested folder | ✅ Removed duplicate JAR |
 | Add `Generated.sav/` to `.gitignore` | Or delete entirely | ✅ Added to .gitignore |
 
-#### ✅ Phase 2: Introduce `Bytecode/` Folder - COMPLETED
+#### ✅ Phase 2: Introduce `BytecodeGen/` Folder - COMPLETED
 
 Moved core bytecode compilation to dedicated folder:
 
 ```
-Bytecode/
+BytecodeGen/
 ├── BytecodeCompiler.cs
 ├── BytecodeCompiler.Blocks.cs
 ├── BytecodeCompiler.ControlFlow.cs
@@ -602,7 +602,7 @@ Bytecode/
 └── VariableResolver.cs
 ```
 
-**Namespace**: `Smalltalk80.Compiler.Bytecode`
+**Namespace**: `Smalltalk80.Compiler.BytecodeGen`
 
 #### ✅ Phase 3: Introduce `Model/` Folder - COMPLETED
 
@@ -639,7 +639,7 @@ Infrastructure/
 Smalltalk80.Compiler/
 ├── Analysis/                        # Static analysis (unchanged)
 ├── AST/                             # AST building (unchanged)
-├── Bytecode/                        # NEW: Core bytecode compilation
+├── BytecodeGen/                     # NEW: Core bytecode compilation
 │   ├── BytecodeCompiler*.cs
 │   ├── BytecodeEmitter.cs
 │   └── VariableResolver.cs

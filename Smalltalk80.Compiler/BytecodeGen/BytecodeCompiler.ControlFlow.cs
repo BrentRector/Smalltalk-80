@@ -2,7 +2,7 @@ using System.Linq;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Compiler.Generated;
 
-namespace Smalltalk80.Compiler.Bytecode
+namespace Smalltalk80.Compiler.BytecodeGen
 {
     /// <summary>
     /// Control flow inlining methods for the BytecodeCompiler.
