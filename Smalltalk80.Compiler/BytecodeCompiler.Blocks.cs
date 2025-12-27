@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Compiler.Generated;
+using Smalltalk80.Core.Bytecodes;
 
 namespace Smalltalk80.Compiler
 {
@@ -209,14 +210,14 @@ namespace Smalltalk80.Compiler
                 argSlotIndices.Add(allocator.GetSlotIndex(argName));
             }
 
-            // Emit blockCopy: send
+            // Emit blockCopy: send (Blue Book special selector 0xC8)
             emitter.PushActiveContext();
             emitter.PushSmallInteger(argCount);
-            emitter.EmitByte(0xC8);
+            emitter.EmitByte((byte)Bytecode.SEND_SPECIAL_BLOCKCOPY);
 
-            // Emit jump placeholder
+            // Emit jump placeholder (LONG_JUMP_4 gives forward range 0-255 with extension byte)
             int jumpBytecodeOffset = emitter.CurrentOffset;
-            emitter.EmitByte(0xA4);
+            emitter.EmitByte((byte)Bytecode.LONG_JUMP_4);
             int jumpOffsetLocation = emitter.CurrentOffset;
             emitter.EmitByte(0x00);
 
@@ -253,9 +254,14 @@ namespace Smalltalk80.Compiler
                         $"Block body too large: jump offset {jumpOffset} exceeds Blue Book forward jump range (0-1023)");
                 }
 
+                // Blue Book long jump encoding: LONG_JUMP_4 + hiPart gives range 0-1023
+                // LONG_JUMP_4 (0xA4): offset = ((4-4)*256 + ext) = 0-255
+                // LONG_JUMP_5 (0xA5): offset = ((5-4)*256 + ext) = 256-511
+                // LONG_JUMP_6 (0xA6): offset = ((6-4)*256 + ext) = 512-767
+                // LONG_JUMP_7 (0xA7): offset = ((7-4)*256 + ext) = 768-1023
                 int hiPart = jumpOffset / 256;
                 int extensionByte = jumpOffset % 256;
-                byte opcode = (byte)(0xA4 + hiPart);
+                byte opcode = (byte)((byte)Bytecode.LONG_JUMP_4 + hiPart);
 
                 emitter.PatchByteAt(jumpBytecodeOffset, opcode);
                 emitter.PatchByteAt(jumpOffsetLocation, (byte)extensionByte);

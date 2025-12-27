@@ -127,9 +127,10 @@ file sealed class ConsoleErrorListener : BaseErrorListener { }
 
 - [ ] **Reduce deep nesting**: Use early returns and guard clauses
 
-- [ ] **Magic number**: `0xC8` on line 215 should be a named constant
+- [x] **~~Magic number~~** ✅ **FIXED**: `0xC8` now uses `Bytecode.SEND_SPECIAL_BLOCKCOPY` from shared definitions
   ```csharp
-  private const byte BlockCopyBytecode = 0xC8;
+  // Fixed: Uses existing constant from BytecodeDefinitions.cs
+  emitter.EmitByte((byte)Bytecode.SEND_SPECIAL_BLOCKCOPY);
   ```
 
 ---
@@ -449,6 +450,91 @@ Ranked by: **Correctness → Robustness → Maintainability → Performance**
 1. Decompose `FileInFormatAstBuilder` into focused classes
 2. Implement table-driven bytecode stack depth calculation
 3. Consider dependency injection for better testability
+
+---
+
+## Documentation Completeness Review
+
+This section evaluates XML documentation comments and inline code comments for each file.
+
+### Documentation Rating Scale
+- ⭐⭐⭐⭐⭐ **Excellent**: All public/protected members documented, comprehensive class-level docs, meaningful inline comments
+- ⭐⭐⭐⭐☆ **Good**: Most members documented, adequate class-level docs, some inline comments
+- ⭐⭐⭐☆☆ **Adequate**: Public API documented, but private methods and complex logic lack comments
+- ⭐⭐☆☆☆ **Poor**: Sparse documentation, missing critical explanations
+- ⭐☆☆☆☆ **Minimal**: Little to no documentation
+
+### Per-File Documentation Assessment
+
+| File | Doc Rating | Strengths | Gaps |
+|------|------------|-----------|------|
+| **BytecodeEmitter.cs** | ⭐⭐⭐⭐⭐ | Comprehensive XML docs on all public methods, Blue Book bytecode references, clear `<remarks>` sections | None |
+| **TempFrameAllocator.cs** | ⭐⭐⭐⭐⭐ | Excellent class-level architecture doc, all public methods documented, Blue Book Chapter 30 reference | None |
+| **TailRecursionAnalyzer.cs** | ⭐⭐⭐⭐⭐ | Outstanding `<remarks>` with safety conditions, diagnostic-enabled analysis documented | None |
+| **CompilerDataTypes.cs** | ⭐⭐⭐⭐⭐ | All types and properties documented, clear Blue Book implementation notes | None |
+| **VariableResolver.cs** | ⭐⭐⭐⭐⭐ | Comprehensive resolution step documentation, architecture spec references | Excessive commented debug code (not doc issue) |
+| **Program.cs** | ⭐⭐⭐⭐☆ | Main entry point documented, `<param>` and `<returns>` present | ConsoleErrorListener methods could use more detail |
+| **BytecodeCompiler.cs** | ⭐⭐⭐⭐☆ | Class and public methods documented, InlineResult enum well documented | LiteralCollector inner class methods sparse |
+| **BytecodeCompiler.ControlFlow.cs** | ⭐⭐⭐⭐☆ | Blue Book Chapter 26 references, good method-level docs | Some helper methods like `CanInlineBlock` could use `<remarks>` |
+| **BytecodeCompiler.Messages.cs** | ⭐⭐⭐⭐☆ | Class-level doc present, cascade compilation explained | Private methods lack parameter descriptions |
+| **ColdStartJsonGenerator.cs** | ⭐⭐⭐⭐☆ | Good class-level doc, Association canonicalization documented | JSON record classes (`JsonClass`, etc.) undocumented |
+| **LiteralExtractor.cs** | ⭐⭐⭐⭐☆ | Public methods documented | Private extraction helpers sparse |
+| **BytecodeCompiler.Blocks.cs** | ⭐⭐⭐☆☆ | Class-level Blue Book reference | Complex state management lacks inline comments |
+| **BytecodeCompiler.Literals.cs** | ⭐⭐⭐☆☆ | `TryParseSmalltalkNumber` documented | Radix parsing logic could use more explanation |
+| **FileInFormatAstBuilder.cs** | ⭐⭐⭐☆☆ | Some method docs | Large file with minimal explanatory comments for complex parsing logic |
+
+### Documentation Gaps to Address
+
+#### High Priority
+1. **BytecodeCompiler.Blocks.cs** - Add inline comments explaining:
+   - Environment state save/restore pattern purpose
+   - Why `savedScopeDepth` check determines nested vs. sequential
+   - Block argument slot reuse strategy
+
+2. **FileInFormatAstBuilder.cs** - Add XML docs for:
+   - `ProcessClassDefinition` - explain chunk parsing
+   - `ProcessMethodCategory` - document method organization
+   - All `Process*Literal` methods - document Smalltalk literal syntax
+
+3. **ColdStartJsonGenerator.cs** - Document JSON record classes:
+   ```csharp
+   /// <summary>
+   /// Represents a class definition in the cold-start JSON bundle.
+   /// Maps to the "classes" array in the schema.
+   /// </summary>
+   public sealed class JsonClass { ... }
+   ```
+
+#### Medium Priority
+4. **BytecodeCompiler.cs** - Document `LiteralCollector`:
+   ```csharp
+   /// <summary>
+   /// Visitor that pre-collects literals from the AST during first pass.
+   /// This ensures selectors are placed at low literal indices for optimal
+   /// bytecode encoding (Blue Book bytecodes 0xD0-0xFF).
+   /// </summary>
+   private class LiteralCollector { ... }
+   ```
+
+5. **BytecodeCompiler.Literals.cs** - Add remarks for radix parsing:
+   ```csharp
+   /// <remarks>
+   /// Smalltalk supports radix notation: 16rFF = 255, 2r1010 = 10.
+   /// Format: [radix]r[digits] where radix is 2-36.
+   /// </remarks>
+   ```
+
+#### Low Priority
+6. Add `<exception>` documentation to methods that throw
+7. Add `<seealso>` cross-references between related classes
+
+### Documentation Recommendations
+
+1. **Adopt documentation policy**: All public/protected members must have XML docs
+2. **Use `<remarks>` for complexity**: Complex algorithms should explain "why", not just "what"
+3. **Reference specifications**: Continue pattern of citing Blue Book chapters
+4. **Document invariants**: State assumptions and preconditions
+5. **Remove commented debug code**: Replace with proper logging or `#if DEBUG` blocks
 
 ---
 
