@@ -58,13 +58,11 @@ testKeywordMessage
         var method = GetFirstMethod(json);
 
         // Push Array, push 10, send new:, return top
-        // new: is a 1-argument keyword message:
-        // - Bytecodes 0xE0-0xEF (224-239): Send Literal Selector With 1 Argument
-        // - Or extended send bytecode 0x83 (131)
+        // new: is a SPECIAL selector with bytecode 205 (0xCD)
+        // It does NOT appear in literals - it uses dedicated bytecode
         var bytecodes = (JArray)method["bytecodes"]!;
-        var hasNewSelector = LiteralContainsSymbol(json, method, "new:") ||
-            bytecodes.Select(t => (int)t).Any(b => (b >= 224 && b <= 239) || b == 131);
-        Assert.That(hasNewSelector, Is.True, "Should have new: selector or send bytecode");
+        Assert.That(bytecodes.Select(t => (int)t).Contains(205), Is.True,
+            "Should use special new: bytecode (205)");
     }
     
     [Test]
@@ -113,22 +111,22 @@ testUnaryPrecedence
         var source = WrapInTestClass(@"
 testBinaryPrecedence
     ^Array new: 2 + 3");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // Should evaluate as Array new: (2 + 3)
         // Binary + has higher precedence than keyword new:
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
-        
-        // The + should be evaluated before new:
-        // new: is a 1-argument keyword message:
-        // - Bytecodes 0xE0-0xEF (224-239): Send Literal Selector With 1 Argument
-        // - Or extended send bytecode 0x83 (131)
-        var hasNewSelector = LiteralContainsSymbol(json, method, "new:") ||
-            bytecodes.Select(t => (int)t).Any(b => (b >= 224 && b <= 239) || b == 131);
-        Assert.That(hasNewSelector, Is.True, "Should have new: selector or send bytecode");
+
+        // + is special selector bytecode 176
+        Assert.That(bytecodes.Select(t => (int)t).Contains(176), Is.True,
+            "Should use special + bytecode (176)");
+
+        // new: is a SPECIAL selector with bytecode 205 (0xCD)
+        Assert.That(bytecodes.Select(t => (int)t).Contains(205), Is.True,
+            "Should use special new: bytecode (205)");
     }
     
     [Test]
