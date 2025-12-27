@@ -1,5 +1,6 @@
 using System.Text;
 using Smalltalk80.Compiler.AST;
+using Smalltalk80.Compiler.Model;
 
 namespace Smalltalk80.Compiler.CodeGen;
 
