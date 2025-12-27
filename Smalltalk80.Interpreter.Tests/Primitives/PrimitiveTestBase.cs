@@ -58,9 +58,13 @@ public abstract class PrimitiveTestBase
         var symbolClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
         var stringClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
         var arrayClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var byteArrayClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var wordArrayClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var displayBitmapClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
         var compiledMethodClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
         var smallIntegerClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
         var blockContextClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
+        var orderedCollectionClassOOP = heap.AllocateObject(ObjectFormat.Pointer, 7, 0);
 
         return new VMMetadata
         {
@@ -93,9 +97,13 @@ public abstract class PrimitiveTestBase
             SymbolClassOOP = symbolClassOOP,
             StringClassOOP = stringClassOOP,
             ArrayClassOOP = arrayClassOOP,
+            ByteArrayClassOOP = byteArrayClassOOP,
+            WordArrayClassOOP = wordArrayClassOOP,
+            DisplayBitmapClassOOP = displayBitmapClassOOP,
             CompiledMethodClassOOP = compiledMethodClassOOP,
             SmallIntegerClassOOP = smallIntegerClassOOP,
-            BlockContextClassOOP = blockContextClassOOP
+            BlockContextClassOOP = blockContextClassOOP,
+            OrderedCollectionClassOOP = orderedCollectionClassOOP
         };
     }
 
@@ -302,9 +310,13 @@ public abstract class PrimitiveTestBase
             SymbolClassOOP = ObjectOOP(12),
             StringClassOOP = ObjectOOP(13),
             ArrayClassOOP = ObjectOOP(14),
+            ByteArrayClassOOP = ObjectOOP(18),
+            WordArrayClassOOP = ObjectOOP(19),
+            DisplayBitmapClassOOP = ObjectOOP(20),
             CompiledMethodClassOOP = ObjectOOP(15),
             SmallIntegerClassOOP = ObjectOOP(16),
-            BlockContextClassOOP = ObjectOOP(17)
+            BlockContextClassOOP = ObjectOOP(17),
+            OrderedCollectionClassOOP = ObjectOOP(21)
         };
     }
 }
