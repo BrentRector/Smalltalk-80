@@ -710,9 +710,10 @@ public class SmalltalkInterpreterThread
     /// <summary>
     /// Installs ScheduledControllers global at runtime.
     /// Runtime-safe: uses heap lookup instead of AssociationRegistry.
-    /// 1. Look for existing Association in Undeclared (forward reference from compilation)
-    /// 2. If found, update value and migrate to SystemDictionary
-    /// 3. If not found, create new Association at runtime
+    ///
+    /// The canonical Association for ScheduledControllers was created during cold start (Phase 3)
+    /// and installed in SystemDictionary with nil value (Phase 5). Method literals point to this
+    /// same Association object. We just need to find it and update its value.
     /// </summary>
     private void InstallScheduledControllersGlobal(SmalltalkOOP controlManagerOOP)
     {
@@ -720,45 +721,50 @@ public class SmalltalkInterpreterThread
         var heap = _context.HeapManager;
         var systemDictOOP = _context.VMMetadata.KnownObjects.Smalltalk;
 
-        // Look for existing Association in Undeclared (forward references go there during compilation)
-        var undeclaredOOP = LookupGlobalByString(systemDictOOP, "Undeclared");
-        SmalltalkOOP associationOOP = heap.GetNil();
-        SmalltalkOOP keySymbolOOP = heap.GetNil();
+        // FIRST: Look for existing Association in SystemDictionary (Phase 5 installed it there)
+        // This is the canonical Association that method literals reference
+        var (associationOOP, keySymbolOOP) = FindAssociationByName(systemDictOOP, globalName);
 
+        if (associationOOP != heap.GetNil())
+        {
+            // Found canonical Association in SystemDictionary - just update its value
+            // This is the same Association object that method literals point to
+            heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, controlManagerOOP);
+            Console.WriteLine($"    ✓ Updated existing {globalName} Association with ControlManager");
+            return;
+        }
+
+        // FALLBACK: Check Undeclared in case Phase 5 didn't install it
+        var undeclaredOOP = LookupGlobalByString(systemDictOOP, "Undeclared");
         if (undeclaredOOP != heap.GetNil())
         {
-            // Search Undeclared for ScheduledControllers Association
             (associationOOP, keySymbolOOP) = FindAssociationByName(undeclaredOOP, globalName);
-        }
-
-        if (associationOOP == heap.GetNil())
-        {
-            // Not in Undeclared - create new Association at runtime
-            // First, intern the symbol
-            keySymbolOOP = _vm!.RuntimeHeapAccess.InternSymbol(globalName);
-            if (keySymbolOOP == heap.GetNil())
+            if (associationOOP != heap.GetNil())
             {
-                throw new InvalidOperationException($"Symbol '{globalName}' not found in USTable");
+                // Found in Undeclared - update value and migrate to SystemDictionary
+                heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, controlManagerOOP);
+                InstallAssociationInDictionary(systemDictOOP, associationOOP, keySymbolOOP, globalName);
+                RemoveFromDictionary(undeclaredOOP, keySymbolOOP, globalName);
+                Console.WriteLine($"    ✓ Migrated {globalName} from Undeclared to SystemDictionary");
+                return;
             }
-
-            // Allocate Association object (2 instance variables: key, value)
-            var associationClassOOP = _vm!.RuntimeHeapAccess.GetClass("Association");
-            associationOOP = heap.AllocateObject(ObjectFormat.Pointer, fixedSlots: 2, indexedSize: 0);
-            heap.SetClassOOP(associationOOP, associationClassOOP);
-            heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX, keySymbolOOP);
         }
 
-        // Set the Association's value to the ControlManager instance
+        // LAST RESORT: Create new Association at runtime (shouldn't normally happen)
+        Console.WriteLine($"    WARNING: {globalName} Association not found, creating new one");
+        keySymbolOOP = _vm!.RuntimeHeapAccess.InternSymbol(globalName);
+        if (keySymbolOOP == heap.GetNil())
+        {
+            throw new InvalidOperationException($"Symbol '{globalName}' not found in USTable");
+        }
+
+        var associationClassOOP = _vm!.RuntimeHeapAccess.GetClass("Association");
+        associationOOP = heap.AllocateObject(ObjectFormat.Pointer, fixedSlots: 2, indexedSize: 0);
+        heap.SetClassOOP(associationOOP, associationClassOOP);
+        heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX, keySymbolOOP);
         heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, controlManagerOOP);
 
-        // Install in SystemDictionary using hash-based insertion
         InstallAssociationInDictionary(systemDictOOP, associationOOP, keySymbolOOP, globalName);
-
-        // Remove from Undeclared dictionary if it was there
-        if (undeclaredOOP != heap.GetNil())
-        {
-            RemoveFromDictionary(undeclaredOOP, keySymbolOOP, globalName);
-        }
     }
 
     /// <summary>
