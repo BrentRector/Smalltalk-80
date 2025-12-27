@@ -83,6 +83,12 @@ public class ColdStartOrchestrator : IColdStartLoader
     public SmalltalkOOP InitExpressionMethods { get; private set; }
 
     /// <summary>
+    /// Gets the VM metadata (available after Run() completes).
+    /// Built as the final step of cold start, before registries are disposed.
+    /// </summary>
+    public VMMetadata? VMMetadata { get; private set; }
+
+    /// <summary>
     /// Initializes a new instance of the ColdStartOrchestrator class.
     /// </summary>
     /// <param name="bundle">The cold start bundle containing the Smalltalk image data.</param>
@@ -214,11 +220,12 @@ public class ColdStartOrchestrator : IColdStartLoader
             // AssociationRegistry was made immutable in Phase 5)
             GlobalRegistry.MakeImmutable();
 
-            // Dispose all cold start registries - no access allowed after this point
-            // Runtime code must use VMMetadata and query the Smalltalk heap directly
-            SymbolRegistry.Dispose();
-            GlobalRegistry.Dispose();
-            AssociationRegistry.Dispose();
+            // Build VM metadata as the final step - extracts needed OOPs from registries
+            VMMetadata = BuildVMMetadata();
+
+            // Dispose all cold start registries - no further access allowed
+            // This is the final barrier: runtime code cannot use cold start structures
+            DisposeRegistries();
 
             _diagnostics?.Emit(new DiagnosticMessageEvent
             {
@@ -306,6 +313,18 @@ public class ColdStartOrchestrator : IColdStartLoader
         };
 
         return metadata;
+    }
+
+    /// <summary>
+    /// Disposes all cold start registries, blocking further access.
+    /// MUST be called AFTER BuildVMMetadata() extracts the needed OOPs.
+    /// After this, all registry access throws ObjectDisposedException.
+    /// </summary>
+    public static void DisposeRegistries()
+    {
+        SymbolRegistry.Dispose();
+        GlobalRegistry.Dispose();
+        AssociationRegistry.Dispose();
     }
 
     /// <summary>

@@ -1,7 +1,8 @@
 # Cold Start / Runtime Isolation Plan
 
 **Created**: 2025-12-27
-**Status**: Planning
+**Status**: Partially Implemented
+**Updated**: 2025-12-27
 
 ## Problem Statement
 
@@ -35,102 +36,95 @@ The Smalltalk heap is the source of truth at runtime. Cold start structures beco
 | `RuntimeHeapAccessor` | `Core/VM/` | Heap queries at runtime |
 | `RuntimeClassCache` | `Core/VM/` | Heap-backed cache with invalidation |
 
-## Post-Freeze Violations Found
+## Implemented: Two-Stage Lifecycle
 
-### Must Fix (runtime execution paths)
-1. **ObjectGraphAllocator.cs:294-522** - `LookupClassOOP("Array")` etc.
-   - Should use VMMetadata class OOPs instead
+All three registries now implement a two-stage lifecycle:
 
-2. **VirtualMachine.cs:1133** - `GetObject<>("objectIdToLocalId")`
-   - This is VM metadata, should be in VMMetadata or removed
+1. **MakeImmutable()** - Blocks writes, allows reads
+   - `SymbolRegistry.MakeImmutable()` - Called at end of Phase 1
+   - `AssociationRegistry.MakeImmutable()` - Called at end of Phase 5
+   - `GlobalRegistry.MakeImmutable()` - Called at end of Phase 6
 
-### Gray Area (init expression phase)
-3. **InitExpressionExecutor.cs:423-825** - `Get("Smalltalk")`
-   - Runs after freeze but before full runtime
-   - Should receive SmalltalkOOP via parameter, not query GlobalRegistry
+2. **Dispose()** - Blocks ALL access, clears data
+   - Called by `ColdStartOrchestrator.DisposeRegistries()` after `BuildVMMetadata()`
+   - All subsequent access throws `ObjectDisposedException`
 
-4. **SmalltalkInterpreterThread.cs:685** - `TryGet("Undeclared")`
-   - Used for diagnostics during startup
-   - Should receive via parameter or query heap
+**Key Change**: `BuildVMMetadata()` is now called AS THE FINAL STEP of cold start, inside `ColdStartOrchestrator.Run()`. This extracts all needed OOPs into `VMMetadata`, then `DisposeRegistries()` is called immediately after to block all future access.
 
-### Diagnostics (lower priority)
-5. **DiagnosticInspector.cs:39-326** - `TryGet("class:Float")` etc.
-   - Used for debug output formatting
-   - Could use VMMetadata class OOPs or accept stale data for debug
+## Implementation Progress
 
-## Implementation Plan
+### Phase 1: Enforce Freeze on Reads ✅ COMPLETE
 
-### Phase 1: Enforce Freeze on Reads (Immediate)
+1. ✅ `GlobalRegistry` - Two-stage lifecycle (MakeImmutable + Dispose)
+2. ✅ `SymbolRegistry` - Two-stage lifecycle (MakeImmutable + Dispose)
+3. ✅ `AssociationRegistry` - Two-stage lifecycle (MakeImmutable + Dispose)
 
-1. Modify `GlobalRegistry.Get()`, `TryGet()`, `LookupClassOOP()`, `GetObject()` to throw after freeze
-2. Modify `SymbolRegistry` similarly
-3. Run tests to identify all violations
+### Phase 4: Clear Transient Data ✅ COMPLETE
 
-### Phase 2: Fix Violations (Short-term)
-
-1. **ObjectGraphAllocator** - Pass VMMetadata or required class OOPs as parameters
-2. **InitExpressionExecutor** - Pass SmalltalkOOP for Smalltalk dictionary as parameter
-3. **VirtualMachine.GetLocalId** - Move objectIdToLocalId to VMMetadata or remove
-4. **SmalltalkInterpreterThread** - Pass required OOPs via constructor/method params
-5. **DiagnosticInspector** - Use VMMetadata class OOPs
-
-### Phase 3: Relocate Cold Start Structures (Medium-term)
-
-1. Create `Engine/ColdStart/` directory
-2. Move `GlobalRegistry.cs` → `Engine/ColdStart/GlobalRegistry.cs`
-3. Move `SymbolRegistry.cs` → `Engine/ColdStart/SymbolRegistry.cs`
-4. Move `AssociationRegistry.cs` → `Engine/ColdStart/AssociationRegistry.cs`
-5. Update namespaces: `Smalltalk80.Interpreter.Engine.ColdStart`
-6. Update all Engine code to use new namespace
-7. **Core/VM code will get compile errors if it tries to use them**
-
-### Phase 4: Clear Transient Data (Medium-term)
-
-After VMMetadata is created and passed to VM:
+All registries are disposed after `BuildVMMetadata()` extracts needed OOPs:
 
 ```csharp
-// In ColdStartOrchestrator after creating VMMetadata
-GlobalRegistry.Dispose();  // Clears all dictionaries, sets to null
-SymbolRegistry.Dispose();  // Clears symbol table
-// These classes now throw ObjectDisposedException on any access
+// In ColdStartOrchestrator.Run() - final steps
+VMMetadata = BuildVMMetadata();      // Extract needed OOPs
+DisposeRegistries();                  // Block all future access
+
+public static void DisposeRegistries()
+{
+    SymbolRegistry.Dispose();
+    GlobalRegistry.Dispose();
+    AssociationRegistry.Dispose();
+}
 ```
 
-### Phase 5: Documentation (Final)
+### Dead Code Removed ✅ COMPLETE
 
-1. Update CLAUDE.md with cold start vs runtime distinction
-2. Add XML docs explaining the architectural boundary
-3. Document VMMetadata as the sole handoff mechanism
+Removed from `Program.cs`:
+- `ResolveLiteralValueAsOOP()` - Duplicated in `LiteralResolver`
+- `AllocateCharacter()`, `AllocateByteArray()`, `AllocateArray()` - Unused helpers
+- `ResolveAssociation()` - Duplicated in `LiteralResolver`
+- `ConvertHexStringToBytes()`, `GetIntValue()`, `GetFloatValue()` - Unused helpers
+- `FormatReturnValue()` - Unused
+- `DumpInitExpressionDebugInfo()` - Unused
+- Duplicate `BuildVMMetadata()` - Now only in orchestrator
+
+### Phase 2: Fix Violations (Remaining)
+
+These may already be resolved by the disposal approach - registries throw after cold start:
+
+1. **ObjectGraphAllocator.cs** - Only used during cold start (before dispose)
+2. **InitExpressionExecutor.cs** - Runs during cold start (before dispose)
+3. **VirtualMachine.cs** - Should not access registries (will throw if it does)
+4. **SmalltalkInterpreterThread.cs** - Should not access registries
+5. **DiagnosticInspector.cs** - May need to use VMMetadata instead
+
+### Phase 3: Relocate Cold Start Structures (Future)
+
+This provides compile-time enforcement but is lower priority now that runtime enforcement is in place:
+
+1. Create `Engine/ColdStart/` directory
+2. Move registry files with new namespace
+3. Core/VM code will get compile errors if it tries to use them
 
 ## Verification Checklist
 
-- [ ] `GlobalRegistry` throws on all access after freeze
-- [ ] `SymbolRegistry` throws on all access after freeze
-- [ ] All post-freeze violations fixed
+- [x] `GlobalRegistry` throws on all access after dispose
+- [x] `SymbolRegistry` throws on all access after dispose
+- [x] `AssociationRegistry` throws on all access after dispose
+- [x] Transient data cleared after cold start
+- [x] `BuildVMMetadata()` consolidated into orchestrator
+- [x] Dead code removed from Program.cs
 - [ ] Cold start structures moved to `Engine/ColdStart/`
 - [ ] `Core/VM/` code compiles without cold start imports
-- [ ] Transient data cleared after cold start
 - [ ] Tests pass
 - [ ] Documentation updated
 
-## Files to Modify
+## Files Modified
 
-### Phase 1
-- `Core/VM/GlobalRegistry.cs` - Add throws on read after freeze
-- `Core/VM/SymbolRegistry.cs` - Add throws on read after freeze
-
-### Phase 2
-- `Core/ObjectGraphAllocator.cs` - Use VMMetadata
-- `Engine/InitExecution/InitExpressionExecutor.cs` - Accept OOPs as params
-- `Core/VM/VirtualMachine.cs` - Remove GlobalRegistry.GetObject call
-- `SmalltalkInterpreterThread.cs` - Accept required OOPs
-- `Core/Diagnostics/DiagnosticInspector.cs` - Use VMMetadata
-
-### Phase 3
-- Create `Engine/ColdStart/` directory
-- Move and rename registry files
-- Update all `using` statements in Engine code
-
-### Phase 4
-- `GlobalRegistry.cs` - Add Dispose() method
-- `SymbolRegistry.cs` - Add Dispose() method
-- `Engine/ColdStartOrchestrator.cs` - Call Dispose() after handoff
+### Completed
+- `Core/VM/GlobalRegistry.cs` - Two-stage lifecycle
+- `Core/VM/SymbolRegistry.cs` - Two-stage lifecycle
+- `Core/VM/AssociationRegistry.cs` - Two-stage lifecycle
+- `Engine/ColdStartOrchestrator.cs` - BuildVMMetadata + DisposeRegistries
+- `Engine/LoaderPhases/Phase1_PreflightAndSymbols.cs` - MakeImmutable()
+- `Engine/LoaderPhases/Phase5/Phase5Orchestrator.cs` - MakeImmutable()
+- `Program.cs` - Removed duplicate BuildVMMetadata, dead code cleanup
