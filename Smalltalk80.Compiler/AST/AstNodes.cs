@@ -3,12 +3,8 @@ using System.Text.Json.Serialization;
 
 namespace Smalltalk80.Compiler.AST;
 
-/// <summary>
-/// AST Node classes for the Smalltalk-80 compiler.
-/// These classes represent the parsed AST structure and are used for JSON serialization.
-/// </summary>
-
-// Compilation result and class definitions
+// AST Node classes for the Smalltalk-80 compiler.
+// These classes represent the parsed AST structure and are used for JSON serialization.
 
 /// <summary>
 /// Root result of parsing a Smalltalk source file.
