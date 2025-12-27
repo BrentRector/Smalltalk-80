@@ -11,20 +11,20 @@ Bundle loaded: 1.0.9
 Initializing heap manager...
 Starting cold start loader (6-phase)...
   === Cold Start Loader (New 6-Phase Architecture) ===
-Phase 1: Preflight Validation and Symbol Interning... ✓ (62ms)
+Phase 1: Preflight Validation and Symbol Interning... ✓ (65ms)
 Phase 2: Class Infrastructure...[AllocateEmptyDictionary] classVarCount=12, rawSize=16.00, ceiledSize=16, initialSize=16
 [Phase 2] Float classPool: classVarCount=12, allocated size=16
 [After Phase 2] Float classPool size = 16
- ✓ (17ms)
+ ✓ (18ms)
 Phase 3: Object Allocation and Initialization...  Bundle v1.0.9+ uses canonical Associations - skipping undeclared Association pre-creation
 [After Phase 3] Float classPool size = 16
- ✓ (16ms)
+ ✓ (18ms)
 Phase 4: Method Compilation...[Phase 4] Pre-compiling 288 init expressions...
 [Phase 4] InitExpressionMethods array OOP: oop=39354
 [Phase 4] ✓ Pre-compiled all 288 init expressions
   Created 390 ClassOrganizer objects
 [Orchestrator] Stored InitExpressionMethods from Phase 4: oop=39354
- ✓ (594ms)
+ ✓ (621ms)
 Phase 5: Globals and Patches...  No patches to apply
 [Phase 5] Initialized SpecialSelectors array with 32 selector/nargs pairs
 [Phase 5] Installing Processor global (instance OOP: oop=13520)
@@ -41,10 +41,10 @@ Phase 5: Globals and Patches...  No patches to apply
   Created DefaultTextStyle (oop=oop=67924) with lineGrid=16, baseline=12
   Created Display (800x600, 60000 byte bitmap) as DisplayScreen OOP(67934)
 [After Phase 5] Float classPool size = 16
- ✓ (174ms)
+ ✓ (172ms)
 Phase 6: Validation and GC Verification...  ✓ VMConstants validation: All 27 constants match class layouts
 [Phase 6] Added InitExpressionMethods as GC root: oop=39354
- ✓ (132ms)
+ ✓ (129ms)
   === Cold Start Complete ===
 Cold start completed successfully!
 
@@ -54,7 +54,7 @@ Cold start completed successfully!
 Display window created (not shown yet)...
 
 === Running GC after cold start ===
-  GC Results: 0/33966 objects collected (0.0% efficiency) in 6.54ms (Mark: 6.50ms, Sweep: 0.00ms), 0 bytes freed
+  GC Results: 0/33966 objects collected (0.0% efficiency) in 6.28ms (Mark: 6.25ms, Sweep: 0.00ms), 0 bytes freed
   Auto-GC enabled for runtime
 
 === Starting Smalltalk Thread ===
@@ -84,7 +84,7 @@ Display window created (not shown yet)...
 === Entering GUI Event Loop ===
 Display window is visible. Close window to exit.
 
-✓ 14ms
+✓ 11ms
   BinaryChoiceView initialize... 
 === CRASH DIAGNOSTICS ===
 Error: Stack underflow: sp=7, initialSP=7 in MethodContext OOP(oop=67982)
@@ -364,7 +364,7 @@ Stack trace:
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 174
   Date initialize... ✓ 3ms
   Decompiler initialize... ✓ 3ms
-  Explainer initialize... ✓ 3ms
+  Explainer initialize... ✓ 4ms
   FileDirectory initialize... ✓ 3ms
   Form initialize... 
 === CRASH DIAGNOSTICS ===
@@ -555,10 +555,10 @@ Stack trace:
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 857
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 174
   InputState initialize... ✓ 3ms
-  InstructionStream initialize... ✓ 5ms
-  MessageNode initialize... ✓ 3ms
+  InstructionStream initialize... ✓ 4ms
+  MessageNode initialize... ✓ 2ms
   Object initialize... ✓ 3ms
-  Paragraph initialize... ✓ 4ms
+  Paragraph initialize... ✓ 3ms
   ParseNode initialize... ✓ 3ms
   ProcessorScheduler initialize... ✓ 3ms
   Project initialize... ✓ 3ms
@@ -625,7 +625,7 @@ Stack trace:
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ResumeProcess(SmalltalkOOP processOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 58
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 857
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 174
-  StringHolder initialize... ✓ 3ms
+  StringHolder initialize... ✓ 2ms
   Symbol initialize... 
 === CRASH DIAGNOSTICS ===
 Error: Stack underflow: sp=3, initialSP=3 in MethodContext OOP(oop=68050)
@@ -709,8 +709,8 @@ Stack trace:
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ResumeProcess(SmalltalkOOP processOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 58
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 857
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 174
-  SystemDictionary initialize... ✓ 5ms
-  SystemTracer initialize... ✓ 3ms
+  SystemDictionary initialize... ✓ 7ms
+  SystemTracer initialize... ✓ 4ms
   Text initialize... 
 === CRASH DIAGNOSTICS ===
 Error: Stack underflow: sp=3, initialSP=3 in MethodContext OOP(oop=68212)
@@ -778,8 +778,8 @@ Stack trace:
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 174
   TextList initialize... ✓ 7ms
   WindowsFileDirectory initialize... ✓ 4ms
-  WindowsFileSystem initialize... ✓ 3ms
-  File initialize... ✓ 9ms
+  WindowsFileSystem initialize... ✓ 2ms
+  File initialize... ✓ 8ms
   BitEditor initialize... 
 [X] METHOD NOT FOUND ERROR
    Selector: +
@@ -843,8 +843,8 @@ Stack trace:
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 857
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 174
   Debugger initialize... ✓ 3ms
-  LargePositiveInteger initialize... ✓ 8ms
-  LargeNegativeInteger initialize... ✓ 9ms
+  LargePositiveInteger initialize... ✓ 9ms
+  LargeNegativeInteger initialize... ✓ 10ms
   Delay initialize... 
 === CRASH DIAGNOSTICS ===
 Error: Stack underflow: sp=2, initialSP=2 in MethodContext OOP(oop=68276)
@@ -1398,7 +1398,7 @@ Stack trace:
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ResumeProcess(SmalltalkOOP processOOP) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 58
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteWithTimeout(SmalltalkOOP processOOP, CancellationToken cancellationToken) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 857
    at Smalltalk80.Interpreter.Engine.InitExecution.InitExpressionExecutor.ExecuteInitExpression(String initLocalId, SmalltalkOOP compiledMethodOOP, Nullable`1 timeoutMs) in D:\Users\brent\OneDrive\Src\Smalltalk-80\Smalltalk80.Interpreter\Engine\InitExecution\InitExpressionExecutor.cs:line 174
-  TextCollector initialize... ✓ 4ms
+  TextCollector initialize... ✓ 3ms
   FormDisplayTest initialize... ✓ 2ms
   BlockContextTestRunner initialize... 
 [X] METHOD NOT FOUND ERROR
@@ -1430,8 +1430,8 @@ Stack trace:
 
 === Running GC after all initialization ===
   GC Roots: 5
-  GC Results: 266/34270 objects collected (0.8% efficiency) in 5.95ms (Mark: 5.15ms, Sweep: 0.58ms), 20,632 bytes freed
-  Cumulative GC: 4 cycles, 267 objects collected, 20,636 bytes freed, 29.43ms total (avg 7.36ms/cycle, 66.8 objects/cycle)
+  GC Results: 266/34270 objects collected (0.8% efficiency) in 5.92ms (Mark: 5.10ms, Sweep: 0.56ms), 20,632 bytes freed
+  Cumulative GC: 4 cycles, 267 objects collected, 20,636 bytes freed, 26.77ms total (avg 6.69ms/cycle, 66.8 objects/cycle)
 
 === Init Expression Execution Complete ===
   29 succeeded, 22 failed, 0 skipped
