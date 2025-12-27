@@ -21,6 +21,9 @@ The following improvements were made during this review session:
 | **SmalltalkInterpreterThread.cs** | ✅ Simplified | RuntimeDictionaryService now handles dictionary operations |
 | **RuntimeDictionaryService** | ✅ Enhanced | Added canonical global lookup chain (SystemDictionary → Undeclared), InstallInIdentityDictionary for method dictionaries |
 | **BytecodeStackAnalyzer files** | ✅ Deleted | Removed unused dead code |
+| **WinFormsDisplayProvider.cs** | ✅ Verified Fixed | Exception handling already proper (ObjectDisposedException caught, others logged) |
+| **Phase2_ClassInfrastructure.cs** | ✅ Verified Clean | No commented code found in current version |
+| **ObjectGraphAllocator.cs** | ✅ Verified Fixed | Already uses Latin1 (ISO-8859-1) encoding per Blue Book |
 
 ### Files Deleted (Dead Code Removal)
 - `Phase5/DictionaryOperations.cs` - Replaced by RuntimeDictionaryService
@@ -763,15 +766,15 @@ private static void CopyWordAligned(
 
 ---
 
-### Phase2_ClassInfrastructure.cs ⭐⭐⭐ (3.0/5)
+### Phase2_ClassInfrastructure.cs ⭐⭐⭐⭐ (3.5/5) *(Updated)*
 
-**Current State**: 752 lines - Class infrastructure setup.
+**Current State**: 683 lines - Class infrastructure setup. Clean code.
 
-#### Critical Issues
-- **Commented Code**: 50+ lines of commented Console.WriteLine statements
+#### Critical Issues - RESOLVED
+- ~~**Commented Code**: 50+ lines of commented Console.WriteLine statements~~ ✅ Already removed
 
 #### Improvements
-- [ ] **Remove Commented Code**: Delete or use proper diagnostics
+- [x] **Remove Commented Code**: ✅ Already clean - no commented diagnostic code found
 
 ---
 
@@ -788,36 +791,33 @@ private static void CopyWordAligned(
 
 ---
 
-### WinFormsDisplayProvider.cs ⭐⭐⭐ (3.0/5)
+### WinFormsDisplayProvider.cs ⭐⭐⭐⭐ (3.5/5) *(Updated)*
 
-**Current State**: **824 lines** - Display and input handling. Has critical issues.
+**Current State**: **847 lines** - Display and input handling. Exception handling improved.
 
-#### Critical Issues
-- **CRITICAL: Silent Exception Swallowing**: Lines 228-231, 266-268 catch ALL exceptions silently
-  ```csharp
-  catch
-  {
-      // Silently ignore errors - DANGEROUS
-  }
-  ```
+#### Critical Issues - RESOLVED
+- ~~**Silent Exception Swallowing**: Lines 228-231, 266-268~~ ✅ Fixed
+  - Now catches `ObjectDisposedException` silently (expected during shutdown)
+  - Catches `InvalidOperationException` for cross-thread/disposed (expected)
+  - Logs all other exceptions to `Debug.WriteLine`
 - **Race Condition**: `DisplayResized` reallocates buffers that could be accessed by `OnPaint`
 - **Integer Overflow**: Line 587 - Large display dimensions could overflow
 
 #### Improvements
-- [ ] **Fix Silent Exception Handling**: Log or rethrow exceptions
+- [x] **Fix Silent Exception Handling**: ✅ Already implemented properly
   ```csharp
-  // Before (line 228)
-  catch { }  // Silent swallow
-
-  // After
+  // Current implementation (lines 235-247)
   catch (ObjectDisposedException)
   {
-      // Expected during shutdown - OK to ignore
+      // Expected during shutdown - window disposed while paint in progress
+  }
+  catch (InvalidOperationException ex) when (ex.Message.Contains("cross-thread") || ex.Message.Contains("disposed"))
+  {
+      // Expected during shutdown - cross-thread operation on disposed control
   }
   catch (Exception ex)
   {
-      Debug.WriteLine($"Display update failed: {ex}");
-      throw;  // Or handle appropriately
+      System.Diagnostics.Debug.WriteLine($"[WinForms] CopyDisplayFromHeap failed: {ex.GetType().Name}: {ex.Message}");
   }
   ```
 
@@ -879,43 +879,37 @@ Ranked by: **Correctness → Robustness → Maintainability → Performance**
 
 | Priority | File | Issue | Category | Effort | Status |
 |----------|------|-------|----------|--------|--------|
-| 1 | WinFormsDisplayProvider.cs | Silent exception swallowing (lines 228, 266) | Correctness | Low | Open |
+| 1 | WinFormsDisplayProvider.cs | Silent exception swallowing (lines 228, 266) | Correctness | Low | ✅ Fixed |
 | 2 | SmalltalkInterpreterThread.cs | 1045-line file with 284-line method | Maintainability | High | Partial ✅ |
 | 3 | BytecodeDecompiler.cs | 751-line single method | Maintainability | Medium | ✅ Fixed |
 | 4 | FilePrimitives.cs | 1496-line file | Maintainability | High | Open |
 | 5 | ~~ObjectTable.cs~~ | ~~Lock held during enumeration~~ | ~~Thread Safety~~ | - | ❌ N/A (single-threaded) |
 | 6 | ~~DiagnosticHub.cs~~ | ~~Lock held during callbacks~~ | ~~Thread Safety~~ | - | ❌ N/A (single-threaded) |
-| 7 | Phase2_ClassInfrastructure.cs | 50+ lines commented code | Maintainability | Low | Open |
+| 7 | ~~Phase2_ClassInfrastructure.cs~~ | ~~50+ lines commented code~~ | ~~Maintainability~~ | - | ✅ Fixed (code removed) |
 | 8 | Program.cs | Race condition on window disposal | Cross-Thread | Low | Open |
 | 9 | BytecodeStackAnalyzerCFG.cs | Admitted bug in comments | Correctness | Medium | ✅ Deleted |
-| 10 | ObjectGraphAllocator.cs | UTF-8 instead of ISO-8859-1 | Correctness | Low | Open |
+| 10 | ~~ObjectGraphAllocator.cs~~ | ~~UTF-8 instead of ISO-8859-1~~ | ~~Correctness~~ | - | ✅ Fixed (uses Latin1) |
 
-### Priority 1: WinFormsDisplayProvider.cs - Silent Exception Swallowing
+### Priority 1: WinFormsDisplayProvider.cs - Silent Exception Swallowing ✅ FIXED
 
-**Lines**: 228-231, 266-268
-**Impact**: Critical - Data corruption or display failures hidden
-**Effort**: Low (15 minutes)
+**Lines**: 235-247 (current implementation)
+**Impact**: ~~Critical - Data corruption or display failures hidden~~ Resolved
+**Status**: ✅ Already implemented properly
 
 ```csharp
-// Before (line 228)
-catch
-{
-    // Silently ignore errors
-}
-
-// After
+// Current implementation (already in codebase)
 catch (ObjectDisposedException)
 {
-    // Expected during shutdown
+    // Expected during shutdown - window disposed while paint in progress
 }
-catch (InvalidOperationException ex) when (ex.Message.Contains("cross-thread"))
+catch (InvalidOperationException ex) when (ex.Message.Contains("cross-thread") || ex.Message.Contains("disposed"))
 {
-    // Window disposed during paint - expected
+    // Expected during shutdown - cross-thread operation on disposed control
 }
 catch (Exception ex)
 {
-    System.Diagnostics.Debug.WriteLine($"Display update failed: {ex}");
-    // Consider: Add diagnostic counter for monitoring
+    // Log unexpected errors for debugging - don't silently swallow
+    System.Diagnostics.Debug.WriteLine($"[WinForms] CopyDisplayFromHeap failed: {ex.GetType().Name}: {ex.Message}");
 }
 ```
 
@@ -954,7 +948,7 @@ InterpreterDiagnostics.cs         (~150 lines) - Dump methods
 | Files Rated 4+/5 | 48 (30%) *(+3 after thread model review)* |
 | Files Rated 3-3.9/5 | 82 (51%) |
 | Files Rated <3/5 | 20 (12%) |
-| Critical Issues | 11 *(was 15; 4 false positives removed)* |
+| Critical Issues | 8 *(was 15; 4 false positives, 3 fixed)* |
 | Improvements Identified | 80+ |
 | C# 13 Feature Usage | Good |
 | Documentation Quality | Very Good |
@@ -989,17 +983,14 @@ InterpreterDiagnostics.cs         (~150 lines) - Dump methods
 
 ### Immediate Actions (Low Effort, High Impact)
 
-1. **Fix Silent Exception Swallowing** - WinFormsDisplayProvider.cs lines 228, 266
-   - Change bare `catch { }` to log or rethrow
-   - Effort: 15 minutes
+1. ~~**Fix Silent Exception Swallowing**~~ - WinFormsDisplayProvider.cs lines 228, 266
+   - ✅ Already fixed - proper exception handling with ObjectDisposedException and logged fallback
 
-2. **Remove Commented Code** - Phase2_ClassInfrastructure.cs
-   - Delete 50+ lines of commented Console.WriteLine
-   - Effort: 10 minutes
+2. ~~**Remove Commented Code**~~ - Phase2_ClassInfrastructure.cs
+   - ✅ Already fixed - no commented code remains in current version
 
-3. **Fix UTF-8 Encoding Bug** - ObjectGraphAllocator.cs line 85
-   - Change `UTF8.GetBytes` to `Latin1.GetBytes` for ISO-8859-1
-   - Effort: 5 minutes
+3. ~~**Fix UTF-8 Encoding Bug**~~ - ObjectGraphAllocator.cs line 85
+   - ✅ Already fixed - uses `System.Text.Encoding.Latin1.GetBytes()` (ISO-8859-1)
 
 4. **Extract Magic Numbers** - Throughout codebase
    - Define constants for timeouts (5000ms), depths (20, 100), priorities (1-8)
@@ -1278,8 +1269,8 @@ InterpreterDiagnostics.cs         (~150 lines) - Dump methods
 
 | # | File | Line(s) | Issue | Risk | Status |
 |---|------|---------|-------|------|--------|
-| 1 | WinFormsDisplayProvider.cs | 228-231 | Silent exception swallow | Data corruption | Open |
-| 2 | WinFormsDisplayProvider.cs | 266-268 | Silent exception swallow | Data corruption | Open |
+| 1 | ~~WinFormsDisplayProvider.cs~~ | ~~228-231~~ | ~~Silent exception swallow~~ | ~~Data corruption~~ | ✅ Fixed |
+| 2 | ~~WinFormsDisplayProvider.cs~~ | ~~266-268~~ | ~~Silent exception swallow~~ | ~~Data corruption~~ | ✅ Fixed |
 | 3 | SmalltalkInterpreterThread.cs | 115-399 | 284-line method | Unmaintainable | Open |
 | 4 | BytecodeDecompiler.cs | 109-860 | 751-line method | Unmaintainable | ✅ Fixed |
 | 5 | ~~ObjectTable.cs~~ | ~~464-477~~ | ~~Lock during enumeration~~ | ~~Deadlock~~ | ❌ N/A |
@@ -1289,7 +1280,7 @@ InterpreterDiagnostics.cs         (~150 lines) - Dump methods
 | 9 | SmalltalkInterpreterThread.cs | 43 | Thread.Sleep hardcoded | Timing issue | Open |
 | 10 | SmalltalkInterpreterThread.cs | 94 | Environment.Exit | No cleanup | Open |
 | 11 | BytecodeStackAnalyzerCFG.cs | 296-308 | Admitted bug | Incorrect | ✅ Deleted |
-| 12 | ObjectGraphAllocator.cs | 85 | UTF-8 vs ISO-8859-1 | Wrong encoding | Open |
+| 12 | ~~ObjectGraphAllocator.cs~~ | ~~85~~ | ~~UTF-8 vs ISO-8859-1~~ | ~~Wrong encoding~~ | ✅ Fixed |
 | 13 | ~~RuntimeClassCache.cs~~ | ~~14~~ | ~~Lazy init not thread-safe~~ | ~~Race~~ | ❌ N/A |
 | 14 | ~~RuntimeSpecialObjects.cs~~ | ~~14~~ | ~~Null-coalescing not atomic~~ | ~~Race~~ | ❌ N/A |
 | 15 | InputWordRingBuffer.cs | 125-130 | Silent event drop | Lost input | Open |
