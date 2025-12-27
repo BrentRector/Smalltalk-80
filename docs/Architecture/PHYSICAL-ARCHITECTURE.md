@@ -1,6 +1,6 @@
 # Physical Architecture
 
-**Last Updated**: 2025-11-20
+**Last Updated**: 2025-12-27
 
 This document describes the file system organization, subsystem structure, and dependencies of the Smalltalk-80 interpreter.
 
@@ -273,9 +273,11 @@ Bytecode analysis and validation tools.
 |------|---------|
 | BytecodeDecompiler.cs | Disassembly |
 | BytecodeStackValidator.cs | Stack balance checking |
-| BytecodeStackAnalyzer.cs | Stack effect analysis |
-| BytecodeStackAnalyzerCFG.cs | Control flow analysis |
 | BytecodeOperandValidator.cs | Operand validation |
+
+**Deleted Files** (2025-12-27):
+- ~~BytecodeStackAnalyzer.cs~~ - Removed (dead code)
+- ~~BytecodeStackAnalyzerCFG.cs~~ - Removed (dead code, contained bugs)
 
 ---
 
@@ -321,11 +323,10 @@ Six cold start phases that build the heap from JSON.
 | 5 | Phase5/*.cs (10 files) | Install globals, apply patches |
 | 6 | Phase6_ValidationAndGC.cs | Validate heap, run GC |
 
-**Phase 5 Components**:
+**Phase 5 Components** (9 files after 2025-12-27 cleanup):
 - Interfaces.cs - Component interfaces
 - DataTypes.cs - Phase5Context record
 - FieldValueResolver.cs - Resolve field values
-- DictionaryOperations.cs - Hash-based operations
 - AssociationManager.cs - Association identity
 - PatchApplier.cs - Apply forward references
 - USTableBuilder.cs - Build symbol table
@@ -333,16 +334,19 @@ Six cold start phases that build the heap from JSON.
 - RuntimeObjectCreator.cs - Create Display, etc.
 - Phase5Orchestrator.cs - Coordinate components
 
+**Deleted**: ~~DictionaryOperations.cs~~ - Replaced by `Core/VM/RuntimeDictionaryService.cs`
+
 ---
 
-### Engine/InitExecution (3 files)
+### Engine/InitExecution (4 files)
 
 Initialize expression execution after cold start.
 
 | File | Purpose |
 |------|---------|
-| InitExpressionExecutor.cs | Execute init expressions |
+| InitExpressionExecutor.cs | Execute single init expressions |
 | InitExpressionOrdering.cs | Dependency ordering |
+| InitExpressionRunner.cs | Orchestrates init expression phases (extracted 2025-12-27) |
 | InitResult.cs | Execution result |
 
 ---
