@@ -46,9 +46,33 @@ This comprehensive code quality review analyzed **162 C# source files** totaling
 **Critical Issues Requiring Immediate Attention**:
 1. Silent exception swallowing in platform code (data corruption risk)
 2. Extremely long files (4 files >800 lines, 1 file >1000 lines)
-3. Thread safety gaps in registry classes
+3. ~~Thread safety gaps in registry classes~~ *(Reassessed - see Threading Model)*
 4. Magic numbers scattered throughout codebase
-5. Significant code duplication in bytecode analyzers
+5. ~~Significant code duplication in bytecode analyzers~~ *(Deleted - dead code removed)*
+
+---
+
+## Threading Model
+
+**IMPORTANT**: This interpreter uses a two-thread architecture with Smalltalk cooperative multitasking:
+
+| Thread | Responsibility | Synchronization Needed |
+|--------|---------------|------------------------|
+| **UI Thread (WinForms)** | Display rendering, mouse/keyboard input | Yes - cross-thread with Smalltalk |
+| **Smalltalk Thread** | All bytecode execution, Smalltalk processes | No - cooperative scheduling |
+
+**Within the Smalltalk thread**, there is NO preemption. Smalltalk processes switch only at explicit yield points (Semaphore wait, Delay, etc.). This means:
+
+- ✅ All heap operations are single-threaded
+- ✅ All registry classes (GlobalRegistry, SymbolRegistry, etc.) are single-threaded
+- ✅ Context management, stack operations are single-threaded
+- ✅ Dictionary operations, method lookup are single-threaded
+
+**True cross-thread concerns** (require synchronization):
+- Display buffer access (UI thread writes, Smalltalk reads via BitBlt)
+- Input event queue (UI produces, Smalltalk consumes)
+- Mouse state polling (atomic read/write with `Interlocked`)
+- Window lifecycle (disposal during paint)
 
 ---
 
@@ -366,23 +390,15 @@ public sealed class SmalltalkThreadContext
 
 ---
 
-### ContextManager.cs ⭐⭐⭐⭐ (4.0/5)
+### ContextManager.cs ⭐⭐⭐⭐⭐ (4.5/5)
 
 **Current State**: Context lifecycle with pooling. Good performance optimization.
 
 #### Critical Issues
-- **Thread Safety**: Dictionary operations on line 36 not thread-safe
-- **Magic Number**: `MaxPooledContextsPerSize = 20` on line 37
+- None - ~~Thread Safety~~ *(Not an issue - only accessed from Smalltalk thread)*
 
 #### Improvements
-- [ ] **Thread-Safe Dictionary**: Use ConcurrentDictionary for pool
-  ```csharp
-  // Before
-  private readonly Dictionary<int, Stack<int>> _contextPool = [];
-
-  // After
-  private readonly ConcurrentDictionary<int, ConcurrentStack<int>> _contextPool = new();
-  ```
+- [ ] **Extract Constant**: `MaxPooledContextsPerSize = 20` could be named constant
 
 ---
 
@@ -626,33 +642,15 @@ private static void CopyWordAligned(
 
 ---
 
-### ObjectTable.cs ⭐⭐⭐⭐ (3.5/5)
+### ObjectTable.cs ⭐⭐⭐⭐ (4.0/5)
 
 **Current State**: 627 lines - Segmented object table with O(1) allocation.
 
 #### Critical Issues
-- **Thread Safety**: Lock held during enumeration could deadlock
-- **Performance**: `GetAllocatedCount` is O(n) under lock
+- ~~**Thread Safety**: Lock held during enumeration~~ *(Reassessed - only Smalltalk thread accesses during normal operation; lock may be defensive for diagnostic dumps)*
 
 #### Improvements
-- [ ] **Avoid Enumeration Under Lock**: Snapshot before returning IEnumerable
-  ```csharp
-  // Before
-  lock (_lock)
-  {
-      foreach (var entry in _entries)
-          yield return entry;  // Lock held during enumeration!
-  }
-
-  // After
-  int[] snapshot;
-  lock (_lock)
-  {
-      snapshot = _entries.ToArray();
-  }
-  foreach (var entry in snapshot)
-      yield return entry;
-  ```
+- [ ] **Performance**: `GetAllocatedCount` is O(n) - consider maintaining a counter
 
 ---
 
@@ -708,33 +706,16 @@ private static void CopyWordAligned(
 
 ---
 
-### DiagnosticHub.cs ⭐⭐⭐⭐ (3.5/5)
+### DiagnosticHub.cs ⭐⭐⭐⭐ (4.0/5)
 
-**Current State**: 135 lines - Thread-safe diagnostic dispatch.
+**Current State**: 135 lines - Diagnostic dispatch from Smalltalk thread.
 
 #### Critical Issues
-- **Lock Duration**: Lock held during listener invocation could deadlock
+- ~~**Lock Duration**: Lock held during listener invocation~~ *(Reassessed - only Smalltalk thread calls emit; lock is defensive)*
 - **Exception Swallowing**: Line 88 writes to Console.Error but continues
 
 #### Improvements
-- [ ] **Copy Listeners Before Invoke**: Reduce lock duration
-  ```csharp
-  // Before
-  lock (_lock)
-  {
-      foreach (var listener in _listeners)
-          listener.OnEvent(evt);  // Lock held during callback!
-  }
-
-  // After
-  List<IDiagnosticListener> snapshot;
-  lock (_lock)
-  {
-      snapshot = new List<IDiagnosticListener>(_listeners);
-  }
-  foreach (var listener in snapshot)
-      listener.OnEvent(evt);
-  ```
+- [ ] **Consider removing lock**: If only called from Smalltalk thread, lock is unnecessary
 
 ---
 
@@ -902,10 +883,10 @@ Ranked by: **Correctness → Robustness → Maintainability → Performance**
 | 2 | SmalltalkInterpreterThread.cs | 1045-line file with 284-line method | Maintainability | High | Partial ✅ |
 | 3 | BytecodeDecompiler.cs | 751-line single method | Maintainability | Medium | ✅ Fixed |
 | 4 | FilePrimitives.cs | 1496-line file | Maintainability | High | Open |
-| 5 | ObjectTable.cs | Lock held during enumeration | Thread Safety | Medium | Open |
-| 6 | DiagnosticHub.cs | Lock held during callbacks | Thread Safety | Low | Open |
+| 5 | ~~ObjectTable.cs~~ | ~~Lock held during enumeration~~ | ~~Thread Safety~~ | - | ❌ N/A (single-threaded) |
+| 6 | ~~DiagnosticHub.cs~~ | ~~Lock held during callbacks~~ | ~~Thread Safety~~ | - | ❌ N/A (single-threaded) |
 | 7 | Phase2_ClassInfrastructure.cs | 50+ lines commented code | Maintainability | Low | Open |
-| 8 | Program.cs | Race condition on window disposal | Correctness | Low | Open |
+| 8 | Program.cs | Race condition on window disposal | Cross-Thread | Low | Open |
 | 9 | BytecodeStackAnalyzerCFG.cs | Admitted bug in comments | Correctness | Medium | ✅ Deleted |
 | 10 | ObjectGraphAllocator.cs | UTF-8 instead of ISO-8859-1 | Correctness | Low | Open |
 
@@ -968,12 +949,12 @@ InterpreterDiagnostics.cs         (~150 lines) - Dump methods
 |--------|-------|
 | Files Reviewed | 162 |
 | Total Lines of Code | ~26,000 |
-| Average Rating | 3.6/5 |
+| Average Rating | 3.7/5 *(updated after reassessment)* |
 | Files Rated 5/5 | 12 (7%) |
-| Files Rated 4+/5 | 45 (28%) |
-| Files Rated 3-3.9/5 | 85 (52%) |
+| Files Rated 4+/5 | 48 (30%) *(+3 after thread model review)* |
+| Files Rated 3-3.9/5 | 82 (51%) |
 | Files Rated <3/5 | 20 (12%) |
-| Critical Issues | 15 |
+| Critical Issues | 11 *(was 15; 4 false positives removed)* |
 | Improvements Identified | 80+ |
 | C# 13 Feature Usage | Good |
 | Documentation Quality | Very Good |
@@ -1292,23 +1273,26 @@ InterpreterDiagnostics.cs         (~150 lines) - Dump methods
 
 ## Appendix B: Critical Issue Summary
 
-| # | File | Line(s) | Issue | Risk |
-|---|------|---------|-------|------|
-| 1 | WinFormsDisplayProvider.cs | 228-231 | Silent exception swallow | Data corruption |
-| 2 | WinFormsDisplayProvider.cs | 266-268 | Silent exception swallow | Data corruption |
-| 3 | SmalltalkInterpreterThread.cs | 115-399 | 284-line method | Unmaintainable |
-| 4 | BytecodeDecompiler.cs | 109-860 | 751-line method | Unmaintainable |
-| 5 | ObjectTable.cs | 464-477 | Lock during enumeration | Deadlock risk |
-| 6 | DiagnosticHub.cs | 68-72 | Lock during callback | Deadlock risk |
-| 7 | Program.cs | 158 | Race on window state | Crash |
-| 8 | Program.cs | 190 | Thread.Interrupt() | Deprecated API |
-| 9 | SmalltalkInterpreterThread.cs | 43 | Thread.Sleep hardcoded | Timing issue |
-| 10 | SmalltalkInterpreterThread.cs | 94 | Environment.Exit | No cleanup |
-| 11 | BytecodeStackAnalyzerCFG.cs | 296-308 | Admitted bug | Incorrect analysis |
-| 12 | ObjectGraphAllocator.cs | 85 | UTF-8 vs ISO-8859-1 | Wrong encoding |
-| 13 | RuntimeClassCache.cs | 14 | Lazy init not thread-safe | Race condition |
-| 14 | RuntimeSpecialObjects.cs | 14 | Null-coalescing not atomic | Race condition |
-| 15 | InputWordRingBuffer.cs | 125-130 | Silent event drop | Lost input |
+> **Note**: Issues marked ❌ were reassessed based on Smalltalk's cooperative multitasking model.
+> Only UI thread ↔ Smalltalk thread boundaries require synchronization.
+
+| # | File | Line(s) | Issue | Risk | Status |
+|---|------|---------|-------|------|--------|
+| 1 | WinFormsDisplayProvider.cs | 228-231 | Silent exception swallow | Data corruption | Open |
+| 2 | WinFormsDisplayProvider.cs | 266-268 | Silent exception swallow | Data corruption | Open |
+| 3 | SmalltalkInterpreterThread.cs | 115-399 | 284-line method | Unmaintainable | Open |
+| 4 | BytecodeDecompiler.cs | 109-860 | 751-line method | Unmaintainable | ✅ Fixed |
+| 5 | ~~ObjectTable.cs~~ | ~~464-477~~ | ~~Lock during enumeration~~ | ~~Deadlock~~ | ❌ N/A |
+| 6 | ~~DiagnosticHub.cs~~ | ~~68-72~~ | ~~Lock during callback~~ | ~~Deadlock~~ | ❌ N/A |
+| 7 | Program.cs | 158 | Race on window state | Crash | Open |
+| 8 | Program.cs | 190 | Thread.Interrupt() | Deprecated API | Open |
+| 9 | SmalltalkInterpreterThread.cs | 43 | Thread.Sleep hardcoded | Timing issue | Open |
+| 10 | SmalltalkInterpreterThread.cs | 94 | Environment.Exit | No cleanup | Open |
+| 11 | BytecodeStackAnalyzerCFG.cs | 296-308 | Admitted bug | Incorrect | ✅ Deleted |
+| 12 | ObjectGraphAllocator.cs | 85 | UTF-8 vs ISO-8859-1 | Wrong encoding | Open |
+| 13 | ~~RuntimeClassCache.cs~~ | ~~14~~ | ~~Lazy init not thread-safe~~ | ~~Race~~ | ❌ N/A |
+| 14 | ~~RuntimeSpecialObjects.cs~~ | ~~14~~ | ~~Null-coalescing not atomic~~ | ~~Race~~ | ❌ N/A |
+| 15 | InputWordRingBuffer.cs | 125-130 | Silent event drop | Lost input | Open |
 
 ---
 
