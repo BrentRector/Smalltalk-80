@@ -536,11 +536,12 @@ namespace Smalltalk80.Compiler
             PushLiteralConstant(literal);
         }
 
-        public void PushLiteralVariable(string name, string? poolDictionaryName = null)
+        /// <summary>
+        /// Finds or adds a literal variable (PoolVariable or GlobalVariable) and returns its index.
+        /// Used by both PushLiteralVariable and StoreLiteralVariable.
+        /// </summary>
+        private int FindOrAddLiteralVariableIndex(string name, string? poolDictionaryName)
         {
-            // Find or add the PoolVariable/GlobalVariable for this variable
-            int index = -1;
-
             // Search in otherLiterals for existing PoolVariable/GlobalVariable with matching name and pool dictionary
             for (int i = 0; i < otherLiterals.Count; i++)
             {
@@ -557,19 +558,20 @@ namespace Smalltalk80.Compiler
                 if (matches)
                 {
                     // Found - calculate final index (after selectors)
-                    index = selectors.Count + i;
-                    break;
+                    return selectors.Count + i;
                 }
             }
 
-            if (index == -1)
-            {
-                // Not found - add new PoolVariable or GlobalVariable literal
-                object variable = poolDictionaryName != null
-                    ? new PoolVariable(new Symbol(name), poolDictionaryName)
-                    : new GlobalVariable(new Symbol(name), null);
-                index = AddLiteral(variable);
-            }
+            // Not found - add new PoolVariable or GlobalVariable literal
+            object variable = poolDictionaryName != null
+                ? new PoolVariable(new Symbol(name), poolDictionaryName)
+                : new GlobalVariable(new Symbol(name), null);
+            return AddLiteral(variable);
+        }
+
+        public void PushLiteralVariable(string name, string? poolDictionaryName = null)
+        {
+            int index = FindOrAddLiteralVariableIndex(name, poolDictionaryName);
 
             if (index <= 31)
             {
@@ -666,38 +668,7 @@ namespace Smalltalk80.Compiler
 
         public void StoreLiteralVariable(string name, string? poolDictionaryName = null)
         {
-            // Find or add the PoolVariable/GlobalVariable for this variable
-            int index = -1;
-
-            // Search in otherLiterals for existing PoolVariable/GlobalVariable with matching name and pool dictionary
-            for (int i = 0; i < otherLiterals.Count; i++)
-            {
-                bool matches = false;
-                if (poolDictionaryName != null && otherLiterals[i] is PoolVariable pool)
-                {
-                    matches = pool.Key.Value == name && pool.PoolDictionaryName == poolDictionaryName;
-                }
-                else if (poolDictionaryName == null && otherLiterals[i] is GlobalVariable global)
-                {
-                    matches = global.Key.Value == name;
-                }
-
-                if (matches)
-                {
-                    // Found - calculate final index (after selectors)
-                    index = selectors.Count + i;
-                    break;
-                }
-            }
-
-            if (index == -1)
-            {
-                // Not found - add new PoolVariable or GlobalVariable literal
-                object variable = poolDictionaryName != null
-                    ? new PoolVariable(new Symbol(name), poolDictionaryName)
-                    : new GlobalVariable(new Symbol(name), null);
-                index = AddLiteral(variable);
-            }
+            int index = FindOrAddLiteralVariableIndex(name, poolDictionaryName);
 
             // Blue Book Extended Pop and Store: 0x82 + type:index byte
             // Type 3 = literal variable
