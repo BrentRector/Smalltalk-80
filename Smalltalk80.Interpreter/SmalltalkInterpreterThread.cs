@@ -613,7 +613,7 @@ public class SmalltalkInterpreterThread
                 return;
             }
 
-            var classPoolOOP = heap.GetInstanceVariable(floatClassOOP, 7); // classPool is instance var 7 in Class
+            var classPoolOOP = heap.GetInstanceVariable(floatClassOOP, VMConstants.CLASS_CLASSPOOL_INDEX);
             int poolSize = heap.GetIndexedSize(classPoolOOP);
 
             Console.WriteLine($"  Float classPool size: {poolSize}");

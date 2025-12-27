@@ -124,9 +124,30 @@ public static class VMConstants
     public const int METHOD_DICTIONARY_VALUE_ARRAY_INDEX = 1;   // Array of CompiledMethods
 
     // ========================================================================
+    // Class field indices (Blue Book)
+    // ========================================================================
+    // Class inherits from: Behavior → ClassDescription
+    // Class adds: 'name classPool sharedPools'
+    // Complete layout:
+    //   Instance variable 0: superclass (from Behavior)
+    //   Instance variable 1: methodDict (from Behavior)
+    //   Instance variable 2: format (from Behavior)
+    //   Instance variable 3: subclasses (from Behavior)
+    //   Instance variable 4: instanceVariables (from ClassDescription)
+    //   Instance variable 5: organization (from ClassDescription)
+    //   Instance variable 6: name (Class field) - Symbol
+    //   Instance variable 7: classPool (Class field) - Dictionary of class variables
+    //   Instance variable 8: sharedPools (Class field) - Array of pool dictionaries
+
+    public const int CLASS_NAME_INDEX = 6;            // Symbol naming the class
+    public const int CLASS_CLASSPOOL_INDEX = 7;       // Dictionary of class variables
+    public const int CLASS_SHAREDPOOLS_INDEX = 8;     // Array of pool dictionaries
+
+    // ========================================================================
     // Metaclass field indices
     // ========================================================================
-    // Metaclass inherits from: Behavior → ClassDescription → Class
+    // Metaclass inherits from: Behavior → ClassDescription
+    // Note: Metaclass does NOT inherit from Class - it's a parallel hierarchy
     // Metaclass adds: 'thisClass'
     // Complete layout:
     //   Instance variable 0: superclass (from Behavior)
