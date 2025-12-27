@@ -701,8 +701,8 @@ public class SmalltalkInterpreterThread
             if (instVarCount == 2 && indexedSize == 0)
             {
                 // Likely an Association
-                var keyOOP = heap.GetInstanceVariable(oop, 0);
-                var valueOOP = heap.GetInstanceVariable(oop, 1);
+                var keyOOP = heap.GetInstanceVariable(oop, VMConstants.ASSOCIATION_KEY_INDEX);
+                var valueOOP = heap.GetInstanceVariable(oop, VMConstants.ASSOCIATION_VALUE_INDEX);
                 string keyStr = heap.GetClassName(keyOOP); // Use heap method for symbol string
                 string valueStr = valueOOP == heap.GetNil() ? "nil" : valueOOP.ToString();
                 return $"Association(key: '{keyStr}', value: {valueStr}) OOP={oop}";
