@@ -1,9 +1,30 @@
 # Smalltalk-80 Interpreter Code Quality Review
 
-**Date**: 2025-12-27
+**Date**: 2025-12-27 (Updated: 2025-12-27)
 **Reviewer**: Claude (claude-opus-4-5-20251101)
 **Project**: Smalltalk80.Interpreter
 **Target**: C# 13 / .NET 9.0
+
+---
+
+## Recent Improvements (2025-12-27)
+
+The following improvements were made during this review session:
+
+| Item | Change | Impact |
+|------|--------|--------|
+| **Phase5/DictionaryOperations.cs** | ✅ Deleted | Eliminated wrapper class; Phase 5 uses RuntimeDictionaryService directly |
+| **IDictionaryOperations interface** | ✅ Removed | Reduced unnecessary abstraction layer |
+| **BytecodeDecompiler.cs** | ✅ Refactored | Split 751-line method into focused handlers |
+| **Magic numbers** | ✅ Fixed | Added VMConstants for Association indices (KEY_INDEX, VALUE_INDEX) |
+| **SmalltalkInterpreterThread.cs** | ✅ Simplified | RuntimeDictionaryService now handles dictionary operations |
+| **RuntimeDictionaryService** | ✅ Enhanced | Added canonical global lookup chain (SystemDictionary → Undeclared) |
+| **BytecodeStackAnalyzer files** | ✅ Deleted | Removed unused dead code |
+
+### Files Deleted (Dead Code Removal)
+- `Phase5/DictionaryOperations.cs` - Replaced by RuntimeDictionaryService
+- `BytecodeStackAnalyzer.cs` - Unused
+- `BytecodeStackAnalyzerCFG.cs` - Unused (contained admitted bug)
 
 ---
 
@@ -554,19 +575,19 @@ private static void CopyWordAligned(
 
 ---
 
-### BytecodeDecompiler.cs ⭐⭐ (2.0/5)
+### BytecodeDecompiler.cs ⭐⭐⭐⭐ (4.0/5) ✅ IMPROVED
 
-**Current State**: **864 lines with 751-line Decompile method**. Needs urgent refactoring.
+**Current State**: Refactored from 864 lines with 751-line method to focused handler methods.
 
-#### Critical Issues
-- **Massive Method**: Lines 109-860 - Single method is 751 lines
-- **Deep Nesting**: 4+ levels in many places
-- **Commented Code**: Lines 305-324
+#### Critical Issues - RESOLVED
+- ~~**Massive Method**: Lines 109-860 - Single method is 751 lines~~ ✅ Fixed
+- ~~**Deep Nesting**: 4+ levels in many places~~ ✅ Fixed
+- ~~**Commented Code**: Lines 305-324~~ ✅ Removed
 
-#### Improvements
-- [ ] **Extract Handler Methods**: One method per bytecode category
+#### Improvements Completed
+- [x] **Extract Handler Methods**: Split into focused handlers per bytecode category
   ```csharp
-  // After
+  // Now implemented:
   private string DecompilePushBytecode(byte bc) { /* ... */ }
   private string DecompileStoreBytecode(byte bc) { /* ... */ }
   private string DecompileSendBytecode(byte bc) { /* ... */ }
@@ -575,37 +596,15 @@ private static void CopyWordAligned(
 
 ---
 
-### BytecodeStackAnalyzer.cs ⭐⭐⭐ (3.0/5)
+### BytecodeStackAnalyzer.cs ✅ DELETED
 
-**Current State**: Stack effect analysis with duplicated logic.
-
-#### Critical Issues
-- **Code Duplication**: Significant overlap with BytecodeStackAnalyzerCFG and BytecodeStackValidator
-
-#### Improvements
-- [ ] **Extract Common Logic**: Share bytecode classification code
-  ```csharp
-  // Create shared utility
-  internal static class BytecodeClassifier
-  {
-      public static int GetStackEffect(byte bytecode) { /* ... */ }
-      public static bool IsJump(byte bytecode) { /* ... */ }
-  }
-  ```
+**Status**: File deleted as dead code - was not being used anywhere in the codebase.
 
 ---
 
-### BytecodeStackAnalyzerCFG.cs ⭐⭐⭐ (2.5/5)
+### BytecodeStackAnalyzerCFG.cs ✅ DELETED
 
-**Current State**: CFG-aware analyzer with admitted bugs in comments.
-
-#### Critical Issues
-- **Known Bug**: Lines 296-308 - Comment admits code doesn't work correctly
-- **Duplication**: Reimplements logic from BytecodeStackAnalyzer
-
-#### Improvements
-- [ ] **Fix Known Bug**: Address the issue noted in comments
-- [ ] **Share Code**: Use common BytecodeClassifier
+**Status**: File deleted as dead code - was not being used and contained admitted bugs in comments.
 
 ---
 
@@ -895,18 +894,18 @@ _mask = _capacity - 1;
 
 Ranked by: **Correctness → Robustness → Maintainability → Performance**
 
-| Priority | File | Issue | Category | Effort |
-|----------|------|-------|----------|--------|
-| 1 | WinFormsDisplayProvider.cs | Silent exception swallowing (lines 228, 266) | Correctness | Low |
-| 2 | SmalltalkInterpreterThread.cs | 1045-line file with 284-line method | Maintainability | High |
-| 3 | BytecodeDecompiler.cs | 751-line single method | Maintainability | Medium |
-| 4 | FilePrimitives.cs | 1496-line file | Maintainability | High |
-| 5 | ObjectTable.cs | Lock held during enumeration | Thread Safety | Medium |
-| 6 | DiagnosticHub.cs | Lock held during callbacks | Thread Safety | Low |
-| 7 | Phase2_ClassInfrastructure.cs | 50+ lines commented code | Maintainability | Low |
-| 8 | Program.cs | Race condition on window disposal | Correctness | Low |
-| 9 | BytecodeStackAnalyzerCFG.cs | Admitted bug in comments | Correctness | Medium |
-| 10 | ObjectGraphAllocator.cs | UTF-8 instead of ISO-8859-1 | Correctness | Low |
+| Priority | File | Issue | Category | Effort | Status |
+|----------|------|-------|----------|--------|--------|
+| 1 | WinFormsDisplayProvider.cs | Silent exception swallowing (lines 228, 266) | Correctness | Low | Open |
+| 2 | SmalltalkInterpreterThread.cs | 1045-line file with 284-line method | Maintainability | High | Partial ✅ |
+| 3 | BytecodeDecompiler.cs | 751-line single method | Maintainability | Medium | ✅ Fixed |
+| 4 | FilePrimitives.cs | 1496-line file | Maintainability | High | Open |
+| 5 | ObjectTable.cs | Lock held during enumeration | Thread Safety | Medium | Open |
+| 6 | DiagnosticHub.cs | Lock held during callbacks | Thread Safety | Low | Open |
+| 7 | Phase2_ClassInfrastructure.cs | 50+ lines commented code | Maintainability | Low | Open |
+| 8 | Program.cs | Race condition on window disposal | Correctness | Low | Open |
+| 9 | BytecodeStackAnalyzerCFG.cs | Admitted bug in comments | Correctness | Medium | ✅ Deleted |
+| 10 | ObjectGraphAllocator.cs | UTF-8 instead of ISO-8859-1 | Correctness | Low | Open |
 
 ### Priority 1: WinFormsDisplayProvider.cs - Silent Exception Swallowing
 
@@ -952,32 +951,12 @@ ControllerLoopStarter.cs          (~100 lines) - MVC startup
 InterpreterDiagnostics.cs         (~150 lines) - Dump methods
 ```
 
-### Priority 3: BytecodeDecompiler.cs - Giant Method
+### Priority 3: BytecodeDecompiler.cs - Giant Method ✅ FIXED
 
-**Lines**: 751-line Decompile method
-**Impact**: High - Cannot understand or modify safely
-**Effort**: Medium (1-2 hours)
+**Status**: ✅ COMPLETED - Method split into focused handlers per bytecode category.
 
-```csharp
-// After: Extract handler per bytecode category
-private string Decompile(byte[] bytecodes)
-{
-    var sb = new StringBuilder();
-    for (int i = 0; i < bytecodes.Length; i++)
-    {
-        var bc = bytecodes[i];
-        sb.AppendLine(bc switch
-        {
-            < 0x10 => DecompilePushReceiverVariable(bc),
-            < 0x20 => DecompilePushTempVariable(bc),
-            < 0x40 => DecompilePushLiteral(bc),
-            < 0x70 => DecompilePushLiteralVariable(bc),
-            // ... etc
-        });
-    }
-    return sb.ToString();
-}
-```
+**Original Issue**: 751-line Decompile method
+**Resolution**: Extracted handler methods for each bytecode category
 
 ---
 

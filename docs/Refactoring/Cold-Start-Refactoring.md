@@ -1,8 +1,41 @@
 # Cold Start Phase Architecture Analysis
 
-**Date**: 2025-11-19
+**Date**: 2025-11-19 (Updated: 2025-12-27)
 **Author**: Claude Code Analysis
-**Status**: Analysis Complete
+**Status**: Partially Implemented
+
+---
+
+## Current Implementation Status (2025-12-27)
+
+### ✅ Completed
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **RuntimeDictionaryService** | ✅ Complete | `Core/VM/RuntimeDictionaryService.cs` - Runtime-safe dictionary operations using only ISmalltalkHeap |
+| **Phase 5 → RuntimeDictionaryService** | ✅ Complete | Phase 5 now directly uses RuntimeDictionaryService, eliminating wrapper |
+| **Phase5/DictionaryOperations.cs** | ✅ Deleted | Wrapper class removed - was just delegating to RuntimeDictionaryService |
+| **IDictionaryOperations interface** | ✅ Removed | Interface removed from Phase5/Interfaces.cs |
+| **Canonical global lookup** | ✅ Complete | IRuntimeHeapAccessor.LookupGlobalAssociation implements SystemDictionary → Undeclared chain |
+| **VMConstants for Association** | ✅ Complete | ASSOCIATION_KEY_INDEX, ASSOCIATION_VALUE_INDEX, DICTIONARY_TALLY_INDEX |
+
+### 🔄 Partially Complete
+
+| Item | Status | Notes |
+|------|--------|-------|
+| **Engine/Services/DictionaryService** | 🔄 Still exists | Used by Phase 3 and Phase 4; duplicates RuntimeDictionaryService functionality |
+| **Engine/Services/SymbolService** | ✅ Exists | Cold-start symbol lookup wrapping SymbolRegistry |
+| **Engine/Services/FieldValueService** | ✅ Exists | Simple value resolution (no allocation) |
+
+### ❌ Remaining Work
+
+| Item | Priority | Notes |
+|------|----------|-------|
+| Migrate Phase 3 to RuntimeDictionaryService | Medium | Requires verifying heap stability in Phase 3 |
+| Migrate Phase 4 to RuntimeDictionaryService | Medium | MethodDictionaryInstaller, LiteralResolver still use DictionaryService |
+| Delete Engine/Services/DictionaryService | Low | After Phase 3 & 4 migrated |
+| Consolidate Phase5/FieldValueResolver | Low | May duplicate FieldValueService |
+| Phase 5 sub-orchestrator simplification | Low | Still has 9 helper files |
 
 ---
 
