@@ -14,15 +14,17 @@ The following improvements were made during this review session:
 | Item | Change | Impact |
 |------|--------|--------|
 | **Phase5/DictionaryOperations.cs** | ✅ Deleted | Eliminated wrapper class; Phase 5 uses RuntimeDictionaryService directly |
+| **Engine/Services/DictionaryService.cs** | ✅ Deleted | Eliminated cold-start specific wrapper; Phases 3, 4, 5 all use RuntimeDictionaryService directly |
 | **IDictionaryOperations interface** | ✅ Removed | Reduced unnecessary abstraction layer |
 | **BytecodeDecompiler.cs** | ✅ Refactored | Split 751-line method into focused handlers |
 | **Magic numbers** | ✅ Fixed | Added VMConstants for Association indices (KEY_INDEX, VALUE_INDEX) |
 | **SmalltalkInterpreterThread.cs** | ✅ Simplified | RuntimeDictionaryService now handles dictionary operations |
-| **RuntimeDictionaryService** | ✅ Enhanced | Added canonical global lookup chain (SystemDictionary → Undeclared) |
+| **RuntimeDictionaryService** | ✅ Enhanced | Added canonical global lookup chain (SystemDictionary → Undeclared), InstallInIdentityDictionary for method dictionaries |
 | **BytecodeStackAnalyzer files** | ✅ Deleted | Removed unused dead code |
 
 ### Files Deleted (Dead Code Removal)
 - `Phase5/DictionaryOperations.cs` - Replaced by RuntimeDictionaryService
+- `Engine/Services/DictionaryService.cs` - Replaced by RuntimeDictionaryService (Phases 3, 4, 5 now use runtime service directly)
 - `BytecodeStackAnalyzer.cs` - Unused
 - `BytecodeStackAnalyzerCFG.cs` - Unused (contained admitted bug)
 
@@ -79,7 +81,7 @@ Smalltalk80.Interpreter/
 │   │   ├── Phase3/                 (2 files)
 │   │   ├── Phase4/                 (3 files)
 │   │   └── Phase5/                 (10 files)
-│   └── Services/                   (3 files)
+│   └── Services/                   (2 files)
 ├── Platform/                       (2 files)
 │   └── Windows/                    (1 file)
 └── Root Files                      (4 files)
