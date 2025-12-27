@@ -5,9 +5,11 @@ using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Compiler.Generated;
 using Smalltalk80.Compiler.Analysis;
+using Smalltalk80.Compiler.Infrastructure;
+using Smalltalk80.Compiler.Model;
 using Smalltalk80.Core.Bytecodes;
 
-namespace Smalltalk80.Compiler
+namespace Smalltalk80.Compiler.Bytecode
 {
     /// <summary>
     /// Result of attempting to inline a conditional message.

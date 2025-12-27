@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using Smalltalk80.Compiler.Generated;
+using Smalltalk80.Compiler.Model;
 
-namespace Smalltalk80.Compiler
+namespace Smalltalk80.Compiler.Infrastructure
 {
     /// <summary>
     /// Interface for bytecode compilation.

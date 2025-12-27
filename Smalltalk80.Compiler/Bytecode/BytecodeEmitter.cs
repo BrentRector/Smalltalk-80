@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Smalltalk80.Compiler.Model;
 using Smalltalk80.Core.Bytecodes;
 
-namespace Smalltalk80.Compiler
+namespace Smalltalk80.Compiler.Bytecode
 {
     /// <summary>
     /// Bytecode emitter that generates Blue Book bytecodes.

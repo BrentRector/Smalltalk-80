@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Smalltalk80.Compiler.Analysis;
 using Smalltalk80.Compiler.Generated;
 
-namespace Smalltalk80.Compiler
+namespace Smalltalk80.Compiler.Bytecode
 {
     /// <summary>
     /// Message expression compilation methods for the BytecodeCompiler.

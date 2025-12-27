@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using Smalltalk80.Compiler.Model;
 
 namespace Smalltalk80.Compiler.AST;
 

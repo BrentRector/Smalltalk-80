@@ -505,19 +505,27 @@ This section evaluates XML documentation comments and inline code comments for e
 
 ## File and Folder Structure Review
 
-### Current Structure Analysis
+### Current Structure (After Restructuring)
 
 ```
 Smalltalk80.Compiler/
 ├── ANTLR4/                          # ANTLR4 JAR file
-│   └── ANTLR4/                      # ⚠️ Redundant nested folder
-├── AST/                             # AST-related files
-│   ├── AstNodes.cs
-│   └── FileInFormatAstBuilder.cs
+│   └── antlr-4.13.2-complete.jar
 ├── Analysis/                        # Static analysis tools
 │   ├── TailCallInfo.cs
 │   ├── TailRecursionAnalyzer.cs
 │   └── TempFrameAllocator.cs
+├── AST/                             # AST-related files
+│   ├── AstNodes.cs
+│   └── FileInFormatAstBuilder.cs
+├── Bytecode/                        # Core bytecode compilation
+│   ├── BytecodeCompiler.cs
+│   ├── BytecodeCompiler.Blocks.cs
+│   ├── BytecodeCompiler.ControlFlow.cs
+│   ├── BytecodeCompiler.Literals.cs
+│   ├── BytecodeCompiler.Messages.cs
+│   ├── BytecodeEmitter.cs
+│   └── VariableResolver.cs
 ├── CodeGen/                         # Code generation
 │   ├── ColdStartDataGenerator.cs
 │   ├── ColdStartJsonGenerator.cs
@@ -525,66 +533,63 @@ Smalltalk80.Compiler/
 │   ├── LayoutGenerator.cs
 │   └── LiteralExtractor.cs
 ├── Generated/                       # ANTLR-generated code
-├── Generated.sav/                   # ⚠️ Backup files (should not be tracked)
 ├── Grammar/                         # ANTLR4 grammar files
+├── Infrastructure/                  # Support code
+│   ├── CollectingErrorListener.cs
+│   ├── CompilerOptions.cs
+│   └── IBytecodeCompiler.cs
+├── Model/                           # Data types
+│   ├── Association.cs
+│   ├── CompiledMethodData.cs
+│   ├── CompilationEnvironment.cs
+│   ├── GlobalVariable.cs
+│   ├── InitializationExpression.cs
+│   ├── MethodInfo.cs
+│   ├── NilObject.cs
+│   ├── PoolVariable.cs
+│   ├── ScopeType.cs
+│   └── Symbol.cs
 ├── Tests/                           # Test files
-├── BytecodeCompiler*.cs             # Partial class files (5 files)
-├── BytecodeEmitter.cs
-├── CollectingErrorListener.cs
-├── CompilationEnvironment.cs
-├── CompilerDataTypes.cs
-├── CompilerOptions.cs
-├── IBytecodeCompiler.cs
-├── Program.cs
-└── VariableResolver.cs
+└── Program.cs                       # CLI entry point
 ```
 
 ### Structure Assessment
 
 | Aspect | Rating | Notes |
 |--------|--------|-------|
-| **Folder naming** | ⭐⭐⭐⭐☆ | Consistent, clear purpose (AST, Analysis, CodeGen, Generated, Grammar) |
-| **File naming** | ⭐⭐⭐⭐☆ | Follows C# conventions, matches class names |
-| **Logical grouping** | ⭐⭐⭐☆☆ | Root-level files are mixed concerns |
+| **Folder naming** | ⭐⭐⭐⭐⭐ | Consistent, clear purpose (AST, Analysis, Bytecode, CodeGen, Infrastructure, Model) |
+| **File naming** | ⭐⭐⭐⭐⭐ | Follows C# conventions, one class per file |
+| **Logical grouping** | ⭐⭐⭐⭐⭐ | Clear separation: Bytecode/, Model/, Infrastructure/ |
 | **Namespace alignment** | ⭐⭐⭐⭐⭐ | Namespaces match folder structure exactly |
 | **Partial class organization** | ⭐⭐⭐⭐⭐ | `BytecodeCompiler.*.cs` pattern is clear and consistent |
 
 ### Issues Identified
 
-#### 🔴 Critical: Remove/Fix
-1. **`ANTLR4/ANTLR4/` nested duplication** - Contains duplicate `antlr-4.13.2-complete.jar`
-2. **`Generated.sav/` backup folder** - Should not be in source control (`.gitignore`)
+#### ✅ Critical: Remove/Fix - COMPLETED
+1. ~~**`ANTLR4/ANTLR4/` nested duplication**~~ ✅ Removed duplicate JAR
+2. ~~**`Generated.sav/` backup folder**~~ ✅ Added to `.gitignore`
 
-#### 🟡 Moderate: Recommended Changes
-3. **Root-level file sprawl** - 10 `.cs` files at root level mixing different concerns:
-   - Core compiler: `BytecodeCompiler*.cs`, `BytecodeEmitter.cs`, `VariableResolver.cs`
-   - Data types: `CompilationEnvironment.cs`, `CompilerDataTypes.cs`, `CompilerOptions.cs`
-   - Infrastructure: `CollectingErrorListener.cs`, `IBytecodeCompiler.cs`
-   - Entry point: `Program.cs`
-
-4. **`CompilerDataTypes.cs` is a "junk drawer"** - Contains 4 unrelated types:
-   - `CompiledMethodData` (compilation result)
-   - `Symbol` (literal type)
-   - `GlobalVariable` (literal type)
-   - `PoolVariable` (literal type)
+#### ✅ Moderate: Recommended Changes - COMPLETED
+3. ~~**Root-level file sprawl**~~ ✅ Organized into `Bytecode/`, `Model/`, `Infrastructure/` folders
+4. ~~**`CompilerDataTypes.cs` is a "junk drawer"**~~ ✅ Split into individual files in `Model/`
 
 #### 🟢 Minor: Consider for Consistency
-5. **`FileInFormatAstBuilder.cs`** - Name reflects Smalltalk "file-in" format but may be unclear to newcomers
+5. **`FileInFormatAstBuilder.cs`** - Name reflects Smalltalk "file-in" format but may be unclear to newcomers (distant future consideration)
 
 ---
 
 ### Recommended Restructuring
 
-#### Phase 1: Cleanup (Low Risk, High Impact)
+#### ✅ Phase 1: Cleanup (Low Risk, High Impact) - COMPLETED
 
-| Action | Files | Rationale |
-|--------|-------|-----------|
-| Delete `ANTLR4/ANTLR4/` | Nested folder | Remove duplicate JAR file |
-| Add `Generated.sav/` to `.gitignore` | Or delete entirely | Backup files shouldn't be tracked |
+| Action | Files | Status |
+|--------|-------|--------|
+| Delete `ANTLR4/ANTLR4/` | Nested folder | ✅ Removed duplicate JAR |
+| Add `Generated.sav/` to `.gitignore` | Or delete entirely | ✅ Added to .gitignore |
 
-#### Phase 2: Introduce `Bytecode/` Folder (Medium Risk)
+#### ✅ Phase 2: Introduce `Bytecode/` Folder - COMPLETED
 
-Move core bytecode compilation to dedicated folder:
+Moved core bytecode compilation to dedicated folder:
 
 ```
 Bytecode/
@@ -597,27 +602,29 @@ Bytecode/
 └── VariableResolver.cs
 ```
 
-**Namespace change**: `Smalltalk80.Compiler` → `Smalltalk80.Compiler.Bytecode`
+**Namespace**: `Smalltalk80.Compiler.Bytecode`
 
-**Risk**: Requires updating `using` statements in consuming code.
+#### ✅ Phase 3: Introduce `Model/` Folder - COMPLETED
 
-#### Phase 3: Introduce `Model/` Folder (Medium Risk)
-
-Extract data types to dedicated folder:
+Extracted data types to dedicated folder:
 
 ```
 Model/
-├── CompiledMethodData.cs       # Extract from CompilerDataTypes.cs
-├── CompilationEnvironment.cs   # Move from root
-├── GlobalVariable.cs           # Extract from CompilerDataTypes.cs
-├── PoolVariable.cs             # Extract from CompilerDataTypes.cs
-├── Symbol.cs                   # Extract from CompilerDataTypes.cs
-└── ScopeType.cs                # Extract from CompilationEnvironment.cs
+├── Association.cs              # Legacy deprecated type
+├── CompiledMethodData.cs       # Compilation result
+├── CompilationEnvironment.cs   # Scope tracking
+├── GlobalVariable.cs           # Global variable literal
+├── InitializationExpression.cs # Init expr data
+├── MethodInfo.cs               # Method metadata
+├── NilObject.cs                # Nil literal
+├── PoolVariable.cs             # Pool variable literal
+├── ScopeType.cs                # Scope enum
+└── Symbol.cs                   # Symbol literal
 ```
 
-**Namespace change**: `Smalltalk80.Compiler` → `Smalltalk80.Compiler.Model`
+**Namespace**: `Smalltalk80.Compiler.Model`
 
-#### Phase 4: Introduce `Infrastructure/` Folder (Low Risk)
+#### ✅ Phase 4: Introduce `Infrastructure/` Folder - COMPLETED
 
 ```
 Infrastructure/

@@ -6,7 +6,9 @@ using System.Text.Json.Serialization;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using Antlr4.Runtime.Misc;
+using Smalltalk80.Compiler.Bytecode;
 using Smalltalk80.Compiler.Generated;
+using Smalltalk80.Compiler.Model;
 
 namespace Smalltalk80.Compiler.AST
 {

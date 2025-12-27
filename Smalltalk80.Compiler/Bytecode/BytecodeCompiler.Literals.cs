@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Smalltalk80.Compiler.Generated;
+using Smalltalk80.Compiler.Model;
 
-namespace Smalltalk80.Compiler
+namespace Smalltalk80.Compiler.Bytecode
 {
     /// <summary>
     /// Literal compilation methods for the BytecodeCompiler.

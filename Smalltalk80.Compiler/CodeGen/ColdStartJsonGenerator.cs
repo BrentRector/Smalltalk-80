@@ -5,8 +5,9 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Smalltalk80.Compiler;
 using Smalltalk80.Compiler.AST;
+using Smalltalk80.Compiler.Bytecode;
+using Smalltalk80.Compiler.Model;
 using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Compiler.CodeGen;

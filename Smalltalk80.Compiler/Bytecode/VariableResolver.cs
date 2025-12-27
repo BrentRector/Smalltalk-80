@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Smalltalk80.Compiler.Analysis;
+using Smalltalk80.Compiler.Model;
 
-namespace Smalltalk80.Compiler
+namespace Smalltalk80.Compiler.Bytecode
 {
     /// <summary>
     /// Unified variable resolution for Smalltalk-80 compiler.

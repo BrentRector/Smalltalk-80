@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Antlr4.Runtime.Tree;
 using Smalltalk80.Compiler.Generated;
+using Smalltalk80.Compiler.Model;
 using Smalltalk80.Core.Bytecodes;
 
-namespace Smalltalk80.Compiler
+namespace Smalltalk80.Compiler.Bytecode
 {
     /// <summary>
     /// Block and dynamic array compilation methods for the BytecodeCompiler.
