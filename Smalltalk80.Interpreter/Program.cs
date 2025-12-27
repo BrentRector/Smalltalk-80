@@ -105,16 +105,20 @@ public static class Program
             // Build VM metadata (needed by Smalltalk thread)
             var vmMetadata = BuildVMMetadata(layoutResolver, loader);
 
-            // NOTE: Window and Display both use 800x600
-            // Smalltalk Display object is 800x600 (created during cold start)
+            // NOTE: Window and Display both use default dimensions
+            // Smalltalk Display object is created during cold start with same dimensions
             // When beDisplay primitive is called, window size matches Display (no resize needed)
             // Resize flow is tested when user calls: DisplayScreen displayExtent: width@height
 
             // Create display window (UI thread object - has heap access for Display bitmap rendering)
-            // Window size: 800x600 (matches Smalltalk Display size)
             Console.WriteLine("\n=== Creating Display Window ===");
-            Console.WriteLine("  Window size: 800x600 (matches Smalltalk Display)");
-            var displayProvider = new WinFormsDisplayProvider(800, 600, "Smalltalk-80", heapManager, vmMetadata);
+            Console.WriteLine($"  Window size: {InterpreterConstants.DefaultDisplayWidth}x{InterpreterConstants.DefaultDisplayHeight} (matches Smalltalk Display)");
+            var displayProvider = new WinFormsDisplayProvider(
+                InterpreterConstants.DefaultDisplayWidth,
+                InterpreterConstants.DefaultDisplayHeight,
+                "Smalltalk-80",
+                heapManager,
+                vmMetadata);
             Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity

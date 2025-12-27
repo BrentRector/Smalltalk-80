@@ -225,9 +225,18 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
                 }
             }
         }
-        catch
+        catch (ObjectDisposedException)
         {
-            // Silently ignore errors
+            // Expected during shutdown - window disposed while paint in progress
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("cross-thread") || ex.Message.Contains("disposed"))
+        {
+            // Expected during shutdown - cross-thread operation on disposed control
+        }
+        catch (Exception ex)
+        {
+            // Log unexpected errors for debugging - don't silently swallow
+            System.Diagnostics.Debug.WriteLine($"[WinForms] CopyDisplayFromHeap failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -255,7 +264,8 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
             {
                 symbolBytes[j] = _heap.GetIndexedByte(keyOOP, j);
             }
-            string symbolText = System.Text.Encoding.UTF8.GetString(symbolBytes);
+            // Use Latin1 (ISO-8859-1) encoding per Blue Book - Smalltalk uses single-byte characters
+            string symbolText = System.Text.Encoding.Latin1.GetString(symbolBytes);
 
             if (symbolText == globalName)
             {

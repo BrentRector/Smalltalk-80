@@ -200,14 +200,10 @@ public class Phase2_ClassInfrastructure : IPhase
                 {
                     // Use 0-based indexing to match heap manager reads
                     SetAndTrackInstanceVariable(metaOOP, thisClassIndex, instOOP);
-                    if (count == 0) // Only log for first metaclass to avoid spam
-                    {
-// Console.WriteLine($"  Setting thisClass: index={thisClassIndex}, meta={metaOOP}, inst={instOOP}");
-                    }
                 }
                 else
                 {
-// Console.WriteLine($"  WARNING: Could not find thisClass field index in Metaclass!");
+                    // thisClass field not found - this would be a critical schema error
                 }
 
                 count++;
@@ -235,34 +231,19 @@ public class Phase2_ClassInfrastructure : IPhase
     {
         // Get OOPs for fundamental classes
         if (!_localIdToObjectId.TryGetValue("meta:Object", out SmalltalkOOP metaObjectOOP))
-        {
-// Console.WriteLine("WARNING: meta:Object not found, skipping fundamental hierarchy wiring");
             return;
-        }
 
         if (!_localIdToObjectId.TryGetValue("class:Class", out SmalltalkOOP classClassOOP))
-        {
-// Console.WriteLine("WARNING: class:Class not found, skipping fundamental hierarchy wiring");
             return;
-        }
 
         if (!_localIdToObjectId.TryGetValue("class:ClassDescription", out SmalltalkOOP classDescriptionOOP))
-        {
-// Console.WriteLine("WARNING: class:ClassDescription not found, skipping fundamental hierarchy wiring");
             return;
-        }
 
         if (!_localIdToObjectId.TryGetValue("class:Behavior", out SmalltalkOOP classBehaviorOOP))
-        {
-// Console.WriteLine("WARNING: class:Behavior not found, skipping fundamental hierarchy wiring");
             return;
-        }
 
         if (!_localIdToObjectId.TryGetValue("class:Object", out SmalltalkOOP classObjectOOP))
-        {
-// Console.WriteLine("WARNING: class:Object not found, skipping fundamental hierarchy wiring");
             return;
-        }
 
         // Wire the metaclass circle using heap manager directly (0-based indexing)
         // Use "Class" instead of "Metaclass" because class:Class, class:ClassDescription, class:Behavior
@@ -270,19 +251,11 @@ public class Phase2_ClassInfrastructure : IPhase
         int superclassIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Class", "superclass", _bundle);
         if (superclassIndex >= 0)
         {
-// Console.WriteLine($"  Wiring fundamental metaclass hierarchy (superclass index: {superclassIndex}):");
-// Console.WriteLine($"    meta:Object.superclass = class:Class");
+            // Wire fundamental metaclass hierarchy per Blue Book specification
             SetAndTrackInstanceVariable(metaObjectOOP, superclassIndex, classClassOOP);
-// Console.WriteLine($"    class:Class.superclass = class:ClassDescription");
             SetAndTrackInstanceVariable(classClassOOP, superclassIndex, classDescriptionOOP);
-// Console.WriteLine($"    class:ClassDescription.superclass = class:Behavior");
             SetAndTrackInstanceVariable(classDescriptionOOP, superclassIndex, classBehaviorOOP);
-// Console.WriteLine($"    class:Behavior.superclass = class:Object");
             SetAndTrackInstanceVariable(classBehaviorOOP, superclassIndex, classObjectOOP);
-        }
-        else
-        {
-// Console.WriteLine("  WARNING: Could not find superclass field index in Class hierarchy!");
         }
 
         // Wire metaclass superclasses
@@ -301,17 +274,12 @@ public class Phase2_ClassInfrastructure : IPhase
     /// </summary>
     private void WireMetaclassSuperclasses()
     {
-        int wiredCount = 0;
-        int skippedCount = 0;
         var symbols = _bundle.Symbols;
 
         // Look up the superclass field index properly (inherited from Behavior)
         int superclassIndex = ClassHierarchyTraversal.FindInstanceVariableIndex("Class", "superclass", _bundle);
         if (superclassIndex < 0)
-        {
-// Console.WriteLine("  WARNING: Could not find superclass field index, skipping metaclass superclass wiring");
             return;
-        }
 
         foreach (var metaCls in _bundle.Classes.Where(c => c.IsMetaclass))
         {
@@ -323,12 +291,9 @@ public class Phase2_ClassInfrastructure : IPhase
             if (instanceCls == null)
                 continue;
 
-            // Get metaclass OOP for diagnostics
+            // Get metaclass OOP
             if (!_localIdToObjectId.TryGetValue(metaCls.LocalId, out SmalltalkOOP metaOOP))
-            {
-// Console.WriteLine($"    WARNING: Metaclass {metaCls.LocalId} not found in localIdToObjectId!");
                 continue;
-            }
 
             // If instance class has a superclass, set metaclass's superclass to superclass's metaclass
             if (instanceCls.SuperNameIndex is int superNameIdx)
@@ -339,34 +304,14 @@ public class Phase2_ClassInfrastructure : IPhase
                 string superMetaLocalId = $"meta:{superName}";
 
                 if (!_localIdToObjectId.TryGetValue(superMetaLocalId, out SmalltalkOOP superMetaOOP))
-                {
-// Console.WriteLine($"    WARNING: Super-metaclass {superMetaLocalId} not found for {metaCls.LocalId}");
-                    skippedCount++;
                     continue;
-                }
 
                 // Use the proper superclass index (0-based, direct heap manager access)
                 SetAndTrackInstanceVariable(metaOOP, superclassIndex, superMetaOOP);
-                wiredCount++;
             }
-            else
-            {
-                // Instance class has no superclass - this metaclass was already wired in WireFundamentalMetaclassCircle()
-                // Only meta:Object should be in this category (Object has no superclass)
-                // meta:Object.superclass = class:Class (wired in fundamental hierarchy)
-                string instanceClassName = symbols[instanceCls.NameIndex];
-
-                // Verify this is meta:Object
-                if (instanceClassName != "Object")
-                {
-// Console.WriteLine($"    WARNING: Unexpected class without superclass: {instanceClassName}");
-                }
-
-                skippedCount++;
-            }
+            // else: Instance class has no superclass - only meta:Object should be in this category
+            // meta:Object.superclass = class:Class (already wired in fundamental hierarchy)
         }
-
-// Console.WriteLine($"  Wired {wiredCount} metaclass superclass relationships ({skippedCount} skipped - meta:Object already wired in fundamental hierarchy)");
     }
 
     #endregion
@@ -669,12 +614,6 @@ public class Phase2_ClassInfrastructure : IPhase
     /// </summary>
     private void PopulateInstanceVariablesField()
     {
-// Console.WriteLine("  Populating ClassDescription.instanceVariables fields...");
-
-        int stringCount = 0;
-        int arrayCount = 0;
-        int classCount = 0;
-
         // Get Array class OOP for allocating instance variable Arrays
         if (!_localIdToObjectId.TryGetValue("class:Array", out SmalltalkOOP arrayClassOOP))
         {
@@ -722,7 +661,6 @@ public class Phase2_ClassInfrastructure : IPhase
                 }
 
                 instVarStringOOPs[i] = stringOOP;
-                stringCount++;
             }
 
             // Allocate Array object to hold the String objects
@@ -735,16 +673,9 @@ public class Phase2_ClassInfrastructure : IPhase
                 _heapManager.SetIndexedOOP(instVarsArrayOOP, i, instVarStringOOPs[i]);
             }
 
-            arrayCount++;
-
             // Set ClassDescription.instanceVariables field (instance variable 4)
             SetAndTrackInstanceVariable(classOOP, 4, instVarsArrayOOP);
-            classCount++;
         }
-
-// Console.WriteLine($"    Populated instanceVariables for {classCount} classes");
-// Console.WriteLine($"    Allocated {stringCount} String objects for field names");
-// Console.WriteLine($"    Allocated {arrayCount} Array objects");
     }
 
     #endregion

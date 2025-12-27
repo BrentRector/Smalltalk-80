@@ -40,7 +40,7 @@ public class SmalltalkInterpreterThread
             // TESTING: Wait for UI thread to show window before executing init expressions
             // This allows us to observe the window resize when DisplayScreen initialize runs
             Console.WriteLine("[Smalltalk Thread] Waiting for window to be displayed...");
-            Thread.Sleep(1000);  // Wait 1 second for window to be fully shown
+            Thread.Sleep(InterpreterConstants.WindowReadyWaitMs);  // Wait for window to be fully shown
 
             // STEP 1: Create VM
             Console.WriteLine("[Smalltalk Thread] Creating virtual machine...");
@@ -128,7 +128,7 @@ public class SmalltalkInterpreterThread
             _context.VMMetadata,
             _context.Diagnostics,
             InitPolicy.ContinueAndCollect,
-            defaultTimeoutMs: 5000
+            defaultTimeoutMs: InterpreterConstants.DefaultInitExpressionTimeoutMs
         );
 
         // Essential init expressions (always run, even with --skip-init-expressions)

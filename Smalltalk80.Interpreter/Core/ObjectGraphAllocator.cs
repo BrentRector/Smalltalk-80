@@ -82,7 +82,8 @@ public class ObjectGraphAllocator
     public SmalltalkOOP AllocateString(string value)
     {
         int fixedSlots = CalculateInstanceVariableCount("String");
-        byte[] stringBytes = System.Text.Encoding.UTF8.GetBytes(value);
+        // Use Latin1 (ISO-8859-1) encoding per Blue Book - Smalltalk uses single-byte characters
+        byte[] stringBytes = System.Text.Encoding.Latin1.GetBytes(value);
 
         // Allocate ByteIndexed object
         var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringBytes.Length);
@@ -104,7 +105,8 @@ public class ObjectGraphAllocator
     public SmalltalkOOP AllocateString(SmalltalkOOP classOOP, string value)
     {
         int fixedSlots = CalculateInstanceVariableCount("String");
-        byte[] stringBytes = System.Text.Encoding.UTF8.GetBytes(value);
+        // Use Latin1 (ISO-8859-1) encoding per Blue Book - Smalltalk uses single-byte characters
+        byte[] stringBytes = System.Text.Encoding.Latin1.GetBytes(value);
 
         // Allocate ByteIndexed object
         var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots, stringBytes.Length);
@@ -646,7 +648,8 @@ public class ObjectGraphAllocator
             bytes[i] = _heapManager.GetIndexedByte(symbolOOP, i);
         }
 
-        return System.Text.Encoding.UTF8.GetString(bytes);
+        // Use Latin1 (ISO-8859-1) encoding per Blue Book - Smalltalk uses single-byte characters
+        return System.Text.Encoding.Latin1.GetString(bytes);
     }
 
 }

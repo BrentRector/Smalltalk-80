@@ -9,6 +9,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
+using static Smalltalk80.Interpreter.InterpreterConstants;
 
 namespace Smalltalk80.Interpreter.Engine.InitExecution;
 
@@ -38,7 +39,7 @@ public class InitExpressionExecutor
         VMMetadata metadata,
         IDiagnosticHub? diagnostics = null,
         InitPolicy policy = InitPolicy.AbortOnFirstError,
-        int defaultTimeoutMs = 5000)
+        int defaultTimeoutMs = DefaultInitExpressionTimeoutMs)
     {
         _heapManager = heapManager;
         _vm = vm;
