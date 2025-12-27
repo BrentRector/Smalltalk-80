@@ -289,7 +289,7 @@ namespace Smalltalk80.Compiler
             else
             {
                 var keywords = header.identifierColon();
-                var parts = new List<string>();
+                List<string> parts = [];
                 var args = header.formalArg();
 
                 for (int i = 0; i < keywords.Length; i++)
@@ -841,7 +841,7 @@ namespace Smalltalk80.Compiler
             public override object? VisitKeywordMessage(Smalltalk80Parser.KeywordMessageContext context)
             {
                 var parts = context.keywordPart();
-                var keywords = new List<string>();
+                List<string> keywords = [];
                 foreach (var part in parts)
                 {
                     keywords.Add(part.IDENTIFIER().GetText() + ":");

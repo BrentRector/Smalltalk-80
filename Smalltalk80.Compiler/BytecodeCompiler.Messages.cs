@@ -469,7 +469,7 @@ namespace Smalltalk80.Compiler
         private InlineResult CompileKeywordMessage(Smalltalk80Parser.KeywordMessageContext msg, bool isSuper = false, bool forValue = true)
         {
             var keywordParts = msg.keywordPart();
-            var keywords = new List<string>();
+            List<string> keywords = [];
 
             foreach (var part in keywordParts)
             {

@@ -245,7 +245,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     /// </summary>
     private void BuildSymbolTable(CompilationResult ast)
     {
-        var symbols = new HashSet<string>();
+        HashSet<string> symbols = [];
 
         // Extract from class definitions
         foreach (var cls in ast.Classes)
@@ -365,7 +365,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     /// </summary>
     private void BuildStringTable(CompilationResult ast)
     {
-        var strings = new List<string>();
+        List<string> strings = [];
 
         // Extract from class comments
         foreach (var cls in ast.Classes)
@@ -498,12 +498,12 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     private static bool IsCommonSelector(string symbol)
     {
         // Common unary selectors
-        var commonSelectors = new HashSet<string>
-        {
+        HashSet<string> commonSelectors =
+        [
             "new", "class", "size", "copy", "value", "yourself",
             "isNil", "notNil", "ifTrue", "ifFalse", "not",
             "first", "last", "isEmpty", "print", "printString"
-        };
+        ];
 
         return commonSelectors.Contains(symbol);
     }
@@ -606,8 +606,8 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     /// </summary>
     private List<JsonFieldLayoutEntry> ComputeFieldLayout(string className, CompilationResult ast)
     {
-        var layout = new List<JsonFieldLayoutEntry>();
-        var classChain = new List<ClassDefinitionNode>();
+        List<JsonFieldLayoutEntry> layout = [];
+        List<ClassDefinitionNode> classChain = [];
 
         // Build inheritance chain (bottom-up: subclass → superclass)
         var currentClassName = className;
@@ -759,7 +759,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     /// </summary>
     private List<JsonFieldLayoutEntry> ComputeMetaclassFieldLayout(CompilationResult ast)
     {
-        var layout = new List<JsonFieldLayoutEntry>();
+        List<JsonFieldLayoutEntry> layout = [];
 
         // All metaclasses have the same layout: Behavior + ClassDescription + Class + Metaclass fields
         // Build the chain: Behavior → ClassDescription → Class → Metaclass
@@ -1468,7 +1468,7 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
     private void GeneratePatches(CompilationResult ast)
     {
         // Build set of valid class names for filtering
-        var validClassNames = new HashSet<string>(_classes.Select(c => GetClassNameFromLocalId(c.LocalId)));
+        HashSet<string> validClassNames = [.. _classes.Select(c => GetClassNameFromLocalId(c.LocalId))];
 
         // Generate patches for Association values in method literals
         foreach (var method in _methods)

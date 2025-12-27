@@ -349,52 +349,26 @@ namespace Smalltalk80.Compiler
             return index;
         }
 
-        private bool LiteralsEqual(object a, object b)
+        private bool LiteralsEqual(object? a, object? b) => (a, b) switch
         {
-            if (a == null || b == null) return a == b;
-
-            // Compare Symbols by their Value
-            if (a is Symbol symA && b is Symbol symB)
-                return symA.Value == symB.Value;
-
-            // Compare GlobalVariables by their Key's Value
-            if (a is GlobalVariable globalA && b is GlobalVariable globalB)
-                return globalA.Key.Value == globalB.Key.Value;
-
-            // Compare PoolVariables by their Key's Value AND pool dictionary name
-            if (a is PoolVariable poolA && b is PoolVariable poolB)
-                return poolA.Key.Value == poolB.Key.Value &&
-                       poolA.PoolDictionaryName == poolB.PoolDictionaryName;
-
-            // LEGACY: Compare Associations by their Key's Value AND pool dictionary name
-            #pragma warning disable CS0618 // Type is obsolete
-            if (a is Association assocA && b is Association assocB)
-                return assocA.Key.Value == assocB.Key.Value &&
-                       assocA.PoolDictionaryName == assocB.PoolDictionaryName;
-            #pragma warning restore CS0618
-
-            // Compare arrays element by element
-            if (a is object[] arrayA && b is object[] arrayB)
-            {
-                if (arrayA.Length != arrayB.Length)
-                    return false;
-                for (int i = 0; i < arrayA.Length; i++)
-                {
-                    if (!LiteralsEqual(arrayA[i], arrayB[i]))
-                        return false;
-                }
-                return true;
-            }
-
-            // For primitive types, use standard equality
-            if (a is string strA && b is string strB) return strA == strB;
-            if (a is int intA && b is int intB) return intA == intB;
-            if (a is bool boolA && b is bool boolB) return boolA == boolB;
-            if (a is NilObject && b is NilObject) return true;
-
-            // Default to standard equality
-            return a.Equals(b);
-        }
+            (null, null) => true,
+            (null, _) or (_, null) => false,
+            (Symbol symA, Symbol symB) => symA.Value == symB.Value,
+            (GlobalVariable gA, GlobalVariable gB) => gA.Key.Value == gB.Key.Value,
+            (PoolVariable pA, PoolVariable pB) => pA.Key.Value == pB.Key.Value &&
+                                                   pA.PoolDictionaryName == pB.PoolDictionaryName,
+#pragma warning disable CS0618 // Type is obsolete
+            (Association aA, Association aB) => aA.Key.Value == aB.Key.Value &&
+                                                 aA.PoolDictionaryName == aB.PoolDictionaryName,
+#pragma warning restore CS0618
+            (object[] arrA, object[] arrB) => arrA.Length == arrB.Length &&
+                                               arrA.Zip(arrB).All(p => LiteralsEqual(p.First, p.Second)),
+            (string sA, string sB) => sA == sB,
+            (int iA, int iB) => iA == iB,
+            (bool bA, bool bB) => bA == bB,
+            (NilObject, NilObject) => true,
+            _ => a!.Equals(b)
+        };
 
         /// <summary>
         /// Increments the sizing counter for the CURRENT nesting level only.

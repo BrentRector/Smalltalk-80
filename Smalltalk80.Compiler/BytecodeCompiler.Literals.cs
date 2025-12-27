@@ -128,7 +128,7 @@ namespace Smalltalk80.Compiler
             else if (literal.arrayLiteral() != null)
             {
                 var array = literal.arrayLiteral();
-                var elements = new List<object>();
+                List<object> elements = [];
 
                 foreach (var element in array.arrayElement())
                 {
@@ -197,7 +197,7 @@ namespace Smalltalk80.Compiler
                 else if (lit.arrayLiteral() != null)
                 {
                     var nestedArray = lit.arrayLiteral();
-                    var nestedElements = new List<object>();
+                    List<object> nestedElements = [];
                     foreach (var nestedElement in nestedArray.arrayElement())
                     {
                         nestedElements.Add(ProcessArrayElement(nestedElement));

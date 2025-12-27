@@ -85,7 +85,7 @@ namespace Smalltalk80.Compiler
         {
             var blockArgs = block.blockArgs();
             int argCount = 0;
-            var argumentNames = new List<string>();
+            List<string> argumentNames = [];
 
             if (blockArgs != null)
             {
@@ -177,7 +177,7 @@ namespace Smalltalk80.Compiler
             environment.TemporariesAllocatedInFrame = 0;
             environment.LocalTemporaryIndices.Clear();
 
-            var blockTempNames = new List<string>();
+            List<string> blockTempNames = [];
             if (blockTemps != null)
             {
                 var tempNodes = (blockTemps.children ?? [])
@@ -203,7 +203,7 @@ namespace Smalltalk80.Compiler
             bool isNested = (savedScopeDepth > 0);
             allocator.EnterBlockScope(argumentNames, blockTempNames, isNested);
 
-            var argSlotIndices = new List<int>();
+            List<int> argSlotIndices = [];
             foreach (var argName in argumentNames)
             {
                 argSlotIndices.Add(allocator.GetSlotIndex(argName));

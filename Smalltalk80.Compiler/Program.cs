@@ -30,7 +30,7 @@ file sealed class Program
         string defaultInputFile = Path.Combine(solutionRoot, "Smalltalk-80 Source", "Smalltalk-80.st");
 
         // Parse arguments - support multiple input files
-        List<string> inputFiles = new List<string>();
+        List<string> inputFiles = [];
         string? outputFile = null;
 
         if (args.Length == 0)

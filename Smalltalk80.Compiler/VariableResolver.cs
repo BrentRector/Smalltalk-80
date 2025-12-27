@@ -327,11 +327,11 @@ namespace Smalltalk80.Compiler
             
             // Step 10c: Check for well-known system globals that should never be pool variables
             // These are created during cold start and should always be treated as globals
-            HashSet<string> wellKnownGlobals = new HashSet<string> 
-            { 
-                "Smalltalk", "Processor", "Display", "Transcript", 
+            HashSet<string> wellKnownGlobals =
+            [
+                "Smalltalk", "Processor", "Display", "Transcript",
                 "Sensor", "ScheduledControllers", "Undeclared"
-            };
+            ];
             
             if (wellKnownGlobals.Contains(varName))
             {
