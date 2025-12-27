@@ -420,7 +420,7 @@ public class InitExpressionExecutor
     /// </summary>
     private bool CheckBlockedProcessesForContext(SmalltalkOOP methodContextOOP, bool verbose = false)
     {
-        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
+        var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
 
         // Check Delay class's semaphore waiting lists
         // Note: Delay's class variables are: AccessProtect, ActiveDelay, SuspendedDelays, TimingSemaphore
@@ -499,9 +499,6 @@ public class InitExpressionExecutor
             const int SUPERCLASS_INDEX = 0;
             const int CLASS_POOL_INDEX = 7;
 
-            // Try symbol-based lookup first
-            var symbolOOP = FindSymbol(variableName);
-
             // Traverse superclass chain looking for the class variable
             var currentClassOOP = classOOP;
             int depth = 0;
@@ -520,23 +517,16 @@ public class InitExpressionExecutor
                         if (assocOOP == _heapManager.GetNil())
                             continue;
 
-                        // Association has key at instance variable 0
+                        // Association has key at instance variable 0 (a Symbol)
                         var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
+                        if (keyOOP == _metadata.KnownObjects.Nil || keyOOP.IsSmallInteger)
+                            continue;
 
-                        // Try exact symbol match first
-                        if (symbolOOP != _metadata.KnownObjects.Nil && keyOOP == symbolOOP)
+                        // Compare key symbol's string content with target name
+                        var keyString = ReadSymbolString(keyOOP);
+                        if (keyString == variableName)
                         {
                             return _heapManager.GetInstanceVariable(assocOOP, 1);
-                        }
-
-                        // Fall back to string content comparison
-                        if (keyOOP != _metadata.KnownObjects.Nil && !keyOOP.IsSmallInteger)
-                        {
-                            var keyString = ReadSymbolString(keyOOP);
-                            if (keyString == variableName)
-                            {
-                                return _heapManager.GetInstanceVariable(assocOOP, 1);
-                            }
                         }
                     }
                 }
@@ -690,19 +680,19 @@ public class InitExpressionExecutor
 
     /// <summary>
     /// Gets the canonical receiver for DoIt expressions.
-    /// Per Smalltalk-80 semantics: use Smalltalk global (from GlobalRegistry).
+    /// Per Smalltalk-80 semantics: use Smalltalk global (SystemDictionary).
     /// </summary>
     private SmalltalkOOP GetCanonicalReceiverForDoIt()
     {
-        // Get Smalltalk global (SystemDictionary) from GlobalRegistry
-        return GlobalRegistry.Get("Smalltalk");
+        // Get Smalltalk global (SystemDictionary) from VMMetadata
+        return _metadata.KnownObjects.Smalltalk;
     }
 
     private SmalltalkOOP CreateMethodContextForInitExpression(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP)
     {
         // Get MethodContext class OOP - lookup from live heap
         // Find MethodContext class by querying Smalltalk dictionary
-        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
+        var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
         var methodContextClassOOP = LookupGlobal(smalltalkOOP, "MethodContext");
         if (methodContextClassOOP == _metadata.KnownObjects.Nil)
         {
@@ -746,18 +736,12 @@ public class InitExpressionExecutor
 
     /// <summary>
     /// Looks up a global variable in the SystemDictionary.
+    /// Uses direct string comparison instead of symbol OOP matching.
     /// </summary>
     private SmalltalkOOP LookupGlobal(SmalltalkOOP systemDictOOP, string globalName)
     {
         // SystemDictionary is an array of Associations
         int size = _heapManager.GetIndexedSize(systemDictOOP);
-
-        // Find the symbol OOP for the global name by searching USTable
-        var symbolOOP = FindSymbol(globalName);
-        if (symbolOOP == _metadata.KnownObjects.Nil)
-        {
-            return _metadata.KnownObjects.Nil;
-        }
 
         for (int i = 0; i < size; i++)
         {
@@ -765,33 +749,17 @@ public class InitExpressionExecutor
             if (assocOOP == _heapManager.GetNil())
                 continue;
 
-            // Association has key at instance variable 0
+            // Association has key at instance variable 0 (a Symbol)
             var keyOOP = _heapManager.GetInstanceVariable(assocOOP, 0);
-            if (keyOOP == symbolOOP)
+            if (keyOOP == _heapManager.GetNil())
+                continue;
+
+            // Compare key symbol's string content with target name
+            var keyString = ReadSymbolString(keyOOP);
+            if (keyString == globalName)
             {
                 // Return value at instance variable 1
                 return _heapManager.GetInstanceVariable(assocOOP, 1);
-            }
-        }
-
-        return _metadata.KnownObjects.Nil;
-    }
-
-    /// <summary>
-    /// Finds a symbol OOP by searching through all registered symbols.
-    /// This is a runtime-safe alternative to SymbolRegistry.GetSymbolOOP(string).
-    /// </summary>
-    private SmalltalkOOP FindSymbol(string symbolText)
-    {
-        // Search through all symbols registered during Phase 1
-        foreach (var (index, symbolOOP) in SymbolRegistry.AllSymbols())
-        {
-            // Compare the symbol's string contents with the search text
-            // Symbols are String objects, so read their bytes
-            var symbolString = ReadSymbolString(symbolOOP);
-            if (symbolString == symbolText)
-            {
-                return symbolOOP;
             }
         }
 
@@ -821,9 +789,8 @@ public class InitExpressionExecutor
     /// </summary>
     private SmalltalkOOP CreateProcessWithNilContext(int priority)
     {
-        // Get Process class OOP - lookup from live heap
-        var smalltalkOOP = GlobalRegistry.Get("Smalltalk");
-        var processClassOOP = LookupGlobal(smalltalkOOP, "Process");
+        // Get Process class OOP from VMMetadata (more efficient than heap lookup)
+        var processClassOOP = _metadata.ProcessClassOOP;
         if (processClassOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("Process class not found in Smalltalk dictionary");

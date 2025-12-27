@@ -565,6 +565,35 @@ public class SmalltalkInterpreterThread
         return System.Text.Encoding.UTF8.GetString(bytes);
     }
 
+    /// <summary>
+    /// Looks up a global by string name, returning nil if not found.
+    /// Runtime-safe: uses string comparison instead of symbol OOP matching.
+    /// </summary>
+    private SmalltalkOOP LookupGlobalByString(SmalltalkOOP systemDictOOP, string globalName)
+    {
+        var heap = _context.HeapManager;
+        int size = heap.GetIndexedSize(systemDictOOP);
+
+        for (int i = 0; i < size; i++)
+        {
+            var assocOOP = heap.GetIndexedOOP(systemDictOOP, i);
+            if (assocOOP == heap.GetNil())
+                continue;
+
+            var keyOOP = heap.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            if (keyOOP == heap.GetNil())
+                continue;
+
+            var keyString = ExtractSymbolString(keyOOP);
+            if (keyString == globalName)
+            {
+                return heap.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+            }
+        }
+
+        return heap.GetNil();
+    }
+
     private string GetClassName(SmalltalkOOP classOOP)
     {
         return _context.HeapManager.GetClassName(classOOP);
@@ -682,7 +711,9 @@ public class SmalltalkInterpreterThread
         InstallAssociationInDictionary(systemDictOOP, associationOOP, keySymbolOOP, globalName);
 
         // Remove from Undeclared dictionary (proper migration)
-        if (GlobalRegistry.TryGet("Undeclared", out var undeclaredOOP))
+        // Look up Undeclared from SystemDictionary at runtime
+        var undeclaredOOP = LookupGlobalByString(systemDictOOP, "Undeclared");
+        if (undeclaredOOP != heap.GetNil())
         {
             RemoveFromDictionary(undeclaredOOP, keySymbolOOP, globalName);
         }
