@@ -853,93 +853,166 @@ public sealed class ColdStartJsonGenerator(string sourceFileDescription)
         foreach (var classNode in ast.Classes)
         {
             // Convert instance methods
-            ConvertMethodCollection(classNode.Methods, classNode.Name, isClassSide: false);
-
-            // Convert class methods
-            ConvertMethodCollection(classNode.ClassMethods, classNode.Name, isClassSide: true);
-        }
-    }
-
-    /// <summary>
-    /// Converts a collection of methods (instance or class side) to JSON format.
-    /// </summary>
-    private void ConvertMethodCollection(
-        IEnumerable<MethodDefinitionNode> methods,
-        string className,
-        bool isClassSide)
-    {
-        string classPrefix = isClassSide ? $"{className}_class" : className;
-        string homeLocalId = isClassSide ? $"meta:{className}" : $"class:{className}";
-
-        foreach (var methodNode in methods)
-        {
-            // Set current method context for block homeContext tracking
-            string methodLocalId = $"method:{classPrefix}>>{methodNode.Selector}";
-            _currentMethodLocalId = methodLocalId;
-
-            // ACTIVATE BLOCK BUFFERING FOR POST-ORDER EMISSION
-            // Any blocks encountered in this method's literals will be buffered instead of
-            // immediately added to _methods. This ensures the parent method appears BEFORE
-            // its blocks in the bundle, creating forward references that enable single-pass
-            // method compilation in the loader.
-            _blockBuffer = [];
-
-            // For extended form (flags=7), add encoded argCount+primitive as last literal
-            var literals = ConvertLiterals(methodNode.Literals);
-            int literalCount = methodNode.Literals.Count;
-
-            bool isExtendedForm = methodNode.PrimitiveIndex > 0 || methodNode.NumArgs > 4;
-            if (isExtendedForm)
+            foreach (var methodNode in classNode.Methods)
             {
-                // Encode argCount (high 5 bits) and primitive (low 8 bits) into SmallInteger
-                int encoded = (methodNode.NumArgs << 8) | methodNode.PrimitiveIndex;
-                literals.Add(new Dictionary<string, object>
+                // Set current method context for block homeContext tracking
+                _currentMethodLocalId = $"method:{classNode.Name}>>{methodNode.Selector}";
+
+                // ACTIVATE BLOCK BUFFERING FOR POST-ORDER EMISSION
+                //
+                // Any blocks encountered in this method's literals will be buffered instead of
+                // immediately added to _methods. This ensures the parent method appears BEFORE
+                // its blocks in the bundle, creating forward references that enable single-pass
+                // method compilation in the loader.
+                _blockBuffer = new List<JsonMethod>();
+
+                // For extended form (flags=7), add encoded argCount+primitive as last literal
+                var literals = ConvertLiterals(methodNode.Literals);
+                int literalCount = methodNode.Literals.Count;
+
+                bool isExtendedForm = methodNode.PrimitiveIndex > 0 || methodNode.NumArgs > 4;
+                if (isExtendedForm)
                 {
-                    ["type"] = "smallInt",
-                    ["value"] = encoded
-                });
-                literalCount++;
+                    // Encode argCount (high 5 bits) and primitive (low 8 bits) into SmallInteger
+                    int encoded = (methodNode.NumArgs << 8) | methodNode.PrimitiveIndex;
+                    literals.Add(new Dictionary<string, object>
+                    {
+                        ["type"] = "smallInt",
+                        ["value"] = encoded
+                    });
+                    literalCount++;
+                }
+
+                // Write source to .sources file and get position
+                string methodLocalId = $"method:{classNode.Name}>>{methodNode.Selector}";
+                int sourcePosition = WriteSourceToFile(methodLocalId, methodNode.Source);
+
+                var method = new JsonMethod
+                {
+                    LocalId = methodLocalId,
+                    HomeClassLocalId = $"class:{classNode.Name}",
+                    SelectorIndex = _symbolTable[methodNode.Selector],
+                    Category = string.IsNullOrEmpty(methodNode.Category) ? null : methodNode.Category,
+                    Header = new MethodHeader
+                    {
+                        Word = CalculateMethodHeaderWord(
+                            Math.Min(literalCount, 63),  // Cap at 63 for header encoding
+                            methodNode.NumTemps,
+                            methodNode.NumArgs,
+                            methodNode.PrimitiveIndex,
+                            methodNode.StackDepth > 32,
+                            methodNode.IsQuickReturnSelf,
+                            methodNode.QuickReturnFieldIndex
+                        ),
+                        // LiteralCount: Capped at 63 (6-bit header limit)
+                        // Actual literal count available via literals.Length
+                        LiteralCount = Math.Min(literalCount, 63),
+                        // TempCount: Always matches what's encoded in Word
+                        TempCount = methodNode.NumTemps,
+                        // ArgCount: For extended form (primitives, >4 args), decoded from last literal
+                        ArgCount = methodNode.NumArgs,
+                        PrimitiveIndex = methodNode.PrimitiveIndex,
+                        LargeContext = methodNode.StackDepth > 32
+                    },
+                    Literals = literals,
+                    Bytecodes = methodNode.Bytecode,
+                    Source = methodNode.Source,
+                    FileIndex = sourcePosition >= 0 ? 1 : null, // FileIndex 1 = .sources file
+                    SourcePosition = sourcePosition >= 0 ? sourcePosition : null,
+                    ArgNames = methodNode.ArgNames.ToArray(),
+                    TempNames = methodNode.TempNames.ToArray()
+                };
+
+                // POST-ORDER EMISSION: Parent method first, then buffered blocks
+                //
+                // Emit the parent method first, creating forward references from this method
+                // to any blocks it contains. Then emit all buffered blocks in the order they
+                // were encountered (depth-first post-order for nested blocks).
+                //
+                // RESULT: Bundle ordering will be [parent_method, block1, block2_nested, ...]
+                // instead of the previous [block2_nested, block1, parent_method].
+                _methods.Add(method);                 // Parent first
+                _methods.AddRange(_blockBuffer);      // Then blocks
+
+                // DEACTIVATE BUFFERING
+                // Clear the buffer for the next method. Setting to null also signals that
+                // any blocks processed outside of method context should be emitted immediately.
+                _blockBuffer = null;
             }
 
-            // Write source to .sources file and get position
-            int sourcePosition = WriteSourceToFile(methodLocalId, methodNode.Source);
-
-            var method = new JsonMethod
+            // Convert class methods
+            foreach (var methodNode in classNode.ClassMethods)
             {
-                LocalId = methodLocalId,
-                HomeClassLocalId = homeLocalId,
-                SelectorIndex = _symbolTable[methodNode.Selector],
-                Category = string.IsNullOrEmpty(methodNode.Category) ? null : methodNode.Category,
-                Header = new MethodHeader
-                {
-                    Word = CalculateMethodHeaderWord(
-                        Math.Min(literalCount, 63),  // Cap at 63 for header encoding
-                        methodNode.NumTemps,
-                        methodNode.NumArgs,
-                        methodNode.PrimitiveIndex,
-                        methodNode.StackDepth > 32,
-                        methodNode.IsQuickReturnSelf,
-                        methodNode.QuickReturnFieldIndex
-                    ),
-                    LiteralCount = Math.Min(literalCount, 63),
-                    TempCount = methodNode.NumTemps,
-                    ArgCount = methodNode.NumArgs,
-                    PrimitiveIndex = methodNode.PrimitiveIndex,
-                    LargeContext = methodNode.StackDepth > 32
-                },
-                Literals = literals,
-                Bytecodes = methodNode.Bytecode,
-                Source = methodNode.Source,
-                FileIndex = sourcePosition >= 0 ? 1 : null,
-                SourcePosition = sourcePosition >= 0 ? sourcePosition : null,
-                ArgNames = methodNode.ArgNames.ToArray(),
-                TempNames = methodNode.TempNames.ToArray()
-            };
+                // Set current method context for block homeContext tracking
+                _currentMethodLocalId = $"method:{classNode.Name}_class>>{methodNode.Selector}";
 
-            // POST-ORDER EMISSION: Parent method first, then buffered blocks
-            _methods.Add(method);
-            _methods.AddRange(_blockBuffer);
-            _blockBuffer = null;
+                // ACTIVATE BLOCK BUFFERING FOR POST-ORDER EMISSION
+                // (Same as instance methods - see comments above for detailed explanation)
+                _blockBuffer = new List<JsonMethod>();
+
+                // For extended form (flags=7), add encoded argCount+primitive as last literal
+                var literals = ConvertLiterals(methodNode.Literals);
+                int literalCount = methodNode.Literals.Count;
+
+                bool isExtendedForm = methodNode.PrimitiveIndex > 0 || methodNode.NumArgs > 4;
+                if (isExtendedForm)
+                {
+                    // Encode argCount (high 5 bits) and primitive (low 8 bits) into SmallInteger
+                    int encoded = (methodNode.NumArgs << 8) | methodNode.PrimitiveIndex;
+                    literals.Add(new Dictionary<string, object>
+                    {
+                        ["type"] = "smallInt",
+                        ["value"] = encoded
+                    });
+                    literalCount++;
+                }
+
+                // Write source to .sources file and get position
+                string classMethodLocalId = $"method:{classNode.Name}_class>>{methodNode.Selector}";
+                int classMethodSourcePosition = WriteSourceToFile(classMethodLocalId, methodNode.Source);
+
+                var method = new JsonMethod
+                {
+                    LocalId = classMethodLocalId,
+                    HomeClassLocalId = $"meta:{classNode.Name}",
+                    SelectorIndex = _symbolTable[methodNode.Selector],
+                    Category = string.IsNullOrEmpty(methodNode.Category) ? null : methodNode.Category,
+                    Header = new MethodHeader
+                    {
+                        Word = CalculateMethodHeaderWord(
+                            Math.Min(literalCount, 63),  // Cap at 63 for header encoding
+                            methodNode.NumTemps,
+                            methodNode.NumArgs,
+                            methodNode.PrimitiveIndex,
+                            methodNode.StackDepth > 32,
+                            methodNode.IsQuickReturnSelf,
+                            methodNode.QuickReturnFieldIndex
+                        ),
+                        // LiteralCount: Capped at 63 (6-bit header limit)
+                        // Actual literal count available via literals.Length
+                        LiteralCount = Math.Min(literalCount, 63),
+                        // TempCount: Always matches what's encoded in Word
+                        TempCount = methodNode.NumTemps,
+                        // ArgCount: For extended form (primitives, >4 args), decoded from last literal
+                        ArgCount = methodNode.NumArgs,
+                        PrimitiveIndex = methodNode.PrimitiveIndex,
+                        LargeContext = methodNode.StackDepth > 32
+                    },
+                    Literals = literals,
+                    Bytecodes = methodNode.Bytecode,
+                    Source = methodNode.Source,
+                    FileIndex = classMethodSourcePosition >= 0 ? 1 : null, // FileIndex 1 = .sources file
+                    SourcePosition = classMethodSourcePosition >= 0 ? classMethodSourcePosition : null,
+                    ArgNames = methodNode.ArgNames.ToArray(),
+                    TempNames = methodNode.TempNames.ToArray()
+                };
+
+                // POST-ORDER EMISSION: Parent method first, then buffered blocks
+                // (Same as instance methods - see comments above for detailed explanation)
+                _methods.Add(method);                 // Parent first
+                _methods.AddRange(_blockBuffer);      // Then blocks
+                _blockBuffer = null;                  // Deactivate buffering
+            }
         }
     }
 
