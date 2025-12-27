@@ -198,7 +198,9 @@ public sealed class ColdStartDataGenerator
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
-        return JsonSerializer.Serialize(_classData.Values.OrderBy(c => c.ClassName).ToList(), options);
+        var sortedClasses = _classData.Values.ToList();
+        sortedClasses.Sort((a, b) => StringComparer.Ordinal.Compare(a.ClassName, b.ClassName));
+        return JsonSerializer.Serialize(sortedClasses, options);
     }
 
     /// <summary>

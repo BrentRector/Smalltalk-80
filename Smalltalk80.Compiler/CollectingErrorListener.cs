@@ -9,7 +9,7 @@ namespace Smalltalk80.Compiler
     /// </summary>
     public class CollectingErrorListener : BaseErrorListener
     {
-        public List<string> Errors { get; } = new List<string>();
+        public List<string> Errors { get; } = [];
 
         public override void SyntaxError(
             TextWriter output,
