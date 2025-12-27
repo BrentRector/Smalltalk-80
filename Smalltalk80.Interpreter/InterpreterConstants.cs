@@ -26,9 +26,11 @@ public static class InterpreterConstants
 
     /// <summary>
     /// Time to wait in milliseconds for the window to be fully shown before
-    /// starting Smalltalk execution. This gives the UI thread time to complete
-    /// window creation and initial paint.
+    /// starting Smalltalk execution.
+    /// OBSOLETE: Replaced by proper synchronization via WindowDisplayed event.
+    /// Kept for reference only.
     /// </summary>
+    [Obsolete("Use WindowDisplayed synchronization event instead")]
     public const int WindowReadyWaitMs = 1000;
 
     /// <summary>

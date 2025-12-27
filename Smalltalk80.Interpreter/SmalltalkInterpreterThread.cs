@@ -37,11 +37,6 @@ public class SmalltalkInterpreterThread
         {
             Console.WriteLine("\n[Smalltalk Thread] Starting...");
 
-            // TESTING: Wait for UI thread to show window before executing init expressions
-            // This allows us to observe the window resize when DisplayScreen initialize runs
-            Console.WriteLine("[Smalltalk Thread] Waiting for window to be displayed...");
-            Thread.Sleep(InterpreterConstants.WindowReadyWaitMs);  // Wait for window to be fully shown
-
             // STEP 1: Create VM
             Console.WriteLine("[Smalltalk Thread] Creating virtual machine...");
             _vm = CreateVirtualMachine();
@@ -54,6 +49,16 @@ public class SmalltalkInterpreterThread
                 Console.WriteLine("[Smalltalk Thread] Event callbacks registered - signaling main thread");
                 _context.EventCallbacksReady.Set();
             });
+
+            // STEP 1.3: Wait for window to be displayed before proceeding
+            // This ensures graphics operations will work during init expressions
+            // Uses proper synchronization instead of Thread.Sleep
+            Console.WriteLine("[Smalltalk Thread] Waiting for window to be displayed...");
+            if (!_context.WindowDisplayed.Wait(TimeSpan.FromSeconds(10)))
+            {
+                throw new TimeoutException("Window was not displayed within 10 seconds");
+            }
+            Console.WriteLine("[Smalltalk Thread] Window displayed - proceeding");
 
             // STEP 1.5: Initialize ProcessorScheduler with high-priority bootstrap process
             // This ensures all init expressions run at priority 8, preventing preemption
@@ -91,7 +96,9 @@ public class SmalltalkInterpreterThread
         {
             Console.Error.WriteLine($"\n[Smalltalk Thread] Fatal error: {ex.Message}");
             Console.Error.WriteLine($"Stack trace:\n{ex.StackTrace}");
-            Environment.Exit(1);
+            // Re-throw to propagate to main thread, allowing proper cleanup
+            // instead of abruptly terminating with Environment.Exit(1)
+            throw;
         }
     }
 

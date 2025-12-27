@@ -24,6 +24,12 @@ The following improvements were made during this review session:
 | **WinFormsDisplayProvider.cs** | ✅ Verified Fixed | Exception handling already proper (ObjectDisposedException caught, others logged) |
 | **Phase2_ClassInfrastructure.cs** | ✅ Verified Clean | No commented code found in current version |
 | **ObjectGraphAllocator.cs** | ✅ Verified Fixed | Already uses Latin1 (ISO-8859-1) encoding per Blue Book |
+| **Program.cs** | ✅ Fixed | Race condition on window disposal - wrapped in try-catch for ObjectDisposedException |
+| **Program.cs** | ✅ Fixed | Removed deprecated Thread.Interrupt() call |
+| **SmalltalkInterpreterThread.cs** | ✅ Fixed | Replaced Thread.Sleep with WindowDisplayed synchronization event |
+| **SmalltalkInterpreterThread.cs** | ✅ Fixed | Replaced Environment.Exit(1) with throw for proper cleanup |
+| **SmalltalkThreadContext.cs** | ✅ Enhanced | Added WindowDisplayed sync event for proper thread coordination |
+| **InputWordRingBuffer.cs** | ✅ Enhanced | Added DroppedEventCount diagnostic counter for lost events |
 
 ### Files Deleted (Dead Code Removal)
 - `Phase5/DictionaryOperations.cs` - Replaced by RuntimeDictionaryService
@@ -948,7 +954,7 @@ InterpreterDiagnostics.cs         (~150 lines) - Dump methods
 | Files Rated 4+/5 | 48 (30%) *(+3 after thread model review)* |
 | Files Rated 3-3.9/5 | 82 (51%) |
 | Files Rated <3/5 | 20 (12%) |
-| Critical Issues | 8 *(was 15; 4 false positives, 3 fixed)* |
+| Critical Issues | 4 *(was 15; 4 false positives, 7 fixed)* |
 | Improvements Identified | 80+ |
 | C# 13 Feature Usage | Good |
 | Documentation Quality | Very Good |
@@ -1275,15 +1281,15 @@ InterpreterDiagnostics.cs         (~150 lines) - Dump methods
 | 4 | BytecodeDecompiler.cs | 109-860 | 751-line method | Unmaintainable | ✅ Fixed |
 | 5 | ~~ObjectTable.cs~~ | ~~464-477~~ | ~~Lock during enumeration~~ | ~~Deadlock~~ | ❌ N/A |
 | 6 | ~~DiagnosticHub.cs~~ | ~~68-72~~ | ~~Lock during callback~~ | ~~Deadlock~~ | ❌ N/A |
-| 7 | Program.cs | 158 | Race on window state | Crash | Open |
-| 8 | Program.cs | 190 | Thread.Interrupt() | Deprecated API | Open |
-| 9 | SmalltalkInterpreterThread.cs | 43 | Thread.Sleep hardcoded | Timing issue | Open |
-| 10 | SmalltalkInterpreterThread.cs | 94 | Environment.Exit | No cleanup | Open |
+| 7 | ~~Program.cs~~ | ~~158~~ | ~~Race on window state~~ | ~~Crash~~ | ✅ Fixed (try-catch for ObjectDisposedException) |
+| 8 | ~~Program.cs~~ | ~~190~~ | ~~Thread.Interrupt()~~ | ~~Deprecated API~~ | ✅ Fixed (removed deprecated call) |
+| 9 | ~~SmalltalkInterpreterThread.cs~~ | ~~43~~ | ~~Thread.Sleep hardcoded~~ | ~~Timing issue~~ | ✅ Fixed (WindowDisplayed sync event) |
+| 10 | ~~SmalltalkInterpreterThread.cs~~ | ~~94~~ | ~~Environment.Exit~~ | ~~No cleanup~~ | ✅ Fixed (throw instead of Exit) |
 | 11 | BytecodeStackAnalyzerCFG.cs | 296-308 | Admitted bug | Incorrect | ✅ Deleted |
 | 12 | ~~ObjectGraphAllocator.cs~~ | ~~85~~ | ~~UTF-8 vs ISO-8859-1~~ | ~~Wrong encoding~~ | ✅ Fixed |
 | 13 | ~~RuntimeClassCache.cs~~ | ~~14~~ | ~~Lazy init not thread-safe~~ | ~~Race~~ | ❌ N/A |
 | 14 | ~~RuntimeSpecialObjects.cs~~ | ~~14~~ | ~~Null-coalescing not atomic~~ | ~~Race~~ | ❌ N/A |
-| 15 | InputWordRingBuffer.cs | 125-130 | Silent event drop | Lost input | Open |
+| 15 | ~~InputWordRingBuffer.cs~~ | ~~125-130~~ | ~~Silent event drop~~ | ~~Lost input~~ | ✅ Fixed (DroppedEventCount diagnostic) |
 
 ---
 

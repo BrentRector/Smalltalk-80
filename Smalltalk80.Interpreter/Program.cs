@@ -160,10 +160,22 @@ public static class Program
             {
                 smalltalkThread.Join();
                 // Only close window if it's still open (not already closed by user)
-                if (!displayProvider.IsDisposed && displayProvider.IsHandleCreated)
+                // Use try-catch to handle race condition where window may be disposed between check and Invoke
+                try
                 {
-                    Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
-                    displayProvider.Invoke((Action)(() => displayProvider.Close()));
+                    if (!displayProvider.IsDisposed && displayProvider.IsHandleCreated)
+                    {
+                        Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
+                        displayProvider.Invoke((Action)(() => displayProvider.Close()));
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Window was disposed between check and Invoke - expected during shutdown
+                }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("cross-thread") || ex.Message.Contains("disposed"))
+                {
+                    // Window handle invalidated - expected during shutdown
                 }
             });
             monitorThread.IsBackground = true;
@@ -179,6 +191,11 @@ public static class Program
             Console.WriteLine("\n=== Showing Display Window ===");
             displayProvider.Show();
 
+            // Signal Smalltalk thread that window is displayed
+            // This replaces the old Thread.Sleep with proper synchronization
+            threadContext.WindowDisplayed.Set();
+            Console.WriteLine("  Window displayed signal sent");
+
             // Run WinForms event loop (blocks until window closes)
             Console.WriteLine("\n=== Entering GUI Event Loop ===");
             Console.WriteLine("Display window is visible. Close window to exit.\n");
@@ -191,8 +208,9 @@ public static class Program
             // Wait for Smalltalk thread to finish (with timeout)
             if (!smalltalkThread.Join(TimeSpan.FromSeconds(5)))
             {
-                Console.WriteLine("Warning: Smalltalk thread did not shut down cleanly");
-                smalltalkThread.Interrupt();
+                // Thread.Interrupt() is deprecated and dangerous - just log warning
+                // The cancellation token should have signaled the thread to stop
+                Console.WriteLine("Warning: Smalltalk thread did not shut down cleanly within 5 seconds");
             }
 
             // Report profiling statistics if enabled
