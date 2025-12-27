@@ -81,7 +81,8 @@ public class Phase5Orchestrator : IPhase
         _runtimeObjectCreator.CreateDefaultTextStyle();
         _runtimeObjectCreator.CreateDisplay();
 
-        // Freeze AssociationRegistry after all globals installed
-        AssociationRegistry.Freeze();
+        // Make AssociationRegistry immutable - no more registrations, but reads still allowed
+        // Dispose() is called by ColdStartOrchestrator after Phase 6 to block all access
+        AssociationRegistry.MakeImmutable();
     }
 }

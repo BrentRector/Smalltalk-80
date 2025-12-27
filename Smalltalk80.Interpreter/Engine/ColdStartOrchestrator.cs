@@ -145,8 +145,8 @@ public class ColdStartOrchestrator : IColdStartLoader
         RunPhase(phase1.Name, () =>
         {
             phase1.Run();
-            // Note: SymbolRegistry.Freeze() moved to after Phase 6 (with GlobalRegistry.Freeze())
-            // Phases 2-6 need to read symbols from the registry
+            // Phase 1 calls SymbolRegistry.MakeImmutable() - reads allowed, writes throw
+            // Dispose() is called after Phase 6 to block all access
         });
 
         // Phase 2: Class Infrastructure
@@ -210,10 +210,15 @@ public class ColdStartOrchestrator : IColdStartLoader
             phase6.Run();
         });
 
-            // Freeze cold start registries - no access allowed after this point
+            // Make GlobalRegistry immutable (SymbolRegistry was made immutable in Phase 1,
+            // AssociationRegistry was made immutable in Phase 5)
+            GlobalRegistry.MakeImmutable();
+
+            // Dispose all cold start registries - no access allowed after this point
             // Runtime code must use VMMetadata and query the Smalltalk heap directly
-            SymbolRegistry.Freeze();
-            GlobalRegistry.Freeze();
+            SymbolRegistry.Dispose();
+            GlobalRegistry.Dispose();
+            AssociationRegistry.Dispose();
 
             _diagnostics?.Emit(new DiagnosticMessageEvent
             {
