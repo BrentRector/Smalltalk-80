@@ -95,37 +95,28 @@ file sealed class ConsoleErrorListener : BaseErrorListener { }
 
 ---
 
-### BytecodeCompiler.Blocks.cs ⭐⭐⭐☆☆ (3/5)
+### BytecodeCompiler.Blocks.cs ⭐⭐⭐⭐☆ (4/5)
 
-**Current State**: Block compilation with complex environment state management. Needs refactoring for clarity.
+**Current State**: Block compilation with well-structured state management using RAII pattern.
 
 #### Critical Issues
-- **Complex state management**: `CompileBlock` method (lines 84-298) is 214 lines long with deep nesting and manual state save/restore
+- None identified
 
 #### Improvements
-- [ ] **Extract state management to separate class**: Create `CompilerState` class to encapsulate save/restore
+- [x] **Extract state management to separate class** ✅ **FIXED**: `BlockCompilationState` class encapsulates save/restore
   ```csharp
-  // Extract to new class
-  private sealed class BlockCompilationState : IDisposable
-  {
-      private readonly BytecodeCompiler _compiler;
-      private readonly CompilationEnvironment _savedEnvironment;
-
-      public BlockCompilationState(BytecodeCompiler compiler)
-      {
-          _compiler = compiler;
-          _savedEnvironment = compiler.environment.Clone();
-      }
-
-      public void Dispose() => _compiler.environment = _savedEnvironment;
-  }
-
-  // Usage
-  using var state = new BlockCompilationState(this);
+  // Implemented: BlockCompilationState with IDisposable pattern
+  using var state = new BlockCompilationState(environment, argumentNames);
   // ... block compilation
+  // Dispose() automatically restores environment
   ```
 
-- [ ] **Reduce deep nesting**: Use early returns and guard clauses
+- [x] **Reduce deep nesting** ✅ **FIXED**: `CompileBlock` refactored into focused helper methods:
+  - `ExtractBlockArguments()` - extracts block argument names
+  - `ExtractBlockTemporaries()` - extracts block temporary names
+  - `SetupBlockEnvironment()` - configures environment for block scope
+  - `EmitBlockBytecode()` - emits block bytecode
+  - `PatchBlockJump()` - patches jump instruction
 
 - [x] **~~Magic number~~** ✅ **FIXED**: `0xC8` now uses `Bytecode.SEND_SPECIAL_BLOCKCOPY` from shared definitions
   ```csharp
@@ -184,19 +175,18 @@ file sealed class ConsoleErrorListener : BaseErrorListener { }
 - None identified
 
 #### Improvements
-- [ ] **Silent exception swallowing**: Line 37 catches all exceptions without logging
+- [x] **Silent exception swallowing** ✅ **FIXED**: Uses specific exception filter
   ```csharp
-  // Before
-  catch { return false; }
-
-  // After
-  catch (Exception ex) when (ex is FormatException or OverflowException)
+  catch (Exception ex) when (ex is FormatException or OverflowException or ArgumentException)
   {
+      // Invalid digit for the specified radix, or number too large
       return false;
   }
   ```
 
-- [ ] **Recursive method without depth limit**: `ProcessArrayElement` can cause stack overflow on deeply nested arrays
+- [x] **Radix parsing documentation** ✅ **FIXED**: Comprehensive `<remarks>` section added explaining Smalltalk radix notation
+
+- [ ] **Recursive method without depth limit**: `ProcessArrayElement` can cause stack overflow on deeply nested arrays (unlikely in practice)
 
 ---
 
@@ -304,16 +294,13 @@ private bool LiteralsEqual(object? a, object? b) => (a, b) switch
 - None identified
 
 #### Improvements
-- [ ] **Consider records for immutable types**: `Symbol`, `GlobalVariable`, `PoolVariable` could be records
+- [x] **Consider records for immutable types** ✅ **FIXED**: `Symbol` and `PoolVariable` converted to sealed records
   ```csharp
-  // Before
-  public class Symbol { public string Value { get; } ... }
-
-  // After
   public sealed record Symbol(string Value);
+  public sealed record PoolVariable(Symbol Key, string PoolDictionaryName);
   ```
 
-- [ ] **Reduce allocation**: `CompiledMethodData.ArgumentNames` initializes with `new()` then is always replaced
+- [ ] **Reduce allocation**: `CompiledMethodData.ArgumentNames` initializes with `new()` then is always replaced (minor)
 
 ---
 
@@ -466,57 +453,41 @@ This section evaluates XML documentation comments and inline code comments for e
 | **TempFrameAllocator.cs** | ⭐⭐⭐⭐⭐ | Excellent class-level architecture doc, all public methods documented, Blue Book Chapter 30 reference | None |
 | **TailRecursionAnalyzer.cs** | ⭐⭐⭐⭐⭐ | Outstanding `<remarks>` with safety conditions, diagnostic-enabled analysis documented | None |
 | **CompilerDataTypes.cs** | ⭐⭐⭐⭐⭐ | All types and properties documented, clear Blue Book implementation notes | None |
-| **VariableResolver.cs** | ⭐⭐⭐⭐⭐ | Comprehensive resolution step documentation, architecture spec references | Excessive commented debug code (not doc issue) |
+| **VariableResolver.cs** | ⭐⭐⭐⭐⭐ | Comprehensive resolution step documentation, architecture spec references, all helper methods documented | None |
 | **Program.cs** | ⭐⭐⭐⭐☆ | Main entry point documented, `<param>` and `<returns>` present | ConsoleErrorListener methods could use more detail |
-| **BytecodeCompiler.cs** | ⭐⭐⭐⭐☆ | Class and public methods documented, InlineResult enum well documented | LiteralCollector inner class methods sparse |
+| **BytecodeCompiler.cs** | ⭐⭐⭐⭐⭐ | Class and public methods documented, InlineResult enum well documented, LiteralCollector fully documented | None |
 | **BytecodeCompiler.ControlFlow.cs** | ⭐⭐⭐⭐☆ | Blue Book Chapter 26 references, good method-level docs | Some helper methods like `CanInlineBlock` could use `<remarks>` |
 | **BytecodeCompiler.Messages.cs** | ⭐⭐⭐⭐☆ | Class-level doc present, cascade compilation explained | Private methods lack parameter descriptions |
-| **ColdStartJsonGenerator.cs** | ⭐⭐⭐⭐☆ | Good class-level doc, Association canonicalization documented | JSON record classes (`JsonClass`, etc.) undocumented |
+| **ColdStartJsonGenerator.cs** | ⭐⭐⭐⭐⭐ | Good class-level doc, Association canonicalization documented, all JSON records fully documented in Records.cs | None |
 | **LiteralExtractor.cs** | ⭐⭐⭐⭐☆ | Public methods documented | Private extraction helpers sparse |
-| **BytecodeCompiler.Blocks.cs** | ⭐⭐⭐☆☆ | Class-level Blue Book reference | Complex state management lacks inline comments |
-| **BytecodeCompiler.Literals.cs** | ⭐⭐⭐☆☆ | `TryParseSmalltalkNumber` documented | Radix parsing logic could use more explanation |
+| **BytecodeCompiler.Blocks.cs** | ⭐⭐⭐⭐⭐ | Comprehensive BlockCompilationState docs, all helper methods documented, Blue Book references | None |
+| **BytecodeCompiler.Literals.cs** | ⭐⭐⭐⭐⭐ | `TryParseSmalltalkNumber` with comprehensive `<remarks>`, radix notation fully explained | None |
 | **FileInFormatAstBuilder.cs** | ⭐⭐⭐☆☆ | Some method docs | Large file with minimal explanatory comments for complex parsing logic |
 
 ### Documentation Gaps to Address
 
-#### High Priority
-1. **BytecodeCompiler.Blocks.cs** - Add inline comments explaining:
-   - Environment state save/restore pattern purpose
-   - Why `savedScopeDepth` check determines nested vs. sequential
-   - Block argument slot reuse strategy
+#### ✅ High Priority - COMPLETED
+1. ~~**BytecodeCompiler.Blocks.cs**~~ ✅ - `BlockCompilationState` class fully documented with:
+   - XML summary explaining save/restore pattern purpose
+   - `SavedScopeDepth` property documented for nested vs. sequential determination
+   - All helper methods (`ExtractBlockArguments`, `SetupBlockEnvironment`, etc.) documented
 
 2. **FileInFormatAstBuilder.cs** - Add XML docs for:
    - `ProcessClassDefinition` - explain chunk parsing
    - `ProcessMethodCategory` - document method organization
    - All `Process*Literal` methods - document Smalltalk literal syntax
 
-3. **ColdStartJsonGenerator.cs** - Document JSON record classes:
-   ```csharp
-   /// <summary>
-   /// Represents a class definition in the cold-start JSON bundle.
-   /// Maps to the "classes" array in the schema.
-   /// </summary>
-   public sealed class JsonClass { ... }
-   ```
+3. ~~**ColdStartJsonGenerator.cs**~~ ✅ - All JSON record classes documented in `ColdStartJsonGenerator.Records.cs`
 
-#### Medium Priority
-4. **BytecodeCompiler.cs** - Document `LiteralCollector`:
-   ```csharp
-   /// <summary>
-   /// Visitor that pre-collects literals from the AST during first pass.
-   /// This ensures selectors are placed at low literal indices for optimal
-   /// bytecode encoding (Blue Book bytecodes 0xD0-0xFF).
-   /// </summary>
-   private class LiteralCollector { ... }
-   ```
+#### ✅ Medium Priority - COMPLETED
+4. ~~**BytecodeCompiler.cs**~~ ✅ - `LiteralCollector` documented with comprehensive `<remarks>`:
+   - Two-pass approach explained
+   - Selector placement optimization explained
+   - Blue Book bytecode references included
 
-5. **BytecodeCompiler.Literals.cs** - Add remarks for radix parsing:
-   ```csharp
-   /// <remarks>
-   /// Smalltalk supports radix notation: 16rFF = 255, 2r1010 = 10.
-   /// Format: [radix]r[digits] where radix is 2-36.
-   /// </remarks>
-   ```
+5. ~~**BytecodeCompiler.Literals.cs**~~ ✅ - Radix parsing documented with `<remarks>`:
+   - All radix examples (binary, octal, hex, base-36)
+   - Scaled decimal format explained
 
 #### Low Priority
 6. Add `<exception>` documentation to methods that throw

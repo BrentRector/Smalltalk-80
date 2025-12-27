@@ -901,8 +901,22 @@ namespace Smalltalk80.Compiler
         }
 
         /// <summary>
-        /// Helper class to collect literals in first pass.
+        /// Visitor that pre-collects literals from the AST during first pass.
         /// </summary>
+        /// <remarks>
+        /// This class ensures optimal literal frame layout by collecting all literals
+        /// before bytecode emission. The two-pass approach is necessary because:
+        /// <list type="bullet">
+        ///   <item><description>Selectors must be placed at low literal indices (0-31) for optimal
+        ///   single-byte send bytecodes (Blue Book bytecodes 0xD0-0xFF)</description></item>
+        ///   <item><description>Other literals (constants, associations) follow selectors</description></item>
+        ///   <item><description>The literal index in bytecodes must be known before emission</description></item>
+        /// </list>
+        ///
+        /// The collector walks the entire method AST, registering all selectors, literals,
+        /// and variable references (globals, class variables, pool variables) that will
+        /// need literal frame entries.
+        /// </remarks>
         private class LiteralCollector : Smalltalk80ParserBaseVisitor<object?>
         {
             private readonly BytecodeEmitter emitter;
@@ -911,6 +925,12 @@ namespace Smalltalk80.Compiler
 
             private static readonly Dictionary<string, (int bytecode, int args)> SpecialSelectors = BytecodeEmitter.SpecialSelectors;
 
+            /// <summary>
+            /// Creates a new literal collector for pre-pass literal discovery.
+            /// </summary>
+            /// <param name="compiler">The compiler instance for context.</param>
+            /// <param name="emitter">The emitter to register literals with.</param>
+            /// <param name="environment">Optional compilation environment for variable resolution.</param>
             public LiteralCollector(BytecodeCompiler compiler, BytecodeEmitter emitter, CompilationEnvironment? environment = null)
             {
                 this.compiler = compiler;
