@@ -20,9 +20,8 @@ internal class MessageDispatcher(
     {
         var currentClassOOP = classOOP;
         int depth = 0;
-        const int maxDepth = 20;
 
-        while (currentClassOOP != metadata.KnownObjects.Nil && depth < maxDepth)
+        while (currentClassOOP != metadata.KnownObjects.Nil && depth < InterpreterConstants.MaxInheritanceDepth)
         {
             // Validate the class OOP before trying to get its name
             if (!heapManager.IsValidOOP(currentClassOOP))

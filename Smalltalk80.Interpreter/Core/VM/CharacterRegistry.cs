@@ -4,7 +4,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
 /// Registry for tracking Character OOPs during cold start.
-/// Holds the CharacterTable - an array of 256 unique Character objects (code points 0-255).
+/// Holds the CharacterTable - an array of CHARACTER_TABLE_SIZE unique Character objects (code points 0-255).
 ///
 /// ARCHITECTURAL ENFORCEMENT: After Freeze() is called (after Phase 3),
 /// Register() will throw exceptions. Runtime code must access the Smalltalk
@@ -16,9 +16,9 @@ namespace Smalltalk80.Interpreter.Core.VM;
 public static class CharacterRegistry
 {
     /// <summary>
-    /// Array of 256 Character OOPs, indexed by code point (0-255).
+    /// Array of CHARACTER_TABLE_SIZE Character OOPs, indexed by code point (0-255).
     /// </summary>
-    private static readonly SmalltalkOOP[] _characterTable = new SmalltalkOOP[256];
+    private static readonly SmalltalkOOP[] _characterTable = new SmalltalkOOP[VMConstants.CHARACTER_TABLE_SIZE];
 
     /// <summary>
     /// The CharacterTable Array OOP in the Smalltalk heap.

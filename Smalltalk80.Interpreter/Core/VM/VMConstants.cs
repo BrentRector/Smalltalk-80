@@ -194,4 +194,19 @@ public static class VMConstants
     // Link instanceVariableNames: 'nextLink'
     // Process, Semaphore signal queues, etc. inherit from Link
     public const int LINK_NEXTLINK_INDEX = 0;
+
+    // ========================================================================
+    // CharacterTable and CharacterScanner constants
+    // ========================================================================
+    // CharacterTable is an Array of 256 unique Character objects (ASCII 0-255)
+    // Used by Character class for identity-based character comparison
+
+    public const int CHARACTER_TABLE_SIZE = 256;
+
+    // StopConditions array for CharacterScanner
+    // Needs 258 entries for Smalltalk 1-based indices 1-258
+    // EndOfRun = 257, CrossedX = 258 are sentinel indices
+    public const int STOP_CONDITIONS_SIZE = 258;
+    public const int STOP_CONDITIONS_END_OF_RUN = 257;   // Smalltalk 1-based index
+    public const int STOP_CONDITIONS_CROSSED_X = 258;    // Smalltalk 1-based index
 }

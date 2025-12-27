@@ -270,32 +270,37 @@ public class PrimitiveRegistry : IPrimitiveRegistry
 
         // File system primitives (120-160)
         // Note: Some numbers from Smalltalk source were relocated to avoid conflicts
-        registry.Register(120, new FileOperations.PathParse());
-        registry.Register(121, new FileOperations.FileOpen());
-        registry.Register(122, new FileOperations.FileClose());
-        registry.Register(123, new FileOperations.FileRead());
-        registry.Register(132, new FileOperations.FileReadByte());
-        registry.Register(134, new FileOperations.FileWriteByte());
-        registry.Register(124, new FileOperations.FileSeek());
-        registry.Register(125, new FileOperations.FileDelete());
-        registry.Register(126, new FileOperations.FileMove());
-        registry.Register(127, new FileOperations.CreateDirectory());
-        registry.Register(135, new FileOperations.GetDrives());
-        registry.Register(136, new FileOperations.FileWrite());
-        registry.Register(137, new FileOperations.GetCurrentDirectory());
-        registry.Register(138, new FileOperations.SetCurrentDirectory());
-        registry.Register(140, new FileOperations.RemoveDirectory());
-        registry.Register(141, new FileOperations.FindFirst());
-        registry.Register(142, new FileOperations.FindNext());
-        registry.Register(143, new FileOperations.FindClose());
-        registry.Register(144, new FileOperations.GetFileSize());
-        registry.Register(145, new FileOperations.GetFilePosition());
-        registry.Register(146, new FileOperations.DirectoryList());
-        registry.Register(151, new FileOperations.FileFlush());
-        registry.Register(152, new FileOperations.ReadFileAsString());
-        registry.Register(153, new FileOperations.WriteStringToFile());
-        registry.Register(154, new FileOperations.GetFileAttributes());
-        registry.Register(155, new FileOperations.FileExists());
+        // File info primitives (path parsing, delete, move, attributes)
+        registry.Register(120, new FileInfoPrimitives.PathParse());
+        registry.Register(125, new FileInfoPrimitives.FileDelete());
+        registry.Register(126, new FileInfoPrimitives.FileMove());
+        registry.Register(144, new FileInfoPrimitives.GetFileSize());
+        registry.Register(145, new FileInfoPrimitives.GetFilePosition());
+        registry.Register(152, new FileInfoPrimitives.ReadFileAsString());
+        registry.Register(153, new FileInfoPrimitives.WriteStringToFile());
+        registry.Register(154, new FileInfoPrimitives.GetFileAttributes());
+        registry.Register(155, new FileInfoPrimitives.FileExists());
+
+        // File stream primitives (open, close, read, write, seek)
+        registry.Register(121, new FileStreamPrimitives.FileOpen());
+        registry.Register(122, new FileStreamPrimitives.FileClose());
+        registry.Register(123, new FileStreamPrimitives.FileRead());
+        registry.Register(124, new FileStreamPrimitives.FileSeek());
+        registry.Register(132, new FileStreamPrimitives.FileReadByte());
+        registry.Register(134, new FileStreamPrimitives.FileWriteByte());
+        registry.Register(136, new FileStreamPrimitives.FileWrite());
+        registry.Register(151, new FileStreamPrimitives.FileFlush());
+
+        // Directory primitives (create, remove, list, enumerate)
+        registry.Register(127, new DirectoryPrimitives.CreateDirectory());
+        registry.Register(135, new DirectoryPrimitives.GetDrives());
+        registry.Register(137, new DirectoryPrimitives.GetCurrentDirectory());
+        registry.Register(138, new DirectoryPrimitives.SetCurrentDirectory());
+        registry.Register(140, new DirectoryPrimitives.RemoveDirectory());
+        registry.Register(141, new DirectoryPrimitives.FindFirst());
+        registry.Register(142, new DirectoryPrimitives.FindNext());
+        registry.Register(143, new DirectoryPrimitives.FindClose());
+        registry.Register(146, new DirectoryPrimitives.DirectoryList());
 
         // Primitive 202: bitState - Get button state from simulated hardware register
         // Enables atomic polling of mouse button state for tight loops (PopUpMenu, etc.)

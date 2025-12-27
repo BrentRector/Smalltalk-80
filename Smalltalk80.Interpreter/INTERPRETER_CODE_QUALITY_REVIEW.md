@@ -30,6 +30,10 @@ The following improvements were made during this review session:
 | **SmalltalkInterpreterThread.cs** | ✅ Fixed | Replaced Environment.Exit(1) with throw for proper cleanup |
 | **SmalltalkThreadContext.cs** | ✅ Enhanced | Added WindowDisplayed sync event for proper thread coordination |
 | **InputWordRingBuffer.cs** | ✅ Enhanced | Added DroppedEventCount diagnostic counter for lost events |
+| **FilePrimitives.cs** | ✅ Split | 1496 lines → 38 lines + 6 focused files |
+| **VMConstants.cs** | ✅ Enhanced | Added CHARACTER_TABLE_SIZE, STOP_CONDITIONS_SIZE constants |
+| **MessageDispatcher.cs** | ✅ Fixed | Changed local maxDepth to use InterpreterConstants.MaxInheritanceDepth |
+| **SmalltalkInterpreterThread.cs** | ✅ Refactored | 284-line ExecuteInitExpressions method → 10 lines delegating to InitExpressionRunner |
 
 ### Files Deleted (Dead Code Removal)
 - `Phase5/DictionaryOperations.cs` - Replaced by RuntimeDictionaryService
@@ -517,23 +521,18 @@ private static void CopyWordAligned(
 
 ---
 
-### FilePrimitives.cs ⭐⭐⭐ (3.0/5)
+### FilePrimitives.cs ⭐⭐⭐⭐ (4.0/5) ✅ REFACTORED
 
-**Current State**: **1496 lines** - Extremely long file needing split.
+**Current State**: **38 lines** - Slim facade with public API wrappers.
 
-#### Critical Issues
-- **File Length**: At 1496 lines, far exceeds maintainable size
-- **Error Handling**: Many try-catch blocks with different patterns
-
-#### Improvements
-- [ ] **Split By Category**: Extract to focused files
-  ```
-  FilePrimitives.cs           → FileCorePrimitives.cs (open/close)
-                              → FileReadPrimitives.cs (read operations)
-                              → FileWritePrimitives.cs (write operations)
-                              → FileSeekPrimitives.cs (positioning)
-                              → FileInfoPrimitives.cs (metadata)
-  ```
+**Refactoring Complete**: Split 1496 lines into 6 focused files:
+- `FilePrimitives.cs` (38 lines) - Public API facade (OpenFileHandle, CloseFileHandle)
+- `FileHandleManager.cs` (~140 lines) - Handle management and BOM offset tracking
+- `DirectoryEnumerator.cs` (~65 lines) - Directory enumeration state
+- `FileStreamPrimitives.cs` (~400 lines) - Core I/O: open, close, read, write, seek
+- `DirectoryPrimitives.cs` (~280 lines) - Directory operations: create, remove, list, enumerate
+- `FileInfoPrimitives.cs` (~340 lines) - File metadata: path parsing, delete, move, attributes
+- `FilePrimitiveHelpers.cs` (~55 lines) - Shared helper methods
 
 ---
 
@@ -886,13 +885,13 @@ Ranked by: **Correctness → Robustness → Maintainability → Performance**
 | Priority | File | Issue | Category | Effort | Status |
 |----------|------|-------|----------|--------|--------|
 | 1 | WinFormsDisplayProvider.cs | Silent exception swallowing (lines 228, 266) | Correctness | Low | ✅ Fixed |
-| 2 | SmalltalkInterpreterThread.cs | 1045-line file with 284-line method | Maintainability | High | Partial ✅ |
+| 2 | ~~SmalltalkInterpreterThread.cs~~ | ~~1045-line file with 284-line method~~ | ~~Maintainability~~ | - | ✅ Fixed (method extracted to InitExpressionRunner) |
 | 3 | BytecodeDecompiler.cs | 751-line single method | Maintainability | Medium | ✅ Fixed |
-| 4 | FilePrimitives.cs | 1496-line file | Maintainability | High | Open |
+| 4 | ~~FilePrimitives.cs~~ | ~~1496-line file~~ | ~~Maintainability~~ | - | ✅ Fixed (split into 6 files) |
 | 5 | ~~ObjectTable.cs~~ | ~~Lock held during enumeration~~ | ~~Thread Safety~~ | - | ❌ N/A (single-threaded) |
 | 6 | ~~DiagnosticHub.cs~~ | ~~Lock held during callbacks~~ | ~~Thread Safety~~ | - | ❌ N/A (single-threaded) |
 | 7 | ~~Phase2_ClassInfrastructure.cs~~ | ~~50+ lines commented code~~ | ~~Maintainability~~ | - | ✅ Fixed (code removed) |
-| 8 | Program.cs | Race condition on window disposal | Cross-Thread | Low | Open |
+| 8 | ~~Program.cs~~ | ~~Race condition on window disposal~~ | ~~Cross-Thread~~ | - | ✅ Fixed |
 | 9 | BytecodeStackAnalyzerCFG.cs | Admitted bug in comments | Correctness | Medium | ✅ Deleted |
 | 10 | ~~ObjectGraphAllocator.cs~~ | ~~UTF-8 instead of ISO-8859-1~~ | ~~Correctness~~ | - | ✅ Fixed (uses Latin1) |
 
