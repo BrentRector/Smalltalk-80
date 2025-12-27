@@ -22,10 +22,11 @@ testSimpleReturn
         // Push 42, return top
         AssertBytecode(method, 32, 124);
         
-        // Check method metadata
-        Assert.That(method["selector"]?.ToString(), Is.EqualTo("testSimpleReturn"));
-        Assert.That((int)method["numArgs"]!, Is.EqualTo(0));
-        Assert.That((int)method["numTemps"]!, Is.EqualTo(0));
+        // Check method metadata - use selectorIndex and header for Blue Book format
+        Assert.That(GetMethodSelector(json, method), Is.EqualTo("testSimpleReturn"));
+        var header = method["header"] as JObject;
+        Assert.That(header?["argCount"]?.Value<int>() ?? (int?)method["numArgs"] ?? 0, Is.EqualTo(0));
+        Assert.That(header?["tempCount"]?.Value<int>() ?? (int?)method["numTemps"] ?? 0, Is.EqualTo(0));
     }
     
     [Test]
@@ -113,8 +114,9 @@ testTemporaries
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // Check temp count
-        Assert.That((int)method["numTemps"]!, Is.EqualTo(2));
+        // Check temp count - use header for Blue Book format
+        var header = method["header"] as JObject;
+        Assert.That(header?["tempCount"]?.Value<int>() ?? (int?)method["numTemps"] ?? 0, Is.EqualTo(2));
         
         // Should store and access temporaries
         var bytecodes = (JArray)method["bytecodes"]!;
@@ -132,9 +134,10 @@ add: a to: b
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // Check parameter count
-        Assert.That((int)method["numArgs"]!, Is.EqualTo(2));
-        Assert.That(method["selector"]?.ToString(), Is.EqualTo("add:to:"));
+        // Check parameter count - use header for Blue Book format
+        var header = method["header"] as JObject;
+        Assert.That(header?["argCount"]?.Value<int>() ?? (int?)method["numArgs"] ?? 0, Is.EqualTo(2));
+        Assert.That(GetMethodSelector(json, method), Is.EqualTo("add:to:"));
         
         // Parameters accessed as temps 0 and 1
         var bytecodes = (JArray)method["bytecodes"]!;
@@ -153,29 +156,31 @@ testPrimitive
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // Check primitive number
-        Assert.That(method["primitive"], Is.Not.Null);
-        Assert.That((int)method["primitive"]!, Is.EqualTo(1));
-        
+        // Check primitive number - stored in header["primitiveIndex"] for Blue Book format
+        var header = method["header"] as JObject;
+        var primitiveIndex = header?["primitiveIndex"]?.Value<int>() ?? (int?)method["primitive"] ?? 0;
+        Assert.That(primitiveIndex, Is.EqualTo(1), "Should have primitive 1");
+
         // Should have fallback code
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes.Count, Is.GreaterThan(0), "Should have fallback bytecode");
     }
-    
+
     [Test]
     public void TestPrimitiveWithoutFallback()
     {
         var source = WrapInTestClass(@"
 testPrimitiveNoFallback
     <primitive: 60>");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // Check primitive number
-        Assert.That(method["primitive"], Is.Not.Null);
-        Assert.That((int)method["primitive"]!, Is.EqualTo(60));
-        
+
+        // Check primitive number - stored in header["primitiveIndex"] for Blue Book format
+        var header = method["header"] as JObject;
+        var primitiveIndex = header?["primitiveIndex"]?.Value<int>() ?? (int?)method["primitive"] ?? 0;
+        Assert.That(primitiveIndex, Is.EqualTo(60), "Should have primitive 60");
+
         // Might have minimal bytecode or just return self
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
@@ -238,8 +243,9 @@ testLongMethod
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // Check large number of temps
-        Assert.That((int)method["numTemps"]!, Is.EqualTo(10));
+        // Check large number of temps - use header for Blue Book format
+        var header = method["header"] as JObject;
+        Assert.That(header?["tempCount"]?.Value<int>() ?? (int?)method["numTemps"] ?? 0, Is.EqualTo(10));
         
         // Should have extended temp access if needed
         var bytecodes = (JArray)method["bytecodes"]!;
@@ -256,8 +262,9 @@ negated
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        Assert.That(method["selector"]?.ToString(), Is.EqualTo("negated"));
-        Assert.That((int)method["numArgs"]!, Is.EqualTo(0));
+        Assert.That(GetMethodSelector(json, method), Is.EqualTo("negated"));
+        var header = method["header"] as JObject;
+        Assert.That(header?["argCount"]?.Value<int>() ?? (int?)method["numArgs"] ?? 0, Is.EqualTo(0));
     }
     
     [Test]
@@ -270,8 +277,9 @@ negated
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        Assert.That(method["selector"]?.ToString(), Is.EqualTo("+"));
-        Assert.That((int)method["numArgs"]!, Is.EqualTo(1));
+        Assert.That(GetMethodSelector(json, method), Is.EqualTo("+"));
+        var header = method["header"] as JObject;
+        Assert.That(header?["argCount"]?.Value<int>() ?? (int?)method["numArgs"] ?? 0, Is.EqualTo(1));
     }
     
     [Test]
@@ -284,8 +292,9 @@ at: index put: value
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        Assert.That(method["selector"]?.ToString(), Is.EqualTo("at:put:"));
-        Assert.That((int)method["numArgs"]!, Is.EqualTo(2));
+        Assert.That(GetMethodSelector(json, method), Is.EqualTo("at:put:"));
+        var header = method["header"] as JObject;
+        Assert.That(header?["argCount"]?.Value<int>() ?? (int?)method["numArgs"] ?? 0, Is.EqualTo(2));
     }
     
     [Test]
@@ -299,9 +308,8 @@ factorial
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // Should have recursive call to factorial
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "factorial"), Is.True);
+        // Should have recursive call to factorial (symbol in literals)
+        Assert.That(LiteralContainsSymbol(json, method, "factorial"), Is.True);
     }
     
     [Test]

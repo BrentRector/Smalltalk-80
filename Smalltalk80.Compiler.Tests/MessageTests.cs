@@ -24,9 +24,8 @@ testUnaryMessage
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
-        // Should have unary send
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "negated"), Is.True);
+        // Should have unary send - negated is not a special selector, so it's in literals
+        Assert.That(LiteralContainsSymbol(json, method, "negated"), Is.True);
     }
     
     [Test]
@@ -54,15 +53,16 @@ testBinaryMessage
         var source = WrapInTestClass(@"
 testKeywordMessage
     ^Array new: 10");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // Push Array, push 10, send new:, return top
+        // new: is a SPECIAL selector with bytecode 205 (0xCD)
+        // It does NOT appear in literals - it uses dedicated bytecode
         var bytecodes = (JArray)method["bytecodes"]!;
-        var literals = (JArray)method["literals"]!;
-        
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "new:"), Is.True);
+        Assert.That(bytecodes.Select(t => (int)t).Contains(205), Is.True,
+            "Should use special new: bytecode (205)");
     }
     
     [Test]
@@ -76,8 +76,9 @@ testMultipleKeywords
         var method = GetFirstMethod(json);
         
         // Push self, push 1, push 'value', send at:put:, return top
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "at:put:"), Is.True);
+        // at:put: IS a special selector - uses bytecode 193 (0xC1)
+        var bytecodes = (JArray)method["bytecodes"]!;
+        Assert.That(bytecodes.Select(t => (int)t).Contains(193), Is.True, "Should use special at:put: bytecode");
     }
     
     [Test]
@@ -94,23 +95,14 @@ testUnaryPrecedence
         // Push 3, send negated, push 4, send +, return
         var literals = (JArray)method["literals"]!;
         
-        // Check order: negated should come before +
-        var negatedIndex = -1;
-        var plusIndex = -1;
-        
-        for (int i = 0; i < literals.Count; i++)
-        {
-            var value = literals[i]["value"]?.ToString();
-            if (value == "negated") negatedIndex = i;
-            if (value == "+") plusIndex = i;
-        }
-        
-        if (negatedIndex >= 0 && plusIndex >= 0)
-        {
-            // In bytecode, negated should be sent before +
-            var bytecodes = (JArray)method["bytecodes"]!;
-            Assert.That(bytecodes, Is.Not.Null);
-        }
+        // Check that negated is in literals (+ uses special bytecode 176)
+        Assert.That(LiteralContainsSymbol(json, method, "negated"), Is.True, "Should have negated in literals");
+
+        // In bytecode, negated should be sent before +
+        var bytecodes = (JArray)method["bytecodes"]!;
+        Assert.That(bytecodes, Is.Not.Null);
+        // + is special selector 0, bytecode 176
+        Assert.That(bytecodes.Select(t => (int)t).Contains(176), Is.True, "Should use special + bytecode");
     }
     
     [Test]
@@ -119,18 +111,22 @@ testUnaryPrecedence
         var source = WrapInTestClass(@"
 testBinaryPrecedence
     ^Array new: 2 + 3");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
+
         // Should evaluate as Array new: (2 + 3)
         // Binary + has higher precedence than keyword new:
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
-        
-        // The + should be evaluated before new:
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "new:"), Is.True);
+
+        // + is special selector bytecode 176
+        Assert.That(bytecodes.Select(t => (int)t).Contains(176), Is.True,
+            "Should use special + bytecode (176)");
+
+        // new: is a SPECIAL selector with bytecode 205 (0xCD)
+        Assert.That(bytecodes.Select(t => (int)t).Contains(205), Is.True,
+            "Should use special new: bytecode (205)");
     }
     
     [Test]
@@ -241,9 +237,9 @@ testAt
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // at: is a common selector that might have special bytecode
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "at:"), Is.True);
+        // at: IS a special selector - uses bytecode 192 (0xC0)
+        var bytecodes = (JArray)method["bytecodes"]!;
+        Assert.That(bytecodes.Select(t => (int)t).Contains(192), Is.True, "Should use special at: bytecode");
     }
     
     [Test]
@@ -256,9 +252,9 @@ testSize
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // size might be a special selector
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "size"), Is.True);
+        // size IS a special selector - uses bytecode 194 (0xC2), NOT in literals
+        var bytecodes = (JArray)method["bytecodes"]!;
+        Assert.That(bytecodes.Select(t => (int)t).Contains(194), Is.True, "Should use special size bytecode");
     }
     
     [Test]
@@ -275,10 +271,9 @@ testComplexChain
         var bytecodes = (JArray)method["bytecodes"]!;
         Assert.That(bytecodes, Is.Not.Null);
         
-        // Should contain +, *, negated, abs in that order
-        var literals = (JArray)method["literals"]!;
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "negated"), Is.True);
-        Assert.That(literals.Any(l => l["value"]?.ToString() == "abs"), Is.True);
+        // Should contain +, *, negated, abs - + and * use special bytecodes
+        Assert.That(LiteralContainsSymbol(json, method, "negated"), Is.True);
+        Assert.That(LiteralContainsSymbol(json, method, "abs"), Is.True);
     }
     
     [Test]

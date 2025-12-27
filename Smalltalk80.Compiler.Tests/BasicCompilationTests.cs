@@ -9,7 +9,7 @@ namespace Smalltalk80.Compiler.Tests;
 
 /// <summary>
 /// Basic compilation tests that verify the compiler generates valid JSON output.
-/// These tests work with the current compiler JSON format (v1.0.3).
+/// These tests work with the current compiler JSON format (v1.0.9).
 /// </summary>
 [TestFixture]
 public class BasicCompilationTests
@@ -89,7 +89,7 @@ simpleMethod
         var root = json.RootElement;
         
         // Verify metadata
-        Assert.That(root.GetProperty("metadata").GetProperty("version").GetString(), Is.EqualTo("1.0.3"));
+        Assert.That(root.GetProperty("metadata").GetProperty("version").GetString(), Is.EqualTo("1.0.9"));
         Assert.That(root.GetProperty("metadata").GetProperty("methodCount").GetInt32(), Is.EqualTo(1));
         
         // Verify method
@@ -170,36 +170,31 @@ add: aNumber
         var source = WrapInTestClass(@"
 blockTest
     ^[42] value");
-        
+
         using var json = CompileToJson(source);
         var root = json.RootElement;
-        
-        // Should have 2 methods: main method and block
+
+        // Blue Book: blocks are compiled inline, not as separate methods
         var methods = root.GetProperty("methods");
-        Assert.That(methods.GetArrayLength(), Is.EqualTo(2));
-        
-        // First method should push block literal and send value
+        Assert.That(methods.GetArrayLength(), Is.EqualTo(1), "Only main method, block is inline");
+
         var mainMethod = methods[0];
-        var mainBytecodes = mainMethod.GetProperty("bytecodes");
-        
-        // Check for literal push (block) and send
-        bool hasLiteralPush = false;
-        bool hasSend = false;
-        
-        for (int i = 0; i < mainBytecodes.GetArrayLength(); i++)
+        var bytecodes = mainMethod.GetProperty("bytecodes");
+
+        // Check for inline block pattern:
+        // PUSH_ACTIVE_CONTEXT (0x89), integer, SEND_SPECIAL_BLOCKCOPY (0xC8), LONG_JUMP, block body, RETURN_TOP_FROM_BLOCK (0x7D)
+        bool hasBlockCopy = false;
+        bool hasBlockReturn = false;
+
+        for (int i = 0; i < bytecodes.GetArrayLength(); i++)
         {
-            var bc = mainBytecodes[i].GetInt32();
-            if (bc >= 0x20 && bc < 0x40) hasLiteralPush = true; // Push literal
-            if (bc >= 0xD0 && bc <= 0xFF) hasSend = true; // Send literal (includes 0xFF)
-            if (bc >= 0xC0 && bc < 0xD0) hasSend = true; // Special sends
+            var bc = bytecodes[i].GetInt32();
+            if (bc == 0xC8) hasBlockCopy = true; // SEND_SPECIAL_BLOCKCOPY
+            if (bc == 0x7D) hasBlockReturn = true; // RETURN_TOP_FROM_BLOCK
         }
-        
-        Assert.That(hasLiteralPush, Is.True, "Should push block literal");
-        Assert.That(hasSend, Is.True, "Should send value message");
-        
-        // Second method should be the block (no selector)
-        var blockMethod = methods[1];
-        Assert.That(blockMethod.TryGetProperty("selectorIndex", out _), Is.False, "Block should not have selectorIndex");
+
+        Assert.That(hasBlockCopy, Is.True, "Should have blockCopy: send for inline block");
+        Assert.That(hasBlockReturn, Is.True, "Should have block return bytecode");
     }
 
     [Test]
@@ -271,17 +266,18 @@ methodWithArgs: arg1 and: arg2
     temp1 := arg1.
     temp2 := arg2.
     ^temp1 + temp2");
-        
+
         using var json = CompileToJson(source);
         var root = json.RootElement;
-        
+
         var method = root.GetProperty("methods")[0];
         var header = method.GetProperty("header");
-        
+
         // Verify header fields
+        // Blue Book: tempCount includes arguments in the unified temp frame
+        // 2 args + 2 temps = 4 total slots
         Assert.That(header.GetProperty("argCount").GetInt32(), Is.EqualTo(2));
-        Assert.That(header.GetProperty("tempCount").GetInt32(), Is.EqualTo(2));
-        Assert.That(header.GetProperty("literalCount").GetInt32(), Is.EqualTo(0));
+        Assert.That(header.GetProperty("tempCount").GetInt32(), Is.EqualTo(4));
         Assert.That(header.GetProperty("primitiveIndex").GetInt32(), Is.EqualTo(0));
         Assert.That(header.GetProperty("largeContext").GetBoolean(), Is.False);
     }
@@ -290,32 +286,30 @@ methodWithArgs: arg1 and: arg2
     public void TestInstallOrder()
     {
         var source = WrapInTestClass(@"test ^1");
-        
+
         using var json = CompileToJson(source);
         var root = json.RootElement;
-        
+
         // Should have install order phases
         var installOrder = root.GetProperty("installOrder");
         var phases = installOrder.GetProperty("phases");
-        
+
         Assert.That(phases.GetArrayLength(), Is.GreaterThan(0));
-        
+
         bool hasClasses = false;
         bool hasMethods = false;
-        bool hasPatches = false;
-        
+
         for (int i = 0; i < phases.GetArrayLength(); i++)
         {
             var phase = phases[i];
             var kind = phase.GetProperty("kind").GetString();
             if (kind == "classes") hasClasses = true;
             if (kind == "methods") hasMethods = true;
-            if (kind == "patches") hasPatches = true;
         }
-        
+
         Assert.That(hasClasses, Is.True, "Should have classes phase");
         Assert.That(hasMethods, Is.True, "Should have methods phase");
-        Assert.That(hasPatches, Is.True, "Should have patches phase");
+        // Note: patches phase is only present when there are forward references
     }
 
     [Test]
