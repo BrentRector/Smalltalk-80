@@ -13,27 +13,30 @@
 | Item | Status | Notes |
 |------|--------|-------|
 | **RuntimeDictionaryService** | ✅ Complete | `Core/VM/RuntimeDictionaryService.cs` - Runtime-safe dictionary operations using only ISmalltalkHeap |
+| **Phase 3 → RuntimeDictionaryService** | ✅ Complete | Phase 3 DictionaryInstaller now uses RuntimeDictionaryService directly |
+| **Phase 4 → RuntimeDictionaryService** | ✅ Complete | Phase 4 MethodDictionaryInstaller uses RuntimeDictionaryService directly |
 | **Phase 5 → RuntimeDictionaryService** | ✅ Complete | Phase 5 now directly uses RuntimeDictionaryService, eliminating wrapper |
+| **Engine/Services/DictionaryService.cs** | ✅ Deleted | All phases now use RuntimeDictionaryService directly |
 | **Phase5/DictionaryOperations.cs** | ✅ Deleted | Wrapper class removed - was just delegating to RuntimeDictionaryService |
 | **IDictionaryOperations interface** | ✅ Removed | Interface removed from Phase5/Interfaces.cs |
 | **Canonical global lookup** | ✅ Complete | IRuntimeHeapAccessor.LookupGlobalAssociation implements SystemDictionary → Undeclared chain |
 | **VMConstants for Association** | ✅ Complete | ASSOCIATION_KEY_INDEX, ASSOCIATION_VALUE_INDEX, DICTIONARY_TALLY_INDEX |
+| **InstallInIdentityDictionary** | ✅ Complete | RuntimeDictionaryService supports MethodDictionary installation |
 
-### 🔄 Partially Complete
+### 📋 Cold-Start Specific Services (By Design)
 
 | Item | Status | Notes |
 |------|--------|-------|
-| **Engine/Services/DictionaryService** | 🔄 Still exists | Used by Phase 3 and Phase 4; duplicates RuntimeDictionaryService functionality |
-| **Engine/Services/SymbolService** | ✅ Exists | Cold-start symbol lookup wrapping SymbolRegistry |
-| **Engine/Services/FieldValueService** | ✅ Exists | Simple value resolution (no allocation) |
+| **Engine/Services/SymbolService** | ✅ Appropriate | Cold-start symbol lookup via SymbolRegistry (disposed after Phase 6) |
+| **Engine/Services/FieldValueService** | ✅ Appropriate | JSON bundle parsing - not heap-based, cold-start specific |
 
-### ❌ Remaining Work
+> **Note**: SymbolService and FieldValueService are NOT candidates for runtime migration.
+> They work with ColdStartBundle schema, not heap operations. See analysis in INTERPRETER_CODE_QUALITY_REVIEW.md.
+
+### ❌ Remaining Work (Low Priority)
 
 | Item | Priority | Notes |
 |------|----------|-------|
-| Migrate Phase 3 to RuntimeDictionaryService | Medium | Requires verifying heap stability in Phase 3 |
-| Migrate Phase 4 to RuntimeDictionaryService | Medium | MethodDictionaryInstaller, LiteralResolver still use DictionaryService |
-| Delete Engine/Services/DictionaryService | Low | After Phase 3 & 4 migrated |
 | Consolidate Phase5/FieldValueResolver | Low | May duplicate FieldValueService |
 | Phase 5 sub-orchestrator simplification | Low | Still has 9 helper files |
 
