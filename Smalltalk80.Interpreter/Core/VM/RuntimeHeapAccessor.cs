@@ -95,8 +95,8 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
             throw new InvalidOperationException("Symbol class not found during InternSymbol");
         }
 
-        // Get Symbol's classPool (instance variable index 7 for Class)
-        var classPoolOOP = _heapManager.GetInstanceVariable(symbolClassOOP, 7);
+        // Get Symbol's classPool
+        var classPoolOOP = _heapManager.GetInstanceVariable(symbolClassOOP, VMConstants.CLASS_CLASSPOOL_INDEX);
         if (classPoolOOP == metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("Symbol classPool is nil during InternSymbol");
@@ -584,8 +584,8 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
             }
         }
 
-        // Get classPool (instance variable 7 of Class)
-        var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, 7);
+        // Get classPool
+        var classPoolOOP = _heapManager.GetInstanceVariable(classOOP, VMConstants.CLASS_CLASSPOOL_INDEX);
         if (classPoolOOP == metadata.KnownObjects.Nil)
         {
             Console.WriteLine($"[LookupClassVariable] ERROR: classPool is nil for {className}!");
