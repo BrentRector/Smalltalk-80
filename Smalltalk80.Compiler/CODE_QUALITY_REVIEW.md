@@ -208,9 +208,9 @@ file sealed class ConsoleErrorListener : BaseErrorListener { }
 - None identified
 
 #### Improvements
-- [ ] **Consider sealed class**: Class is not inherited - mark as `sealed` for potential perf benefit
+- [x] **Consider sealed class**: Class is not inherited - mark as `sealed` for potential perf benefit ✅ **FIXED**
 - [ ] **Obsolete attribute on method**: Line 1095-1099 has obsolete wrapper - remove in future version
-- [ ] **Large method**: `CalculateMaxStackDepth` (lines 128-286) could use table-driven approach
+- [x] **Large method**: `CalculateMaxStackDepth` - refactored to table-driven approach ✅ **FIXED**
 
 #### Code Samples (Positive)
 ```csharp
@@ -225,29 +225,18 @@ private bool LiteralsEqual(object? a, object? b) => (a, b) switch
 
 ---
 
-### VariableResolver.cs ⭐⭐⭐☆☆ (3/5)
+### VariableResolver.cs ⭐⭐⭐⭐☆ (4/5)
 
-**Current State**: Complex variable resolution with 12 resolution steps. Contains significant commented debugging code.
+**Current State**: Well-structured variable resolution with 12-step resolution priority. Refactored into focused helper methods.
 
 #### Critical Issues
-- **Excessive commented code**: ~50 lines of commented Console.WriteLine statements make code hard to read
+- None identified
 
 #### Improvements
-- [ ] **Remove all commented debugging code**: Lines 66-77, 230-241, 257-277, 297-326, etc.
-- [ ] **Extract well-known globals to constant**: Line 330
-  ```csharp
-  // Before
-  HashSet<string> wellKnownGlobals = ["Smalltalk", "Processor", ...];
-
-  // After
-  private static readonly HashSet<string> WellKnownGlobals = [
-      "Smalltalk", "Processor", "Display", "Transcript",
-      "Sensor", "ScheduledControllers", "Undeclared", "Disk"
-  ];
-  ```
-
-- [ ] **Long method**: `ResolveVariable` is 330+ lines - split into smaller focused methods
-- [ ] **Use struct record** for `ResolutionResult` to reduce allocations
+- [x] **Remove all commented debugging code** ✅ **FIXED** (Priority 2)
+- [x] **Extract well-known globals to constant** ✅ **FIXED** - `WellKnownGlobals` HashSet at class level
+- [x] **Long method**: `ResolveVariable` refactored from 330 lines to 35 lines with 8 helper methods ✅ **FIXED** (Priority 7)
+- [ ] **Use struct record** for `ResolutionResult` to reduce allocations (currently using struct)
 
 ---
 
@@ -412,14 +401,15 @@ Ranked by: **Correctness → Robustness → Maintainability → Performance**
 | 4 | BytecodeCompiler.Literals.cs | Silent exception swallowing in `TryParseSmalltalkNumber` | Robustness | ✅ **FIXED** |
 | 5 | FileInFormatAstBuilder.cs | 1622-line class with multiple responsibilities | Maintainability | ✅ **FIXED** |
 | 6 | ColdStartJsonGenerator.cs | 2067-line file - split using partial classes | Maintainability | ✅ **FIXED** |
-| 7 | VariableResolver.cs | 330-line `ResolveVariable` method | Maintainability | Pending |
+| 7 | VariableResolver.cs | 330-line `ResolveVariable` method | Maintainability | ✅ **FIXED** |
 | 8 | BytecodeCompiler.ControlFlow.cs | Stub methods that always return false | Maintainability | ✅ **FIXED** |
 | 9 | CompilerDataTypes.cs | Mutable classes that could be records | Performance | ✅ **FIXED** |
-| 10 | BytecodeEmitter.cs | 150-line `CalculateMaxStackDepth` - use table-driven | Maintainability | Partial (sealed) |
+| 10 | BytecodeEmitter.cs | 150-line `CalculateMaxStackDepth` - use table-driven | Maintainability | ✅ **FIXED** |
 
 **Implementation Summary:**
-- **9 of 10 priorities addressed** (8 fully fixed, 1 partial)
-- Remaining item (7) requires larger structural change
+- **All 10 priorities addressed and fixed**
+- Priority 7: Split `ResolveVariable` into 8 focused helper methods
+- Priority 10: Implemented table-driven bytecode stack effect calculation
 
 ---
 

@@ -125,6 +125,7 @@ namespace Smalltalk80.Compiler
 
         /// <summary>
         /// Calculates the maximum stack depth required by the given bytecode array.
+        /// Uses table-driven dispatch for maintainability.
         /// </summary>
         public static int CalculateMaxStackDepth(byte[] bytes)
         {
@@ -135,155 +136,128 @@ namespace Smalltalk80.Compiler
             while (pc < bytes.Length)
             {
                 byte bytecode = bytes[pc];
+                var (stackEffect, byteLength) = GetBytecodeStackEffect(bytecode, bytes, pc);
 
-                // Analyze stack effect of each bytecode according to Blue Book
-                if (bytecode <= 15) // Push Receiver Variable
-                {
-                    currentDepth++;
-                    pc++;
-                }
-                else if (bytecode <= 31) // Push Temporary Location
-                {
-                    currentDepth++;
-                    pc++;
-                }
-                else if (bytecode <= 63) // Push Literal Constant
-                {
-                    currentDepth++;
-                    pc++;
-                }
-                else if (bytecode <= 95) // Push Literal Variable
-                {
-                    currentDepth++;
-                    pc++;
-                }
-                else if (bytecode <= 103) // Pop and Store Receiver Variable
-                {
-                    currentDepth--; // Pop value
-                    pc++;
-                }
-                else if (bytecode <= 111) // Pop and Store Temporary Location
-                {
-                    currentDepth--; // Pop value
-                    pc++;
-                }
-                else if (bytecode <= 119) // Push special constants
-                {
-                    currentDepth++;
-                    pc++;
-                }
-                else if (bytecode >= 120 && bytecode <= 127) // Returns (0x78-0x7F)
-                {
-                    // Returns don't affect max calculation (stack cleaned up by return)
-                    pc++;
-                }
-                else if (bytecode == 128) // Extended Push
-                {
-                    currentDepth++;
-                    pc += 3; // Skip 2 extension bytes
-                }
-                else if (bytecode == 129) // Extended Store (non-popping)
-                {
-                    // Store doesn't change stack
-                    pc += 3;
-                }
-                else if (bytecode == 130) // Extended Pop and Store
-                {
-                    currentDepth--;
-                    pc += 3;
-                }
-                else if (bytecode == 131) // Send Literal Selector
-                {
-                    pc++;
-                    if (pc < bytes.Length)
-                    {
-                        int argCount = (bytes[pc] >> 5) & 0x07;
-                        currentDepth -= (argCount + 1); // Pop receiver + args
-                        currentDepth++; // Push result
-                        pc++;
-                    }
-                }
-                else if (bytecode == 132) // Double Extended Send
-                {
-                    pc++;
-                    if (pc < bytes.Length)
-                    {
-                        int argCount = bytes[pc];
-                        currentDepth -= (argCount + 1); // Pop receiver + args
-                        currentDepth++; // Push result
-                        pc += 2; // Skip selector byte
-                    }
-                }
-                else if (bytecode == 135) // Pop Stack Top
-                {
-                    currentDepth--;
-                    pc++;
-                }
-                else if (bytecode == 136) // Duplicate Stack Top
-                {
-                    currentDepth++;
-                    pc++;
-                }
-                else if (bytecode == 137) // Push Active Context
-                {
-                    currentDepth++;
-                    pc++;
-                }
-                // NOTE: Jump bytecodes (0x90-0x97, 0xA0-0xA7) removed.
-                // Compiler generates zero jumps with Blue Book block compilation.
-                else if (bytecode >= 176 && bytecode <= 191) // Send Arithmetic Message
-                {
-                    // Arithmetic messages typically have 1 arg
-                    currentDepth -= 2; // Pop receiver + arg
-                    currentDepth++; // Push result
-                    pc++;
-                }
-                else if (bytecode >= 192 && bytecode <= 207) // Send Special Message
-                {
-                    // Special messages vary - conservatively assume 1 arg
-                    currentDepth -= 2; // Pop receiver + arg
-                    currentDepth++; // Push result
-                    pc++;
-                }
-                else if (bytecode >= 208 && bytecode <= 223) // Send Literal Selector With No Arguments
-                {
-                    currentDepth--; // Pop receiver
-                    currentDepth++; // Push result
-                    pc++;
-                }
-                else if (bytecode >= 224 && bytecode <= 239) // Send Literal Selector With 1 Argument
-                {
-                    currentDepth -= 2; // Pop receiver + 1 arg
-                    currentDepth++; // Push result
-                    pc++;
-                }
-                else if (bytecode >= 240 && bytecode <= 255) // Send Literal Selector With 2 Arguments
-                {
-                    currentDepth -= 3; // Pop receiver + 2 args
-                    currentDepth++; // Push result
-                    pc++;
-                }
-                else
-                {
-                    // Unknown bytecode
-                    pc++;
-                }
+                currentDepth += stackEffect;
+                pc += byteLength;
 
-                // Track maximum depth
                 if (currentDepth > maxDepth)
-                {
                     maxDepth = currentDepth;
-                }
 
                 // Sanity check - stack shouldn't go negative
                 if (currentDepth < 0)
-                {
                     currentDepth = 0;
-                }
             }
 
-            // Return exact max depth without buffer
             return maxDepth;
+        }
+
+        /// <summary>
+        /// Blue Book bytecode ranges and their stack effects.
+        /// Format: (minByte, maxByte, stackEffect, byteLength)
+        /// </summary>
+        private static readonly (int min, int max, int effect, int length)[] BytecodeRanges =
+        [
+            // Push operations (+1 stack)
+            (0, 15, +1, 1),      // Push Receiver Variable
+            (16, 31, +1, 1),     // Push Temporary Location
+            (32, 63, +1, 1),     // Push Literal Constant
+            (64, 95, +1, 1),     // Push Literal Variable
+
+            // Store operations (-1 stack)
+            (96, 103, -1, 1),    // Pop and Store Receiver Variable
+            (104, 111, -1, 1),   // Pop and Store Temporary Location
+
+            // Special constants and returns
+            (112, 119, +1, 1),   // Push special constants (self, true, false, nil, -1, 0, 1, 2)
+            (120, 127, 0, 1),    // Returns (stack cleaned up by return)
+
+            // Extended operations (handled specially below)
+            // 128-132: see GetExtendedBytecodeEffect
+
+            // Stack manipulation
+            (135, 135, -1, 1),   // Pop Stack Top
+            (136, 136, +1, 1),   // Duplicate Stack Top
+            (137, 137, +1, 1),   // Push Active Context
+
+            // Jumps (control flow - used for inlined conditionals)
+            (144, 151, 0, 1),    // Short unconditional jump
+            (152, 159, -1, 1),   // Short conditional jump (pops condition)
+            (160, 167, 0, 2),    // Long unconditional jump
+            (168, 175, -1, 2),   // Long conditional jump (pops condition)
+
+            // Send operations (pop receiver + args, push result)
+            (176, 191, -1, 1),   // Send Arithmetic Message (1 arg: -2+1=-1)
+            (192, 207, -1, 1),   // Send Special Message (1 arg assumed: -2+1=-1)
+            (208, 223, 0, 1),    // Send 0-arg message (-1+1=0)
+            (224, 239, -1, 1),   // Send 1-arg message (-2+1=-1)
+            (240, 255, -2, 1),   // Send 2-arg message (-3+1=-2)
+        ];
+
+        /// <summary>
+        /// Gets the stack effect and byte length for a bytecode.
+        /// Extended bytecodes (128-132) require special handling.
+        /// </summary>
+        private static (int stackEffect, int byteLength) GetBytecodeStackEffect(byte bytecode, byte[] bytes, int pc)
+        {
+            // Handle extended bytecodes specially (they need to read extension bytes)
+            if (bytecode is >= 128 and <= 132)
+                return GetExtendedBytecodeEffect(bytecode, bytes, pc);
+
+            // Table lookup for standard bytecodes
+            foreach (var (min, max, effect, length) in BytecodeRanges)
+            {
+                if (bytecode >= min && bytecode <= max)
+                    return (effect, length);
+            }
+
+            // Unknown bytecode - skip it safely
+            return (0, 1);
+        }
+
+        /// <summary>
+        /// Handles extended bytecodes (128-132) that have variable-length encoding
+        /// and dynamic stack effects based on extension bytes.
+        /// </summary>
+        private static (int stackEffect, int byteLength) GetExtendedBytecodeEffect(byte bytecode, byte[] bytes, int pc)
+        {
+            return bytecode switch
+            {
+                128 => (+1, 3),  // Extended Push
+                129 => (0, 3),   // Extended Store (non-popping)
+                130 => (-1, 3),  // Extended Pop and Store
+
+                131 => GetSendLiteralSelectorEffect(bytes, pc),     // Send Literal Selector
+                132 => GetDoubleExtendedSendEffect(bytes, pc),      // Double Extended Send
+
+                _ => (0, 1)
+            };
+        }
+
+        /// <summary>
+        /// Bytecode 131: Send Literal Selector - arg count encoded in extension byte.
+        /// </summary>
+        private static (int stackEffect, int byteLength) GetSendLiteralSelectorEffect(byte[] bytes, int pc)
+        {
+            if (pc + 1 >= bytes.Length)
+                return (0, 2);
+
+            int argCount = (bytes[pc + 1] >> 5) & 0x07;
+            // Pop receiver + args, push result: -(argCount + 1) + 1 = -argCount
+            return (-argCount, 2);
+        }
+
+        /// <summary>
+        /// Bytecode 132: Double Extended Send - arg count is full extension byte.
+        /// </summary>
+        private static (int stackEffect, int byteLength) GetDoubleExtendedSendEffect(byte[] bytes, int pc)
+        {
+            if (pc + 1 >= bytes.Length)
+                return (0, 3);
+
+            int argCount = bytes[pc + 1];
+            // Pop receiver + args, push result: -(argCount + 1) + 1 = -argCount
+            return (-argCount, 3);
         }
 
         /// <summary>

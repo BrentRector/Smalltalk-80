@@ -63,114 +63,104 @@ namespace Smalltalk80.Compiler
 
         /// <summary>
         /// Resolves a variable name to its type and bytecode index.
-        /// Follows the 9-step resolution priority from Variable-Indexing-Architecture.md Section 7.2.
+        /// Follows the 12-step resolution priority from Variable-Indexing-Architecture.md Section 7.2.
         /// </summary>
         /// <param name="varName">Variable name to resolve</param>
         /// <param name="context">Current compilation environment</param>
         /// <param name="allocator">Optional temp frame allocator for unified temp allocation</param>
         /// <returns>Resolution result with type, index, and assignability</returns>
-        /// <exception cref="InvalidOperationException">Thrown if variable not found in any scope</exception>
         public ResolutionResult ResolveVariable(string varName, CompilationEnvironment context, TempFrameAllocator? allocator = null)
         {
-            // Step 1: Check pseudo-variables first (highest priority, cannot be shadowed)
+            // Step 1: Pseudo-variables (highest priority, cannot be shadowed)
             var pseudoResult = TryResolvePseudoVariable(varName);
             if (pseudoResult.HasValue)
-            {
                 return pseudoResult.Value;
-            }
 
-            // Step 2-5: Try to resolve as temp variable using allocator (if provided)
-            // This is the unified temp frame approach for method args/temps and block temps
-            int slotIndex = -1;
-            bool allocatorHasVar = allocator != null && allocator.TryGetSlotIndex(varName, out slotIndex);
+            // Steps 2-5: Try unified temp frame resolution via allocator
+            var allocatorResult = TryResolveFromAllocator(varName, context, allocator);
+            if (allocatorResult.HasValue)
+                return allocatorResult.Value;
 
-            if (allocatorHasVar)
+            // Steps 2-6: Environment-based fallback (when allocator unavailable)
+            var envResult = TryResolveFromEnvironment(varName, context);
+            if (envResult.HasValue)
+                return envResult.Value;
+
+            // Steps 7-9: Instance, class, and pool variables
+            var fieldResult = TryResolveFieldVariable(varName, context);
+            if (fieldResult.HasValue)
+                return fieldResult.Value;
+
+            // Steps 10-11: Global resolution (class names, pool dictionaries, system globals)
+            var globalResult = TryResolveGlobalVariable(varName, context);
+            if (globalResult.HasValue)
+                return globalResult.Value;
+
+            // Step 12: Fallback - assume global variable (resolved at runtime)
+            return new ResolutionResult(
+                VariableType.Global,
+                -1,  // Literal index assigned by caller
+                true,  // Globals are assignable (via Smalltalk at:put:)
+                varName
+            );
+        }
+
+        /// <summary>
+        /// Steps 2-5: Try to resolve variable using the unified temp frame allocator.
+        /// Returns null if allocator is unavailable or variable not found.
+        /// </summary>
+        private ResolutionResult? TryResolveFromAllocator(string varName, CompilationEnvironment context, TempFrameAllocator? allocator)
+        {
+            if (allocator == null || !allocator.TryGetSlotIndex(varName, out int slotIndex))
+                return null;
+
+            // Check current scope arguments
+            if (context.LocalArgumentIndices.TryGetValue(varName, out _))
             {
-                // Allocator has the variable - determine type based on scope and dictionaries
-                // Check current scope first
-                if (context.LocalArgumentIndices.TryGetValue(varName, out int argIndex))
-                {
-                    // Distinguish between method arguments and block arguments
-                    if (context.ScopeDepth == 0)
-                    {
-                        // Method scope: This is a method argument (read-only pseudo-variable)
-                        return new ResolutionResult(
-                            VariableType.MethodArgument,
-                            slotIndex,  // Absolute unified frame index
-                            false,  // Method args are read-only
-                            varName
-                        );
-                    }
-                    else
-                    {
-                        // Block scope: This is a block argument (assignable per Blue Book)
-                        return new ResolutionResult(
-                            VariableType.BlockTemporary,
-                            slotIndex,  // Absolute unified frame index
-                            true,  // Block args ARE assignable
-                            varName
-                        );
-                    }
-                }
-
-                if (context.LocalTemporaryIndices.ContainsKey(varName))
-                {
-                    return new ResolutionResult(
-                        context.ScopeDepth > 0 ? VariableType.BlockTemporary : VariableType.MethodTemporary,
-                        slotIndex,
-                        true,  // All temps are assignable
-                        varName
-                    );
-                }
-
-                // Check parent scopes for the variable
-                var parentContext = context.Parent;
-                while (parentContext != null)
-                {
-                    if (parentContext.LocalArgumentIndices.ContainsKey(varName) || parentContext.LocalTemporaryIndices.ContainsKey(varName))
-                    {
-                        return new ResolutionResult(
-                            VariableType.ParentVariable,
-                            slotIndex,
-                            true,  // Parent variables are assignable
-                            varName
-                        );
-                    }
-                    parentContext = parentContext.Parent;
-                }
-
-                // CRITICAL FIX: If we reach here, allocator has variable but environment doesn't
-                // This indicates environment desynchronization during nested compilation
-                // Trust the allocator and infer variable type from scope depth
-                //
-                // UNIFIED TEMP FRAME: All variables (including block args) are in unified frame
-                // Infer type based on scope depth:
-                // - Block scope (depth > 0): BlockTemporary (includes former block args)
-                // - Method scope (depth == 0): MethodTemporary
-                VariableType inferredType;
-                if (context.ScopeDepth > 0)
-                {
-                    // Block scope: All variables are BlockTemporary (including former block args)
-                    inferredType = VariableType.BlockTemporary;
-                }
-                else
-                {
-                    // Method scope: Must be method temp (args already checked above at line 95)
-                    inferredType = VariableType.MethodTemporary;
-                }
-
-                return new ResolutionResult(
-                    inferredType,
-                    slotIndex,  // Use allocator's authoritative slot index
-                    true,  // Assume assignable (safe default - will be refined below)
-                    varName
-                );
+                return context.ScopeDepth == 0
+                    ? new ResolutionResult(VariableType.MethodArgument, slotIndex, false, varName)
+                    : new ResolutionResult(VariableType.BlockTemporary, slotIndex, true, varName);
             }
 
-            // FALLBACK: Use environment-based resolution (for backward compatibility)
-            // This path is taken when allocator is null or variable not found in allocator
+            // Check current scope temporaries
+            if (context.LocalTemporaryIndices.ContainsKey(varName))
+            {
+                var type = context.ScopeDepth > 0 ? VariableType.BlockTemporary : VariableType.MethodTemporary;
+                return new ResolutionResult(type, slotIndex, true, varName);
+            }
 
-            // Step 2: Check block-local variables (if in block)
+            // Check parent scopes
+            if (TryFindInParentScopes(varName, context))
+                return new ResolutionResult(VariableType.ParentVariable, slotIndex, true, varName);
+
+            // Allocator has variable but environment doesn't - infer type from scope depth
+            var inferredType = context.ScopeDepth > 0 ? VariableType.BlockTemporary : VariableType.MethodTemporary;
+            return new ResolutionResult(inferredType, slotIndex, true, varName);
+        }
+
+        /// <summary>
+        /// Check if a variable exists in any parent scope.
+        /// </summary>
+        private static bool TryFindInParentScopes(string varName, CompilationEnvironment context)
+        {
+            var parentContext = context.Parent;
+            while (parentContext != null)
+            {
+                if (parentContext.LocalArgumentIndices.ContainsKey(varName) ||
+                    parentContext.LocalTemporaryIndices.ContainsKey(varName))
+                    return true;
+                parentContext = parentContext.Parent;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Steps 2-6: Environment-based resolution fallback.
+        /// Used when allocator is unavailable or variable not found in allocator.
+        /// </summary>
+        private ResolutionResult? TryResolveFromEnvironment(string varName, CompilationEnvironment context)
+        {
+            // Step 2: Block-local variables
             if (context.ScopeDepth > 0)
             {
                 var blockResult = TryResolveBlockLocal(varName, context);
@@ -178,7 +168,7 @@ namespace Smalltalk80.Compiler
                     return blockResult.Value;
             }
 
-            // Step 3-4: Check parent scopes (hierarchical traversal for blocks)
+            // Steps 3-4: Parent scope variables
             if (context.ScopeDepth > 0 && context.Parent != null)
             {
                 var parentResult = TryResolveParentVariable(varName, context);
@@ -186,19 +176,24 @@ namespace Smalltalk80.Compiler
                     return parentResult.Value;
             }
 
-            // Step 5: Check method arguments
-            // IMPORTANT: Must traverse to method level to find method arguments
-            // Use OwnArguments to get method's own arguments (no inheritance)
+            // Steps 5-6: Method arguments and temporaries
+            return TryResolveMethodVariable(varName, context);
+        }
+
+        /// <summary>
+        /// Steps 5-6: Resolve method arguments and temporaries.
+        /// Traverses to method level and checks local dictionaries.
+        /// </summary>
+        private ResolutionResult? TryResolveMethodVariable(string varName, CompilationEnvironment context)
+        {
+            // Navigate to method scope
             var methodContext = context;
             while (methodContext.ScopeDepth > 0 && methodContext.Parent != null)
-            {
                 methodContext = methodContext.Parent;
-            }
 
+            // Step 5: Method arguments
             if (methodContext.LocalArgumentIndices.TryGetValue(varName, out int methodArgIndex))
             {
-                // Method arguments use DIRECT indices - NO hierarchical offset!
-                // VM will traverse home chain automatically to reach the method context
                 return new ResolutionResult(
                     VariableType.MethodArgument,
                     methodArgIndex,
@@ -207,17 +202,10 @@ namespace Smalltalk80.Compiler
                 );
             }
 
-            // Step 6: Check method temporaries
-            // Use OwnTemporaries to get method's own temps (0-based, no inheritance)
-            // (methodContext was computed in Step 5 above)
+            // Step 6: Method temporaries
             if (methodContext.LocalTemporaryIndices.TryGetValue(varName, out int methodTempIndex))
             {
-                // OwnTemporaries uses 0-based indexing within the method scope
-                // Need to add method's argument count to get position in temp frame
                 int baseIndex = methodContext.ArgumentCount + methodTempIndex;
-
-                // Method temps use DIRECT indices - NO hierarchical offset!
-                // VM will traverse home chain automatically to reach the method context
                 return new ResolutionResult(
                     VariableType.MethodTemporary,
                     baseIndex,
@@ -226,7 +214,15 @@ namespace Smalltalk80.Compiler
                 );
             }
 
-            // Step 7: Check instance variables
+            return null;
+        }
+
+        /// <summary>
+        /// Steps 7-9: Resolve instance, class, and pool variables.
+        /// </summary>
+        private ResolutionResult? TryResolveFieldVariable(string varName, CompilationEnvironment context)
+        {
+            // Step 7: Instance variables
             if (context.InstanceVariables.TryGetValue(varName, out int fieldIndex))
             {
                 return new ResolutionResult(
@@ -237,11 +233,9 @@ namespace Smalltalk80.Compiler
                 );
             }
 
-            // Step 8: Check class variables
+            // Step 8: Class variables
             if (context.ClassVariables.ContainsKey(varName))
             {
-                // Class variables are resolved via literal associations
-                // The actual literal index will be added by the caller
                 return new ResolutionResult(
                     VariableType.ClassVariable,
                     -1,  // Literal index assigned by caller
@@ -250,104 +244,98 @@ namespace Smalltalk80.Compiler
                 );
             }
 
-            // Step 9: Check pool dictionary variables
+            // Step 9: Pool dictionary variables
             if (context.PoolVariables.TryGetValue(varName, out object? poolDictName))
             {
-                // Pool variables are resolved via literal associations
-                // The actual literal index will be added by the caller
-                // Extract the pool dictionary name from the stored value
-                string? poolDictionaryName = poolDictName as string;
-
                 return new ResolutionResult(
                     VariableType.PoolVariable,
                     -1,  // Literal index assigned by caller
                     true,  // Pool variables are assignable (via Association value:)
                     varName,
-                    poolDictionaryName
+                    poolDictName as string
                 );
             }
 
-            // Step 10: Check if this is a defined class name (before treating as pool variable)
-            // Class names should be treated as globals, not pool variables
-            if (context.KnownClassNames != null && context.KnownClassNames.Contains(varName))
+            return null;
+        }
+
+        /// <summary>
+        /// Steps 10-11: Resolve global variables (class names, pool dictionaries, system globals).
+        /// </summary>
+        private ResolutionResult? TryResolveGlobalVariable(string varName, CompilationEnvironment context)
+        {
+            // Step 10: Known class names
+            if (context.KnownClassNames?.Contains(varName) == true)
             {
                 return new ResolutionResult(
                     VariableType.Global,
-                    -1,  // Literal index assigned by caller
-                    false,  // Class names are read-only (cannot assign to them)
+                    -1,
+                    false,  // Class names are read-only
                     varName
                 );
             }
 
-            // Step 10b: Check if this is a pool dictionary name (before treating as pool variable)
-            // Pool dictionary names (like 'FilePool') are global variables containing Dictionary instances
-            if (context.KnownPoolDictionaryNames != null && context.KnownPoolDictionaryNames.Contains(varName))
+            // Step 10b: Known pool dictionary names
+            if (context.KnownPoolDictionaryNames?.Contains(varName) == true)
             {
                 return new ResolutionResult(
                     VariableType.Global,
-                    -1,  // Literal index assigned by caller
-                    true,  // Pool dictionary names are assignable (e.g., FilePool _ Dictionary new)
+                    -1,
+                    true,  // Pool dictionary names are assignable
                     varName
                 );
             }
 
-            // Step 10c: Check for well-known system globals that should never be pool variables
+            // Step 10c: Well-known system globals
             if (WellKnownGlobals.Contains(varName))
             {
                 return new ResolutionResult(
                     VariableType.Global,
-                    -1,  // Literal index assigned by caller
+                    -1,
                     true,  // System globals need to be assignable during initialization
                     varName
                 );
             }
 
-            // Step 11: Check if class has pool dictionaries and assume undefined variables are pool variables
-            // For offline compiler: if the class declares pool dictionaries, undefined variables
-            // should be treated as pool variable references (they'll be resolved at runtime)
-            // IMPORTANT: The pool dictionary NAME itself (e.g., "TextConstants") should be treated as
-            // a global variable, NOT as a pool variable!
-            if (context.PoolVariables.TryGetValue("__HAS_POOLS__", out object? poolNamesObj))
+            // Step 11: Infer pool variable from class pool dictionaries
+            return TryResolveFromPoolDictionaries(varName, context);
+        }
+
+        /// <summary>
+        /// Step 11: Check if variable should be treated as pool variable based on class pool dictionaries.
+        /// </summary>
+        private ResolutionResult? TryResolveFromPoolDictionaries(string varName, CompilationEnvironment context)
+        {
+            if (!context.PoolVariables.TryGetValue("__HAS_POOLS__", out object? poolNamesObj))
+                return null;
+
+            string poolNames = poolNamesObj as string ?? "";
+            string[] pools = poolNames.Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+            // Check if variable is a pool dictionary name itself
+            if (pools.Contains(varName))
             {
-                // Extract pool dictionary names from the marker
-                string poolNames = poolNamesObj as string ?? "";
-                string[] pools = poolNames.Split(',', StringSplitOptions.RemoveEmptyEntries);
-
-                // Check if this variable is actually a pool dictionary name itself
-                if (pools.Contains(varName))
-                {
-                    return new ResolutionResult(
-                        VariableType.Global,
-                        -1,  // Literal index assigned by caller
-                        true,  // Pool dictionaries are assignable globals
-                        varName
-                    );
-                }
-
-                if (pools.Length > 0)
-                {
-                    // Assume the variable is from the first pool dictionary
-                    // (In reality, it could be from any of them, but we don't know at compile time)
-                    string assumedPoolDict = pools[0];
-
-                    return new ResolutionResult(
-                        VariableType.PoolVariable,
-                        -1,  // Literal index assigned by caller
-                        true,  // Pool variables are assignable (via Association value:)
-                        varName,
-                        assumedPoolDict  // Pool dictionary name
-                    );
-                }
+                return new ResolutionResult(
+                    VariableType.Global,
+                    -1,
+                    true,  // Pool dictionaries are assignable globals
+                    varName
+                );
             }
 
-            // Step 12: Fallback - assume global variable (will be resolved at runtime)
-            // Global variables are stored as Associations in Smalltalk dictionary
-            return new ResolutionResult(
-                VariableType.Global,
-                -1,  // Literal index assigned by caller
-                true,  // Globals are assignable (via Smalltalk at:put:)
-                varName
-            );
+            // Assume variable is from first pool dictionary
+            if (pools.Length > 0)
+            {
+                return new ResolutionResult(
+                    VariableType.PoolVariable,
+                    -1,
+                    true,  // Pool variables are assignable
+                    varName,
+                    pools[0]
+                );
+            }
+
+            return null;
         }
 
         /// <summary>
