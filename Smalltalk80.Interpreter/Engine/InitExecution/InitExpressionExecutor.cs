@@ -38,7 +38,7 @@ public class InitExpressionExecutor
         VMMetadata metadata,
         IDiagnosticHub? diagnostics = null,
         InitPolicy policy = InitPolicy.AbortOnFirstError,
-        int defaultTimeoutMs = Smalltalk80.Interpreter.InterpreterConstants.DefaultInitExpressionTimeoutMs)
+        int defaultTimeoutMs = 5000)  // See InterpreterConstants.DefaultInitExpressionTimeoutMs
     {
         _heapManager = heapManager;
         _vm = vm;
