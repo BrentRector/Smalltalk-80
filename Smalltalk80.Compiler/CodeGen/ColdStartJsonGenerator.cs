@@ -990,13 +990,6 @@ public sealed partial class ColdStartJsonGenerator(string sourceFileDescription)
             }
         }
 
-        int newCount = _associations.Count;
-        int added = newCount - existingCount;
-
-        if (added > 0)
-        {
-            Console.WriteLine($"[ColdStartJsonGenerator] Added {added} class variable Association(s) not referenced in method literals (total: {newCount})");
-        }
     }
 
     /// <summary>

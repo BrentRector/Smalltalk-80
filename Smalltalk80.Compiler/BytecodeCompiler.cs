@@ -360,11 +360,6 @@ namespace Smalltalk80.Compiler
                 VariableSlotMap = allocator.GetAllAllocatedVariables()
             };
 
-            if (selector == "hasInterned:ifTrue:" && compiledMethod.VariableSlotMap is { Count: > 0 })
-            {
-                Console.WriteLine($"[VAR SLOTS] {selector}: {string.Join(", ", compiledMethod.VariableSlotMap.Select(kvp => $"{kvp.Key}={kvp.Value}"))}");
-            }
-
             return compiledMethod;
         }
 
