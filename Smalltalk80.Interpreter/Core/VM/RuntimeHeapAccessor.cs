@@ -18,6 +18,9 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     // Caching layer (invalidated by primitive 89)
     private readonly RuntimeClassCache _classCache;
 
+    // Dictionary operations service
+    private readonly RuntimeDictionaryService _dictService;
+
     // Cached CharacterTable OOP (invalidated by primitive 89)
     private SmalltalkOOP _characterTableCache;
     private bool _characterTableCacheValid = false;
@@ -31,6 +34,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
         _heapManager = heapManager;
         this.metadata = metadata;
         _classCache = new RuntimeClassCache(this, heapManager);
+        _dictService = new RuntimeDictionaryService(heapManager);
 
         // Initialize cache fields to Nil
         _characterTableCache = heapManager.GetNil();
@@ -604,4 +608,103 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
         }
         return result;
     }
+
+    #region Canonical Global Lookup (Smalltalk → Undeclared → undefined)
+
+    /// <summary>
+    /// Looks up a global variable following the canonical Smalltalk-80 lookup chain:
+    /// 1. Search SystemDictionary (Smalltalk)
+    /// 2. If not found, search Undeclared
+    /// 3. If found in Undeclared and migrate=true, move it to SystemDictionary
+    /// 4. If not found anywhere, return nil
+    /// </summary>
+    public virtual SmalltalkOOP LookupGlobalAssociation(string globalName, bool migrate = false)
+    {
+        var systemDictOOP = metadata.KnownObjects.Smalltalk;
+        var nilOOP = metadata.KnownObjects.Nil;
+
+        // Step 1: Search SystemDictionary first
+        var assocOOP = _dictService.FindAssociationByName(systemDictOOP, globalName);
+        if (assocOOP != nilOOP)
+        {
+            return assocOOP;
+        }
+
+        // Step 2: Search Undeclared
+        var undeclaredOOP = _dictService.LookupValueByName(systemDictOOP, "Undeclared");
+        if (undeclaredOOP == nilOOP)
+        {
+            return nilOOP;  // Undeclared doesn't exist
+        }
+
+        assocOOP = _dictService.FindAssociationByName(undeclaredOOP, globalName);
+        if (assocOOP == nilOOP)
+        {
+            return nilOOP;  // Not found anywhere
+        }
+
+        // Step 3: If migrate=true, move from Undeclared to SystemDictionary
+        if (migrate)
+        {
+            var keySymbolOOP = _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            _dictService.InstallAssociation(systemDictOOP, assocOOP, keySymbolOOP);
+            _dictService.RemoveAssociation(undeclaredOOP, keySymbolOOP);
+        }
+
+        return assocOOP;
+    }
+
+    /// <summary>
+    /// Looks up a global variable's value following the canonical lookup chain.
+    /// </summary>
+    public virtual SmalltalkOOP LookupGlobalValue(string globalName)
+    {
+        var assocOOP = LookupGlobalAssociation(globalName, migrate: false);
+        if (assocOOP == metadata.KnownObjects.Nil)
+        {
+            return metadata.KnownObjects.Nil;
+        }
+        return _heapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+    }
+
+    /// <summary>
+    /// Sets a global variable's value, creating the Association if necessary.
+    /// Follows the canonical lookup chain and migrates from Undeclared if found there.
+    /// </summary>
+    public virtual SmalltalkOOP SetGlobalValue(string globalName, SmalltalkOOP valueOOP)
+    {
+        var systemDictOOP = metadata.KnownObjects.Smalltalk;
+        var nilOOP = metadata.KnownObjects.Nil;
+
+        // Look up with migration enabled (moves from Undeclared to SystemDictionary)
+        var assocOOP = LookupGlobalAssociation(globalName, migrate: true);
+
+        if (assocOOP != nilOOP)
+        {
+            // Found existing Association - update its value
+            _heapManager.SetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
+            return assocOOP;
+        }
+
+        // Not found anywhere - create new Association
+        var keySymbolOOP = InternSymbol(globalName);
+        if (keySymbolOOP == nilOOP)
+        {
+            throw new InvalidOperationException($"Symbol '{globalName}' not found in USTable");
+        }
+
+        // Allocate new Association
+        var associationClassOOP = GetClass("Association");
+        assocOOP = _heapManager.AllocateObject(ObjectFormat.Pointer, fixedSlots: 2, indexedSize: 0);
+        _heapManager.SetClassOOP(assocOOP, associationClassOOP);
+        _heapManager.SetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX, keySymbolOOP);
+        _heapManager.SetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX, valueOOP);
+
+        // Install in SystemDictionary
+        _dictService.InstallAssociation(systemDictOOP, assocOOP, keySymbolOOP);
+
+        return assocOOP;
+    }
+
+    #endregion
 }

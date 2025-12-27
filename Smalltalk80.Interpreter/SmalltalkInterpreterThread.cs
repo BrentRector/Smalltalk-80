@@ -480,148 +480,16 @@ public class SmalltalkInterpreterThread
 
     /// <summary>
     /// Looks up a global variable in the Smalltalk dictionary at runtime.
-    /// This is the runtime-safe way to access globals (not using GlobalRegistry).
-    /// Uses hash-based lookup for O(1) average case performance.
+    /// Uses the canonical Smalltalk-80 lookup chain: SystemDictionary → Undeclared.
     /// </summary>
     private SmalltalkOOP LookupGlobal(string globalName)
     {
-        // Get Smalltalk global dictionary from VMMetadata (runtime-safe)
-        var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
-
-        // Find the symbol OOP for the global name (linear search through dictionary)
-        var symbolOOP = FindSymbol(globalName);
-        if (symbolOOP == _context.HeapManager.GetNil())
-        {
-            throw new InvalidOperationException($"Global '{globalName}' not found - symbol does not exist");
-        }
-
-        // Use hash-based dictionary lookup now that we have the symbol OOP
-        var valueOOP = HashBasedDictionaryLookup(smalltalkOOP, symbolOOP);
+        var valueOOP = _vm!.RuntimeHeapAccess.LookupGlobalValue(globalName);
         if (valueOOP == _context.HeapManager.GetNil())
         {
-            throw new InvalidOperationException($"Global '{globalName}' not found in Smalltalk dictionary");
+            throw new InvalidOperationException($"Global '{globalName}' not found");
         }
-
         return valueOOP;
-    }
-
-    /// <summary>
-    /// Hash-based dictionary lookup using Smalltalk-80 Dictionary>>findKeyOrNil: semantics.
-    /// Uses identity hash of the key OOP and linear probing.
-    /// </summary>
-    private SmalltalkOOP HashBasedDictionaryLookup(SmalltalkOOP dictOOP, SmalltalkOOP keyOOP)
-    {
-        var heap = _context.HeapManager;
-        int size = heap.GetIndexedSize(dictOOP);
-        if (size == 0) return heap.GetNil();
-
-        var nilOOP = heap.GetNil();
-
-        // Hash-based lookup: start at hash slot, linear probe until found or nil
-        int startIndex = IdentityHashUtility.ComputeDictionaryHashIndex(keyOOP, size);
-        int index = startIndex;
-
-        do
-        {
-            var associationOOP = heap.GetIndexedOOP(dictOOP, index);
-
-            // Empty slot - key not in dictionary
-            if (associationOOP == nilOOP)
-                return nilOOP;
-
-            // Get the key from the Association
-            if (!associationOOP.IsSmallInteger)
-            {
-                var assocKeyOOP = heap.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-                if (assocKeyOOP == keyOOP)  // Identity comparison for Symbols
-                {
-                    return heap.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-                }
-            }
-
-            // Linear probe to next slot
-            index = (index + 1) % size;
-        } while (index != startIndex);
-
-        return nilOOP;  // Wrapped around - not found
-    }
-
-    /// <summary>
-    /// Finds a symbol OOP by searching through Smalltalk dictionary keys at runtime.
-    /// This finds symbols used as global names (classes, global variables).
-    /// Runtime-safe: only accesses heap via ISmalltalkHeap interface.
-    /// </summary>
-    private SmalltalkOOP FindSymbol(string symbolText)
-    {
-        var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
-        int size = _context.HeapManager.GetIndexedSize(smalltalkOOP);
-
-        // Linear search through all associations in the Smalltalk dictionary
-        for (int i = 0; i < size; i++)
-        {
-            var assocOOP = _context.HeapManager.GetIndexedOOP(smalltalkOOP, i);
-            if (assocOOP == _context.HeapManager.GetNil())
-                continue;
-
-            // Get key (Symbol) from the association
-            var keyOOP = _context.HeapManager.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            if (keyOOP == _context.HeapManager.GetNil())
-                continue;
-
-            // Check if this Symbol matches the text we're looking for
-            var keyString = ExtractSymbolString(keyOOP);
-            if (keyString == symbolText)
-            {
-                return keyOOP;
-            }
-        }
-
-        return _context.HeapManager.GetNil();
-    }
-
-    /// <summary>
-    /// Extracts the string value from a Symbol OOP.
-    /// </summary>
-    private string ExtractSymbolString(SmalltalkOOP symbolOOP)
-    {
-        int size = _context.HeapManager.GetIndexedSize(symbolOOP);
-        var bytes = new byte[size];
-
-        for (int i = 0; i < size; i++)
-        {
-            bytes[i] = _context.HeapManager.GetIndexedByte(symbolOOP, i);
-        }
-
-        return System.Text.Encoding.UTF8.GetString(bytes);
-    }
-
-    /// <summary>
-    /// Looks up a global by string name, returning nil if not found.
-    /// Runtime-safe: uses string comparison instead of symbol OOP matching.
-    /// </summary>
-    private SmalltalkOOP LookupGlobalByString(SmalltalkOOP systemDictOOP, string globalName)
-    {
-        var heap = _context.HeapManager;
-        int size = heap.GetIndexedSize(systemDictOOP);
-
-        for (int i = 0; i < size; i++)
-        {
-            var assocOOP = heap.GetIndexedOOP(systemDictOOP, i);
-            if (assocOOP == heap.GetNil())
-                continue;
-
-            var keyOOP = heap.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            if (keyOOP == heap.GetNil())
-                continue;
-
-            var keyString = ExtractSymbolString(keyOOP);
-            if (keyString == globalName)
-            {
-                return heap.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
-            }
-        }
-
-        return heap.GetNil();
     }
 
     private string GetClassName(SmalltalkOOP classOOP)
@@ -709,259 +577,22 @@ public class SmalltalkInterpreterThread
 
     /// <summary>
     /// Installs ScheduledControllers global at runtime.
-    /// Runtime-safe: uses heap lookup instead of AssociationRegistry.
-    ///
-    /// The canonical Association for ScheduledControllers was created during cold start (Phase 3)
-    /// and installed in SystemDictionary with nil value (Phase 5). Method literals point to this
-    /// same Association object. We just need to find it and update its value.
+    /// Uses the canonical Smalltalk-80 lookup chain: SystemDictionary → Undeclared → create new.
+    /// The canonical Association was created during cold start and installed in SystemDictionary.
+    /// Method literals point to this same Association object.
     /// </summary>
     private void InstallScheduledControllersGlobal(SmalltalkOOP controlManagerOOP)
     {
         const string globalName = "ScheduledControllers";
-        var heap = _context.HeapManager;
-        var systemDictOOP = _context.VMMetadata.KnownObjects.Smalltalk;
 
-        // FIRST: Look for existing Association in SystemDictionary (Phase 5 installed it there)
-        // This is the canonical Association that method literals reference
-        var (associationOOP, keySymbolOOP) = FindAssociationByName(systemDictOOP, globalName);
-
-        if (associationOOP != heap.GetNil())
-        {
-            // Found canonical Association in SystemDictionary - just update its value
-            // This is the same Association object that method literals point to
-            heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, controlManagerOOP);
-            Console.WriteLine($"    ✓ Updated existing {globalName} Association with ControlManager");
-            return;
-        }
-
-        // FALLBACK: Check Undeclared in case Phase 5 didn't install it
-        var undeclaredOOP = LookupGlobalByString(systemDictOOP, "Undeclared");
-        if (undeclaredOOP != heap.GetNil())
-        {
-            (associationOOP, keySymbolOOP) = FindAssociationByName(undeclaredOOP, globalName);
-            if (associationOOP != heap.GetNil())
-            {
-                // Found in Undeclared - update value and migrate to SystemDictionary
-                heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, controlManagerOOP);
-                InstallAssociationInDictionary(systemDictOOP, associationOOP, keySymbolOOP, globalName);
-                RemoveFromDictionary(undeclaredOOP, keySymbolOOP, globalName);
-                Console.WriteLine($"    ✓ Migrated {globalName} from Undeclared to SystemDictionary");
-                return;
-            }
-        }
-
-        // LAST RESORT: Create new Association at runtime (shouldn't normally happen)
-        Console.WriteLine($"    WARNING: {globalName} Association not found, creating new one");
-        keySymbolOOP = _vm!.RuntimeHeapAccess.InternSymbol(globalName);
-        if (keySymbolOOP == heap.GetNil())
-        {
-            throw new InvalidOperationException($"Symbol '{globalName}' not found in USTable");
-        }
-
-        var associationClassOOP = _vm!.RuntimeHeapAccess.GetClass("Association");
-        associationOOP = heap.AllocateObject(ObjectFormat.Pointer, fixedSlots: 2, indexedSize: 0);
-        heap.SetClassOOP(associationOOP, associationClassOOP);
-        heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX, keySymbolOOP);
-        heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, controlManagerOOP);
-
-        InstallAssociationInDictionary(systemDictOOP, associationOOP, keySymbolOOP, globalName);
+        // Use the canonical global lookup and set API
+        // This handles: SystemDictionary lookup → Undeclared fallback → migration → creation
+        _vm!.RuntimeHeapAccess.SetGlobalValue(globalName, controlManagerOOP);
+        Console.WriteLine($"    ✓ Installed {globalName} global with ControlManager");
     }
 
-    /// <summary>
-    /// Finds an Association by key name in a dictionary, returning both the Association and its key symbol.
-    /// Uses linear search with string comparison for runtime flexibility.
-    /// </summary>
-    private (SmalltalkOOP association, SmalltalkOOP keySymbol) FindAssociationByName(SmalltalkOOP dictOOP, string keyName)
-    {
-        var heap = _context.HeapManager;
-        int size = heap.GetIndexedSize(dictOOP);
-
-        for (int i = 0; i < size; i++)
-        {
-            var assocOOP = heap.GetIndexedOOP(dictOOP, i);
-            if (assocOOP == heap.GetNil())
-                continue;
-
-            var keyOOP = heap.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-            if (keyOOP == heap.GetNil())
-                continue;
-
-            var keyString = ExtractSymbolString(keyOOP);
-            if (keyString == keyName)
-            {
-                return (assocOOP, keyOOP);
-            }
-        }
-
-        return (heap.GetNil(), heap.GetNil());
-    }
-
-    /// <summary>
-    /// Installs an Association in a dictionary using hash-based slot finding.
-    /// Runtime version of DictionaryOperations.InstallAssociation.
-    /// </summary>
-    private void InstallAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP associationOOP,
-        SmalltalkOOP keySymbolOOP, string keyName)
-    {
-        var heap = _context.HeapManager;
-        int dictSize = heap.GetIndexedSize(dictionaryOOP);
-        var nilOOP = heap.GetNil();
-
-        // Use identity hash for symbol lookup
-        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
-
-        // Probe for nil slot or matching key (linear probing)
-        int startLocation = location;
-        bool incrementTally = true;
-
-        while (true)
-        {
-            var probe = heap.GetIndexedOOP(dictionaryOOP, location);
-
-            if (probe == nilOOP)
-            {
-                // Found empty slot - install association
-                heap.SetIndexedOOP(dictionaryOOP, location, associationOOP);
-
-                // Increment tally
-                if (incrementTally)
-                {
-                    var currentTallyOOP = heap.GetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX);
-                    if (currentTallyOOP.IsSmallInteger)
-                    {
-                        int newTally = currentTallyOOP.AsSmallInteger() + 1;
-                        heap.SetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(newTally));
-                    }
-                }
-
-                return;
-            }
-
-            // Check if Association with same key already exists
-            var probeKeyOOP = heap.GetInstanceVariable(probe, 0);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                // Replace existing
-                heap.SetIndexedOOP(dictionaryOOP, location, associationOOP);
-                return;
-            }
-
-            // Linear probe
-            location = (location + 1) % dictSize;
-
-            if (location == startLocation)
-            {
-                throw new InvalidOperationException(
-                    $"Dictionary is full - cannot install '{keyName}' association");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Removes an Association from a dictionary (for Undeclared cleanup).
-    /// Runtime version of DictionaryOperations.RemoveAssociation.
-    /// </summary>
-    private void RemoveFromDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbolOOP, string keyName)
-    {
-        var heap = _context.HeapManager;
-        var nilOOP = heap.GetNil();
-        int dictSize = heap.GetIndexedSize(dictionaryOOP);
-
-        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
-        int startLocation = location;
-
-        while (true)
-        {
-            var probe = heap.GetIndexedOOP(dictionaryOOP, location);
-
-            if (probe == nilOOP)
-            {
-                // Not found
-                return;
-            }
-
-            var probeKeyOOP = heap.GetInstanceVariable(probe, 0);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                // Found - remove
-                heap.SetIndexedOOP(dictionaryOOP, location, nilOOP);
-
-                // Decrement tally
-                var tallyOOP = heap.GetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX);
-                if (tallyOOP.IsSmallInteger)
-                {
-                    int tally = tallyOOP.AsSmallInteger();
-                    heap.SetInstanceVariable(dictionaryOOP, VMConstants.DICTIONARY_TALLY_INDEX, SmalltalkOOP.FromSmallInteger(tally - 1));
-                }
-
-                // Fix probe chain
-                FixCollisionsFrom(dictionaryOOP, location);
-                return;
-            }
-
-            location = (location + 1) % dictSize;
-
-            if (location == startLocation)
-            {
-                return; // Not found after full scan
-            }
-        }
-    }
-
-    /// <summary>
-    /// Repairs the linear probing chain after removing an entry.
-    /// Runtime version of DictionaryOperations.FixCollisionsFrom.
-    /// </summary>
-    private void FixCollisionsFrom(SmalltalkOOP dictionaryOOP, int startIndex)
-    {
-        var heap = _context.HeapManager;
-        var nilOOP = heap.GetNil();
-        int dictSize = heap.GetIndexedSize(dictionaryOOP);
-        int oldIndex = startIndex;
-
-        while (true)
-        {
-            oldIndex = (oldIndex + 1) % dictSize;
-            var nextObject = heap.GetIndexedOOP(dictionaryOOP, oldIndex);
-
-            if (nextObject == nilOOP)
-                break;
-
-            // Find where this Association SHOULD be
-            var keyOOP = heap.GetInstanceVariable(nextObject, 0);
-            int nextIndex = IdentityHashUtility.ComputeHashIndex(keyOOP, dictSize);
-
-            // Linear probe to find correct slot
-            int probeCount = 0;
-            while (true)
-            {
-                var probe = heap.GetIndexedOOP(dictionaryOOP, nextIndex);
-
-                if (probe == nilOOP || probe == nextObject)
-                    break;
-
-                var probeKeyOOP = heap.GetInstanceVariable(probe, 0);
-                if (probeKeyOOP == keyOOP)
-                    break;
-
-                nextIndex = (nextIndex + 1) % dictSize;
-                probeCount++;
-
-                if (probeCount >= dictSize)
-                {
-                    throw new InvalidOperationException(
-                        "FixCollisionsFrom: Cannot find slot for Association during rehash");
-                }
-            }
-
-            // Move if displaced
-            if (nextIndex != oldIndex)
-            {
-                heap.SetIndexedOOP(dictionaryOOP, nextIndex, nextObject);
-                heap.SetIndexedOOP(dictionaryOOP, oldIndex, nilOOP);
-            }
-        }
-    }
+    // NOTE: Dictionary operations are now in RuntimeDictionaryService
+    // Use _vm.RuntimeHeapAccess for canonical global lookup operations
 
     /// <summary>
     /// Dumps Float class variables to verify they have initialized values (NOT nil).
@@ -973,25 +604,16 @@ public class SmalltalkInterpreterThread
         try
         {
             var heap = _context.HeapManager;
-            var smalltalkOOP = _context.VMMetadata.KnownObjects.Smalltalk;
 
-            // Find Float class in Smalltalk dictionary
-            var floatSymbol = FindSymbol("Float");
-            if (floatSymbol == heap.GetNil())
+            // Find Float class using runtime heap access
+            var floatClassOOP = _vm!.RuntimeHeapAccess.GetClass("Float");
+            if (floatClassOOP == heap.GetNil())
             {
-                Console.WriteLine("  ERROR: 'Float' symbol not found!");
+                Console.WriteLine("  ERROR: Float class not found!");
                 return;
             }
 
-            var floatAssoc = FindAssociationInDictionary(smalltalkOOP, floatSymbol);
-            if (floatAssoc == heap.GetNil())
-            {
-                Console.WriteLine("  ERROR: Float Association not found in Smalltalk!");
-                return;
-            }
-
-            var floatClassOOP = heap.GetInstanceVariable(floatAssoc, VMConstants.ASSOCIATION_VALUE_INDEX);
-            var classPoolOOP = heap.GetInstanceVariable(floatClassOOP, 7); // classPool is instance var 7 in Class (NOT 3!)
+            var classPoolOOP = heap.GetInstanceVariable(floatClassOOP, 7); // classPool is instance var 7 in Class
             int poolSize = heap.GetIndexedSize(classPoolOOP);
 
             Console.WriteLine($"  Float classPool size: {poolSize}");
@@ -1008,8 +630,7 @@ public class SmalltalkInterpreterThread
                     var keyOOP = heap.GetInstanceVariable(entry, VMConstants.ASSOCIATION_KEY_INDEX);
                     var valueOOP = heap.GetInstanceVariable(entry, VMConstants.ASSOCIATION_VALUE_INDEX);
 
-                    // Try to get key as string (it's a Symbol) - extract bytes manually
-                    string keyStr = GetSymbolString(keyOOP);
+                    string keyStr = heap.GetClassName(keyOOP); // Symbols have their text as "class name"
                     string valueStr = valueOOP == heap.GetNil() ? "nil" :
                                       valueOOP.IsSmallInteger ? $"SmallInteger({valueOOP.AsSmallInteger()})" :
                                       $"Object({valueOOP})";
@@ -1023,61 +644,6 @@ public class SmalltalkInterpreterThread
         catch (Exception ex)
         {
             Console.WriteLine($"  ERROR during diagnostic: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Finds an Association in a dictionary using hash-based probing.
-    /// Returns the Association OOP if found, or nil if not found.
-    /// </summary>
-    private string GetSymbolString(SmalltalkOOP symbolOOP)
-    {
-        var heap = _context.HeapManager;
-        int size = heap.GetIndexedSize(symbolOOP);
-        var bytes = new byte[size];
-        for (int i = 0; i < size; i++)
-        {
-            bytes[i] = heap.GetIndexedByte(symbolOOP, i);
-        }
-        return System.Text.Encoding.Latin1.GetString(bytes);
-    }
-
-    private SmalltalkOOP FindAssociationInDictionary(SmalltalkOOP dictionaryOOP, SmalltalkOOP keySymbolOOP)
-    {
-        var heap = _context.HeapManager;
-        var nilOOP = heap.GetNil();
-        int dictSize = heap.GetIndexedSize(dictionaryOOP);
-
-        // Use identity hash for symbol lookup
-        int location = IdentityHashUtility.ComputeHashIndex(keySymbolOOP, dictSize);
-        int startLocation = location;
-
-        while (true)
-        {
-            var probe = heap.GetIndexedOOP(dictionaryOOP, location);
-
-            if (probe == nilOOP)
-            {
-                // Not found - reached empty slot
-                return nilOOP;
-            }
-
-            // Check if this Association's key matches
-            var probeKeyOOP = heap.GetInstanceVariable(probe, VMConstants.ASSOCIATION_KEY_INDEX);
-            if (probeKeyOOP == keySymbolOOP)
-            {
-                // Found - return the Association
-                return probe;
-            }
-
-            // Linear probe to next slot
-            location = (location + 1) % dictSize;
-
-            if (location == startLocation)
-            {
-                // Wrapped around - not found
-                return nilOOP;
-            }
         }
     }
 
@@ -1137,7 +703,7 @@ public class SmalltalkInterpreterThread
                 // Likely an Association
                 var keyOOP = heap.GetInstanceVariable(oop, 0);
                 var valueOOP = heap.GetInstanceVariable(oop, 1);
-                string keyStr = GetSymbolString(keyOOP);
+                string keyStr = heap.GetClassName(keyOOP); // Use heap method for symbol string
                 string valueStr = valueOOP == heap.GetNil() ? "nil" : valueOOP.ToString();
                 return $"Association(key: '{keyStr}', value: {valueStr}) OOP={oop}";
             }
