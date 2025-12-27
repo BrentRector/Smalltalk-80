@@ -708,45 +708,86 @@ public class SmalltalkInterpreterThread
     }
 
     /// <summary>
-    /// Installs ScheduledControllers global using the canonical Association from cold start.
-    /// This follows the same pattern as SystemDictionaryInstaller:
-    /// 1. Get canonical Association from AssociationRegistry
-    /// 2. Set its value to the ControlManager instance
-    /// 3. Install in SystemDictionary using hash-based insertion
+    /// Installs ScheduledControllers global at runtime.
+    /// Runtime-safe: uses heap lookup instead of AssociationRegistry.
+    /// 1. Look for existing Association in Undeclared (forward reference from compilation)
+    /// 2. If found, update value and migrate to SystemDictionary
+    /// 3. If not found, create new Association at runtime
     /// </summary>
     private void InstallScheduledControllersGlobal(SmalltalkOOP controlManagerOOP)
     {
         const string globalName = "ScheduledControllers";
         var heap = _context.HeapManager;
+        var systemDictOOP = _context.VMMetadata.KnownObjects.Smalltalk;
 
-        // Get canonical Association from AssociationRegistry (created during method compilation)
-        var allAssociations = AssociationRegistry.GetAll();
-        if (!allAssociations.TryGetValue(globalName, out var associationOOP))
+        // Look for existing Association in Undeclared (forward references go there during compilation)
+        var undeclaredOOP = LookupGlobalByString(systemDictOOP, "Undeclared");
+        SmalltalkOOP associationOOP = heap.GetNil();
+        SmalltalkOOP keySymbolOOP = heap.GetNil();
+
+        if (undeclaredOOP != heap.GetNil())
         {
-            throw new InvalidOperationException(
-                $"Canonical Association for '{globalName}' not found in AssociationRegistry. " +
-                "This symbol should have been registered during method compilation.");
+            // Search Undeclared for ScheduledControllers Association
+            (associationOOP, keySymbolOOP) = FindAssociationByName(undeclaredOOP, globalName);
         }
 
-        // Console.WriteLine($"      Found canonical Association: {associationOOP}");
+        if (associationOOP == heap.GetNil())
+        {
+            // Not in Undeclared - create new Association at runtime
+            // First, intern the symbol
+            keySymbolOOP = _vm!.RuntimeHeapAccess.InternSymbol(globalName);
+            if (keySymbolOOP == heap.GetNil())
+            {
+                throw new InvalidOperationException($"Symbol '{globalName}' not found in USTable");
+            }
+
+            // Allocate Association object (2 instance variables: key, value)
+            var associationClassOOP = _vm!.RuntimeHeapAccess.GetClass("Association");
+            associationOOP = heap.AllocateObject(ObjectFormat.Pointer, fixedSlots: 2, indexedSize: 0);
+            heap.SetClassOOP(associationOOP, associationClassOOP);
+            heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX, keySymbolOOP);
+        }
 
         // Set the Association's value to the ControlManager instance
         heap.SetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX, controlManagerOOP);
 
-        // Get the key symbol from the Association for hash calculation
-        var keySymbolOOP = heap.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_KEY_INDEX);
-
         // Install in SystemDictionary using hash-based insertion
-        var systemDictOOP = _context.VMMetadata.KnownObjects.Smalltalk;
         InstallAssociationInDictionary(systemDictOOP, associationOOP, keySymbolOOP, globalName);
 
-        // Remove from Undeclared dictionary (proper migration)
-        // Look up Undeclared from SystemDictionary at runtime
-        var undeclaredOOP = LookupGlobalByString(systemDictOOP, "Undeclared");
+        // Remove from Undeclared dictionary if it was there
         if (undeclaredOOP != heap.GetNil())
         {
             RemoveFromDictionary(undeclaredOOP, keySymbolOOP, globalName);
         }
+    }
+
+    /// <summary>
+    /// Finds an Association by key name in a dictionary, returning both the Association and its key symbol.
+    /// Uses linear search with string comparison for runtime flexibility.
+    /// </summary>
+    private (SmalltalkOOP association, SmalltalkOOP keySymbol) FindAssociationByName(SmalltalkOOP dictOOP, string keyName)
+    {
+        var heap = _context.HeapManager;
+        int size = heap.GetIndexedSize(dictOOP);
+
+        for (int i = 0; i < size; i++)
+        {
+            var assocOOP = heap.GetIndexedOOP(dictOOP, i);
+            if (assocOOP == heap.GetNil())
+                continue;
+
+            var keyOOP = heap.GetInstanceVariable(assocOOP, VMConstants.ASSOCIATION_KEY_INDEX);
+            if (keyOOP == heap.GetNil())
+                continue;
+
+            var keyString = ExtractSymbolString(keyOOP);
+            if (keyString == keyName)
+            {
+                return (assocOOP, keyOOP);
+            }
+        }
+
+        return (heap.GetNil(), heap.GetNil());
     }
 
     /// <summary>
