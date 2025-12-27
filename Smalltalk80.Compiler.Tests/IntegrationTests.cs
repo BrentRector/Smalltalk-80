@@ -63,8 +63,10 @@ public class IntegrationTests : CompilerTestBase
             m["selector"]?.ToString() == "complexArithmetic");
         Assert.That(arithmetic, Is.Not.Null);
         
-        // Should have temporaries
-        Assert.That((int)arithmetic!["numTemps"]!, Is.GreaterThan(0));
+        // Should have temporaries - check header tempCount
+        var header = arithmetic!["header"] as JObject;
+        var tempCount = header?["tempCount"]?.Value<int>() ?? (int?)arithmetic["numTemps"] ?? 0;
+        Assert.That(tempCount, Is.GreaterThan(0));
         
         // Should have arithmetic bytecodes
         var bytecodes = (JArray)arithmetic["bytecodes"]!;
@@ -246,8 +248,10 @@ largeMethod
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
         
-        // Should handle large number of temps
-        Assert.That((int)method["numTemps"]!, Is.EqualTo(51)); // 50 temps + result
+        // Should handle large number of temps - check header tempCount
+        var header = method["header"] as JObject;
+        var tempCount = header?["tempCount"]?.Value<int>() ?? (int?)method["numTemps"] ?? 0;
+        Assert.That(tempCount, Is.EqualTo(51)); // 50 temps + result
         
         // Should have extended bytecodes for large temp/literal access
         var bytecodes = (JArray)method["bytecodes"]!;
@@ -275,10 +279,23 @@ testUnicode
         // Verify Unicode strings are preserved
         var literals = (JArray)method["literals"]!;
         
-        var hasUnicode = literals.Any(l => 
-            l["type"]?.ToString() == "String" && 
+        // Unicode strings - check in strings array (compiler uses lowercase "string" type)
+        var strings = json["strings"] as JArray;
+        var hasUnicode = false;
+
+        // First check if strings are inline in literals (direct value)
+        hasUnicode = literals.Any(l =>
+            (l["type"]?.ToString() == "string" || l["type"]?.ToString() == "String") &&
             (l["value"]?.ToString()?.Contains("世界") == true ||
              l["value"]?.ToString()?.Contains("😀") == true));
+
+        // If not found in literals, check strings array
+        if (!hasUnicode && strings != null)
+        {
+            hasUnicode = strings.Any(s =>
+                s?.ToString()?.Contains("世界") == true ||
+                s?.ToString()?.Contains("😀") == true);
+        }
              
         Assert.That(hasUnicode, Is.True, "Should preserve Unicode characters");
     }

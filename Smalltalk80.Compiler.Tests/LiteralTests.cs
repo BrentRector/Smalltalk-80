@@ -208,12 +208,12 @@ testNestedArray
         var source = WrapInTestClass(@"
 testTrue
     ^true");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // Push true (113), return top
-        AssertBytecode(method, 113, 124);
+
+        // Compiler optimizes ^true to RETURN_TRUE (121) single bytecode
+        AssertBytecode(method, 121);
     }
     
     [Test]
@@ -222,12 +222,12 @@ testTrue
         var source = WrapInTestClass(@"
 testFalse
     ^false");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // Push false (114), return top
-        AssertBytecode(method, 114, 124);
+
+        // Compiler optimizes ^false to RETURN_FALSE (122) single bytecode
+        AssertBytecode(method, 122);
     }
     
     [Test]
@@ -236,12 +236,12 @@ testFalse
         var source = WrapInTestClass(@"
 testNil
     ^nil");
-        
+
         var json = CompileSource(source);
         var method = GetFirstMethod(json);
-        
-        // Push nil (115), return top
-        AssertBytecode(method, 115, 124);
+
+        // Compiler optimizes ^nil to RETURN_NIL (123) single bytecode
+        AssertBytecode(method, 123);
     }
     
     [Test]
