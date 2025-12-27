@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Smalltalk80.Compiler;
+using Smalltalk80.Compiler.BytecodeGen;
 using Smalltalk80.Core.Bytecodes;
 
 namespace Smalltalk80.Compiler.Tests;
