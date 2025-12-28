@@ -304,6 +304,53 @@ public class RuntimeDictionaryService
 
     #endregion
 
+    #region IdentityDictionary Lookup
+
+    /// <summary>
+    /// Looks up a value in an IdentityDictionary by key OOP using hash-based lookup.
+    /// IdentityDictionary structure: indexed slots = keys, valueArray (slot 1) = values.
+    /// Used by MethodDictionary lookup where keys are selector Symbols and values are CompiledMethods.
+    /// </summary>
+    /// <param name="dictOOP">The IdentityDictionary to search.</param>
+    /// <param name="keyOOP">The key OOP to find.</param>
+    /// <returns>The value OOP if found, nil otherwise.</returns>
+    public SmalltalkOOP LookupInIdentityDictionary(SmalltalkOOP dictOOP, SmalltalkOOP keyOOP)
+    {
+        var valuesArrayOOP = _heap.GetInstanceVariable(dictOOP, VMConstants.IDENTITY_DICTIONARY_VALUE_ARRAY_INDEX);
+        if (valuesArrayOOP == _nilOOP)
+            return _nilOOP;
+
+        int dictSize = _heap.GetIndexedSize(dictOOP);
+        if (dictSize == 0)
+            return _nilOOP;
+
+        int hashIndex = IdentityHashUtility.ComputeHashIndex(keyOOP, dictSize);
+        int index = hashIndex;
+        int probeCount = 0;
+
+        while (probeCount < dictSize)
+        {
+            var currentKeyOOP = _heap.GetIndexedOOP(dictOOP, index);
+
+            if (currentKeyOOP == _nilOOP)
+                return _nilOOP;  // Empty slot - not found
+
+            if (currentKeyOOP == keyOOP)
+            {
+                // Found! Return corresponding value
+                return _heap.GetIndexedOOP(valuesArrayOOP, index);
+            }
+
+            // Linear probe to next slot
+            index = (index + 1) % dictSize;
+            probeCount++;
+        }
+
+        return _nilOOP;
+    }
+
+    #endregion
+
     #region Collision Chain Repair
 
     /// <summary>

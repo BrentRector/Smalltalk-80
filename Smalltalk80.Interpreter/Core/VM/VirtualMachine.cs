@@ -52,6 +52,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private readonly NonLocalReturnHandler _nlrHandler;
     private readonly ExecutionTracer _tracer;
     private readonly ITimerManager _timerManager;
+    private readonly RuntimeDictionaryService _dictionaryService;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -172,10 +173,13 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             () => _tracer.IncrementPushTraceCounter()
         );
 
+        _dictionaryService = new RuntimeDictionaryService(heapManager);
+
         _messageDispatcher = new MessageDispatcher(
             heapManager,
             this, // IObjectMetadataAccessor
-            metadata
+            metadata,
+            _dictionaryService
         );
 
         _bytecodeInterpreter = new BytecodeInterpreter(

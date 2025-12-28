@@ -13,7 +13,8 @@ namespace Smalltalk80.Interpreter.Core.VM;
 internal class MessageDispatcher(
     ISmalltalkHeap heapManager,
     IObjectMetadataAccessor helpers,
-    VMMetadata metadata) : IMessageDispatcher
+    VMMetadata metadata,
+    RuntimeDictionaryService dictionaryService) : IMessageDispatcher
 {
     /// <summary>
     /// Maximum inheritance chain depth for method lookup.
@@ -153,43 +154,11 @@ internal class MessageDispatcher(
                 continue;
             }
 
-            // Get values array from method dictionary
-            var valuesArrayOOP = heapManager.GetInstanceVariable(methodDictOOP, VMConstants.METHOD_DICTIONARY_VALUE_ARRAY_INDEX);
-            if (valuesArrayOOP == metadata.KnownObjects.Nil)
-            {
-                var superclassOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
-                currentClassOOP = superclassOOP;
-                depth++;
-                continue;
-            }
-
             // Hash-based lookup in method dictionary (MethodDictionary is an IdentityDictionary)
-            // Indexed slots contain selector Symbols, valueArray contains CompiledMethods
-            int dictSize = heapManager.GetIndexedSize(methodDictOOP);
-            if (dictSize > 0)
+            var methodOOP = dictionaryService.LookupInIdentityDictionary(methodDictOOP, selectorOOP);
+            if (methodOOP != metadata.KnownObjects.Nil)
             {
-                int hashIndex = IdentityHashUtility.ComputeHashIndex(selectorOOP, dictSize);
-                int index = hashIndex;
-                int probeCount = 0;
-
-                while (probeCount < dictSize)
-                {
-                    var currentSelectorOOP = heapManager.GetIndexedOOP(methodDictOOP, index);
-
-                    if (currentSelectorOOP == metadata.KnownObjects.Nil)
-                        break;  // Empty slot - selector not in this class
-
-                    if (currentSelectorOOP == selectorOOP)
-                    {
-                        // Found! Get corresponding method from values array
-                        var methodOOP = heapManager.GetIndexedOOP(valuesArrayOOP, index);
-                        return new MethodLookupResult { MethodOOP = methodOOP };
-                    }
-
-                    // Linear probe to next slot
-                    index = (index + 1) % dictSize;
-                    probeCount++;
-                }
+                return new MethodLookupResult { MethodOOP = methodOOP };
             }
 
             // Not found, try superclass
