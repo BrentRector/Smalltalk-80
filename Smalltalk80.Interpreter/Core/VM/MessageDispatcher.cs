@@ -163,17 +163,32 @@ internal class MessageDispatcher(
                 continue;
             }
 
-            // Search for selector in method dictionary using direct OOP comparison
+            // Hash-based lookup in method dictionary (MethodDictionary is an IdentityDictionary)
+            // Indexed slots contain selector Symbols, valueArray contains CompiledMethods
             int dictSize = heapManager.GetIndexedSize(methodDictOOP);
-            for (int i = 0; i < dictSize; i++)
+            if (dictSize > 0)
             {
-                var currentSelectorOOP = heapManager.GetIndexedOOP(methodDictOOP, i);
+                int hashIndex = IdentityHashUtility.ComputeHashIndex(selectorOOP, dictSize);
+                int index = hashIndex;
+                int probeCount = 0;
 
-                // Direct OOP comparison - no string allocation!
-                if (currentSelectorOOP == selectorOOP)
+                while (probeCount < dictSize)
                 {
-                    var methodOOP = heapManager.GetIndexedOOP(valuesArrayOOP, i);
-                    return new MethodLookupResult { MethodOOP = methodOOP };
+                    var currentSelectorOOP = heapManager.GetIndexedOOP(methodDictOOP, index);
+
+                    if (currentSelectorOOP == metadata.KnownObjects.Nil)
+                        break;  // Empty slot - selector not in this class
+
+                    if (currentSelectorOOP == selectorOOP)
+                    {
+                        // Found! Get corresponding method from values array
+                        var methodOOP = heapManager.GetIndexedOOP(valuesArrayOOP, index);
+                        return new MethodLookupResult { MethodOOP = methodOOP };
+                    }
+
+                    // Linear probe to next slot
+                    index = (index + 1) % dictSize;
+                    probeCount++;
                 }
             }
 
