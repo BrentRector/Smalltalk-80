@@ -12,6 +12,7 @@ public record CommandLineConfig
     public string? ReportOutput { get; init; }
     public string? ExecuteExpression { get; init; }
     public string? DiagnosticCategories { get; init; }
+    public bool DisableGC { get; init; }
 }
 
 /// <summary>
@@ -33,6 +34,7 @@ public static class CommandLineParser
         string? reportOutput = null;
         string? executeExpression = null;
         string? diagnosticCategories = null;
+        bool disableGC = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -73,6 +75,10 @@ public static class CommandLineParser
             {
                 diagnosticCategories = args[i].Substring("--diagnostics=".Length);
             }
+            else if (args[i] == "--no-gc")
+            {
+                disableGC = true;
+            }
             else if (args[i] == "--help" || args[i] == "-h")
             {
                 PrintUsage();
@@ -95,7 +101,8 @@ public static class CommandLineParser
             TestFilter = testFilter,
             ReportOutput = reportOutput,
             ExecuteExpression = executeExpression,
-            DiagnosticCategories = diagnosticCategories
+            DiagnosticCategories = diagnosticCategories,
+            DisableGC = disableGC
         };
     }
 
@@ -122,6 +129,8 @@ public static class CommandLineParser
         Console.Error.WriteLine("                         method: runtime method entry/exit tracing");
         Console.Error.WriteLine("                         gc: garbage collection events");
         Console.Error.WriteLine("                         bytecode: low-level bytecode execution");
+        Console.Error.WriteLine("  --no-gc                Disable automatic garbage collection");
+        Console.Error.WriteLine("                         (useful for benchmarking to avoid GC interference)");
         Console.Error.WriteLine("  --help, -h             Show this help message");
     }
 }
