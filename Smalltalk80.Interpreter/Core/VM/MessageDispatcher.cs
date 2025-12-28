@@ -120,6 +120,84 @@ internal class MessageDispatcher(
     }
 
     /// <inheritdoc />
+    public MethodLookupResult? LookupMethod(SmalltalkOOP classOOP, SmalltalkOOP selectorOOP)
+    {
+        var currentClassOOP = classOOP;
+        int depth = 0;
+
+        while (currentClassOOP != metadata.KnownObjects.Nil && depth < MaxInheritanceDepth)
+        {
+            // Validate the class OOP before trying to access it
+            if (!heapManager.IsValidOOP(currentClassOOP))
+            {
+                string? selectorName = GetSymbolName(selectorOOP);
+                throw new InvalidOperationException(
+                    $"Invalid class OOP {currentClassOOP.RawValue} encountered at depth {depth} during lookup of '{selectorName}' " +
+                    $"(starting from class OOP {classOOP.RawValue})");
+            }
+
+            // Get the method dictionary from the class
+            var methodDictOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_METHODDICT_INDEX);
+
+            if (methodDictOOP == metadata.KnownObjects.Nil)
+            {
+                // No method dictionary, try superclass
+                var superclassOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
+                if (superclassOOP == metadata.KnownObjects.Nil)
+                {
+                    break;
+                }
+
+                currentClassOOP = superclassOOP;
+                depth++;
+                continue;
+            }
+
+            // Get values array from method dictionary
+            var valuesArrayOOP = heapManager.GetInstanceVariable(methodDictOOP, VMConstants.METHOD_DICTIONARY_VALUE_ARRAY_INDEX);
+            if (valuesArrayOOP == metadata.KnownObjects.Nil)
+            {
+                var superclassOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
+                currentClassOOP = superclassOOP;
+                depth++;
+                continue;
+            }
+
+            // Search for selector in method dictionary using direct OOP comparison
+            int dictSize = heapManager.GetIndexedSize(methodDictOOP);
+            for (int i = 0; i < dictSize; i++)
+            {
+                var currentSelectorOOP = heapManager.GetIndexedOOP(methodDictOOP, i);
+
+                // Direct OOP comparison - no string allocation!
+                if (currentSelectorOOP == selectorOOP)
+                {
+                    var methodOOP = heapManager.GetIndexedOOP(valuesArrayOOP, i);
+                    return new MethodLookupResult { MethodOOP = methodOOP };
+                }
+            }
+
+            // Not found, try superclass
+            var nextSuperclassOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
+
+            // Validate superclass OOP before following it
+            if (nextSuperclassOOP != metadata.KnownObjects.Nil && !heapManager.IsValidOOP(nextSuperclassOOP))
+            {
+                string currentClassName = helpers.GetClassName(currentClassOOP);
+                string? selectorName = GetSymbolName(selectorOOP);
+                throw new InvalidOperationException(
+                    $"Invalid superclass OOP {nextSuperclassOOP.RawValue} found in class {currentClassName} (OOP {currentClassOOP.RawValue}) " +
+                    $"at depth {depth} during lookup of '{selectorName}'");
+            }
+
+            currentClassOOP = nextSuperclassOOP;
+            depth++;
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
     public int GetPrimitiveNumber(SmalltalkOOP methodOOP)
     {
         var headerInfo = helpers.ParseMethodHeader(methodOOP);

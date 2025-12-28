@@ -93,8 +93,8 @@ public partial class VirtualMachine
         // This is guaranteed by the compiler which enforces this invariant
         var superclassOOP = _heapManager.GetInstanceVariable(homeClassOOP, VMConstants.BEHAVIOR_SUPERCLASS_INDEX);
 
-        // Get selector name for diagnostics
-        string? selectorName = GetSymbolName(selectorOOP);
+        // Defer selectorName until needed for diagnostics - use OOP comparison for lookup
+        string? selectorName = null;  // Lazy - only populated when needed
 
         // Get receiver class for diagnostic event
         var recvClass = GetClassName(GetClass(receiverOOP));
@@ -102,6 +102,7 @@ public partial class VirtualMachine
         // Emit diagnostic event for super method entry (conditional on listener subscription)
         if (_diagnostics?.IsEnabled(DiagnosticEventTypes.MethodEntry) == true)
         {
+            selectorName ??= GetSymbolName(selectorOOP);  // Lazy get for diagnostics
             _diagnostics.Emit(new MethodEntryEvent
             {
                 Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
@@ -115,11 +116,12 @@ public partial class VirtualMachine
             });
         }
 
-        // Now look up the method starting from the superclass
-        var methodInfo = _messageDispatcher.LookupMethod(superclassOOP, selectorName!);
+        // Use OOP-based lookup - no string allocation or comparison!
+        var methodInfo = _messageDispatcher.LookupMethod(superclassOOP, selectorOOP);
 
         if (methodInfo == null)
         {
+            selectorName ??= GetSymbolName(selectorOOP);  // Lazy get for error message
             string? superclassName = GetClassName(superclassOOP);
             throw new InvalidOperationException(
                 $"Super method not found: {selectorName ?? "<unknown>"} in superclass {superclassName} (superclassOOP={superclassOOP})");
@@ -168,6 +170,7 @@ public partial class VirtualMachine
             else if (_tracer.ShouldTracePrimitiveFailure())
             {
                 // Log primitive failures during tracing
+                selectorName ??= GetSymbolName(selectorOOP);  // Lazy get for tracing
                 _tracer.TracePrimitiveFailure(primitiveNumber, selectorName ?? "unknown");
             }
         }
@@ -175,6 +178,7 @@ public partial class VirtualMachine
         // Log method sends during tracing
         if (_tracer.ShouldTraceSend())
         {
+            selectorName ??= GetSymbolName(selectorOOP);  // Lazy get for tracing
             var currentMethod = GetCurrentMethodLocalId();
             _tracer.TraceSendEntry(recvClass, selectorName ?? "unknown", currentMethod);
 
@@ -223,8 +227,8 @@ public partial class VirtualMachine
                 $"Invalid class OOP {classOOP.RawValue} for receiver OOP {receiverOOP.RawValue} when sending '{selectorName2 ?? "unknown"}'");
         }
 
-        // Get selector name once for all uses
-        string? selectorName = GetSymbolName(selectorOOP);
+        // Defer GetSymbolName until needed for diagnostics - use OOP comparison for lookup
+        string? selectorName = null;  // Lazy - only populated when needed
 
 
 
@@ -247,7 +251,8 @@ public partial class VirtualMachine
         var compiledMethodClassId = RuntimeSpecialObjects.Instance.CompiledMethodClass;
         if (classOOP == compiledMethodClassId)
         {
-            if (selectorName == "value" || selectorName == "value:" || selectorName == "value:value:")
+            // Use OOP comparison instead of string comparison for block value messages
+            if (selectorOOP == _valueSelectorOOP || selectorOOP == _valueColonSelectorOOP || selectorOOP == _valueColonValueColonSelectorOOP)
             {
                 // Execute the block with proper BlockContext wrapping
                 return CallOutcome.Normal(InvokeBlock(receiverOOP, args));
@@ -257,11 +262,13 @@ public partial class VirtualMachine
         // Debug: check for classId 0 on "comment:" send
         if (classOOP == _heapManager.GetNil())
         {
+            selectorName ??= GetSymbolName(selectorOOP);  // Lazy get for error message
             throw new InvalidOperationException(
                 $"Method not found: {selectorName ?? "unknown"} in class 0 (receiver OOP={receiverOOP}, receiverId has classId 0!)");
         }
 
-        var methodInfo = _messageDispatcher.LookupMethod(classOOP, selectorName!);
+        // Use OOP-based lookup - no string allocation or comparison!
+        var methodInfo = _messageDispatcher.LookupMethod(classOOP, selectorOOP);
 
         // DIAGNOSTIC: Show what method was found for hash/stringhash (disabled for quiet mode)
         // if ((selectorName == "hash" || selectorName == "stringhash") && methodInfo != null)
@@ -273,6 +280,7 @@ public partial class VirtualMachine
 
         if (methodInfo == null)
         {
+            selectorName ??= GetSymbolName(selectorOOP);  // Lazy get for error message
             string? className = GetClassName(classOOP);
             string receiverLocalId = GetLocalId(receiverOOP) ?? "";
             string receiverInfo = string.IsNullOrEmpty(receiverLocalId)
@@ -293,6 +301,7 @@ public partial class VirtualMachine
 
         // Record method call for infinite loop debugging
         string recvClassName = GetClassName(classOOP) ?? "?";
+        selectorName ??= GetSymbolName(selectorOOP);  // Lazy get - needed for tracing
         _tracer.RecordMethodCall(recvClassName, selectorName ?? "?");
 
         // Log error: sends but let Smalltalk handle them gracefully via NotifierView

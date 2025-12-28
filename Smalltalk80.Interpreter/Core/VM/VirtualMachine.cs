@@ -86,6 +86,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private SmalltalkOOP _ifFalseIfTrueSelectorOOP;
     private SmalltalkOOP _whileTrueSelectorOOP;
     private SmalltalkOOP _whileFalseSelectorOOP;
+
+    // Cached selector OOPs for block value messages
+    private SmalltalkOOP _valueSelectorOOP;
+    private SmalltalkOOP _valueColonSelectorOOP;
+    private SmalltalkOOP _valueColonValueColonSelectorOOP;
+
     private bool _conditionalSelectorsInitialized;
 
     // Interrupt mask counter for critical sections (used by HeapManager during GC)
@@ -215,6 +221,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _ifFalseIfTrueSelectorOOP = _selectorCache.LookupSelector("ifFalse:ifTrue:");
         _whileTrueSelectorOOP = _selectorCache.LookupSelector("whileTrue:");
         _whileFalseSelectorOOP = _selectorCache.LookupSelector("whileFalse:");
+
+        // Initialize block value selector OOPs for fast-path block invocation check
+        _valueSelectorOOP = _selectorCache.LookupSelector("value");
+        _valueColonSelectorOOP = _selectorCache.LookupSelector("value:");
+        _valueColonValueColonSelectorOOP = _selectorCache.LookupSelector("value:value:");
+
         _conditionalSelectorsInitialized = true;
     }
 
