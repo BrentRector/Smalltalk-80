@@ -25,8 +25,9 @@ internal class StackManager(
     Func<int> getPushTraceCounter,
     Action incrementPushTraceCounter) : IStackManager
 {
-    // Suppress unused parameter warning - getPushTraceCounter available for future diagnostics
+    // Suppress unused parameter warnings - these are available for future diagnostics
     private readonly Func<int> _getPushTraceCounter = getPushTraceCounter;
+    private readonly VMMetadata _metadata = metadata;  // Was used for BlockContext check, kept for potential future use
     /// <inheritdoc />
     public void Push(SmalltalkOOP valueOOP)
     {
