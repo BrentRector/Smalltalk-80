@@ -166,8 +166,9 @@ internal class MessageDispatcher(
                     $"(starting from class OOP {classOOP.RawValue})");
             }
 
-            // Check cache at each step - may have been populated by sibling class lookup
-            if (_methodCache.TryGetValue((currentClassOOP, selectorOOP), out var cachedMethodOOP))
+            // Check cache at each step AFTER the first (starting class was already checked in LookupMethod)
+            // This catches sibling class scenarios where a shared ancestor was cached
+            if (depth > 0 && _methodCache.TryGetValue((currentClassOOP, selectorOOP), out var cachedMethodOOP))
             {
                 // Cache hit! Also cache for all classes we visited getting here
                 for (int i = 0; i < visitedCount; i++)
