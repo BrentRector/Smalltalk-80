@@ -23,6 +23,12 @@ internal class MessageDispatcher(
     /// </summary>
     private const int MaxInheritanceDepth = 20;
 
+    /// <summary>
+    /// Cache for method lookups: (classOOP, selectorOOP) → methodOOP.
+    /// Avoids repeated class hierarchy walks for the same message send.
+    /// </summary>
+    private readonly Dictionary<(SmalltalkOOP, SmalltalkOOP), SmalltalkOOP> _methodCache = new();
+
     /// <inheritdoc />
     public MethodLookupResult? LookupMethod(SmalltalkOOP classOOP, string selectorName)
     {
@@ -123,6 +129,30 @@ internal class MessageDispatcher(
 
     /// <inheritdoc />
     public MethodLookupResult? LookupMethod(SmalltalkOOP classOOP, SmalltalkOOP selectorOOP)
+    {
+        // Check cache first
+        var cacheKey = (classOOP, selectorOOP);
+        if (_methodCache.TryGetValue(cacheKey, out var cachedMethodOOP))
+        {
+            return new MethodLookupResult { MethodOOP = cachedMethodOOP };
+        }
+
+        // Cache miss - perform full hierarchy walk
+        var result = LookupMethodUncached(classOOP, selectorOOP);
+
+        // Cache the result if found
+        if (result != null)
+        {
+            _methodCache[cacheKey] = result.MethodOOP;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Performs uncached method lookup by walking the class hierarchy.
+    /// </summary>
+    private MethodLookupResult? LookupMethodUncached(SmalltalkOOP classOOP, SmalltalkOOP selectorOOP)
     {
         var currentClassOOP = classOOP;
         int depth = 0;
