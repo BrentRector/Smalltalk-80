@@ -138,24 +138,22 @@ internal class MessageDispatcher(
         }
 
         // Cache miss - perform full hierarchy walk
-        var result = LookupMethodUncached(classOOP, selectorOOP);
-
-        // Cache the result if found
-        if (result != null)
-        {
-            _methodCache[cacheKey] = result.MethodOOP;
-        }
-
-        return result;
+        // LookupMethodUncached caches for ALL visited classes, not just the starting class
+        return LookupMethodUncached(classOOP, selectorOOP);
     }
 
     /// <summary>
     /// Performs uncached method lookup by walking the class hierarchy.
+    /// Caches results for all intermediate classes visited during the walk.
     /// </summary>
     private MethodLookupResult? LookupMethodUncached(SmalltalkOOP classOOP, SmalltalkOOP selectorOOP)
     {
         var currentClassOOP = classOOP;
         int depth = 0;
+
+        // Track all classes visited during the walk for cache population
+        Span<SmalltalkOOP> visitedClasses = stackalloc SmalltalkOOP[MaxInheritanceDepth];
+        int visitedCount = 0;
 
         while (currentClassOOP != metadata.KnownObjects.Nil && depth < MaxInheritanceDepth)
         {
@@ -167,6 +165,9 @@ internal class MessageDispatcher(
                     $"Invalid class OOP {currentClassOOP.RawValue} encountered at depth {depth} during lookup of '{selectorName}' " +
                     $"(starting from class OOP {classOOP.RawValue})");
             }
+
+            // Record this class for cache population
+            visitedClasses[visitedCount++] = currentClassOOP;
 
             // Get the method dictionary from the class
             var methodDictOOP = heapManager.GetInstanceVariable(currentClassOOP, VMConstants.BEHAVIOR_METHODDICT_INDEX);
@@ -189,6 +190,11 @@ internal class MessageDispatcher(
             var methodOOP = dictionaryService.LookupInIdentityDictionary(methodDictOOP, selectorOOP);
             if (methodOOP != metadata.KnownObjects.Nil)
             {
+                // Found! Cache for ALL visited classes, not just the starting class
+                for (int i = 0; i < visitedCount; i++)
+                {
+                    _methodCache[(visitedClasses[i], selectorOOP)] = methodOOP;
+                }
                 return new MethodLookupResult { MethodOOP = methodOOP };
             }
 
