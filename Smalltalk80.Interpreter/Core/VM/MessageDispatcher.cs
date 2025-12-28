@@ -10,6 +10,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// <param name="heapManager">The heap manager for memory operations.</param>
 /// <param name="helpers">VM helper methods.</param>
 /// <param name="metadata">VM metadata for known objects.</param>
+/// <param name="dictionaryService">Service for hash-based dictionary lookups.</param>
 internal class MessageDispatcher(
     ISmalltalkHeap heapManager,
     IObjectMetadataAccessor helpers,
