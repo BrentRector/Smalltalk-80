@@ -261,16 +261,273 @@ After optimizations, target times (per repetition):
 
 ---
 
+## Phase 2 Deep Analysis: Remaining Slow Paths
+
+After implementing Phase 1 optimizations (O1, O2, O8), benchmark results show 6-30x speedups on stack operations and accessors. However, several tests showed minimal improvement (1-6%):
+
+| Test | Before | After | Speedup | Status |
+|------|--------|-------|---------|--------|
+| create 3@4 (Point) | 2516 µs | 2463 µs | 1.02x | ❌ Still slow |
+| create 20 points | 4437 µs | 4403 µs | 1.01x | ❌ Still slow |
+| perform: #+ | 4844 µs | 4626 µs | 1.05x | ❌ Still slow |
+| load literal indirect | 2900 µs | 2740 µs | 1.06x | ❌ Still slow |
+| Float asFloat | 3910 µs | 3910 µs | 1.00x | ❌ Still slow |
+| Float addition | 3600 µs | 3600 µs | 1.00x | ❌ Still slow |
+
+### Root Cause Analysis
+
+#### 1. Point Creation - STRING-Based Lookups (PointPrimitives.cs:26-35)
+
+```csharp
+// BOTTLENECK: String-based allocation
+var pointOOP = context.AllocateObject("Point", 0);
+
+// BOTTLENECK: String-based field lookups (EVERY Point creation!)
+int xIndex = context.LayoutResolver.GetFieldIndex("class:Point", "x");
+int yIndex = context.LayoutResolver.GetFieldIndex("class:Point", "y");
+```
+
+**Cost per Point creation:**
+1. `AllocateObject("Point", 0)` → calls `RuntimeHeapAccess.GetClass("Point")`
+2. `GetClass("Point")` → calls `LookupGlobalByName()` with O(n) byte-by-byte comparison
+3. `GetFieldIndex("class:Point", "x")` → calls `_fieldMap["class:Point"].IndexOf("x")` (string dict lookup + List.IndexOf)
+4. Same for "y" field
+
+**Fix: Cache class OOP and field indices in VMMetadata**
+```csharp
+// Before (current code):
+var pointOOP = context.AllocateObject("Point", 0);
+int xIndex = context.LayoutResolver.GetFieldIndex("class:Point", "x");
+
+// After (optimized):
+var pointOOP = context.HeapManager.AllocateInstanceOf(context.Metadata.PointClassOOP, 0);
+context.HeapManager.SetInstanceVariable(pointOOP, VMConstants.POINT_X_INDEX, xOop);
+context.HeapManager.SetInstanceVariable(pointOOP, VMConstants.POINT_Y_INDEX, yOop);
+```
+
+#### 2. Float Arithmetic - Allocation + Byte Copying (FloatPrimitives.cs:14-38)
+
+```csharp
+// BOTTLENECK 1: Allocates byte array on every ToDouble
+private static double ToDouble(ISmalltalkHeap heap, SmalltalkOOP floatOop)
+{
+    byte[] bytes = new byte[8];  // <-- GC allocation every call!
+    for (int i = 0; i < 4; i++)  // <-- Loop instead of bulk copy
+    {
+        ushort word = heap.GetIndexedWord(floatOop, i);
+        bytes[i * 2] = (byte)(word & 0xFF);
+        bytes[i * 2 + 1] = (byte)((word >> 8) & 0xFF);
+    }
+    return BitConverter.ToDouble(bytes, 0);
+}
+
+// BOTTLENECK 2: String-based class lookup
+private static SmalltalkOOP FromDouble(PrimitiveExecutionContext ctx, double value)
+{
+    var floatOop = ctx.AllocateObject("Float", 4);  // <-- STRING LOOKUP!
+    // ...
+}
+```
+
+**Cost per Float operation:**
+1. `ToDouble`: 1 allocation (8 bytes) + 4 GetIndexedWord + 8 byte manipulations
+2. `FromDouble`: 1 string lookup + 1 allocation + 4 SetIndexedWord + 8 byte manipulations
+
+**Fix: Use Span<byte> + cached FloatClassOOP**
+```csharp
+// Optimized ToDouble - no allocation
+private static double ToDouble(ISmalltalkHeap heap, SmalltalkOOP floatOop)
+{
+    Span<byte> bytes = stackalloc byte[8];
+    for (int i = 0; i < 4; i++)
+    {
+        ushort word = heap.GetIndexedWord(floatOop, i);
+        BinaryPrimitives.WriteUInt16LittleEndian(bytes.Slice(i * 2), word);
+    }
+    return BinaryPrimitives.ReadDoubleLittleEndian(bytes);
+}
+
+// Optimized FromDouble - use cached class OOP
+private static SmalltalkOOP FromDouble(PrimitiveExecutionContext ctx, double value)
+{
+    var floatOop = ctx.HeapManager.AllocateInstanceOf(ctx.Metadata.FloatClassOOP, 4);
+    // ... rest same
+}
+```
+
+#### 3. Method Lookup (perform:) - O(n) with String Allocations (MessageDispatcher.cs:88-102)
+
+```csharp
+// BOTTLENECK: Called for EVERY method in dictionary during lookup
+int dictSize = heapManager.GetIndexedSize(methodDictOOP);
+for (int i = 0; i < dictSize; i++)
+{
+    var selectorOOP = heapManager.GetIndexedOOP(methodDictOOP, i);
+
+    // ALLOCATES new byte[] + string for EVERY method examined!
+    string? currentSelectorName = GetSymbolName(selectorOOP);
+
+    if (currentSelectorName == selectorName)
+    {
+        var methodOOP = heapManager.GetIndexedOOP(valuesArrayOOP, i);
+        return new MethodLookupResult { MethodOOP = methodOOP };
+    }
+}
+```
+
+**Cost per method lookup:**
+- O(n) where n = methods in class + all superclass methods
+- For each method examined: 1 byte[] allocation + 1 string allocation + byte-by-byte copy
+
+**Fix: Compare Symbol OOPs directly (identity)**
+
+Since Symbols are interned, we can compare OOPs directly instead of strings:
+
+```csharp
+// Optimized - compare interned Symbol OOPs
+public MethodLookupResult? LookupMethod(SmalltalkOOP classOOP, SmalltalkOOP selectorOOP)
+{
+    for (int i = 0; i < dictSize; i++)
+    {
+        var keySelectorOOP = heapManager.GetIndexedOOP(methodDictOOP, i);
+
+        // Identity comparison - no string allocation!
+        if (keySelectorOOP == selectorOOP)
+        {
+            var methodOOP = heapManager.GetIndexedOOP(valuesArrayOOP, i);
+            return new MethodLookupResult { MethodOOP = methodOOP };
+        }
+    }
+}
+```
+
+Additionally, add method cache:
+```csharp
+// Global method cache
+private readonly Dictionary<(SmalltalkOOP class, SmalltalkOOP selector), SmalltalkOOP> _methodCache;
+
+public MethodLookupResult? LookupMethod(SmalltalkOOP classOOP, SmalltalkOOP selectorOOP)
+{
+    if (_methodCache.TryGetValue((classOOP, selectorOOP), out var cachedMethod))
+        return new MethodLookupResult { MethodOOP = cachedMethod };
+
+    // ... lookup and cache result
+}
+```
+
+#### 4. Global Lookup (load literal indirect) - RuntimeHeapAccessor.InternSymbol
+
+```csharp
+// BOTTLENECK: InternSymbol searches entire USTable (nested loops!)
+public virtual SmalltalkOOP InternSymbol(string symbolName)
+{
+    // Search through USTable (Array-of-Arrays)
+    for (int i = 0; i < ustableSize; i++)
+    {
+        var bucketOOP = _heapManager.GetIndexedOOP(ustableOOP, i);
+
+        int bucketSize = _heapManager.GetIndexedSize(bucketOOP);
+        for (int k = 0; k < bucketSize; k++)  // Nested loop!
+        {
+            var symbolOOP = _heapManager.GetIndexedOOP(bucketOOP, k);
+
+            // Byte-by-byte comparison for EVERY symbol
+            for (int j = 0; j < searchBytes.Length; j++)
+            {
+                if (symbolByte != searchBytes[j]) { ... }
+            }
+        }
+    }
+}
+```
+
+**Fix: Use Symbol cache or pass Symbol OOP directly**
+
+For `load literal indirect` bytecode, the literal IS already a Symbol OOP - no need to intern:
+
+```csharp
+// In BytecodeInterpreter, the literal variable IS the Association OOP
+var associationOOP = GetLiteral(literalIndex);
+var valueOOP = heapManager.GetInstanceVariable(associationOOP, VMConstants.ASSOCIATION_VALUE_INDEX);
+Push(valueOOP);
+```
+
+The slowdown is likely in cold start code that uses string-based lookups. Runtime bytecode should NOT call InternSymbol.
+
+---
+
+### Priority Phase 2 Implementation
+
+| Optimization | Impact | Complexity | Speedup |
+|-------------|--------|------------|---------|
+| **P2.1** Cache PointClassOOP + field indices | Point creation | Low | 5-8x |
+| **P2.2** Use FloatClassOOP + Span | Float ops | Low | 3-5x |
+| **P2.3** Symbol OOP comparison in method lookup | All message sends | Medium | 2-4x |
+| **P2.4** Method lookup cache | perform:, all sends | Medium | 5-10x |
+
+### VMMetadata Extensions Required
+
+Add these cached values to VMMetadata:
+
+```csharp
+public record VMMetadata
+{
+    // Existing...
+    public required SmalltalkOOP PointClassOOP { get; init; }
+    public required SmalltalkOOP FloatClassOOP { get; init; }
+
+    // NEW: Cached field indices (Point x/y are always 0/1)
+    public const int POINT_X_INDEX = 0;
+    public const int POINT_Y_INDEX = 1;
+}
+```
+
+### VMConstants Extensions Required
+
+```csharp
+public static class VMConstants
+{
+    // Point field indices (fixed by Blue Book)
+    public const int POINT_X_INDEX = 0;
+    public const int POINT_Y_INDEX = 1;
+
+    // Float word indices
+    public const int FLOAT_WORD_COUNT = 4;
+}
+```
+
+---
+
 ## Appendix: Code Locations
 
+### Phase 1 Files (Stack & Fast Path)
 | Component | File | Lines |
 |-----------|------|-------|
-| Stack Push | StackManager.cs | 31-76 |
-| Stack Pop | StackManager.cs | 79-136 |
+| Stack Push | StackManager.cs | 31-52 |
+| Stack Pop | StackManager.cs | 54-83 |
 | Bytecode Dispatch | BytecodeInterpreter.cs | 84-782 |
 | Arithmetic Fast Path | BytecodeInterpreter.cs | 1049-1098 |
 | Special Selectors | BytecodeInterpreter.cs | 1105-1339 |
 | Integer Arithmetic | BytecodeInterpreter.cs | 1349-1385 |
-| Method Lookup | MessageDispatcher.cs | 25-120 |
+
+### Phase 2 Files (Primitives & Dispatch)
+| Component | File | Lines | Bottleneck |
+|-----------|------|-------|------------|
+| Point Creation | PointPrimitives.cs | 14-39 | STRING lookup |
+| Float ToDouble | FloatPrimitives.cs | 14-24 | byte[] allocation |
+| Float FromDouble | FloatPrimitives.cs | 27-38 | STRING lookup |
+| Method Lookup | MessageDispatcher.cs | 25-120 | O(n) + string alloc |
+| GetSymbolName | MessageDispatcher.cs | 134-154 | byte[] + string alloc |
+| AllocateObject | PrimitiveInterfaces.cs | 219-226 | STRING lookup |
+| GetFieldValue | PrimitiveInterfaces.cs | 149-164 | STRING lookup |
+| InternSymbol | RuntimeHeapAccessor.cs | 83-160 | O(n²) + byte compare |
+| LookupGlobalByName | RuntimeHeapAccessor.cs | 167-212 | O(n) + byte compare |
+| LayoutResolver | LayoutResolver.cs | 44-47 | Dict + List.IndexOf |
+
+### Heap & Allocation
+| Component | File | Lines |
+|-----------|------|-------|
 | Object Allocation | SmalltalkHeapManager.cs | 103-250 |
 | Heap Access | SmalltalkHeapManager.cs | 295-445 |
+| VMMetadata | VMMetadata.cs | 1-52 |
+| VMConstants | VMConstants.cs | - |
