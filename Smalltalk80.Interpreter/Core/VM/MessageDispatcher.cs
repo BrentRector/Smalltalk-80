@@ -144,7 +144,7 @@ internal class MessageDispatcher(
 
     /// <summary>
     /// Performs uncached method lookup by walking the class hierarchy.
-    /// Caches results for all intermediate classes visited during the walk.
+    /// Checks cache at each step and caches results for all visited classes.
     /// </summary>
     private MethodLookupResult? LookupMethodUncached(SmalltalkOOP classOOP, SmalltalkOOP selectorOOP)
     {
@@ -164,6 +164,17 @@ internal class MessageDispatcher(
                 throw new InvalidOperationException(
                     $"Invalid class OOP {currentClassOOP.RawValue} encountered at depth {depth} during lookup of '{selectorName}' " +
                     $"(starting from class OOP {classOOP.RawValue})");
+            }
+
+            // Check cache at each step - may have been populated by sibling class lookup
+            if (_methodCache.TryGetValue((currentClassOOP, selectorOOP), out var cachedMethodOOP))
+            {
+                // Cache hit! Also cache for all classes we visited getting here
+                for (int i = 0; i < visitedCount; i++)
+                {
+                    _methodCache[(visitedClasses[i], selectorOOP)] = cachedMethodOOP;
+                }
+                return new MethodLookupResult { MethodOOP = cachedMethodOOP };
             }
 
             // Record this class for cache population
