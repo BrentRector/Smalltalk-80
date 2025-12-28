@@ -8,49 +8,34 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// Float primitives (40-54) using new IPrimitive interface.
 /// Float is stored as IEEE 754 double precision (8 bytes / 4 words).
 ///
-/// OPTIMIZATION (2025-12-28): Zero-allocation conversion using BitConverter.Int64BitsToDouble.
-/// Instead of allocating byte[8] and looping, we assemble 4 ushorts into a long using
-/// bit shifts, then reinterpret the bits as a double. This eliminates all GC allocations
-/// in the hot path.
+/// OPTIMIZATION (2025-12-28): Zero-allocation IEEE 754 conversion.
+/// - GetFloatAsDouble: Single heap call reads 4 words and returns double
+/// - SetFloatFromDouble: Single heap call writes double to 4 words
+/// - Uses cached FloatClassOOP instead of string-based class lookup
+/// - Uses BitConverter.Int64BitsToDouble for zero-allocation bit reinterpretation
 /// </summary>
 public static class FloatArithmetic
 {
     /// <summary>
     /// Helper: Converts a Float object to C# double.
-    /// OPTIMIZED: Zero allocation - assembles 4 ushorts into long, then reinterprets as double.
+    /// OPTIMIZED: Single heap call reads all 4 words and converts to IEEE 754 double.
     /// </summary>
     private static double ToDouble(ISmalltalkHeap heap, SmalltalkOOP floatOop)
     {
-        // Read all 4 words from heap
-        ushort w0 = heap.GetIndexedWord(floatOop, 0);
-        ushort w1 = heap.GetIndexedWord(floatOop, 1);
-        ushort w2 = heap.GetIndexedWord(floatOop, 2);
-        ushort w3 = heap.GetIndexedWord(floatOop, 3);
-
-        // Assemble into 64-bit integer (little-endian: w0 is least significant)
-        long bits = (long)w0 | ((long)w1 << 16) | ((long)w2 << 32) | ((long)w3 << 48);
-
-        // Reinterpret bits as IEEE 754 double - zero allocation
-        return BitConverter.Int64BitsToDouble(bits);
+        return heap.GetFloatAsDouble(floatOop);
     }
 
     /// <summary>
     /// Helper: Creates a Float object from C# double.
-    /// OPTIMIZED: Uses cached FloatClassOOP and zero-allocation bit extraction.
+    /// OPTIMIZED: Uses cached FloatClassOOP and single heap call to write IEEE 754 value.
     /// </summary>
     private static SmalltalkOOP FromDouble(PrimitiveExecutionContext ctx, double value)
     {
         // Allocate Float with 4 indexed words using cached class OOP
         var floatOop = ctx.HeapManager.AllocateInstanceOf(ctx.Metadata!.FloatClassOOP, 4);
 
-        // Reinterpret double as 64-bit integer - zero allocation
-        long bits = BitConverter.DoubleToInt64Bits(value);
-
-        // Extract and store 4 words (little-endian)
-        ctx.HeapManager.SetIndexedWord(floatOop, 0, (ushort)(bits & 0xFFFF));
-        ctx.HeapManager.SetIndexedWord(floatOop, 1, (ushort)((bits >> 16) & 0xFFFF));
-        ctx.HeapManager.SetIndexedWord(floatOop, 2, (ushort)((bits >> 32) & 0xFFFF));
-        ctx.HeapManager.SetIndexedWord(floatOop, 3, (ushort)((bits >> 48) & 0xFFFF));
+        // Write IEEE 754 double directly to Float's 4 words
+        ctx.HeapManager.SetFloatFromDouble(floatOop, value);
 
         return floatOop;
     }

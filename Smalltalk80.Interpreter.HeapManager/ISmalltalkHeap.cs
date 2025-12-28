@@ -130,6 +130,28 @@ public interface ISmalltalkHeap
     /// </summary>
     void SetIndexedWord(SmalltalkOOP objectOOP, int index, ushort value);
 
+    // ========================================
+    // Float Optimization (Zero-Allocation IEEE 754)
+    // ========================================
+
+    /// <summary>
+    /// Reads a Float object's 4 words directly as a C# double.
+    /// OPTIMIZATION: Single method call instead of 4 GetIndexedWord calls.
+    /// Reads words 0-3 as little-endian IEEE 754 double-precision value.
+    /// </summary>
+    /// <param name="floatOOP">Float object (must be WordIndexed with exactly 4 words)</param>
+    /// <returns>IEEE 754 double-precision value</returns>
+    double GetFloatAsDouble(SmalltalkOOP floatOOP);
+
+    /// <summary>
+    /// Writes a C# double directly into a Float object's 4 words.
+    /// OPTIMIZATION: Single method call instead of 4 SetIndexedWord calls.
+    /// Writes IEEE 754 double-precision value as words 0-3 in little-endian format.
+    /// </summary>
+    /// <param name="floatOOP">Float object (must be WordIndexed with exactly 4 words)</param>
+    /// <param name="value">IEEE 754 double-precision value to write</param>
+    void SetFloatFromDouble(SmalltalkOOP floatOOP, double value);
+
     /// <summary>
     /// Bulk copy indexed bytes from heap object to destination span.
     /// Much faster than element-by-element access for large bitmaps.
