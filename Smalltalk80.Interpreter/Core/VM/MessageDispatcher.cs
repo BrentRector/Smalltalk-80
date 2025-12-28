@@ -237,6 +237,12 @@ internal class MessageDispatcher(
         return headerInfo.Primitive;
     }
 
+    /// <inheritdoc />
+    public void ClearCache()
+    {
+        _methodCache.Clear();
+    }
+
     /// <summary>
     /// Gets the string name from a Symbol OOP.
     /// </summary>

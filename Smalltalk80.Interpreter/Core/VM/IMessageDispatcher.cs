@@ -35,6 +35,12 @@ public interface IMessageDispatcher
     /// <param name="methodOOP">CompiledMethod to inspect.</param>
     /// <returns>Primitive number (0 if no primitive).</returns>
     int GetPrimitiveNumber(SmalltalkOOP methodOOP);
+
+    /// <summary>
+    /// Clears the method lookup cache.
+    /// Called by Primitive 89 (Behavior>>flushCache) when methods are recompiled.
+    /// </summary>
+    void ClearCache();
 }
 
 /// <summary>

@@ -2387,14 +2387,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     /// <summary>
     /// Clears the method lookup cache.
-    /// Currently a no-op since this implementation doesn't have a method cache.
-    /// The selector caches are static and don't need clearing.
+    /// Called by Primitive 89 (Behavior>>flushCache) when methods are recompiled.
     /// </summary>
     public void ClearMethodCache()
     {
-        // No-op: This implementation doesn't have a dynamic method cache
-        // The selector caches (_arithmeticSelectorCache, _specialSelectorCache) are
-        // static lookup tables initialized once at startup and never modified.
+        // Clear the method lookup cache in MessageDispatcher
+        _messageDispatcher.ClearCache();
     }
 
     /// <summary>
