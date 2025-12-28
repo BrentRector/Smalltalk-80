@@ -209,4 +209,14 @@ public static class VMConstants
     public const int STOP_CONDITIONS_SIZE = 258;
     public const int STOP_CONDITIONS_END_OF_RUN = 257;   // Smalltalk 1-based index
     public const int STOP_CONDITIONS_CROSSED_X = 258;    // Smalltalk 1-based index
+
+    // ========================================================================
+    // Point field indices (Blue Book)
+    // ========================================================================
+    // Point instanceVariableNames: 'x y'
+    // Used by primitive 18 (@) for fast Point creation
+    // These indices are fixed by the Smalltalk-80 class definition
+
+    public const int POINT_X_INDEX = 0;  // First instance variable: x coordinate
+    public const int POINT_Y_INDEX = 1;  // Second instance variable: y coordinate
 }

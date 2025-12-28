@@ -5,6 +5,10 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
 /// <summary>
 /// Point primitives using new IPrimitive interface.
+///
+/// OPTIMIZATION (2025-12-28): Zero string lookups for Point creation.
+/// - Uses cached PointClassOOP instead of string-based class lookup
+/// - Uses VMConstants.POINT_X_INDEX/POINT_Y_INDEX instead of LayoutResolver lookup
 /// </summary>
 public static class PointPrimitives
 {
@@ -22,17 +26,12 @@ public static class PointPrimitives
             if (!xOop.IsSmallInteger || !yOop.IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            // Allocate Point with 2 instance variables
-            var pointOOP = context.AllocateObject("Point", 0);
+            // Allocate Point using cached class OOP (no string lookup)
+            var pointOOP = context.HeapManager.AllocateInstanceOf(context.Metadata!.PointClassOOP, 0);
 
-            // Get field indices from layout resolver
-            if (context.LayoutResolver == null) return PrimitiveResult.Fail(context.Metadata!);
-            int xIndex = context.LayoutResolver.GetFieldIndex("class:Point", "x");
-            int yIndex = context.LayoutResolver.GetFieldIndex("class:Point", "y");
-
-            // Store coordinates
-            context.HeapManager.SetInstanceVariable(pointOOP, xIndex, xOop);
-            context.HeapManager.SetInstanceVariable(pointOOP, yIndex, yOop);
+            // Store coordinates using Blue Book field indices (no LayoutResolver lookup)
+            context.HeapManager.SetInstanceVariable(pointOOP, VMConstants.POINT_X_INDEX, xOop);
+            context.HeapManager.SetInstanceVariable(pointOOP, VMConstants.POINT_Y_INDEX, yOop);
 
             return PrimitiveResult.Ok(pointOOP);
         }
