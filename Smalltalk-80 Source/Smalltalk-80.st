@@ -8909,9 +8909,6 @@ buildCharacterBlockIn: aParagraph
 					characterPoint x > rightMargin
 						ifTrue:	[characterPoint x: rightMargin]].
 	destX _ leftMargin _ aParagraph leftMarginForDisplayForLine: lineIndex.
-	[| compLeft | compLeft _ aParagraph compositionRectangle left.
-	 Transcript cr; show: 'scan: clickX='; print: characterPoint x;
-		show: ' leftM='; print: leftMargin; show: ' compL='; print: compLeft] value.
 	nextLeftMargin_ aParagraph leftMarginForDisplayForLine: lineIndex+1.
 	lastIndex _ line first.
 

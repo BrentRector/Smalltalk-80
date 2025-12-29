@@ -55,7 +55,7 @@ public static class FontPrimitives
     public class ScanCharacters : IPrimitive
     {
         // Set to true to enable detailed logging for debugging
-        private const bool DebugLogging = false;
+        private const bool DebugLogging = true;
 
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
