@@ -2232,12 +2232,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         return _heapManager.GetObjectFormat(objectOOP);
     }
 
-    SmalltalkOOP IPrimitiveContext.InternSymbol(string symbolName)
-    {
-        // Delegate to RuntimeHeapAccessor which uses hash-based USTable lookup
-        return _runtimeHeapAccess.InternSymbol(symbolName);
-    }
-
     SmalltalkOOP IPrimitiveContext.GetGlobalObjectByName(string globalName)
     {
         // HEAP-ONLY IMPLEMENTATION: Access Smalltalk global dictionary from heap,
@@ -2270,7 +2264,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         // First, intern the key as a Symbol (required for dictionary lookup)
-        var keySymbolOOP = ((IPrimitiveContext)this).InternSymbol(lookupKey);
+        var keySymbolOOP = _runtimeHeapAccess.InternSymbol(lookupKey);
         if (keySymbolOOP == _metadata.KnownObjects.Nil)
         {
             // Symbol not found - global doesn't exist
