@@ -8713,8 +8713,15 @@ cr
 crossedX
 	"Text display has wrapping.  The scanner just found a character past the x location of the cursor.  We know that the cursor is pointing at a character or before one."
 
-	| leadingTab currentX |
-	((characterPoint x <= (destX + ((lastCharacterExtent x) // 2)))
+	| leadingTab currentX midpoint |
+	midpoint _ destX + ((lastCharacterExtent x) // 2).
+	Transcript cr; show: 'crossedX: click='; print: characterPoint x;
+		show: ' destX='; print: destX;
+		show: ' width='; print: lastCharacterExtent x;
+		show: ' midpoint='; print: midpoint;
+		show: ' lastIndex='; print: lastIndex;
+		show: ' char='; print: (text at: lastIndex).
+	((characterPoint x <= midpoint)
 		or: [line last = lastIndex])
 		ifTrue:	[lastCharacter _ (text at: lastIndex).			
 				((lastCharacter = Space and: [textStyle alignment = Justified])
@@ -8730,6 +8737,7 @@ crossedX
 												characterPoint _ destX @ destY.
 												^ self endOfRun]].
 								characterPoint _ destX @ destY].
+				Transcript show: ' LEFT→caret='; print: characterPoint x.
 				^true].
 	"Pointing past middle of a character, return the next character."
 	lastIndex _ lastIndex + 1.
@@ -8737,6 +8745,7 @@ crossedX
 	currentX _ destX + lastCharacterExtent x.
 	lastCharacterExtent x: (font widthOf: lastCharacter).
 	characterPoint _ currentX @ destY.
+	Transcript show: ' RIGHT→caret='; print: currentX.
 
 	"Yukky if next character is space or tab."
 	(lastCharacter = Space and: [textStyle alignment = Justified])
@@ -8913,6 +8922,10 @@ buildCharacterBlockIn: aParagraph
 	lastIndex _ line first.
 
 	self setStopConditions.		"also sets font"
+	Transcript cr; show: 'buildCharBlock: clickX='; print: characterPoint x;
+		show: ' leftMargin='; print: leftMargin;
+		show: ' lineFirst='; print: line first;
+		show: ' lineLast='; print: line last.
 	runLength _ (text runLengthFor: line first).
 	characterIndex ~~ nil
 		ifTrue:	[lineStop _ characterIndex	"scanning for index"]
@@ -8933,6 +8946,10 @@ buildCharacterBlockIn: aParagraph
 						displaying: false.
 
 		"see setStopConditions for stopping conditions for character block 	operations."
+	Transcript cr; show: 'afterScan: destX='; print: destX;
+		show: ' lastIndex='; print: lastIndex;
+		show: ' stopCond='; print: stopCondition;
+		show: ' char='; print: (text at: lastIndex).
 	lastCharacterExtent x: (font widthOf: (text at: lastIndex)).
 	(self perform: stopCondition)
 		ifTrue:	[^CharacterBlock
