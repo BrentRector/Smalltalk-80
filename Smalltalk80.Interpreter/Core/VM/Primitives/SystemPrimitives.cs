@@ -8,25 +8,38 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// </summary>
 public static class SystemOperations
 {
+    /// <summary>
+    /// Maximum theoretical OOP count based on our SmalltalkOOP representation.
+    /// SmalltalkOOP uses a 32-bit tagged pointer where LSB=0 means object pointer.
+    /// Maximum object table index = Int32.MaxValue >> 1 = 1,073,741,823.
+    /// </summary>
+    private const int MaxTheoreticalOops = int.MaxValue >> 1;
+
     /// <summary>Primitive 112: coreLeft - Free memory available</summary>
+    /// <remarks>
+    /// On modern systems with virtual memory, we have essentially unlimited memory.
+    /// The original Blue Book ran on systems with limited physical memory.
+    /// We report a large value based on theoretical maximum to ensure Smalltalk's
+    /// low memory monitoring never triggers spuriously.
+    /// </remarks>
     public class CoreLeft : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Query garbage collector for memory statistics
-            var stats = context.HeapManager.GC.GetStatistics();
-            int totalSlots = context.HeapManager.GetObjectTableSize();
-            int usedSlots = stats.TotalObjects;
-            int freeSlots = totalSlots - usedSlots;
+            // Use theoretical maximum OOPs minus active objects, times estimated bytes per slot.
+            // This ensures we always report a very large amount of free memory.
+            int activeObjects = context.HeapManager.GetActiveObjectCount();
+            int freeOops = MaxTheoreticalOops - activeObjects;
+            if (freeOops < 0) freeOops = int.MaxValue;
 
             // Estimate memory: assume ~1KB average object size
-            int estimatedFreeBytes = freeSlots * 1024;
-            if (estimatedFreeBytes < 0) estimatedFreeBytes = 0;
+            // Use long arithmetic to avoid overflow, then cap at SmallInteger max
+            long estimatedFreeBytes = (long)freeOops * 1024;
             if (estimatedFreeBytes > 0x3FFFFFFF) estimatedFreeBytes = 0x3FFFFFFF;
 
-            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(estimatedFreeBytes));
+            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)estimatedFreeBytes));
         }
     }
 
@@ -70,20 +83,26 @@ public static class SystemOperations
     }
 
     /// <summary>Primitive 115: oopsLeft - Available object pointer slots</summary>
+    /// <remarks>
+    /// On modern systems, the object table can grow as needed up to the theoretical maximum.
+    /// We report free OOPs relative to what we CAN allocate, not what we HAVE allocated.
+    /// This ensures Smalltalk's low memory monitoring never triggers spuriously.
+    /// </remarks>
     public class OopsLeft : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            int totalSlots = context.HeapManager.GetObjectTableSize();
+            // Use theoretical maximum minus active objects for free OOPs.
+            // This ensures we always report a very large number of available OOPs.
             int activeObjects = context.HeapManager.GetActiveObjectCount();
-            int freeSlots = totalSlots - activeObjects;
+            int freeOops = MaxTheoreticalOops - activeObjects;
 
-            if (freeSlots < 0) freeSlots = 0;
-            if (freeSlots > 0x3FFFFFFF) freeSlots = 0x3FFFFFFF;
+            if (freeOops < 0) freeOops = int.MaxValue;
+            if (freeOops > 0x3FFFFFFF) freeOops = 0x3FFFFFFF;
 
-            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(freeSlots));
+            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(freeOops));
         }
     }
 

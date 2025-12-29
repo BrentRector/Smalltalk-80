@@ -26,6 +26,13 @@ public partial class VirtualMachine : IProcessScheduler
     }
 
     /// <summary>
+    /// Maximum theoretical OOP count based on our SmalltalkOOP representation.
+    /// SmalltalkOOP uses a 32-bit tagged pointer where LSB=0 means object pointer.
+    /// Maximum object table index = Int32.MaxValue >> 1 = 1,073,741,823.
+    /// </summary>
+    private const int MaxTheoreticalOops = int.MaxValue >> 1;
+
+    /// <summary>
     /// Checks if memory thresholds have been crossed and signals the low memory semaphore.
     /// This allows the system to respond to low memory conditions.
     /// Called periodically from the interpreter loop.
@@ -35,23 +42,24 @@ public partial class VirtualMachine : IProcessScheduler
         if (!_lowMemoryManager.IsEnabled)
             return;
 
-        // Get current memory statistics
-        int totalSlots = _heapManager.GetObjectTableSize();
-        int activeObjects = _heapManager.GetActiveObjectCount();
-        int freeOops = totalSlots - activeObjects;
-
-        // On modern systems with virtual memory, we have essentially unlimited memory.
+        // Get current memory statistics using THEORETICAL maximum, not current allocated size.
         // The original Blue Book ran on systems with limited physical memory where
         // low memory monitoring was critical. On modern systems with GB of RAM and
-        // virtual memory, the OS handles memory pressure transparently.
+        // virtual memory, the object table can grow as needed. We report free OOPs
+        // relative to what we CAN allocate (theoretical max), not what we HAVE allocated.
         //
-        // Use same formula as primitive 112 (coreLeft) to be consistent:
-        // coreLeft returns freeSlots * 1024 (bytes)
-        // Smalltalk sets WordsLeftLimit = coreLeft // 4 = freeSlots * 256
-        // So we report freeWords = freeOops * 256 to match.
-        // This ensures freeWords is always proportional to the threshold.
-        int freeWords = freeOops * 256;
-        if (freeWords < 0) freeWords = int.MaxValue;  // Overflow means lots of memory
+        // This ensures that freeOops is always a huge number (about 1 billion minus
+        // the ~50K active objects), which will never trigger Smalltalk's thresholds
+        // (typically set to values like 500 or 25,000).
+        int activeObjects = _heapManager.GetActiveObjectCount();
+        int freeOops = MaxTheoreticalOops - activeObjects;
+        if (freeOops < 0) freeOops = int.MaxValue;  // Overflow protection
+
+        // freeWords uses same formula: assume each OOP slot can hold 256 words.
+        // This gives us a proportional value that's also huge.
+        // Use long arithmetic to avoid overflow.
+        long freeWordsLong = (long)freeOops * 256;
+        int freeWords = freeWordsLong > int.MaxValue ? int.MaxValue : (int)freeWordsLong;
 
         // Check thresholds and get semaphore to signal if crossed
         var semaphoreOOP = _lowMemoryManager.CheckThresholds(freeOops, freeWords);
