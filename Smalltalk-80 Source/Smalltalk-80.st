@@ -29580,10 +29580,12 @@ dyForPoint: pt
 mouseSelect: previousStartBlock to: previousStopBlock
 	"Answer with an Array of two CharacterBlocks that represent the text selection that the user makes. Allow for scrolling to extend selections."
 
-	| pivotBlock startBlock stopBlock showingCaret dy pt okToScroll scrollDelay word cursorPt mousePt |
+	| pivotBlock startBlock stopBlock showingCaret dy pt okToScroll scrollDelay word cursorPt mousePt mx my cx cy |
 	mousePt _ Sensor mousePoint.
 	cursorPt _ Sensor cursorPoint.
-	Transcript cr; show: 'CLICK mouse='; print: mousePt; show: ' cursor='; print: cursorPt.
+	mx _ mousePt x. my _ mousePt y. cx _ cursorPt x. cy _ cursorPt y.
+	[Transcript cr; show: 'CLICK m='; print: mx; show: '@'; print: my;
+		show: ' c='; print: cx; show: '@'; print: cy] value.
 	startBlock _ stopBlock _ pivotBlock _ self characterBlockAtPoint: cursorPt.
 	self displayCaretForBlock: pivotBlock.
 	showingCaret _ true.
