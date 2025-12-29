@@ -2164,121 +2164,6 @@ flush
 ExternalBinaryStream class
     instanceVariableNames: ''!
 
-"==================== WindowsFileStream ===================="
-
-ExternalBinaryStream subclass: #WindowsFileStream
-    instanceVariableNames: 'handle buffer bufferPosition bufferSize'
-    classVariableNames: 'BufferSize'
-    poolDictionaries: ''
-    category: 'Files-Streams'!
-
-WindowsFileStream comment:
-'I am a Windows binary file stream using Win32 file I/O.
-I use buffering for efficient read/write operations.'!
-
-!WindowsFileStream class methodsFor: 'class initialization'!
-
-initialize
-    BufferSize _ 4096.
-    ^self! !
-
-!WindowsFileStream methodsFor: 'initialization'!
-
-initialize
-    super initialize.
-    buffer _ ByteArray new: BufferSize.
-    bufferPosition _ 0.
-    bufferSize _ 0.
-    position _ 0.
-    ^self! !
-
-!WindowsFileStream methodsFor: 'open/close'!
-
-on: aWindowsFileReference
-    fileReference _ aWindowsFileReference.
-    handle _ aWindowsFileReference handle.
-    position _ 0.
-    bufferPosition _ 0.
-    bufferSize _ 0.
-    ^self!
-
-on: aWindowsFileReference mode: modeSymbol
-    modeSymbol = #read ifTrue: [aWindowsFileReference openRead].
-    modeSymbol = #write ifTrue: [aWindowsFileReference openWrite].
-    modeSymbol = #append ifTrue: [aWindowsFileReference openAppend].
-    self on: aWindowsFileReference.
-    ^self! !
-
-!WindowsFileStream methodsFor: 'reading'!
-
-basicRead: count
-    <primitive: 123>
-    | result bytesRead |
-    result _ ByteArray new: count.
-    bytesRead _ self primRead: handle into: result count: count.
-    bytesRead < count ifTrue: [
-        result _ result copyFrom: 1 to: bytesRead].
-    position _ position + bytesRead.
-    ^result!
-
-next
-    "Return next byte using buffered reading for efficiency.
-     Overrides ExternalBinaryStream>>next which calls basicRead: 1."
-    bufferPosition >= bufferSize ifTrue: [self fillBuffer].
-    bufferPosition >= bufferSize ifTrue: [^nil].  "EOF"
-    bufferPosition _ bufferPosition + 1.
-    position _ position + 1.
-    ^buffer at: bufferPosition!
-
-fillBuffer
-    "Fill the internal buffer from file."
-    | data bufferStartPosition |
-    bufferStartPosition _ position.
-    data _ self basicRead: BufferSize.  "This advances position"
-    data size = 0 ifTrue: [bufferSize _ 0. ^0].  "EOF"
-    1 to: data size do: [:i | buffer at: i put: (data at: i)].
-    bufferSize _ data size.
-    bufferPosition _ 0.
-    position _ bufferStartPosition.  "Reset; next will increment per byte"
-    ^bufferSize! !
-
-!WindowsFileStream methodsFor: 'writing'!
-
-basicWrite: buffer
-    <primitive: 123>
-    | bytesWritten |
-    bytesWritten _ self primWrite: handle from: buffer count: buffer size.
-    position _ position + bytesWritten.
-    ^bytesWritten! !
-
-!WindowsFileStream methodsFor: 'positioning'!
-
-setPosition: anOffset
-    <primitive: 124>
-    self primSeek: handle offset: anOffset origin: 0.
-    position _ anOffset.
-    "Invalidate buffer on seek"
-    bufferPosition _ 0.
-    bufferSize _ 0.
-    ^self! !
-
-!WindowsFileStream methodsFor: 'private'!
-
-primRead: aHandle into: buffer count: count
-    <primitive: 123>
-    ^0!
-
-primWrite: aHandle from: buffer count: count
-    <primitive: 123>
-    ^0!
-
-primSeek: aHandle offset: offset origin: origin
-    <primitive: 124>
-    ^-1! !
-
-WindowsFileStream class
-    instanceVariableNames: ''!
-
 "==================== ExternalTextStream ===================="
 
 ExternalBinaryStream subclass: #ExternalTextStream
@@ -2421,20 +2306,20 @@ I handle character encoding and line endings for text files.'!
 !WindowsTextStream class methodsFor: 'instance creation'!
 
 onFileNamed: fileName
-    | ref bin |
+    "Create a text stream on a file. WindowsFileReference provides stream operations."
+    | ref |
     ref _ WindowsFileReference fileName: fileName.
     ref openRead.
-    bin _ WindowsFileStream new on: ref.
-    ^self new on: bin encoding: #ascii lineEnding: #crlf!
+    ^self new on: ref encoding: #ascii lineEnding: #crlf!
 
 onFileNamed: fileName mode: modeSymbol
-    | ref bin |
+    "Create a text stream on a file with specified mode."
+    | ref |
     ref _ WindowsFileReference fileName: fileName.
     modeSymbol = #read ifTrue: [ref openRead].
     modeSymbol = #write ifTrue: [ref openWrite].
     modeSymbol = #append ifTrue: [ref openAppend].
-    bin _ WindowsFileStream new on: ref.
-    ^self new on: bin encoding: #ascii lineEnding: #crlf! !
+    ^self new on: ref encoding: #ascii lineEnding: #crlf! !
 
 WindowsTextStream class
     instanceVariableNames: ''!

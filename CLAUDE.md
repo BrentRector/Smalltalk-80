@@ -104,7 +104,7 @@ This matches the Smalltalk runtime compiler's behavior (`MessageNode>>emitIf:on:
 **Source Code Retrieval** ✅ **WORKING**
 - ✅ Compiler generates `.sources` file with chunk-formatted source
 - ✅ Source positions encoded in CompiledMethod bytecodes (last 3 bytes)
-- ✅ `SourceFiles` global initialized with WindowsFileReference objects
+- ✅ `SourceFiles` global initialized with WindowsFileStream objects
 - ✅ UTF-8 BOM handling in file primitives (transparent offset compensation)
 - ✅ `CompiledMethod>>getSource` retrieves source via `RemoteString`
 
