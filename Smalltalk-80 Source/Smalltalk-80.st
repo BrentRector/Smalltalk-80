@@ -1337,6 +1337,21 @@ position: anInteger
     newPos >= 0 ifTrue: [position _ newPos].
     ^position!
 
+fileName
+    "Answer the file name. Handle both String and WindowsPathName for pathName."
+    | path sep idx |
+    pathName isString
+        ifTrue: [
+            path _ pathName.
+            sep _ path includes: $\
+                ifTrue: [$\]
+                ifFalse: [$/].
+            idx _ path findLast: [:c | c = sep].
+            idx = 0
+                ifTrue: [^path]
+                ifFalse: [^path copyFrom: idx + 1 to: path size]]
+        ifFalse: [^pathName fileName]!
+
 name
     "Answer the name of the file. This is used by SourceFiles for compatibility with FileStream."
     ^self fileName! !
