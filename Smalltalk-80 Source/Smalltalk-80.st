@@ -8714,14 +8714,6 @@ crossedX
 	"Text display has wrapping.  The scanner just found a character past the x location of the cursor.  We know that the cursor is pointing at a character or before one."
 
 	| leadingTab currentX |
-	"DEBUG: Log crossedX values"
-	Transcript cr; show: 'crossedX: lastIndex='; print: lastIndex;
-		show: ' destX='; print: destX;
-		show: ' charPt.x='; print: characterPoint x;
-		show: ' lastCharExt.x='; print: lastCharacterExtent x;
-		show: ' char='; print: (text at: lastIndex);
-		show: ' line.first='; print: line first;
-		show: ' line.last='; print: line last.
 	((characterPoint x <= (destX + ((lastCharacterExtent x) // 2)))
 		or: [line last = lastIndex])
 		ifTrue:	[lastCharacter _ (text at: lastIndex).			
@@ -8943,12 +8935,7 @@ buildCharacterBlockIn: aParagraph
 		"see setStopConditions for stopping conditions for character block 	operations."
 	lastCharacterExtent x: (font widthOf: (text at: lastIndex)).
 	(self perform: stopCondition)
-		ifTrue:	[
-			"DEBUG: Log final CharacterBlock values"
-			Transcript cr; show: 'CharacterBlock: stringIndex='; print: lastIndex;
-				show: ' topLeft='; print: characterPoint;
-				show: ' char='; print: lastCharacter.
-			^CharacterBlock
+		ifTrue:	[^CharacterBlock
 					stringIndex: lastIndex
 					character: lastCharacter
 					topLeft: characterPoint
@@ -9039,25 +9026,14 @@ scanCharactersFrom: startIndex to: stopIndex in: sourceString rightX: rightX sto
 
 	| ascii nextDestX |
 	<primitive: 103>
-	"DEBUG: Log scan parameters"
-	Transcript cr; show: 'scanChars: start='; print: startIndex;
-		show: ' stop='; print: stopIndex;
-		show: ' rightX='; print: rightX;
-		show: ' destX='; print: destX.
 	lastIndex _ startIndex.
 	[lastIndex <= stopIndex]
-		whileTrue:
+		whileTrue: 
 			[ascii _ (sourceString at: lastIndex) asciiValue.
 			(stopConditions at: ascii + 1) ~~ nil ifTrue: [^stops at: ascii + 1].
 			sourceX _ xTable at: ascii + 1.
 			nextDestX _ destX + (width _ (xTable at: ascii + 2) - sourceX).
-			nextDestX > rightX ifTrue: [
-				"DEBUG: Log CrossedX trigger"
-				Transcript cr; show: '  CrossedX at lastIndex='; print: lastIndex;
-					show: ' char='; print: (sourceString at: lastIndex);
-					show: ' destX='; print: destX;
-					show: ' nextDestX='; print: nextDestX.
-				^stops at: CrossedX].
+			nextDestX > rightX ifTrue: [^stops at: CrossedX].
 			display ifTrue: [self copyBits].
 			destX _ nextDestX.
 			lastIndex _ lastIndex + 1].
