@@ -36,39 +36,104 @@ SystemDictionary>>snapshotAs: fileName thenQuit: aBoolean
 
 ## Image File Format
 
+### Binary Encoding Conventions
+
+| Aspect | Specification |
+|--------|---------------|
+| **Byte Order** | Little-endian (Intel/x86 native order) |
+| **Integer Types** | Signed 32-bit for all integer fields |
+| **String Encoding** | ASCII for magic number |
+| **OOP Encoding** | Tagged 32-bit value (see below) |
+
+### OOP (Object Pointer) Encoding
+
+All OOP values use LSB tagging in a 32-bit signed integer:
+
+| LSB | Interpretation | Value Extraction |
+|-----|----------------|------------------|
+| 0 | Object table pointer | `objectTableIndex = rawValue >> 1` |
+| 1 | SmallInteger immediate | `integerValue = rawValue >> 1` (arithmetic shift) |
+
+Example values:
+- `0x00000004` → Object table index 2 (4 >> 1 = 2)
+- `0x00000015` → SmallInteger 10 ((0x15 >> 1) = 10, LSB=1)
+- `0xFFFFFFFD` → SmallInteger -2 ((-3 >> 1) = -2, LSB=1)
+
+### ObjectFormat Enum
+
+| Value | Name | Description |
+|-------|------|-------------|
+| 0 | Pointer | Named instance variables only, no indexed portion |
+| 1 | PointerIndexed | Named instance variables + indexed OOP fields (Array, OrderedCollection) |
+| 2 | ByteIndexed | Named instance variables + indexed byte fields (String, ByteArray, CompiledMethod) |
+| 3 | WordIndexed | Named instance variables + indexed 16-bit word fields (WordArray) |
+
 ### Header (16 bytes)
 
-| Offset | Size | Field | Description |
-|--------|------|-------|-------------|
-| 0 | 4 | Magic | "WOST" (Wise Owl Smalltalk) |
-| 4 | 4 | Version | Format version (currently 1) |
-| 8 | 4 | ObjectCount | Number of objects in file |
-| 12 | 4 | MaxObjectId | Highest object table index used |
+| Offset | Size | Type | Field | Description |
+|--------|------|------|-------|-------------|
+| 0 | 4 | char[4] | Magic | "WOST" (ASCII, Wise Owl Smalltalk) |
+| 4 | 4 | int32 | Version | Format version (currently 1) |
+| 8 | 4 | int32 | ObjectCount | Number of objects in file |
+| 12 | 4 | int32 | MaxObjectId | Highest object table index used |
 
 ### Per-Object Record
 
 Each object is stored with its identity (object table index) preserved:
 
-| Field | Size | Description |
-|-------|------|-------------|
-| ObjectId | 4 bytes | Object table index (OOP identity) |
-| Format | 1 byte | ObjectFormat enum value |
-| InstanceVarCount | 4 bytes | Number of named instance variables |
-| IndexedSize | 4 bytes | Size of indexed portion (0 if none) |
-| ClassOOP | 4 bytes | Raw OOP value of class |
-| InstanceVars | 4 × count | OOP values for each instance variable |
-| IndexedData | varies | Format-specific indexed content |
+| Offset | Size | Type | Field | Description |
+|--------|------|------|-------|-------------|
+| 0 | 4 | int32 | ObjectId | Object table index (1-based) |
+| 4 | 1 | uint8 | Format | ObjectFormat enum value (0-3) |
+| 5 | 4 | int32 | InstanceVarCount | Number of named instance variables |
+| 9 | 4 | int32 | IndexedSize | Number of indexed elements (0 if none) |
+| 13 | 4 | int32 | ClassOOP | Raw tagged OOP value of class |
+| 17 | 4 × N | int32[] | InstanceVars | OOP values for each instance variable |
+| 17 + 4N | varies | varies | IndexedData | Format-specific indexed content |
 
-### Indexed Data Formats
+**Per-object header size**: 17 bytes fixed + variable data
 
-| ObjectFormat | Storage | Per-Element Size |
-|--------------|---------|------------------|
-| Pointer | None | N/A |
-| PointerIndexed | OOP array | 4 bytes |
-| ByteIndexed | byte array | 1 byte |
-| WordIndexed | ushort array | 2 bytes |
+### Indexed Data By Format
 
-**Note**: ByteIndexed objects with instance variables (like CompiledMethod) have BOTH an instance variable array AND a separate byte array. Both are stored.
+| Format | IndexedData Size | Element Type | Description |
+|--------|------------------|--------------|-------------|
+| Pointer (0) | 0 bytes | N/A | No indexed data |
+| PointerIndexed (1) | 4 × IndexedSize | int32 (OOP) | Array of tagged OOP values |
+| ByteIndexed (2) | IndexedSize | uint8 | Raw byte array |
+| WordIndexed (3) | 2 × IndexedSize | uint16 | Array of 16-bit words (little-endian) |
+
+**Note**: ByteIndexed objects with instance variables (like CompiledMethod) have BOTH an instance variable array AND a separate byte array. Both are stored sequentially.
+
+### Complete File Structure
+
+```
++---------------------------+
+| Header (16 bytes)         |
+|  - Magic: "WOST"          |
+|  - Version: 1             |
+|  - ObjectCount: N         |
+|  - MaxObjectId: M         |
++---------------------------+
+| Object 1                  |
+|  - ObjectId               |
+|  - Format                 |
+|  - InstanceVarCount       |
+|  - IndexedSize            |
+|  - ClassOOP               |
+|  - InstanceVars[...]      |
+|  - IndexedData[...]       |
++---------------------------+
+| Object 2                  |
+|  - ...                    |
++---------------------------+
+| ...                       |
++---------------------------+
+| Object N                  |
+|  - ...                    |
++---------------------------+
+```
+
+Objects appear in ascending ObjectId order (as enumerated from the object table). Gaps in ObjectId sequence indicate garbage-collected objects that are not stored.
 
 ## Save Operation
 
