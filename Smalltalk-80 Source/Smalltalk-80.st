@@ -1340,10 +1340,10 @@ position: anInteger
 fileName
     "Answer the file name. Handle both String and WindowsPathName for pathName."
     | path sep idx |
-    pathName isString
+    (pathName isKindOf: String)
         ifTrue: [
             path _ pathName.
-            sep _ path includes: $\
+            sep _ (path includes: $\)
                 ifTrue: [$\]
                 ifFalse: [$/].
             idx _ path findLast: [:c | c = sep].
