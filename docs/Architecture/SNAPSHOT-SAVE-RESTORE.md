@@ -79,19 +79,21 @@ Example values:
 
 ### Per-Object Record
 
-Each object is stored with its identity (object table index) preserved:
+Each object is stored with its identity preserved. All OOP fields use the tagged raw value format for consistency.
 
 | Offset | Size | Type | Field | Description |
 |--------|------|------|-------|-------------|
-| 0 | 4 | int32 | ObjectId | Object table index (1-based) |
+| 0 | 4 | int32 | ObjectOOP | Raw tagged OOP value (objectTableIndex << 1) |
 | 4 | 1 | uint8 | Format | ObjectFormat enum value (0-3) |
 | 5 | 4 | int32 | InstanceVarCount | Number of named instance variables |
 | 9 | 4 | int32 | IndexedSize | Number of indexed elements (0 if none) |
 | 13 | 4 | int32 | ClassOOP | Raw tagged OOP value of class |
-| 17 | 4 × N | int32[] | InstanceVars | OOP values for each instance variable |
+| 17 | 4 × N | int32[] | InstanceVars | Raw tagged OOP values for each instance variable |
 | 17 + 4N | varies | varies | IndexedData | Format-specific indexed content |
 
 **Per-object header size**: 17 bytes fixed + variable data
+
+**Design decision**: All OOP fields (ObjectOOP, ClassOOP, InstanceVars, PointerIndexed data) store the raw tagged value rather than the object table index. This is self-describing and consistent - readers don't need to know which fields are OOPs vs integers.
 
 ### Indexed Data By Format
 
@@ -102,7 +104,7 @@ Each object is stored with its identity (object table index) preserved:
 | ByteIndexed (2) | IndexedSize | uint8 | Raw byte array |
 | WordIndexed (3) | 2 × IndexedSize | uint16 | Array of 16-bit words (little-endian) |
 
-**Note**: ByteIndexed objects with instance variables (like CompiledMethod) have BOTH an instance variable array AND a separate byte array. Both are stored sequentially.
+**Note**: Any indexed object (PointerIndexed, ByteIndexed, or WordIndexed) may have named instance variables in addition to its indexed portion. Both are stored: first the instance variables as OOPs, then the indexed data in format-specific encoding. For example, CompiledMethod is ByteIndexed with instance variables for header, literals, etc.
 
 ### Complete File Structure
 
@@ -115,7 +117,7 @@ Each object is stored with its identity (object table index) preserved:
 |  - MaxObjectId: M         |
 +---------------------------+
 | Object 1                  |
-|  - ObjectId               |
+|  - ObjectOOP              |
 |  - Format                 |
 |  - InstanceVarCount       |
 |  - IndexedSize            |
@@ -133,7 +135,7 @@ Each object is stored with its identity (object table index) preserved:
 +---------------------------+
 ```
 
-Objects appear in ascending ObjectId order (as enumerated from the object table). Gaps in ObjectId sequence indicate garbage-collected objects that are not stored.
+Objects appear in ascending object table index order (as enumerated from the object table). Gaps in the sequence indicate garbage-collected objects that are not stored.
 
 ## Save Operation
 
@@ -143,13 +145,44 @@ Save is triggered by primitive 97 (snapshotPrimitive).
 
 ### Pre-Save State Flush
 
-Before writing the image, the VM must flush all cached interpreter state back to heap objects:
+Before writing the image, the VM must flush cached interpreter state back to heap objects.
 
-1. **Active Context State**: Write current IP and SP back to the active MethodContext/BlockContext
-2. **Process State**: Ensure active process's suspendedContext field points to the active context
-3. **Scheduler State**: ProcessScheduler's activeProcess field must be current
+#### Why Caching Exists
 
-This ensures all execution state is captured in heap objects, not in C# variables.
+The VM caches IP (instruction pointer) and SP (stack pointer) in C# variables for performance. Every bytecode execution requires reading IP, incrementing it, and often modifying SP. Going through the heap for each operation would be prohibitively slow:
+
+```csharp
+// Slow: heap access per bytecode
+var ipOOP = _heapManager.GetInstanceVariable(context, PC_INDEX);
+int ip = ipOOP.AsSmallInteger();
+ip++;
+_heapManager.SetInstanceVariable(context, PC_INDEX, SmalltalkOOP.FromSmallInteger(ip));
+
+// Fast: cached C# variables
+byte bytecode = _bytecodes[_ip++];
+```
+
+#### What Must Be Flushed
+
+Only IP and SP need explicit flushing:
+
+1. **IP/SP**: Write current values back to the active MethodContext/BlockContext
+
+What does NOT need explicit action:
+
+2. **suspendedContext**: Already points to the active context. When a process is activated via `ActivateProcess()`, the context is read from `suspendedContext` but the field is not cleared. The reference remains valid while the process runs.
+
+3. **activeProcess**: Already current in ProcessScheduler - maintained by normal process scheduling.
+
+#### GC Reachability
+
+The active context remains reachable for garbage collection through the chain:
+
+```
+Smalltalk (GC root) → Processor → activeProcess → suspendedContext → context
+```
+
+This is why `suspendedContext` is not cleared on activation - it provides the GC root for the running context.
 
 ### Write Sequence
 
@@ -199,7 +232,8 @@ This pre-allocates enough blocks to accommodate all object indices without repea
 For each object in the file:
 
 ```csharp
-int objectId = ReadInt32();
+SmalltalkOOP objectOOP = ReadOOP();           // Tagged OOP value
+int objectId = objectOOP.ToObjectTableIndex(); // Extract index
 ObjectFormat format = (ObjectFormat)ReadByte();
 int instanceVarCount = ReadInt32();
 int indexedSize = ReadInt32();
@@ -330,14 +364,16 @@ Most VM state is stored in Smalltalk objects and automatically saved/restored:
 
 ### State That Lives in C# (Must Be Flushed/Restored)
 
-The VM caches some state in C# variables for performance:
+The VM caches execution state in C# variables for performance. This state must be synchronized with heap objects for save/restore:
 
 | C# Variable | Heap Location | Flush Before Save | Restore After Load |
 |-------------|---------------|-------------------|-------------------|
-| _activeContext | Process.suspendedContext | Yes | Yes |
-| _instructionPointer | Context.instructionPointer | Yes | Yes |
-| _stackPointer | Context.stackPointer | Yes | Yes |
-| _activeProcess | Processor.activeProcess | Implicit | Yes |
+| _instructionPointer | Context.instructionPointer | **Yes** | Yes |
+| _stackPointer | Context.stackPointer | **Yes** | Yes |
+| _activeContext | Process.suspendedContext | No (already set) | Yes |
+| _activeProcess | Processor.activeProcess | No (already set) | Yes |
+
+**Key insight**: Only IP and SP need explicit flushing. The `_activeContext` and `_activeProcess` C# variables are caches of heap state that's already correct - `suspendedContext` points to the active context, and `activeProcess` is maintained by process scheduling.
 
 ### Flush Protocol (Before Save)
 
@@ -354,7 +390,8 @@ void FlushVMStateToHeap()
         ContextInstanceVars.StackPointer,
         SmalltalkOOP.FromSmallInteger(_stackPointer));
 
-    // Context is already linked to process via suspendedContext
+    // No need to set suspendedContext - already points to active context
+    // No need to set activeProcess - already current in ProcessScheduler
 }
 ```
 
