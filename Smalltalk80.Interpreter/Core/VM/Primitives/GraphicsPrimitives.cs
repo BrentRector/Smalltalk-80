@@ -240,6 +240,15 @@ public static class GraphicsOperations
     }
 
     /// <summary>Primitive 97: snapshot - Save image to disk</summary>
+    /// <remarks>
+    /// Returns nil when the snapshot was just created (so Smalltalk can quit if requested).
+    /// When the image is later restored, execution continues from here but returns
+    /// the receiver (non-nil), so the restore path runs instead of quit.
+    ///
+    /// Smalltalk code:
+    ///   justSnapped := self snapshotPrimitive isNil.
+    ///   justSnapped &amp; quitIfTrue ifTrue: [self quitPrimitive]
+    /// </remarks>
     public class Snapshot : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
@@ -251,7 +260,9 @@ public static class GraphicsOperations
             bool success = context.Platform.PerformSnapshot(context.Receiver);
             if (!success) return PrimitiveResult.Fail(context.Metadata!);
 
-            return PrimitiveResult.Ok(context.Receiver);
+            // Return nil to indicate "snapshot was just created"
+            // This allows Smalltalk code to call quitPrimitive if quitIfTrue is set
+            return PrimitiveResult.Ok(context.HeapManager.GetNil());
         }
     }
 
