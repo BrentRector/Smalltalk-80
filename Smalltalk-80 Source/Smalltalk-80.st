@@ -8904,6 +8904,10 @@ buildCharacterBlockIn: aParagraph
 	destY _ (aParagraph topAtLineIndex: lineIndex).
 	line _ aParagraph lineAt: lineIndex.
 	text _ aParagraph textAt: lineIndex.
+	Transcript cr; show: 'buildBlock: lineIdx='; print: lineIndex;
+		show: ' destY='; print: destY;
+		show: ' line.first='; print: line first;
+		show: ' line.last='; print: line last.
 	rightMargin _ aParagraph rightMarginForDisplay.
 
 	(lineIndex = aParagraph numberOfLines and:
