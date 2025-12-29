@@ -132,15 +132,18 @@ public static class FontPrimitives
                 var stopCondition = context.HeapManager.GetIndexedOOP(stopConditionsOOP, ascii);
                 if (stopCondition != context.Metadata!.KnownObjects.Nil)
                 {
-                    // Update lastIndex before returning
+                    // Update instance variables before returning
+                    // CRITICAL: Must set destX so stop condition handlers (like CompositionScanner>>space) read correct value
                     context.HeapManager.SetInstanceVariable(context.Receiver, SCANNER_LASTINDEX_INDEX,
                         SmalltalkOOP.FromSmallInteger(lastIndex));
+                    context.HeapManager.SetInstanceVariable(context.Receiver, BITBLT_DESTX_INDEX,
+                        SmalltalkOOP.FromSmallInteger(destX));
 
                     // Return stops at: (ascii + 1) - 0-based index is ascii
                     var result = context.HeapManager.GetIndexedOOP(stopsOOP, ascii);
 
                     if (DebugLogging)
-                        Console.WriteLine($"[Prim103] StopCondition: ascii={ascii} char='{(char)ascii}' lastIndex={lastIndex}");
+                        Console.WriteLine($"[Prim103] StopCondition: ascii={ascii} char='{(char)ascii}' lastIndex={lastIndex} destX={destX}");
 
                     return PrimitiveResult.Ok(result);
                 }
