@@ -1541,6 +1541,14 @@ nextPutAll: aCollection
             ifFalse: [self nextPut: (Character value: each)]].
     ^aCollection!
 
+do: aBlock
+    "Iterate over all characters in the file from current position to end.
+    Used when this file is passed to another stream's nextPutAll:."
+    | char |
+    [self atEnd] whileFalse: [
+        char _ self next.
+        char notNil ifTrue: [aBlock value: char]]!
+
 primReadByte: aHandle at: pos
     "Read a byte from file at position. Returns -1 on EOF/error"
     <primitive: 132>
