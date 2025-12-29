@@ -124,11 +124,36 @@ public class ImageWriter
                     {
                         int previewLen = Math.Min(100, indexedSize);
                         var previewBytes = new byte[previewLen];
+                        int nonZeroCount = 0;
+                        int firstNonZero = -1;
                         for (int i = 0; i < previewLen; i++)
                         {
                             previewBytes[i] = _heap.GetIndexedByte(oop, i);
+                            if (previewBytes[i] != 0)
+                            {
+                                nonZeroCount++;
+                                if (firstNonZero < 0) firstNonZero = i;
+                            }
                         }
-                        preview = $" Preview: \"{Encoding.Latin1.GetString(previewBytes).Replace("\n", "\\n").Replace("\r", "\\r")}\"...";
+
+                        // Check if it's all zeros
+                        if (nonZeroCount == 0)
+                        {
+                            // Sample deeper into the object to check if it's truly all zeros
+                            int sampleCount = 0;
+                            for (int i = 0; i < Math.Min(1000, indexedSize); i += 100)
+                            {
+                                if (_heap.GetIndexedByte(oop, i) != 0) sampleCount++;
+                            }
+                            preview = sampleCount == 0
+                                ? " [ALL ZEROS - uninitialized buffer?]"
+                                : $" [First 100 bytes zero, but has content at deeper offsets]";
+                        }
+                        else
+                        {
+                            string text = Encoding.Latin1.GetString(previewBytes).Replace("\n", "\\n").Replace("\r", "\\r");
+                            preview = $" Preview: \"{text}\"...";
+                        }
                     }
 
                     Console.WriteLine($"    {className} (oop={oop}): {bytes:N0} bytes ({format}, indexedSize={indexedSize}){preview}");
