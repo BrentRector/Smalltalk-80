@@ -1335,7 +1335,11 @@ position: anInteger
     | newPos |
     newPos _ self primSeek: handle offset: anInteger origin: 0.
     newPos >= 0 ifTrue: [position _ newPos].
-    ^position! !
+    ^position!
+
+name
+    "Answer the name of the file. This is used by SourceFiles for compatibility with FileStream."
+    ^self fileName! !
 
 !WindowsFileReference methodsFor: 'operations'!
 
