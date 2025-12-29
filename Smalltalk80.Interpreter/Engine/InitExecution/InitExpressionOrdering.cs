@@ -7,7 +7,6 @@ public static class InitExpressionOrdering
 {
     /// <summary>
     /// Returns the explicit execution order for init expressions.
-    /// This is the exact order they should run, with FormDisplayTest last.
     /// </summary>
     public static List<string> GetExecutionOrder()
     {
@@ -64,7 +63,6 @@ public static class InitExpressionOrdering
             "VariableNode initialize",
             "FormMenuView initialize",
             "TextCollector initialize",
-            "FormDisplayTest initialize",  // Must run last - depends on FormMenuView loading Forms
 
             // BlockContext Diagnostic Tests (9 individual variable tests)
             "DiagOa initialize",
