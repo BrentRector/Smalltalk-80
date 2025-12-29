@@ -2234,75 +2234,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     SmalltalkOOP IPrimitiveContext.InternSymbol(string symbolName)
     {
-        // CRITICAL: Must access USTable from Smalltalk heap, NOT from C# proxy data
-        // The _symbols array and SymbolRegistry are coldstart-time snapshots that become
-        // stale as soon as the Smalltalk interpreter begins running and creates new symbols.
-
-        // Get USTable from Symbol's classPool (it's a class variable, not a global)
-        var ustableOOP = _runtimeHeapAccess.LookupClassVariable("Symbol", "USTable");
-        if (ustableOOP == _metadata.KnownObjects.Nil)
-        {
-            // USTable not yet created (shouldn't happen after cold start)
-            return _metadata.KnownObjects.Nil;
-        }
-
-        // USTable is an Array of Arrays (buckets) for collision chaining.
-        // Each bucket contains symbols that hash to that index.
-        // Lookup: hash → bucket index → search within bucket
-        int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
-        var nilOOP = _metadata.KnownObjects.Nil;
-
-        // Compute bucket index using same hash as Smalltalk's stringhash
-        // (matches String>>hash algorithm used by Symbol class>>hasInterned:ifTrue:)
-        int hash = SymbolHasher.ComputeHash(symbolName);
-        int bucketIndex = hash % ustableSize;
-
-        // Get the bucket array at this index
-        var bucketOOP = _heapManager.GetIndexedOOP(ustableOOP, bucketIndex);
-        if (bucketOOP == nilOOP || bucketOOP.IsSmallInteger)
-        {
-            return nilOOP; // No bucket = symbol not found
-        }
-
-        // Search within this bucket only (typically 1-3 symbols)
-        int bucketSize = _heapManager.GetIndexedSize(bucketOOP);
-
-        for (int i = 0; i < bucketSize; i++)
-        {
-            var symbolOOP = _heapManager.GetIndexedOOP(bucketOOP, i);
-
-            // Skip nil slots
-            if (symbolOOP == nilOOP || symbolOOP.IsSmallInteger)
-                continue;
-
-            // Compare using GetByteSpan for zero-copy access
-            var symbolBytes = _heapManager.GetByteSpan(symbolOOP);
-
-            // Quick length check first
-            if (symbolBytes.Length != symbolName.Length)
-                continue;
-
-            // Compare bytes (Symbol uses Latin-1 encoding)
-            bool match = true;
-            for (int j = 0; j < symbolName.Length; j++)
-            {
-                if (symbolBytes[j] != (byte)symbolName[j])
-                {
-                    match = false;
-                    break;
-                }
-            }
-
-            if (match)
-            {
-                // Found matching symbol in the Smalltalk heap
-                return symbolOOP;
-            }
-        }
-
-        // Symbol not found - return Nil to signal primitive failure
-        // The Smalltalk fallback code will create a new Symbol if needed
-        return _metadata.KnownObjects.Nil;
+        // Delegate to RuntimeHeapAccessor which uses hash-based USTable lookup
+        return _runtimeHeapAccess.InternSymbol(symbolName);
     }
 
     SmalltalkOOP IPrimitiveContext.GetGlobalObjectByName(string globalName)
