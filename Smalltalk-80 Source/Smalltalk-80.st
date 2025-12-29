@@ -39357,8 +39357,10 @@ snapshotAs: imageFilePrefix thenQuit: quitIfTrue
 	Cursor execute show.
 	self logChange: '''----SNAPSHOT----'''.
 	Disk == nil
-		ifFalse:	"install as snapshot file and update creation time"
-			[(FileStream fileNamed: imageFilePrefix, '.im') beSnapshotFile; readWrite; close].
+		ifFalse:	"Register snapshot filename with VM for primitive 97.
+				   Use WindowsFile directly to avoid FileStream reading the entire
+				   existing file into memory (which would bloat the new snapshot)."
+			[(WindowsFile named: imageFilePrefix, '.im') beSnapshotFile].
 	self releaseExternalViews.
 	Transcript cr; show: 'Snapshot at: ', Time dateAndTimeNow printString.
 	height _ Display height.
