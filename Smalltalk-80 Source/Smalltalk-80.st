@@ -1414,7 +1414,7 @@ rename: newName
     | oldPath newPath |
     self close.
     oldPath _ pathName asString.
-    newPath _ newName isString 
+    newPath _ (newName isKindOf: String)
         ifTrue: [newName]
         ifFalse: [newName asString].
     self primMove: oldPath to: newPath.
