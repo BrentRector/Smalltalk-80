@@ -8,25 +8,38 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// </summary>
 public static class SystemOperations
 {
+    /// <summary>
+    /// Maximum theoretical OOP count based on our SmalltalkOOP representation.
+    /// SmalltalkOOP uses a 32-bit tagged pointer where LSB=0 means object pointer.
+    /// Maximum object table index = Int32.MaxValue >> 1 = 1,073,741,823.
+    /// </summary>
+    private const int MaxTheoreticalOops = int.MaxValue >> 1;
+
     /// <summary>Primitive 112: coreLeft - Free memory available</summary>
+    /// <remarks>
+    /// On modern systems with virtual memory, we have essentially unlimited memory.
+    /// The original Blue Book ran on systems with limited physical memory.
+    /// We report a large value based on theoretical maximum to ensure Smalltalk's
+    /// low memory monitoring never triggers spuriously.
+    /// </remarks>
     public class CoreLeft : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Query garbage collector for memory statistics
-            var stats = context.HeapManager.GC.GetStatistics();
-            int totalSlots = context.HeapManager.GetObjectTableSize();
-            int usedSlots = stats.TotalObjects;
-            int freeSlots = totalSlots - usedSlots;
+            // Use theoretical maximum OOPs minus active objects, times estimated bytes per slot.
+            // This ensures we always report a very large amount of free memory.
+            int activeObjects = context.HeapManager.GetActiveObjectCount();
+            int freeOops = MaxTheoreticalOops - activeObjects;
+            if (freeOops < 0) freeOops = int.MaxValue;
 
             // Estimate memory: assume ~1KB average object size
-            int estimatedFreeBytes = freeSlots * 1024;
-            if (estimatedFreeBytes < 0) estimatedFreeBytes = 0;
+            // Use long arithmetic to avoid overflow, then cap at SmallInteger max
+            long estimatedFreeBytes = (long)freeOops * 1024;
             if (estimatedFreeBytes > 0x3FFFFFFF) estimatedFreeBytes = 0x3FFFFFFF;
 
-            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(estimatedFreeBytes));
+            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)estimatedFreeBytes));
         }
     }
 
@@ -70,44 +83,104 @@ public static class SystemOperations
     }
 
     /// <summary>Primitive 115: oopsLeft - Available object pointer slots</summary>
+    /// <remarks>
+    /// On modern systems, the object table can grow as needed up to the theoretical maximum.
+    /// We report free OOPs relative to what we CAN allocate, not what we HAVE allocated.
+    /// This ensures Smalltalk's low memory monitoring never triggers spuriously.
+    /// </remarks>
     public class OopsLeft : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            int totalSlots = context.HeapManager.GetObjectTableSize();
+            // Use theoretical maximum minus active objects for free OOPs.
+            // This ensures we always report a very large number of available OOPs.
             int activeObjects = context.HeapManager.GetActiveObjectCount();
-            int freeSlots = totalSlots - activeObjects;
+            int freeOops = MaxTheoreticalOops - activeObjects;
 
-            if (freeSlots < 0) freeSlots = 0;
-            if (freeSlots > 0x3FFFFFFF) freeSlots = 0x3FFFFFFF;
+            if (freeOops < 0) freeOops = int.MaxValue;
+            if (freeOops > 0x3FFFFFFF) freeOops = 0x3FFFFFFF;
 
-            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(freeSlots));
+            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(freeOops));
         }
     }
 
     /// <summary>Primitive 116: signalAtOopsLeftWordsLeft - Set low memory threshold</summary>
+    /// <remarks>
+    /// Smalltalk: signal: aSemaphore atOopsLeft: numOops wordsLeft: numWords
+    /// Blue Book: numOops is a 16-bit Integer, numWords is a 32-bit LargePositiveInteger.
+    /// We accept SmallInteger or LargePositiveInteger for both to handle .NET's large memory.
+    ///
+    /// When available oops or words drop below the specified thresholds, the VM
+    /// signals the semaphore, allowing the system to respond to low memory.
+    /// </remarks>
     public class SignalAtOopsLeftWordsLeft : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            // Method signature: signal: aSemaphore atOopsLeft: numOops wordsLeft: numWords
+            // So we have 3 arguments: semaphore, oopsLimit, wordsLimit
+            if (context.Arguments.Length != 3) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Receiver must be Semaphore object (or nil to disable)
-            if (!context.Receiver.IsSmallInteger && context.Receiver != context.HeapManager.GetNil())
+            // Arguments:
+            // [0] = aSemaphore (Semaphore or nil)
+            // [1] = numOops (SmallInteger)
+            // [2] = numWords (SmallInteger or LargePositiveInteger)
+            var semaphoreOOP = context.Arguments[0];
+            var oopsOOP = context.Arguments[1];
+            var wordsOOP = context.Arguments[2];
+
+            // LowMemoryManager is required
+            if (context.LowMemoryManager == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // If semaphore is nil, disable monitoring
+            if (semaphoreOOP == context.HeapManager.GetNil())
             {
-                if (!context.Arguments[0].IsSmallInteger || !context.Arguments[1].IsSmallInteger)
-                    return PrimitiveResult.Fail(context.Metadata!);
-
-                int oopsThreshold = context.Arguments[0].AsSmallInteger();
-                int wordsThreshold = context.Arguments[1].AsSmallInteger();
-
-                if (oopsThreshold < 0 || wordsThreshold < 0)
-                    return PrimitiveResult.Fail(context.Metadata!);
-
-                // Stub implementation - accept parameters but don't implement monitoring
+                context.LowMemoryManager.Disable();
+                return PrimitiveResult.Ok(context.Receiver);
             }
+
+            // Extract oops threshold (must be SmallInteger)
+            if (!oopsOOP.IsSmallInteger)
+                return PrimitiveResult.Fail(context.Metadata!);
+            int oopsThreshold = oopsOOP.AsSmallInteger();
+
+            // Extract words threshold (SmallInteger or LargePositiveInteger)
+            int wordsThreshold;
+            if (wordsOOP.IsSmallInteger)
+            {
+                wordsThreshold = wordsOOP.AsSmallInteger();
+            }
+            else
+            {
+                // LargePositiveInteger - extract value from bytes
+                // For practical purposes, cap at int.MaxValue
+                int size = context.HeapManager.GetIndexedSize(wordsOOP);
+                if (size == 0)
+                {
+                    wordsThreshold = 0;
+                }
+                else if (size <= 4)
+                {
+                    // Read as little-endian 32-bit integer
+                    int value = 0;
+                    for (int i = 0; i < size; i++)
+                    {
+                        value |= context.HeapManager.GetIndexedByte(wordsOOP, i) << (i * 8);
+                    }
+                    wordsThreshold = value;
+                }
+                else
+                {
+                    // Larger than 32-bit - cap at max
+                    wordsThreshold = int.MaxValue;
+                }
+            }
+
+            // Set the thresholds in the low memory manager
+            context.LowMemoryManager.SetThresholds(semaphoreOOP, oopsThreshold, wordsThreshold);
 
             return PrimitiveResult.Ok(context.Receiver);
         }

@@ -63,6 +63,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         VMMetadata? metadata = null,
         IStackManager? stackManager = null,
         ITimerManager? timerManager = null,
+        ILowMemoryManager? lowMemoryManager = null,
         IProcessScheduler? processScheduler = null,
         VirtualMachine? vm = null)
     {
@@ -86,6 +87,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 messageSender: messageSender,
                 metadata: metadata,
                 timerManager: timerManager,
+                lowMemoryManager: lowMemoryManager,
                 processScheduler: processScheduler,
                 legacyContext: ctx,
                 vm: vm
@@ -290,6 +292,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(134, new FileStreamPrimitives.FileWriteByte());
         registry.Register(136, new FileStreamPrimitives.FileWrite());
         registry.Register(151, new FileStreamPrimitives.FileFlush());
+        registry.Register(156, new FileStreamPrimitives.SetSnapshotFile());
 
         // Directory primitives (create, remove, list, enumerate)
         registry.Register(127, new DirectoryPrimitives.CreateDirectory());

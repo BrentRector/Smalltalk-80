@@ -52,6 +52,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private readonly NonLocalReturnHandler _nlrHandler;
     private readonly ExecutionTracer _tracer;
     private readonly ITimerManager _timerManager;
+    private readonly ILowMemoryManager _lowMemoryManager;
     private readonly RuntimeDictionaryService _dictionaryService;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
@@ -143,6 +144,9 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
         // Initialize timer manager for Delay mechanism (primitive 100)
         _timerManager = new TimerManager();
+
+        // Initialize low memory manager for primitive 116
+        _lowMemoryManager = new LowMemoryManager();
 
         _contextManager = new ContextManager(
             heapManager,
@@ -412,6 +416,10 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
                 // This enables Delay>>wait to work - when the timer fires, we signal the semaphore
                 // which wakes the Delay timing process at high priority.
                 CheckAndSignalExpiredTimer();
+
+                // Check for low memory conditions and signal the low memory semaphore if needed.
+                // This allows the system to respond to low memory (e.g., trigger GC or warn user).
+                CheckAndSignalLowMemory();
             }
 
             // Execute bytecode - Smalltalk handles all scheduling via primitives

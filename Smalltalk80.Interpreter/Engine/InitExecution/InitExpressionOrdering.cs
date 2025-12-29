@@ -43,6 +43,7 @@ public static class InitExpressionOrdering
             "TextList initialize",
             "WindowsFileDirectory initialize",
             "WindowsFileSystem initialize",
+            "WindowsFileStream initialize",
             "FileDirectory initialize",
             "File initialize",
             "BitEditor initialize",
