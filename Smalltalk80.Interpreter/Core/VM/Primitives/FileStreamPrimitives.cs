@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -496,6 +497,46 @@ public static class FileStreamPrimitives
             }
             catch
             {
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Primitive 156: Set the snapshot file path.
+    /// Called by WindowsFile>>beSnapshotFile to register the path for primitive 97.
+    /// Receiver: WindowsFile instance with fileName instance variable.
+    /// Returns: self on success.
+    /// </summary>
+    public class SetSnapshotFile : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
+
+            // Receiver is a WindowsFile with fileName in instance variable
+            var receiver = context.Receiver;
+            if (receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            // WindowsFile has fileName as instance variable 0
+            // Instance variables: fileName fileDirectory serialNumber lastPageNumber binary readWrite error
+            try
+            {
+                var fileNameOOP = context.HeapManager.GetInstanceVariable(receiver, 0);
+                if (fileNameOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+                string? fileName = FilePrimitiveHelpers.ExtractString(context, fileNameOOP);
+                if (fileName == null) return PrimitiveResult.Fail(context.Metadata!);
+
+                // Store the snapshot file path for primitive 97
+                ImageWriter.SnapshotFilePath = fileName;
+                Console.WriteLine($"[Primitive 156] Snapshot file set to: {fileName}");
+
+                return PrimitiveResult.Ok(receiver);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Primitive 156] Error: {ex.Message}");
                 return PrimitiveResult.Fail(context.Metadata!);
             }
         }

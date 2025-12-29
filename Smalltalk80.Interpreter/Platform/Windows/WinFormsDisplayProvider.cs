@@ -560,8 +560,38 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public bool PerformSnapshot(SmalltalkOOP snapshotRequestOOP)
     {
-        // Snapshot not yet implemented
-        return false;
+        // Get the snapshot file path set by primitive 156 (beSnapshotFile)
+        string? filePath = ImageWriter.SnapshotFilePath;
+        if (string.IsNullOrEmpty(filePath))
+        {
+            Console.WriteLine("[Snapshot] Error: No snapshot file path set. Call beSnapshotFile first.");
+            return false;
+        }
+
+        if (_heap == null)
+        {
+            Console.WriteLine("[Snapshot] Error: No heap reference available.");
+            return false;
+        }
+
+        Console.WriteLine($"[Snapshot] Saving image to: {filePath}");
+
+        // Create ImageWriter and serialize the heap
+        var writer = new ImageWriter(_heap);
+        bool success = writer.WriteImage(filePath);
+
+        if (success)
+        {
+            Console.WriteLine("[Snapshot] Image saved successfully.");
+            // Clear the snapshot path after successful save
+            ImageWriter.SnapshotFilePath = null;
+        }
+        else
+        {
+            Console.WriteLine("[Snapshot] Failed to save image.");
+        }
+
+        return success;
     }
 
     public void InvalidateDisplayRegion(int x, int y, int w, int h)

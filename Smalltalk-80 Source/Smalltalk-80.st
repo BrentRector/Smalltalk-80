@@ -342,7 +342,8 @@ readWrite
 
 beSnapshotFile
     "Mark this file as a snapshot file.
-     On Windows, this is a no-op since we don't have special snapshot file handling."
+     Register the filename with the VM for primitive 97 to use."
+    <primitive: 156>
     ^self!
 
 open
