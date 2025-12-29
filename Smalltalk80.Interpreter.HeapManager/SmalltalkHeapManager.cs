@@ -418,6 +418,20 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         WriteIndexedByte(entry, index, value);
     }
 
+    public ReadOnlySpan<byte> GetByteSpan(SmalltalkOOP objectOOP)
+    {
+        if (objectOOP.IsSmallInteger)
+            return ReadOnlySpan<byte>.Empty;
+
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+
+        if (entry.FormatExplicit != ObjectFormat.ByteIndexed)
+            return ReadOnlySpan<byte>.Empty;
+
+        var byteArray = entry.AsByteArray();
+        return byteArray ?? ReadOnlySpan<byte>.Empty;
+    }
+
     public ushort GetIndexedWord(SmalltalkOOP objectOOP, int index)
     {
         if (objectOOP.IsSmallInteger)

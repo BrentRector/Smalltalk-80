@@ -119,6 +119,14 @@ public interface ISmalltalkHeap
     void SetIndexedByte(SmalltalkOOP objectOOP, int index, byte value);
 
     /// <summary>
+    /// Gets the underlying byte array as a ReadOnlySpan for ByteIndexed objects.
+    /// OPTIMIZATION: Zero-copy access for content-based operations like hashing.
+    /// </summary>
+    /// <param name="objectOOP">ByteIndexed object (String, ByteArray, Symbol)</param>
+    /// <returns>ReadOnlySpan over the byte content, or empty span if not ByteIndexed</returns>
+    ReadOnlySpan<byte> GetByteSpan(SmalltalkOOP objectOOP);
+
+    /// <summary>
     /// Gets indexed word from WordIndexed objects (WordArrays, Bitmaps).
     /// Validates format is WordIndexed and index is within range.
     /// </summary>
