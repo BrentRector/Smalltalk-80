@@ -89,6 +89,7 @@ public static class SystemOperations
 
     /// <summary>Primitive 116: signalAtOopsLeftWordsLeft - Set low memory threshold</summary>
     /// <remarks>
+    /// Smalltalk: signal: aSemaphore atOopsLeft: numOops wordsLeft: numWords
     /// Blue Book: numOops is a 16-bit Integer, numWords is a 32-bit LargePositiveInteger.
     /// We accept SmallInteger or LargePositiveInteger for both to handle .NET's large memory.
     /// This is a stub - we accept the thresholds but don't implement actual monitoring.
@@ -97,20 +98,17 @@ public static class SystemOperations
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            // Method signature: signal: aSemaphore atOopsLeft: numOops wordsLeft: numWords
+            // So we have 3 arguments: semaphore, oopsLimit, wordsLimit
+            if (context.Arguments.Length != 3) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Receiver must be Semaphore object or nil (to disable monitoring)
-            // For stub implementation, just accept any valid receiver
+            // Arguments:
+            // [0] = aSemaphore (Semaphore or nil)
+            // [1] = numOops (SmallInteger)
+            // [2] = numWords (SmallInteger or LargePositiveInteger)
 
-            // Arguments can be SmallInteger or LargePositiveInteger
-            // We don't validate strictly since this is a stub implementation
-            // Just verify they are valid OOPs (not corrupt)
-            var arg0 = context.Arguments[0];
-            var arg1 = context.Arguments[1];
-
-            // Accept SmallIntegers directly
-            // For non-SmallInteger, just accept it (could be LargePositiveInteger)
-            // Stub: don't actually set up monitoring, just succeed
+            // Stub implementation - accept parameters but don't implement monitoring
+            // Just succeed to allow system initialization to complete
 
             return PrimitiveResult.Ok(context.Receiver);
         }
