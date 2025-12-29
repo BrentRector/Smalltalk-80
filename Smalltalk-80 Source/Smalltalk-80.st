@@ -40036,7 +40036,7 @@ initialize
 
 	(Smalltalk includes: TextConstants)
 		ifFalse: [Smalltalk at: #TextConstants put: (Dictionary new: 32)].
-	TextConstants at: #CaretForm  
+	TextConstants at: #CaretForm
 		 		 put: (Cursor
 	extent: 16@16
 	fromArray: #(
@@ -40056,7 +40056,7 @@ initialize
 		2r0
 		2r0
 		2r0)
-	offset: 8@0).
+	offset: -8@0).
 
 	self initTextConstants!
 initTextConstants	"Text initTextConstants."
