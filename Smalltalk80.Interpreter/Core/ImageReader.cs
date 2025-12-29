@@ -15,7 +15,7 @@ namespace Smalltalk80.Interpreter.Core;
 ///   - 4-byte object count
 ///   - 4-byte max object ID (highest object table index)
 /// - For each object (in OOP order):
-///   - 4-byte ObjectOOP (tagged value: objectTableIndex << 1)
+///   - 4-byte ObjectOOP (tagged value: objectTableIndex * 2)
 ///   - 1-byte format (ObjectFormat enum)
 ///   - 4-byte instance variable count
 ///   - 4-byte indexed size
