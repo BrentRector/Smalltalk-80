@@ -340,6 +340,11 @@ readWrite
 
 !WindowsFile methodsFor: 'file status'!
 
+beSnapshotFile
+    "Mark this file as a snapshot file.
+     On Windows, this is a no-op since we don't have special snapshot file handling."
+    ^self!
+
 open
     "Open the file for access."
     lastPageNumber _ 1.
