@@ -8,12 +8,13 @@ namespace Smalltalk80.Interpreter.Core;
 /// Deserializes a Smalltalk heap from a binary image file.
 /// Restores objects to the same OOP locations for reference preservation.
 ///
-/// Image Format (version 1):
-/// - Header (16 bytes):
+/// Image Format (version 2):
+/// - Header (20 bytes):
 ///   - 4-byte magic "WOST" (Wise Owl Smalltalk)
-///   - 4-byte version
+///   - 4-byte version (2)
 ///   - 4-byte object count
 ///   - 4-byte max object ID (highest object table index)
+///   - 4-byte Smalltalk OOP (SystemDictionary - root for rebuilding VMMetadata)
 /// - For each object (in OOP order):
 ///   - 4-byte ObjectOOP (tagged value: objectTableIndex * 2)
 ///   - 1-byte format (ObjectFormat enum)
@@ -28,8 +29,11 @@ public class ImageReader
     /// <summary>Expected magic number identifying Wise Owl Smalltalk image files.</summary>
     public const string ExpectedMagic = "WOST";
 
-    /// <summary>Supported image format version.</summary>
-    public const int SupportedVersion = 1;
+    /// <summary>Current image format version.</summary>
+    public const int CurrentVersion = 2;
+
+    /// <summary>Minimum supported image format version.</summary>
+    public const int MinSupportedVersion = 2;
 
     private readonly ISmalltalkHeap _heap;
 
@@ -76,8 +80,9 @@ public class ImageReader
 
             int objectCount = headerResult.ObjectCount;
             int maxObjectId = headerResult.MaxObjectId;
+            var smalltalkOOP = headerResult.SmalltalkOOP;
 
-            Console.WriteLine($"[ImageReader] Image version {SupportedVersion}, {objectCount} objects, maxObjectId={maxObjectId}");
+            Console.WriteLine($"[ImageReader] Image version {headerResult.Version}, {objectCount} objects, maxObjectId={maxObjectId}, SmalltalkOOP={smalltalkOOP}");
 
             // Prepare heap for restore
             _heap.PrepareForRestore(maxObjectId);
@@ -104,7 +109,7 @@ public class ImageReader
             _heap.RebuildFreeList();
 
             Console.WriteLine($"[ImageReader] Successfully restored {objectsRead} objects");
-            return ImageRestoreResult.Succeeded(objectsRead, maxObjectId);
+            return ImageRestoreResult.Succeeded(objectsRead, maxObjectId, smalltalkOOP);
         }
         catch (EndOfStreamException)
         {
@@ -128,8 +133,8 @@ public class ImageReader
     {
         try
         {
-            // Read magic (4 bytes ASCII)
-            if (reader.BaseStream.Length < 16)
+            // Read magic (4 bytes ASCII) - minimum header is 20 bytes for version 2
+            if (reader.BaseStream.Length < 20)
             {
                 return new HeaderReadResult(ImageRestoreResult.TruncatedFile(filePath, 0, 0));
             }
@@ -144,9 +149,9 @@ public class ImageReader
 
             // Read version (4 bytes)
             int version = reader.ReadInt32();
-            if (version != SupportedVersion)
+            if (version < MinSupportedVersion)
             {
-                return new HeaderReadResult(ImageRestoreResult.UnsupportedVersion(filePath, version, SupportedVersion));
+                return new HeaderReadResult(ImageRestoreResult.UnsupportedVersion(filePath, version, MinSupportedVersion));
             }
 
             // Read object count (4 bytes)
@@ -155,7 +160,11 @@ public class ImageReader
             // Read max object ID (4 bytes)
             int maxObjectId = reader.ReadInt32();
 
-            return new HeaderReadResult(objectCount, maxObjectId);
+            // Read Smalltalk OOP (4 bytes) - version 2+
+            int smalltalkOOPRaw = reader.ReadInt32();
+            var smalltalkOOP = new SmalltalkOOP(smalltalkOOPRaw);
+
+            return new HeaderReadResult(version, objectCount, maxObjectId, smalltalkOOP);
         }
         catch (EndOfStreamException)
         {
@@ -290,23 +299,29 @@ public class ImageReader
     private readonly struct HeaderReadResult
     {
         public readonly bool Success;
+        public readonly int Version;
         public readonly int ObjectCount;
         public readonly int MaxObjectId;
+        public readonly SmalltalkOOP SmalltalkOOP;
         public readonly ImageRestoreResult? Error;
 
-        public HeaderReadResult(int objectCount, int maxObjectId)
+        public HeaderReadResult(int version, int objectCount, int maxObjectId, SmalltalkOOP smalltalkOOP)
         {
             Success = true;
+            Version = version;
             ObjectCount = objectCount;
             MaxObjectId = maxObjectId;
+            SmalltalkOOP = smalltalkOOP;
             Error = null;
         }
 
         public HeaderReadResult(ImageRestoreResult error)
         {
             Success = false;
+            Version = 0;
             ObjectCount = 0;
             MaxObjectId = 0;
+            SmalltalkOOP = default;
             Error = error;
         }
     }

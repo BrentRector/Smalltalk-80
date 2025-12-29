@@ -20,11 +20,6 @@ public class SmalltalkThreadContext
     public required ISmalltalkHeap HeapManager { get; init; }
 
     /// <summary>
-    /// Layout resolver for looking up class structures.
-    /// </summary>
-    public required LayoutResolver LayoutResolver { get; init; }
-
-    /// <summary>
     /// VM metadata including special selectors and class OOPs.
     /// </summary>
     public required VMMetadata VMMetadata { get; init; }

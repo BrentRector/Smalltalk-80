@@ -141,7 +141,7 @@ public partial class VirtualMachine
             int currentPC = ((IPrimitiveContext)this).GetInstructionPointer();
 
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
-                primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
+                primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess,
                 _contextManager, currentPC, this, this, _metadata, _stackManager, _timerManager, _lowMemoryManager, this, vm: this);
 
             // Emit diagnostic event for primitive execution in super send
@@ -393,7 +393,7 @@ public partial class VirtualMachine
 
             // Try to execute the primitive
             var primitiveResult = _primitiveRegistry.ExecuteLegacyExtended(
-                primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess, _layoutResolver,
+                primitiveNumber, this, receiverOOP, args, _runtimeHeapAccess,
                 _contextManager, currentPC, this, this, _metadata, _stackManager, _timerManager, _lowMemoryManager, this, vm: this);
 
             // Emit diagnostic event for primitive execution

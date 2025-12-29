@@ -31,24 +31,6 @@ public interface IPrimitiveContext
     // Graphics/Input support methods
 
     /// <summary>
-    /// Gets a field value from an object using the layout resolver.
-    /// </summary>
-    /// <param name="oop">Object pointer.</param>
-    /// <param name="className">Class name (e.g., "class:Point").</param>
-    /// <param name="fieldName">Field name (e.g., "x").</param>
-    /// <returns>Field value as SmalltalkOOP.</returns>
-    SmalltalkOOP GetFieldValue(SmalltalkOOP oop, string className, string fieldName);
-
-    /// <summary>
-    /// Sets a field value in an object using the layout resolver.
-    /// </summary>
-    /// <param name="oop">Object pointer.</param>
-    /// <param name="className">Class name (e.g., "class:Point").</param>
-    /// <param name="fieldName">Field name (e.g., "x").</param>
-    /// <param name="value">Field value as SmalltalkOOP.</param>
-    void SetFieldValue(SmalltalkOOP oop, string className, string fieldName, SmalltalkOOP value);
-
-    /// <summary>
     /// Gets byte array data from an indexed object (e.g., ByteArray, String, Form bits).
     /// </summary>
     /// <param name="oop">Object pointer to indexed byte object.</param>
@@ -129,14 +111,6 @@ public interface IPrimitiveContext
     /// <param name="oop1">First object pointer.</param>
     /// <param name="oop2">Second object pointer.</param>
     void BecomeTwoWay(SmalltalkOOP oop1, SmalltalkOOP oop2);
-
-    /// <summary>
-    /// Gets a field index from a class using the layout resolver.
-    /// </summary>
-    /// <param name="className">Class name (e.g., "class:MethodContext").</param>
-    /// <param name="fieldName">Field name (e.g., "method").</param>
-    /// <returns>Field index.</returns>
-    int GetFieldIndex(string className, string fieldName);
 
     /// <summary>
     /// Gets an instance variable from an object.

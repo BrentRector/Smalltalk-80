@@ -8,12 +8,13 @@ namespace Smalltalk80.Interpreter.Core;
 /// Serializes the Smalltalk heap to a binary image file.
 /// Uses .NET BinaryWriter for efficient binary I/O.
 ///
-/// Image Format (version 1):
-/// - Header (16 bytes):
+/// Image Format (version 2):
+/// - Header (20 bytes):
 ///   - 4-byte magic "WOST" (Wise Owl Smalltalk)
-///   - 4-byte version
+///   - 4-byte version (2)
 ///   - 4-byte object count
 ///   - 4-byte max object ID (highest object table index)
+///   - 4-byte Smalltalk OOP (SystemDictionary - root for rebuilding VMMetadata)
 /// - For each object (in OOP order):
 ///   - 4-byte ObjectOOP (tagged value: objectTableIndex * 2)
 ///   - 1-byte format (ObjectFormat enum)
@@ -29,9 +30,10 @@ public class ImageWriter
     public const string Magic = "WOST";
 
     /// <summary>Current image format version.</summary>
-    public const int Version = 1;
+    public const int Version = 2;
 
     private readonly ISmalltalkHeap _heap;
+    private readonly SmalltalkOOP _smalltalkOOP;
 
     /// <summary>
     /// Gets or sets the path to the snapshot file.
@@ -39,9 +41,15 @@ public class ImageWriter
     /// </summary>
     public static string? SnapshotFilePath { get; set; }
 
-    public ImageWriter(ISmalltalkHeap heap)
+    /// <summary>
+    /// Creates an ImageWriter for the given heap.
+    /// </summary>
+    /// <param name="heap">The heap to serialize.</param>
+    /// <param name="smalltalkOOP">The OOP of the Smalltalk SystemDictionary (used to rebuild VMMetadata on restore).</param>
+    public ImageWriter(ISmalltalkHeap heap, SmalltalkOOP smalltalkOOP)
     {
         _heap = heap ?? throw new ArgumentNullException(nameof(heap));
+        _smalltalkOOP = smalltalkOOP;
     }
 
     /// <summary>
@@ -198,6 +206,9 @@ public class ImageWriter
 
         // Max object ID (4 bytes) - highest object table index used
         writer.Write(maxObjectId);
+
+        // Smalltalk OOP (4 bytes) - root SystemDictionary for rebuilding VMMetadata
+        writer.Write(_smalltalkOOP.RawValue);
     }
 
     private void WriteObject(BinaryWriter writer, SmalltalkOOP oop)

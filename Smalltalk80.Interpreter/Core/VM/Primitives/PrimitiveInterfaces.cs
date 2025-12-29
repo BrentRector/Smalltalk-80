@@ -64,9 +64,6 @@ public readonly struct PrimitiveExecutionContext
     /// <summary>Gets the context manager for context operations (optional for simple primitives).</summary>
     public IContextManager? ContextManager { get; }
 
-    /// <summary>Gets the layout resolver for field access (optional).</summary>
-    public LayoutResolver? LayoutResolver { get; }
-
     /// <summary>Gets the platform bridge for platform operations (optional, may be null in headless mode).</summary>
     public IPlatformBridge? Platform { get; }
 
@@ -115,7 +112,6 @@ public readonly struct PrimitiveExecutionContext
         ISmalltalkHeap heapManager,
         IStackManager? stackManager = null,
         IContextManager? contextManager = null,
-        LayoutResolver? layoutResolver = null,
         IPlatformBridge? platform = null,
         RuntimeHeapAccessor? runtimeHeapAccess = null,
         int instructionPointer = 0,
@@ -133,7 +129,6 @@ public readonly struct PrimitiveExecutionContext
         HeapManager = heapManager;
         StackManager = stackManager;
         ContextManager = contextManager;
-        LayoutResolver = layoutResolver;
         Platform = platform;
         RuntimeHeapAccess = runtimeHeapAccess;
         InstructionPointer = instructionPointer;
@@ -145,47 +140,6 @@ public readonly struct PrimitiveExecutionContext
         ProcessScheduler = processScheduler;
         LegacyContext = legacyContext;
         VM = vm;
-    }
-
-    /// <summary>
-    /// Gets a field value from an object by querying the runtime heap for field layout.
-    /// The Smalltalk heap is the authoritative source of class structure at runtime.
-    /// </summary>
-    public SmalltalkOOP GetFieldValue(SmalltalkOOP oop, string className, string fieldName)
-    {
-        if (RuntimeHeapAccess == null)
-            throw new InvalidOperationException("RuntimeHeapAccess not available");
-
-        // Get the class OOP from the heap
-        var classOOP = HeapManager.GetClassOOP(oop);
-
-        // Query the heap for the field index
-        int fieldIndex = RuntimeHeapAccess.GetFieldIndex(classOOP, fieldName);
-        if (fieldIndex < 0)
-            throw new InvalidOperationException($"Field '{fieldName}' not found in class '{className}'");
-
-        var result = HeapManager.GetInstanceVariable(oop, fieldIndex);
-        return result;
-    }
-
-    /// <summary>
-    /// Sets a field value in an object by querying the runtime heap for field layout.
-    /// The Smalltalk heap is the authoritative source of class structure at runtime.
-    /// </summary>
-    public void SetFieldValue(SmalltalkOOP oop, string className, string fieldName, SmalltalkOOP value)
-    {
-        if (RuntimeHeapAccess == null)
-            throw new InvalidOperationException("RuntimeHeapAccess not available");
-
-        // Get the class OOP from the heap
-        var classOOP = HeapManager.GetClassOOP(oop);
-
-        // Query the heap for the field index
-        int fieldIndex = RuntimeHeapAccess.GetFieldIndex(classOOP, fieldName);
-        if (fieldIndex < 0)
-            throw new InvalidOperationException($"Field '{fieldName}' not found in class '{className}'");
-
-        HeapManager.SetInstanceVariable(oop, fieldIndex, value);
     }
 
     /// <summary>
@@ -353,7 +307,6 @@ public interface IPrimitiveRegistry
         SmalltalkOOP receiver,
         SmalltalkOOP[] args,
         RuntimeHeapAccessor? runtimeHeapAccess,
-        LayoutResolver? layoutResolver,
         IContextManager? contextManager = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,

@@ -60,7 +60,6 @@ public static class Program
             SmalltalkHeapManager heapManager;
             VMMetadata vmMetadata;
             ColdStartBundle? bundle = null;
-            LayoutResolver? layoutResolver = null;
 
             // Check if restoring from image or doing cold start
             if (config.RestoreImageFile != null)
@@ -96,17 +95,10 @@ public static class Program
 
                 Console.WriteLine($"Image restored: {restoreResult.ObjectsRestored} objects");
 
-                // Load VMMetadata and LayoutResolver from companion file
-                var (loadedMetadata, loadedLayoutResolver) = VMMetadataSerializer.Load(config.RestoreImageFile);
-                if (loadedMetadata == null || loadedLayoutResolver == null)
-                {
-                    Console.Error.WriteLine($"Error: Failed to load metadata from {VMMetadataSerializer.GetMetadataPath(config.RestoreImageFile)}");
-                    Console.Error.WriteLine("The image file may have been saved without metadata.");
-                    Environment.Exit(1);
-                    return;
-                }
-                vmMetadata = loadedMetadata;
-                layoutResolver = loadedLayoutResolver;
+                // Rebuild VMMetadata from Smalltalk dictionary (stored in image header)
+                // This eliminates the need for a companion .meta file
+                var metadataBuilder = new VMMetadataBuilder(heapManager, restoreResult.SmalltalkOOP);
+                vmMetadata = metadataBuilder.Build();
 
                 // Configure heap with class name field index for diagnostics
                 heapManager.SetClassNameFieldIndex(vmMetadata.ClassNameFieldIndex);
@@ -145,8 +137,6 @@ public static class Program
 
                 var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, diagnostics);
                 loader.Run();
-                layoutResolver = loader.LayoutResolver ?? throw new InvalidOperationException("LayoutResolver is null after cold start");
-
                 // Write report if requested
                 if (reportOutput != null)
                 {
@@ -180,8 +170,7 @@ public static class Program
                 InterpreterConstants.DefaultDisplayHeight,
                 "Smalltalk-80",
                 heapManager,
-                vmMetadata,
-                layoutResolver);
+                vmMetadata);
             Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity
@@ -202,19 +191,10 @@ public static class Program
                 Console.WriteLine("  Auto-GC enabled for runtime");
             }
 
-            // Validate that layoutResolver was initialized
-            if (layoutResolver == null)
-            {
-                Console.Error.WriteLine("Error: LayoutResolver was not initialized");
-                Environment.Exit(1);
-                return;
-            }
-
             // Create Smalltalk thread context
             var threadContext = new SmalltalkThreadContext
             {
                 HeapManager = heapManager,
-                LayoutResolver = layoutResolver,
                 VMMetadata = vmMetadata,
                 Bundle = bundle,
                 PlatformBridge = displayProvider,  // Smalltalk thread calls methods on UI object

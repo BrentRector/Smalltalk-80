@@ -1,3 +1,5 @@
+using Smalltalk80.Interpreter.Shared.Types;
+
 namespace Smalltalk80.Interpreter.Core;
 
 /// <summary>
@@ -36,8 +38,14 @@ public sealed class ImageRestoreResult
     /// </summary>
     public int MaxObjectId { get; }
 
+    /// <summary>
+    /// The OOP of the Smalltalk SystemDictionary, used to rebuild VMMetadata.
+    /// Only valid when Success is true.
+    /// </summary>
+    public SmalltalkOOP SmalltalkOOP { get; }
+
     private ImageRestoreResult(bool success, string? errorMessage, string? technicalDetails,
-        ImageRestoreErrorKind errorKind, int objectsRestored, int maxObjectId)
+        ImageRestoreErrorKind errorKind, int objectsRestored, int maxObjectId, SmalltalkOOP smalltalkOOP = default)
     {
         Success = success;
         ErrorMessage = errorMessage;
@@ -45,12 +53,16 @@ public sealed class ImageRestoreResult
         ErrorKind = errorKind;
         ObjectsRestored = objectsRestored;
         MaxObjectId = maxObjectId;
+        SmalltalkOOP = smalltalkOOP;
     }
 
     /// <summary>
     /// Creates a successful restore result.
     /// </summary>
-    public static ImageRestoreResult Succeeded(int objectsRestored, int maxObjectId)
+    /// <param name="objectsRestored">Number of objects restored.</param>
+    /// <param name="maxObjectId">Maximum object ID from image header.</param>
+    /// <param name="smalltalkOOP">OOP of the Smalltalk SystemDictionary for rebuilding VMMetadata.</param>
+    public static ImageRestoreResult Succeeded(int objectsRestored, int maxObjectId, SmalltalkOOP smalltalkOOP)
     {
         return new ImageRestoreResult(
             success: true,
@@ -58,7 +70,8 @@ public sealed class ImageRestoreResult
             technicalDetails: null,
             errorKind: ImageRestoreErrorKind.None,
             objectsRestored: objectsRestored,
-            maxObjectId: maxObjectId);
+            maxObjectId: maxObjectId,
+            smalltalkOOP: smalltalkOOP);
     }
 
     /// <summary>

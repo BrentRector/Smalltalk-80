@@ -219,4 +219,38 @@ public static class VMConstants
 
     public const int POINT_X_INDEX = 0;  // First instance variable: x coordinate
     public const int POINT_Y_INDEX = 1;  // Second instance variable: y coordinate
+
+    // ========================================================================
+    // StrikeFont field indices
+    // ========================================================================
+    // Object subclass: #StrikeFont
+    // instanceVariableNames: 'xTable glyphs name stopConditions type minAscii maxAscii
+    //     maxWidth strikeLength ascent descent xOffset raster subscript superscript emphasis'
+    // Used by CharacterScanner and font primitives
+
+    public const int STRIKEFONT_XTABLE_INDEX = 0;         // Array of left x-coordinates
+    public const int STRIKEFONT_GLYPHS_INDEX = 1;         // Form containing character bits
+    public const int STRIKEFONT_NAME_INDEX = 2;           // Font name
+    public const int STRIKEFONT_STOPCONDITIONS_INDEX = 3; // Stop conditions array
+    public const int STRIKEFONT_TYPE_INDEX = 4;           // Font type
+    public const int STRIKEFONT_MINASCII_INDEX = 5;       // Minimum ASCII value
+    public const int STRIKEFONT_MAXASCII_INDEX = 6;       // Maximum ASCII value
+    public const int STRIKEFONT_MAXWIDTH_INDEX = 7;       // Maximum character width
+    public const int STRIKEFONT_STRIKELENGTH_INDEX = 8;   // Length of strike (total width)
+    public const int STRIKEFONT_ASCENT_INDEX = 9;         // Ascent (height above baseline)
+    public const int STRIKEFONT_DESCENT_INDEX = 10;       // Descent (depth below baseline)
+    public const int STRIKEFONT_XOFFSET_INDEX = 11;       // X offset
+    public const int STRIKEFONT_RASTER_INDEX = 12;        // Raster width
+    public const int STRIKEFONT_SUBSCRIPT_INDEX = 13;     // Subscript offset
+    public const int STRIKEFONT_SUPERSCRIPT_INDEX = 14;   // Superscript offset
+    public const int STRIKEFONT_EMPHASIS_INDEX = 15;      // Font emphasis (bold, italic, etc.)
+
+    // ========================================================================
+    // Collection instance variable counts (for allocation)
+    // ========================================================================
+    // Dictionary inherits from Set which has only 'tally'
+    // These counts are used when allocating collection objects
+
+    public const int SET_INSTVAR_COUNT = 1;        // Set has: tally
+    public const int DICTIONARY_INSTVAR_COUNT = 1; // Dictionary inherits only tally from Set
 }
