@@ -361,6 +361,7 @@ public interface IPrimitiveRegistry
         VMMetadata? metadata = null,
         IStackManager? stackManager = null,
         ITimerManager? timerManager = null,
+        ILowMemoryManager? lowMemoryManager = null,
         IProcessScheduler? processScheduler = null,
         VirtualMachine? vm = null);
 
