@@ -29580,13 +29580,8 @@ dyForPoint: pt
 mouseSelect: previousStartBlock to: previousStopBlock
 	"Answer with an Array of two CharacterBlocks that represent the text selection that the user makes. Allow for scrolling to extend selections."
 
-	| pivotBlock startBlock stopBlock showingCaret dy pt okToScroll scrollDelay word cursorPt mousePt mx my cx cy |
-	mousePt _ Sensor mousePoint.
-	cursorPt _ Sensor cursorPoint.
-	mx _ mousePt x. my _ mousePt y. cx _ cursorPt x. cy _ cursorPt y.
-	[Transcript cr; show: 'CLICK m='; print: mx; show: '@'; print: my;
-		show: ' c='; print: cx; show: '@'; print: cy] value.
-	startBlock _ stopBlock _ pivotBlock _ self characterBlockAtPoint: cursorPt.
+	| pivotBlock startBlock stopBlock showingCaret dy pt okToScroll scrollDelay word |
+	startBlock _ stopBlock _ pivotBlock _ self characterBlockAtPoint: Sensor cursorPoint.
 	self displayCaretForBlock: pivotBlock.
 	showingCaret _ true.
 	okToScroll _ true.
@@ -40041,7 +40036,7 @@ initialize
 
 	(Smalltalk includes: TextConstants)
 		ifFalse: [Smalltalk at: #TextConstants put: (Dictionary new: 32)].
-	TextConstants at: #CaretForm  
+	TextConstants at: #CaretForm
 		 		 put: (Cursor
 	extent: 16@16
 	fromArray: #(
@@ -40061,7 +40056,7 @@ initialize
 		2r0
 		2r0
 		2r0)
-	offset: 8@0).
+	offset: 0@0).
 
 	self initTextConstants!
 initTextConstants	"Text initTextConstants."
