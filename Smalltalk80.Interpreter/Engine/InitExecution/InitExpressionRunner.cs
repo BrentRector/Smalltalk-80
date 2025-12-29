@@ -255,6 +255,15 @@ public class InitExpressionRunner
     private void RunGarbageCollection()
     {
         Console.WriteLine($"\n=== Running GC after all initialization ===");
+
+        // Remove InitExpressionMethods from GC roots - no longer needed after all init expressions complete
+        // This allows the init expression CompiledMethods to be garbage collected
+        if (_initMethodsOOP != _heapManager.GetNil())
+        {
+            _heapManager.GC.RemoveGCRoot(_initMethodsOOP);
+            Console.WriteLine($"  Removed InitExpressionMethods from GC roots: {_initMethodsOOP}");
+        }
+
         var gcRoots = _heapManager.GC.GetGCRoots();
         Console.WriteLine($"  GC Roots: {gcRoots.Length}");
         var gcStats = _heapManager.GC.GarbageCollect();
