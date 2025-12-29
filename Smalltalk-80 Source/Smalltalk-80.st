@@ -226,7 +226,7 @@ WindowsPathName class
 "==================== WindowsFile ===================="
 
 Object subclass: #WindowsFile
-    instanceVariableNames: 'fileName fileDirectory serialNumber lastPageNumber binary readWrite error'
+    instanceVariableNames: 'fileName fileDirectory serialNumber lastPageNumber binary readWrite error currentPage'
     classVariableNames: ''
     poolDictionaries: ''
     category: 'System-Files'!
@@ -242,7 +242,8 @@ Instance Variables:
     lastPageNumber  <Integer> number of pages (always 1 for Windows files)
     binary          <Boolean> true if file is in binary mode
     readWrite       <Integer> access mode flags
-    error           <Boolean> true if an error has occurred'!
+    error           <Boolean> true if an error has occurred
+    currentPage     <WindowsFilePage> the active page with file handle'!
 
 !WindowsFile class methodsFor: 'instance creation'!
 
@@ -352,7 +353,10 @@ open
     ^self!
 
 close
-    "Close the file."
+    "Close the file and its page handle."
+    currentPage isNil ifFalse: [
+        currentPage close.
+        currentPage _ nil].
     ^self!
 
 reopen
@@ -419,6 +423,7 @@ readPageNumber: aPageNumber
     page file: self.
     page pageNumber: aPageNumber.
     binary ifTrue: [page binary] ifFalse: [page text].
+    currentPage _ page.
     ^page!
 
 readOrAddPageNumber: aPageNumber
@@ -430,6 +435,7 @@ readOrAddPageNumber: aPageNumber
     page file: self.
     page pageNumber: aPageNumber.
     binary ifTrue: [page binary] ifFalse: [page text].
+    currentPage _ page.
     ^page!
 
 initPage: aPage
@@ -19438,8 +19444,8 @@ close
 	"Set the receiver's file status to closed."
 
 	closed
-		ifFalse: 
-			[self writing 
+		ifFalse:
+			[self writing
 				ifTrue: [(rwmode bitAnd: Shorten) = Shorten
 							ifTrue: [self shorten]
 							ifFalse: [self flush]].
@@ -39350,8 +39356,9 @@ snapshotAs: imageFilePrefix thenQuit: quitIfTrue
 	| height justSnapped |
 	Cursor execute show.
 	self logChange: '''----SNAPSHOT----'''.
-	"Register snapshot filename with VM (primitive 156) - ImageWriter will create the file"
-	(WindowsFile named: imageFilePrefix, '.im') beSnapshotFile.
+	Disk == nil
+		ifFalse:	"install as snapshot file and update creation time"
+			[(FileStream fileNamed: imageFilePrefix, '.im') beSnapshotFile; readWrite; close].
 	self releaseExternalViews.
 	Transcript cr; show: 'Snapshot at: ', Time dateAndTimeNow printString.
 	height _ Display height.
