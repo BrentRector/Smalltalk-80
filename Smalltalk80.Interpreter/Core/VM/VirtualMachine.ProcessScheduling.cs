@@ -25,6 +25,35 @@ public partial class VirtualMachine : IProcessScheduler
         SignalSemaphore(semaphoreOOP);
     }
 
+    /// <summary>
+    /// Checks if memory thresholds have been crossed and signals the low memory semaphore.
+    /// This allows the system to respond to low memory conditions.
+    /// Called periodically from the interpreter loop.
+    /// </summary>
+    private void CheckAndSignalLowMemory()
+    {
+        if (!_lowMemoryManager.IsEnabled)
+            return;
+
+        // Get current memory statistics
+        int totalSlots = _heapManager.GetObjectTableSize();
+        int activeObjects = _heapManager.GetActiveObjectCount();
+        int freeOops = totalSlots - activeObjects;
+
+        // Estimate free words (memory) - use GC statistics if available
+        var gcStats = _heapManager.GC.GetStatistics();
+        int freeWords = (totalSlots - gcStats.TotalObjects) * 256;  // Rough estimate: 256 words per object slot
+        if (freeWords < 0) freeWords = 0;
+
+        // Check thresholds and get semaphore to signal if crossed
+        var semaphoreOOP = _lowMemoryManager.CheckThresholds(freeOops, freeWords);
+        if (semaphoreOOP == default || semaphoreOOP == _metadata.KnownObjects.Nil)
+            return;
+
+        // Signal the low memory semaphore
+        SignalSemaphore(semaphoreOOP);
+    }
+
     #region IProcessScheduler Implementation
 
     /// <inheritdoc/>

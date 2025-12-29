@@ -92,7 +92,9 @@ public static class SystemOperations
     /// Smalltalk: signal: aSemaphore atOopsLeft: numOops wordsLeft: numWords
     /// Blue Book: numOops is a 16-bit Integer, numWords is a 32-bit LargePositiveInteger.
     /// We accept SmallInteger or LargePositiveInteger for both to handle .NET's large memory.
-    /// This is a stub - we accept the thresholds but don't implement actual monitoring.
+    ///
+    /// When available oops or words drop below the specified thresholds, the VM
+    /// signals the semaphore, allowing the system to respond to low memory.
     /// </remarks>
     public class SignalAtOopsLeftWordsLeft : IPrimitive
     {
@@ -106,9 +108,60 @@ public static class SystemOperations
             // [0] = aSemaphore (Semaphore or nil)
             // [1] = numOops (SmallInteger)
             // [2] = numWords (SmallInteger or LargePositiveInteger)
+            var semaphoreOOP = context.Arguments[0];
+            var oopsOOP = context.Arguments[1];
+            var wordsOOP = context.Arguments[2];
 
-            // Stub implementation - accept parameters but don't implement monitoring
-            // Just succeed to allow system initialization to complete
+            // LowMemoryManager is required
+            if (context.LowMemoryManager == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // If semaphore is nil, disable monitoring
+            if (semaphoreOOP == context.HeapManager.GetNil())
+            {
+                context.LowMemoryManager.Disable();
+                return PrimitiveResult.Ok(context.Receiver);
+            }
+
+            // Extract oops threshold (must be SmallInteger)
+            if (!oopsOOP.IsSmallInteger)
+                return PrimitiveResult.Fail(context.Metadata!);
+            int oopsThreshold = oopsOOP.AsSmallInteger();
+
+            // Extract words threshold (SmallInteger or LargePositiveInteger)
+            int wordsThreshold;
+            if (wordsOOP.IsSmallInteger)
+            {
+                wordsThreshold = wordsOOP.AsSmallInteger();
+            }
+            else
+            {
+                // LargePositiveInteger - extract value from bytes
+                // For practical purposes, cap at int.MaxValue
+                int size = context.HeapManager.GetIndexedSize(wordsOOP);
+                if (size == 0)
+                {
+                    wordsThreshold = 0;
+                }
+                else if (size <= 4)
+                {
+                    // Read as little-endian 32-bit integer
+                    int value = 0;
+                    for (int i = 0; i < size; i++)
+                    {
+                        value |= context.HeapManager.GetIndexedByte(wordsOOP, i) << (i * 8);
+                    }
+                    wordsThreshold = value;
+                }
+                else
+                {
+                    // Larger than 32-bit - cap at max
+                    wordsThreshold = int.MaxValue;
+                }
+            }
+
+            // Set the thresholds in the low memory manager
+            context.LowMemoryManager.SetThresholds(semaphoreOOP, oopsThreshold, wordsThreshold);
 
             return PrimitiveResult.Ok(context.Receiver);
         }

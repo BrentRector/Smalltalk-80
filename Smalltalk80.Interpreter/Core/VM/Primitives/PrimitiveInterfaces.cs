@@ -88,6 +88,9 @@ public readonly struct PrimitiveExecutionContext
     /// <summary>Gets the timer manager for scheduling semaphore signals (used by Delay).</summary>
     public ITimerManager? TimerManager { get; }
 
+    /// <summary>Gets the low memory manager for low memory threshold monitoring.</summary>
+    public ILowMemoryManager? LowMemoryManager { get; }
+
     /// <summary>Gets the process scheduler for process management primitives (signal, wait, resume, suspend).</summary>
     public IProcessScheduler? ProcessScheduler { get; }
 
@@ -120,6 +123,7 @@ public readonly struct PrimitiveExecutionContext
         IPrimitiveMessageSender? messageSender = null,
         VMMetadata? metadata = null,
         ITimerManager? timerManager = null,
+        ILowMemoryManager? lowMemoryManager = null,
         IProcessScheduler? processScheduler = null,
         IPrimitiveContext? legacyContext = null,
         VirtualMachine? vm = null)
@@ -137,6 +141,7 @@ public readonly struct PrimitiveExecutionContext
         MessageSender = messageSender;
         Metadata = metadata;
         TimerManager = timerManager;
+        LowMemoryManager = lowMemoryManager;
         ProcessScheduler = processScheduler;
         LegacyContext = legacyContext;
         VM = vm;

@@ -63,6 +63,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         VMMetadata? metadata = null,
         IStackManager? stackManager = null,
         ITimerManager? timerManager = null,
+        ILowMemoryManager? lowMemoryManager = null,
         IProcessScheduler? processScheduler = null,
         VirtualMachine? vm = null)
     {
@@ -86,6 +87,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 messageSender: messageSender,
                 metadata: metadata,
                 timerManager: timerManager,
+                lowMemoryManager: lowMemoryManager,
                 processScheduler: processScheduler,
                 legacyContext: ctx,
                 vm: vm
