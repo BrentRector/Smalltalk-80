@@ -9,6 +9,13 @@ namespace Smalltalk80.Interpreter.Core.VM.Scheduling;
 /// the VM signals a registered semaphore to allow the system to respond to low memory
 /// conditions. Typically used to trigger garbage collection or warn the user.
 ///
+/// Hysteresis: To prevent repeated signaling when memory is persistently low,
+/// we require memory to recover above threshold before signaling again.
+/// This means:
+/// 1. Signal when memory drops below threshold
+/// 2. Don't signal again until memory goes ABOVE threshold first
+/// 3. Then signal again when it drops below threshold
+///
 /// Thread Safety: All state access is protected by a lock since thresholds can be
 /// set from primitives while the VM main loop checks them.
 /// </summary>
@@ -40,7 +47,9 @@ public class LowMemoryManager : ILowMemoryManager
             _semaphore = semaphoreOOP;
             _oopsThreshold = oopsThreshold;
             _wordsThreshold = wordsThreshold;
-            _hasSignaled = false;  // Reset signaled flag when thresholds change
+            // DON'T reset _hasSignaled here - we use hysteresis to prevent
+            // repeated signaling when memory is persistently low.
+            // Only reset when memory recovers above threshold.
         }
     }
 
@@ -49,15 +58,29 @@ public class LowMemoryManager : ILowMemoryManager
     {
         lock (_lock)
         {
-            // Not enabled or already signaled
-            if (_semaphore == default || _hasSignaled)
+            // Not enabled
+            if (_semaphore == default)
                 return default;
 
             // Check if either threshold has been crossed
             bool oopsBelowThreshold = currentFreeOops < _oopsThreshold;
             bool wordsBelowThreshold = currentFreeWords < _wordsThreshold;
+            bool belowThreshold = oopsBelowThreshold || wordsBelowThreshold;
 
-            if (oopsBelowThreshold || wordsBelowThreshold)
+            if (_hasSignaled)
+            {
+                // Already signaled - check if memory has recovered above threshold
+                if (!belowThreshold)
+                {
+                    // Memory recovered - reset so we can signal again next time it drops
+                    _hasSignaled = false;
+                }
+                // Either way, don't signal now
+                return default;
+            }
+
+            // Not yet signaled - check if we should signal now
+            if (belowThreshold)
             {
                 // Mark as signaled to prevent continuous signaling
                 _hasSignaled = true;
