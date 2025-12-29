@@ -34,6 +34,10 @@ public static class FontPrimitives
     /// The inner loop of text display in CharacterScanner. Scans characters from
     /// startIndex to stopIndex, checking stop conditions and accumulating character widths.
     ///
+    /// NOTE: This primitive is currently disabled (always fails) to use the Smalltalk
+    /// fallback implementation. The caret positioning bug needs further investigation
+    /// as the initial C# implementation caused text display issues.
+    ///
     /// Updates receiver's instance variables: lastIndex, destX, sourceX, width
     /// Returns a stop condition symbol from the stops array.
     ///
@@ -49,130 +53,9 @@ public static class FontPrimitives
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
-            // Validate argument count
-            if (context.Arguments.Length != 6)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            // Receiver must be a CharacterScanner (not SmallInteger)
-            if (context.Receiver.IsSmallInteger)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            // Get arguments
-            var startIndexOOP = context.Arguments[0];
-            var stopIndexOOP = context.Arguments[1];
-            var sourceStringOOP = context.Arguments[2];
-            var rightXOOP = context.Arguments[3];
-            var stopsOOP = context.Arguments[4];
-            var displayingOOP = context.Arguments[5];
-
-            // Validate integer arguments
-            if (!startIndexOOP.IsSmallInteger || !stopIndexOOP.IsSmallInteger || !rightXOOP.IsSmallInteger)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            // Validate object arguments
-            if (sourceStringOOP.IsSmallInteger || stopsOOP.IsSmallInteger)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            // If displaying is true, fail to let Smalltalk code handle copyBits
-            // (displaying is typically false for character block scanning)
-            if (displayingOOP == context.Metadata!.KnownObjects.True)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            int startIndex = startIndexOOP.AsSmallInteger();
-            int stopIndex = stopIndexOOP.AsSmallInteger();
-            int rightX = rightXOOP.AsSmallInteger();
-
-            // Validate indices
-            if (startIndex < 1 || stopIndex < startIndex)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            int stringSize = context.HeapManager.GetIndexedSize(sourceStringOOP);
-            if (stopIndex > stringSize)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            // Get receiver's instance variables
-            var destXOOP = context.HeapManager.GetInstanceVariable(context.Receiver, BITBLT_DESTX_INDEX);
-            var xTableOOP = context.HeapManager.GetInstanceVariable(context.Receiver, SCANNER_XTABLE_INDEX);
-
-            if (!destXOOP.IsSmallInteger || xTableOOP.IsSmallInteger)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            int destX = destXOOP.AsSmallInteger();
-
-            // Get stopConditions from receiver (for checking character-specific stops)
-            var stopConditionsOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 16); // stopConditions
-
-            // Initialize lastIndex
-            int lastIndex = startIndex;
-
-            // Main scanning loop
-            while (lastIndex <= stopIndex)
-            {
-                // Get character at lastIndex (0-based index into string)
-                int ascii = context.HeapManager.GetIndexedByte(sourceStringOOP, lastIndex - 1);
-
-                // Check stop conditions for this character (Smalltalk: stopConditions at: ascii + 1)
-                // If not nil, return the corresponding symbol from stops
-                var stopCondition = context.HeapManager.GetIndexedOOP(stopConditionsOOP, ascii); // ascii+1-1 = ascii (0-based)
-                if (stopCondition != context.Metadata!.KnownObjects.Nil)
-                {
-                    // Update lastIndex before returning
-                    context.HeapManager.SetInstanceVariable(context.Receiver, SCANNER_LASTINDEX_INDEX,
-                        SmalltalkOOP.FromSmallInteger(lastIndex));
-
-                    // Return stops at: (ascii + 1) - which is stops[ascii] in 0-based
-                    var result = context.HeapManager.GetIndexedOOP(stopsOOP, ascii);
-                    return PrimitiveResult.Ok(result);
-                }
-
-                // Get character width from xTable
-                // xTable layout: xTable[ascii + 1] = left edge, xTable[ascii + 2] = right edge
-                // Width = xTable[ascii + 2] - xTable[ascii + 1]
-                var sourceXOOP = context.HeapManager.GetIndexedOOP(xTableOOP, ascii); // ascii+1-1 = ascii
-                var nextXOOP = context.HeapManager.GetIndexedOOP(xTableOOP, ascii + 1); // ascii+2-1 = ascii+1
-
-                if (!sourceXOOP.IsSmallInteger || !nextXOOP.IsSmallInteger)
-                    return PrimitiveResult.Fail(context.Metadata!);
-
-                int sourceX = sourceXOOP.AsSmallInteger();
-                int width = nextXOOP.AsSmallInteger() - sourceX;
-                int nextDestX = destX + width;
-
-                // Check if we've crossed the rightX limit
-                if (nextDestX > rightX)
-                {
-                    // Update receiver's instance variables
-                    context.HeapManager.SetInstanceVariable(context.Receiver, SCANNER_LASTINDEX_INDEX,
-                        SmalltalkOOP.FromSmallInteger(lastIndex));
-                    context.HeapManager.SetInstanceVariable(context.Receiver, BITBLT_DESTX_INDEX,
-                        SmalltalkOOP.FromSmallInteger(destX));
-                    context.HeapManager.SetInstanceVariable(context.Receiver, BITBLT_SOURCEX_INDEX,
-                        SmalltalkOOP.FromSmallInteger(sourceX));
-                    context.HeapManager.SetInstanceVariable(context.Receiver, BITBLT_WIDTH_INDEX,
-                        SmalltalkOOP.FromSmallInteger(width));
-
-                    // Return stops at: CrossedX (258 in Smalltalk, index 257 in 0-based)
-                    var crossedXResult = context.HeapManager.GetIndexedOOP(stopsOOP, CROSSED_X_INDEX - 1);
-                    return PrimitiveResult.Ok(crossedXResult);
-                }
-
-                // Advance destX and lastIndex
-                destX = nextDestX;
-                lastIndex++;
-            }
-
-            // Reached end of run
-            // Update lastIndex to stopIndex (as per Smalltalk fallback: lastIndex _ stopIndex)
-            lastIndex = stopIndex;
-
-            context.HeapManager.SetInstanceVariable(context.Receiver, SCANNER_LASTINDEX_INDEX,
-                SmalltalkOOP.FromSmallInteger(lastIndex));
-            context.HeapManager.SetInstanceVariable(context.Receiver, BITBLT_DESTX_INDEX,
-                SmalltalkOOP.FromSmallInteger(destX));
-
-            // Return stops at: EndOfRun (257 in Smalltalk, index 256 in 0-based)
-            var endOfRunResult = context.HeapManager.GetIndexedOOP(stopsOOP, END_OF_RUN_INDEX - 1);
-            return PrimitiveResult.Ok(endOfRunResult);
+            // Always fail to use Smalltalk fallback - the C# implementation needs debugging
+            // The caret position bug requires further investigation of the Smalltalk code
+            return PrimitiveResult.Fail(context.Metadata!);
         }
     }
     /// <summary>
