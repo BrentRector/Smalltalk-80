@@ -40056,7 +40056,7 @@ initialize
 		2r0
 		2r0
 		2r0)
-	offset: 0@0).
+	offset: -5@0).
 
 	self initTextConstants!
 initTextConstants	"Text initTextConstants."
