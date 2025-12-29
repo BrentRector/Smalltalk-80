@@ -576,6 +576,13 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
         Console.WriteLine($"[Snapshot] Saving image to: {filePath}");
 
+        // Force Smalltalk garbage collection before snapshot
+        // This reclaims unreachable objects (e.g., temporary Forms from displayExtent:)
+        // to ensure consistent snapshot sizes
+        Console.WriteLine("[Snapshot] Running garbage collection...");
+        var gcStats = _heap.GC.GarbageCollect();
+        Console.WriteLine($"[Snapshot] GC complete: collected {gcStats.CollectedObjects} objects");
+
         // Create ImageWriter and serialize the heap
         var writer = new ImageWriter(_heap);
         bool success = writer.WriteImage(filePath);
