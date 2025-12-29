@@ -17,16 +17,33 @@ public static class FontPrimitives
 {
     // CharacterScanner instance variable indices (inherited from BitBlt + own)
     // BitBlt ivars (0-13): destForm, sourceForm, halftoneForm, combinationRule, destX, destY, width, height, sourceX, sourceY, clipX, clipY, clipWidth, clipHeight
-    // CharacterScanner ivars (14-25): lastIndex, xTable, stopConditions, text, textStyle, leftMargin, rightMargin, font, line, runStopIndex, spaceCount, spaceWidth, outputMedium
+    // CharacterScanner ivars (14-26): lastIndex, xTable, stopConditions, text, textStyle, leftMargin, rightMargin, font, line, runStopIndex, spaceCount, spaceWidth, outputMedium
+    // CharacterBlockScanner adds (27-32): characterPoint, characterIndex, lastCharacter, lastCharacterExtent, lastSpaceOrTabExtent, nextLeftMargin
     private const int BITBLT_DESTX_INDEX = 4;
+    private const int BITBLT_DESTY_INDEX = 5;
     private const int BITBLT_WIDTH_INDEX = 6;
     private const int BITBLT_SOURCEX_INDEX = 8;
     private const int SCANNER_LASTINDEX_INDEX = 14;
     private const int SCANNER_XTABLE_INDEX = 15;
 
+    // CharacterBlockScanner-specific
+    private const int BLOCKSCANNER_CHARACTERPOINT_INDEX = 27;
+    private const int CHARACTER_SCANNER_IVAR_COUNT = 27;  // CharacterScanner has 27 ivars (0-26)
+
     // Stop condition array indices (Smalltalk 1-based)
     private const int END_OF_RUN_INDEX = 257;
     private const int CROSSED_X_INDEX = 258;
+
+    /// <summary>
+    /// Creates a Point object with the given x and y coordinates.
+    /// </summary>
+    private static SmalltalkOOP CreatePoint(PrimitiveExecutionContext context, int x, int y)
+    {
+        var pointOOP = context.HeapManager.AllocateInstanceOf(context.Metadata!.PointClassOOP, 0);
+        context.HeapManager.SetInstanceVariable(pointOOP, VMConstants.POINT_X_INDEX, SmalltalkOOP.FromSmallInteger(x));
+        context.HeapManager.SetInstanceVariable(pointOOP, VMConstants.POINT_Y_INDEX, SmalltalkOOP.FromSmallInteger(y));
+        return pointOOP;
+    }
 
     /// <summary>
     /// Primitive 103: scanCharactersFrom:to:in:rightX:stopConditions:displaying:
@@ -98,14 +115,21 @@ public static class FontPrimitives
 
             // Get receiver's instance variables
             var destXOOP = context.HeapManager.GetInstanceVariable(context.Receiver, BITBLT_DESTX_INDEX);
+            var destYOOP = context.HeapManager.GetInstanceVariable(context.Receiver, BITBLT_DESTY_INDEX);
             var xTableOOP = context.HeapManager.GetInstanceVariable(context.Receiver, SCANNER_XTABLE_INDEX);
             var stopConditionsOOP = context.HeapManager.GetInstanceVariable(context.Receiver, 16); // stopConditions
 
-            if (!destXOOP.IsSmallInteger || xTableOOP.IsSmallInteger)
+            if (!destXOOP.IsSmallInteger || !destYOOP.IsSmallInteger || xTableOOP.IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
 
             int destX = destXOOP.AsSmallInteger();
+            int destY = destYOOP.AsSmallInteger();
             int initialDestX = destX;
+
+            // Check if receiver is CharacterBlockScanner (has characterPoint instance variable)
+            // CharacterBlockScanner has 33 ivars (0-32), CharacterScanner has 27 (0-26)
+            int ivarCount = context.HeapManager.GetInstanceVariableCount(context.Receiver);
+            bool isCharacterBlockScanner = ivarCount > CHARACTER_SCANNER_IVAR_COUNT;
 
             if (DebugLogging)
             {
@@ -177,6 +201,14 @@ public static class FontPrimitives
                     context.HeapManager.SetInstanceVariable(context.Receiver, BITBLT_WIDTH_INDEX,
                         SmalltalkOOP.FromSmallInteger(width));
 
+                    // For CharacterBlockScanner, also update characterPoint (used for caret positioning)
+                    // The Smalltalk code sets: characterPoint := destX @ destY (before checking CrossedX)
+                    if (isCharacterBlockScanner)
+                    {
+                        var pointOOP = CreatePoint(context, destX, destY);
+                        context.HeapManager.SetInstanceVariable(context.Receiver, BLOCKSCANNER_CHARACTERPOINT_INDEX, pointOOP);
+                    }
+
                     if (DebugLogging)
                         Console.WriteLine($"[Prim103] CrossedX: lastIndex={lastIndex} destX={destX} (started at {initialDestX}, rightX={rightX})");
 
@@ -197,6 +229,13 @@ public static class FontPrimitives
                 SmalltalkOOP.FromSmallInteger(lastIndex));
             context.HeapManager.SetInstanceVariable(context.Receiver, BITBLT_DESTX_INDEX,
                 SmalltalkOOP.FromSmallInteger(destX));
+
+            // For CharacterBlockScanner, update characterPoint for end of run
+            if (isCharacterBlockScanner)
+            {
+                var pointOOP = CreatePoint(context, destX, destY);
+                context.HeapManager.SetInstanceVariable(context.Receiver, BLOCKSCANNER_CHARACTERPOINT_INDEX, pointOOP);
+            }
 
             if (DebugLogging)
                 Console.WriteLine($"[Prim103] EndOfRun: lastIndex={lastIndex} destX={destX}");
