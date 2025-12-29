@@ -8713,14 +8713,8 @@ cr
 crossedX
 	"Text display has wrapping.  The scanner just found a character past the x location of the cursor.  We know that the cursor is pointing at a character or before one."
 
-	| leadingTab currentX midpoint |
-	midpoint _ destX + ((lastCharacterExtent x) // 2).
-	Transcript cr; show: 'crossedX: clickX='; print: characterPoint x;
-		show: ' destX='; print: destX;
-		show: ' width='; print: lastCharacterExtent x;
-		show: ' mid='; print: midpoint;
-		show: ' idx='; print: lastIndex.
-	((characterPoint x <= midpoint)
+	| leadingTab currentX |
+	((characterPoint x <= (destX + ((lastCharacterExtent x) // 2)))
 		or: [line last = lastIndex])
 		ifTrue:	[lastCharacter _ (text at: lastIndex).			
 				((lastCharacter = Space and: [textStyle alignment = Justified])
@@ -8736,7 +8730,6 @@ crossedX
 												characterPoint _ destX @ destY.
 												^ self endOfRun]].
 								characterPoint _ destX @ destY].
-				Transcript show: ' LEFT->'; print: characterPoint x.
 				^true].
 	"Pointing past middle of a character, return the next character."
 	lastIndex _ lastIndex + 1.
@@ -8744,7 +8737,6 @@ crossedX
 	currentX _ destX + lastCharacterExtent x.
 	lastCharacterExtent x: (font widthOf: lastCharacter).
 	characterPoint _ currentX @ destY.
-	Transcript show: ' RIGHT->'; print: currentX; show: ' idx='; print: lastIndex.
 
 	"Yukky if next character is space or tab."
 	(lastCharacter = Space and: [textStyle alignment = Justified])
@@ -8904,10 +8896,7 @@ buildCharacterBlockIn: aParagraph
 	destY _ (aParagraph topAtLineIndex: lineIndex).
 	line _ aParagraph lineAt: lineIndex.
 	text _ aParagraph textAt: lineIndex.
-	Transcript cr; show: 'buildBlock: lineIdx='; print: lineIndex;
-		show: ' destY='; print: destY;
-		show: ' line.first='; print: line first;
-		show: ' line.last='; print: line last.
+	Transcript cr; show: 'lineIdx='; print: lineIndex; show: ' destY='; print: destY.
 	rightMargin _ aParagraph rightMarginForDisplay.
 
 	(lineIndex = aParagraph numberOfLines and:
@@ -29595,9 +29584,7 @@ mouseSelect: previousStartBlock to: previousStopBlock
 	| pivotBlock startBlock stopBlock showingCaret dy pt okToScroll scrollDelay word cursorPt |
 	cursorPt _ Sensor cursorPoint.
 	startBlock _ stopBlock _ pivotBlock _ self characterBlockAtPoint: cursorPt.
-	Transcript cr; show: 'mouseSelect: cursor='; print: cursorPt;
-		show: ' block.topLeft='; print: pivotBlock topLeft;
-		show: ' block.stringIndex='; print: pivotBlock stringIndex.
+	Transcript cr; show: 'cursor='; print: cursorPt; show: ' topLeft='; print: pivotBlock topLeft.
 	self displayCaretForBlock: pivotBlock.
 	showingCaret _ true.
 	okToScroll _ true.
