@@ -8715,12 +8715,11 @@ crossedX
 
 	| leadingTab currentX midpoint |
 	midpoint _ destX + ((lastCharacterExtent x) // 2).
-	Transcript cr; show: 'crossedX: click='; print: characterPoint x;
+	Transcript cr; show: 'crossedX: clickX='; print: characterPoint x;
 		show: ' destX='; print: destX;
 		show: ' width='; print: lastCharacterExtent x;
-		show: ' midpoint='; print: midpoint;
-		show: ' lastIndex='; print: lastIndex;
-		show: ' char='; print: (text at: lastIndex).
+		show: ' mid='; print: midpoint;
+		show: ' idx='; print: lastIndex.
 	((characterPoint x <= midpoint)
 		or: [line last = lastIndex])
 		ifTrue:	[lastCharacter _ (text at: lastIndex).			
@@ -8737,7 +8736,7 @@ crossedX
 												characterPoint _ destX @ destY.
 												^ self endOfRun]].
 								characterPoint _ destX @ destY].
-				Transcript show: ' LEFT→caret='; print: characterPoint x.
+				Transcript show: ' LEFT->'; print: characterPoint x.
 				^true].
 	"Pointing past middle of a character, return the next character."
 	lastIndex _ lastIndex + 1.
@@ -8745,7 +8744,7 @@ crossedX
 	currentX _ destX + lastCharacterExtent x.
 	lastCharacterExtent x: (font widthOf: lastCharacter).
 	characterPoint _ currentX @ destY.
-	Transcript show: ' RIGHT→caret='; print: currentX.
+	Transcript show: ' RIGHT->'; print: currentX; show: ' idx='; print: lastIndex.
 
 	"Yukky if next character is space or tab."
 	(lastCharacter = Space and: [textStyle alignment = Justified])
@@ -8922,10 +8921,6 @@ buildCharacterBlockIn: aParagraph
 	lastIndex _ line first.
 
 	self setStopConditions.		"also sets font"
-	Transcript cr; show: 'buildCharBlock: clickX='; print: characterPoint x;
-		show: ' leftMargin='; print: leftMargin;
-		show: ' lineFirst='; print: line first;
-		show: ' lineLast='; print: line last.
 	runLength _ (text runLengthFor: line first).
 	characterIndex ~~ nil
 		ifTrue:	[lineStop _ characterIndex	"scanning for index"]
@@ -8946,10 +8941,6 @@ buildCharacterBlockIn: aParagraph
 						displaying: false.
 
 		"see setStopConditions for stopping conditions for character block 	operations."
-	Transcript cr; show: 'afterScan: destX='; print: destX;
-		show: ' lastIndex='; print: lastIndex;
-		show: ' stopCond='; print: stopCondition;
-		show: ' char='; print: (text at: lastIndex).
 	lastCharacterExtent x: (font widthOf: (text at: lastIndex)).
 	(self perform: stopCondition)
 		ifTrue:	[^CharacterBlock
@@ -29597,8 +29588,12 @@ dyForPoint: pt
 mouseSelect: previousStartBlock to: previousStopBlock
 	"Answer with an Array of two CharacterBlocks that represent the text selection that the user makes. Allow for scrolling to extend selections."
 
-	| pivotBlock startBlock stopBlock showingCaret dy pt okToScroll scrollDelay word |
-	startBlock _ stopBlock _ pivotBlock _ self characterBlockAtPoint: Sensor cursorPoint.
+	| pivotBlock startBlock stopBlock showingCaret dy pt okToScroll scrollDelay word cursorPt |
+	cursorPt _ Sensor cursorPoint.
+	startBlock _ stopBlock _ pivotBlock _ self characterBlockAtPoint: cursorPt.
+	Transcript cr; show: 'mouseSelect: cursor='; print: cursorPt;
+		show: ' block.topLeft='; print: pivotBlock topLeft;
+		show: ' block.stringIndex='; print: pivotBlock stringIndex.
 	self displayCaretForBlock: pivotBlock.
 	showingCaret _ true.
 	okToScroll _ true.
