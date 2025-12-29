@@ -811,17 +811,17 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public void Quit(int exitCode)
     {
+        // Close the window to trigger graceful shutdown
+        // This exits Application.Run() and lets Program.cs handle cleanup
+        // (printing shutdown messages, waiting for threads, etc.)
+        // Don't call Environment.Exit() - that bypasses the shutdown sequence
         if (InvokeRequired)
         {
-            BeginInvoke(new Action(() => {
-                Close();
-                Environment.Exit(exitCode);
-            }));
+            BeginInvoke(new Action(() => Close()));
         }
         else
         {
             Close();
-            Environment.Exit(exitCode);
         }
     }
 
