@@ -92,6 +92,42 @@ internal class ObjectTableManager : IObjectTableManager
         return _freeObjectTableIndices.Count;
     }
 
+    /// <summary>
+    /// Ensures the object table has enough blocks to accommodate the specified maximum object ID.
+    /// Used during snapshot restore to pre-allocate blocks before populating entries.
+    /// </summary>
+    /// <param name="maxObjectId">The highest object table index that will be used.</param>
+    public void EnsureCapacity(int maxObjectId)
+    {
+        // Canonical mapping: index >= 1, so (index - 1) gives 0-based block/entry
+        int requiredBlocks = ((maxObjectId - 1) / ObjectTableBlock.BlockSize) + 1;
+
+        while (_objectTableBlocks.Count < requiredBlocks)
+        {
+            _objectTableBlocks.Add(new ObjectTableBlock());
+        }
+
+        // Update _nextObjectTableIndex if needed
+        if (maxObjectId >= _nextObjectTableIndex)
+        {
+            _nextObjectTableIndex = maxObjectId + 1;
+        }
+    }
+
+    /// <summary>
+    /// Clears all object table entries and resets state.
+    /// Used during snapshot restore to start with empty object table.
+    /// </summary>
+    public void Clear()
+    {
+        _objectTableBlocks.Clear();
+        _freeObjectTableIndices.Clear();
+        _nextObjectTableIndex = 1;
+
+        // Allocate initial block
+        _objectTableBlocks.Add(new ObjectTableBlock());
+    }
+
     public bool IsValidObjectOOP(SmalltalkOOP objectOOP)
     {
         if (objectOOP.IsSmallInteger)
