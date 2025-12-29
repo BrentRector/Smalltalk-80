@@ -67,9 +67,16 @@ public class SmalltalkInterpreterThread
             var schedulerInit = new ProcessSchedulerInitializer(_context.HeapManager, _context.VMMetadata);
             schedulerInit.InitializeForRuntime();
 
-            // STEP 2: Execute init expressions
-            Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
-            ExecuteInitExpressions();
+            // STEP 2: Execute init expressions (skip if restoring from saved image)
+            if (_context.Bundle != null)
+            {
+                Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
+                ExecuteInitExpressions();
+            }
+            else
+            {
+                Console.WriteLine("[Smalltalk Thread] Skipping init expressions (restored from saved image)");
+            }
 
             // STEP 3: Execute user expression if requested (skips controller loop)
             if (_context.Config.ExecuteExpression != null)
@@ -121,6 +128,9 @@ public class SmalltalkInterpreterThread
 
     private void ExecuteInitExpressions()
     {
+        if (_context.Bundle == null)
+            return;
+
         var runner = new InitExpressionRunner(
             _context.HeapManager,
             _vm!,

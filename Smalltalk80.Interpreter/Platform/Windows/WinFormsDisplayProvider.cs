@@ -26,6 +26,7 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     private readonly object _bufferLock = new();
     private readonly ISmalltalkHeap? _heap;
     private readonly VMMetadata? _vmMetadata;
+    private readonly LayoutResolver? _layoutResolver;
     private readonly IRuntimeHeapAccessor? _runtimeHeapAccess;
     private bool _disposed = false;
 
@@ -98,12 +99,13 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     /// </summary>
     public Memory<byte> DisplayBuffer => new Memory<byte>(_displayBuffer);
 
-    public WinFormsDisplayProvider(int width, int height, string title = "Smalltalk-80", ISmalltalkHeap? heap = null, VMMetadata? vmMetadata = null)
+    public WinFormsDisplayProvider(int width, int height, string title = "Smalltalk-80", ISmalltalkHeap? heap = null, VMMetadata? vmMetadata = null, LayoutResolver? layoutResolver = null)
     {
         Width = width;
         Height = height;
         _heap = heap;
         _vmMetadata = vmMetadata;
+        _layoutResolver = layoutResolver;
         _runtimeHeapAccess = (heap != null && vmMetadata != null)
             ? new RuntimeHeapAccessor(heap, vmMetadata)
             : null;
@@ -589,6 +591,12 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
         if (success)
         {
+            // Also save VMMetadata and LayoutResolver to companion file
+            if (_vmMetadata != null)
+            {
+                VMMetadataSerializer.Save(_vmMetadata, _layoutResolver, filePath);
+            }
+
             Console.WriteLine("[Snapshot] Image saved successfully.");
             // Clear the snapshot path after successful save
             ImageWriter.SnapshotFilePath = null;

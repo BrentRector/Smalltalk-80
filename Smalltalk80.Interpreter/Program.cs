@@ -41,14 +41,6 @@ public static class Program
                 return;
             }
 
-            if (!File.Exists(config.ColdStartFile))
-            {
-                Console.Error.WriteLine($"Error: Cold start file not found: {config.ColdStartFile}");
-                CommandLineParser.PrintUsage();
-                Environment.Exit(1);
-                return;
-            }
-
             // Extract config values for easier access
             var coldStartFile = config.ColdStartFile;
             var dumpClassName = config.DumpClassName;
@@ -64,47 +56,116 @@ public static class Program
             // Register diagnostic listeners (returns profile listener if enabled)
             var profileListener = RegisterDiagnosticListeners(diagnostics, diagnosticCategories);
 
-            Console.WriteLine($"Loading cold start bundle: {coldStartFile}");
+            // These will be set by either cold start or restore
+            SmalltalkHeapManager heapManager;
+            VMMetadata vmMetadata;
+            ColdStartBundle? bundle = null;
+            LayoutResolver? layoutResolver = null;
 
-            // Load the cold start bundle from JSON
-            var bundle = ColdStartBundle.LoadFromFile(coldStartFile);
-
-            Console.WriteLine($"Bundle loaded: {bundle.Metadata.Version}");
-            Console.WriteLine($"  Symbols: {bundle.Symbols.Length}");
-            Console.WriteLine($"  Classes: {bundle.Classes.Length}");
-            Console.WriteLine($"  Objects: {bundle.Objects.Length}");
-            Console.WriteLine($"  Methods: {bundle.Methods.Length}");
-            Console.WriteLine();
-
-            // Create the heap manager
-            Console.WriteLine("Initializing heap manager...");
-            var heapManager = new SmalltalkHeapManager(diagnostics);
-
-            // Create and run the loader
-            Console.WriteLine("Starting cold start loader (6-phase)...");
-
-            var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, diagnostics);
-            loader.Run();
-            var layoutResolver = loader.LayoutResolver ?? throw new InvalidOperationException("LayoutResolver is null after cold start");
-
-            // Write report if requested
-            if (reportOutput != null)
+            // Check if restoring from image or doing cold start
+            if (config.RestoreImageFile != null)
             {
-                var reportJson = System.Text.Json.JsonSerializer.Serialize(loader.Report, new System.Text.Json.JsonSerializerOptions
+                // === RESTORE FROM IMAGE ===
+                Console.WriteLine($"Restoring from image: {config.RestoreImageFile}");
+
+                // Check if image file exists
+                if (!File.Exists(config.RestoreImageFile))
                 {
-                    WriteIndented = true,
-                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-                });
+                    Console.Error.WriteLine($"Error: Image file not found: {config.RestoreImageFile}");
+                    Environment.Exit(1);
+                    return;
+                }
 
-                File.WriteAllText(reportOutput, reportJson);
-                Console.WriteLine($"\nColdstart report written to: {reportOutput}");
+                // Create fresh heap manager
+                heapManager = new SmalltalkHeapManager(diagnostics);
+
+                // Create ImageReader and restore heap
+                var imageReader = new ImageReader(heapManager);
+                var restoreResult = imageReader.ReadImage(config.RestoreImageFile);
+
+                if (!restoreResult.Success)
+                {
+                    Console.Error.WriteLine($"Error: {restoreResult.ErrorMessage}");
+                    if (restoreResult.TechnicalDetails != null)
+                    {
+                        Console.Error.WriteLine($"Details: {restoreResult.TechnicalDetails}");
+                    }
+                    Environment.Exit(1);
+                    return;
+                }
+
+                Console.WriteLine($"Image restored: {restoreResult.ObjectsRestored} objects");
+
+                // Load VMMetadata and LayoutResolver from companion file
+                var (loadedMetadata, loadedLayoutResolver) = VMMetadataSerializer.Load(config.RestoreImageFile);
+                if (loadedMetadata == null || loadedLayoutResolver == null)
+                {
+                    Console.Error.WriteLine($"Error: Failed to load metadata from {VMMetadataSerializer.GetMetadataPath(config.RestoreImageFile)}");
+                    Console.Error.WriteLine("The image file may have been saved without metadata.");
+                    Environment.Exit(1);
+                    return;
+                }
+                vmMetadata = loadedMetadata;
+                layoutResolver = loadedLayoutResolver;
+
+                // Configure heap with class name field index for diagnostics
+                heapManager.SetClassNameFieldIndex(vmMetadata.ClassNameFieldIndex);
+
+                Console.WriteLine("Image restore completed successfully!");
             }
+            else
+            {
+                // === COLD START ===
+                if (!File.Exists(config.ColdStartFile))
+                {
+                    Console.Error.WriteLine($"Error: Cold start file not found: {config.ColdStartFile}");
+                    CommandLineParser.PrintUsage();
+                    Environment.Exit(1);
+                    return;
+                }
 
-            Console.WriteLine("Cold start completed successfully!");
+                Console.WriteLine($"Loading cold start bundle: {coldStartFile}");
 
-            // Get VM metadata (built by orchestrator as final step of cold start)
-            var vmMetadata = loader.VMMetadata
-                ?? throw new InvalidOperationException("VMMetadata is null after cold start");
+                // Load the cold start bundle from JSON
+                bundle = ColdStartBundle.LoadFromFile(coldStartFile);
+
+                Console.WriteLine($"Bundle loaded: {bundle.Metadata.Version}");
+                Console.WriteLine($"  Symbols: {bundle.Symbols.Length}");
+                Console.WriteLine($"  Classes: {bundle.Classes.Length}");
+                Console.WriteLine($"  Objects: {bundle.Objects.Length}");
+                Console.WriteLine($"  Methods: {bundle.Methods.Length}");
+                Console.WriteLine();
+
+                // Create the heap manager
+                Console.WriteLine("Initializing heap manager...");
+                heapManager = new SmalltalkHeapManager(diagnostics);
+
+                // Create and run the loader
+                Console.WriteLine("Starting cold start loader (6-phase)...");
+
+                var loader = new ColdStartOrchestrator(bundle, heapManager, coldStartFile, diagnostics);
+                loader.Run();
+                layoutResolver = loader.LayoutResolver ?? throw new InvalidOperationException("LayoutResolver is null after cold start");
+
+                // Write report if requested
+                if (reportOutput != null)
+                {
+                    var reportJson = System.Text.Json.JsonSerializer.Serialize(loader.Report, new System.Text.Json.JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                    });
+
+                    File.WriteAllText(reportOutput, reportJson);
+                    Console.WriteLine($"\nColdstart report written to: {reportOutput}");
+                }
+
+                Console.WriteLine("Cold start completed successfully!");
+
+                // Get VM metadata (built by orchestrator as final step of cold start)
+                vmMetadata = loader.VMMetadata
+                    ?? throw new InvalidOperationException("VMMetadata is null after cold start");
+            }
 
             // NOTE: Window and Display both use default dimensions
             // Smalltalk Display object is created during cold start with same dimensions
@@ -119,7 +180,8 @@ public static class Program
                 InterpreterConstants.DefaultDisplayHeight,
                 "Smalltalk-80",
                 heapManager,
-                vmMetadata);
+                vmMetadata,
+                layoutResolver);
             Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity
@@ -138,6 +200,14 @@ public static class Program
             {
                 heapManager.AutoGCEnabled = true;
                 Console.WriteLine("  Auto-GC enabled for runtime");
+            }
+
+            // Validate that layoutResolver was initialized
+            if (layoutResolver == null)
+            {
+                Console.Error.WriteLine("Error: LayoutResolver was not initialized");
+                Environment.Exit(1);
+                return;
             }
 
             // Create Smalltalk thread context
