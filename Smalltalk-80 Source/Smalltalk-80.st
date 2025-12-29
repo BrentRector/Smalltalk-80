@@ -493,6 +493,10 @@ initialize
 
 !WindowsFilePage methodsFor: 'file accessing'!
 
+endFile
+    "Make this the last page of the file. Delegates to the file."
+    ^file endFile: self!
+
 file
     "Answer the file I belong to."
     ^file!
