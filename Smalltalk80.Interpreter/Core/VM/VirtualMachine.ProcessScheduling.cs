@@ -40,10 +40,18 @@ public partial class VirtualMachine : IProcessScheduler
         int activeObjects = _heapManager.GetActiveObjectCount();
         int freeOops = totalSlots - activeObjects;
 
-        // Estimate free words (memory) - use GC statistics if available
-        var gcStats = _heapManager.GC.GetStatistics();
-        int freeWords = (totalSlots - gcStats.TotalObjects) * 256;  // Rough estimate: 256 words per object slot
-        if (freeWords < 0) freeWords = 0;
+        // On modern systems with virtual memory, we have essentially unlimited memory.
+        // The original Blue Book ran on systems with limited physical memory where
+        // low memory monitoring was critical. On modern systems with GB of RAM and
+        // virtual memory, the OS handles memory pressure transparently.
+        //
+        // Use same formula as primitive 112 (coreLeft) to be consistent:
+        // coreLeft returns freeSlots * 1024 (bytes)
+        // Smalltalk sets WordsLeftLimit = coreLeft // 4 = freeSlots * 256
+        // So we report freeWords = freeOops * 256 to match.
+        // This ensures freeWords is always proportional to the threshold.
+        int freeWords = freeOops * 256;
+        if (freeWords < 0) freeWords = int.MaxValue;  // Overflow means lots of memory
 
         // Check thresholds and get semaphore to signal if crossed
         var semaphoreOOP = _lowMemoryManager.CheckThresholds(freeOops, freeWords);
