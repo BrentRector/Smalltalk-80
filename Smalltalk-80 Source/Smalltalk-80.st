@@ -1522,6 +1522,25 @@ readWriteShorten
     "Set to read-write mode - no-op for basic implementation"
     ^self!
 
+reset
+    "Position the stream at the beginning of the file"
+    position _ 0.
+    self primSeek: handle offset: 0 origin: 0.
+    ^self!
+
+shorten
+    "Truncate the file at the current position"
+    <primitive: 140>
+    ^self!
+
+nextPutAll: aCollection
+    "Write all elements of aCollection to the file"
+    aCollection do: [:each |
+        (each isKindOf: Character)
+            ifTrue: [self nextPut: each]
+            ifFalse: [self nextPut: (Character value: each)]].
+    ^aCollection!
+
 primReadByte: aHandle at: pos
     "Read a byte from file at position. Returns -1 on EOF/error"
     <primitive: 132>
