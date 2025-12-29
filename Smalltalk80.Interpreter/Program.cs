@@ -129,8 +129,16 @@ public static class Program
 
             // Enable allocation-triggered GC now that cold start is complete and roots are established
             // During cold start, objects are built but not yet rooted, so AutoGC was disabled
-            heapManager.AutoGCEnabled = true;
-            Console.WriteLine("  Auto-GC enabled for runtime");
+            // --no-gc flag disables GC entirely (useful for benchmarking)
+            if (config.DisableGC)
+            {
+                Console.WriteLine("  Auto-GC DISABLED (--no-gc flag)");
+            }
+            else
+            {
+                heapManager.AutoGCEnabled = true;
+                Console.WriteLine("  Auto-GC enabled for runtime");
+            }
 
             // Create Smalltalk thread context
             var threadContext = new SmalltalkThreadContext

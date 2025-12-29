@@ -308,6 +308,9 @@ public class ColdStartOrchestrator : IColdStartLoader
             BlockContextClassOOP = GlobalRegistry.Get("class:BlockContext"),
             OrderedCollectionClassOOP = GlobalRegistry.Get("class:OrderedCollection"),
             ProcessClassOOP = GlobalRegistry.Get("class:Process"),
+            PointClassOOP = GlobalRegistry.Get("class:Point"),
+            FloatClassOOP = GlobalRegistry.Get("class:Float"),
+            CharacterClassOOP = GlobalRegistry.Get("class:Character"),
             KnownObjects = knownObjects,
             ProcessorScheduler = processorSchedulerOOP,
             InitExpressionMethods = InitExpressionMethods

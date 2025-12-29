@@ -7,56 +7,63 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 /// <summary>
 /// Float primitives (40-54) using new IPrimitive interface.
 /// Float is stored as IEEE 754 double precision (8 bytes / 4 words).
+///
+/// OPTIMIZATION (2025-12-28): Zero-allocation IEEE 754 conversion.
+/// - GetFloatAsDouble: Single heap call reads 4 words and returns double
+/// - SetFloatFromDouble: Single heap call writes double to 4 words
+/// - Uses cached FloatClassOOP instead of string-based class lookup
+/// - Uses BitConverter.Int64BitsToDouble for zero-allocation bit reinterpretation
 /// </summary>
 public static class FloatArithmetic
 {
-    /// <summary>Helper: Converts a Float object to C# double.</summary>
+    /// <summary>
+    /// Helper: Converts a Float object to C# double.
+    /// OPTIMIZED: Single heap call reads all 4 words and converts to IEEE 754 double.
+    /// </summary>
     private static double ToDouble(ISmalltalkHeap heap, SmalltalkOOP floatOop)
     {
-        byte[] bytes = new byte[8];
-        for (int i = 0; i < 4; i++)
-        {
-            ushort word = heap.GetIndexedWord(floatOop, i);
-            bytes[i * 2] = (byte)(word & 0xFF);
-            bytes[i * 2 + 1] = (byte)((word >> 8) & 0xFF);
-        }
-        return BitConverter.ToDouble(bytes, 0);
+        return heap.GetFloatAsDouble(floatOop);
     }
 
-    /// <summary>Helper: Creates a Float object from C# double.</summary>
+    /// <summary>
+    /// Helper: Creates a Float object from C# double.
+    /// OPTIMIZED: Uses cached FloatClassOOP and single heap call to write IEEE 754 value.
+    /// </summary>
     private static SmalltalkOOP FromDouble(PrimitiveExecutionContext ctx, double value)
     {
-        // Allocate Float with 4 indexed words
-        var floatOop = ctx.AllocateObject("Float", 4);
-        byte[] bytes = BitConverter.GetBytes(value);
-        for (int i = 0; i < 4; i++)
-        {
-            ushort word = (ushort)(bytes[i * 2] | (bytes[i * 2 + 1] << 8));
-            ctx.HeapManager.SetIndexedWord(floatOop, i, word);
-        }
+        // Allocate Float with 4 indexed words using cached class OOP
+        var floatOop = ctx.HeapManager.AllocateInstanceOf(ctx.Metadata!.FloatClassOOP, 4);
+
+        // Write IEEE 754 double directly to Float's 4 words
+        ctx.HeapManager.SetFloatFromDouble(floatOop, value);
+
         return floatOop;
     }
 
-    /// <summary>Helper: Checks if an object is a Float.</summary>
-    private static bool IsFloat(ISmalltalkHeap heap, SmalltalkOOP oop)
+    /// <summary>
+    /// Helper: Checks if an object is a Float.
+    /// OPTIMIZED: Uses cached FloatClassOOP for O(1) class comparison.
+    /// </summary>
+    private static bool IsFloat(PrimitiveExecutionContext ctx, SmalltalkOOP oop)
     {
         if (oop.IsSmallInteger) return false;
-        var format = heap.GetObjectFormat(oop);
-        if (format != ObjectFormat.WordIndexed) return false;
-        return heap.GetIndexedSize(oop) == 4;
+        return ctx.HeapManager.GetClassOOP(oop) == ctx.Metadata!.FloatClassOOP;
     }
 
-    /// <summary>Helper: Gets numeric value (SmallInteger or Float) as double.</summary>
-    private static bool TryGetDouble(ISmalltalkHeap heap, SmalltalkOOP oop, out double value)
+    /// <summary>
+    /// Helper: Gets numeric value (SmallInteger or Float) as double.
+    /// OPTIMIZED: Uses cached FloatClassOOP for type check.
+    /// </summary>
+    private static bool TryGetDouble(PrimitiveExecutionContext ctx, SmalltalkOOP oop, out double value)
     {
         if (oop.IsSmallInteger)
         {
             value = oop.AsSmallInteger();
             return true;
         }
-        if (IsFloat(heap, oop))
+        if (IsFloat(ctx, oop))
         {
-            value = ToDouble(heap, oop);
+            value = ToDouble(ctx.HeapManager, oop);
             return true;
         }
         value = 0;
@@ -82,8 +89,8 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.Ok(FromDouble(context, a + b));
         }
     }
@@ -94,8 +101,8 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.Ok(FromDouble(context, a - b));
         }
     }
@@ -106,8 +113,8 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.FromBool(a < b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
@@ -118,8 +125,8 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.FromBool(a > b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
@@ -130,8 +137,8 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.FromBool(a <= b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
@@ -142,8 +149,8 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.FromBool(a >= b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
@@ -154,8 +161,8 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.FromBool(a == b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
@@ -166,8 +173,8 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.FromBool(a != b, context.Metadata!.KnownObjects.True, context.Metadata!.KnownObjects.False);
         }
     }
@@ -178,8 +185,8 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.Ok(FromDouble(context, a * b));
         }
     }
@@ -190,8 +197,8 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double a)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Arguments[0], out double b)) return PrimitiveResult.Fail(context.Metadata!);
             if (b == 0) return PrimitiveResult.Fail(context.Metadata!);
             return PrimitiveResult.Ok(FromDouble(context, a / b));
         }
@@ -203,7 +210,7 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double value)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double value)) return PrimitiveResult.Fail(context.Metadata!);
 
             double truncated = Math.Truncate(value);
             const int SmallIntegerMin = -(1 << 30);
@@ -222,7 +229,7 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double value)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double value)) return PrimitiveResult.Fail(context.Metadata!);
 
             double fraction = value - Math.Truncate(value);
             return PrimitiveResult.Ok(FromDouble(context, fraction));
@@ -235,7 +242,7 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double value)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double value)) return PrimitiveResult.Fail(context.Metadata!);
 
             if (value == 0) return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(0));
 
@@ -250,7 +257,7 @@ public static class FloatArithmetic
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
-            if (!TryGetDouble(context.HeapManager, context.Receiver, out double value)) return PrimitiveResult.Fail(context.Metadata!);
+            if (!TryGetDouble(context, context.Receiver, out double value)) return PrimitiveResult.Fail(context.Metadata!);
             if (!context.Arguments[0].IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             int power = context.Arguments[0].AsSmallInteger();

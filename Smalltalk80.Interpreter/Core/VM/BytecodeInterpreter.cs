@@ -1059,42 +1059,66 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         var argOOP = context.Pop();
         var receiverOOP = context.Pop();
 
-        // Try primitive arithmetic for SmallIntegers
+        // Fast path for SmallInteger arithmetic (most common case)
+        // Non-SmallInteger operations (Float, LargeInteger, @) fall through to message send
+        // where primitives handle them properly
         if (receiverOOP.IsSmallInteger && argOOP.IsSmallInteger)
         {
-            // For primitive arithmetic, we need the selector name for ExecuteIntegerArithmetic
-            string selector = selectorIndex switch
+            var resultOOP = ExecuteIntegerArithmeticByIndex(selectorIndex, receiverOOP, argOOP);
+            if (resultOOP != metadata.KnownObjects.Nil)
             {
-                0x00 => "+",
-                0x01 => "-",
-                0x02 => "<",
-                0x03 => ">",
-                0x04 => "<=",
-                0x05 => ">=",
-                0x06 => "=",
-                0x07 => "~=",
-                0x08 => "*",
-                0x09 => "/",
-                0x0A => "\\",
-                0x0B => "@",
-                0x0C => "bitShift:",
-                0x0D => "//",
-                0x0E => "bitAnd:",
-                0x0F => "bitOr:",
-                _ => throw new InvalidOperationException($"Unknown arithmetic bytecode: 0x{bytecode:X2}")
-            };
-
-            var resultOOP = ExecuteIntegerArithmetic(receiverOOP, selector, argOOP);
-            if (resultOOP != metadata.KnownObjects.Nil ||
-                selector is "=" or "~=" or "<" or ">" or "<=" or ">=")
+                context.Push(resultOOP);
+                return true;
+            }
+            // Comparison operations may return False (which equals Nil check above)
+            // but that's a valid result, so check explicitly for comparisons
+            if (selectorIndex >= 0x02 && selectorIndex <= 0x07)
             {
+                // Comparisons: <, >, <=, >=, =, ~= - result is valid even if False
                 context.Push(resultOOP);
                 return true;
             }
         }
 
-        // Fall back to message send using cached selector OOP
+        // Fall back to message send - primitives handle Float, LargeInteger, Point creation (@), etc.
         return context.SendMessageAndContinue(receiverOOP, selectorOOP, [argOOP]);
+    }
+
+    /// <summary>
+    /// Executes integer arithmetic by selector index (faster than string matching).
+    /// </summary>
+    private SmalltalkOOP ExecuteIntegerArithmeticByIndex(int selectorIndex, SmalltalkOOP receiverOOP, SmalltalkOOP argOOP)
+    {
+        int a = receiverOOP.AsSmallInteger();
+        int b = argOOP.AsSmallInteger();
+
+        try
+        {
+            return selectorIndex switch
+            {
+                0x00 => SmalltalkOOP.FromSmallInteger(a + b),  // +
+                0x01 => SmalltalkOOP.FromSmallInteger(a - b),  // -
+                0x02 => a < b ? metadata.KnownObjects.True : metadata.KnownObjects.False,   // <
+                0x03 => a > b ? metadata.KnownObjects.True : metadata.KnownObjects.False,   // >
+                0x04 => a <= b ? metadata.KnownObjects.True : metadata.KnownObjects.False,  // <=
+                0x05 => a >= b ? metadata.KnownObjects.True : metadata.KnownObjects.False,  // >=
+                0x06 => a == b ? metadata.KnownObjects.True : metadata.KnownObjects.False,  // =
+                0x07 => a != b ? metadata.KnownObjects.True : metadata.KnownObjects.False,  // ~=
+                0x08 => SmalltalkOOP.FromSmallInteger(a * b),  // *
+                0x09 => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : metadata.KnownObjects.Nil,  // /
+                0x0A => b != 0 ? SmalltalkOOP.FromSmallInteger(a - b * (int)Math.Floor((double)a / b)) : metadata.KnownObjects.Nil,  // \ (mod)
+                0x0B => metadata.KnownObjects.Nil,  // @ - let primitive 18 handle it
+                0x0C => b >= 0 ? SmalltalkOOP.FromSmallInteger(a << b) : SmalltalkOOP.FromSmallInteger(a >> (-b)),  // bitShift:
+                0x0D => b != 0 ? SmalltalkOOP.FromSmallInteger((int)Math.Floor((double)a / b)) : metadata.KnownObjects.Nil,  // //
+                0x0E => SmalltalkOOP.FromSmallInteger(a & b),  // bitAnd:
+                0x0F => SmalltalkOOP.FromSmallInteger(a | b),  // bitOr:
+                _ => metadata.KnownObjects.Nil
+            };
+        }
+        catch
+        {
+            return metadata.KnownObjects.Nil;
+        }
     }
 
     /// <summary>
@@ -1211,15 +1235,19 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
         }
 
         // Fast path for at: (index 0) - indexed access
-        // WHITELIST APPROACH: Only allow classes that use direct indexed storage without override logic.
+        // WHITELIST APPROACH: Only allow classes that use direct indexed storage without override logic
+        // AND don't have primitives (primitive 60 handles at: for most classes).
         // Many classes override at: with custom behavior (OrderedCollection uses firstIndex offset,
         // Dictionary uses hashing, Interval computes values, String returns Characters, etc.)
-        // Safe classes: Array, ByteArray, WordArray, DisplayBitmap
+        // These classes have at: primitive 60 which handles them properly.
+        // NOTE: Most at: calls should go through primitive 60 via message send.
+        // This fast path is only for classes that frequently use special bytecode at: without primitives.
         if (selectorIndex == 0 && !receiverOOP.IsSmallInteger && args[0].IsSmallInteger)
         {
             var classOOP = heapManager.GetClassOOP(receiverOOP);
 
-            // WHITELIST: Only these classes have direct indexed storage
+            // WHITELIST: Only classes where primitive 60 would do the same thing
+            // and we're avoiding method lookup overhead
             if (classOOP == metadata.ArrayClassOOP ||
                 classOOP == metadata.ByteArrayClassOOP ||
                 classOOP == metadata.WordArrayClassOOP ||
@@ -1250,7 +1278,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 }
                 // Out of bounds - fall through to message send for error handling
             }
-            // Not in whitelist - fall through to message send
+            // Not in whitelist - fall through to message send (primitives handle String, etc.)
         }
 
         // Fast path for at:put: (index 1) - indexed store
@@ -1334,54 +1362,23 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             }
         }
 
+        // Fast path for x/y on Point (index 14 = x, index 15 = y)
+        // Point has instance variables: x (index 0), y (index 1)
+        if ((selectorIndex == 14 || selectorIndex == 15) && !receiverOOP.IsSmallInteger)
+        {
+            var classOOP = heapManager.GetClassOOP(receiverOOP);
+            if (classOOP == metadata.PointClassOOP)
+            {
+                // Direct instance variable access: x = ivar[0], y = ivar[1]
+                int ivarIndex = selectorIndex == 14 ? 0 : 1;
+                var value = heapManager.GetInstanceVariable(receiverOOP, ivarIndex);
+                context.Push(value);
+                return true;
+            }
+        }
+
         // Fall back to message send using cached selector OOP
         return context.SendMessageAndContinue(receiverOOP, selectorOOP, args);
-    }
-
-    /// <summary>
-    /// Executes integer arithmetic primitively (for SmallIntegers).
-    /// Returns nil OOP if operation fails or is not supported.
-    /// </summary>
-    /// <param name="receiverOOP">The receiver SmallInteger OOP.</param>
-    /// <param name="selector">The arithmetic selector name.</param>
-    /// <param name="argOOP">The argument SmallInteger OOP.</param>
-    /// <returns>The result OOP, or nil if the operation failed.</returns>
-    private SmalltalkOOP ExecuteIntegerArithmetic(SmalltalkOOP receiverOOP, string selector, SmalltalkOOP argOOP)
-    {
-        if (!receiverOOP.IsSmallInteger || !argOOP.IsSmallInteger)
-        {
-            return metadata.KnownObjects.Nil;
-        }
-
-        int a = receiverOOP.AsSmallInteger();
-        int b = argOOP.AsSmallInteger();
-
-        try
-        {
-            return selector switch
-            {
-                "+" => SmalltalkOOP.FromSmallInteger(a + b),
-                "-" => SmalltalkOOP.FromSmallInteger(a - b),
-                "*" => SmalltalkOOP.FromSmallInteger(a * b),
-                "/" => b != 0 ? SmalltalkOOP.FromSmallInteger(a / b) : metadata.KnownObjects.Nil,
-                "\\" => b != 0 ? SmalltalkOOP.FromSmallInteger(a - b * (int)Math.Floor((double)a / b)) : metadata.KnownObjects.Nil,  // Smalltalk floored modulo
-                "//" => b != 0 ? SmalltalkOOP.FromSmallInteger((int)Math.Floor((double)a / b)) : metadata.KnownObjects.Nil,  // Smalltalk floored division
-                "<" => a < b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
-                ">" => a > b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
-                "<=" => a <= b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
-                ">=" => a >= b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
-                "=" => a == b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
-                "~=" => a != b ? metadata.KnownObjects.True : metadata.KnownObjects.False,
-                "bitAnd:" => SmalltalkOOP.FromSmallInteger(a & b),
-                "bitOr:" => SmalltalkOOP.FromSmallInteger(a | b),
-                "bitShift:" => b >= 0 ? SmalltalkOOP.FromSmallInteger(a << b) : SmalltalkOOP.FromSmallInteger(a >> (-b)),
-                _ => metadata.KnownObjects.Nil
-            };
-        }
-        catch
-        {
-            return metadata.KnownObjects.Nil;
-        }
     }
 
     /// <summary>

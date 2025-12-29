@@ -109,51 +109,54 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
             throw new InvalidOperationException("USTable not found in Symbol classPool");
         }
 
-        // USTable is an Array in the Smalltalk heap containing Symbol OOPs
+        // USTable is an Array of Arrays (buckets) for collision chaining.
+        // Use hash-based bucket lookup for O(1) access instead of linear scan.
         int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
         var nilOOP = metadata.KnownObjects.Nil;
 
-        // Convert search string to bytes (Latin-1 encoding)
-        byte[] searchBytes = Encoding.Latin1.GetBytes(symbolName);
+        // Compute bucket index using same hash as Smalltalk's stringhash
+        // (matches String>>hash algorithm used by Symbol class>>hasInterned:ifTrue:)
+        int hash = SymbolHasher.ComputeHash(symbolName);
+        int bucketIndex = hash % ustableSize;
 
-        // Search through USTable (Array-of-Arrays structure for collision chaining)
-        for (int i = 0; i < ustableSize; i++)
+        // Get the bucket array at this index
+        var bucketOOP = _heapManager.GetIndexedOOP(ustableOOP, bucketIndex);
+        if (bucketOOP == nilOOP || bucketOOP.IsSmallInteger)
         {
-            var bucketOOP = _heapManager.GetIndexedOOP(ustableOOP, i);
+            return nilOOP; // No bucket = symbol not found
+        }
 
-            // Skip nil buckets (empty slots)
-            if (bucketOOP == nilOOP)
+        // Search within this bucket only (typically 1-3 symbols)
+        int bucketSize = _heapManager.GetIndexedSize(bucketOOP);
+
+        for (int i = 0; i < bucketSize; i++)
+        {
+            var symbolOOP = _heapManager.GetIndexedOOP(bucketOOP, i);
+
+            // Skip nil slots
+            if (symbolOOP == nilOOP || symbolOOP.IsSmallInteger)
                 continue;
 
-            // Bucket is an Array of Symbols - iterate through it
-            int bucketSize = _heapManager.GetIndexedSize(bucketOOP);
-            for (int k = 0; k < bucketSize; k++)
+            // Compare using GetByteSpan for zero-copy access
+            var symbolBytes = _heapManager.GetByteSpan(symbolOOP);
+
+            // Quick length check first
+            if (symbolBytes.Length != symbolName.Length)
+                continue;
+
+            // Compare bytes (Symbol uses Latin-1 encoding)
+            bool match = true;
+            for (int j = 0; j < symbolName.Length; j++)
             {
-                var symbolOOP = _heapManager.GetIndexedOOP(bucketOOP, k);
-
-                // Skip nil slots
-                if (symbolOOP == nilOOP || symbolOOP.IsSmallInteger)
-                    continue;
-
-                // Compare Symbol bytes in heap
-                int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
-                if (symbolLength == searchBytes.Length)
+                if (symbolBytes[j] != (byte)symbolName[j])
                 {
-                    bool match = true;
-                    for (int j = 0; j < searchBytes.Length; j++)
-                    {
-                        byte symbolByte = _heapManager.GetIndexedByte(symbolOOP, j);
-                        if (symbolByte != searchBytes[j])
-                        {
-                            match = false;
-                            break;
-                        }
-                    }
-
-                    if (match)
-                        return symbolOOP;
+                    match = false;
+                    break;
                 }
             }
+
+            if (match)
+                return symbolOOP;
         }
 
         return nilOOP;  // Symbol not found

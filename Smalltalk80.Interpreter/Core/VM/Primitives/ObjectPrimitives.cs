@@ -39,6 +39,12 @@ public static class SimpleObjectPrimitives
     }
 
     /// <summary>Primitive 75: Object hash - returns identity hash (OOP/2)</summary>
+    /// <remarks>
+    /// Returns half the object pointer (identity hash) per Blue Book specification.
+    /// Note: String>>hash is overridden in Smalltalk with a content-based algorithm.
+    /// Symbol>>hash uses this primitive for identity hash, but Symbol>>stringhash
+    /// calls super hash (String>>hash) for content-based USTable lookup.
+    /// </remarks>
     public class Hash : IPrimitive
     {
         public PrimitiveResult Execute(PrimitiveExecutionContext context)

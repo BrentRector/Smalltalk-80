@@ -168,17 +168,6 @@ public interface IPrimitiveContext
     /// <returns>ObjectFormat enum value.</returns>
     ObjectFormat GetObjectFormat(SmalltalkOOP objectOOP);
 
-    // Symbol interning support
-
-    /// <summary>
-    /// Interns a string as a Symbol, returning existing Symbol if already interned.
-    /// Searches the symbol table for a matching symbol string, returns the Symbol OOP if found.
-    /// If not found, returns Nil (primitives should fail and let Smalltalk create new Symbol).
-    /// </summary>
-    /// <param name="symbolName">String to intern as a symbol.</param>
-    /// <returns>Symbol OOP if found, Nil if not found.</returns>
-    SmalltalkOOP InternSymbol(string symbolName);
-
     // Global object lookup support
 
     /// <summary>

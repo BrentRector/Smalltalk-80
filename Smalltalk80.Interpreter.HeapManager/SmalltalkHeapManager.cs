@@ -418,6 +418,20 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         WriteIndexedByte(entry, index, value);
     }
 
+    public ReadOnlySpan<byte> GetByteSpan(SmalltalkOOP objectOOP)
+    {
+        if (objectOOP.IsSmallInteger)
+            return ReadOnlySpan<byte>.Empty;
+
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+
+        if (entry.FormatExplicit != ObjectFormat.ByteIndexed)
+            return ReadOnlySpan<byte>.Empty;
+
+        var byteArray = entry.AsByteArray();
+        return byteArray ?? ReadOnlySpan<byte>.Empty;
+    }
+
     public ushort GetIndexedWord(SmalltalkOOP objectOOP, int index)
     {
         if (objectOOP.IsSmallInteger)
@@ -442,6 +456,57 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             throw new InvalidOperationException($"Object format {entry.FormatExplicit} does not support word indexing");
 
         WriteIndexedWord(entry, index, value);
+    }
+
+    // ========================================
+    // Float Optimization (Zero-Allocation IEEE 754)
+    // ========================================
+
+    /// <inheritdoc />
+    public double GetFloatAsDouble(SmalltalkOOP floatOOP)
+    {
+        if (floatOOP.IsSmallInteger)
+            throw new ArgumentException("Cannot get Float value from SmallInteger");
+
+        var entry = _tableManager.GetObjectTableEntry(floatOOP);
+
+        if (entry.FormatExplicit != ObjectFormat.WordIndexed)
+            throw new InvalidOperationException($"Object format {entry.FormatExplicit} is not a Float (WordIndexed)");
+
+        var wordArray = entry.AsWordArray();
+        if (wordArray == null || wordArray.Length != 4)
+            throw new InvalidOperationException($"Float must have exactly 4 words, got {wordArray?.Length ?? 0}");
+
+        // Assemble 4 words into long (little-endian: word 0 is least significant)
+        long bits = (long)wordArray[0]
+                  | ((long)wordArray[1] << 16)
+                  | ((long)wordArray[2] << 32)
+                  | ((long)wordArray[3] << 48);
+
+        return BitConverter.Int64BitsToDouble(bits);
+    }
+
+    /// <inheritdoc />
+    public void SetFloatFromDouble(SmalltalkOOP floatOOP, double value)
+    {
+        if (floatOOP.IsSmallInteger)
+            throw new ArgumentException("Cannot set Float value in SmallInteger");
+
+        var entry = _tableManager.GetObjectTableEntry(floatOOP);
+
+        if (entry.FormatExplicit != ObjectFormat.WordIndexed)
+            throw new InvalidOperationException($"Object format {entry.FormatExplicit} is not a Float (WordIndexed)");
+
+        var wordArray = entry.AsWordArray();
+        if (wordArray == null || wordArray.Length != 4)
+            throw new InvalidOperationException($"Float must have exactly 4 words, got {wordArray?.Length ?? 0}");
+
+        // Extract 4 words from long (little-endian)
+        long bits = BitConverter.DoubleToInt64Bits(value);
+        wordArray[0] = (ushort)(bits & 0xFFFF);
+        wordArray[1] = (ushort)((bits >> 16) & 0xFFFF);
+        wordArray[2] = (ushort)((bits >> 32) & 0xFFFF);
+        wordArray[3] = (ushort)((bits >> 48) & 0xFFFF);
     }
 
     /// <summary>

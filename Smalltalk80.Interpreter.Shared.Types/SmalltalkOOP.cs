@@ -5,7 +5,7 @@ namespace Smalltalk80.Interpreter.Shared.Types;
 /// Implements immediate SmallInteger encoding with LSB tagging.
 /// LSB = 0: Object pointer (ObjectTable index), LSB = 1: SmallInteger immediate value
 /// </summary>
-public readonly struct SmalltalkOOP
+public readonly struct SmalltalkOOP : IEquatable<SmalltalkOOP>
 {
     private readonly int _value;
 
@@ -59,8 +59,9 @@ public readonly struct SmalltalkOOP
         ? $"SmallInteger({AsSmallInteger()})"
         : $"oop={_value}";
 
-    public override bool Equals(object? obj) => obj is SmalltalkOOP other && _value == other._value;
-    public override int GetHashCode() => _value.GetHashCode();
+    public bool Equals(SmalltalkOOP other) => _value == other._value;
+    public override bool Equals(object? obj) => obj is SmalltalkOOP other && Equals(other);
+    public override int GetHashCode() => _value;
 
     public static bool operator ==(SmalltalkOOP left, SmalltalkOOP right) => left._value == right._value;
     public static bool operator !=(SmalltalkOOP left, SmalltalkOOP right) => left._value != right._value;

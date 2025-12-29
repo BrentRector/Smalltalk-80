@@ -19,12 +19,28 @@ public interface IMessageDispatcher
     MethodLookupResult? LookupMethod(SmalltalkOOP classOOP, string selectorName);
 
     /// <summary>
+    /// Looks up a method in a class hierarchy using direct Symbol OOP comparison.
+    /// This is the optimized path that avoids string allocation and comparison.
+    /// Walks up the superclass chain until the method is found or nil is reached.
+    /// </summary>
+    /// <param name="classOOP">Starting class for method lookup.</param>
+    /// <param name="selectorOOP">Symbol OOP of the selector to find.</param>
+    /// <returns>MethodLookupResult containing the method OOP, or null if not found.</returns>
+    MethodLookupResult? LookupMethod(SmalltalkOOP classOOP, SmalltalkOOP selectorOOP);
+
+    /// <summary>
     /// Gets the primitive number from a CompiledMethod.
     /// Returns 0 if the method has no primitive.
     /// </summary>
     /// <param name="methodOOP">CompiledMethod to inspect.</param>
     /// <returns>Primitive number (0 if no primitive).</returns>
     int GetPrimitiveNumber(SmalltalkOOP methodOOP);
+
+    /// <summary>
+    /// Clears the method lookup cache.
+    /// Called by Primitive 89 (Behavior>>flushCache) when methods are recompiled.
+    /// </summary>
+    void ClearCache();
 }
 
 /// <summary>

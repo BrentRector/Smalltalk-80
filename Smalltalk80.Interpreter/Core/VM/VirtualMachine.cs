@@ -52,6 +52,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private readonly NonLocalReturnHandler _nlrHandler;
     private readonly ExecutionTracer _tracer;
     private readonly ITimerManager _timerManager;
+    private readonly RuntimeDictionaryService _dictionaryService;
 
     // Verbose debug mode for current init expression (controlled by Program.cs)
     private bool _verboseDebugMode = false;
@@ -86,6 +87,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private SmalltalkOOP _ifFalseIfTrueSelectorOOP;
     private SmalltalkOOP _whileTrueSelectorOOP;
     private SmalltalkOOP _whileFalseSelectorOOP;
+
+    // Cached selector OOPs for block value messages
+    private SmalltalkOOP _valueSelectorOOP;
+    private SmalltalkOOP _valueColonSelectorOOP;
+    private SmalltalkOOP _valueColonValueColonSelectorOOP;
+
     private bool _conditionalSelectorsInitialized;
 
     // Interrupt mask counter for critical sections (used by HeapManager during GC)
@@ -166,10 +173,13 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
             () => _tracer.IncrementPushTraceCounter()
         );
 
+        _dictionaryService = new RuntimeDictionaryService(heapManager);
+
         _messageDispatcher = new MessageDispatcher(
             heapManager,
             this, // IObjectMetadataAccessor
-            metadata
+            metadata,
+            _dictionaryService
         );
 
         _bytecodeInterpreter = new BytecodeInterpreter(
@@ -215,6 +225,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _ifFalseIfTrueSelectorOOP = _selectorCache.LookupSelector("ifFalse:ifTrue:");
         _whileTrueSelectorOOP = _selectorCache.LookupSelector("whileTrue:");
         _whileFalseSelectorOOP = _selectorCache.LookupSelector("whileFalse:");
+
+        // Initialize block value selector OOPs for fast-path block invocation check
+        _valueSelectorOOP = _selectorCache.LookupSelector("value");
+        _valueColonSelectorOOP = _selectorCache.LookupSelector("value:");
+        _valueColonValueColonSelectorOOP = _selectorCache.LookupSelector("value:value:");
+
         _conditionalSelectorsInitialized = true;
     }
 
@@ -2216,66 +2232,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         return _heapManager.GetObjectFormat(objectOOP);
     }
 
-    SmalltalkOOP IPrimitiveContext.InternSymbol(string symbolName)
-    {
-        // CRITICAL: Must access USTable from Smalltalk heap, NOT from C# proxy data
-        // The _symbols array and SymbolRegistry are coldstart-time snapshots that become
-        // stale as soon as the Smalltalk interpreter begins running and creates new symbols.
-
-        // Get USTable from Symbol's classPool (it's a class variable, not a global)
-        var ustableOOP = _runtimeHeapAccess.LookupClassVariable("Symbol", "USTable");
-        if (ustableOOP == _metadata.KnownObjects.Nil)
-        {
-            // USTable not yet created (shouldn't happen after cold start)
-            return _metadata.KnownObjects.Nil;
-        }
-
-        // USTable is an Array of Symbol OOPs (with nils for empty slots)
-        int ustableSize = _heapManager.GetIndexedSize(ustableOOP);
-        var nilOOP = _metadata.KnownObjects.Nil;
-
-        // Convert input string to bytes for comparison (Latin-1 encoding)
-        byte[] searchBytes = System.Text.Encoding.Latin1.GetBytes(symbolName);
-
-        // Iterate through all slots in USTable
-        for (int i = 0; i < ustableSize; i++)
-        {
-            var symbolOOP = _heapManager.GetIndexedOOP(ustableOOP, i);
-
-            // Skip nil slots (empty entries in hash table)
-            if (symbolOOP == nilOOP || symbolOOP.IsSmallInteger)
-                continue;
-
-            // Get the Symbol's string length from its indexed fields in the Smalltalk heap
-            int symbolLength = _heapManager.GetIndexedSize(symbolOOP);
-
-            // Compare byte-by-byte
-            if (symbolLength == searchBytes.Length)
-            {
-                bool match = true;
-                for (int j = 0; j < searchBytes.Length; j++)
-                {
-                    byte symbolByte = _heapManager.GetIndexedByte(symbolOOP, j);
-                    if (symbolByte != searchBytes[j])
-                    {
-                        match = false;
-                        break;
-                    }
-                }
-
-                if (match)
-                {
-                    // Found matching symbol in the Smalltalk heap
-                    return symbolOOP;
-                }
-            }
-        }
-
-        // Symbol not found - return Nil to signal primitive failure
-        // The Smalltalk fallback code will create a new Symbol if needed
-        return _metadata.KnownObjects.Nil;
-    }
-
     SmalltalkOOP IPrimitiveContext.GetGlobalObjectByName(string globalName)
     {
         // HEAP-ONLY IMPLEMENTATION: Access Smalltalk global dictionary from heap,
@@ -2308,7 +2264,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         // First, intern the key as a Symbol (required for dictionary lookup)
-        var keySymbolOOP = ((IPrimitiveContext)this).InternSymbol(lookupKey);
+        var keySymbolOOP = _runtimeHeapAccess.InternSymbol(lookupKey);
         if (keySymbolOOP == _metadata.KnownObjects.Nil)
         {
             // Symbol not found - global doesn't exist
@@ -2371,14 +2327,12 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     /// <summary>
     /// Clears the method lookup cache.
-    /// Currently a no-op since this implementation doesn't have a method cache.
-    /// The selector caches are static and don't need clearing.
+    /// Called by Primitive 89 (Behavior>>flushCache) when methods are recompiled.
     /// </summary>
     public void ClearMethodCache()
     {
-        // No-op: This implementation doesn't have a dynamic method cache
-        // The selector caches (_arithmeticSelectorCache, _specialSelectorCache) are
-        // static lookup tables initialized once at startup and never modified.
+        // Clear the method lookup cache in MessageDispatcher
+        _messageDispatcher.ClearCache();
     }
 
     /// <summary>
