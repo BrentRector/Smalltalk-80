@@ -1549,6 +1549,23 @@ do: aBlock
         char _ self next.
         char notNil ifTrue: [aBlock value: char]]!
 
+skip: anInteger
+    "Skip forward (positive) or backward (negative) by anInteger characters"
+    | newPos |
+    newPos _ position + anInteger.
+    newPos < 0 ifTrue: [newPos _ 0].
+    self position: newPos.
+    ^self!
+
+copy
+    "Answer a copy of this file reference, positioned at the same place"
+    | newRef |
+    newRef _ self class new.
+    newRef pathName: pathName.
+    newRef openRead.
+    newRef position: position.
+    ^newRef!
+
 primReadByte: aHandle at: pos
     "Read a byte from file at position. Returns -1 on EOF/error"
     <primitive: 132>
@@ -1592,6 +1609,330 @@ primGetAttributes: path
 
 WindowsFileReference class
     instanceVariableNames: ''!
+
+"==================== WindowsFileStream ===================="
+
+Object subclass: #WindowsFileStream
+    instanceVariableNames: 'pathName handle position rwmode closed'
+    classVariableNames: 'Read Write Shorten'
+    poolDictionaries: ''
+    category: 'Files-Streams'!
+
+WindowsFileStream comment:
+'I am a file stream for Windows that provides FileStream-compatible interface.
+I am used in SourceFiles to provide source code access.
+
+Instance variables:
+    pathName    <String> full path to the file
+    handle      <Integer> Windows file handle (-1 if closed)
+    position    <Integer> current read/write position
+    rwmode      <Integer> combination of Read, Write, Shorten flags
+    closed      <Boolean> true if stream is closed'!
+
+!WindowsFileStream class methodsFor: 'class initialization'!
+
+initialize
+    "Initialize class variables for file modes"
+    Read _ 1.
+    Write _ 2.
+    Shorten _ 4! !
+
+!WindowsFileStream class methodsFor: 'instance creation'!
+
+pathName: aString
+    "Create a new stream on the file at aString path"
+    ^self new pathName: aString!
+
+pathName: aString handle: aHandle
+    "Create a stream with an already-open file handle"
+    ^self new pathName: aString handle: aHandle! !
+
+!WindowsFileStream methodsFor: 'initialization'!
+
+initialize
+    handle _ -1.
+    position _ 0.
+    rwmode _ nil.
+    closed _ true.
+    ^self!
+
+pathName: aString
+    "Set path name"
+    pathName _ aString.
+    ^self!
+
+pathName: aString handle: aHandle
+    "Set path and handle for pre-opened file"
+    pathName _ aString.
+    handle _ aHandle.
+    position _ 0.
+    rwmode _ Read + Write.
+    closed _ false.
+    ^self! !
+
+!WindowsFileStream methodsFor: 'accessing'!
+
+name
+    "Answer the name of the file"
+    | path sep idx |
+    path _ pathName.
+    sep _ (path includes: $\)
+        ifTrue: [$\]
+        ifFalse: [$/].
+    idx _ path findLast: [:c | c = sep].
+    idx = 0
+        ifTrue: [^path]
+        ifFalse: [^path copyFrom: idx + 1 to: path size]!
+
+file
+    "Answer self for FileStream compatibility"
+    ^self!
+
+position
+    "Answer current position"
+    ^position!
+
+position: anInteger
+    "Set current position"
+    | newPos |
+    closed ifTrue: [self reopen].
+    newPos _ self primSeek: handle offset: anInteger origin: 0.
+    newPos >= 0 ifTrue: [position _ newPos].
+    ^position!
+
+size
+    "Answer the file size"
+    <primitive: 144>
+    | attrs |
+    attrs _ self primGetAttributes: pathName.
+    attrs isNil ifTrue: [^0].
+    ^attrs at: 1! !
+
+!WindowsFileStream methodsFor: 'testing'!
+
+atEnd
+    "Answer whether at end of file"
+    ^position >= self size!
+
+closed
+    "Answer whether the stream is closed"
+    ^closed!
+
+writing
+    "Answer whether writing is allowed"
+    rwmode == nil ifTrue: [^false].
+    ^(rwmode bitAnd: Write) = Write! !
+
+!WindowsFileStream methodsFor: 'positioning'!
+
+reset
+    "Position at beginning of file"
+    closed ifTrue: [self reopen].
+    position _ 0.
+    self primSeek: handle offset: 0 origin: 0.
+    ^self!
+
+setToEnd
+    "Position at end of file"
+    | newPos |
+    closed ifTrue: [self reopen].
+    newPos _ self primSeek: handle offset: 0 origin: 2.
+    newPos >= 0 ifTrue: [position _ newPos].
+    ^self!
+
+skip: anInteger
+    "Skip forward or backward by anInteger characters"
+    | newPos |
+    closed ifTrue: [self reopen].
+    newPos _ position + anInteger.
+    newPos < 0 ifTrue: [newPos _ 0].
+    self position: newPos.
+    ^self! !
+
+!WindowsFileStream methodsFor: 'reading'!
+
+next
+    "Read and return the next character"
+    | byte |
+    closed ifTrue: [self reopen].
+    <primitive: 132>
+    byte _ self primReadByte: handle at: position.
+    byte < 0 ifTrue: [^nil].
+    position _ position + 1.
+    ^Character value: byte!
+
+next: anInteger
+    "Read and return the next anInteger characters as a String"
+    | result |
+    result _ String new: anInteger.
+    1 to: anInteger do: [:i |
+        | char |
+        char _ self next.
+        char isNil ifTrue: [^result copyFrom: 1 to: i - 1].
+        result at: i put: char].
+    ^result!
+
+peek
+    "Return next character without advancing position"
+    | byte |
+    closed ifTrue: [self reopen].
+    byte _ self primReadByte: handle at: position.
+    byte < 0 ifTrue: [^nil].
+    ^Character value: byte!
+
+nextChunk
+    "Read and return the next chunk (text terminated by !).
+     Doubled !! are converted to single !"
+    | result char prevWasBang |
+    result _ WriteStream on: (String new: 1000).
+    prevWasBang _ false.
+    [self atEnd] whileFalse: [
+        char _ self next.
+        char isNil ifTrue: [^result contents].
+        char == $!
+            ifTrue: [
+                prevWasBang
+                    ifTrue: [
+                        result nextPut: $!.
+                        prevWasBang _ false]
+                    ifFalse: [prevWasBang _ true]]
+            ifFalse: [
+                prevWasBang ifTrue: [^result contents].
+                result nextPut: char]].
+    ^result contents! !
+
+!WindowsFileStream methodsFor: 'writing'!
+
+nextPut: aCharacter
+    "Write a character"
+    | byte |
+    closed ifTrue: [self reopen].
+    <primitive: 134>
+    byte _ aCharacter asciiValue.
+    self primWriteByte: handle at: position value: byte.
+    position _ position + 1.
+    ^aCharacter!
+
+nextPutAll: aCollection
+    "Write all elements of aCollection"
+    aCollection do: [:each |
+        (each isKindOf: Character)
+            ifTrue: [self nextPut: each]
+            ifFalse: [self nextPut: (Character value: each)]].
+    ^aCollection!
+
+cr
+    "Write a carriage return"
+    self nextPut: Character cr!
+
+nextChunkPut: aString
+    "Write aString as a chunk (with ! terminator).
+     Single ! in aString are doubled to !!"
+    aString do: [:char |
+        char == $! ifTrue: [self nextPut: $!].
+        self nextPut: char].
+    self nextPut: $!.
+    self cr.
+    ^aString! !
+
+!WindowsFileStream methodsFor: 'enumerating'!
+
+do: aBlock
+    "Iterate over all characters from current position to end"
+    | char |
+    [self atEnd] whileFalse: [
+        char _ self next.
+        char notNil ifTrue: [aBlock value: char]]! !
+
+!WindowsFileStream methodsFor: 'file modes'!
+
+readOnly
+    "Set to read-only mode"
+    rwmode _ Read.
+    ^self!
+
+readWrite
+    "Set to read-write mode"
+    rwmode _ Read + Write.
+    ^self!
+
+readWriteShorten
+    "Set to read-write-shorten mode"
+    rwmode _ Read + Write + Shorten.
+    ^self! !
+
+!WindowsFileStream methodsFor: 'file status'!
+
+close
+    "Close the stream"
+    closed ifFalse: [
+        self writing ifTrue: [
+            (rwmode bitAnd: Shorten) = Shorten ifTrue: [self shorten]].
+        handle >= 0 ifTrue: [self primClose: handle].
+        handle _ -1.
+        closed _ true].
+    ^self!
+
+reopen
+    "Reopen a closed stream"
+    | savedPos |
+    closed ifFalse: [^self].
+    savedPos _ position.
+    handle _ self primOpen: pathName accessMode: 3 shareMode: 1 createMode: 4.
+    handle < 0 ifTrue: [self error: 'Cannot reopen file'].
+    closed _ false.
+    self position: savedPos.
+    ^self!
+
+shorten
+    "Truncate file at current position"
+    <primitive: 140>
+    ^self!
+
+flush
+    "Flush any buffered data - no-op for direct file access"
+    ^self! !
+
+!WindowsFileStream methodsFor: 'copying'!
+
+copy
+    "Answer a copy of this stream, positioned at the same place"
+    | newStream |
+    newStream _ self class pathName: pathName.
+    newStream reopen.
+    newStream position: position.
+    ^newStream! !
+
+!WindowsFileStream methodsFor: 'private'!
+
+primOpen: path accessMode: access shareMode: share createMode: create
+    <primitive: 121>
+    ^-1!
+
+primClose: aHandle
+    <primitive: 122>
+    ^false!
+
+primSeek: aHandle offset: offset origin: origin
+    <primitive: 124>
+    ^-1!
+
+primReadByte: aHandle at: pos
+    <primitive: 132>
+    ^-1!
+
+primWriteByte: aHandle at: pos value: byte
+    <primitive: 134>
+    ^byte!
+
+primGetAttributes: path
+    <primitive: 154>
+    ^nil! !
+
+WindowsFileStream class
+    instanceVariableNames: ''!
+
+WindowsFileStream initialize!
 
 "==================== DirectoryReference ===================="
 

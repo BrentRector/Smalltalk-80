@@ -160,10 +160,10 @@ public class SystemDictionaryInstaller(
             return nilOOP;
         }
 
-        // Create WindowsFileReference objects for each file
-        var sourcesRef = CreateWindowsFileReference(sourcesPath, sourcesHandle);
-        var changesRef = CreateWindowsFileReference(changesPath, changesHandle);
-        Console.WriteLine($"[SourceFiles] Created WindowsFileReference OOPs: sources={sourcesRef}, changes={changesRef}");
+        // Create WindowsFileStream objects for each file
+        var sourcesRef = CreateWindowsFileStream(sourcesPath, sourcesHandle, readOnly: true);
+        var changesRef = CreateWindowsFileStream(changesPath, changesHandle, readOnly: false);
+        Console.WriteLine($"[SourceFiles] Created WindowsFileStream OOPs: sources={sourcesRef}, changes={changesRef}");
 
         // Create Array of size 2 for SourceFiles
         var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
@@ -178,40 +178,42 @@ public class SystemDictionaryInstaller(
     }
 
     /// <summary>
-    /// Creates a WindowsFileReference object in the heap with the given path and file handle.
-    /// WindowsFileReference has instance variables: pathName (inherited), handle, position
+    /// Creates a WindowsFileStream object in the heap with the given path and file handle.
+    /// WindowsFileStream has instance variables: pathName, handle, position, rwmode, closed
     /// </summary>
-    private SmalltalkOOP CreateWindowsFileReference(string filePath, int handle)
+    private SmalltalkOOP CreateWindowsFileStream(string filePath, int handle, bool readOnly)
     {
-        var windowsFileRefClassOOP = GlobalRegistry.LookupClassOOP("WindowsFileReference");
-        if (windowsFileRefClassOOP == context.HeapManager.GetNil())
+        var windowsFileStreamClassOOP = GlobalRegistry.LookupClassOOP("WindowsFileStream");
+        if (windowsFileStreamClassOOP == context.HeapManager.GetNil())
         {
-            throw new InvalidOperationException("WindowsFileReference class not found");
+            throw new InvalidOperationException("WindowsFileStream class not found");
         }
 
-        // Allocate instance with 3 named instance variables: pathName, handle, position
-        var fileRefOOP = context.HeapManager.AllocateInstanceOf(windowsFileRefClassOOP, 0);
+        // Allocate instance with 5 named instance variables: pathName, handle, position, rwmode, closed
+        var fileStreamOOP = context.HeapManager.AllocateInstanceOf(windowsFileStreamClassOOP, 0);
 
-        // Store the path as a plain String instead of WindowsPathName.
-        // This is critical because WindowsPathName>>asString has issues on Linux:
-        // - Linux paths have no drive letter, so driveLetter is nil
-        // - WindowsPathName>>isUNC returns true for paths with 2+ components when driveLetter is nil
-        // - asString prepends "\\" for UNC paths, producing paths like "\\home\user\..."
-        // - These don't exist on Linux, causing File.Exists to return false
-        // - primitive 154 returns nil, size returns 0, atEnd is true, nextChunk returns ''
-        // Using a plain String avoids this: String>>asString returns self.
+        // Store the path as a plain String
         var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
         var pathNameOOP = context.Allocator.AllocateString(stringClassOOP, filePath);
+
+        // rwmode values: Read=1, Write=2, Shorten=4
+        // Sources file (readOnly=true): Read = 1
+        // Changes file (readOnly=false): Read + Write = 3
+        int rwmode = readOnly ? 1 : 3;
 
         // Set instance variables
         // slot 0: pathName (String with full path)
         // slot 1: handle (SmallInteger)
         // slot 2: position (SmallInteger, initialized to 0)
-        context.HeapManager.SetInstanceVariable(fileRefOOP, 0, pathNameOOP);
-        context.HeapManager.SetInstanceVariable(fileRefOOP, 1, SmalltalkOOP.FromSmallInteger(handle));
-        context.HeapManager.SetInstanceVariable(fileRefOOP, 2, SmalltalkOOP.FromSmallInteger(0));
+        // slot 3: rwmode (SmallInteger)
+        // slot 4: closed (Boolean - false for open)
+        context.HeapManager.SetInstanceVariable(fileStreamOOP, 0, pathNameOOP);
+        context.HeapManager.SetInstanceVariable(fileStreamOOP, 1, SmalltalkOOP.FromSmallInteger(handle));
+        context.HeapManager.SetInstanceVariable(fileStreamOOP, 2, SmalltalkOOP.FromSmallInteger(0));
+        context.HeapManager.SetInstanceVariable(fileStreamOOP, 3, SmalltalkOOP.FromSmallInteger(rwmode));
+        context.HeapManager.SetInstanceVariable(fileStreamOOP, 4, context.HeapManager.GetFalse()); // not closed
 
-        return fileRefOOP;
+        return fileStreamOOP;
     }
 
     /// <summary>
