@@ -211,7 +211,7 @@ public class SystemDictionaryInstaller(
         context.HeapManager.SetInstanceVariable(fileStreamOOP, 1, SmalltalkOOP.FromSmallInteger(handle));
         context.HeapManager.SetInstanceVariable(fileStreamOOP, 2, SmalltalkOOP.FromSmallInteger(0));
         context.HeapManager.SetInstanceVariable(fileStreamOOP, 3, SmalltalkOOP.FromSmallInteger(rwmode));
-        context.HeapManager.SetInstanceVariable(fileStreamOOP, 4, context.HeapManager.GetFalse()); // not closed
+        context.HeapManager.SetInstanceVariable(fileStreamOOP, 4, GlobalRegistry.FalseOOP); // not closed
 
         return fileStreamOOP;
     }
