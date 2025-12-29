@@ -50,6 +50,11 @@ public class ImageWriter
 
             Console.WriteLine($"[ImageWriter] Writing {objectCount} objects to {filePath}");
 
+            // Track size statistics
+            long totalInstanceVarBytes = 0;
+            long totalIndexedBytes = 0;
+            var largestObjects = new List<(SmalltalkOOP oop, string className, int indexedSize, ObjectFormat format)>();
+
             using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
             using var writer = new BinaryWriter(stream, Encoding.UTF8);
 
@@ -60,6 +65,28 @@ public class ImageWriter
             int written = 0;
             foreach (var oop in objects)
             {
+                // Calculate sizes for diagnostics
+                int instanceVarCount = _heap.GetInstanceVariableCount(oop);
+                int indexedSize = _heap.GetIndexedSize(oop);
+                var format = _heap.GetObjectFormat(oop);
+
+                totalInstanceVarBytes += instanceVarCount * 4;
+                int indexedBytes = format switch
+                {
+                    ObjectFormat.PointerIndexed => indexedSize * 4,
+                    ObjectFormat.ByteIndexed => indexedSize,
+                    ObjectFormat.WordIndexed => indexedSize * 2,
+                    _ => 0
+                };
+                totalIndexedBytes += indexedBytes;
+
+                // Track large objects (>10KB indexed data)
+                if (indexedBytes > 10000)
+                {
+                    string className = _heap.GetClassName(oop);
+                    largestObjects.Add((oop, className, indexedSize, format));
+                }
+
                 WriteObject(writer, oop);
                 written++;
 
@@ -67,6 +94,30 @@ public class ImageWriter
                 if (written % 10000 == 0)
                 {
                     Console.WriteLine($"[ImageWriter] Progress: {written}/{objectCount}");
+                }
+            }
+
+            // Report statistics
+            Console.WriteLine($"[ImageWriter] Size breakdown:");
+            Console.WriteLine($"  Instance variables: {totalInstanceVarBytes:N0} bytes");
+            Console.WriteLine($"  Indexed data: {totalIndexedBytes:N0} bytes");
+            Console.WriteLine($"  Object headers: {objectCount * 17:N0} bytes (17 bytes each)");
+            Console.WriteLine($"  Large objects (>10KB indexed): {largestObjects.Count}");
+
+            // Report top 10 largest objects
+            if (largestObjects.Count > 0)
+            {
+                Console.WriteLine($"[ImageWriter] Top largest objects:");
+                foreach (var (oop, className, indexedSize, format) in largestObjects.OrderByDescending(x => x.indexedSize).Take(10))
+                {
+                    int bytes = format switch
+                    {
+                        ObjectFormat.PointerIndexed => indexedSize * 4,
+                        ObjectFormat.ByteIndexed => indexedSize,
+                        ObjectFormat.WordIndexed => indexedSize * 2,
+                        _ => 0
+                    };
+                    Console.WriteLine($"    {className}: {bytes:N0} bytes ({format}, indexedSize={indexedSize})");
                 }
             }
 
