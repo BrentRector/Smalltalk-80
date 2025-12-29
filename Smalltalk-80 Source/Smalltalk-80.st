@@ -449,7 +449,16 @@ contentsOfEntireFile
     self readOnly.
     contents _ self next: self size.
     self close.
-    ^contents! !
+    ^contents!
+
+nextWord
+    "Answer the next two bytes from the receiver as an Integer (big-endian)."
+    | high low |
+    high _ self next.
+    high == nil ifTrue: [^false].
+    low _ self next.
+    low == nil ifTrue: [^false].
+    ^(high asInteger bitShift: 8) + low asInteger! !
 
 !WindowsFileStream methodsFor: 'writing'!
 
@@ -483,6 +492,12 @@ nextChunkPut: aString
     self nextPut: $!.
     self cr.
     ^aString!
+
+nextWordPut: aWord
+    "Append to the receiver an Integer as the next two bytes (big-endian)."
+    self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
+    self nextPut: (Character value: (aWord bitAnd: 255)).
+    ^aWord!
 
 flush
     "No-op for direct file access"
