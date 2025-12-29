@@ -1079,4 +1079,124 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     }
 
     #endregion
+
+    #region Image Restore Support
+
+    /// <summary>
+    /// Prepares the heap for image restore by clearing existing state and pre-allocating capacity.
+    /// </summary>
+    public void PrepareForRestore(int maxObjectId)
+    {
+        // Clear existing object table
+        _tableManager.Clear();
+
+        // Pre-allocate blocks for all objects we'll restore
+        _tableManager.EnsureCapacity(maxObjectId);
+    }
+
+    /// <summary>
+    /// Restores an object at a specific object table index.
+    /// </summary>
+    public void RestoreObject(int objectId, ObjectFormat format, SmalltalkOOP classOOP,
+        SmalltalkOOP[] instanceVars, object? indexedStorage)
+    {
+        // Calculate size in words for metadata
+        int headerWords = 1;
+        int indexedWords = CalculateIndexedWordsForRestore(format, indexedStorage);
+        int totalWords = headerWords + instanceVars.Length + indexedWords;
+
+        // Create managed storage based on format
+        object? managedStorage;
+        int? originalIndexedSize = null;
+
+        switch (format)
+        {
+            case ObjectFormat.Pointer:
+                // OOP array: header slot + instance variables
+                var pointerArray = new SmalltalkOOP[1 + instanceVars.Length];
+                pointerArray[0] = classOOP;
+                for (int i = 0; i < instanceVars.Length; i++)
+                    pointerArray[1 + i] = instanceVars[i];
+                managedStorage = pointerArray;
+                break;
+
+            case ObjectFormat.PointerIndexed:
+                // OOP array: header slot + instance variables + indexed OOPs
+                var indexedOops = indexedStorage as SmalltalkOOP[] ?? Array.Empty<SmalltalkOOP>();
+                var pointerIndexedArray = new SmalltalkOOP[1 + instanceVars.Length + indexedOops.Length];
+                pointerIndexedArray[0] = classOOP;
+                for (int i = 0; i < instanceVars.Length; i++)
+                    pointerIndexedArray[1 + i] = instanceVars[i];
+                for (int i = 0; i < indexedOops.Length; i++)
+                    pointerIndexedArray[1 + instanceVars.Length + i] = indexedOops[i];
+                managedStorage = pointerIndexedArray;
+                break;
+
+            case ObjectFormat.ByteIndexed:
+                // Byte array for indexed storage
+                managedStorage = indexedStorage as byte[] ?? Array.Empty<byte>();
+                originalIndexedSize = ((byte[])managedStorage).Length;
+                break;
+
+            case ObjectFormat.WordIndexed:
+                // Word array for indexed storage
+                managedStorage = indexedStorage as ushort[] ?? Array.Empty<ushort>();
+                break;
+
+            default:
+                throw new ArgumentException($"Unknown object format: {format}");
+        }
+
+        // Create object table entry
+        var entry = new ObjectTableEntry(
+            managedStorage: managedStorage,
+            format: format,
+            sizeInWords: totalWords,
+            instanceVariableCount: instanceVars.Length,
+            originalIndexedSize: originalIndexedSize
+        );
+
+        // For ByteIndexed/WordIndexed with instance variables, set up separate storage
+        if ((format == ObjectFormat.ByteIndexed || format == ObjectFormat.WordIndexed) &&
+            instanceVars.Length > 0)
+        {
+            entry.InstanceVariableStorage = new SmalltalkOOP[instanceVars.Length];
+            for (int i = 0; i < instanceVars.Length; i++)
+                entry.InstanceVariableStorage[i] = instanceVars[i];
+        }
+
+        // Set class OOP (for ByteIndexed/WordIndexed, stored separately)
+        if (format == ObjectFormat.ByteIndexed || format == ObjectFormat.WordIndexed)
+        {
+            entry.ClassOOP = classOOP;
+        }
+
+        // Place entry at specific object table index
+        _tableManager.SetObjectTableEntry(objectId, entry);
+    }
+
+    /// <summary>
+    /// Rebuilds the free list by scanning for null entries.
+    /// </summary>
+    public void RebuildFreeList()
+    {
+        _tableManager.RebuildFreeList();
+    }
+
+    /// <summary>
+    /// Calculates indexed words for restore operation.
+    /// </summary>
+    private static int CalculateIndexedWordsForRestore(ObjectFormat format, object? indexedStorage)
+    {
+        return format switch
+        {
+            ObjectFormat.Pointer => 0,
+            ObjectFormat.PointerIndexed => (indexedStorage as SmalltalkOOP[])?.Length ?? 0,
+            ObjectFormat.ByteIndexed => (((indexedStorage as byte[])?.Length ?? 0) + 3) / 4,
+            ObjectFormat.WordIndexed => (((indexedStorage as ushort[])?.Length ?? 0) + 1) / 2,
+            _ => 0
+        };
+    }
+
+    #endregion
 }

@@ -9,20 +9,27 @@ namespace Smalltalk80.Interpreter.Core;
 /// Restores objects to the same OOP locations for reference preservation.
 ///
 /// Image Format (version 1):
-/// - Header: 4-byte magic "STI1", 4-byte version, 4-byte object count
+/// - Header (16 bytes):
+///   - 4-byte magic "WOST" (Wise Owl Smalltalk)
+///   - 4-byte version
+///   - 4-byte object count
+///   - 4-byte max object ID (highest object table index)
 /// - For each object (in OOP order):
-///   - 4-byte object table index
+///   - 4-byte ObjectOOP (tagged value: objectTableIndex << 1)
 ///   - 1-byte format (ObjectFormat enum)
 ///   - 4-byte instance variable count
 ///   - 4-byte indexed size
-///   - 4-byte class OOP raw value
-///   - Instance variable data: 4 bytes per OOP
-///   - Indexed data: format-specific (OOPs, bytes, or words)
+///   - 4-byte class OOP (tagged value)
+///   - Instance variable data: 4 bytes per OOP (tagged values)
+///   - Indexed data: format-specific (OOPs as tagged, bytes, or words)
 /// </summary>
 public class ImageReader
 {
-    private const string ExpectedMagic = "STI1";
-    private const int SupportedVersion = 1;
+    /// <summary>Expected magic number identifying Wise Owl Smalltalk image files.</summary>
+    public const string ExpectedMagic = "WOST";
+
+    /// <summary>Supported image format version.</summary>
+    public const int SupportedVersion = 1;
 
     private readonly ISmalltalkHeap _heap;
 
@@ -33,105 +40,172 @@ public class ImageReader
 
     /// <summary>
     /// Reads an image file and restores objects to the heap.
-    /// Returns true on success.
+    /// Returns a detailed result indicating success or failure with user-friendly messages.
     /// </summary>
-    public bool ReadImage(string filePath)
+    public ImageRestoreResult ReadImage(string filePath)
     {
+        // Check if file exists
+        if (!File.Exists(filePath))
+        {
+            return ImageRestoreResult.FileNotFound(filePath);
+        }
+
+        FileStream? stream = null;
+        BinaryReader? reader = null;
+        int objectsRead = 0;
+
         try
         {
-            Console.WriteLine($"[ImageReader] Reading image from {filePath}");
-
-            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var reader = new BinaryReader(stream, Encoding.UTF8);
-
-            // Read and verify header
-            var (objectCount, version) = ReadHeader(reader);
-            if (objectCount < 0)
+            // Open file
+            try
             {
-                return false;
+                stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                reader = new BinaryReader(stream, Encoding.UTF8);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return ImageRestoreResult.FileAccessError(filePath, ex);
             }
 
-            Console.WriteLine($"[ImageReader] Image version {version}, {objectCount} objects");
+            // Read and validate header
+            var headerResult = ReadAndValidateHeader(reader, filePath);
+            if (!headerResult.Success)
+            {
+                return headerResult.Error!;
+            }
+
+            int objectCount = headerResult.ObjectCount;
+            int maxObjectId = headerResult.MaxObjectId;
+
+            Console.WriteLine($"[ImageReader] Image version {SupportedVersion}, {objectCount} objects, maxObjectId={maxObjectId}");
+
+            // Prepare heap for restore
+            _heap.PrepareForRestore(maxObjectId);
 
             // Read each object
-            int read = 0;
             for (int i = 0; i < objectCount; i++)
             {
-                if (!ReadObject(reader))
+                var loadResult = LoadObject(reader, filePath, i);
+                if (!loadResult.Success)
                 {
-                    Console.WriteLine($"[ImageReader] Error reading object {i}");
-                    return false;
+                    return loadResult.Result!;
                 }
-                read++;
+
+                objectsRead++;
 
                 // Progress every 10000 objects
-                if (read % 10000 == 0)
+                if (objectsRead % 10000 == 0)
                 {
-                    Console.WriteLine($"[ImageReader] Progress: {read}/{objectCount}");
+                    Console.WriteLine($"[ImageReader] Progress: {objectsRead}/{objectCount}");
                 }
             }
 
-            Console.WriteLine($"[ImageReader] Successfully read {read} objects");
-            return true;
+            // Rebuild free list for future allocations
+            _heap.RebuildFreeList();
+
+            Console.WriteLine($"[ImageReader] Successfully restored {objectsRead} objects");
+            return ImageRestoreResult.Succeeded(objectsRead, maxObjectId);
+        }
+        catch (EndOfStreamException)
+        {
+            return ImageRestoreResult.TruncatedFile(filePath, objectsRead, 0);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ImageReader] Error reading image: {ex.Message}");
-            return false;
+            return ImageRestoreResult.UnexpectedError(filePath, ex, objectsRead);
+        }
+        finally
+        {
+            reader?.Dispose();
+            stream?.Dispose();
         }
     }
 
-    private (int objectCount, int version) ReadHeader(BinaryReader reader)
+    /// <summary>
+    /// Reads and validates the image header.
+    /// </summary>
+    private HeaderReadResult ReadAndValidateHeader(BinaryReader reader, string filePath)
     {
-        // Read magic (4 bytes ASCII)
-        byte[] magicBytes = reader.ReadBytes(4);
-        string magic = Encoding.ASCII.GetString(magicBytes);
-
-        if (magic != ExpectedMagic)
+        try
         {
-            Console.WriteLine($"[ImageReader] Invalid magic: expected '{ExpectedMagic}', got '{magic}'");
-            return (-1, 0);
-        }
+            // Read magic (4 bytes ASCII)
+            if (reader.BaseStream.Length < 16)
+            {
+                return new HeaderReadResult(ImageRestoreResult.TruncatedFile(filePath, 0, 0));
+            }
 
-        // Read version (4 bytes)
-        int version = reader.ReadInt32();
-        if (version != SupportedVersion)
+            byte[] magicBytes = reader.ReadBytes(4);
+            string magic = Encoding.ASCII.GetString(magicBytes);
+
+            if (magic != ExpectedMagic)
+            {
+                return new HeaderReadResult(ImageRestoreResult.InvalidFormat(filePath, magic));
+            }
+
+            // Read version (4 bytes)
+            int version = reader.ReadInt32();
+            if (version != SupportedVersion)
+            {
+                return new HeaderReadResult(ImageRestoreResult.UnsupportedVersion(filePath, version, SupportedVersion));
+            }
+
+            // Read object count (4 bytes)
+            int objectCount = reader.ReadInt32();
+
+            // Read max object ID (4 bytes)
+            int maxObjectId = reader.ReadInt32();
+
+            return new HeaderReadResult(objectCount, maxObjectId);
+        }
+        catch (EndOfStreamException)
         {
-            Console.WriteLine($"[ImageReader] Unsupported version: {version}");
-            return (-1, version);
+            return new HeaderReadResult(ImageRestoreResult.TruncatedFile(filePath, 0, 0));
         }
-
-        // Read object count (4 bytes)
-        int objectCount = reader.ReadInt32();
-
-        return (objectCount, version);
     }
 
-    private bool ReadObject(BinaryReader reader)
+    /// <summary>
+    /// Loads a single object from the image file.
+    /// </summary>
+    private LoadObjectResult LoadObject(BinaryReader reader, string filePath, int objectIndex)
     {
         try
         {
             // Read object header
-            int objectId = reader.ReadInt32();
-            var format = (ObjectFormat)reader.ReadByte();
+            int objectOOPRaw = reader.ReadInt32();
+            var objectOOP = new SmalltalkOOP(objectOOPRaw);
+            int objectId = objectOOP.ToObjectTableIndex();
+
+            byte formatByte = reader.ReadByte();
+            if (formatByte > 3)
+            {
+                return new LoadObjectResult(ImageRestoreResult.CorruptedData(
+                    filePath, objectIndex, $"Invalid format byte {formatByte}"));
+            }
+            var format = (ObjectFormat)formatByte;
+
             int instanceVarCount = reader.ReadInt32();
             int indexedSize = reader.ReadInt32();
             int classOOPRaw = reader.ReadInt32();
+            var classOOP = new SmalltalkOOP(classOOPRaw);
 
-            // Allocate the object with proper format
-            var newOOP = _heap.AllocateObject(format, instanceVarCount, indexedSize);
-
-            // Set class reference
-            _heap.SetClassOOP(newOOP, new SmalltalkOOP(classOOPRaw));
+            // Validate counts are non-negative
+            if (instanceVarCount < 0 || indexedSize < 0)
+            {
+                return new LoadObjectResult(ImageRestoreResult.CorruptedData(
+                    filePath, objectIndex, $"Negative count: instanceVars={instanceVarCount}, indexed={indexedSize}"));
+            }
 
             // Read instance variables
+            var instanceVars = new SmalltalkOOP[instanceVarCount];
             for (int i = 0; i < instanceVarCount; i++)
             {
                 int ivarRaw = reader.ReadInt32();
-                _heap.SetInstanceVariable(newOOP, i, new SmalltalkOOP(ivarRaw));
+                instanceVars[i] = new SmalltalkOOP(ivarRaw);
             }
 
             // Read indexed data based on format
+            object? indexedStorage = null;
+
             switch (format)
             {
                 case ObjectFormat.Pointer:
@@ -139,60 +213,66 @@ public class ImageReader
                     break;
 
                 case ObjectFormat.PointerIndexed:
+                    var indexedOops = new SmalltalkOOP[indexedSize];
                     for (int i = 0; i < indexedSize; i++)
                     {
                         int indexedRaw = reader.ReadInt32();
-                        _heap.SetIndexedOOP(newOOP, i, new SmalltalkOOP(indexedRaw));
+                        indexedOops[i] = new SmalltalkOOP(indexedRaw);
                     }
+                    indexedStorage = indexedOops;
                     break;
 
                 case ObjectFormat.ByteIndexed:
-                    for (int i = 0; i < indexedSize; i++)
+                    var bytes = reader.ReadBytes(indexedSize);
+                    if (bytes.Length != indexedSize)
                     {
-                        byte b = reader.ReadByte();
-                        _heap.SetIndexedByte(newOOP, i, b);
+                        return new LoadObjectResult(ImageRestoreResult.TruncatedFile(
+                            filePath, objectIndex, objectIndex + 1));
                     }
+                    indexedStorage = bytes;
                     break;
 
                 case ObjectFormat.WordIndexed:
+                    var words = new ushort[indexedSize];
                     for (int i = 0; i < indexedSize; i++)
                     {
-                        ushort w = reader.ReadUInt16();
-                        _heap.SetIndexedWord(newOOP, i, w);
+                        words[i] = reader.ReadUInt16();
                     }
+                    indexedStorage = words;
                     break;
             }
 
-            // Verify the object was allocated at expected OOP
-            // Note: This assumes objects are written and read in the same order
-            // and that the heap allocator assigns sequential OOPs
-            int actualId = newOOP.ToObjectTableIndex();
-            if (actualId != objectId)
-            {
-                Console.WriteLine($"[ImageReader] Warning: Object allocated at {actualId}, expected {objectId}");
-                // This could be a problem if objects don't restore at original OOPs
-                // May need heap support for allocating at specific OOP
-            }
+            // Restore object at its original OOP location
+            _heap.RestoreObject(objectId, format, classOOP, instanceVars, indexedStorage);
 
-            return true;
+            return new LoadObjectResult(true);
+        }
+        catch (EndOfStreamException)
+        {
+            return new LoadObjectResult(ImageRestoreResult.TruncatedFile(filePath, objectIndex, objectIndex + 1));
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ImageReader] Error reading object: {ex.Message}");
-            return false;
+            return new LoadObjectResult(ImageRestoreResult.CorruptedData(
+                filePath, objectIndex, ex.Message));
         }
     }
 
     /// <summary>
-    /// Checks if a file is a valid Smalltalk image.
+    /// Checks if a file is a valid Smalltalk image by reading its magic number.
     /// </summary>
     public static bool IsImageFile(string filePath)
     {
+        if (!File.Exists(filePath))
+            return false;
+
         try
         {
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var reader = new BinaryReader(stream, Encoding.UTF8);
+            if (stream.Length < 4)
+                return false;
 
+            using var reader = new BinaryReader(stream, Encoding.UTF8);
             byte[] magicBytes = reader.ReadBytes(4);
             string magic = Encoding.ASCII.GetString(magicBytes);
 
@@ -201,6 +281,54 @@ public class ImageReader
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Internal result type for header reading.
+    /// </summary>
+    private readonly struct HeaderReadResult
+    {
+        public readonly bool Success;
+        public readonly int ObjectCount;
+        public readonly int MaxObjectId;
+        public readonly ImageRestoreResult? Error;
+
+        public HeaderReadResult(int objectCount, int maxObjectId)
+        {
+            Success = true;
+            ObjectCount = objectCount;
+            MaxObjectId = maxObjectId;
+            Error = null;
+        }
+
+        public HeaderReadResult(ImageRestoreResult error)
+        {
+            Success = false;
+            ObjectCount = 0;
+            MaxObjectId = 0;
+            Error = error;
+        }
+    }
+
+    /// <summary>
+    /// Internal result type for object loading.
+    /// </summary>
+    private readonly struct LoadObjectResult
+    {
+        public readonly bool Success;
+        public readonly ImageRestoreResult? Result;
+
+        public LoadObjectResult(bool success)
+        {
+            Success = success;
+            Result = null;
+        }
+
+        public LoadObjectResult(ImageRestoreResult error)
+        {
+            Success = false;
+            Result = error;
         }
     }
 }

@@ -128,6 +128,29 @@ internal class ObjectTableManager : IObjectTableManager
         _objectTableBlocks.Add(new ObjectTableBlock());
     }
 
+    /// <summary>
+    /// Rebuilds the free list by scanning the object table for null entries.
+    /// Used after snapshot restore to enable OOP reuse for new allocations.
+    /// </summary>
+    public void RebuildFreeList()
+    {
+        _freeObjectTableIndices.Clear();
+
+        // Scan all indices from 1 to _nextObjectTableIndex - 1
+        // Add null entries to free list for reuse
+        for (int index = 1; index < _nextObjectTableIndex; index++)
+        {
+            int blockIndex = (index - 1) / ObjectTableBlock.BlockSize;
+            int entryIndex = (index - 1) % ObjectTableBlock.BlockSize;
+
+            if (blockIndex < _objectTableBlocks.Count &&
+                _objectTableBlocks[blockIndex].Entries[entryIndex] == null)
+            {
+                _freeObjectTableIndices.Push(index);
+            }
+        }
+    }
+
     public bool IsValidObjectOOP(SmalltalkOOP objectOOP)
     {
         if (objectOOP.IsSmallInteger)
