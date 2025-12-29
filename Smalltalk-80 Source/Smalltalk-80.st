@@ -1755,7 +1755,6 @@ next
     "Read and return the next character"
     | byte |
     closed ifTrue: [self reopen].
-    <primitive: 132>
     byte _ self primReadByte: handle at: position.
     byte < 0 ifTrue: [^nil].
     position _ position + 1.
@@ -1807,7 +1806,6 @@ nextPut: aCharacter
     "Write a character"
     | byte |
     closed ifTrue: [self reopen].
-    <primitive: 134>
     byte _ aCharacter asciiValue.
     self primWriteByte: handle at: position value: byte.
     position _ position + 1.
