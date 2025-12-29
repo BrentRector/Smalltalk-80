@@ -317,8 +317,6 @@ public static class GraphicsOperations
             int width = context.HeapManager.GetInstanceVariable(context.Receiver, 1).AsSmallInteger();
             int height = context.HeapManager.GetInstanceVariable(context.Receiver, 2).AsSmallInteger();
 
-            Console.WriteLine($"[BeDisplay] Primitive 102 called with {width}x{height}");
-
             // Notify platform bridge of new Display dimensions
             // Platform will check if dimensions changed and resize window if needed
             if (context.Platform != null)
