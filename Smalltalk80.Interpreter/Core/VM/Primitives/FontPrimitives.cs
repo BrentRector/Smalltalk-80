@@ -1,6 +1,8 @@
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.HeapManager;
 
+#pragma warning disable CS0162 // Unreachable code detected (due to DebugLogging const)
+
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
 /// <summary>
