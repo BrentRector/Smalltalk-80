@@ -117,7 +117,21 @@ public class ImageWriter
                         ObjectFormat.WordIndexed => indexedSize * 2,
                         _ => 0
                     };
-                    Console.WriteLine($"    {className}: {bytes:N0} bytes ({format}, indexedSize={indexedSize})");
+
+                    // Show content preview for large ByteIndexed objects (String, Symbol, ByteArray)
+                    string preview = "";
+                    if (format == ObjectFormat.ByteIndexed && indexedSize > 0)
+                    {
+                        int previewLen = Math.Min(100, indexedSize);
+                        var previewBytes = new byte[previewLen];
+                        for (int i = 0; i < previewLen; i++)
+                        {
+                            previewBytes[i] = _heap.GetIndexedByte(oop, i);
+                        }
+                        preview = $" Preview: \"{Encoding.Latin1.GetString(previewBytes).Replace("\n", "\\n").Replace("\r", "\\r")}\"...";
+                    }
+
+                    Console.WriteLine($"    {className} (oop={oop}): {bytes:N0} bytes ({format}, indexedSize={indexedSize}){preview}");
                 }
             }
 
