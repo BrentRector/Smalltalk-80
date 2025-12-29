@@ -8896,7 +8896,6 @@ buildCharacterBlockIn: aParagraph
 	destY _ (aParagraph topAtLineIndex: lineIndex).
 	line _ aParagraph lineAt: lineIndex.
 	text _ aParagraph textAt: lineIndex.
-	Transcript cr; show: 'lineIdx='; print: lineIndex; show: ' destY='; print: destY.
 	rightMargin _ aParagraph rightMarginForDisplay.
 
 	(lineIndex = aParagraph numberOfLines and:
@@ -29584,9 +29583,8 @@ mouseSelect: previousStartBlock to: previousStopBlock
 	| pivotBlock startBlock stopBlock showingCaret dy pt okToScroll scrollDelay word cursorPt mousePt |
 	mousePt _ Sensor mousePoint.
 	cursorPt _ Sensor cursorPoint.
+	Transcript cr; show: 'CLICK mouse='; print: mousePt; show: ' cursor='; print: cursorPt.
 	startBlock _ stopBlock _ pivotBlock _ self characterBlockAtPoint: cursorPt.
-	Transcript cr; show: 'mouse='; print: mousePt; show: ' cursor='; print: cursorPt;
-		show: ' offset='; print: Sensor currentCursor offset.
 	self displayCaretForBlock: pivotBlock.
 	showingCaret _ true.
 	okToScroll _ true.
