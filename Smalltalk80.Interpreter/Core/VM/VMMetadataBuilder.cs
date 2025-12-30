@@ -34,7 +34,9 @@ public class VMMetadataBuilder
         Console.WriteLine("[VMMetadataBuilder] Rebuilding VMMetadata from Smalltalk dictionary...");
 
         // Step 1: Find nil, true, false by locating their classes and finding the sole instance
-        // These are pseudo-variables, not globals - they're the unique instances of their classes
+        // nil is the sole instance of UndefinedObject
+        // true is the sole instance of True (subclass of Boolean)
+        // false is the sole instance of False (subclass of Boolean)
         var undefinedObjectClassOOP = LookupGlobal("UndefinedObject");
         var trueClassOOP = LookupGlobal("True");
         var falseClassOOP = LookupGlobal("False");
@@ -141,8 +143,7 @@ public class VMMetadataBuilder
 
     /// <summary>
     /// Finds the sole instance of a class by scanning the heap.
-    /// Used for pseudo-variables (nil, true, false) which are unique instances
-    /// of UndefinedObject, True, and False respectively.
+    /// Used for nil which is the unique instance of UndefinedObject.
     /// </summary>
     private SmalltalkOOP FindSoleInstanceOf(SmalltalkOOP classOOP, string className)
     {
@@ -157,4 +158,5 @@ public class VMMetadataBuilder
         throw new InvalidOperationException(
             $"No instance of {className} found in heap during image restore");
     }
+
 }
