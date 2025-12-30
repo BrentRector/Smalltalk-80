@@ -209,10 +209,30 @@ hash
 	^components inject: 0 into: [:h :comp |
 		h bitXor: (fs hashForName: comp)]! !
 
+!Path methodsFor: 'validation'!
+
+hasValidComponents
+	"Answer whether all path components are valid file names"
+	components isNil ifTrue: [^false].
+	components isEmpty ifTrue: [^true].
+	^components allSatisfy: [:comp |
+		comp notNil and: [comp notEmpty]]!
+
+isValid
+	"Answer whether this path is valid"
+	^self hasValidComponents!
+
+validateComponents
+	"Signal an error if any component is invalid"
+	self hasValidComponents ifFalse: [
+		self error: 'Path contains invalid components']! !
+
 !Path methodsFor: 'private'!
 
 setComponents: anArray
-	"Set the path components"
+	"Set the path components. Validates that array is not nil."
+	anArray isNil ifTrue: [
+		self error: 'Path components cannot be nil'].
 	components _ anArray! !
 
 Path class
@@ -459,6 +479,33 @@ isDirectory
 	"Answer whether this entry is a directory"
 	^false! !
 
+!FileSystemNode methodsFor: 'validation'!
+
+isValidName
+	"Answer whether this entry's name is valid for the file system"
+	^self fileSystem isValidFileName: self name!
+
+hasValidPath
+	"Answer whether the path is valid (non-nil, non-empty)"
+	pathName isNil ifTrue: [^false].
+	pathName isEmpty ifTrue: [^false].
+	^true!
+
+validatePath
+	"Signal an error if the path is invalid"
+	self hasValidPath ifFalse: [
+		self error: 'Invalid path: path is nil or empty']!
+
+validateName
+	"Signal an error if the name component is invalid"
+	self isValidName ifFalse: [
+		self error: 'Invalid file name: ', self name]!
+
+validateExists
+	"Signal an error if this entry does not exist"
+	self exists ifFalse: [
+		self error: 'File or directory not found: ', pathName]! !
+
 !FileSystemNode methodsFor: 'attributes'!
 
 isHidden
@@ -497,7 +544,9 @@ printOn: aStream
 !FileSystemNode methodsFor: 'private'!
 
 initPathName: aString
-	"Initialize the path"
+	"Initialize the path. Validates that path is not nil."
+	aString isNil ifTrue: [
+		self error: 'Cannot create ', self class name, ' with nil path'].
 	pathName _ aString! !
 
 FileSystemNode class
@@ -746,6 +795,43 @@ fullNameFor: aName
 	"Answer the full path for a file/directory name in this directory"
 	self subclassResponsibility! !
 
+!Directory methodsFor: 'validation'!
+
+checkName: aName fixErrors: fixFlag
+	"Validate aName as a file name. If fixFlag is true, return a corrected name.
+	 If fixFlag is false and name is invalid, signal an error."
+	| fs |
+	aName isNil ifTrue: [
+		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is nil']].
+	aName isEmpty ifTrue: [
+		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is empty']].
+	fs _ self fileSystem.
+	(fs isValidFileName: aName) ifTrue: [^aName].
+	fixFlag
+		ifTrue: [^fs sanitizeFileName: aName]
+		ifFalse: [self error: 'Invalid file name: ', aName]!
+
+checkNameOfFile: aFile
+	"Check aFile's name, signal error if invalid"
+	^self checkName: aFile name fixErrors: false!
+
+checkNameOfFile: aFile fixErrors: aBoolean
+	"Check aFile's name, optionally fix errors"
+	^self checkName: aFile name fixErrors: aBoolean!
+
+isLegalFileName: aName
+	"Answer whether aName is a legal file name for this directory's file system"
+	^self fileSystem isValidFileName: aName!
+
+isLegalOldFileName: aName
+	"Answer whether aName is legal and exists in this directory"
+	^(self isLegalFileName: aName) and: [self includesKey: aName]!
+
+validateFileName: aName
+	"Signal an error if aName is not a valid file name"
+	(self isLegalFileName: aName) ifFalse: [
+		self error: 'Invalid file name: ', aName]! !
+
 Directory class
 	instanceVariableNames: ''!
 
@@ -844,11 +930,34 @@ illegalCharacters
 
 isValidFileName: aName
 	"Answer whether aName is a valid file name"
+	aName isNil ifTrue: [^false].
 	aName isEmpty ifTrue: [^false].
 	aName size > self maxFileNameLength ifTrue: [^false].
+	(self reservedNames anySatisfy: [:reserved |
+		self namesEqual: aName and: reserved]) ifTrue: [^false].
 	aName do: [:ch |
 		(self illegalCharacters includes: ch) ifTrue: [^false]].
-	^true! !
+	^true!
+
+reservedNames
+	"Answer a collection of reserved file names (default: none)"
+	^#()!
+
+sanitizeFileName: aName
+	"Answer a valid file name based on aName by replacing illegal characters"
+	| result |
+	aName isNil ifTrue: [^'untitled'].
+	aName isEmpty ifTrue: [^'untitled'].
+	result _ aName collect: [:ch |
+		(self illegalCharacters includes: ch)
+			ifTrue: [$_]
+			ifFalse: [ch]].
+	result size > self maxFileNameLength
+		ifTrue: [result _ result copyFrom: 1 to: self maxFileNameLength].
+	(self reservedNames anySatisfy: [:reserved |
+		self namesEqual: result and: reserved])
+			ifTrue: [result _ '_', result].
+	^result! !
 
 !FileSystem methodsFor: 'path characteristics'!
 
@@ -961,7 +1070,27 @@ maxFileNameLength
 
 illegalCharacters
 	"Characters not allowed in Windows file names"
-	^#($\ $/ $: $* $? $" $< $> $|)! !
+	^#($\ $/ $: $* $? $" $< $> $|)!
+
+reservedNames
+	"Windows reserved device names - cannot be used as file names"
+	^#('CON' 'PRN' 'AUX' 'NUL'
+	   'COM1' 'COM2' 'COM3' 'COM4' 'COM5' 'COM6' 'COM7' 'COM8' 'COM9'
+	   'LPT1' 'LPT2' 'LPT3' 'LPT4' 'LPT5' 'LPT6' 'LPT7' 'LPT8' 'LPT9')!
+
+isValidFileName: aName
+	"Windows-specific validation including reserved names and trailing dots/spaces"
+	| baseName |
+	(super isValidFileName: aName) ifFalse: [^false].
+	"Windows doesn't allow trailing dots or spaces"
+	(aName last = $. or: [aName last = $ ]) ifTrue: [^false].
+	"Check base name without extension against reserved names"
+	baseName _ (aName includes: $.)
+		ifTrue: [aName copyFrom: 1 to: (aName indexOf: $.) - 1]
+		ifFalse: [aName].
+	(self reservedNames anySatisfy: [:reserved |
+		baseName sameAs: reserved]) ifTrue: [^false].
+	^true! !
 
 !WindowsFileSystem methodsFor: 'path characteristics'!
 
@@ -1809,32 +1938,10 @@ filesMatching: pattern
 
 !WindowsDirectory methodsFor: 'filename validation'!
 
-checkName: fileName fixErrors: fixFlag
-    "Validate filename, optionally fix errors"
-    fileName isEmpty ifTrue: [
-        fixFlag ifFalse: [self error: 'empty filename']].
-    fileName last = $.
-        ifTrue: [
-            fixFlag
-                ifTrue: [^fileName copyFrom: 1 to: fileName size - 1]
-                ifFalse: [self error: 'filename ends with .']].
-    ^fileName!
-
-checkNameOfFile: aFile
-    "Check file's name"
-    ^self checkName: aFile fileName fixErrors: false!
-
-checkNameOfFile: aFile fixErrors: aBoolean
-    "Check file's name with fix option"
-    ^self checkName: aFile fileName fixErrors: aBoolean!
-
-isLegalFileName: aString
-    "Test if filename is legal"
-    ^(self checkName: aString fixErrors: true) = aString!
-
-isLegalOldFileName: aString
-    "Test if filename is legal and exists"
-    ^(self isLegalFileName: aString) and: [self includesKey: aString]! !
+"Validation methods inherited from Directory which delegates to FileSystem.
+ WindowsDirectory inherits: checkName:fixErrors:, isLegalFileName:,
+ isLegalOldFileName:, checkNameOfFile:, checkNameOfFile:fixErrors:,
+ validateFileName: - all using WindowsFileSystem's validation rules."! !
 
 !WindowsDirectory methodsFor: 'file copying'!
 
