@@ -6,35 +6,31 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
 /// <summary>
 /// Primitives for file system link operations: symbolic links, hard links, and junctions.
-/// Uses Windows API via P/Invoke for NTFS link support.
+/// Uses .NET APIs where available (.NET 6+), P/Invoke only for operations not in .NET:
+/// - Hard links (CreateHardLinkW)
+/// - Junctions (DeviceIoControl)
+/// - Reparse tag detection (FindFirstFileW)
+/// - Hard link count (GetFileInformationByHandle)
 /// </summary>
 public static class LinkPrimitives
 {
-    #region Windows API Constants and Structures
+    #region Windows API Constants and Structures (for operations not in .NET)
 
     private const uint FILE_FLAG_BACKUP_SEMANTICS = 0x02000000;
     private const uint FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000;
     private const uint GENERIC_READ = 0x80000000;
+    private const uint OPEN_EXISTING = 3;
     private const uint FILE_SHARE_READ = 0x00000001;
     private const uint FILE_SHARE_WRITE = 0x00000002;
     private const uint FILE_SHARE_DELETE = 0x00000004;
-    private const uint OPEN_EXISTING = 3;
 
     private const uint FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400;
-    private const uint FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
 
     private const uint IO_REPARSE_TAG_SYMLINK = 0xA000000C;
     private const uint IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003;
 
-    private const uint FSCTL_GET_REPARSE_POINT = 0x000900A8;
     private const uint FSCTL_SET_REPARSE_POINT = 0x000900A4;
     private const uint FSCTL_DELETE_REPARSE_POINT = 0x000900AC;
-
-    private const int MAX_PATH = 260;
-    private const int MAXIMUM_REPARSE_DATA_BUFFER_SIZE = 16384;
-
-    private const uint SYMBOLIC_LINK_FLAG_DIRECTORY = 0x1;
-    private const uint SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE = 0x2;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct BY_HANDLE_FILE_INFORMATION
@@ -68,32 +64,15 @@ public static class LinkPrimitives
         public string cAlternateFileName;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct REPARSE_DATA_BUFFER_HEADER
-    {
-        public uint ReparseTag;
-        public ushort ReparseDataLength;
-        public ushort Reserved;
-    }
-
     #endregion
 
-    #region Windows API P/Invoke
-
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern bool CreateSymbolicLinkW(
-        string lpSymlinkFileName,
-        string lpTargetFileName,
-        uint dwFlags);
+    #region Windows API P/Invoke (only for operations not available in .NET)
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool CreateHardLinkW(
         string lpFileName,
         string lpExistingFileName,
         IntPtr lpSecurityAttributes);
-
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern uint GetFileAttributesW(string lpFileName);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern SafeFileHandle CreateFileW(
@@ -111,30 +90,12 @@ public static class LinkPrimitives
         out BY_HANDLE_FILE_INFORMATION lpFileInformation);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern uint GetFinalPathNameByHandleW(
-        SafeFileHandle hFile,
-        [Out] char[] lpszFilePath,
-        uint cchFilePath,
-        uint dwFlags);
-
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern IntPtr FindFirstFileW(
         string lpFileName,
         out WIN32_FIND_DATA lpFindFileData);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool FindClose(IntPtr hFindFile);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool DeviceIoControl(
-        SafeFileHandle hDevice,
-        uint dwIoControlCode,
-        IntPtr lpInBuffer,
-        uint nInBufferSize,
-        [Out] byte[] lpOutBuffer,
-        uint nOutBufferSize,
-        out uint lpBytesReturned,
-        IntPtr lpOverlapped);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool DeviceIoControl(
@@ -149,10 +110,10 @@ public static class LinkPrimitives
 
     #endregion
 
-    #region Primitive 230: CreateSymbolicLink
+    #region Primitive 230: CreateSymbolicLink (uses .NET API)
 
     /// <summary>
-    /// Primitive 230: Create a symbolic link.
+    /// Primitive 230: Create a symbolic link using .NET 6+ API.
     /// Arguments: linkPath (String), targetPath (String), isDirectory (Boolean)
     /// Returns: receiver on success, signals error on failure
     /// </summary>
@@ -172,22 +133,14 @@ public static class LinkPrimitives
 
             try
             {
-                uint flags = isDirectory ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0;
-                // Try with unprivileged flag first (Windows 10 1607+ with Developer Mode)
-                flags |= SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
-
-                bool success = CreateSymbolicLinkW(linkPath, targetPath, flags);
-
-                if (!success)
+                // Use .NET 6+ API - handles privilege requirements internally
+                if (isDirectory)
                 {
-                    // Retry without unprivileged flag (requires admin)
-                    flags &= ~SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
-                    success = CreateSymbolicLinkW(linkPath, targetPath, flags);
+                    Directory.CreateSymbolicLink(linkPath, targetPath);
                 }
-
-                if (!success)
+                else
                 {
-                    return PrimitiveResult.Fail(context.Metadata!);
+                    File.CreateSymbolicLink(linkPath, targetPath);
                 }
 
                 return PrimitiveResult.Ok(context.Receiver);
@@ -371,10 +324,10 @@ public static class LinkPrimitives
 
     #endregion
 
-    #region Primitive 233: GetFileAttributes
+    #region Primitive 233: GetFileAttributes (uses .NET API)
 
     /// <summary>
-    /// Primitive 233: Get file attributes as integer.
+    /// Primitive 233: Get file attributes as integer using .NET API.
     /// Argument: path (String)
     /// Returns: Integer attributes or nil if file doesn't exist
     /// </summary>
@@ -389,14 +342,17 @@ public static class LinkPrimitives
 
             try
             {
-                uint attrs = GetFileAttributesW(path);
-
-                if (attrs == 0xFFFFFFFF) // INVALID_FILE_ATTRIBUTES
-                {
-                    return PrimitiveResult.Ok(context.HeapManager.GetNil());
-                }
-
+                // Use .NET API - works for both files and directories
+                FileAttributes attrs = File.GetAttributes(path);
                 return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger((int)attrs));
+            }
+            catch (FileNotFoundException)
+            {
+                return PrimitiveResult.Ok(context.HeapManager.GetNil());
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return PrimitiveResult.Ok(context.HeapManager.GetNil());
             }
             catch
             {
@@ -454,12 +410,14 @@ public static class LinkPrimitives
 
     #endregion
 
-    #region Primitive 235: GetSymbolicLinkTarget
+    #region Primitive 235: GetSymbolicLinkTarget (uses .NET API)
 
     /// <summary>
-    /// Primitive 235: Get symbolic link target path.
+    /// Primitive 235: Get symbolic link target path using .NET API.
     /// Argument: path (String)
     /// Returns: String target path or nil if not a symbolic link
+    /// Note: .NET's ResolveLinkTarget works for both symlinks and junctions,
+    /// so we first check the reparse tag to ensure it's actually a symlink.
     /// </summary>
     public class GetSymbolicLinkTarget : IPrimitive
     {
@@ -472,65 +430,37 @@ public static class LinkPrimitives
 
             try
             {
-                // Open the reparse point
-                using var handle = CreateFileW(
-                    path,
-                    GENERIC_READ,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                    IntPtr.Zero,
-                    OPEN_EXISTING,
-                    FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
-                    IntPtr.Zero);
+                // First verify it's a symlink (not a junction) using reparse tag
+                IntPtr findHandle = FindFirstFileW(path, out WIN32_FIND_DATA findData);
+                if (findHandle == new IntPtr(-1))
+                {
+                    return PrimitiveResult.Ok(context.HeapManager.GetNil());
+                }
+                FindClose(findHandle);
 
-                if (handle.IsInvalid)
+                if ((findData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0 ||
+                    findData.dwReserved0 != IO_REPARSE_TAG_SYMLINK)
                 {
                     return PrimitiveResult.Ok(context.HeapManager.GetNil());
                 }
 
-                // Read the reparse data
-                byte[] buffer = new byte[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
-                bool success = DeviceIoControl(
-                    handle,
-                    FSCTL_GET_REPARSE_POINT,
-                    IntPtr.Zero,
-                    0,
-                    buffer,
-                    (uint)buffer.Length,
-                    out uint bytesReturned,
-                    IntPtr.Zero);
+                // Use .NET API to get the link target (returnFinalTarget: false for immediate target)
+                FileSystemInfo? target;
+                if ((findData.dwFileAttributes & 0x10) != 0) // FILE_ATTRIBUTE_DIRECTORY
+                {
+                    target = Directory.ResolveLinkTarget(path, returnFinalTarget: false);
+                }
+                else
+                {
+                    target = File.ResolveLinkTarget(path, returnFinalTarget: false);
+                }
 
-                if (!success)
+                if (target == null)
                 {
                     return PrimitiveResult.Ok(context.HeapManager.GetNil());
                 }
 
-                // Parse the reparse buffer
-                uint reparseTag = BitConverter.ToUInt32(buffer, 0);
-
-                if (reparseTag != IO_REPARSE_TAG_SYMLINK)
-                {
-                    return PrimitiveResult.Ok(context.HeapManager.GetNil());
-                }
-
-                // Symlink structure after header:
-                // SubstituteNameOffset (2), SubstituteNameLength (2)
-                // PrintNameOffset (2), PrintNameLength (2)
-                // Flags (4)
-                // PathBuffer (variable)
-
-                ushort substituteNameOffset = BitConverter.ToUInt16(buffer, 8);
-                ushort substituteNameLength = BitConverter.ToUInt16(buffer, 10);
-                ushort printNameOffset = BitConverter.ToUInt16(buffer, 12);
-                ushort printNameLength = BitConverter.ToUInt16(buffer, 14);
-
-                // Use print name (more human-readable)
-                int pathBufferStart = 20; // After header and flags
-                string targetPath = System.Text.Encoding.Unicode.GetString(
-                    buffer,
-                    pathBufferStart + printNameOffset,
-                    printNameLength);
-
-                return PrimitiveResult.Ok(FilePrimitiveHelpers.CreateString(context, targetPath));
+                return PrimitiveResult.Ok(FilePrimitiveHelpers.CreateString(context, target.FullName));
             }
             catch
             {
@@ -541,12 +471,13 @@ public static class LinkPrimitives
 
     #endregion
 
-    #region Primitive 236: GetJunctionTarget
+    #region Primitive 236: GetJunctionTarget (uses .NET API)
 
     /// <summary>
-    /// Primitive 236: Get junction target path.
+    /// Primitive 236: Get junction target path using .NET API.
     /// Argument: path (String)
     /// Returns: String target path or nil if not a junction
+    /// Note: .NET's ResolveLinkTarget works for junctions too.
     /// </summary>
     public class GetJunctionTarget : IPrimitive
     {
@@ -559,64 +490,29 @@ public static class LinkPrimitives
 
             try
             {
-                // Open the reparse point
-                using var handle = CreateFileW(
-                    path,
-                    GENERIC_READ,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                    IntPtr.Zero,
-                    OPEN_EXISTING,
-                    FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
-                    IntPtr.Zero);
+                // First verify it's a junction using reparse tag
+                IntPtr findHandle = FindFirstFileW(path, out WIN32_FIND_DATA findData);
+                if (findHandle == new IntPtr(-1))
+                {
+                    return PrimitiveResult.Ok(context.HeapManager.GetNil());
+                }
+                FindClose(findHandle);
 
-                if (handle.IsInvalid)
+                if ((findData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0 ||
+                    findData.dwReserved0 != IO_REPARSE_TAG_MOUNT_POINT)
                 {
                     return PrimitiveResult.Ok(context.HeapManager.GetNil());
                 }
 
-                // Read the reparse data
-                byte[] buffer = new byte[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
-                bool success = DeviceIoControl(
-                    handle,
-                    FSCTL_GET_REPARSE_POINT,
-                    IntPtr.Zero,
-                    0,
-                    buffer,
-                    (uint)buffer.Length,
-                    out uint bytesReturned,
-                    IntPtr.Zero);
+                // Use .NET API - ResolveLinkTarget works for junctions
+                FileSystemInfo? target = Directory.ResolveLinkTarget(path, returnFinalTarget: false);
 
-                if (!success)
+                if (target == null)
                 {
                     return PrimitiveResult.Ok(context.HeapManager.GetNil());
                 }
 
-                // Parse the reparse buffer
-                uint reparseTag = BitConverter.ToUInt32(buffer, 0);
-
-                if (reparseTag != IO_REPARSE_TAG_MOUNT_POINT)
-                {
-                    return PrimitiveResult.Ok(context.HeapManager.GetNil());
-                }
-
-                // Mount point structure after header:
-                // SubstituteNameOffset (2), SubstituteNameLength (2)
-                // PrintNameOffset (2), PrintNameLength (2)
-                // PathBuffer (variable)
-
-                ushort substituteNameOffset = BitConverter.ToUInt16(buffer, 8);
-                ushort substituteNameLength = BitConverter.ToUInt16(buffer, 10);
-                ushort printNameOffset = BitConverter.ToUInt16(buffer, 12);
-                ushort printNameLength = BitConverter.ToUInt16(buffer, 14);
-
-                // Use print name (more human-readable, without \??\ prefix)
-                int pathBufferStart = 16; // After header (no flags field for mount points)
-                string targetPath = System.Text.Encoding.Unicode.GetString(
-                    buffer,
-                    pathBufferStart + printNameOffset,
-                    printNameLength);
-
-                return PrimitiveResult.Ok(FilePrimitiveHelpers.CreateString(context, targetPath));
+                return PrimitiveResult.Ok(FilePrimitiveHelpers.CreateString(context, target.FullName));
             }
             catch
             {
@@ -627,10 +523,10 @@ public static class LinkPrimitives
 
     #endregion
 
-    #region Primitive 237: GetFinalPath
+    #region Primitive 237: GetFinalPath (uses .NET API)
 
     /// <summary>
-    /// Primitive 237: Get final path name, resolving all links.
+    /// Primitive 237: Get final path name, resolving all links using .NET API.
     /// Argument: path (String)
     /// Returns: String resolved path or nil on error
     /// </summary>
@@ -645,53 +541,47 @@ public static class LinkPrimitives
 
             try
             {
-                // Determine if it's a file or directory
-                uint attrs = GetFileAttributesW(path);
-                if (attrs == 0xFFFFFFFF)
-                {
-                    return PrimitiveResult.Ok(context.HeapManager.GetNil());
-                }
+                // Check if it's a reparse point at all
+                FileAttributes attrs = File.GetAttributes(path);
 
-                uint flags = FILE_FLAG_BACKUP_SEMANTICS;
-                if ((attrs & FILE_ATTRIBUTE_REPARSE_POINT) == 0)
+                if ((attrs & FileAttributes.ReparsePoint) == 0)
                 {
-                    // Not a reparse point, just return the path as-is
+                    // Not a reparse point, just return the full path
                     string fullPath = Path.GetFullPath(path);
                     return PrimitiveResult.Ok(FilePrimitiveHelpers.CreateString(context, fullPath));
                 }
 
-                // Open without OPEN_REPARSE_POINT to follow links
-                using var handle = CreateFileW(
-                    path,
-                    GENERIC_READ,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                    IntPtr.Zero,
-                    OPEN_EXISTING,
-                    flags,
-                    IntPtr.Zero);
+                // Use .NET API with returnFinalTarget: true to follow entire chain
+                FileSystemInfo? target;
+                if ((attrs & FileAttributes.Directory) != 0)
+                {
+                    target = Directory.ResolveLinkTarget(path, returnFinalTarget: true);
+                }
+                else
+                {
+                    target = File.ResolveLinkTarget(path, returnFinalTarget: true);
+                }
 
-                if (handle.IsInvalid)
+                if (target == null)
+                {
+                    // Link exists but target doesn't - return the target path anyway
+                    // Fall back to immediate target
+                    if ((attrs & FileAttributes.Directory) != 0)
+                    {
+                        target = Directory.ResolveLinkTarget(path, returnFinalTarget: false);
+                    }
+                    else
+                    {
+                        target = File.ResolveLinkTarget(path, returnFinalTarget: false);
+                    }
+                }
+
+                if (target == null)
                 {
                     return PrimitiveResult.Ok(context.HeapManager.GetNil());
                 }
 
-                char[] buffer = new char[MAX_PATH * 2];
-                uint result = GetFinalPathNameByHandleW(handle, buffer, (uint)buffer.Length, 0);
-
-                if (result == 0 || result > buffer.Length)
-                {
-                    return PrimitiveResult.Ok(context.HeapManager.GetNil());
-                }
-
-                string finalPath = new string(buffer, 0, (int)result);
-
-                // Remove \\?\ prefix if present
-                if (finalPath.StartsWith(@"\\?\"))
-                {
-                    finalPath = finalPath.Substring(4);
-                }
-
-                return PrimitiveResult.Ok(FilePrimitiveHelpers.CreateString(context, finalPath));
+                return PrimitiveResult.Ok(FilePrimitiveHelpers.CreateString(context, target.FullName));
             }
             catch
             {
