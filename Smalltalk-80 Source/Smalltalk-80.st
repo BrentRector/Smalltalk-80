@@ -18297,7 +18297,7 @@ initialize
 
 	"Install Disk as GLOBAL variable (not just pool variable) since it's a system-wide
 	 resource used by many classes that don't have FilePool in their poolDictionaries."
-	Smalltalk at: #Disk put: WindowsDirectory default! !
+	Smalltalk at: #Disk put: WindowsFileSystem default! !
 
 !File class methodsFor: 'documentation'!
 documentation
