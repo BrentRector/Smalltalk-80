@@ -1267,6 +1267,24 @@ pathFromString: aString
 	"Answer a Path object parsed from aString"
 	^self pathClass fromString: aString! !
 
+!FileSystem methodsFor: 'node factory'!
+
+fileAt: aPathString
+	"Answer a File object for the given path"
+	^self fileClass on: aPathString!
+
+fileNamed: aPathString
+	"Answer a File object for the given path (synonym for fileAt:)"
+	^self fileAt: aPathString!
+
+directoryAt: aPathString
+	"Answer a Directory object for the given path"
+	^self directoryClass on: aPathString!
+
+directoryNamed: aPathString
+	"Answer a Directory object for the given path (synonym for directoryAt:)"
+	^self directoryAt: aPathString! !
+
 !FileSystem methodsFor: 'naming semantics'!
 
 isCaseSensitive
@@ -1352,7 +1370,13 @@ oldFile: fileDesignator
 
 newFile: fileDesignator
 	"Answer a write stream on a new file"
-	^self currentDirectory newFile: fileDesignator! !
+	^self currentDirectory newFile: fileDesignator!
+
+directoryFromName: fileDesignator setFileName: localNameBlock
+	"Parse a file path into directory and filename components.
+	 Call localNameBlock with the filename, return the directory.
+	 This is used by legacy file operations for compatibility."
+	^self directoryClass directoryFromName: fileDesignator setFileName: localNameBlock! !
 
 !FileSystem methodsFor: 'link support'!
 
@@ -1782,12 +1806,17 @@ reopen
 
 !WindowsFileStream methodsFor: 'accessing'!
 
+path
+    "Answer a Path object for this stream's file"
+    ^Disk pathFromString: pathName!
+
 name
     "Extract filename from path"
-    | lastSep |
-    lastSep _ pathName findLast: [:c | c = $\ or: [c = $/]].
-    lastSep = 0 ifTrue: [^pathName].
-    ^pathName copyFrom: lastSep + 1 to: pathName size!
+    ^self path fileName!
+
+directory
+    "Answer the Directory containing this file"
+    ^Disk directoryAt: self path directoryPath asString!
 
 file
     "Return self for compatibility"
@@ -2160,28 +2189,25 @@ initPathName: aString
 
 !WindowsFile methodsFor: 'accessing'!
 
+path
+    "Answer a Path object for this file"
+    ^self fileSystem pathFromString: pathName!
+
 pathName
     "Return the file path"
     ^pathName!
 
 fileName
-    "Extract just the filename"
-    | lastSep |
-    lastSep _ pathName findLast: [:c | c = $\ or: [c = $/]].
-    lastSep = 0 ifTrue: [^pathName].
-    ^pathName copyFrom: lastSep + 1 to: pathName size!
+    "Extract just the filename using Path"
+    ^self path fileName!
 
 fullName
     "Return full path"
     ^pathName!
 
 directory
-    "Return WindowsDirectory for parent"
-    | lastSep dirPath |
-    lastSep _ pathName findLast: [:c | c = $\ or: [c = $/]].
-    lastSep = 0 ifTrue: [^WindowsDirectory on: '.'].
-    dirPath _ pathName copyFrom: 1 to: lastSep - 1.
-    ^WindowsDirectory on: dirPath! !
+    "Return Directory for parent"
+    ^self fileSystem directoryAt: self path directoryPath asString! !
 
 !WindowsFile methodsFor: 'testing'!
 
@@ -18010,720 +18036,17 @@ or: alternativeBlock
 !False methodsFor: 'printing'!
 printOn: aStream 
 	"Print false."
-	aStream nextPutAll: 'false'! !Object subclass: #File
-	instanceVariableNames: 'fileDirectory fileName pageCache serialNumber lastPageNumber binary readWrite error '
-	classVariableNames: ''
-	poolDictionaries: 'FilePool '
-	category: 'Files-Abstract'!
-File comment:
-'I am an abstract representation of a collection of FilePages and a reference to a FileDirectory which contains me.  My instance is usually uniquely identified both by an alphanumeric name (a String) and a serial number (a ByteArray).
+	aStream nextPutAll: 'false'\! \!
+
+"==================== Legacy File/FileDirectory/FilePage classes removed ===================="
+"The legacy page-based file system classes (Object subclass: #File, FileDirectory, FilePage)
+ have been deprecated and removed. Use the modern file system API instead:
+ - Disk (WindowsFileSystem instance) - entry point for file system operations
+ - File, Directory (abstract) - file system node abstractions  
+ - WindowsFile, WindowsDirectory (concrete) - Windows implementations
+ - WindowsFileStream - modern stream-based file I/O
+ - WindowsPath - path manipulation"
 
-According to this Smalltalk model, a File System consists of coordinated subclass definitions for FilePage, File, and FileDirectory.  User programs typically do not directly access a File or its FilePages but access it as a sequence of characters or bytes through a FileStream.
-
-Instance Variables:
-	fileName		<String>
-	serialNumber	<ByteArray>
-	fileDirectory	<FileDirectory>
-	lastPageNumber	<Integer>
-	binary			<Boolean> indicates binary or textual contents
-	readWrite		<Integer> tells if writing is allowed
-	error			<Symbol> an error condition
-	pageCache		not currently used.'!
-
-
-!File methodsFor: 'accessing'!
-size
-	"Answer the receiver's size in pages;  a file is a collection of pages."
-
-	lastPageNumber isNil 
-		ifTrue: [^self findLastPageNumber]
-		ifFalse: [^lastPageNumber]! !
-
-!File methodsFor: 'testing'!
-characterSize
-	"Answer the size of the receiver in characters.  The definitions 
-	characterSize and findLastPageNumber are circular;  a subclass must 
-	define either or both."
-
-	| page |
-	page _ self readPageNumber: self size.
-	^lastPageNumber - 1 * page dataSize + page size! !
-
-!File methodsFor: 'comparing'!
-match: aFile 
-	"Answer whether the two strings, the receiver's file name and that
-	of the argument, aFile, match.  (See String|match:)."
-	^self fileName match: aFile fileName! !
-
-!File methodsFor: 'converting'!
-asFileStream
-	"Answer a FileStream on the first page of the receiver."
-
-	self open.
-	^FileStream on: (self readOrAddPageNumber: 1)! !
-
-!File methodsFor: 'printing'!
-printOn: aStream 
-	fileName printOn: aStream! !
-
-!File methodsFor: 'nonhomogeneous accessing'!
-read: aFilePage 
-	"Read aFilePage if it exists, else answer false.  aFilePage contains a pageNumber and other
-	information, e.g., a serialNumber necessary to obtain the page.  It is possible that 
-	aFilePage pageNumber = 0 may or may not exist in some file systems. The pageNumber may
-	be used to compute a byte range to be read, or to lookup a disk address in a table.
-	In a file system where pages are linked, aFilePage may contain the address
-	of the next page and may help reveal lastPageNumber."
-
-	self subclassResponsibility!
-readOrAdd: aFilePage 
-	"Read aFilePage if it exists or extend File to create it as an empty page."
-
-	| pageNumber filePage |
-	filePage _ aFilePage.
-	pageNumber _ filePage pageNumber.
-	pageNumber <= lastPageNumber ifTrue: [^self read: filePage].
-	(lastPageNumber + 1 to: pageNumber - 1)
-		do: ["write full intermediate pages"
-			filePage pageNumber: pageNumber.
-			filePage _ self write: filePage].
-	"return an empty last page"
-	filePage pageNumber: pageNumber.
-	filePage size: 0.
-	^filePage!
-readPageNumber: aPageNumber 
-	"Create a FilePage for page number, aPageNumber, and read into it."
-
-	^self read: (self initPageNumber: aPageNumber)!
-write: aFilePage
-	"Write aFilePage, one that has been read or created (see File|readOrAdd:).
-	If aFilePage pageNumber < lastPageNumber, make sure page is full.
-	If aFilePage pageNumber = (lastPageNumber+1), then update file length.
-	Page numbers greater than lastPageNumber+1 are illegal (use File|readOrAdd:).
-
-	Answer the result of writing the page.  In some implementations, at end of file,
-	the next empty page is also written and answered."
-
-	self subclassResponsibility! !
-
-!File methodsFor: 'file accessing'!
-beSnapshotFile
-	self subclassResponsibility!
-directory
-	"Answer the directory in which the receiver is referenced."
-	^fileDirectory!
-directory: aFileDirectory 
-	"Set the directory in which the receiver is referenced to be aFileDirectory."
-	fileDirectory _ aFileDirectory!
-endFile: aFilePage 
-	"Make the file end with aFilePage, i.e., remove all file pages after 
-	aFilePage, and answer the result of writing aFilePage (File|write:). If the argument is
-	nil, delete all of the receiver's pages."
-
-	self subclassResponsibility!
-fileName
-	"Answer the name of the receiver."
-	^fileName!
-fileName: aFileName 
-	"Set the name of the receiver to be aFileName."
-	fileName _ aFileName!
-fullName
-	"Answer the name of the receiver, including directory names if necessary."
-	^self directory fullName, self fileName!
-rename: newFileName 
-	"Change the name of the receiver to be newFileName."
-
-	fileDirectory rename: self newName: newFileName! !
-
-!File methodsFor: 'file testing'!
-isBinary
-	"Answer whether the information in the receiver is stored in binary format."
-	^binary!
-isText
-	"Answer whether the information in the receiver is stored as ascii characters."
-	^binary == false! !
-
-!File methodsFor: 'file modes'!
-binary
-	"Set the receiver's contents to be in binary format."
-	binary _ true!
-readWrite
-	"Answer the read/write status of the receiver."
-	^readWrite!
-readWrite: statusInteger 
-	"Set the read/write status of the receiver to be statusInteger."
-	readWrite _ statusInteger!
-text
-	"Set the receiver's contents to be in ascii character format."
-	binary _ false! !
-
-!File methodsFor: 'file status'!
-close
-	"Close the receiver.  Subclasses may wish to update the leader page."
-	self subclassResponsibility!
-open
-	"Open the receiver."
-	self findLastPageNumber!
-reinitialize
-	"Reset the receiver to its initial status."
-	lastPageNumber _ nil.
-	error _ ''.
-	serialNumber _ ByteArray new: 4.
-	"text mode is default"
-	binary isNil ifTrue: [binary _ false]!
-release
-	"Release the receiver.  This is a more forgiving version of close 
-	and should always be possible even if close isn't desired or doesn't work."
-
-	self subclassResponsibility!
-reopen
-	"Reopen the receiver by possibly looking it up in a file directory and then opening."
-
-	self sameAsStoredFile
-		ifFalse: 
-			[self reinitialize.
-			fileDirectory findOrAdd: self].
-	self open! !
-
-!File methodsFor: 'page accessing'!
-serialNumber
-	"Answer the receiver's serial number."
-	^serialNumber!
-serialNumber: aSerialNumber 
-	"Set the receiver's serial number to be aSerialNumber."
-	serialNumber _ aSerialNumber! !
-
-!File methodsFor: 'error handling'!
-error
-	"Answer a Symbol indicating the last error condition."
-	^error!
-error: e 
-	"Construct an error message using the argument, e."
-
-	| s errorString |
-	s _ WriteStream on: (String new: 50).
-	s nextPutAll: fileName.
-	s nextPutAll: ' '.
-	s nextPutAll: e.
-	s nextPutAll: ', '.
-	s nextPutAll: error.
-	errorString _ s contents.
-	error _ ''.
-	^super error: errorString!
-errorString: anInteger 
-	"Construct an error string corresponding to the error code, anInteger."
-	self subclassResponsibility! !
-
-!File methodsFor: 'file/page/directory implementation'!
-doCommand: command page: aFilePage error: errorString 
-	"The argument, command, is typically read or write; 
-	page is a FilePage containing data and possibly other information;
-	errorString is a String to include in an error message 
-	(or if it is nil, no error is to be reported). 
-	 
-	Execute some disk primitive (which is usually another message). 
-	 
-	Answer aFilePage if successful. If an error occurs, answer false if errorString is nil. 
-	Otherwise, create an error message with errorString."
-
-	self subclassResponsibility!
-initPage: aFilePage 
-	"Initialize the argument, aFilePage."
-
-	aFilePage reinitialize.
-	aFilePage serialNumber: serialNumber.
-	^aFilePage!
-initPageNumber: aPageNumber 
-	"Create and initialize the file page with page number, aPageNumber;
-	serial number that of the receiver.  Answer the new FilePage."
-
-	| aFilePage |
-	aFilePage _ self pageClass new file: self page: nil.
-	binary
-		ifTrue: [aFilePage binary]
-		ifFalse: [aFilePage text].
-	aFilePage pageNumber: aPageNumber.
-	aFilePage serialNumber: serialNumber.
-	^aFilePage!
-lastPageNumber
-	"Answer the number of the last page of the receiver."
-	^self size!
-size: aPageNumber 
-	"Set the last page number of the receiver to be aPageNumber."
-	lastPageNumber _ aPageNumber! !
-
-!File methodsFor: 'private'!
-findLastPageNumber
-	"set and answer with the page number of my last page. 
-	see circularity comment for characterSize"
-
-	^lastPageNumber _ self pageNumberFrom: self size!
-pageClass
-	"answer with the appropriate subclass of FilePage which I contain"
-
-	self subclassResponsibility!
-pageNumberFrom: characterIndex 
-	"compute a page number from a character index"
-
-	^characterIndex - 1 // self pageClass new dataSize + 1!
-readOrAddPageNumber: aPageNumber 
-	"create aFilePage and read or extend into it"
-
-	^self readOrAdd: (self initPageNumber: aPageNumber)!
-sameAsStoredFile
-	"Answer true if File instance is correct enough so that it doesn't have to be 
-	reinitialized.  This allows reopen to go more quickly for certain 
-	implementations.  For example, in a local file system, a write date and time 
-	may guarantee that it hasn't changed since we closed this file.  This is the 
-	default. "
-
-	^false! !
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
-File class
-	instanceVariableNames: ''!
-
-
-!File class methodsFor: 'class initialization'!
-initialize
-	"Initialize FilePool with file mode constants.
-	 Note: Check if FilePool already exists (cold start pre-creates it with canonical Associations)."
-
-	(Smalltalk includesKey: #FilePool) ifFalse: [
-		Smalltalk at: #FilePool put: (FilePool _ Dictionary new)].
-	FilePool at: #Read put: 1.
-	FilePool at: #Write put: 2.
-	FilePool at: #Shorten put: 3.
-
-	"Install Disk as GLOBAL variable (not just pool variable) since it's a system-wide
-	 resource used by many classes that don't have FilePool in their poolDictionaries."
-	Smalltalk at: #Disk put: WindowsFileSystem default! !
-
-!File class methodsFor: 'documentation'!
-documentation
-	"Subclasses of File are expected to implement the following messages.  Unless 	otherwise indicated, they are provided as self subclassResponsibilty
-
-	testing
-		[optional] characterSize
-
-	fileStream accessing	
-		read:
-		write:
-
-	file accessing 
-		endFile:
-
-	file status
-	(these are implemented as returning self) 
-		close
-		release
-
-	error handling 
-		errorString:
-
-	file/page/directory implementation
-		doCommand:page:error:
-
-	private
-		[optional] findLastPageNumber 
-			(this has an implementation but is circular with characterSize 
-				so one or both must be reimplemented)
-		pageClass
-
-"! !
-
-File initialize!
-Object subclass: #FileDirectory
-	instanceVariableNames: 'directoryName closed '
-	classVariableNames: 'ExternalReferences '
-	poolDictionaries: 'FilePool '
-	category: 'Files-Abstract'!
-FileDirectory comment: 'A FileDirectory is uniquely identified by the device or server that it refers to. A FileDirectory is a collection of Files.  It may also be found in some other dictionary or FileDirectory, though often this is implicit'!
-
-
-!FileDirectory methodsFor: 'testing'!
-includes: aFile
-	"Answer whether aFile is in the receiver's list of files."
-	^(self find: aFile) notNil!
-includesKey: aFileName
-	"Answer whether a file whose name is aFileName is included in the receiver."
-	| file |
-	file _ self find: (self initFileName: aFileName).
-	file notNil ifTrue:
-		[file release. "close the IFS connection, if an IFS leaf file"
-		^true].
-	^false! !
-
-!FileDirectory methodsFor: 'adding'!
-add: aFile 
-	"Add the file, aFile, to the receiver.   This creates a new version of the file rather than generating an error if a file with the same name exists."
-
-	| old file |
-	file _ aFile.
-	self versionNumbers
-		ifTrue: 
-			["ignore explicit version and directory will create a next version"
-			file _ self initFileName: (file fileName copyUpTo: $!!)]
-		ifFalse: 
-			[(self find: file) notNil
-				ifTrue: 
-					["otherwise, if file already exists, 
-					  rename it to name$, deleting that file first if it exists"
-					old _ self initFileName: (file fileName copyWith: $$).
-					self remove: old ifAbsentDo: [:f | false].
-					self rename: file newName: old fileName.
-					file fileName: (file fileName copyUpTo: $$).
-					(self find: file) notNil ifTrue: [file error: 'insert/rename ??']]].
-	self addNew: file.
-	^file!
-addKey: aFileName 
-	"If a file whose name is aFileName exists and the receiver does not know how
-	to create a new version, the create an error.  Otherwise create a new empty file."
-
-	^self add: (self initFileName: aFileName)!
-addNew: aFile
-	"Add the argument, aFile, as a new file in the receiver."
-	self subclassResponsibility! !
-
-!FileDirectory methodsFor: 'removing'!
-remove: aFile
-	"Remove aFile if found in the receiver.  Create an error if it is not."
-
-	^self remove: aFile ifAbsentDo: [:f | f error: 'file not found']!
-remove: aFileName ifAbsentDo: aBlock 
-	"Remove aFile if found in the receiver.  Answer the result of evaluating aBlock if the file is not found."
-
-	| f |
-	f _ self find: aFileName ifAbsentDo: aBlock.
-	f notNil
-		ifTrue: [^self removeOld: f]
-		ifFalse: [^aBlock value: f]!
-removeOld: aFile 
-	"If aFile exists, remove it."
-
-	self subclassResponsibility! !
-
-!FileDirectory methodsFor: 'enumerating'!
-do: aBlock 
-	"Sequence over all possible files in the receiver, evaluating aBlock for each one."
-
-	| aFile |
-	self reset.
-	[aFile _ self next.
-	aFile notNil]
-		whileTrue: [aBlock value: aFile]!
-reset
-	"Set to the beginning of the directory."
-	self subclassResponsibility! !
-
-!FileDirectory methodsFor: 'accessing'!
-directoryName
-	"Answer the name of the receiver."
-	^directoryName!
-fullName
-	"Answer the name of the receiver in a form recognized when parsing file names (i.e., using [...]).  May be empty for a default directory."
-	^''!
-next
-	"Answer the next file instance in the receiver (part of the streaming protocol)."
-	self subclassResponsibility!
-versionNumbers
-	"Answer true if versions numbers are supported."
-
-	^false		"this is the default"! !
-
-!FileDirectory methodsFor: 'dictionary removing'!
-removeKey: aFileName 
-	"Remove and answer the file whose name is aFileName;  create an error if not
-	found."
-	^self
-		remove: (self initFileName: aFileName)
-		ifAbsentDo: [:f | f error: 'file not found']! !
-
-!FileDirectory methodsFor: 'printing'!
-listFilesOn: aStream 
-	"Write a list of each file name in the receiver onto the stream, aStream."
-	self do: 
-		[:aFile | 
-		aStream cr.
-		aFile fileName printOn: aStream]!
-printOn: aStream 
-	aStream nextPutAll: 
-		(self closed
-			ifTrue: ['a closed ']
-			ifFalse: ['an open ']).
-	aStream nextPutAll: self class name.
-	aStream nextPutAll: ' on '.
-	directoryName printOn: aStream! !
-
-!FileDirectory methodsFor: 'file accessing'!
-checkName: aFileName fixErrors: aBoolean 
-	"Check a string aFileName for validity as a file name.  If there are problems 
-	(e.g., illegal length or characters) and aBoolean is false, create an error;  if 
-	there are problems and aBoolean is true, make the name legal (usually by 
-	truncating and/or tranforming characters) and answer the new name.  Otherwise, 
-	answer the name.  Default behavior is to get rid of ending period.  
-	Subclasses can do any kind of checking they want and answer either the 
-	name, or false if no good."
-
-	aFileName isEmpty ifTrue: [aBoolean ifFalse: [self error: 'file name empty']].
-	aFileName last = $.
-		ifTrue: 
-			[aBoolean ifFalse: [self error: 'file name ends in .'].
-			^aFileName copyFrom: 1 to: aFileName size - 1]
-		ifFalse: [^aFileName]!
-checkNameOfFile: aFileName
-	"See FileDirector|checkNameOfFile: aFileName fixErrors: false."
-	^self checkNameOfFile: aFileName fixErrors: false!
-checkNameOfFile: aFile fixErrors: aBoolean 
-	"See FileDirectory|checkNameOfFile: aFileName fixErrors: aBoolean.  The first argument
-	is the name of the file, aFile."
-	^self checkName: aFile fileName fixErrors: aBoolean!
-file: aFileName 
-	"Answer a FileStream on an old or new File whose name is aFileName."
-
-	^(self findOrAddKey: aFileName) asFileStream!
-fileClass
-	"Answer the proper subclass of File of which the files in the receiver are instances."
-
-	self subclassResponsibility!
-filesMatching: pattern 
-	"Answer an Array of the names of files that match the string, pattern."
-	| names name |
-	names _ WriteStream on: (Array new: 10).
-	self do: 
-		[:each |
-		name _ each fileName.
-		(pattern match: name)
-			ifTrue:
-				[name last = $. ifTrue: [name _ name copyFrom: 1 to: name size - 1].
-				names nextPut: name]].
-	^names contents!
-isLegalFileName: aString 
-	"Answer whether aString is a legal file name."
-	^(self checkName: aString fixErrors: true) = aString!
-isLegalOldFileName: aString 
-	"Answer whether aString is a legal file name."
-
-	^(self checkName: aString fixErrors: true) = aString
-		and: [self includesKey: aString]!
-newFile: aFileName 
-	"Answer a FileStream on a new File whose name is aFileName;  error if the
-	argument is not a new file name."
-
-	^(self addKey: aFileName) asFileStream!
-oldFile: aFileName 
-	"Answer a FileStream on an old File whose name is aFileName;  error if the
-	argument is not an old name."
-
-	^(self findKey: aFileName) asFileStream!
-rename: aFile newName: newName 
-	"Rename the file, aFile, to have the name newName.  Create an
-	error if a file by the name, newName, already exists."
-	self subclassResponsibility! !
-
-!FileDirectory methodsFor: 'file testing'!
-closed
-	"Answer whether the receiver is closed."
-	^closed! !
-
-!FileDirectory methodsFor: 'file status'!
-close
-	"Close the receiver if it is not already closed."
-	closed
-		ifFalse: 
-			[ExternalReferences remove: self ifAbsent: [].
-			self release]!
-flush
-	"Write any state on local storage."
-
-	self subclassResponsibility!
-open
-	"Open the directory."
-
-	closed _ false.
-	(ExternalReferences includes: self)
-		ifFalse: [ExternalReferences addLast: self]!
-release
-	"Release the receiver. a more forgiving version of close 
-	which should always be possible even if close isn't desired or doesn't work."
-
-	closed _ true! !
-
-!FileDirectory methodsFor: 'file copying'!
-retrieve: aFileName 
-	"Copy the file whose name is aFileName to itself.  Subclasses may want to overwrite this to
-	redirect the directory on which a file of the same name is copied.  See 
-	FileDirectory|retrieveFrom:copyTo:."
-	^self retrieveFrom: aFileName copyTo: aFileName!
-retrieveFrom: aFileName1 copyTo: aFileName2 
-	"Copy file whose name is aFileName1 (usually from this receiver) to a file
-	whose name is aFileName2 (usually a local directory)."
-
-	| f1 f2 |
-	f1 _ self oldFile: aFileName1.
-	f1 readOnly.
-	f2 _ self file: aFileName2.
-	f2 nextPutAll: f1.
-	f2 close.
-	f1 close!
-store: aFileName 
-	"Store the file whose name is aFileName to itself.  Subclasses may want to overwrite this to
-	redirect the directory on which a file of the same name is copied.  See 
-	FileDirectory|storeFrom:copyTo:."
-	^self storeFrom: aFileName copyTo: aFileName!
-storeFrom: aFileName1 copyTo: aFileName2 
-	"Copy file whose name is aFileName1 (usually from a local directory) to a file
-	whose name is aFileName2 (usually on the receiver)."
-
-	| f1 f2 |
-	f1 _ self oldFile: aFileName1.
-	f1 readOnly.
-	f2 _ self file: aFileName2.
-	f2 nextPutAll: f1.
-	f2 close.
-	f1 close! !
-
-!FileDirectory methodsFor: 'page accessing'!
-allocate: aFilePage after: virtualDiskAddress 
-	"Answer aFilePage with its real disk address field filled in."
-
-	self subclassResponsibility!
-allocateSN: aFile 
-	"Allocate a new serial number for the file, aFile."
-
-	self subclassResponsibility!
-deallocate: aFilePage 
-	"Deallocate aFilePage at some real disk address."
-
-	self subclassResponsibility!
-freePages
-	"Answer the number of free pages remaining."
-
-	self subclassResponsibility!
-newPage
-	"Create a dummy file and a page from it."
-
-	^(self initFileName: '') initPageNumber: 0! !
-
-!FileDirectory methodsFor: 'private'!
-find: aFile 
-	^self find: aFile ifAbsentDo: [:f | nil]!
-find: aFile ifAbsentDo: aBlock 
-	"return aFile (partially initialized) if found, otherwise false. 
-	this is a default implementation"
-
-	| fname |
-	"check file name"
-	fname _ self checkNameOfFile: aFile.
-	aFile fileName: fname.
-	"iterate through non-deleted entries of directory, 
-	and return partially initialized file if found"
-	self do: [:each | (fname sameAs: each fileName) ifTrue: [^each]].
-	"failure"
-	^aBlock value: aFile!
-findKey: aFileName 
-	^self
-		find: (self initFileName: aFileName)
-		ifAbsentDo: [:file | file error: 'file not found']!
-findOrAdd: aFile 
-	"find an old file if it exists, or create one"
-
-	| f |
-	(f _ self find: aFile) notNil
-		ifTrue: [^f]
-		ifFalse: [^self addNew: aFile]!
-findOrAddKey: t1 
-	^self findOrAdd: (self initFileName: t1)!
-initFile: aFile 
-	aFile reinitialize.
-	^aFile!
-initFileName: aFileName 
-	| aFile |
-	aFile _ self fileClass new.
-	aFile directory: self.
-	aFile fileName: aFileName.
-	aFile reinitialize.
-	^aFile!
-setDirectory: aFileDirectory directoryName: aString 
-	"assume that the directory is implicit"
-
-	directoryName _ aString.
-	closed _ true! !
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
-FileDirectory class
-	instanceVariableNames: ''!
-
-
-!FileDirectory class methodsFor: 'class initialization'!
-initialize
-	self initializeExternalReferences
-	"FileDirectory initialize"! !
-
-!FileDirectory class methodsFor: 'instance creation'!
-directory: aFileDirectory directoryName: aString 
-	"Answer an instance of me in directory aFileDirectory whose name is aString."
-
-	^self new setDirectory: aFileDirectory directoryName: aString!
-directoryFromName: fileDesignator setFileName: localNameBlock
-	"Delegate to the actual Disk implementation for proper path parsing."
-
-	^Disk class directoryFromName: fileDesignator setFileName: localNameBlock! !
-
-!FileDirectory class methodsFor: 'external reference access'!
-addExternalReference: anElement 
-	"Add anElement as a file that is currently referenced in the system."
-	(ExternalReferences includes: anElement)
-		ifFalse: [ExternalReferences addLast: anElement]!
-initializeExternalReferences
-	"ExternalReferences is an OrderedCollection of the files that are referenced
-	in the system.  Initialize this class variable."
-	ExternalReferences _ OrderedCollection new!
-releaseExternalReferences
-	"Remove and release all of the files referenced by the collection ExternalReferences."
-	[ExternalReferences isEmpty]
-		whileFalse: [ExternalReferences removeLast release]!
-removeExternalReference: anElement 
-	"Remove anElement as a file that is currently referenced in the system."
-	ExternalReferences remove: anElement ifAbsent: []! !
-
-!FileDirectory class methodsFor: 'documentation'!
-documentation 
-	"subclasses are expected to implement the following messages which are
-	implemented as self subclassResponsibility unless otherwise noted.
-
-	file accessing
-		fileClass
-		[optional] rename:newName:
-		[default] checkNameOfFile:
-			(default makes no sense to me; for the abstract anything is okay)
-
-	file status
-		[optional] flush
-
-	page accessing
-		[optional] allocate:after:
-		[optional] allocateSN
-		[optional] deallocate:
-		[optional] freePages
-
-	dictionary adding
-		addNew: 
-
-	dictionary removing
-		removeOld:
-
-	dictionary enumerating
-		[optional] next
-		[default] do: 
-		[optional] reset
-
-	directory accessing
-		[default] versionNumbers
-
-"! !
-
-FileDirectory initialize!
 FileModel subclass: #FileList
 	instanceVariableNames: 'list myPattern isReading '
 	classVariableNames: 'FileMenu PatternMenu '
@@ -18779,7 +18102,7 @@ deleteFile
 	"Remove the selected file from its directory."
 
 	| dir localName |
-	dir _ FileDirectory directoryFromName: fileName setFileName: [:localName].
+	dir _ Disk directoryFromName: fileName setFileName: [:ln | localName _ ln].
 	(dir includesKey: localName)
 		ifTrue: [(self confirm: 'really remove the selected file?') ifFalse: [^self].
 	dir removeKey: localName].
@@ -18841,15 +18164,15 @@ filesMatching: pattern
 	"Answer a list of file names matching the pattern string.  Do this by asking the appropriate directory."
 
 	| dir nameBody matches |
-	dir _ FileDirectory directoryFromName: pattern setFileName: [:nameBody].
+	dir _ Disk directoryFromName: pattern setFileName: [:nb | nameBody _ nb].
 	matches _ dir filesMatching: nameBody.
 	^matches!
 isLegalFileName: pattern
 	"Answer whether pattern is a valid file name.  Do this by asking the appropriate directory."
 
 	| dir nameBody |
-	dir _ FileDirectory directoryFromName: pattern setFileName: [:nameBody].
-	^dir isLegalFileName: pattern!
+	dir _ Disk directoryFromName: pattern setFileName: [:nb | nameBody _ nb].
+	^dir isLegalFileName: nameBody!
 list: aList
 	list _ aList.
 	isReading _ false! !
@@ -18921,7 +18244,7 @@ Instance Variables:
 text
 	| dir localName |
 	fileName == nil ifTrue: [^nil].
-	dir _ FileDirectory directoryFromName: fileName setFileName: [:localName].
+	dir _ Disk directoryFromName: fileName setFileName: [:ln | localName _ ln].
 	(dir includesKey: localName) ifFalse:		"don't create file"
 		[^'-new file-' asText emphasizeFrom: 2 to: 9 with: 3].
 	^Cursor read showWhile:
@@ -19005,315 +18328,30 @@ open: aFileModel named: aString withController: aController
 
 !FileModel class methodsFor: 'initialization'!
 flushMenus 
-	TextMenu _ nil! !Object subclass: #FilePage
-	instanceVariableNames: 'file page binary '
-	classVariableNames: ''
-	poolDictionaries: 'FilePool '
-	category: 'Files-Abstract'!
-FilePage comment:
-'I represent a fixed size page or record of data from a File.  My instance is uniquely identified within its File by its pageNumber.
+	TextMenu _ nil\! \!
 
-The normal layout of a FilePage is as a ByteArray, which begins with some header information (e.g. serial number, page number, size), some data with possible leftover allocation, and some trailer information: pageSize = headerSize + size + (dataSize - size) + trailerSize.  In the current implementations, all FilePages (except possibly the last page) of a File are full (i.e. no unused data allocation).  This assumption is also reflected in File characterSize, and in FileStream positioning methods.  Given the current implementation of ByteArrays and Strings, each page has a type (binary or text).  The messages asStream: and fromStream: do the necessary conversion. 
+"==================== FilePage class removed ===================="
+"The legacy FilePage class has been deprecated and removed.
+ Use WindowsFileStream for modern stream-based file I/O."
 
-Instance Variables:
-	file		<File> that contains the instance
-	page	<Integer> the number of the instance
-	binary 	<Boolean> true if content of page is binary, else it is text
-'!
-
-
-!FilePage methodsFor: 'accessing'!
-at: aByteIndex 
-	"Answer the data byte associated with aByteIndex."
-
-	^page at: (self dataIndex: aByteIndex size: 1)!
-at: aByteIndex put: aByte 
-	"Put the date byte, aByte, at location aByteIndex.  Answer aByte."
-	^page at: (self dataIndex: aByteIndex size: 1) put: aByte!
-size
-	"Answer the number of data characters the receiver contains 
-	(0 <= self size <= self dataSize)"
-
-	^self subclassResponsibility!
-wordAt: aWordIndex 
-	"Answer the data word associated with aWordIndex."
-
-	^page wordAt: (self dataIndex: aWordIndex size: 2)!
-wordAt: aWordIndex put: aWord 
-	"Put aWord at location aWordIndex.  Answer aWord."
-	^page wordAt: (self dataIndex: aWordIndex size: 2) put: aWord! !
-
-!FilePage methodsFor: 'testing'!
-isEmpty
-	"Answer whether this page has no data."
-
-	^self size = 0! !
-
-!FilePage methodsFor: 'converting'!
-asFileStream: aStream 
-	"Initialize aStream (typically a FileStream) to access the data portion of the receiver 
-	-- this is the normal way to access characters and words. 
-	Pages which segment data and header can do this differently."
-
-	| offset len sourceData destData |
-	len _ self size.
-	offset _ self headerSize.
-	sourceData _ self dataString.
-	binary 
-		ifTrue: [^aStream
-					on: sourceData
-					from: offset + 1
-					to: offset + len"self dataBeginning"
-					"self dataEnd"].
-	destData _ String new: self dataSize.
-	destData replaceFrom: 1 to: len withByteArray: sourceData startingAt: offset+1.
-	^aStream on: destData from: 1 to: len!
-fromFileStream: aStream 
-	"Copy data into page; pages which separate data and header can do this differently"
-	| sourceData destData offset |
-	binary 
-		ifFalse: 
-			[offset _ self headerSize.
-			sourceData _ aStream contents.
-			destData _ self dataString.
-			destData
-				replaceFrom: offset + 1
-				to: offset+ self size
-				withString: sourceData
-				startingAt: 1]! !
-
-!FilePage methodsFor: 'nonhomogeneous accessing'!
-headerWordAt: n 
-	"Answer the n-th header word;  default is that it is at the beginning of 
-	page."
-
-	^page wordAt: n!
-headerWordAt: n put: v 
-	"Set and answer n-th header word."
-
-	^page wordAt: n put: v!
-pageWordAt: aWordIndex 
-	"Answer the word associated with aWordIndex in the page as a whole, 
-	ignoring header, data and trailer boundaries"
-
-	^page wordAt: aWordIndex!
-pageWordAt: aWordIndex put: aWord 
-	"Set and answer the word associated with aWordIndex in the page as a whole, 
-	ignoring header, data and trailer boundaries."
-
-	^page wordAt: aWordIndex put: aWord!
-readPageNumber: aPageNumber 
-	"Answer the result of file reading a page into the receiver."
-
-	self pageNumber: aPageNumber.
-	self size: 0.
-	^file read: self!
-write
-	"Answer the result of writing the receiver onto its file."	
-	^file write: self! !
-
-!FilePage methodsFor: 'file accessing'!
-endFile
-	"Answer the result of making the receiver be the last page of its file."
-
-	^file endFile: self!
-file
-	"Answer with the receiver's file."
-
-	^file! !
-
-!FilePage methodsFor: 'file testing'!
-isBinary
-	"Answer whether the information in the receiver is stored in binary format."
-	^binary!
-isText
-	"Answer whether the information in the receiver is stored as ascii characters."
-	^binary == false! !
-
-!FilePage methodsFor: 'file modes'!
-binary
-	"Set the receiver's information type to be binary."
-	binary _ true!
-text
-	"Set the receiver's information type to be ascii characters."
-	binary _ false! !
-
-!FilePage methodsFor: 'file status'!
-reinitialize
-	"Reset the receiver to its initial status."
-	page == nil ifTrue: [page _ self allocatePage].
-	self size: 0!
-reopen
-	"Reopen the receiver's file and reinitialize the receiver onto it."
-
-	file reopen.
-	file initPage: self! !
-
-!FilePage methodsFor: 'page initialization'!
-file: aFile 
-	"Set the receiver's file to be aFile."
-	file _ aFile!
-file: aFile page: aByteArray 
-	"Set the receiver's file to be aFile, and its page to contain aByteArray."
-	file _ aFile.
-	page _ aByteArray.
-	self reinitialize!
-page: aByteArray 
-	"Set the receiver's page to contain aByteArray."
-	page _ aByteArray! !
-
-!FilePage methodsFor: 'page accessing'!
-address
-	"Answer the disk address for the receiver.  This need only be defined for 
-	those subclasses which have access to an address, probably for local 
-	disks and not for remote file servers"
-
-	self subclassResponsibility!
-address: addressNumber
-	"Set the receiver's disk address."
-
-	self subclassResponsibility!
-dataBeginning
-	"Answer the index in the receiver for the first element of data-1."
-
-	binary
-		ifTrue: [^self headerSize]
-		ifFalse: [^0]!
-dataEnd
-	"Answer the character index for the last character of actual data."
-
-	^self dataBeginning + self size!
-dataEnd: aPageIndex 
-	"Set the end of the data in the receiver."
-
-	^self size: aPageIndex - self dataBeginning!
-dataMaxEnd
-	"Answer the maximum possible data byte index."
-
-	^self dataBeginning + self dataSize!
-dataString
-	"Answer a string containing the data."
-
-	^page!
-page
-	"Answer the receiver's page"
-
-	^page!
-pageNumber
-	"Answer the receiver's page number, an Integer."
-
-	^self subclassResponsibility!
-pageNumber: anInteger 
-	"Set the receiver's page number."
-
-	^self subclassResponsibility!
-serialNumber
-	"Answer the serial number of the receiver's page."
-
-	^file serialNumber!
-serialNumber: aSN
-	"Set the serial number of the receiver's page."
-
-	^self subclassResponsibility! !
-
-!FilePage methodsFor: 'page testing'!
-dataSize
-	"Answer the maximum size of data (in characters) in the receiver's page."
-	^512!
-headerSize
-	"Answer the size of the receiver's header in characters."
-
-	^0!
-isFull
-	"Answer whether the receiver has no more room at the end for more data."
-	^self size = self dataSize!
-lastPage
-	"Answer whether the receiver is at the last page in its file."
-
-	^self pageNumber >= file lastPageNumber!
-pageSize
-	"Answer the total size of the receiver's page, in bytes."
-
-	^self headerSize + self dataSize + self trailerSize!
-trailerSize
-	"Answer the size of trailer in bytes."
-
-	^0! !
-
-!FilePage methodsFor: 'file/page/directory implementation'!
-doCommand: command error: s 
-	"Answer the result of executing a command on the receiver."
-
-	^file doCommand: command page: self error: s!
-size: aByteIndex 
-	"Set the number of data characters the receiver contains to be aByteIndex. 
-	aByteIndex <= dataSize on last page; aByteIndex = dataSize on earlier 
-	pages)."
-
-	^self subclassResponsibility! !
-
-!FilePage methodsFor: 'private'!
-allocatePage
-	"allocate a page buffer"
-
-	^ByteArray new: self pageSize"this is a default"!
-dataIndex: index size: nBytes 
-	"Answer with an index offset properly into page, unless index would be 
-	out of bounds.   nBytes = 1 for characters; nBytes = 2 for words"
-
-	(index > 0 and: [index <= (self size // nBytes)])
-		ifTrue: [^(self headerSize // nBytes) + index]
-		ifFalse: [self error: 'index out of bounds']!
-readOrAddPageNumber: aPageNumber 
-	"answer with the result of file reading a page or creating a page into me"
-
-	self pageNumber: aPageNumber.
-	self size: 0.
-	^file readOrAdd: self! !
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
-FilePage class
-	instanceVariableNames: ''!
-
-
-!FilePage class methodsFor: 'documentation'!
-documentation
-	"My subclasses are expected to implement the following messages.  These are
-	provided as self subclassResponsibility.  Some are optional for implementation,
-	depending on the representation of the actual file page;  for some, defaults are
-	provided.
-
-	testing
-		size
-	page initialization
-		pageNumber:
-	page accessing
-		[optional] address
-		[optional] address:
-		[optional] pageNumber
-		[optional] pageNumber:
-		[optional] serialNumber:
-	page testing
-		[default] dataSize
-		[default] headerSize
-		[default] trailerSize
-	file/page/directory implementation
-		size:
-"! !ExternalStream subclass: #FileStream
+ExternalStream subclass: #FileStream
 	instanceVariableNames: 'page rwmode closed '
 	classVariableNames: ''
 	poolDictionaries: 'FilePool '
 	category: 'Files-Streams'!
 FileStream comment:
-'I represent a Stream that accesses a FilePage from a File.  One use for my instance is to access larger "virtual Strings" than can be stored contiguously in main memory.  I restrict the objects stored and retrieved to be Integers or Characters.  An end of file pointer terminates reading;  it can be extended by writing past it, or the file can be explicitly truncated.
+'I provide stream-based access to files. My class methods (fileNamed:, newFileNamed:, oldFileNamed:)
+delegate to WindowsFileStream for modern stream-based file I/O.
 
-To use the file system for most applications, you typically create a FileStream.  This is done by sending a message to a FileDirectory (file:, oldFile:, newFile:, rename:newName:) which creates an instance of me.  Accesses to the file are then done via my instance.
+To use the file system, send one of my class methods:
+  FileStream fileNamed: aPath      - open for read/write
+  FileStream newFileNamed: aPath   - create/truncate for writing
+  FileStream oldFileNamed: aPath   - open existing for reading
 
-Instance variables
-	page			<FilePage> the current FilePage being accessed
-	rwmode			<Integer> denoting readOnly, readWrite, or readWriteShorten.
-					readWriteShorten with textual contents is the default.
-	closed			<Boolean> false if the file is open'!
+All class methods return a WindowsFileStream instance which provides the actual I/O.
+
+Note: The legacy instance methods using FilePage are deprecated. Use WindowsFileStream directly
+for new code, or use the class methods which delegate to WindowsFileStream.'!
 
 
 !FileStream methodsFor: 'accessing'!
@@ -19628,7 +18666,7 @@ close
 			closed _ true.
 			readLimit _ writeLimit _ 0.
 			self file close.
-			FileDirectory removeExternalReference: self]!
+			WindowsDirectory removeExternalReference: self]!
 flush
 	"Write the current page back onto the file."
 	self closed
@@ -19692,7 +18730,7 @@ on: aFilePage
 		ifTrue: [page _ page page].
 	page asFileStream: self.
 	closed _ false.
-	FileDirectory addExternalReference: self!
+	WindowsDirectory addExternalReference: self!
 position: objpos size: size 
 	"set the current character position and the current page 
 	from the position of an object of a given size (see positionSize:)"
@@ -21598,14 +20636,14 @@ eraseMode
 	mode _ 4.
 	tool _ previousTool!
 fileInForm
-	"Ask the user for a file name and then recalls the Form in that file as the 
+	"Ask the user for a file name and then recalls the Form in that file as the
 	current source Form (form).  Does not change the tool."
 
 	| inName directory localName trying newForm |
 	trying _ true.
 	[trying] whileTrue:
 		[inName _ self promptRequest: 'type a name for recalling a source Form . . . '.
-		directory _ FileDirectory directoryFromName: inName setFileName: [:localName].
+		directory _ Disk directoryFromName: inName setFileName: [:ln | localName _ ln].
 		(((directory isLegalFileName: localName)
 			and: [directory includesKey: localName])
 				and: [(newForm  _ Form readFrom: inName) ~~ nil])
@@ -21622,10 +20660,10 @@ fileOutForm
 	trying _ true.
 	[trying] whileTrue:
 		[outName _ self promptRequest: 'type a name for saving the source Form . . . '.
-		directory _ FileDirectory directoryFromName: outName setFileName: [:localName].
-		(directory isLegalFileName: outName)
+		directory _ Disk directoryFromName: outName setFileName: [:ln | localName _ ln].
+		(directory isLegalFileName: localName)
 			ifTrue:
-				[(directory includesKey: localName) 
+				[(directory includesKey: localName)
 					ifTrue: [(BinaryChoice message: 'writing over old file--okay?')
 								ifTrue: [form writeOn: outName]]
 					ifFalse: [form writeOn: outName].
@@ -39526,9 +38564,9 @@ snapshotAs: imageFilePrefix thenQuit: quitIfTrue
 	self logChange: '''----SNAPSHOT----'''.
 	Disk == nil
 		ifFalse:	"Register snapshot filename with VM for primitive 97.
-				   Use WindowsFile directly to avoid FileStream reading the entire
+				   Use Disk fileNamed: to avoid FileStream reading the entire
 				   existing file into memory (which would bloat the new snapshot)."
-			[(WindowsFile named: imageFilePrefix, '.im') beSnapshotFile].
+			[(Disk fileNamed: imageFilePrefix, '.im') beSnapshotFile].
 	self releaseExternalViews.
 	Transcript cr; show: 'Snapshot at: ', Time dateAndTimeNow printString.
 	height _ Display height.
@@ -39681,7 +38719,7 @@ releaseExternalViews
 	SourceFiles==nil 
 		ifFalse: [SourceFiles do: [:t | t==nil ifFalse: [t close]]].
 	Disk==nil ifFalse: [Disk close].
-	FileDirectory releaseExternalReferences!
+	WindowsDirectory releaseExternalReferences!
 snapshotPrimitive
 	"Write the current state of the object memory on a file in the same format as 
 	the Smalltalk-80 release.  The file can later be resumed, returning you to 
@@ -39795,7 +38833,7 @@ doitWithout: classSet
 	ctxt push: nil.
 	self init: ctxt.
 	self initClampedClasses: classSet.
-	FileDirectory initializeExternalReferences.
+	WindowsDirectory initializeExternalReferences.
 	Smalltalk shutdown.
 	"Make sure the system is stable underneath us."
 	Transcript show: 'Tracing . . . '.

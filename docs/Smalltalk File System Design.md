@@ -1,8 +1,8 @@
 # Smalltalk-80 File System Design
 
-**Version:** 1.3
+**Version:** 1.4
 **Date:** 2025-12-30
-**Status:** Implemented
+**Status:** Implemented - Legacy classes removed
 
 > **Note**: This document has been updated to reflect the actual implementation.
 > See `Smalltalk-80 Source/Smalltalk-80.st` for the authoritative source code.
@@ -3147,42 +3147,71 @@ Disk volumes do: [:vol |
 
 ## Migration from Legacy System
 
-### Classes to Delete
+### Removed Classes (Version 1.4)
 
-| Class | Reason |
-|-------|--------|
-| `FilePage` | Page abstraction eliminated |
-| Legacy `File` | Replaced by new abstract `File` |
-| Legacy `FileDirectory` | Replaced by abstract `Directory` |
-| Legacy `FileStream` | Replaced by abstract `FileStream` |
+The following legacy classes have been **completely removed** from the codebase:
 
-### Classes to Rename/Refactor
+| Class | Status | Replacement |
+|-------|--------|-------------|
+| `FilePage` | **REMOVED** | Use `WindowsFileStream` for byte-stream access |
+| Legacy `File` (Object subclass) | **REMOVED** | Use `File` → `WindowsFile` (FileSystemNode subclass) |
+| `FileDirectory` | **REMOVED** | Use `Disk` (WindowsFileSystem) or `WindowsDirectory` |
 
-| Old | New | Notes |
-|-----|-----|-------|
-| `FileDirectory` | `Directory` | Simplified name |
-| `WindowsFileStream` | Keep | Now inherits from `FileStream` |
-| `WindowsDirectory` | Keep | Now inherits from `Directory` |
-| `WindowsFile` | Keep | Now inherits from `File` |
+### Current Class Hierarchy
+
+**Abstract Classes** (program to these):
+- `FileSystem` → entry point, platform knowledge
+- `FileSystemNode` → common file/directory protocol
+  - `File` → file-specific operations
+  - `Directory` → directory-specific operations
+  - `SymbolicLink` → link operations
+- `Path` → path manipulation
+
+**Concrete Windows Classes** (instantiate these via Disk):
+- `WindowsFileSystem` → Windows file system operations
+- `WindowsFile` → Windows file implementation
+- `WindowsDirectory` → Windows directory implementation
+- `WindowsSymbolicLink` → Windows symbolic link implementation
+- `WindowsPath` → Windows path handling
+- `WindowsFileStream` → Windows file I/O streams
 
 ### Global Variables
 
-| Variable | Old Value | New Value |
-|----------|-----------|-----------|
-| `Disk` | `WindowsDirectory default` | `WindowsFileSystem default` |
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `Disk` | `WindowsFileSystem default` | Entry point to file system |
 
-### Code Migration
+### API Usage
 
-Most existing Smalltalk code should work unchanged because:
+**Modern API (recommended):**
+```smalltalk
+"Get files and directories through Disk"
+file := Disk fileNamed: 'C:\path\to\file.txt'.
+dir := Disk directoryAt: 'C:\path\to\dir'.
 
-1. `Disk` still responds to `file:`, `oldFile:`, `newFile:`
-2. Streams still respond to the same protocol
-3. Factory methods (`FileStream fileNamed:`, etc.) still work
+"Create paths"
+path := Disk pathFromString: 'C:\path\to\file.txt'.
 
-Code that directly references page-based methods will need updating:
-- `FilePage` references → delete
-- `page` instance variable access → use stream methods
-- `readPageNumber:`, `writePageNumber:` → use positioning
+"Parse file designators"
+dir := Disk directoryFromName: 'C:\path\file.txt' setFileName: [:name | localName := name].
+
+"File streams (through FileStream class methods)"
+stream := FileStream fileNamed: 'path'.    "read/write"
+stream := FileStream newFileNamed: 'path'. "create/truncate"
+stream := FileStream oldFileNamed: 'path'. "read only"
+```
+
+**Legacy FileStream class methods still work** (delegate to WindowsFileStream):
+- `FileStream fileNamed:` → `WindowsFileStream readWriteOn:`
+- `FileStream newFileNamed:` → `WindowsFileStream writeOn:`
+- `FileStream oldFileNamed:` → `WindowsFileStream readOn:`
+
+### Code Migration Notes
+
+1. **FileDirectory references**: Replace with `Disk` or appropriate abstract class
+2. **FilePage references**: Remove entirely; use stream-based I/O
+3. **Direct WindowsFile/WindowsDirectory references**: Use `Disk fileNamed:`/`Disk directoryAt:` instead
+4. **directoryFromName:setFileName:**: Now available on `FileSystem` (and thus `Disk`)
 
 ---
 
