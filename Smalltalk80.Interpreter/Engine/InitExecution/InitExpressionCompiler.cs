@@ -19,7 +19,7 @@ public class InitExpressionCompiler
     private readonly ISmalltalkHeap _heapManager;
     private readonly ColdStartBundle _bundle;
     private readonly VMMetadata _metadata;
-    private readonly IRuntimeHeapAccessor _runtimeHeapAccess;
+    private readonly IRuntimeServices _runtimeServices;
 
     public InitExpressionCompiler(
         ISmalltalkHeap heapManager,
@@ -29,7 +29,7 @@ public class InitExpressionCompiler
         _heapManager = heapManager ?? throw new ArgumentNullException(nameof(heapManager));
         _bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
         _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
-        _runtimeHeapAccess = new RuntimeHeapAccessor(heapManager, metadata);
+        _runtimeServices = new RuntimeServices(heapManager, metadata);
     }
 
     /// <summary>
@@ -45,8 +45,8 @@ public class InitExpressionCompiler
         string homeClassLocalId = ExtractHomeClassFromInitExpression(expr, literalOOPs);
 
         // Get required class OOPs using hash-based lookup
-        var compiledMethodClassOOP = _runtimeHeapAccess.GetClass("CompiledMethod");
-        var byteArrayClassOOP = _runtimeHeapAccess.GetClass("ByteArray");
+        var compiledMethodClassOOP = _runtimeServices.GetClass("CompiledMethod");
+        var byteArrayClassOOP = _runtimeServices.GetClass("ByteArray");
 
         if (compiledMethodClassOOP == _heapManager.GetNil())
             throw new InvalidOperationException("CompiledMethod class not found");
@@ -54,7 +54,7 @@ public class InitExpressionCompiler
             throw new InvalidOperationException("ByteArray class not found");
 
         // Get homeClass OOP using hash-based lookup
-        var homeClassOOP = _runtimeHeapAccess.GetClass(homeClassLocalId.Replace("meta:", ""));
+        var homeClassOOP = _runtimeServices.GetClass(homeClassLocalId.Replace("meta:", ""));
         if (homeClassOOP == _heapManager.GetNil())
             throw new InvalidOperationException($"Home class not found: {homeClassLocalId}");
 
@@ -237,7 +237,7 @@ public class InitExpressionCompiler
                 if (literalValue.Index.HasValue)
                 {
                     string symbolText = _bundle.Symbols[literalValue.Index.Value];
-                    return _runtimeHeapAccess.InternSymbol(symbolText);
+                    return _runtimeServices.InternSymbol(symbolText);
                 }
                 throw new InvalidOperationException("Symbol literal missing Index");
 
@@ -256,7 +256,7 @@ public class InitExpressionCompiler
                 {
                     string keySymbolText = _bundle.Symbols[literalValue.Association.KeyIndex];
                     var smalltalkOOP = _metadata.KnownObjects.Smalltalk;
-                    var keySymbolOOP = _runtimeHeapAccess.InternSymbol(keySymbolText);
+                    var keySymbolOOP = _runtimeServices.InternSymbol(keySymbolText);
                     var assocOOP = FindAssociation(smalltalkOOP, keySymbolOOP);
                     return assocOOP;
                 }
@@ -372,7 +372,7 @@ public class InitExpressionCompiler
         var floatOOP = _heapManager.AllocateObject(ObjectFormat.WordIndexed, fixedSlots: 0, indexedSize: 4);
 
         // Set Float class using hash-based lookup
-        var floatClassOOP = _runtimeHeapAccess.GetClass("Float");
+        var floatClassOOP = _runtimeServices.GetClass("Float");
         if (floatClassOOP != _heapManager.GetNil())
         {
             _heapManager.SetClassOOP(floatOOP, floatClassOOP);
@@ -404,7 +404,7 @@ public class InitExpressionCompiler
         var stringOOP = _heapManager.AllocateObject(ObjectFormat.ByteIndexed, fixedSlots: 0, indexedSize: bytes.Length);
 
         // Set String class using hash-based lookup
-        var stringClassOOP = _runtimeHeapAccess.GetClass("String");
+        var stringClassOOP = _runtimeServices.GetClass("String");
         if (stringClassOOP != _heapManager.GetNil())
         {
             _heapManager.SetClassOOP(stringOOP, stringClassOOP);

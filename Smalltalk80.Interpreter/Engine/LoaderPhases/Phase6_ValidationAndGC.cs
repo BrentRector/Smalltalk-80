@@ -1021,7 +1021,7 @@ public class Phase6_ValidationAndGC : IPhase
                 $"Expected exactly 1 object.");
         }
 
-// Console.WriteLine($"  ✓ GC Verification passed: {gcStats.LiveObjects} objects reachable, 1 placeholder nil collected as expected");
+        Console.WriteLine($"  ✓ GC Verification passed: {gcStats.LiveObjects} objects reachable, 1 placeholder nil collected as expected");
     }
 
     // ========================================================================================

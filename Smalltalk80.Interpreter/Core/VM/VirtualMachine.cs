@@ -26,7 +26,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// - IBytecodeInterpreter → BytecodeInterpreter.cs: Bytecode dispatch and execution
 /// - IVMDebugger → VMDebugger.cs: Debugging and diagnostic output
 ///
-/// Uses ISmalltalkHeap for object storage and LayoutResolver for dynamic field access.
+/// Uses ISmalltalkHeap for object storage. Field indices are compile-time constants (VMConstants).
 /// Consistently uses SmalltalkOOP for ALL object references to avoid OOP↔int conversions.
 ///
 /// RUNTIME ONLY: This class must ONLY access the Smalltalk heap via ISmalltalkHeap.
@@ -37,8 +37,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 {
     private readonly ISmalltalkHeap _heapManager;
 
-    private readonly RuntimeHeapAccessor _runtimeHeapAccess;
-    private readonly LayoutResolver _layoutResolver;
+    private readonly RuntimeServices _runtimeServices;
     private readonly VMMetadata _metadata;
     private readonly IPlatformBridge? _platformBridge;
     private readonly IDiagnosticHub? _diagnostics;
@@ -126,15 +125,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     public IContextManager ContextManager => _contextManager;
 
     /// <summary>Gets the runtime heap accessor for hash-based dictionary lookups and symbol interning.</summary>
-    public IRuntimeHeapAccessor RuntimeHeapAccess => _runtimeHeapAccess;
+    public IRuntimeServices RuntimeServices => _runtimeServices;
 
-    public VirtualMachine(ISmalltalkHeap heapManager,  LayoutResolver layoutResolver, VMMetadata metadata, IPlatformBridge? platformBridge = null, IDiagnosticHub? diagnostics = null)
+    public VirtualMachine(ISmalltalkHeap heapManager, VMMetadata metadata, IPlatformBridge? platformBridge = null, IDiagnosticHub? diagnostics = null)
     {
         _heapManager = heapManager;
 
-        _layoutResolver = layoutResolver;
-        _runtimeHeapAccess = new RuntimeHeapAccessor(heapManager, metadata);
-        RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
+        _runtimeServices = new RuntimeServices(heapManager, metadata);
+        RuntimeSpecialObjects.Instance.Initialize(_runtimeServices);
         _metadata = metadata;
         _platformBridge = platformBridge;
         _diagnostics = diagnostics;
@@ -189,7 +187,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _bytecodeInterpreter = new BytecodeInterpreter(
             heapManager,
             this, // IBytecodeContext
-            _runtimeHeapAccess,
+            _runtimeServices,
             metadata,
             diagnostics
         );
@@ -1646,7 +1644,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     ISmalltalkHeap IPrimitiveContext.HeapManager => _heapManager;
     void IPrimitiveContext.InvalidateAllRuntimeCaches()
     {
-        _runtimeHeapAccess.InvalidateAllCaches();
+        _runtimeServices.InvalidateAllCaches();
     }
 
     // ICacheManager explicit interface implementation
@@ -1657,7 +1655,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     void ICacheManager.InvalidateAllRuntimeCaches()
     {
-        _runtimeHeapAccess.InvalidateAllCaches();
+        _runtimeServices.InvalidateAllCaches();
     }
 
     // IPrimitiveMessageSender explicit interface implementation
@@ -1704,22 +1702,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     IPlatformBridge? IPrimitiveContext.PlatformBridge => _platformBridge;
     bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
 
-    SmalltalkOOP IPrimitiveContext.GetFieldValue(SmalltalkOOP oop, string className, string fieldName)
-    {
-        // Use LayoutResolver to get field index from precomputed layouts (not stale!)
-        string classLocalId = className.StartsWith("class:") ? className : $"class:{className}";
-        int fieldIndex = _layoutResolver.GetFieldIndex(classLocalId, fieldName);
-        return _heapManager.GetInstanceVariable(oop, fieldIndex);
-    }
-
-    void IPrimitiveContext.SetFieldValue(SmalltalkOOP oop, string className, string fieldName, SmalltalkOOP value)
-    {
-        // Use LayoutResolver to get field index from precomputed layouts (not stale!)
-        string classLocalId = className.StartsWith("class:") ? className : $"class:{className}";
-        int fieldIndex = _layoutResolver.GetFieldIndex(classLocalId, fieldName);
-        _heapManager.SetInstanceVariable(oop, fieldIndex, value);
-    }
-
     Memory<byte> IPrimitiveContext.GetByteArray(SmalltalkOOP oop)
     {
         int size = _heapManager.GetIndexedSize(oop);
@@ -1738,7 +1720,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     {
         // Look up class OOP from heap - className might already have "class:" prefix
         string classNameClean = className.StartsWith("class:") ? className.Substring(6) : className;
-        var classOOP = _runtimeHeapAccess.GetClass(classNameClean);
+        var classOOP = _runtimeServices.GetClass(classNameClean);
         if (classOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException($"Class {classNameClean} not found in heap");
@@ -1838,14 +1820,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         int stackSize = argCount + 16; // 16 slots for execution stack
 
         // Get BlockContext class from runtime heap lookup (primitive 80-82 compatibility)
-        var blockContextClassOOP = _runtimeHeapAccess.GetClass("BlockContext");
+        var blockContextClassOOP = _runtimeServices.GetClass("BlockContext");
 
         // Allocate BlockContext with indexed fields for stack
         // BlockContext has 6 fixed fields (sender, pc, stackp, nargs, startpc, home) plus indexed stack slots
         var blockContextOOP = _heapManager.AllocateObject(ObjectFormat.PointerIndexed, 6, stackSize);
         _heapManager.SetClassOOP(blockContextOOP, blockContextClassOOP); // Set class reference
 
-        // Get field indices using LayoutResolver
+        // Get field indices from VMConstants
         int senderIndex = VMConstants.BLOCKCONTEXT_CALLER_INDEX;
         int pcIndex = VMConstants.BLOCKCONTEXT_PC_INDEX;
         int stackpIndex = VMConstants.CONTEXT_STACKP_INDEX;
@@ -1973,7 +1955,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Check if this is a metaclass by checking if it's an instance of Metaclass
         var classOfClassOOP = _heapManager.GetClassOOP(classOOP);
         
-        var metaclassOOP = _runtimeHeapAccess.GetClass("Metaclass");
+        var metaclassOOP = _runtimeServices.GetClass("Metaclass");
         if (metaclassOOP != _metadata.KnownObjects.Nil)
         {
             if (classOfClassOOP == metaclassOOP)
@@ -1987,7 +1969,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Now try to find classPool instance variable (only Class objects have it)
         // Class instanceVariableNames: 'name classPool sharedPools' (plus inherited from ClassDescription/Behavior)
         // classPool is at index 7 (0-5 from Behavior/ClassDescription, 6=name, 7=classPool)
-        int classPoolIndex = _layoutResolver.GetFieldIndex("class:Class", "classPool");
+        int classPoolIndex = VMConstants.CLASS_CLASSPOOL_INDEX;
         
         // Verify actualClassOOP has enough instance variables for classPool
         var format = _heapManager.GetObjectFormat(actualClassOOP);
@@ -2081,14 +2063,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     {
         const int initialSize = 8;
 
-        var dictClassOOP = _runtimeHeapAccess.GetClass("Dictionary");
+        var dictClassOOP = _runtimeServices.GetClass("Dictionary");
         if (dictClassOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("Dictionary class not found - needed for classPool lazy initialization");
         }
 
         // Dictionary inherits from Set, which has 1 instance variable: tally
-        int instVarCount = _layoutResolver.GetInstanceVariableCount("class:Dictionary");
+        int instVarCount = VMConstants.DICTIONARY_INSTVAR_COUNT;
 
         var dictOOP = _heapManager.AllocateObject(
             ObjectFormat.PointerIndexed,
@@ -2212,14 +2194,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _heapManager.Become.BecomeTwoWay(oop1, oop2);
     }
 
-
-    int IPrimitiveContext.GetFieldIndex(string className, string fieldName)
-    {
-        // Use LayoutResolver to get field index from precomputed layouts (not stale!)
-        string classLocalId = className.StartsWith("class:") ? className : $"class:{className}";
-        return _layoutResolver.GetFieldIndex(classLocalId, fieldName);
-    }
-
     SmalltalkOOP IPrimitiveContext.GetInstanceVariable(SmalltalkOOP objectOOP, int index)
     {
         return _heapManager.GetInstanceVariable(objectOOP, index);
@@ -2272,7 +2246,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         // First, intern the key as a Symbol (required for dictionary lookup)
-        var keySymbolOOP = _runtimeHeapAccess.InternSymbol(lookupKey);
+        var keySymbolOOP = _runtimeServices.InternSymbol(lookupKey);
         if (keySymbolOOP == _metadata.KnownObjects.Nil)
         {
             // Symbol not found - global doesn't exist
@@ -2362,7 +2336,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
             // Look up in Undeclared dictionary
             var systemDictOOP = _metadata.KnownObjects.Smalltalk;
-            var undeclaredOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, "Undeclared");
+            var undeclaredOOP = _runtimeServices.LookupGlobalByName(systemDictOOP, "Undeclared");
             if (undeclaredOOP != _metadata.KnownObjects.Nil)
             {
                 var undeclaredValueOOP = LookupInDictionary(undeclaredOOP, keySymbol);

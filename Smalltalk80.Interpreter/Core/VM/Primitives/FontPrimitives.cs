@@ -220,7 +220,6 @@ public static class FontPrimitives
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (context.LayoutResolver == null) return PrimitiveResult.Fail(context.Metadata!);
 
             // Get character value
             var charArg = context.Arguments[0];
@@ -240,14 +239,10 @@ public static class FontPrimitives
                 charValue = context.HeapManager.GetInstanceVariable(charArg, 0).AsSmallInteger();
             }
 
-            // Get StrikeFont fields
-            int minAsciiIdx = context.LayoutResolver.GetFieldIndex("StrikeFont", "minAscii");
-            int maxAsciiIdx = context.LayoutResolver.GetFieldIndex("StrikeFont", "maxAscii");
-            int xTableIdx = context.LayoutResolver.GetFieldIndex("StrikeFont", "xTable");
-
-            var minAsciiOOP = context.HeapManager.GetInstanceVariable(context.Receiver, minAsciiIdx);
-            var maxAsciiOOP = context.HeapManager.GetInstanceVariable(context.Receiver, maxAsciiIdx);
-            var xTableOOP = context.HeapManager.GetInstanceVariable(context.Receiver, xTableIdx);
+            // Get StrikeFont fields using compile-time constants
+            var minAsciiOOP = context.HeapManager.GetInstanceVariable(context.Receiver, VMConstants.STRIKEFONT_MINASCII_INDEX);
+            var maxAsciiOOP = context.HeapManager.GetInstanceVariable(context.Receiver, VMConstants.STRIKEFONT_MAXASCII_INDEX);
+            var xTableOOP = context.HeapManager.GetInstanceVariable(context.Receiver, VMConstants.STRIKEFONT_XTABLE_INDEX);
 
             if (!minAsciiOOP.IsSmallInteger || !maxAsciiOOP.IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
@@ -284,7 +279,6 @@ public static class FontPrimitives
         {
             if (context.Arguments.Length != 1) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (context.LayoutResolver == null) return PrimitiveResult.Fail(context.Metadata!);
 
             var stringArg = context.Arguments[0];
             if (stringArg.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
@@ -292,14 +286,10 @@ public static class FontPrimitives
             // Get string characters
             int stringSize = context.HeapManager.GetIndexedSize(stringArg);
 
-            // Get StrikeFont fields
-            int minAsciiIdx = context.LayoutResolver.GetFieldIndex("StrikeFont", "minAscii");
-            int maxAsciiIdx = context.LayoutResolver.GetFieldIndex("StrikeFont", "maxAscii");
-            int xTableIdx = context.LayoutResolver.GetFieldIndex("StrikeFont", "xTable");
-
-            var minAsciiOOP = context.HeapManager.GetInstanceVariable(context.Receiver, minAsciiIdx);
-            var maxAsciiOOP = context.HeapManager.GetInstanceVariable(context.Receiver, maxAsciiIdx);
-            var xTableOOP = context.HeapManager.GetInstanceVariable(context.Receiver, xTableIdx);
+            // Get StrikeFont fields using compile-time constants
+            var minAsciiOOP = context.HeapManager.GetInstanceVariable(context.Receiver, VMConstants.STRIKEFONT_MINASCII_INDEX);
+            var maxAsciiOOP = context.HeapManager.GetInstanceVariable(context.Receiver, VMConstants.STRIKEFONT_MAXASCII_INDEX);
+            var xTableOOP = context.HeapManager.GetInstanceVariable(context.Receiver, VMConstants.STRIKEFONT_XTABLE_INDEX);
 
             if (!minAsciiOOP.IsSmallInteger || !maxAsciiOOP.IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
@@ -343,10 +333,9 @@ public static class FontPrimitives
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (context.LayoutResolver == null) return PrimitiveResult.Fail(context.Metadata!);
 
-            int ascentIdx = context.LayoutResolver.GetFieldIndex("StrikeFont", "ascent");
-            var ascentOOP = context.HeapManager.GetInstanceVariable(context.Receiver, ascentIdx);
+            // Use compile-time constant for field index
+            var ascentOOP = context.HeapManager.GetInstanceVariable(context.Receiver, VMConstants.STRIKEFONT_ASCENT_INDEX);
 
             return PrimitiveResult.Ok(ascentOOP);
         }
@@ -363,10 +352,9 @@ public static class FontPrimitives
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
-            if (context.LayoutResolver == null) return PrimitiveResult.Fail(context.Metadata!);
 
-            int descentIdx = context.LayoutResolver.GetFieldIndex("StrikeFont", "descent");
-            var descentOOP = context.HeapManager.GetInstanceVariable(context.Receiver, descentIdx);
+            // Use compile-time constant for field index
+            var descentOOP = context.HeapManager.GetInstanceVariable(context.Receiver, VMConstants.STRIKEFONT_DESCENT_INDEX);
 
             return PrimitiveResult.Ok(descentOOP);
         }

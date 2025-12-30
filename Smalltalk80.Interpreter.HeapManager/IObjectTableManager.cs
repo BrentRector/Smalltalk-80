@@ -65,6 +65,25 @@ internal interface IObjectTableManager
     /// Gets all object table blocks for iteration (used by GC).
     /// </summary>
     IReadOnlyList<ObjectTableBlock> GetBlocks();
+
+    /// <summary>
+    /// Ensures the object table has enough blocks to accommodate the specified maximum object ID.
+    /// Used during snapshot restore to pre-allocate blocks before populating entries.
+    /// </summary>
+    /// <param name="maxObjectId">The highest object table index that will be used.</param>
+    void EnsureCapacity(int maxObjectId);
+
+    /// <summary>
+    /// Clears all object table entries and resets state.
+    /// Used during snapshot restore to start with empty object table.
+    /// </summary>
+    void Clear();
+
+    /// <summary>
+    /// Rebuilds the free list by scanning the object table for null entries.
+    /// Used after snapshot restore to enable OOP reuse for new allocations.
+    /// </summary>
+    void RebuildFreeList();
 }
 
 /// <summary>

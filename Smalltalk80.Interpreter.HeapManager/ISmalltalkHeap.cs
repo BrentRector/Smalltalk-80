@@ -321,4 +321,33 @@ public interface ISmalltalkHeap
     /// Default is false (disabled). Enable after cold start completes and GC roots are established.
     /// </summary>
     bool AutoGCEnabled { get; set; }
+
+    // ========================================
+    // Image Restore Support
+    // ========================================
+
+    /// <summary>
+    /// Prepares the heap for image restore by clearing existing state and pre-allocating capacity.
+    /// Used during snapshot restore to set up a clean object table before populating it.
+    /// </summary>
+    /// <param name="maxObjectId">The highest object table index that will be restored.</param>
+    void PrepareForRestore(int maxObjectId);
+
+    /// <summary>
+    /// Restores an object at a specific object table index.
+    /// Used during snapshot restore to place objects at their original OOP locations.
+    /// </summary>
+    /// <param name="objectId">The object table index where the object should be placed.</param>
+    /// <param name="format">The object format (Pointer, PointerIndexed, ByteIndexed, WordIndexed).</param>
+    /// <param name="classOOP">The class OOP for this object.</param>
+    /// <param name="instanceVars">Array of instance variable OOPs.</param>
+    /// <param name="indexedStorage">The indexed portion storage (SmalltalkOOP[], byte[], or ushort[]).</param>
+    void RestoreObject(int objectId, ObjectFormat format, SmalltalkOOP classOOP,
+        SmalltalkOOP[] instanceVars, object? indexedStorage);
+
+    /// <summary>
+    /// Rebuilds the free list by scanning the object table for null entries.
+    /// Used after snapshot restore to enable OOP reuse for new allocations.
+    /// </summary>
+    void RebuildFreeList();
 }

@@ -4,7 +4,7 @@ using Smalltalk80.Interpreter.Shared.Types;
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
-/// Interface for runtime heap access during VM execution.
+/// Interface for runtime services during VM execution.
 /// Provides safe, read-only access to Smalltalk objects and metadata.
 /// All methods access ONLY the Smalltalk heap, never cold-start proxy data.
 ///
@@ -13,7 +13,7 @@ namespace Smalltalk80.Interpreter.Core.VM;
 /// - Used exclusively during runtime execution
 /// - Caches invalidated by primitive 89 (flushCache)
 /// </summary>
-public interface IRuntimeHeapAccessor
+public interface IRuntimeServices
 {
     /// <summary>
     /// Invalidates all runtime caches.

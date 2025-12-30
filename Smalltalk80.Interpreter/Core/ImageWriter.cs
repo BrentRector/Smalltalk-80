@@ -8,23 +8,32 @@ namespace Smalltalk80.Interpreter.Core;
 /// Serializes the Smalltalk heap to a binary image file.
 /// Uses .NET BinaryWriter for efficient binary I/O.
 ///
-/// Image Format (version 1):
-/// - Header: 4-byte magic "STI1", 4-byte version, 4-byte object count
+/// Image Format (version 2):
+/// - Header (20 bytes):
+///   - 4-byte magic "WOST" (Wise Owl Smalltalk)
+///   - 4-byte version (2)
+///   - 4-byte object count
+///   - 4-byte max object ID (highest object table index)
+///   - 4-byte Smalltalk OOP (SystemDictionary - root for rebuilding VMMetadata)
 /// - For each object (in OOP order):
-///   - 4-byte object table index
+///   - 4-byte ObjectOOP (tagged value: objectTableIndex * 2)
 ///   - 1-byte format (ObjectFormat enum)
 ///   - 4-byte instance variable count
 ///   - 4-byte indexed size
-///   - 4-byte class OOP raw value
-///   - Instance variable data: 4 bytes per OOP
-///   - Indexed data: format-specific (OOPs, bytes, or words)
+///   - 4-byte class OOP (tagged value)
+///   - Instance variable data: 4 bytes per OOP (tagged values)
+///   - Indexed data: format-specific (OOPs as tagged, bytes, or words)
 /// </summary>
 public class ImageWriter
 {
-    private const string Magic = "STI1";
-    private const int Version = 1;
+    /// <summary>Magic number identifying Wise Owl Smalltalk image files.</summary>
+    public const string Magic = "WOST";
+
+    /// <summary>Current image format version.</summary>
+    public const int Version = 2;
 
     private readonly ISmalltalkHeap _heap;
+    private readonly SmalltalkOOP _smalltalkOOP;
 
     /// <summary>
     /// Gets or sets the path to the snapshot file.
@@ -32,9 +41,15 @@ public class ImageWriter
     /// </summary>
     public static string? SnapshotFilePath { get; set; }
 
-    public ImageWriter(ISmalltalkHeap heap)
+    /// <summary>
+    /// Creates an ImageWriter for the given heap.
+    /// </summary>
+    /// <param name="heap">The heap to serialize.</param>
+    /// <param name="smalltalkOOP">The OOP of the Smalltalk SystemDictionary (used to rebuild VMMetadata on restore).</param>
+    public ImageWriter(ISmalltalkHeap heap, SmalltalkOOP smalltalkOOP)
     {
         _heap = heap ?? throw new ArgumentNullException(nameof(heap));
+        _smalltalkOOP = smalltalkOOP;
     }
 
     /// <summary>
@@ -58,8 +73,16 @@ public class ImageWriter
             using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
             using var writer = new BinaryWriter(stream, Encoding.UTF8);
 
+            // Find max object ID for header
+            int maxObjectId = 0;
+            foreach (var oop in objects)
+            {
+                int id = oop.ToObjectTableIndex();
+                if (id > maxObjectId) maxObjectId = id;
+            }
+
             // Write header
-            WriteHeader(writer, objectCount);
+            WriteHeader(writer, objectCount, maxObjectId);
 
             // Write each object
             int written = 0;
@@ -170,7 +193,7 @@ public class ImageWriter
         }
     }
 
-    private void WriteHeader(BinaryWriter writer, int objectCount)
+    private void WriteHeader(BinaryWriter writer, int objectCount, int maxObjectId)
     {
         // Magic number (4 bytes ASCII)
         writer.Write(Encoding.ASCII.GetBytes(Magic));
@@ -180,23 +203,28 @@ public class ImageWriter
 
         // Object count (4 bytes)
         writer.Write(objectCount);
+
+        // Max object ID (4 bytes) - highest object table index used
+        writer.Write(maxObjectId);
+
+        // Smalltalk OOP (4 bytes) - root SystemDictionary for rebuilding VMMetadata
+        writer.Write(_smalltalkOOP.RawValue);
     }
 
     private void WriteObject(BinaryWriter writer, SmalltalkOOP oop)
     {
         // Get object metadata
-        int objectId = oop.ToObjectTableIndex();
         var format = _heap.GetObjectFormat(oop);
         int instanceVarCount = _heap.GetInstanceVariableCount(oop);
         int indexedSize = _heap.GetIndexedSize(oop);
         var classOOP = _heap.GetClassOOP(oop);
 
-        // Write object header
-        writer.Write(objectId);                     // 4 bytes: object table index
+        // Write object header - all OOPs stored as tagged values for consistency
+        writer.Write(oop.RawValue);                 // 4 bytes: ObjectOOP (tagged value)
         writer.Write((byte)format);                 // 1 byte: format
         writer.Write(instanceVarCount);             // 4 bytes: instance var count
         writer.Write(indexedSize);                  // 4 bytes: indexed size
-        writer.Write(classOOP.RawValue);            // 4 bytes: class OOP
+        writer.Write(classOOP.RawValue);            // 4 bytes: class OOP (tagged value)
 
         // Write instance variables (always OOPs)
         for (int i = 0; i < instanceVarCount; i++)

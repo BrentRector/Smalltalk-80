@@ -20,19 +20,15 @@ public class SmalltalkThreadContext
     public required ISmalltalkHeap HeapManager { get; init; }
 
     /// <summary>
-    /// Layout resolver for looking up class structures.
-    /// </summary>
-    public required LayoutResolver LayoutResolver { get; init; }
-
-    /// <summary>
     /// VM metadata including special selectors and class OOPs.
     /// </summary>
     public required VMMetadata VMMetadata { get; init; }
 
     /// <summary>
     /// The cold start bundle containing init expressions and metadata.
+    /// Null when restoring from a saved image (init expressions already ran).
     /// </summary>
-    public required ColdStartBundle Bundle { get; init; }
+    public ColdStartBundle? Bundle { get; init; }
 
     /// <summary>
     /// Platform bridge for Smalltalk -> UI communication.

@@ -26,7 +26,7 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     private readonly object _bufferLock = new();
     private readonly ISmalltalkHeap? _heap;
     private readonly VMMetadata? _vmMetadata;
-    private readonly IRuntimeHeapAccessor? _runtimeHeapAccess;
+    private readonly IRuntimeServices? _runtimeServices;
     private bool _disposed = false;
 
     // Input semaphore OOP for event notification (signaled on raw input)
@@ -104,8 +104,8 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         Height = height;
         _heap = heap;
         _vmMetadata = vmMetadata;
-        _runtimeHeapAccess = (heap != null && vmMetadata != null)
-            ? new RuntimeHeapAccessor(heap, vmMetadata)
+        _runtimeServices = (heap != null && vmMetadata != null)
+            ? new RuntimeServices(heap, vmMetadata)
             : null;
 
         Console.WriteLine($"[WinForms] Creating window: {width}x{height}");
@@ -190,14 +190,14 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     /// </summary>
     private void CopyDisplayFromHeap()
     {
-        if (_heap == null || _vmMetadata == null || _runtimeHeapAccess == null)
+        if (_heap == null || _vmMetadata == null || _runtimeServices == null)
             return;
 
         try
         {
             // Look up Display global using hash-based lookup
             var smalltalkOOP = _vmMetadata.KnownObjects.Smalltalk;
-            var displaySymbolOOP = _runtimeHeapAccess.InternSymbol("Display");
+            var displaySymbolOOP = _runtimeServices.InternSymbol("Display");
             if (displaySymbolOOP == _heap.GetNil())
                 return;
             var displayOOP = HashBasedDictionaryLookup(smalltalkOOP, displaySymbolOOP);
@@ -576,6 +576,14 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
         Console.WriteLine($"[Snapshot] Saving image to: {filePath}");
 
+        // Get Smalltalk OOP for image header (required for restore to rebuild VMMetadata)
+        if (_vmMetadata == null)
+        {
+            Console.WriteLine("[Snapshot] Error: VMMetadata not available.");
+            return false;
+        }
+        var smalltalkOOP = _vmMetadata.KnownObjects.Smalltalk;
+
         // Force Smalltalk garbage collection before snapshot
         // This reclaims unreachable objects (e.g., temporary Forms from displayExtent:)
         // to ensure consistent snapshot sizes
@@ -584,7 +592,8 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         Console.WriteLine($"[Snapshot] GC complete: collected {gcStats.CollectedObjects} objects");
 
         // Create ImageWriter and serialize the heap
-        var writer = new ImageWriter(_heap);
+        // Version 2 format includes Smalltalk OOP in header for rebuilding VMMetadata on restore
+        var writer = new ImageWriter(_heap, smalltalkOOP);
         bool success = writer.WriteImage(filePath);
 
         if (success)
@@ -811,17 +820,17 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
 
     public void Quit(int exitCode)
     {
+        // Close the window to trigger graceful shutdown
+        // This exits Application.Run() and lets Program.cs handle cleanup
+        // (printing shutdown messages, waiting for threads, etc.)
+        // Don't call Environment.Exit() - that bypasses the shutdown sequence
         if (InvokeRequired)
         {
-            BeginInvoke(new Action(() => {
-                Close();
-                Environment.Exit(exitCode);
-            }));
+            BeginInvoke(new Action(() => Close()));
         }
         else
         {
             Close();
-            Environment.Exit(exitCode);
         }
     }
 

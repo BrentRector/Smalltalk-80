@@ -26,7 +26,7 @@ public static class InputOperations
             }
 
             // Get Point class OOP
-            var pointClassOOP = context.RuntimeHeapAccess?.GetClass("Point");
+            var pointClassOOP = context.RuntimeServices?.GetClass("Point");
             if (pointClassOOP == null || pointClassOOP == context.HeapManager.GetNil())
                 return PrimitiveResult.Fail(context.Metadata!);
 

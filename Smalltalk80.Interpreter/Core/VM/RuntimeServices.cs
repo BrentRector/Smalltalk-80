@@ -5,12 +5,12 @@ using System.Text;
 namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
-/// Accessor for runtime heap data structures.
-/// Provides safe, read-only access to Smalltalk objects and metadata during VM execution.
+/// Runtime service layer for accessing heap data structures during VM execution.
+/// Provides safe, read-only access to Smalltalk objects and metadata.
 /// Replaces GlobalRegistry and LayoutResolver for runtime use.
 /// All methods access ONLY the Smalltalk heap, never cold-start proxy data.
 /// </summary>
-public class RuntimeHeapAccessor : IRuntimeHeapAccessor
+public class RuntimeServices : IRuntimeServices
 {
     private readonly ISmalltalkHeap _heapManager;
     private readonly VMMetadata metadata;
@@ -29,7 +29,7 @@ public class RuntimeHeapAccessor : IRuntimeHeapAccessor
     private SmalltalkOOP _ustableCache;
     private bool _ustableCacheValid = false;
 
-    public RuntimeHeapAccessor(ISmalltalkHeap heapManager, VMMetadata metadata)
+    public RuntimeServices(ISmalltalkHeap heapManager, VMMetadata metadata)
     {
         _heapManager = heapManager;
         this.metadata = metadata;

@@ -5,19 +5,19 @@ namespace Smalltalk80.Interpreter.Core.VM;
 
 /// <summary>
 /// Cache for runtime class lookups with invalidation support.
-/// Used by RuntimeHeapAccessor to avoid repeated heap walks.
+/// Used by RuntimeServices to avoid repeated heap walks.
 /// Invalidated by primitive 89 (flushCache) when classes are modified.
 /// </summary>
 public class RuntimeClassCache
 {
-    private readonly RuntimeHeapAccessor _heapAccess;
+    private readonly RuntimeServices _runtimeServices;
     private readonly ISmalltalkHeap _heapManager;
     private Dictionary<string, SmalltalkOOP> _classCache = new();
     private bool _cacheValid = true;
 
-    public RuntimeClassCache(RuntimeHeapAccessor heapAccess, ISmalltalkHeap heapManager)
+    public RuntimeClassCache(RuntimeServices runtimeServices, ISmalltalkHeap heapManager)
     {
-        _heapAccess = heapAccess;
+        _runtimeServices = runtimeServices;
         _heapManager = heapManager;
     }
 
@@ -29,7 +29,7 @@ public class RuntimeClassCache
     {
         if (!_cacheValid || !_classCache.TryGetValue(className, out var classOOP))
         {
-            classOOP = _heapAccess.LookupClassInHeap(className);
+            classOOP = _runtimeServices.LookupClassInHeap(className);
             if (_cacheValid)
                 _classCache[className] = classOOP;
         }

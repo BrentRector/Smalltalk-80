@@ -13,6 +13,11 @@ public record CommandLineConfig
     public string? ExecuteExpression { get; init; }
     public string? DiagnosticCategories { get; init; }
     public bool DisableGC { get; init; }
+
+    /// <summary>
+    /// Path to image file to restore from. If set, cold start is skipped.
+    /// </summary>
+    public string? RestoreImageFile { get; init; }
 }
 
 /// <summary>
@@ -35,6 +40,7 @@ public static class CommandLineParser
         string? executeExpression = null;
         string? diagnosticCategories = null;
         bool disableGC = false;
+        string? restoreImageFile = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -42,6 +48,21 @@ public static class CommandLineParser
             {
                 coldStartFile = args[i + 1];
                 i++; // Skip the next argument
+            }
+            else if (args[i] == "--restore")
+            {
+                // --restore with optional filename
+                // Check if next arg exists and is not another option
+                if (i + 1 < args.Length && !args[i + 1].StartsWith("-"))
+                {
+                    restoreImageFile = args[i + 1];
+                    i++;
+                }
+                else
+                {
+                    // Default to snapshot.im in current working directory
+                    restoreImageFile = "snapshot.im";
+                }
             }
             else if (args[i] == "--dump-class" && i + 1 < args.Length)
             {
@@ -102,7 +123,8 @@ public static class CommandLineParser
             ReportOutput = reportOutput,
             ExecuteExpression = executeExpression,
             DiagnosticCategories = diagnosticCategories,
-            DisableGC = disableGC
+            DisableGC = disableGC,
+            RestoreImageFile = restoreImageFile
         };
     }
 
@@ -115,6 +137,8 @@ public static class CommandLineParser
         Console.Error.WriteLine("Options:");
         Console.Error.WriteLine("  --coldstart <file>     Specify the cold start bundle file to load");
         Console.Error.WriteLine("                         (default: Data/coldstart.json in executable directory)");
+        Console.Error.WriteLine("  --restore [file]       Restore from saved image instead of cold start");
+        Console.Error.WriteLine("                         (default: snapshot.im in current directory)");
         Console.Error.WriteLine("  --dump-class <name>    Dump comprehensive information about a class");
         Console.Error.WriteLine("                         after cold start completes");
         Console.Error.WriteLine("  --test-filter <pattern> Run only init expressions matching pattern");

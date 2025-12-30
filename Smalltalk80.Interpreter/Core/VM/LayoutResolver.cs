@@ -82,4 +82,26 @@ public class LayoutResolver
     /// Gets whether the LayoutResolver has been frozen.
     /// </summary>
     public bool IsFrozen => _isFrozen;
+
+    /// <summary>
+    /// Exports all class layouts for serialization.
+    /// </summary>
+    public Dictionary<string, List<string>> ExportLayouts()
+    {
+        return new Dictionary<string, List<string>>(_fieldMap);
+    }
+
+    /// <summary>
+    /// Imports class layouts from serialized data.
+    /// </summary>
+    public void ImportLayouts(Dictionary<string, List<string>> layouts)
+    {
+        if (_isFrozen)
+            throw new InvalidOperationException("Cannot import layouts after LayoutResolver is frozen");
+
+        foreach (var (classId, fields) in layouts)
+        {
+            _fieldMap[classId] = new List<string>(fields);
+        }
+    }
 }

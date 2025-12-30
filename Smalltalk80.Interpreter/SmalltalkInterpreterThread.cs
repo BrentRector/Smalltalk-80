@@ -60,29 +60,40 @@ public class SmalltalkInterpreterThread
             }
             Console.WriteLine("[Smalltalk Thread] Window displayed - proceeding");
 
-            // STEP 1.5: Initialize ProcessorScheduler with high-priority bootstrap process
-            // This ensures all init expressions run at priority 8, preventing preemption
-            // when they fork processes (like Delay's timing process also at priority 8)
-            Console.WriteLine("[Smalltalk Thread] Initializing ProcessorScheduler for runtime...");
-            var schedulerInit = new ProcessSchedulerInitializer(_context.HeapManager, _context.VMMetadata);
-            schedulerInit.InitializeForRuntime();
+            // Check if restoring from saved image vs cold start
+            bool isRestore = _context.Bundle == null;
 
-            // STEP 2: Execute init expressions
-            Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
-            ExecuteInitExpressions();
-
-            // STEP 3: Execute user expression if requested (skips controller loop)
-            if (_context.Config.ExecuteExpression != null)
+            if (isRestore)
             {
-                Console.WriteLine("[Smalltalk Thread] Executing user expression...");
-                ExecuteUserExpression();
-                Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
-                return;
+                // RESTORE PATH: Resume saved active process
+                Console.WriteLine("[Smalltalk Thread] Resuming from saved image...");
+                ResumeFromSnapshot();
             }
+            else
+            {
+                // COLD START PATH: Initialize and run normally
+                // STEP 1.5: Initialize ProcessorScheduler with high-priority bootstrap process
+                Console.WriteLine("[Smalltalk Thread] Initializing ProcessorScheduler for runtime...");
+                var schedulerInit = new ProcessSchedulerInitializer(_context.HeapManager, _context.VMMetadata);
+                schedulerInit.InitializeForRuntime();
 
-            // STEP 4: Start MVC controller loop (runs forever)
-            Console.WriteLine("[Smalltalk Thread] Starting controller loop...");
-            StartControllerLoop();
+                // STEP 2: Execute init expressions
+                Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
+                ExecuteInitExpressions();
+
+                // STEP 3: Execute user expression if requested (skips controller loop)
+                if (_context.Config.ExecuteExpression != null)
+                {
+                    Console.WriteLine("[Smalltalk Thread] Executing user expression...");
+                    ExecuteUserExpression();
+                    Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
+                    return;
+                }
+
+                // STEP 4: Start MVC controller loop (runs forever)
+                Console.WriteLine("[Smalltalk Thread] Starting controller loop...");
+                StartControllerLoop();
+            }
 
             // Note: We only reach here if the controller loop exits (unexpected)
             Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
@@ -106,7 +117,6 @@ public class SmalltalkInterpreterThread
     {
         var vm = new VirtualMachine(
             _context.HeapManager,
-            _context.LayoutResolver,
             _context.VMMetadata,
             platformBridge: _context.PlatformBridge,
             _context.Diagnostics
@@ -121,6 +131,9 @@ public class SmalltalkInterpreterThread
 
     private void ExecuteInitExpressions()
     {
+        if (_context.Bundle == null)
+            return;
+
         var runner = new InitExpressionRunner(
             _context.HeapManager,
             _vm!,
@@ -217,7 +230,7 @@ public class SmalltalkInterpreterThread
     /// </summary>
     private SmalltalkOOP LookupGlobal(string globalName)
     {
-        var valueOOP = _vm!.RuntimeHeapAccess.LookupGlobalValue(globalName);
+        var valueOOP = _vm!.RuntimeServices.LookupGlobalValue(globalName);
         if (valueOOP == _context.HeapManager.GetNil())
         {
             throw new InvalidOperationException($"Global '{globalName}' not found");
@@ -320,12 +333,67 @@ public class SmalltalkInterpreterThread
 
         // Use the canonical global lookup and set API
         // This handles: SystemDictionary lookup → Undeclared fallback → migration → creation
-        _vm!.RuntimeHeapAccess.SetGlobalValue(globalName, controlManagerOOP);
+        _vm!.RuntimeServices.SetGlobalValue(globalName, controlManagerOOP);
         Console.WriteLine($"    ✓ Installed {globalName} global with ControlManager");
     }
 
     // NOTE: Dictionary operations are now in RuntimeDictionaryService
-    // Use _vm.RuntimeHeapAccess for canonical global lookup operations
+    // Use _vm.RuntimeServices for canonical global lookup operations
+
+    /// <summary>
+    /// Resumes execution from a saved snapshot image.
+    /// The saved activeProcess is inside snapshotAs:thenQuit: just after snapshotPrimitive.
+    /// The receiver (Smalltalk) was pushed onto the stack BEFORE the image was saved by primitive 97,
+    /// so it's already there as the return value of snapshotPrimitive.
+    /// This makes justSnapped = false, triggering the post-snapshot restore code.
+    /// </summary>
+    private void ResumeFromSnapshot()
+    {
+        Console.WriteLine("\n=== Resuming from Snapshot ===");
+
+        var heap = _context.HeapManager;
+        var metadata = _context.VMMetadata;
+
+        // Step 1: Get the saved activeProcess from ProcessorScheduler
+        var schedulerOOP = metadata.ProcessorScheduler;
+        var activeProcessOOP = heap.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+
+        if (activeProcessOOP == metadata.KnownObjects.Nil)
+        {
+            throw new InvalidOperationException("No active process found in restored image");
+        }
+
+        Console.WriteLine($"  Active process: {activeProcessOOP}");
+
+        // Step 2: Get the process's suspended context
+        var suspendedContextOOP = heap.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+
+        if (suspendedContextOOP == metadata.KnownObjects.Nil)
+        {
+            throw new InvalidOperationException("Active process has no suspended context");
+        }
+
+        Console.WriteLine($"  Suspended context: {suspendedContextOOP}");
+
+        // Step 3: Set the active context to the suspended context
+        _vm!.ContextManager.SetActiveContext(suspendedContextOOP);
+
+        // Note: The receiver (Smalltalk) is already on the stack - it was pushed by primitive 97
+        // BEFORE the image was written. We do NOT need to push it again.
+        // This makes justSnapped = self snapshotPrimitive isNil evaluate to false,
+        // which triggers the post-snapshot restoration code (DisplayScreen displayHeight: height, etc.)
+        Console.WriteLine($"  Smalltalk is already on stack as snapshotPrimitive return value");
+
+        // Step 4: Disable infinite loop detection - the event loop intentionally runs forever
+        _vm.InfiniteLoopDetectionEnabled = false;
+
+        // Step 5: Resume execution from the saved context
+        Console.WriteLine("  Resuming bytecode execution...");
+        _vm.ExecuteExistingContext(suspendedContextOOP);
+
+        // Note: We should never reach here - the restore code eventually enters the controller loop
+        Console.WriteLine("  Snapshot resume completed (unexpected exit)");
+    }
 
     /// <summary>
     /// Dumps Float class variables to verify they have initialized values (NOT nil).
@@ -339,7 +407,7 @@ public class SmalltalkInterpreterThread
             var heap = _context.HeapManager;
 
             // Find Float class using runtime heap access
-            var floatClassOOP = _vm!.RuntimeHeapAccess.GetClass("Float");
+            var floatClassOOP = _vm!.RuntimeServices.GetClass("Float");
             if (floatClassOOP == heap.GetNil())
             {
                 Console.WriteLine("  ERROR: Float class not found!");

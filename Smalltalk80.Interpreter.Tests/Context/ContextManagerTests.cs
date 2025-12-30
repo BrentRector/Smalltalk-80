@@ -40,7 +40,7 @@ public class ContextManagerTests
             ObjectOOP(101)  // ProcessorScheduler
         ));
 
-        // Create metadata with test class OOPs (must be created before RuntimeHeapAccessor)
+        // Create metadata with test class OOPs (must be created before RuntimeServices)
         _metadata = new VMMetadata
         {
             KnownObjects = new KnownObjects(
@@ -70,7 +70,7 @@ public class ContextManagerTests
         };
 
         // Initialize RuntimeSpecialObjects for tests
-        var mockRuntimeAccess = new Mock<RuntimeHeapAccessor>(_mockHeap.Object, _metadata);
+        var mockRuntimeAccess = new Mock<RuntimeServices>(_mockHeap.Object, _metadata);
         mockRuntimeAccess.Setup(r => r.GetClass("MethodContext")).Returns(_methodContextClassOOP);
         RuntimeSpecialObjects.Instance.Initialize(mockRuntimeAccess.Object);
 

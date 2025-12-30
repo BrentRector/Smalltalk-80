@@ -99,7 +99,7 @@ public static class SimpleObjectPrimitives
             if (context.Receiver.IsSmallInteger)
             {
                 // SmallInteger class - need to look it up
-                classOOP = context.RuntimeHeapAccess?.GetClass("SmallInteger")
+                classOOP = context.RuntimeServices?.GetClass("SmallInteger")
                     ?? context.HeapManager.GetNil();
             }
             else
@@ -340,11 +340,11 @@ public static class SimpleObjectPrimitives
         // Helper to get Character object for ASCII code
         private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
         {
-            if (context.RuntimeHeapAccess == null)
+            if (context.RuntimeServices == null)
                 return context.HeapManager.GetNil();
 
-            // Use RuntimeHeapAccessor to look up CharacterTable class variable
-            var characterTableOOP = context.RuntimeHeapAccess.LookupClassVariable("Character", "CharacterTable");
+            // Use RuntimeServices to look up CharacterTable class variable
+            var characterTableOOP = context.RuntimeServices.LookupClassVariable("Character", "CharacterTable");
             if (characterTableOOP == context.HeapManager.GetNil())
                 return context.HeapManager.GetNil();
 
@@ -411,11 +411,11 @@ public static class SimpleObjectPrimitives
         // Helper to get Character object for ASCII code (shared with Primitive 63)
         private static SmalltalkOOP GetCharacterForAscii(PrimitiveExecutionContext context, byte asciiValue)
         {
-            if (context.RuntimeHeapAccess == null)
+            if (context.RuntimeServices == null)
                 return context.HeapManager.GetNil();
 
-            // Use RuntimeHeapAccessor to look up CharacterTable class variable
-            var characterTableOOP = context.RuntimeHeapAccess.LookupClassVariable("Character", "CharacterTable");
+            // Use RuntimeServices to look up CharacterTable class variable
+            var characterTableOOP = context.RuntimeServices.LookupClassVariable("Character", "CharacterTable");
             if (characterTableOOP == context.HeapManager.GetNil())
                 return context.HeapManager.GetNil();
 
@@ -738,7 +738,7 @@ public static class SimpleObjectPrimitives
             var compiledMethodClassOOP = context.Metadata!.CompiledMethodClassOOP;
 
             // ByteArray class still needs to be looked up (not in metadata)
-            var byteArrayClassOOP = context.RuntimeHeapAccess?.GetClass("ByteArray");
+            var byteArrayClassOOP = context.RuntimeServices?.GetClass("ByteArray");
             if (byteArrayClassOOP == null)
                 return PrimitiveResult.Fail(context.Metadata!);
 

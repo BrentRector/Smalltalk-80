@@ -23,23 +23,23 @@ public class RuntimeSpecialObjects
     private SmalltalkOOP? _symbolClass;
     private SmalltalkOOP? _associationClass;
 
-    // Reference to heap access for lookups
-    private RuntimeHeapAccessor? _heapAccess;
+    // Reference to runtime services for lookups
+    private RuntimeServices? _runtimeServices;
 
     /// <summary>
-    /// Initializes the singleton with heap accessor reference.
+    /// Initializes the singleton with runtime services reference.
     /// Must be called during VM initialization.
     /// </summary>
-    public void Initialize(RuntimeHeapAccessor heapAccess)
+    public void Initialize(RuntimeServices runtimeServices)
     {
-        _heapAccess = heapAccess;
+        _runtimeServices = runtimeServices;
     }
 
     private SmalltalkOOP LookupClass(string className)
     {
-        if (_heapAccess == null)
+        if (_runtimeServices == null)
             throw new InvalidOperationException("RuntimeSpecialObjects not initialized");
-        return _heapAccess.GetClass(className);
+        return _runtimeServices.GetClass(className);
     }
 
     public SmalltalkOOP CompiledMethodClass =>
