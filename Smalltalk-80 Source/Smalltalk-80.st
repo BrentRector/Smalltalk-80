@@ -268,10 +268,27 @@ Instance Variables:
 Class Variables:
     Separator     <Character> the path separator (backslash on Windows)
 
-A WindowsPath can represent:
+Path Representations:
 - Drive paths: C:\folder\file.txt (driveLetter=C, uncServer=nil, uncShare=nil)
 - UNC paths: \\server\share\folder\file.txt (driveLetter=nil, uncServer="server", uncShare="share")
-- Relative paths: folder\file.txt (driveLetter=nil, uncServer=nil, uncShare=nil)'!
+- Relative paths: folder\file.txt (driveLetter=nil, uncServer=nil, uncShare=nil)
+
+Parsing vs Canonicalization:
+During parsing (fromString:), I perform MINIMAL normalization to preserve user intent:
+- Forward slashes (/) are converted to backslashes (\) for internal consistency
+- Empty path components are removed
+
+I deliberately DO NOT canonicalize during parsing:
+- "." and ".." components are preserved as-is
+- Drive letter case is preserved (c: stays lowercase)
+- This allows round-tripping and retains the original path form
+
+To get a fully canonical path, explicitly call #canonicalize which:
+- Resolves "." (current directory) by removing
+- Resolves ".." (parent directory) by removing with parent
+- Uppercases drive letters for consistency
+
+This design gives callers control over when normalization occurs.'!
 
 !WindowsPath class methodsFor: 'class initialization'!
 

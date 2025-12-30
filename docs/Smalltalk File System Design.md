@@ -163,6 +163,50 @@ Windows file systems are **case-insensitive** but **case-preserving**:
 - Reserved name validation uses `sameAs:` for case-insensitive comparison
 - File names like `NUL`, `nul`, `Nul` are all rejected
 
+### Parsing vs Canonicalization Strategy
+
+Our `WindowsPath` implementation uses a **minimal parsing, explicit canonicalization** strategy:
+
+**During Parsing (`fromString:`)** — Minimal normalization to preserve user intent:
+
+| Transformation | Applied? | Rationale |
+|----------------|----------|-----------|
+| `/` → `\` | ✅ Yes | Essential for internal consistency; both are valid input |
+| Remove empty components | ✅ Yes | Result of splitting on separator |
+| Resolve `.` | ❌ No | Preserves user intent |
+| Resolve `..` | ❌ No | Preserves user intent; symlink semantics may differ |
+| Uppercase drive letter | ❌ No | Preserves original input |
+
+**During Canonicalization (`canonicalize`)** — Full normalization on demand:
+
+| Transformation | Applied? | Rationale |
+|----------------|----------|-----------|
+| Resolve `.` | ✅ Yes | Removes current-directory references |
+| Resolve `..` | ✅ Yes | Collapses parent-directory references |
+| Uppercase drive letter | ✅ Yes | Consistent canonical form |
+| UNC server/share | Preserved | Case-preserving per Windows behavior |
+
+**Why This Design?**
+
+1. **Round-trip fidelity**: `(WindowsPath fromString: 'c:/foo/../bar') asString` returns `'c:\foo\..\bar'` — the structure is preserved.
+
+2. **User control**: Callers decide when to canonicalize. Some use cases (logging, display, debugging) benefit from seeing the original path form.
+
+3. **Symlink correctness**: On file systems with symbolic links, `foo/../bar` may not equal `bar` if `foo` is a symlink. Deferring resolution avoids incorrect assumptions.
+
+4. **Comparison still works**: Path equality (`=`) uses `namesEqual:` which is case-insensitive on Windows, so `c:\foo` equals `C:\FOO` even without canonicalization.
+
+**Usage Examples:**
+```smalltalk
+"Parsing preserves structure"
+path := WindowsPath fromString: 'c:/users/../admin/./docs'.
+path asString.  "→ 'c:\users\..\admin\.\docs'"
+
+"Explicit canonicalization when needed"
+path canonicalize asString.  "→ 'C:\admin\docs'"
+path canonicalString.  "→ 'C:\admin\docs' (convenience)"
+```
+
 ---
 
 ## Class Hierarchy
@@ -2092,10 +2136,27 @@ Instance Variables:
 Class Variables:
     Separator     <Character> the path separator (backslash on Windows)
 
-A WindowsPath can represent:
+Path Representations:
 - Drive paths: C:\folder\file.txt (driveLetter=C, uncServer=nil, uncShare=nil)
 - UNC paths: \\server\share\folder\file.txt (driveLetter=nil, uncServer="server", uncShare="share")
-- Relative paths: folder\file.txt (driveLetter=nil, uncServer=nil, uncShare=nil)'!
+- Relative paths: folder\file.txt (driveLetter=nil, uncServer=nil, uncShare=nil)
+
+Parsing vs Canonicalization:
+During parsing (fromString:), I perform MINIMAL normalization to preserve user intent:
+- Forward slashes (/) are converted to backslashes (\) for internal consistency
+- Empty path components are removed
+
+I deliberately DO NOT canonicalize during parsing:
+- "." and ".." components are preserved as-is
+- Drive letter case is preserved (c: stays lowercase)
+- This allows round-tripping and retains the original path form
+
+To get a fully canonical path, explicitly call #canonicalize which:
+- Resolves "." (current directory) by removing
+- Resolves ".." (parent directory) by removing with parent
+- Uppercases drive letters for consistency
+
+This design gives callers control over when normalization occurs.'!
 
 "-------------------- class initialization --------------------"
 
