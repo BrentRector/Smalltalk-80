@@ -167,17 +167,34 @@ public static class Program
                     ?? throw new InvalidOperationException("VMMetadata is null after cold start");
             }
 
-            // NOTE: Window and Display both use default dimensions
-            // Smalltalk Display object is created during cold start with same dimensions
-            // When beDisplay primitive is called, window size matches Display (no resize needed)
-            // Resize flow is tested when user calls: DisplayScreen displayExtent: width@height
+            // Determine display dimensions
+            // For cold start: use default dimensions
+            // For restore: read dimensions from restored Display object
+            int displayWidth, displayHeight;
+            if (config.RestoreImageFile != null)
+            {
+                // Read Display dimensions from restored heap
+                // Form has: bits (0), width (1), height (2), offset (3)
+                var displayOOP = vmMetadata.KnownObjects.Display;
+                var widthOOP = heapManager.GetInstanceVariable(displayOOP, 1);
+                var heightOOP = heapManager.GetInstanceVariable(displayOOP, 2);
+                displayWidth = widthOOP.IsSmallInteger ? widthOOP.AsSmallInteger() : InterpreterConstants.DefaultDisplayWidth;
+                displayHeight = heightOOP.IsSmallInteger ? heightOOP.AsSmallInteger() : InterpreterConstants.DefaultDisplayHeight;
+                Console.WriteLine($"  Restored Display size: {displayWidth}x{displayHeight}");
+            }
+            else
+            {
+                // Cold start uses default dimensions
+                displayWidth = InterpreterConstants.DefaultDisplayWidth;
+                displayHeight = InterpreterConstants.DefaultDisplayHeight;
+            }
 
             // Create display window (UI thread object - has heap access for Display bitmap rendering)
             Console.WriteLine("\n=== Creating Display Window ===");
-            Console.WriteLine($"  Window size: {InterpreterConstants.DefaultDisplayWidth}x{InterpreterConstants.DefaultDisplayHeight} (matches Smalltalk Display)");
+            Console.WriteLine($"  Window size: {displayWidth}x{displayHeight}");
             var displayProvider = new WinFormsDisplayProvider(
-                InterpreterConstants.DefaultDisplayWidth,
-                InterpreterConstants.DefaultDisplayHeight,
+                displayWidth,
+                displayHeight,
                 "Smalltalk-80",
                 heapManager,
                 vmMetadata);
