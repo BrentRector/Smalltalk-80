@@ -33,15 +33,19 @@ public class VMMetadataBuilder
     {
         Console.WriteLine("[VMMetadataBuilder] Rebuilding VMMetadata from Smalltalk dictionary...");
 
-        // Step 1: Find nil, true, false from the Smalltalk dictionary
-        // These are globals with known names
-        var nilOOP = LookupGlobal("nil");
-        var trueOOP = LookupGlobal("true");
-        var falseOOP = LookupGlobal("false");
+        // Step 1: Find nil, true, false by locating their classes and finding the sole instance
+        // These are pseudo-variables, not globals - they're the unique instances of their classes
+        var undefinedObjectClassOOP = LookupGlobal("UndefinedObject");
+        var trueClassOOP = LookupGlobal("True");
+        var falseClassOOP = LookupGlobal("False");
+
+        var nilOOP = FindSoleInstanceOf(undefinedObjectClassOOP, "UndefinedObject");
+        var trueOOP = FindSoleInstanceOf(trueClassOOP, "True");
+        var falseOOP = FindSoleInstanceOf(falseClassOOP, "False");
 
         Console.WriteLine($"  nil={nilOOP}, true={trueOOP}, false={falseOOP}");
 
-        // Step 2: Find Processor (ProcessorScheduler instance) and Display
+        // Step 2: Find Processor (ProcessorScheduler instance) and Display - these ARE globals
         var processorOOP = LookupGlobal("Processor");
         var displayOOP = LookupGlobal("Display");
         Console.WriteLine($"  Processor={processorOOP}, Display={displayOOP}");
@@ -133,5 +137,24 @@ public class VMMetadataBuilder
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Finds the sole instance of a class by scanning the heap.
+    /// Used for pseudo-variables (nil, true, false) which are unique instances
+    /// of UndefinedObject, True, and False respectively.
+    /// </summary>
+    private SmalltalkOOP FindSoleInstanceOf(SmalltalkOOP classOOP, string className)
+    {
+        foreach (var oop in _heap.EnumerateObjectTable())
+        {
+            if (_heap.GetClassOOP(oop) == classOOP)
+            {
+                return oop;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"No instance of {className} found in heap during image restore");
     }
 }
