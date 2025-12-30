@@ -67,8 +67,8 @@ public readonly struct PrimitiveExecutionContext
     /// <summary>Gets the platform bridge for platform operations (optional, may be null in headless mode).</summary>
     public IPlatformBridge? Platform { get; }
 
-    /// <summary>Gets the runtime heap accessor for class/global lookups.</summary>
-    public RuntimeHeapAccessor? RuntimeHeapAccess { get; }
+    /// <summary>Gets the runtime services for class/global lookups.</summary>
+    public RuntimeServices? RuntimeServices { get; }
 
     /// <summary>Gets the current instruction pointer when primitive was called (for block primitives).</summary>
     public int InstructionPointer { get; }
@@ -113,7 +113,7 @@ public readonly struct PrimitiveExecutionContext
         IStackManager? stackManager = null,
         IContextManager? contextManager = null,
         IPlatformBridge? platform = null,
-        RuntimeHeapAccessor? runtimeHeapAccess = null,
+        RuntimeServices? runtimeServices = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
@@ -130,7 +130,7 @@ public readonly struct PrimitiveExecutionContext
         StackManager = stackManager;
         ContextManager = contextManager;
         Platform = platform;
-        RuntimeHeapAccess = runtimeHeapAccess;
+        RuntimeServices = runtimeServices;
         InstructionPointer = instructionPointer;
         CacheManager = cacheManager;
         MessageSender = messageSender;
@@ -167,9 +167,9 @@ public readonly struct PrimitiveExecutionContext
     /// </summary>
     public SmalltalkOOP GetBlockContextClassOOP()
     {
-        if (RuntimeHeapAccess == null)
-            throw new InvalidOperationException("RuntimeHeapAccess not available");
-        return RuntimeHeapAccess.GetClass("BlockContext");
+        if (RuntimeServices == null)
+            throw new InvalidOperationException("RuntimeServices not available");
+        return RuntimeServices.GetClass("BlockContext");
     }
 
     /// <summary>
@@ -177,10 +177,10 @@ public readonly struct PrimitiveExecutionContext
     /// </summary>
     public SmalltalkOOP AllocateObject(string className, int indexedSize)
     {
-        if (RuntimeHeapAccess == null)
-            throw new InvalidOperationException("RuntimeHeapAccess not available");
+        if (RuntimeServices == null)
+            throw new InvalidOperationException("RuntimeServices not available");
 
-        var classOOP = RuntimeHeapAccess.GetClass(className);
+        var classOOP = RuntimeServices.GetClass(className);
         return HeapManager.AllocateInstanceOf(classOOP, indexedSize);
     }
 
@@ -204,8 +204,8 @@ public readonly struct PrimitiveExecutionContext
     /// </summary>
     public SmalltalkOOP GetGlobalObjectByName(string globalName)
     {
-        if (RuntimeHeapAccess == null)
-            throw new InvalidOperationException("RuntimeHeapAccess not available");
+        if (RuntimeServices == null)
+            throw new InvalidOperationException("RuntimeServices not available");
 
         // Remove "class:" or "global:" prefix if present
         string name = globalName;
@@ -216,11 +216,11 @@ public readonly struct PrimitiveExecutionContext
 
         // For classes, use GetClass
         if (globalName.StartsWith("class:"))
-            return RuntimeHeapAccess.GetClass(name);
+            return RuntimeServices.GetClass(name);
 
         // For globals, look up in SystemDictionary
         var systemDictOOP = Metadata!.KnownObjects.Smalltalk;
-        return RuntimeHeapAccess.LookupGlobalByName(systemDictOOP, name);
+        return RuntimeServices.LookupGlobalByName(systemDictOOP, name);
     }
 }
 
@@ -306,7 +306,7 @@ public interface IPrimitiveRegistry
         IPrimitiveContext ctx,
         SmalltalkOOP receiver,
         SmalltalkOOP[] args,
-        RuntimeHeapAccessor? runtimeHeapAccess,
+        RuntimeServices? runtimeServices,
         IContextManager? contextManager = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,

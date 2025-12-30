@@ -28,7 +28,7 @@ public static class LargeIntegerArithmetic
 
         // Check if it's a LargeNegativeInteger
         SmalltalkOOP classOOP = context.HeapManager.GetClassOOP(largeIntOop);
-        var negClass = context.RuntimeHeapAccess?.GetClass("LargeNegativeInteger");
+        var negClass = context.RuntimeServices?.GetClass("LargeNegativeInteger");
 
         if (negClass != null && classOOP == negClass)
         {
@@ -115,11 +115,11 @@ public static class LargeIntegerArithmetic
         SmalltalkOOP classOOP = context.HeapManager.GetClassOOP(objectOop);
 
         // Check against both LargeInteger classes
-        var posClass = context.RuntimeHeapAccess?.GetClass("LargePositiveInteger");
+        var posClass = context.RuntimeServices?.GetClass("LargePositiveInteger");
         if (posClass != null && posClass != context.HeapManager.GetNil() && classOOP == posClass)
             return true;
 
-        var negClass = context.RuntimeHeapAccess?.GetClass("LargeNegativeInteger");
+        var negClass = context.RuntimeServices?.GetClass("LargeNegativeInteger");
         if (negClass != null && negClass != context.HeapManager.GetNil() && classOOP == negClass)
             return true;
 
@@ -135,7 +135,7 @@ public static class LargeIntegerArithmetic
             ? "LargePositiveInteger"
             : "LargeNegativeInteger";
 
-        var classOOP = context.RuntimeHeapAccess?.GetClass(className);
+        var classOOP = context.RuntimeServices?.GetClass(className);
 
         if (classOOP != null && classOOP != context.HeapManager.GetNil())
             return classOOP.Value;

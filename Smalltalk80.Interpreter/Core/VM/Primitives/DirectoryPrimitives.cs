@@ -271,7 +271,7 @@ public static class DirectoryPrimitives
                 var names = entries.Select(Path.GetFileName).Where(n => n != null).ToArray();
 
                 // Create Array
-                var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
+                var arrayClassOOP = context.RuntimeServices?.GetClass("Array")
                     ?? throw new InvalidOperationException("Cannot find Array class");
                 var arrayOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP, names.Length);
 
@@ -286,7 +286,7 @@ public static class DirectoryPrimitives
             catch
             {
                 // Return empty array on error
-                var emptyArrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
+                var emptyArrayClassOOP = context.RuntimeServices?.GetClass("Array")
                     ?? throw new InvalidOperationException("Cannot find Array class");
                 return PrimitiveResult.Ok(context.HeapManager.AllocateInstanceOf(emptyArrayClassOOP, 0));
             }

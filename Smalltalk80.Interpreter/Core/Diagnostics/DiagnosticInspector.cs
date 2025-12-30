@@ -456,17 +456,17 @@ public static class DiagnosticInspector
     }
 
     /// <summary>
-    /// Tests RuntimeHeapAccessor.BuildFieldMap() to verify it can read instance variable names.
+    /// Tests RuntimeServices.BuildFieldMap() to verify it can read instance variable names.
     /// </summary>
     public static void TestBuildFieldMap(ISmalltalkHeap heapManager, VMMetadata metadata)
     {
         try
         {
-            var runtimeHeapAccess = new RuntimeHeapAccessor(heapManager, metadata);
+            var runtimeServices = new RuntimeServices(heapManager, metadata);
             Console.WriteLine("Building field map from heap...");
 
             var startTime = System.Diagnostics.Stopwatch.StartNew();
-            var fieldMap = runtimeHeapAccess.BuildFieldMap();
+            var fieldMap = runtimeServices.BuildFieldMap();
             startTime.Stop();
 
             Console.WriteLine($"Built field map in {startTime.ElapsedMilliseconds}ms");

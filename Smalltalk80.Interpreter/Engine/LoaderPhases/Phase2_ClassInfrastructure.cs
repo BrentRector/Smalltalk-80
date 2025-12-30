@@ -606,7 +606,7 @@ public class Phase2_ClassInfrastructure : IPhase
     /// <summary>
     /// Populates ClassDescription.instanceVariables field (instance variable 4) with Array-of-Strings
     /// containing the class's own instance variable names (not inherited ones).
-    /// This enables runtime reflection via RuntimeHeapAccessor.BuildFieldMap().
+    /// This enables runtime reflection via RuntimeServices.BuildFieldMap().
     ///
     /// ClassDescription field layout:
     ///   Inherited from Behavior: superclass(0), methodDict(1), format(2), subclasses(3)

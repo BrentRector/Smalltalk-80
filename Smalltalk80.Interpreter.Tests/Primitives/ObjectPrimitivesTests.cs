@@ -692,7 +692,7 @@ public class ObjectPrimitivesTests : PrimitiveTestBase
         var mockHeap = CreateMockHeapManager();
         var smallIntClassOOP = ObjectOOP(42);
 
-        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntimeAccess = CreateMockRuntimeServices(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("SmallInteger")).Returns(smallIntClassOOP);
 
         var context = CreateContext(SmallInt(10), [], mockHeap.Object, mockRuntimeAccess.Object);

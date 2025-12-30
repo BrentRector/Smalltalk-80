@@ -28,7 +28,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10)); // Not BlockContext class
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntimeAccess = CreateMockRuntimeServices(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         // Blue Book: blockCopy: takes 1 argument (nargs only)
@@ -56,7 +56,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntimeAccess = CreateMockRuntimeServices(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         // Blue Book: blockCopy: takes 1 argument (nargs only)
@@ -85,7 +85,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntimeAccess = CreateMockRuntimeServices(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         // Blue Book: blockCopy: takes 1 argument (nargs only)
@@ -114,7 +114,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntimeAccess = CreateMockRuntimeServices(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         // Blue Book: blockCopy: takes 1 argument (nargs only)
@@ -143,7 +143,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntimeAccess = CreateMockRuntimeServices(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         // Blue Book: blockCopy: takes 1 argument (nargs only)
@@ -173,7 +173,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntimeAccess = CreateMockRuntimeServices(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         // Blue Book: blockCopy: takes 1 argument (nargs only)
@@ -209,7 +209,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupInstanceVariable(mockHeap, outerBlockContextOOP, VMConstants.BLOCKCONTEXT_HOME_INDEX, methodContextOOP);
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntimeAccess = CreateMockRuntimeServices(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         // Blue Book: blockCopy: takes 1 argument (nargs only)
@@ -243,7 +243,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassOOP(mockHeap, methodContextOOP, ObjectOOP(10));
         mockHeap.Setup(h => h.AllocateInstanceOf(blockContextClassOOP, 32)).Returns(newBlockContextOOP);
 
-        var mockRuntimeAccess = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntimeAccess = CreateMockRuntimeServices(mockHeap);
         mockRuntimeAccess.Setup(r => r.GetClass("BlockContext")).Returns(blockContextClassOOP);
 
         // Blue Book: blockCopy: takes 1 argument (nargs only)
@@ -1042,7 +1042,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
 
         mockHeap.Setup(h => h.GetClassName(semaphoreOOP)).Returns((string)null!);
 
-        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
         var context = CreateContext(semaphoreOOP, [], mockHeap.Object, mockRuntime.Object);
 
         var result = primitive.Execute(context);
@@ -1063,7 +1063,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
         SetupClassName(mockHeap, semaphoreOOP, "Semaphore");
         mockHeap.Setup(h => h.GetClassOOP(semaphoreOOP)).Returns(semaphoreClassOOP);
 
-        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap, metadata);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap, metadata);
         // Setup field indices for Semaphore fields
         mockRuntime.Setup(r => r.GetFieldIndex(semaphoreClassOOP, "firstLink")).Returns(0);
         mockRuntime.Setup(r => r.GetFieldIndex(semaphoreClassOOP, "excessSignals")).Returns(1);
@@ -1123,7 +1123,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
 
         mockHeap.Setup(h => h.GetClassName(semaphoreOOP)).Returns((string)null!);
 
-        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
         var context = CreateContext(semaphoreOOP, [], mockHeap.Object, mockRuntime.Object);
 
         var result = primitive.Execute(context);
@@ -1170,7 +1170,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
 
         mockHeap.Setup(h => h.GetClassName(processOOP)).Returns((string)null!);
 
-        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
         var context = CreateContext(processOOP, [], mockHeap.Object, mockRuntime.Object);
 
         var result = primitive.Execute(context);
@@ -1217,7 +1217,7 @@ public class ControlPrimitivesTests : PrimitiveTestBase
 
         mockHeap.Setup(h => h.GetClassName(processOOP)).Returns((string)null!);
 
-        var mockRuntime = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
         var context = CreateContext(processOOP, [], mockHeap.Object, mockRuntime.Object);
 
         var result = primitive.Execute(context);

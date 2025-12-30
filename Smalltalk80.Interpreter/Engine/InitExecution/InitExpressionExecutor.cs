@@ -425,7 +425,7 @@ public class InitExpressionExecutor
         // Check Delay class's semaphore waiting lists
         // Note: Delay's class variables are: AccessProtect, ActiveDelay, SuspendedDelays, TimingSemaphore
         // There is NO TimerProcess variable - the process is created by forkAt: but not stored
-        var delayClassOOP = _vm.RuntimeHeapAccess.GetClass("Delay");
+        var delayClassOOP = _vm.RuntimeServices.GetClass("Delay");
         if (verbose)
             Console.WriteLine($"    [DEBUG] Delay class lookup: {(delayClassOOP != _metadata.KnownObjects.Nil ? delayClassOOP.ToString() : "nil")}");
 
@@ -456,7 +456,7 @@ public class InitExpressionExecutor
 
         // Check InputState class's InputSemaphore
         // Note: InputProcess and InputSemaphore are in InputState, not InputSensor!
-        var inputStateClassOOP = _vm.RuntimeHeapAccess.GetClass("InputState");
+        var inputStateClassOOP = _vm.RuntimeServices.GetClass("InputState");
         if (verbose)
             Console.WriteLine($"    [DEBUG] InputState class lookup: {(inputStateClassOOP != _metadata.KnownObjects.Nil ? inputStateClassOOP.ToString() : "nil")}");
 
@@ -691,7 +691,7 @@ public class InitExpressionExecutor
     private SmalltalkOOP CreateMethodContextForInitExpression(SmalltalkOOP methodOOP, SmalltalkOOP receiverOOP)
     {
         // Get MethodContext class OOP - lookup from live heap using hash-based lookup
-        var methodContextClassOOP = _vm.RuntimeHeapAccess.GetClass("MethodContext");
+        var methodContextClassOOP = _vm.RuntimeServices.GetClass("MethodContext");
         if (methodContextClassOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("MethodContext class not found in Smalltalk dictionary");

@@ -26,7 +26,7 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     private readonly object _bufferLock = new();
     private readonly ISmalltalkHeap? _heap;
     private readonly VMMetadata? _vmMetadata;
-    private readonly IRuntimeHeapAccessor? _runtimeHeapAccess;
+    private readonly IRuntimeServices? _runtimeServices;
     private bool _disposed = false;
 
     // Input semaphore OOP for event notification (signaled on raw input)
@@ -104,8 +104,8 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
         Height = height;
         _heap = heap;
         _vmMetadata = vmMetadata;
-        _runtimeHeapAccess = (heap != null && vmMetadata != null)
-            ? new RuntimeHeapAccessor(heap, vmMetadata)
+        _runtimeServices = (heap != null && vmMetadata != null)
+            ? new RuntimeServices(heap, vmMetadata)
             : null;
 
         Console.WriteLine($"[WinForms] Creating window: {width}x{height}");
@@ -190,14 +190,14 @@ public class WinFormsDisplayProvider : Form, IPlatformBridge, IDisposable
     /// </summary>
     private void CopyDisplayFromHeap()
     {
-        if (_heap == null || _vmMetadata == null || _runtimeHeapAccess == null)
+        if (_heap == null || _vmMetadata == null || _runtimeServices == null)
             return;
 
         try
         {
             // Look up Display global using hash-based lookup
             var smalltalkOOP = _vmMetadata.KnownObjects.Smalltalk;
-            var displaySymbolOOP = _runtimeHeapAccess.InternSymbol("Display");
+            var displaySymbolOOP = _runtimeServices.InternSymbol("Display");
             if (displaySymbolOOP == _heap.GetNil())
                 return;
             var displayOOP = HashBasedDictionaryLookup(smalltalkOOP, displaySymbolOOP);

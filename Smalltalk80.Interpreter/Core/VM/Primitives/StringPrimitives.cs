@@ -79,8 +79,8 @@ public static class StringPrimitives
             string stringValue = System.Text.Encoding.Latin1.GetString(bytes);
 
             // Look up in USTable
-            if (context.RuntimeHeapAccess == null) return PrimitiveResult.Fail(context.Metadata!);
-            var symbolOOP = context.RuntimeHeapAccess.InternSymbol(stringValue);
+            if (context.RuntimeServices == null) return PrimitiveResult.Fail(context.Metadata!);
+            var symbolOOP = context.RuntimeServices.InternSymbol(stringValue);
 
             if (symbolOOP == context.HeapManager.GetNil())
                 return PrimitiveResult.Fail(context.Metadata!);

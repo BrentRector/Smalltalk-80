@@ -118,7 +118,7 @@ public abstract class PrimitiveTestBase
         SmalltalkOOP receiver,
         SmalltalkOOP[] arguments,
         ISmalltalkHeap heapManager,
-        RuntimeHeapAccessor? runtimeHeapAccess = null,
+        RuntimeServices? runtimeServices = null,
         IContextManager? contextManager = null,
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
@@ -137,7 +137,7 @@ public abstract class PrimitiveTestBase
             contextManager: contextManager,
             layoutResolver: null,
             platform: null,
-            runtimeHeapAccess: runtimeHeapAccess,
+            runtimeServices: runtimeServices,
             instructionPointer: instructionPointer,
             cacheManager: cacheManager,
             messageSender: messageSender,
@@ -264,15 +264,15 @@ public abstract class PrimitiveTestBase
     }
 
     /// <summary>
-    /// Creates a basic mock RuntimeHeapAccessor that returns -1 for all field lookups.
+    /// Creates a basic mock RuntimeServices that returns -1 for all field lookups.
     /// Tests can set up specific field indices as needed.
     /// </summary>
-    protected static Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccessor(Mock<ISmalltalkHeap> mockHeap, VMMetadata? metadata = null)
+    protected static Mock<RuntimeServices> CreateMockRuntimeServices(Mock<ISmalltalkHeap> mockHeap, VMMetadata? metadata = null)
     {
         // Use provided metadata or create a default one using the heap
         var testMetadata = metadata ?? CreateDefaultTestMetadata(mockHeap.Object);
 
-        var mock = new Mock<RuntimeHeapAccessor>(mockHeap.Object, testMetadata);
+        var mock = new Mock<RuntimeServices>(mockHeap.Object, testMetadata);
 
         // Default: return -1 (field not found) for any field lookup
         mock.Setup(r => r.GetFieldIndex(It.IsAny<SmalltalkOOP>(), It.IsAny<string>())).Returns(-1);

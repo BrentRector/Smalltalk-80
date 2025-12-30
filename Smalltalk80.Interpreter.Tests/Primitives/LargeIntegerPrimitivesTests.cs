@@ -40,9 +40,9 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
         return largeIntOOP;
     }
 
-    private Mock<RuntimeHeapAccessor> CreateMockRuntimeHeapAccess(Mock<ISmalltalkHeap> mockHeap)
+    private Mock<RuntimeServices> CreateMockRuntimeServices(Mock<ISmalltalkHeap> mockHeap)
     {
-        var mock = CreateMockRuntimeHeapAccessor(mockHeap);
+        var mock = CreateMockRuntimeServices(mockHeap);
         mock.Setup(r => r.GetClass("LargePositiveInteger")).Returns(ObjectOOP(1000));
         mock.Setup(r => r.GetClass("LargeNegativeInteger")).Returns(ObjectOOP(1001));
         return mock;
@@ -54,7 +54,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerAdd_TwoLargeIntegers_ReturnsSum()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(1000000000));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(2000000000));
@@ -75,7 +75,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     {
         var primitive = new LargeIntegerArithmetic.Add();
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(2000000000));
 
@@ -94,7 +94,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerSubtract_TwoLargeIntegers_ReturnsDifference()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(3000000000));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(1000000000));
@@ -118,7 +118,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerLessThan_SmallerValue_ReturnsTrue()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(1000000000));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(2000000000));
@@ -135,7 +135,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerGreaterThan_LargerValue_ReturnsTrue()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(2000000000));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(1000000000));
@@ -152,7 +152,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerEqual_EqualValues_ReturnsTrue()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(1000000000));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(1000000000));
@@ -169,7 +169,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerNotEqual_DifferentValues_ReturnsTrue()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(1000000000));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(2000000000));
@@ -190,7 +190,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerMultiply_TwoLargeIntegers_ReturnsProduct()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(100000));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(200000));
@@ -214,7 +214,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerDivide_ExactDivision_ReturnsQuotient()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(1000000000));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(100000000));
@@ -234,7 +234,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerDivide_NotExact_Fails()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(1000000001));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(100000000));
@@ -255,7 +255,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerBitAnd_ReturnsAndResult()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(0xFF00FF00));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(0xFFFF0000));
@@ -275,7 +275,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerBitOr_ReturnsOrResult()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(0xFF00FF00));
         var int2 = SetupLargePositiveInteger(mockHeap, 150, new BigInteger(0x00FF00FF));
@@ -299,7 +299,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerBitShift_LeftShift_ReturnsShiftedValue()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(1000000000));
         var resultOOP = ObjectOOP(200);
@@ -318,7 +318,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerBitShift_RightShift_ReturnsShiftedValue()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(1000000000));
         var resultOOP = ObjectOOP(200);
@@ -337,7 +337,7 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
     public void LargeIntegerBitShift_NonSmallIntegerShift_Fails()
     {
         var mockHeap = CreateMockHeapManager();
-        var mockRuntime = CreateMockRuntimeHeapAccess(mockHeap);
+        var mockRuntime = CreateMockRuntimeServices(mockHeap);
 
         var int1 = SetupLargePositiveInteger(mockHeap, 100, new BigInteger(1000000000));
 

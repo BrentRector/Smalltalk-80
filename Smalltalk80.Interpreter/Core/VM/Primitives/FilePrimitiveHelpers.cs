@@ -38,7 +38,7 @@ internal static class FilePrimitiveHelpers
     public static SmalltalkOOP CreateString(PrimitiveExecutionContext context, string value)
     {
         // Get String class
-        var stringClassOOP = context.RuntimeHeapAccess?.GetClass("String")
+        var stringClassOOP = context.RuntimeServices?.GetClass("String")
             ?? throw new InvalidOperationException("Cannot find String class");
 
         // Allocate String with indexed bytes

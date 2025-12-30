@@ -226,7 +226,7 @@ public class SmalltalkInterpreterThread
     /// </summary>
     private SmalltalkOOP LookupGlobal(string globalName)
     {
-        var valueOOP = _vm!.RuntimeHeapAccess.LookupGlobalValue(globalName);
+        var valueOOP = _vm!.RuntimeServices.LookupGlobalValue(globalName);
         if (valueOOP == _context.HeapManager.GetNil())
         {
             throw new InvalidOperationException($"Global '{globalName}' not found");
@@ -329,12 +329,12 @@ public class SmalltalkInterpreterThread
 
         // Use the canonical global lookup and set API
         // This handles: SystemDictionary lookup → Undeclared fallback → migration → creation
-        _vm!.RuntimeHeapAccess.SetGlobalValue(globalName, controlManagerOOP);
+        _vm!.RuntimeServices.SetGlobalValue(globalName, controlManagerOOP);
         Console.WriteLine($"    ✓ Installed {globalName} global with ControlManager");
     }
 
     // NOTE: Dictionary operations are now in RuntimeDictionaryService
-    // Use _vm.RuntimeHeapAccess for canonical global lookup operations
+    // Use _vm.RuntimeServices for canonical global lookup operations
 
     /// <summary>
     /// Dumps Float class variables to verify they have initialized values (NOT nil).
@@ -348,7 +348,7 @@ public class SmalltalkInterpreterThread
             var heap = _context.HeapManager;
 
             // Find Float class using runtime heap access
-            var floatClassOOP = _vm!.RuntimeHeapAccess.GetClass("Float");
+            var floatClassOOP = _vm!.RuntimeServices.GetClass("Float");
             if (floatClassOOP == heap.GetNil())
             {
                 Console.WriteLine("  ERROR: Float class not found!");

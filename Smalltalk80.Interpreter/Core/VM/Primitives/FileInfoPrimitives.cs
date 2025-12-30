@@ -33,7 +33,7 @@ public static class FileInfoPrimitives
                 string extension = Path.GetExtension(path);
 
                 // Create Array with 3 elements
-                var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
+                var arrayClassOOP = context.RuntimeServices?.GetClass("Array")
                     ?? throw new InvalidOperationException("Cannot find Array class");
                 var arrayOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP, 3);
 
@@ -181,7 +181,7 @@ public static class FileInfoPrimitives
 
                 // For simplicity, return as an Array with known order:
                 // [0] = size, [1] = attributes, [2] = isDirectory
-                var arrayClassOOP = context.RuntimeHeapAccess?.GetClass("Array")
+                var arrayClassOOP = context.RuntimeServices?.GetClass("Array")
                     ?? throw new InvalidOperationException("Cannot find Array class");
                 var resultOOP = context.HeapManager.AllocateInstanceOf(arrayClassOOP, 3);
 

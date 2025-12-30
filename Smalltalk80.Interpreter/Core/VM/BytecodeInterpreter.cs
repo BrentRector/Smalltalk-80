@@ -15,7 +15,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 {
     private readonly ISmalltalkHeap heapManager;
     private readonly IBytecodeContext context;
-    private readonly RuntimeHeapAccessor runtimeHeapAccess;
+    private readonly RuntimeServices runtimeServices;
     private readonly VMMetadata metadata;
     private readonly IDiagnosticHub? diagnostics;
 
@@ -32,13 +32,13 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
     public BytecodeInterpreter(
         ISmalltalkHeap heapManager,
         IBytecodeContext context,
-        RuntimeHeapAccessor runtimeHeapAccess,
+        RuntimeServices runtimeServices,
         VMMetadata metadata,
         IDiagnosticHub? diagnostics = null)
     {
         this.heapManager = heapManager;
         this.context = context;
-        this.runtimeHeapAccess = runtimeHeapAccess;
+        this.runtimeServices = runtimeServices;
         this.metadata = metadata;
         this.diagnostics = diagnostics;
     }
@@ -326,9 +326,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
             // Character literals in method literal frames were created during cold start,
             // but CharacterTable entries (created by Character initialize) are canonical.
             // Without this, identity comparison (==) fails between literals and CharacterTable entries.
-            if (!literal.IsSmallInteger && runtimeHeapAccess.IsCharacter(literal))
+            if (!literal.IsSmallInteger && runtimeServices.IsCharacter(literal))
             {
-                literal = runtimeHeapAccess.GetCanonicalCharacter(literal);
+                literal = runtimeServices.GetCanonicalCharacter(literal);
             }
 
             context.Push(literal);
@@ -364,7 +364,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
             // POOL VARIABLES: Check if this is a 2-element Array (binding metadata)
             var classOOP = heapManager.GetClassOOP(literalOOP);
-            var arrayClassOOP = runtimeHeapAccess.GetClass("Array");
+            var arrayClassOOP = runtimeServices.GetClass("Array");
 
             if (classOOP == arrayClassOOP)
             {
@@ -377,7 +377,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
 
                     // Check if element 0 is a Symbol (pool name) or an OOP (already patched to dictionary)
                     var element0Class = heapManager.GetClassOOP(element0);
-                    var symbolClass = runtimeHeapAccess.GetClass("Symbol");
+                    var symbolClass = runtimeServices.GetClass("Symbol");
 
                     if (element0Class == symbolClass)
                     {
@@ -391,7 +391,7 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     {
                         // Already patched: element0 is pool dictionary OOP (fast path)
                         // Verify element0 is a Dictionary (should always be true after patching)
-                        var dictionaryClassOOP = runtimeHeapAccess.GetClass("Dictionary");
+                        var dictionaryClassOOP = runtimeServices.GetClass("Dictionary");
                         if (element0Class != dictionaryClassOOP)
                         {
                             throw new InvalidOperationException(
@@ -835,9 +835,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                 {
                     var literal = context.GetMethodLiteral(methodOOP, index + 1); // +1 to skip header
                     // Canonicalize Character literals
-                    if (!literal.IsSmallInteger && runtimeHeapAccess.IsCharacter(literal))
+                    if (!literal.IsSmallInteger && runtimeServices.IsCharacter(literal))
                     {
-                        literal = runtimeHeapAccess.GetCanonicalCharacter(literal);
+                        literal = runtimeServices.GetCanonicalCharacter(literal);
                     }
                     context.Push(literal);
                     return true;
@@ -895,14 +895,14 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                             }
 
                             var systemDictOOP = metadata.KnownObjects.Smalltalk;
-                            var poolDictOOP = runtimeHeapAccess.LookupGlobalByName(systemDictOOP, poolDictName);
+                            var poolDictOOP = runtimeServices.LookupGlobalByName(systemDictOOP, poolDictName);
 
                             if (poolDictOOP == metadata.KnownObjects.Nil)
                             {
                                 throw new InvalidOperationException($"Pool dictionary not found: {poolDictName}");
                             }
 
-                            var valueOOP = runtimeHeapAccess.LookupGlobalByName(poolDictOOP, varName);
+                            var valueOOP = runtimeServices.LookupGlobalByName(poolDictOOP, varName);
                             context.Push(valueOOP);
                             return true;
                         }

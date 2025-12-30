@@ -37,7 +37,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 {
     private readonly ISmalltalkHeap _heapManager;
 
-    private readonly RuntimeHeapAccessor _runtimeHeapAccess;
+    private readonly RuntimeServices _runtimeServices;
     private readonly VMMetadata _metadata;
     private readonly IPlatformBridge? _platformBridge;
     private readonly IDiagnosticHub? _diagnostics;
@@ -125,14 +125,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     public IContextManager ContextManager => _contextManager;
 
     /// <summary>Gets the runtime heap accessor for hash-based dictionary lookups and symbol interning.</summary>
-    public IRuntimeHeapAccessor RuntimeHeapAccess => _runtimeHeapAccess;
+    public IRuntimeServices RuntimeServices => _runtimeServices;
 
     public VirtualMachine(ISmalltalkHeap heapManager, VMMetadata metadata, IPlatformBridge? platformBridge = null, IDiagnosticHub? diagnostics = null)
     {
         _heapManager = heapManager;
 
-        _runtimeHeapAccess = new RuntimeHeapAccessor(heapManager, metadata);
-        RuntimeSpecialObjects.Instance.Initialize(_runtimeHeapAccess);
+        _runtimeServices = new RuntimeServices(heapManager, metadata);
+        RuntimeSpecialObjects.Instance.Initialize(_runtimeServices);
         _metadata = metadata;
         _platformBridge = platformBridge;
         _diagnostics = diagnostics;
@@ -187,7 +187,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _bytecodeInterpreter = new BytecodeInterpreter(
             heapManager,
             this, // IBytecodeContext
-            _runtimeHeapAccess,
+            _runtimeServices,
             metadata,
             diagnostics
         );
@@ -1644,7 +1644,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     ISmalltalkHeap IPrimitiveContext.HeapManager => _heapManager;
     void IPrimitiveContext.InvalidateAllRuntimeCaches()
     {
-        _runtimeHeapAccess.InvalidateAllCaches();
+        _runtimeServices.InvalidateAllCaches();
     }
 
     // ICacheManager explicit interface implementation
@@ -1655,7 +1655,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     void ICacheManager.InvalidateAllRuntimeCaches()
     {
-        _runtimeHeapAccess.InvalidateAllCaches();
+        _runtimeServices.InvalidateAllCaches();
     }
 
     // IPrimitiveMessageSender explicit interface implementation
@@ -1720,7 +1720,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     {
         // Look up class OOP from heap - className might already have "class:" prefix
         string classNameClean = className.StartsWith("class:") ? className.Substring(6) : className;
-        var classOOP = _runtimeHeapAccess.GetClass(classNameClean);
+        var classOOP = _runtimeServices.GetClass(classNameClean);
         if (classOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException($"Class {classNameClean} not found in heap");
@@ -1820,7 +1820,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         int stackSize = argCount + 16; // 16 slots for execution stack
 
         // Get BlockContext class from runtime heap lookup (primitive 80-82 compatibility)
-        var blockContextClassOOP = _runtimeHeapAccess.GetClass("BlockContext");
+        var blockContextClassOOP = _runtimeServices.GetClass("BlockContext");
 
         // Allocate BlockContext with indexed fields for stack
         // BlockContext has 6 fixed fields (sender, pc, stackp, nargs, startpc, home) plus indexed stack slots
@@ -1955,7 +1955,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // Check if this is a metaclass by checking if it's an instance of Metaclass
         var classOfClassOOP = _heapManager.GetClassOOP(classOOP);
         
-        var metaclassOOP = _runtimeHeapAccess.GetClass("Metaclass");
+        var metaclassOOP = _runtimeServices.GetClass("Metaclass");
         if (metaclassOOP != _metadata.KnownObjects.Nil)
         {
             if (classOfClassOOP == metaclassOOP)
@@ -2063,7 +2063,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     {
         const int initialSize = 8;
 
-        var dictClassOOP = _runtimeHeapAccess.GetClass("Dictionary");
+        var dictClassOOP = _runtimeServices.GetClass("Dictionary");
         if (dictClassOOP == _metadata.KnownObjects.Nil)
         {
             throw new InvalidOperationException("Dictionary class not found - needed for classPool lazy initialization");
@@ -2246,7 +2246,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         }
 
         // First, intern the key as a Symbol (required for dictionary lookup)
-        var keySymbolOOP = _runtimeHeapAccess.InternSymbol(lookupKey);
+        var keySymbolOOP = _runtimeServices.InternSymbol(lookupKey);
         if (keySymbolOOP == _metadata.KnownObjects.Nil)
         {
             // Symbol not found - global doesn't exist
@@ -2336,7 +2336,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
             // Look up in Undeclared dictionary
             var systemDictOOP = _metadata.KnownObjects.Smalltalk;
-            var undeclaredOOP = _runtimeHeapAccess.LookupGlobalByName(systemDictOOP, "Undeclared");
+            var undeclaredOOP = _runtimeServices.LookupGlobalByName(systemDictOOP, "Undeclared");
             if (undeclaredOOP != _metadata.KnownObjects.Nil)
             {
                 var undeclaredValueOOP = LookupInDictionary(undeclaredOOP, keySymbol);
