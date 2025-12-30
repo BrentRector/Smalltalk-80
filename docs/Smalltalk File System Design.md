@@ -2004,6 +2004,15 @@ asString
     "Answer the path as a string"
     self subclassResponsibility!
 
+canonicalize
+    "Answer a new Path in canonical form for this platform.
+     Canonical form includes:
+     - Using the platform's preferred separator
+     - Resolving . (current) and .. (parent) components
+     - Removing redundant separators
+     - Platform-specific normalization (e.g., case on case-insensitive systems)"
+    self subclassResponsibility!
+
 printOn: aStream
     "Print the path"
     aStream nextPutAll: self class name.
@@ -2259,6 +2268,45 @@ isRoot
 isUNC
     "Answer whether this is a UNC path (\\server\share)."
     ^uncServer notNil and: [uncShare notNil]! !
+
+"-------------------- conversion --------------------"
+
+!WindowsPath methodsFor: 'conversion'!
+
+canonicalize
+    "Answer a new WindowsPath in canonical Windows form.
+     Canonical form:
+     - Uses backslash separator (already normalized during parsing)
+     - Resolves . (current directory) components by removing them
+     - Resolves .. (parent directory) components by removing parent
+     - Drive letter is uppercased
+     - UNC server and share names are preserved as-is (case-preserving)"
+    | newComponents result |
+    newComponents := OrderedCollection new.
+
+    "Process each component, resolving . and .."
+    components do: [:comp |
+        comp = '.'
+            ifTrue: ["Skip current directory reference"]
+            ifFalse: [
+                comp = '..'
+                    ifTrue: [
+                        "Go up one level if possible"
+                        newComponents isEmpty
+                            ifFalse: [newComponents removeLast]]
+                    ifFalse: [newComponents add: comp]]].
+
+    result := self class new.
+    result setDriveLetter: (driveLetter ifNotNil: [driveLetter asUppercase])
+           uncServer: uncServer
+           uncShare: uncShare
+           components: newComponents asArray.
+    ^result!
+
+canonicalString
+    "Answer the path as a canonical string.
+     Convenience method combining canonicalize and asString."
+    ^self canonicalize asString! !
 
 "-------------------- navigation --------------------"
 
