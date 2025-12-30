@@ -387,7 +387,15 @@ public class SmalltalkInterpreterThread
         // Step 4: Disable infinite loop detection - the event loop intentionally runs forever
         _vm.InfiniteLoopDetectionEnabled = false;
 
-        // Step 5: Resume execution from the saved context
+        // Step 5: Stop restore timer and report timing
+        if (_context.RestoreTimer != null)
+        {
+            _context.RestoreTimer.Stop();
+            Console.WriteLine($"\n=== Image Restore Timing ===");
+            Console.WriteLine($"  Total restore time: {_context.RestoreTimer.ElapsedMilliseconds}ms ({_context.RestoreTimer.Elapsed.TotalSeconds:F2}s)");
+        }
+
+        // Step 6: Resume execution from the saved context
         Console.WriteLine("  Resuming bytecode execution...");
         _vm.ExecuteExistingContext(suspendedContextOOP);
 

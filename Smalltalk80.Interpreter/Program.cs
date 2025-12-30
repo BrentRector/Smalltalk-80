@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows.Forms;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.Diagnostics;
@@ -60,11 +61,13 @@ public static class Program
             SmalltalkHeapManager heapManager;
             VMMetadata vmMetadata;
             ColdStartBundle? bundle = null;
+            Stopwatch? restoreTimer = null;
 
             // Check if restoring from image or doing cold start
             if (config.RestoreImageFile != null)
             {
                 // === RESTORE FROM IMAGE ===
+                restoreTimer = Stopwatch.StartNew();
                 Console.WriteLine($"Restoring from image: {config.RestoreImageFile}");
 
                 // Check if image file exists
@@ -211,7 +214,8 @@ public static class Program
                 Bundle = bundle,
                 PlatformBridge = displayProvider,  // Smalltalk thread calls methods on UI object
                 Diagnostics = diagnostics,
-                Config = config
+                Config = config,
+                RestoreTimer = restoreTimer
             };
 
             // Create and start Smalltalk thread

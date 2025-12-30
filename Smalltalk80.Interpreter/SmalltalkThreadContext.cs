@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Smalltalk80.Interpreter.Core.Diagnostics;
 using Smalltalk80.Interpreter.Core.Schema;
 using Smalltalk80.Interpreter.Core.VM;
@@ -70,4 +71,11 @@ public class SmalltalkThreadContext
     /// window is ready for graphics operations.
     /// </summary>
     public ManualResetEventSlim WindowDisplayed { get; } = new(false);
+
+    /// <summary>
+    /// Stopwatch for timing image restore operations.
+    /// Started in Program.cs when restore begins, stopped in SmalltalkInterpreterThread
+    /// when interpreter resumes execution.
+    /// </summary>
+    public Stopwatch? RestoreTimer { get; set; }
 }
