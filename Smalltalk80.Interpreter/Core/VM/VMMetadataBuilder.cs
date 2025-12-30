@@ -33,7 +33,7 @@ public class VMMetadataBuilder
     {
         Console.WriteLine("[VMMetadataBuilder] Rebuilding VMMetadata from Smalltalk dictionary...");
 
-        // Step 1: Find nil, true, false by locating their classes and finding the sole instance
+        // Step 1: Find nil, true, false by locating their classes and finding the sole instances
         // nil is the sole instance of UndefinedObject
         // true is the sole instance of True (subclass of Boolean)
         // false is the sole instance of False (subclass of Boolean)
@@ -41,9 +41,9 @@ public class VMMetadataBuilder
         var trueClassOOP = LookupGlobal("True");
         var falseClassOOP = LookupGlobal("False");
 
-        var nilOOP = FindSoleInstanceOf(undefinedObjectClassOOP, "UndefinedObject");
-        var trueOOP = FindSoleInstanceOf(trueClassOOP, "True");
-        var falseOOP = FindSoleInstanceOf(falseClassOOP, "False");
+        // Single heap scan to find all three singletons
+        var (nilOOP, trueOOP, falseOOP) = FindSingletonInstances(
+            undefinedObjectClassOOP, trueClassOOP, falseClassOOP);
 
         Console.WriteLine($"  nil={nilOOP}, true={trueOOP}, false={falseOOP}");
 
@@ -142,21 +142,41 @@ public class VMMetadataBuilder
     }
 
     /// <summary>
-    /// Finds the sole instance of a class by scanning the heap.
-    /// Used for nil which is the unique instance of UndefinedObject.
+    /// Finds nil, true, and false singleton instances in a single heap scan.
+    /// More efficient than three separate scans.
     /// </summary>
-    private SmalltalkOOP FindSoleInstanceOf(SmalltalkOOP classOOP, string className)
+    private (SmalltalkOOP nil, SmalltalkOOP @true, SmalltalkOOP @false) FindSingletonInstances(
+        SmalltalkOOP undefinedObjectClassOOP,
+        SmalltalkOOP trueClassOOP,
+        SmalltalkOOP falseClassOOP)
     {
+        SmalltalkOOP? nilOOP = null;
+        SmalltalkOOP? trueOOP = null;
+        SmalltalkOOP? falseOOP = null;
+
         foreach (var oop in _heap.EnumerateObjectTable())
         {
-            if (_heap.GetClassOOP(oop) == classOOP)
-            {
-                return oop;
-            }
+            var classOOP = _heap.GetClassOOP(oop);
+
+            if (classOOP == undefinedObjectClassOOP)
+                nilOOP = oop;
+            else if (classOOP == trueClassOOP)
+                trueOOP = oop;
+            else if (classOOP == falseClassOOP)
+                falseOOP = oop;
+
+            // Early exit once all three are found
+            if (nilOOP.HasValue && trueOOP.HasValue && falseOOP.HasValue)
+                break;
         }
 
-        throw new InvalidOperationException(
-            $"No instance of {className} found in heap during image restore");
-    }
+        if (!nilOOP.HasValue)
+            throw new InvalidOperationException("No instance of UndefinedObject found in heap");
+        if (!trueOOP.HasValue)
+            throw new InvalidOperationException("No instance of True found in heap");
+        if (!falseOOP.HasValue)
+            throw new InvalidOperationException("No instance of False found in heap");
 
+        return (nilOOP.Value, trueOOP.Value, falseOOP.Value);
+    }
 }
