@@ -2006,27 +2006,26 @@ withComponents: anArray
 
 ### WindowsPath (Concrete)
 
-Windows implementation of Path.
+Windows implementation of Path. Handles both forward slash (/) and backslash (\) as path separators.
 
 ```smalltalk
 Path subclass: #WindowsPath
-    instanceVariableNames: 'drive isUNC'
-    classVariableNames: 'Separator AltSeparator VolumeSeparator'
+    instanceVariableNames: 'driveLetter'
+    classVariableNames: 'Separator'
     poolDictionaries: ''
     category: 'Files-Windows'!
 
 WindowsPath comment:
 'I am the Windows implementation of Path.
 I handle Windows path semantics including drive letters and UNC paths.
+I accept both forward slash (/) and backslash (\) as separators during parsing,
+but always output paths using the canonical backslash separator.
 
 Instance Variables:
-    drive   <String or nil> drive letter (e.g., ''C:'')
-    isUNC   <Boolean> true if this is a UNC path (\\server\share)
+    driveLetter   <Character or nil> drive letter or nil for UNC/relative paths
 
 Class Variables:
-    Separator       <Character> primary separator (\)
-    AltSeparator    <Character> alternate separator (/)
-    VolumeSeparator <Character> volume separator (:)'!
+    Separator     <Character> the primary path separator (backslash on Windows)'!
 
 "-------------------- class initialization --------------------"
 
@@ -2035,9 +2034,7 @@ Class Variables:
 initialize
     "Initialize class variables"
     "WindowsPath initialize"
-    Separator := $\.
-    AltSeparator := $/.
-    VolumeSeparator := $:.! !
+    Separator := $\.! !
 
 "-------------------- class methods --------------------"
 
@@ -2045,58 +2042,94 @@ initialize
 
 fromString: aString
     "Parse a Windows path string"
-    | path comps drv unc |
-    path := aString.
-    drv := nil.
-    unc := false.
-
-    "Check for UNC path"
-    (path beginsWith: '\\') ifTrue: [
-        unc := true.
-        path := path copyFrom: 3 to: path size].
-
-    "Check for drive letter"
-    (path size >= 2 and: [(path at: 2) = VolumeSeparator]) ifTrue: [
-        drv := (path copyFrom: 1 to: 2) asUppercase.
-        path := path copyFrom: 3 to: path size.
-        (path notEmpty and: [path first = Separator or: [path first = AltSeparator]])
-            ifTrue: [path := path copyFrom: 2 to: path size]].
-
-    "Split into components"
-    comps := path subStrings: (Array with: Separator with: AltSeparator).
-    comps := comps reject: [:c | c isEmpty].
-
-    ^self new
-        setComponents: comps;
-        setDrive: drv;
-        setUNC: unc!
-
-root
-    "Answer a path representing the root of C:"
-    ^self fromString: 'C:\'!
+    ^self new initializeFromString: aString!
 
 separator
-    ^Separator! !
+    "Answer the path separator character"
+    ^Separator!
+
+isSeparator: aCharacter
+    "Answer whether aCharacter is a path separator.
+     Windows accepts both backslash and forward slash."
+    ^aCharacter = $\ or: [aCharacter = $/]! !
+
+"-------------------- initialization --------------------"
+
+!WindowsPath methodsFor: 'initialization'!
+
+initializeFromString: aString
+    "Parse a Windows path string.
+     Windows accepts both backslash and forward slash as separators."
+    | parts startIndex normalized |
+    aString isEmpty ifTrue: [
+        driveLetter := nil.
+        components := #().
+        ^self].
+
+    "Normalize forward slashes to backslashes for consistent parsing"
+    normalized := aString copyReplaceAll: '/' with: '\'.
+
+    "Check for drive letter (C:)"
+    (normalized size >= 2 and: [(normalized at: 2) = $:]) ifTrue: [
+        driveLetter := normalized at: 1.
+        startIndex := 3.
+        "Skip leading separator after drive"
+        (normalized size >= 3 and: [(self class isSeparator: (normalized at: 3))])
+            ifTrue: [startIndex := 4]]
+    ifFalse: [
+        "Check for UNC path (\\server\share)"
+        (normalized size >= 2 and: [(self class isSeparator: (normalized at: 1))
+            and: [(self class isSeparator: (normalized at: 2))]])
+            ifTrue: [
+                driveLetter := nil.
+                startIndex := 3]
+            ifFalse: [
+                driveLetter := nil.
+                startIndex := 1.
+                "Skip leading separator for absolute paths"
+                (self class isSeparator: (normalized at: 1)) ifTrue: [startIndex := 2]]].
+
+    "Parse remaining components - split on backslash"
+    startIndex > normalized size
+        ifTrue: [components := #()]
+        ifFalse: [
+            parts := (normalized copyFrom: startIndex to: normalized size)
+                findTokens: (String with: Separator).
+            components := parts select: [:p | p notEmpty]].
+    ^self! !
 
 "-------------------- accessing --------------------"
 
 !WindowsPath methodsFor: 'accessing'!
 
-drive
-    "Answer the drive letter (e.g., 'C:') or nil"
-    ^drive!
+driveLetter
+    "Answer the drive letter or nil"
+    ^driveLetter!
 
-uncServer
-    "Answer the UNC server name, or nil if not a UNC path"
-    (isUNC and: [components notEmpty])
-        ifTrue: [^components first]
-        ifFalse: [^nil]!
+fileName
+    "Answer the last component (filename)"
+    components isEmpty ifTrue: [^''].
+    ^components last!
 
-uncShare
-    "Answer the UNC share name, or nil if not a UNC path"
-    (isUNC and: [components size >= 2])
-        ifTrue: [^components second]
-        ifFalse: [^nil]! !
+directoryPath
+    "Answer a new path without the filename"
+    | newPath |
+    components size <= 1 ifTrue: [
+        ^self class fromString: (driveLetter ifNil: [''] ifNotNil: [driveLetter asString, ':'])].
+    newPath := self class new.
+    newPath setDriveLetter: driveLetter components: components allButLast.
+    ^newPath!
+
+asString
+    "Answer the path as a string (uses canonical backslash separator)"
+    | stream |
+    stream := WriteStream on: (String new: 100).
+    driveLetter notNil ifTrue: [
+        stream nextPut: driveLetter; nextPut: $:].
+    components do: [:comp |
+        stream nextPut: Separator; nextPutAll: comp].
+    stream position = 0 ifTrue: [^'.'].
+    ^stream contents! !
 
 "-------------------- testing --------------------"
 
@@ -2104,73 +2137,50 @@ uncShare
 
 isAbsolute
     "Answer whether this is an absolute path"
-    ^drive notNil or: [isUNC]!
+    ^driveLetter notNil!
+
+isRelative
+    "Answer whether this is a relative path"
+    ^driveLetter isNil!
+
+isEmpty
+    "Answer whether this path is empty"
+    ^driveLetter isNil and: [components isEmpty]!
 
 isRoot
     "Answer whether this path represents a root directory"
-    ^components isEmpty and: [self isAbsolute]!
-
-isUNCPath
-    "Answer whether this is a UNC path"
-    ^isUNC! !
-
-"-------------------- conversion --------------------"
-
-!WindowsPath methodsFor: 'conversion'!
-
-asString
-    "Answer the path as a Windows path string"
-    | stream |
-    stream := WriteStream on: (String new: 100).
-
-    isUNC ifTrue: [
-        stream nextPutAll: '\\'].
-
-    drive notNil ifTrue: [
-        stream nextPutAll: drive.
-        (components notEmpty or: [self isRoot])
-            ifTrue: [stream nextPut: Separator]].
-
-    components
-        do: [:comp | stream nextPutAll: comp]
-        separatedBy: [stream nextPut: Separator].
-
-    ^stream contents! !
+    ^components isEmpty and: [self isAbsolute]! !
 
 "-------------------- navigation --------------------"
 
-!WindowsPath methodsFor: 'navigation'!
+!WindowsPath methodsFor: 'operations'!
 
 / aString
-    "Answer a new Path with aString appended"
-    | newPath |
+    "Answer a new path with aString appended as a component"
+    | newPath newComponents |
+    newComponents := components copyWith: aString.
     newPath := self class new.
-    newPath setComponents: (components copyWith: aString).
-    newPath setDrive: drive.
-    newPath setUNC: isUNC.
+    newPath setDriveLetter: driveLetter components: newComponents.
     ^newPath!
 
-parent
-    "Answer the parent path"
-    | newPath |
-    components isEmpty ifTrue: [^nil].
-    newPath := self class new.
-    newPath setComponents: (components copyFrom: 1 to: components size - 1).
-    newPath setDrive: drive.
-    newPath setUNC: isUNC.
-    ^newPath! !
+withExtension: extString
+    "Answer a new path with the given extension"
+    | baseName newName |
+    components isEmpty ifTrue: [^self].
+    baseName := self fileName.
+    (baseName includes: $.)
+        ifTrue: [baseName := baseName copyFrom: 1 to: (baseName findLast: [:c | c = $.]) - 1].
+    newName := baseName, '.', extString.
+    ^self directoryPath / newName! !
 
 "-------------------- private --------------------"
 
 !WindowsPath methodsFor: 'private'!
 
-setDrive: aString
-    "Set the drive letter"
-    drive := aString!
-
-setUNC: aBoolean
-    "Set the UNC flag"
-    isUNC := aBoolean! !
+setDriveLetter: drive components: comps
+    driveLetter := drive.
+    components := comps.
+    ^self! !
 ```
 
 ---
