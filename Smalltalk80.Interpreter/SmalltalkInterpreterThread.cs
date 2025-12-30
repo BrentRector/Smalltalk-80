@@ -381,7 +381,7 @@ public class SmalltalkInterpreterThread
         // This makes justSnapped = self snapshotPrimitive isNil evaluate to false,
         // which triggers the post-snapshot restoration code (DisplayScreen displayHeight: height, etc.)
         var smalltalkOOP = metadata.KnownObjects.Smalltalk;
-        _vm.StackManager.Push(smalltalkOOP);
+        _vm.PushOntoActiveContext(smalltalkOOP);
         Console.WriteLine($"  Pushed Smalltalk ({smalltalkOOP}) as snapshotPrimitive return value");
 
         // Step 5: Disable infinite loop detection - the event loop intentionally runs forever
