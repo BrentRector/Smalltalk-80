@@ -819,6 +819,29 @@ copyTo: destinationPath
     "Copy this directory to destinationPath (not implemented)"
     self error: 'Directory copy not yet implemented'! !
 
+"-------------------- file copying --------------------"
+
+!WindowsDirectory methodsFor: 'file copying'!
+
+retrieveFrom: aFileName1 copyTo: aFileName2
+    "Copy from one file to another. Uses platform primitive when available,
+     falls back to stream copying when primitive fails."
+    | srcPath destPath |
+    srcPath := self fullNameFor: aFileName1.
+    destPath := self fullNameFor: aFileName2.
+    ^self primCopyFile: srcPath to: destPath!
+
+primCopyFile: srcPath to: destPath
+    "Platform primitive for file copy. Falls back to stream copy if primitive fails."
+    <primitive: 157>
+    | f1 f2 |
+    "Fallback: character-by-character stream copy"
+    f1 := (Disk fileAt: srcPath) readStream.
+    f2 := (Disk fileAt: destPath) writeStream.
+    [f1 atEnd] whileFalse: [f2 nextPut: f1 next].
+    f2 close.
+    f1 close! !
+
 "-------------------- attributes --------------------"
 
 !WindowsDirectory methodsFor: 'attributes'!
