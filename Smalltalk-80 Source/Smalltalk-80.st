@@ -1452,9 +1452,10 @@ Class Variables:
 !WindowsFileSystem class methodsFor: 'class initialization'!
 
 initialize
-	"Initialize class variables"
+	"Initialize class variables and install Disk global"
 	"WindowsFileSystem initialize"
-	Default _ self new! !
+	Default _ self new.
+	Smalltalk at: #Disk put: Default! !
 
 !WindowsFileSystem class methodsFor: 'instance access'!
 
@@ -2690,12 +2691,6 @@ primRemoveDirectory
 
 WindowsSymbolicLink class
     instanceVariableNames: ''!
-
-"==================== File System Global Initialization ===================="
-"Install Disk as the entry point to the file system"
-Smalltalk at: #Disk put: WindowsFileSystem default!
-
-
 
 
 CodeController subclass: #AlwaysAcceptCodeController
