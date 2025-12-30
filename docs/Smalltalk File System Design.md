@@ -1,6 +1,6 @@
 # Smalltalk-80 File System Design
 
-**Version:** 1.1
+**Version:** 1.2
 **Date:** 2025-12-30
 **Status:** Implemented
 
@@ -12,11 +12,12 @@
 1. [Overview](#overview)
 2. [Design Goals](#design-goals)
 3. [Design Rationale](#design-rationale)
-4. [Class Hierarchy](#class-hierarchy)
-5. [Class Specifications](#class-specifications)
-6. [Initialization and Cold Start](#initialization-and-cold-start)
-7. [Usage Examples](#usage-examples)
-8. [Migration from Legacy System](#migration-from-legacy-system)
+4. [Microsoft Compliance](#microsoft-compliance)
+5. [Class Hierarchy](#class-hierarchy)
+6. [Class Specifications](#class-specifications)
+7. [Initialization and Cold Start](#initialization-and-cold-start)
+8. [Usage Examples](#usage-examples)
+9. [Migration from Legacy System](#migration-from-legacy-system)
 
 ---
 
@@ -110,6 +111,57 @@ The `FileSystemNode` base class captures this shared protocol, following .NET's 
 | Common base | `FileSystemInfo` | `FileSystemNode` |
 | Path handling | `Path` (static) | `Path` → `WindowsPath` (instances) |
 | File streaming | `FileStream` | `FileStream` → `WindowsFileStream` |
+
+---
+
+## Microsoft Compliance
+
+Our Windows implementation follows the [Microsoft Naming Files, Paths, and Namespaces](https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file) documentation precisely.
+
+### File Name Validation
+
+**Illegal Characters:**
+- Reserved characters: `< > : " / \ | ? *`
+- Control characters: ASCII 0-31 (NUL through Unit Separator)
+
+**Reserved Names (case-insensitive):**
+- Device names: `CON`, `PRN`, `AUX`, `NUL`
+- Serial ports: `COM1` through `COM9`
+- Parallel ports: `LPT1` through `LPT9`
+- These are reserved even with extensions (e.g., `NUL.txt` is invalid)
+
+**Additional Restrictions:**
+- No trailing dots (`.`) or spaces (` `)
+- Maximum file name length: 255 characters (NTFS)
+- Maximum path length: 260 characters (MAX_PATH)
+
+### UNC Path Support
+
+**Format:** `\\server\share\path\to\file`
+
+Our `WindowsPath` class fully parses and reconstructs UNC paths:
+- `uncServer`: The server name (e.g., "fileserver")
+- `uncShare`: The share name (e.g., "documents")
+- `components`: Additional path components after the share
+
+UNC paths are considered absolute paths.
+
+### Path Separator Handling
+
+Windows accepts both:
+- **Backslash (`\`)**: Primary/canonical separator
+- **Forward slash (`/`)**: Alternate separator
+
+Our implementation:
+1. Accepts both during parsing
+2. Normalizes to backslash internally
+3. Outputs using canonical backslash
+
+### Case Sensitivity
+
+Windows file systems are **case-insensitive** but **case-preserving**:
+- Reserved name validation uses `sameAs:` for case-insensitive comparison
+- File names like `NUL`, `nul`, `Nul` are all rejected
 
 ---
 
@@ -1653,9 +1705,12 @@ reservedNames
        'LPT1' 'LPT2' 'LPT3' 'LPT4' 'LPT5' 'LPT6' 'LPT7' 'LPT8' 'LPT9')!
 
 isValidFileName: aName
-    "Windows-specific validation including reserved names and trailing dots/spaces"
+    "Windows-specific validation including reserved names, trailing dots/spaces,
+     and control characters (ASCII 0-31) per Microsoft documentation."
     | baseName |
     (super isValidFileName: aName) ifFalse: [^false].
+    "Windows doesn't allow control characters (ASCII 0-31)"
+    aName do: [:ch | ch asciiValue < 32 ifTrue: [^false]].
     "Windows doesn't allow trailing dots or spaces"
     (aName last = $. or: [aName last = $ ]) ifTrue: [^false].
     "Check base name without extension against reserved names"
@@ -2006,26 +2061,32 @@ withComponents: anArray
 
 ### WindowsPath (Concrete)
 
-Windows implementation of Path. Handles both forward slash (/) and backslash (\) as path separators.
+Windows implementation of Path. Handles both forward slash (/) and backslash (\) as path separators per Microsoft documentation. Fully supports UNC paths (`\\server\share\path`) as well as drive-letter paths (`C:\folder\file`).
 
 ```smalltalk
 Path subclass: #WindowsPath
-    instanceVariableNames: 'driveLetter'
+    instanceVariableNames: 'driveLetter uncServer uncShare'
     classVariableNames: 'Separator'
     poolDictionaries: ''
     category: 'Files-Windows'!
 
 WindowsPath comment:
-'I am the Windows implementation of Path.
-I handle Windows path semantics including drive letters and UNC paths.
-I accept both forward slash (/) and backslash (\) as separators during parsing,
-but always output paths using the canonical backslash separator.
+'I represent a Windows file system path. I handle path parsing and manipulation
+without any file I/O operations.
 
 Instance Variables:
-    driveLetter   <Character or nil> drive letter or nil for UNC/relative paths
+    driveLetter   <Character|nil> drive letter (C, D, etc.) or nil for UNC/relative paths
+    uncServer     <String|nil> UNC server name (e.g., "server" from "\\server\share")
+    uncShare      <String|nil> UNC share name (e.g., "share" from "\\server\share")
+    components    <Array> path components (directories and filename after root)
 
 Class Variables:
-    Separator     <Character> the primary path separator (backslash on Windows)'!
+    Separator     <Character> the path separator (backslash on Windows)
+
+A WindowsPath can represent:
+- Drive paths: C:\folder\file.txt (driveLetter=C, uncServer=nil, uncShare=nil)
+- UNC paths: \\server\share\folder\file.txt (driveLetter=nil, uncServer="server", uncShare="share")
+- Relative paths: folder\file.txt (driveLetter=nil, uncServer=nil, uncShare=nil)'!
 
 "-------------------- class initialization --------------------"
 
@@ -2058,9 +2119,13 @@ isSeparator: aCharacter
 !WindowsPath methodsFor: 'initialization'!
 
 initializeFromString: aString
-    "Parse a Windows path string.
-     Windows accepts both backslash and forward slash as separators."
+    "Parse a Windows path string per Microsoft UNC conventions.
+     Windows accepts both backslash and forward slash as separators.
+     UNC format: \\server\share\path\to\file"
     | parts startIndex normalized |
+    uncServer := nil.
+    uncShare := nil.
+
     aString isEmpty ifTrue: [
         driveLetter := nil.
         components := #().
@@ -2081,8 +2146,18 @@ initializeFromString: aString
         (normalized size >= 2 and: [(self class isSeparator: (normalized at: 1))
             and: [(self class isSeparator: (normalized at: 2))]])
             ifTrue: [
+                "Parse UNC: \\server\share\rest"
                 driveLetter := nil.
-                startIndex := 3]
+                parts := (normalized copyFrom: 3 to: normalized size)
+                    findTokens: (String with: Separator).
+                parts := parts select: [:p | p notEmpty].
+                parts size >= 1 ifTrue: [uncServer := parts first].
+                parts size >= 2 ifTrue: [uncShare := parts second].
+                "Components are everything after server\share"
+                parts size > 2
+                    ifTrue: [components := parts copyFrom: 3 to: parts size]
+                    ifFalse: [components := #()].
+                ^self]
             ifFalse: [
                 driveLetter := nil.
                 startIndex := 1.
@@ -2103,29 +2178,57 @@ initializeFromString: aString
 !WindowsPath methodsFor: 'accessing'!
 
 driveLetter
-    "Answer the drive letter or nil"
+    "Answer the drive letter or nil."
     ^driveLetter!
 
+uncServer
+    "Answer the UNC server name or nil."
+    ^uncServer!
+
+uncShare
+    "Answer the UNC share name or nil."
+    ^uncShare!
+
+components
+    "Answer the path components."
+    ^components!
+
 fileName
-    "Answer the last component (filename)"
+    "Answer the last component (filename)."
     components isEmpty ifTrue: [^''].
     ^components last!
 
+extension
+    "Answer the file extension or empty string."
+    | name dotIndex |
+    name := self fileName.
+    dotIndex := name findLast: [:c | c = $.].
+    dotIndex = 0 ifTrue: [^''].
+    ^name copyFrom: dotIndex + 1 to: name size!
+
 directoryPath
-    "Answer a new path without the filename"
+    "Answer a new path without the filename."
     | newPath |
     components size <= 1 ifTrue: [
+        self isUNC ifTrue: [
+            ^self class fromString: '\\', uncServer, '\', uncShare].
         ^self class fromString: (driveLetter ifNil: [''] ifNotNil: [driveLetter asString, ':'])].
     newPath := self class new.
-    newPath setDriveLetter: driveLetter components: components allButLast.
+    newPath setDriveLetter: driveLetter uncServer: uncServer uncShare: uncShare components: components allButLast.
     ^newPath!
 
 asString
-    "Answer the path as a string (uses canonical backslash separator)"
+    "Answer the path as a string per Microsoft UNC conventions."
     | stream |
     stream := WriteStream on: (String new: 100).
-    driveLetter notNil ifTrue: [
-        stream nextPut: driveLetter; nextPut: $:].
+    self isUNC ifTrue: [
+        "UNC path: \\server\share\path\..."
+        stream nextPut: Separator; nextPut: Separator.
+        stream nextPutAll: uncServer.
+        stream nextPut: Separator; nextPutAll: uncShare]
+    ifFalse: [
+        driveLetter notNil ifTrue: [
+            stream nextPut: driveLetter; nextPut: $:]].
     components do: [:comp |
         stream nextPut: Separator; nextPutAll: comp].
     stream position = 0 ifTrue: [^'.'].
@@ -2136,35 +2239,41 @@ asString
 !WindowsPath methodsFor: 'testing'!
 
 isAbsolute
-    "Answer whether this is an absolute path"
-    ^driveLetter notNil!
+    "Answer whether this is an absolute path.
+     Both drive paths (C:\) and UNC paths (\\server\share) are absolute."
+    ^driveLetter notNil or: [self isUNC]!
 
 isRelative
-    "Answer whether this is a relative path"
-    ^driveLetter isNil!
+    "Answer whether this is a relative path."
+    ^self isAbsolute not!
 
 isEmpty
-    "Answer whether this path is empty"
-    ^driveLetter isNil and: [components isEmpty]!
+    "Answer whether this path is empty."
+    ^driveLetter isNil and: [uncServer isNil and: [components isEmpty]]!
 
 isRoot
-    "Answer whether this path represents a root directory"
-    ^components isEmpty and: [self isAbsolute]! !
+    "Answer whether this path represents a root directory.
+     For drive paths: C:\ is root. For UNC paths: \\server\share is root."
+    ^components isEmpty and: [self isAbsolute]!
+
+isUNC
+    "Answer whether this is a UNC path (\\server\share)."
+    ^uncServer notNil and: [uncShare notNil]! !
 
 "-------------------- navigation --------------------"
 
 !WindowsPath methodsFor: 'operations'!
 
 / aString
-    "Answer a new path with aString appended as a component"
+    "Answer a new path with aString appended as a component."
     | newPath newComponents |
     newComponents := components copyWith: aString.
     newPath := self class new.
-    newPath setDriveLetter: driveLetter components: newComponents.
+    newPath setDriveLetter: driveLetter uncServer: uncServer uncShare: uncShare components: newComponents.
     ^newPath!
 
 withExtension: extString
-    "Answer a new path with the given extension"
+    "Answer a new path with the given extension."
     | baseName newName |
     components isEmpty ifTrue: [^self].
     baseName := self fileName.
@@ -2178,7 +2287,18 @@ withExtension: extString
 !WindowsPath methodsFor: 'private'!
 
 setDriveLetter: drive components: comps
+    "Set drive letter and components (for backward compatibility)."
     driveLetter := drive.
+    uncServer := nil.
+    uncShare := nil.
+    components := comps.
+    ^self!
+
+setDriveLetter: drive uncServer: server uncShare: share components: comps
+    "Set all path components including UNC server and share."
+    driveLetter := drive.
+    uncServer := server.
+    uncShare := share.
     components := comps.
     ^self! !
 ```
