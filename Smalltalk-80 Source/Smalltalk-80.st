@@ -42,26 +42,189 @@ labels: aString selectors: selArray
 confirm  "ActionMenu confirm"
 	^ (ActionMenu labels: 'confirm\abort' withCRs selectors: nil) startUp = 1! !
 
-"==================== SIMPLIFIED FILE SYSTEM ARCHITECTURE ===================="
+"==================== MODERNIZED FILE SYSTEM ARCHITECTURE ===================="
 "
-This is a redesigned file system that eliminates the legacy Alto FilePage concept.
-Key classes:
-  - WindowsFileStream: Primary file I/O (direct handle-based streaming)
-  - WindowsFile: File metadata only (exists, size, delete, rename)
-  - WindowsDirectory: Directory operations (list, create files/dirs)
-  - WindowsPath: Path manipulation (parsing, building paths)
+This file system architecture follows the principle: 'Program to abstractions,
+instantiate concrete classes.'
 
-The old page-based architecture has been removed. Files are now treated as
-what they actually are in Windows: contiguous byte streams accessed via handles.
+Abstract Classes:
+  - Path: Platform-independent path manipulation protocol
+  - FileSystemNode: Common base for files and directories
+  - File: Abstract file metadata
+  - Directory: Abstract directory operations
+  - FileSystem: Platform knowledge and concrete class factories
+
+Concrete Windows Classes:
+  - WindowsPath: Windows path semantics (backslash, drive letters)
+  - WindowsFile: Windows file metadata via primitives
+  - WindowsDirectory: Windows directory operations via primitives
+  - WindowsFileStream: Direct handle-based file I/O
+  - WindowsFileSystem: Windows file system properties and factories
+
+The legacy Alto page-based architecture (FilePage) has been eliminated.
+Files are accessed as byte streams via Windows handles.
+
+Entry Point: The 'Disk' global provides the file system entry point.
 "
+
+"==================== Path (Abstract) ===================="
+
+Object subclass: #Path
+	instanceVariableNames: 'components'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+Path comment:
+'I am the abstract base class for file system paths.
+I provide platform-independent path manipulation.
+
+Instance Variables:
+    components  <Array of String> path components
+
+Concrete subclasses implement platform-specific parsing and formatting.'!
+
+!Path class methodsFor: 'instance creation'!
+
+fromString: aString
+	"Parse a path string. Delegates to Disk for concrete class."
+	^Disk pathClass fromString: aString!
+
+root
+	"Answer a path representing the root directory"
+	self subclassResponsibility!
+
+separator
+	"Answer the path separator character"
+	self subclassResponsibility!
+
+withComponents: anArray
+	"Answer a new instance with the given components"
+	^self new setComponents: anArray! !
+
+!Path methodsFor: 'accessing'!
+
+components
+	"Answer the path components"
+	^components!
+
+fileName
+	"Answer the last component (file name)"
+	components isEmpty ifTrue: [^''].
+	^components last!
+
+directoryPath
+	"Answer a Path for the parent directory"
+	components size <= 1 ifTrue: [^nil].
+	^self class withComponents: (components copyFrom: 1 to: components size - 1)!
+
+extension
+	"Answer the file extension (without dot), or empty string"
+	| name dotIndex |
+	name _ self fileName.
+	name isEmpty ifTrue: [^''].
+	dotIndex _ name findLast: [:ch | ch = $.].
+	dotIndex = 0 ifTrue: [^''].
+	^name copyFrom: dotIndex + 1 to: name size!
+
+baseName
+	"Answer the file name without extension"
+	| name dotIndex |
+	name _ self fileName.
+	name isEmpty ifTrue: [^''].
+	dotIndex _ name findLast: [:ch | ch = $.].
+	dotIndex = 0 ifTrue: [^name].
+	^name copyFrom: 1 to: dotIndex - 1! !
+
+!Path methodsFor: 'testing'!
+
+isAbsolute
+	"Answer whether this is an absolute path"
+	self subclassResponsibility!
+
+isRelative
+	"Answer whether this is a relative path"
+	^self isAbsolute not!
+
+isRoot
+	"Answer whether this path represents a root directory"
+	self subclassResponsibility!
+
+isEmpty
+	"Answer whether this path is empty"
+	^components isEmpty! !
+
+!Path methodsFor: 'navigation'!
+
+parent
+	"Answer the parent Path, or nil if at root"
+	^self directoryPath!
+
+/ aString
+	"Answer a new Path with aString appended as a component"
+	^self class withComponents: (components copyWith: aString)!
+
+resolve: aRelativePath
+	"Resolve a relative path against this path"
+	aRelativePath isAbsolute ifTrue: [^aRelativePath].
+	^self class withComponents: (components, aRelativePath components)! !
+
+!Path methodsFor: 'conversion'!
+
+asString
+	"Answer the path as a string"
+	self subclassResponsibility!
+
+printOn: aStream
+	"Print the path"
+	aStream nextPutAll: self class name.
+	aStream nextPutAll: '('.
+	aStream nextPutAll: self asString.
+	aStream nextPutAll: ')'!
+
+directory
+	"Answer a Directory for this path"
+	^Disk directoryClass on: self asString!
+
+file
+	"Answer a File for this path"
+	^Disk fileClass on: self asString! !
+
+!Path methodsFor: 'comparing'!
+
+= aPath
+	"Answer whether two paths are equal"
+	| fs |
+	self species = aPath species ifFalse: [^false].
+	self components size = aPath components size ifFalse: [^false].
+	fs _ Disk.
+	self components with: aPath components do: [:a :b |
+		(fs namesEqual: a and: b) ifFalse: [^false]].
+	^true!
+
+hash
+	"Answer a hash value consistent with ="
+	| fs |
+	fs _ Disk.
+	^components inject: 0 into: [:h :comp |
+		h bitXor: (fs hashForName: comp)]! !
+
+!Path methodsFor: 'private'!
+
+setComponents: anArray
+	"Set the path components"
+	components _ anArray! !
+
+Path class
+	instanceVariableNames: ''!
 
 "==================== WindowsPath ===================="
 
-Object subclass: #WindowsPath
-    instanceVariableNames: 'driveLetter components'
-    classVariableNames: 'Separator'
-    poolDictionaries: ''
-    category: 'Files-Windows'!
+Path subclass: #WindowsPath
+	instanceVariableNames: 'driveLetter'
+	classVariableNames: 'Separator'
+	poolDictionaries: ''
+	category: 'Files-Windows'!
 
 WindowsPath comment:
 'I represent a Windows file system path. I handle path parsing and manipulation
@@ -184,7 +347,11 @@ isRelative
 
 isEmpty
     "Answer whether this path is empty."
-    ^driveLetter isNil and: [components isEmpty]! !
+    ^driveLetter isNil and: [components isEmpty]!
+
+isRoot
+    "Answer whether this path represents a root directory."
+    ^components isEmpty and: [self isAbsolute]! !
 
 !WindowsPath methodsFor: 'operations'!
 
@@ -222,6 +389,601 @@ WindowsPath class
     instanceVariableNames: ''!
 
 WindowsPath initialize!
+
+"==================== FileSystemNode (Abstract) ===================="
+
+Object subclass: #FileSystemNode
+	instanceVariableNames: 'pathName'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+FileSystemNode comment:
+'I am the abstract base class for file system entries (files and directories).
+I define the common protocol for accessing paths, testing existence, and
+manipulating attributes.
+
+Instance Variables:
+    pathName    <String> full path to this entry'!
+
+!FileSystemNode class methodsFor: 'instance creation'!
+
+on: aPathString
+	"Answer a new instance for the given path"
+	^self new initPathName: aPathString! !
+
+!FileSystemNode methodsFor: 'accessing'!
+
+name
+	"Answer the local name (last component of path)"
+	^self path fileName!
+
+fullName
+	"Answer the full path as a String"
+	^pathName!
+
+pathName
+	"Answer the full path (alias for fullName)"
+	^pathName!
+
+pathName: aString
+	"Set the full path"
+	pathName _ aString!
+
+parent
+	"Answer the parent Directory"
+	| parentPath |
+	parentPath _ self path parent.
+	parentPath isNil ifTrue: [^nil].
+	^self fileSystem directoryClass on: parentPath asString!
+
+path
+	"Answer a Path object for this entry"
+	^self fileSystem pathFromString: pathName!
+
+fileSystem
+	"Answer the FileSystem for this entry"
+	^Disk! !
+
+!FileSystemNode methodsFor: 'testing'!
+
+exists
+	"Answer whether this entry exists in the file system"
+	self subclassResponsibility!
+
+isFile
+	"Answer whether this entry is a file"
+	^false!
+
+isDirectory
+	"Answer whether this entry is a directory"
+	^false! !
+
+!FileSystemNode methodsFor: 'attributes'!
+
+isHidden
+	"Answer whether this entry is hidden"
+	self subclassResponsibility!
+
+isReadOnly
+	"Answer whether this entry is read-only"
+	self subclassResponsibility!
+
+creationTime
+	"Answer the creation time"
+	self subclassResponsibility!
+
+modificationTime
+	"Answer the last modification time"
+	self subclassResponsibility! !
+
+!FileSystemNode methodsFor: 'operations'!
+
+delete
+	"Delete this entry from the file system"
+	self subclassResponsibility!
+
+renameTo: newName
+	"Rename this entry to newName (in same directory)"
+	self subclassResponsibility! !
+
+!FileSystemNode methodsFor: 'printing'!
+
+printOn: aStream
+	aStream nextPutAll: self class name.
+	aStream nextPutAll: ' on '.
+	pathName printOn: aStream! !
+
+!FileSystemNode methodsFor: 'private'!
+
+initPathName: aString
+	"Initialize the path"
+	pathName _ aString! !
+
+FileSystemNode class
+	instanceVariableNames: ''!
+
+"==================== File (Abstract) ===================="
+
+FileSystemNode subclass: #File
+	instanceVariableNames: 'binary'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+File comment:
+'I am the abstract base class for files.
+I represent file metadata and provide methods to create streams for reading/writing.
+
+Instance Variables:
+    binary  <Boolean> true if file should be accessed in binary mode'!
+
+!File class methodsFor: 'instance creation'!
+
+named: aPathString
+	"Answer a File for the given path. Delegates to Disk for concrete class."
+	^Disk fileClass on: aPathString! !
+
+!File methodsFor: 'testing'!
+
+isFile
+	"Answer true - I am a file"
+	^true!
+
+isBinary
+	"Answer whether this file is in binary mode"
+	^binary == true!
+
+isText
+	"Answer whether this file is in text mode"
+	^binary ~~ true! !
+
+!File methodsFor: 'accessing'!
+
+size
+	"Answer the file size in bytes"
+	self subclassResponsibility!
+
+extension
+	"Answer the file extension (without dot), or empty string"
+	| name dotIndex |
+	name _ self name.
+	dotIndex _ name findLast: [:ch | ch = $.].
+	dotIndex = 0 ifTrue: [^''].
+	^name copyFrom: dotIndex + 1 to: name size!
+
+baseName
+	"Answer the file name without extension"
+	| name dotIndex |
+	name _ self name.
+	dotIndex _ name findLast: [:ch | ch = $.].
+	dotIndex = 0 ifTrue: [^name].
+	^name copyFrom: 1 to: dotIndex - 1!
+
+directory
+	"Answer the parent Directory"
+	^self parent! !
+
+!File methodsFor: 'modes'!
+
+binary
+	"Set binary mode for subsequent stream operations"
+	binary _ true!
+
+text
+	"Set text mode for subsequent stream operations"
+	binary _ false! !
+
+!File methodsFor: 'streaming'!
+
+readStream
+	"Answer a FileStream for reading"
+	self subclassResponsibility!
+
+writeStream
+	"Answer a FileStream for writing (create/truncate)"
+	self subclassResponsibility!
+
+readWriteStream
+	"Answer a FileStream for read/write"
+	self subclassResponsibility!
+
+appendStream
+	"Answer a FileStream for appending"
+	self subclassResponsibility!
+
+asFileStream
+	"Answer a default FileStream (read/write)"
+	^self readWriteStream! !
+
+!File methodsFor: 'content access'!
+
+contents
+	"Read and answer the entire file contents as a String"
+	| stream contents |
+	stream _ self readStream.
+	contents _ stream contentsOfEntireFile.
+	^contents!
+
+contents: aString
+	"Write aString as the entire file contents"
+	| stream |
+	stream _ self writeStream.
+	stream nextPutAll: aString.
+	stream close! !
+
+!File methodsFor: 'initialization'!
+
+initialize
+	"Initialize instance variables"
+	binary _ false! !
+
+File class
+	instanceVariableNames: ''!
+
+"==================== Directory (Abstract) ===================="
+
+FileSystemNode subclass: #Directory
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+Directory comment:
+'I am the abstract base class for directories.
+I define the protocol for listing, creating, and managing files and subdirectories.
+
+Concrete subclasses implement platform-specific directory operations.'!
+
+!Directory class methodsFor: 'instance creation'!
+
+on: aPathString
+	"Answer a Directory for the given path. Delegates to Disk for concrete class."
+	^Disk directoryClass on: aPathString! !
+
+!Directory methodsFor: 'testing'!
+
+isDirectory
+	"Answer true - I am a directory"
+	^true!
+
+isEmpty
+	"Answer whether this directory contains no entries"
+	^self entries isEmpty!
+
+includes: aFileSystemNode
+	"Answer whether this directory contains the given entry"
+	^self includesKey: aFileSystemNode name!
+
+includesKey: aName
+	"Answer whether this directory contains an entry with the given name"
+	^self entries anySatisfy: [:entry |
+		Disk namesEqual: entry and: aName]! !
+
+!Directory methodsFor: 'enumeration'!
+
+entries
+	"Answer all entries (files and subdirectories) as a collection of names"
+	self subclassResponsibility!
+
+files
+	"Answer all file names in this directory"
+	self subclassResponsibility!
+
+directories
+	"Answer all subdirectory names"
+	self subclassResponsibility!
+
+fileNames
+	"Answer the names of all files"
+	^self files!
+
+directoryNames
+	"Answer the names of all subdirectories"
+	^self directories!
+
+do: aBlock
+	"Evaluate aBlock for each file"
+	self files do: [:name |
+		aBlock value: (self fileNamed: name)]!
+
+filesDo: aBlock
+	"Evaluate aBlock for each file"
+	self do: aBlock!
+
+directoriesDo: aBlock
+	"Evaluate aBlock for each subdirectory"
+	self directories do: [:name |
+		aBlock value: (self directoryNamed: name)]! !
+
+!Directory methodsFor: 'file access'!
+
+fileNamed: aName
+	"Answer a File object for the named file"
+	self subclassResponsibility!
+
+directoryNamed: aName
+	"Answer a Directory object for the named subdirectory"
+	self subclassResponsibility!
+
+file: aName
+	"Answer a read/write FileStream on the named file"
+	self subclassResponsibility!
+
+oldFile: aName
+	"Answer a read-only FileStream on an existing file"
+	self subclassResponsibility!
+
+newFile: aName
+	"Answer a write FileStream on a new file (create/truncate)"
+	self subclassResponsibility! !
+
+!Directory methodsFor: 'modification'!
+
+createFile: aName
+	"Create a new empty file with the given name, answer the File"
+	self subclassResponsibility!
+
+createDirectory: aName
+	"Create a new subdirectory with the given name, answer the Directory"
+	self subclassResponsibility!
+
+create
+	"Create this directory if it doesn't exist"
+	self subclassResponsibility!
+
+remove: aFileSystemNode
+	"Remove the given entry from this directory"
+	aFileSystemNode delete!
+
+removeKey: aName
+	"Remove the entry with the given name"
+	(self fileNamed: aName) delete! !
+
+!Directory methodsFor: 'path utilities'!
+
+fullNameFor: aName
+	"Answer the full path for a file/directory name in this directory"
+	self subclassResponsibility! !
+
+Directory class
+	instanceVariableNames: ''!
+
+"==================== FileSystem (Abstract) ===================="
+
+Object subclass: #FileSystem
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+FileSystem comment:
+'I am the abstract base class representing a platform file system.
+I provide:
+- Concrete class factories for platform-specific implementations
+- File system characteristics (case sensitivity, name constraints, etc.)
+- Directory access (root, current, home, temp)
+
+Concrete subclasses implement platform-specific behavior.'!
+
+!FileSystem class methodsFor: 'instance access'!
+
+default
+	"Answer the default FileSystem instance"
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'concrete class factories'!
+
+pathClass
+	"Answer the concrete Path class for this file system"
+	self subclassResponsibility!
+
+fileClass
+	"Answer the concrete File class for this file system"
+	self subclassResponsibility!
+
+directoryClass
+	"Answer the concrete Directory class for this file system"
+	self subclassResponsibility!
+
+streamClass
+	"Answer the concrete FileStream class for this file system"
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'directory access'!
+
+currentDirectory
+	"Answer the current working directory"
+	self subclassResponsibility!
+
+rootDirectory
+	"Answer the root directory of the default volume"
+	self subclassResponsibility!
+
+temporaryDirectory
+	"Answer the system temporary directory"
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'path factory'!
+
+pathFromString: aString
+	"Answer a Path object parsed from aString"
+	^self pathClass fromString: aString! !
+
+!FileSystem methodsFor: 'naming semantics'!
+
+isCaseSensitive
+	"Answer whether file names are case-sensitive"
+	self subclassResponsibility!
+
+isCasePreserving
+	"Answer whether file name case is preserved"
+	self subclassResponsibility!
+
+namesEqual: name1 and: name2
+	"Answer whether the two names refer to the same file"
+	self isCaseSensitive
+		ifTrue: [^name1 = name2]
+		ifFalse: [^name1 sameAs: name2]!
+
+hashForName: aName
+	"Answer a hash value for the name, consistent with namesEqual:and:"
+	self isCaseSensitive
+		ifTrue: [^aName hash]
+		ifFalse: [^aName asLowercase hash]! !
+
+!FileSystem methodsFor: 'name constraints'!
+
+maxFileNameLength
+	"Answer the maximum length of a single file name component"
+	self subclassResponsibility!
+
+illegalCharacters
+	"Answer a collection of characters not allowed in file names"
+	self subclassResponsibility!
+
+isValidFileName: aName
+	"Answer whether aName is a valid file name"
+	aName isEmpty ifTrue: [^false].
+	aName size > self maxFileNameLength ifTrue: [^false].
+	aName do: [:ch |
+		(self illegalCharacters includes: ch) ifTrue: [^false]].
+	^true! !
+
+!FileSystem methodsFor: 'path characteristics'!
+
+pathSeparator
+	"Answer the primary path separator character"
+	self subclassResponsibility!
+
+isAbsolutePath: aString
+	"Answer whether aString represents an absolute path"
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'file operations'!
+
+file: fileDesignator
+	"Answer a read/write stream on the named file"
+	^self currentDirectory file: fileDesignator!
+
+oldFile: fileDesignator
+	"Answer a read stream on an existing file"
+	^self currentDirectory oldFile: fileDesignator!
+
+newFile: fileDesignator
+	"Answer a write stream on a new file"
+	^self currentDirectory newFile: fileDesignator! !
+
+FileSystem class
+	instanceVariableNames: ''!
+
+"==================== WindowsFileSystem ===================="
+
+FileSystem subclass: #WindowsFileSystem
+	instanceVariableNames: ''
+	classVariableNames: 'Default'
+	poolDictionaries: ''
+	category: 'Files-Windows'!
+
+WindowsFileSystem comment:
+'I am the Windows implementation of FileSystem.
+I provide Windows-specific file system behavior including NTFS characteristics.
+
+Class Variables:
+    Default     <WindowsFileSystem> the singleton instance'!
+
+!WindowsFileSystem class methodsFor: 'class initialization'!
+
+initialize
+	"Initialize class variables"
+	"WindowsFileSystem initialize"
+	Default _ self new! !
+
+!WindowsFileSystem class methodsFor: 'instance access'!
+
+default
+	"Answer the singleton instance"
+	Default isNil ifTrue: [Default _ self new].
+	^Default! !
+
+!WindowsFileSystem methodsFor: 'concrete class factories'!
+
+pathClass
+	"Answer WindowsPath"
+	^WindowsPath!
+
+fileClass
+	"Answer WindowsFile"
+	^WindowsFile!
+
+directoryClass
+	"Answer WindowsDirectory"
+	^WindowsDirectory!
+
+streamClass
+	"Answer WindowsFileStream"
+	^WindowsFileStream! !
+
+!WindowsFileSystem methodsFor: 'directory access'!
+
+currentDirectory
+	"Answer the current working directory"
+	^WindowsDirectory on: '.'!
+
+rootDirectory
+	"Answer the root directory of the default volume (C:\)"
+	^WindowsDirectory on: 'C:\'!
+
+temporaryDirectory
+	"Answer the system temporary directory"
+	^WindowsDirectory on: (self primGetTempDirectory)!
+
+primGetTempDirectory
+	"Answer temp directory path"
+	<primitive: 150>
+	^'C:\Temp'! !
+
+!WindowsFileSystem methodsFor: 'naming semantics'!
+
+isCaseSensitive
+	"Windows is case-insensitive"
+	^false!
+
+isCasePreserving
+	"Windows preserves case"
+	^true! !
+
+!WindowsFileSystem methodsFor: 'name constraints'!
+
+maxFileNameLength
+	"NTFS maximum file name length"
+	^255!
+
+illegalCharacters
+	"Characters not allowed in Windows file names"
+	^#($\ $/ $: $* $? $" $< $> $|)! !
+
+!WindowsFileSystem methodsFor: 'path characteristics'!
+
+pathSeparator
+	"Primary path separator is backslash"
+	^$\!
+
+isAbsolutePath: aString
+	"Test for absolute path (C:\ or \\server\share)"
+	aString isEmpty ifTrue: [^false].
+	"UNC path"
+	(aString beginsWith: '\\') ifTrue: [^true].
+	"Drive letter path"
+	(aString size >= 3 and: [
+		(aString at: 2) = $: and: [
+			(aString at: 3) = $\ or: [(aString at: 3) = $/]]]) ifTrue: [^true].
+	^false! !
+
+WindowsFileSystem class
+	instanceVariableNames: ''!
+
+WindowsFileSystem initialize!
 
 "==================== WindowsFileStream ===================="
 
@@ -596,6 +1358,47 @@ open: modeValue
 
     modeValue = AppendMode ifTrue: [self setToEnd]! !
 
+!WindowsFileStream methodsFor: 'fileIn/Out'!
+
+fileIn
+	"File in the contents of this stream.
+	 Guarantee stream is readOnly before fileIn for efficiency."
+	| val |
+	Transcript cr; show: 'Filing in from: ', self name; cr.
+	self readOnly.
+	Cursor read showWhile: [
+		[self atEnd] whileFalse: [
+			self skipSeparators.
+			val _ (self peekFor: $!)
+				ifTrue: [(Compiler evaluate: self nextChunk logged: false)
+						 scanFrom: self]
+				ifFalse: [Compiler evaluate: self nextChunk logged: true]].
+		self close].
+	^val!
+
+skipSeparators
+	"Skip whitespace characters"
+	[self atEnd not and: [self peek isSeparator]]
+		whileTrue: [self next]!
+
+peekFor: anObject
+	"Answer true and advance if next element equals anObject"
+	self peek = anObject
+		ifTrue: [self next. ^true]
+		ifFalse: [^false]!
+
+timeStamp
+	"Write a timestamp"
+	| stream |
+	stream _ WriteStream on: (String new: 50).
+	Smalltalk timeStamp: stream.
+	self nextChunkPut: stream contents.
+	self cr!
+
+emphasis: ignored
+	"No-op for plain file streams - allows compatibility with streams that carry emphasis"
+	^self! !
+
 !WindowsFileStream methodsFor: 'primitives'!
 
 primOpen: path accessMode: access shareMode: share createMode: create
@@ -633,18 +1436,18 @@ WindowsFileStream initialize!
 
 "==================== WindowsFile ===================="
 
-Object subclass: #WindowsFile
-    instanceVariableNames: 'pathName'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: 'Files-Windows'!
+File subclass: #WindowsFile
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Windows'!
 
 WindowsFile comment:
-'I represent file metadata without holding a file handle.
-I am used for file operations like exists, size, delete, rename, and creating streams.
+'I am the Windows implementation of File.
+I use Windows API primitives to access file metadata and attributes.
 
-Instance Variables:
-    pathName    <String> full path to the file'!
+Inherits from File (abstract) which inherits from FileSystemNode.
+Instance variable pathName is inherited from FileSystemNode.'!
 
 !WindowsFile class methodsFor: 'instance creation'!
 
@@ -754,18 +1557,18 @@ WindowsFile class
 
 "==================== WindowsDirectory ===================="
 
-Object subclass: #WindowsDirectory
-    instanceVariableNames: 'pathName'
-    classVariableNames: 'Separator ExternalReferences'
-    poolDictionaries: 'FilePool'
-    category: 'Files-Windows'!
+Directory subclass: #WindowsDirectory
+	instanceVariableNames: ''
+	classVariableNames: 'Separator ExternalReferences'
+	poolDictionaries: 'FilePool'
+	category: 'Files-Windows'!
 
 WindowsDirectory comment:
-'I represent a directory in the Windows file system.
-I provide directory operations without the legacy page allocation concept.
+'I am the Windows implementation of Directory.
+I use Windows API primitives to implement directory operations.
 
-Instance Variables:
-    pathName    <String> full path to the directory
+Inherits from Directory (abstract) which inherits from FileSystemNode.
+Instance variable pathName is inherited from FileSystemNode.
 
 Class Variables:
     Separator           <Character> path separator (backslash)
@@ -1102,6 +1905,10 @@ WindowsDirectory class
     instanceVariableNames: ''!
 
 WindowsDirectory initialize!
+
+"==================== File System Global Initialization ===================="
+"Install Disk as the entry point to the file system"
+Smalltalk at: #Disk put: WindowsFileSystem default!
 
 
 
