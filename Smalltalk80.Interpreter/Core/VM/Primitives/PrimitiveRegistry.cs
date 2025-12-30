@@ -307,6 +307,19 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         // Enables atomic polling of mouse button state for tight loops (PopUpMenu, etc.)
         registry.Register(202, new InputOperations.BitState());
 
+        // Link primitives (230-239) - Windows NTFS link support
+        // Symbolic links, hard links, and junctions
+        registry.Register(230, new LinkPrimitives.CreateSymbolicLink());
+        registry.Register(231, new LinkPrimitives.CreateHardLink());
+        registry.Register(232, new LinkPrimitives.CreateJunction());
+        registry.Register(233, new LinkPrimitives.GetFileAttributesEx());
+        registry.Register(234, new LinkPrimitives.GetReparseTag());
+        registry.Register(235, new LinkPrimitives.GetSymbolicLinkTarget());
+        registry.Register(236, new LinkPrimitives.GetJunctionTarget());
+        registry.Register(237, new LinkPrimitives.GetFinalPath());
+        registry.Register(238, new LinkPrimitives.GetHardLinkCount());
+        registry.Register(239, new LinkPrimitives.DeleteReparsePoint());
+
         return registry;
     }
 }
