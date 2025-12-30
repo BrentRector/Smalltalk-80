@@ -272,28 +272,38 @@ fromString: aString
 
 separator
     "Answer the path separator character."
-    ^Separator! !
+    ^Separator!
+
+isSeparator: aCharacter
+    "Answer whether aCharacter is a path separator.
+     Windows accepts both backslash and forward slash."
+    ^aCharacter = $\ or: [aCharacter = $/]! !
 
 !WindowsPath methodsFor: 'initialization'!
 
 initializeFromString: aString
-    "Parse a Windows path string."
-    | parts startIndex |
+    "Parse a Windows path string.
+     Windows accepts both backslash and forward slash as separators."
+    | parts startIndex normalized |
     aString isEmpty ifTrue: [
         driveLetter _ nil.
         components _ #().
         ^self].
 
+    "Normalize forward slashes to backslashes for consistent parsing"
+    normalized _ aString copyReplaceAll: '/' with: '\'.
+
     "Check for drive letter (C:)"
-    (aString size >= 2 and: [(aString at: 2) = $:]) ifTrue: [
-        driveLetter _ aString at: 1.
+    (normalized size >= 2 and: [(normalized at: 2) = $:]) ifTrue: [
+        driveLetter _ normalized at: 1.
         startIndex _ 3.
         "Skip leading separator after drive"
-        (aString size >= 3 and: [(aString at: 3) = Separator])
+        (normalized size >= 3 and: [(self class isSeparator: (normalized at: 3))])
             ifTrue: [startIndex _ 4]]
     ifFalse: [
         "Check for UNC path (\\server\share)"
-        (aString size >= 2 and: [(aString at: 1) = Separator and: [(aString at: 2) = Separator]])
+        (normalized size >= 2 and: [(self class isSeparator: (normalized at: 1))
+            and: [(self class isSeparator: (normalized at: 2))]])
             ifTrue: [
                 driveLetter _ nil.
                 startIndex _ 3]
@@ -301,13 +311,13 @@ initializeFromString: aString
                 driveLetter _ nil.
                 startIndex _ 1.
                 "Skip leading separator for absolute paths"
-                ((aString at: 1) = Separator) ifTrue: [startIndex _ 2]]].
+                (self class isSeparator: (normalized at: 1)) ifTrue: [startIndex _ 2]]].
 
-    "Parse remaining components"
-    startIndex > aString size
+    "Parse remaining components - split on backslash"
+    startIndex > normalized size
         ifTrue: [components _ #()]
         ifFalse: [
-            parts _ (aString copyFrom: startIndex to: aString size)
+            parts _ (normalized copyFrom: startIndex to: normalized size)
                 findTokens: (String with: Separator).
             components _ parts select: [:p | p notEmpty]].
     ^self! !
