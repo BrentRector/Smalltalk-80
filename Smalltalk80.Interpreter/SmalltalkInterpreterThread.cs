@@ -60,36 +60,40 @@ public class SmalltalkInterpreterThread
             }
             Console.WriteLine("[Smalltalk Thread] Window displayed - proceeding");
 
-            // STEP 1.5: Initialize ProcessorScheduler with high-priority bootstrap process
-            // This ensures all init expressions run at priority 8, preventing preemption
-            // when they fork processes (like Delay's timing process also at priority 8)
-            Console.WriteLine("[Smalltalk Thread] Initializing ProcessorScheduler for runtime...");
-            var schedulerInit = new ProcessSchedulerInitializer(_context.HeapManager, _context.VMMetadata);
-            schedulerInit.InitializeForRuntime();
+            // Check if restoring from saved image vs cold start
+            bool isRestore = _context.Bundle == null;
 
-            // STEP 2: Execute init expressions (skip if restoring from saved image)
-            if (_context.Bundle != null)
+            if (isRestore)
             {
-                Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
-                ExecuteInitExpressions();
+                // RESTORE PATH: Resume saved active process
+                Console.WriteLine("[Smalltalk Thread] Resuming from saved image...");
+                ResumeFromSnapshot();
             }
             else
             {
-                Console.WriteLine("[Smalltalk Thread] Skipping init expressions (restored from saved image)");
-            }
+                // COLD START PATH: Initialize and run normally
+                // STEP 1.5: Initialize ProcessorScheduler with high-priority bootstrap process
+                Console.WriteLine("[Smalltalk Thread] Initializing ProcessorScheduler for runtime...");
+                var schedulerInit = new ProcessSchedulerInitializer(_context.HeapManager, _context.VMMetadata);
+                schedulerInit.InitializeForRuntime();
 
-            // STEP 3: Execute user expression if requested (skips controller loop)
-            if (_context.Config.ExecuteExpression != null)
-            {
-                Console.WriteLine("[Smalltalk Thread] Executing user expression...");
-                ExecuteUserExpression();
-                Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
-                return;
-            }
+                // STEP 2: Execute init expressions
+                Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
+                ExecuteInitExpressions();
 
-            // STEP 4: Start MVC controller loop (runs forever)
-            Console.WriteLine("[Smalltalk Thread] Starting controller loop...");
-            StartControllerLoop();
+                // STEP 3: Execute user expression if requested (skips controller loop)
+                if (_context.Config.ExecuteExpression != null)
+                {
+                    Console.WriteLine("[Smalltalk Thread] Executing user expression...");
+                    ExecuteUserExpression();
+                    Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
+                    return;
+                }
+
+                // STEP 4: Start MVC controller loop (runs forever)
+                Console.WriteLine("[Smalltalk Thread] Starting controller loop...");
+                StartControllerLoop();
+            }
 
             // Note: We only reach here if the controller loop exits (unexpected)
             Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
@@ -335,6 +339,61 @@ public class SmalltalkInterpreterThread
 
     // NOTE: Dictionary operations are now in RuntimeDictionaryService
     // Use _vm.RuntimeServices for canonical global lookup operations
+
+    /// <summary>
+    /// Resumes execution from a saved snapshot image.
+    /// The saved activeProcess is inside snapshotAs:thenQuit: just after snapshotPrimitive.
+    /// We push the receiver (Smalltalk) onto the stack as the return value of snapshotPrimitive,
+    /// which makes justSnapped false and triggers the post-snapshot restore code.
+    /// </summary>
+    private void ResumeFromSnapshot()
+    {
+        Console.WriteLine("\n=== Resuming from Snapshot ===");
+
+        var heap = _context.HeapManager;
+        var metadata = _context.VMMetadata;
+
+        // Step 1: Get the saved activeProcess from ProcessorScheduler
+        var schedulerOOP = metadata.ProcessorScheduler;
+        var activeProcessOOP = heap.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+
+        if (activeProcessOOP == metadata.KnownObjects.Nil)
+        {
+            throw new InvalidOperationException("No active process found in restored image");
+        }
+
+        Console.WriteLine($"  Active process: {activeProcessOOP}");
+
+        // Step 2: Get the process's suspended context
+        var suspendedContextOOP = heap.GetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX);
+
+        if (suspendedContextOOP == metadata.KnownObjects.Nil)
+        {
+            throw new InvalidOperationException("Active process has no suspended context");
+        }
+
+        Console.WriteLine($"  Suspended context: {suspendedContextOOP}");
+
+        // Step 3: Set the active context to the suspended context
+        _vm!.ContextManager.SetActiveContext(suspendedContextOOP);
+
+        // Step 4: Push the receiver (Smalltalk) onto the stack as the return value of snapshotPrimitive
+        // This makes justSnapped = self snapshotPrimitive isNil evaluate to false,
+        // which triggers the post-snapshot restoration code (DisplayScreen displayHeight: height, etc.)
+        var smalltalkOOP = metadata.KnownObjects.Smalltalk;
+        _vm.StackManager.Push(smalltalkOOP);
+        Console.WriteLine($"  Pushed Smalltalk ({smalltalkOOP}) as snapshotPrimitive return value");
+
+        // Step 5: Disable infinite loop detection - the event loop intentionally runs forever
+        _vm.InfiniteLoopDetectionEnabled = false;
+
+        // Step 6: Resume execution from the saved context
+        Console.WriteLine("  Resuming bytecode execution...");
+        _vm.ExecuteExistingContext(suspendedContextOOP);
+
+        // Note: We should never reach here - the restore code eventually enters the controller loop
+        Console.WriteLine("  Snapshot resume completed (unexpected exit)");
+    }
 
     /// <summary>
     /// Dumps Float class variables to verify they have initialized values (NOT nil).
