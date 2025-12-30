@@ -105,7 +105,10 @@ public abstract class PrimitiveTestBase
             SmallIntegerClassOOP = smallIntegerClassOOP,
             BlockContextClassOOP = blockContextClassOOP,
             OrderedCollectionClassOOP = orderedCollectionClassOOP,
-            ProcessClassOOP = processClassOOP
+            ProcessClassOOP = processClassOOP,
+            PointClassOOP = nilOOP,  // Use nil for tests
+            FloatClassOOP = nilOOP,  // Use nil for tests
+            CharacterClassOOP = nilOOP  // Use nil for tests
         };
     }
 
@@ -135,7 +138,7 @@ public abstract class PrimitiveTestBase
             heapManager,
             stackManager: null,
             contextManager: contextManager,
-            layoutResolver: null,
+            
             platform: null,
             runtimeServices: runtimeServices,
             instructionPointer: instructionPointer,
@@ -319,7 +322,10 @@ public abstract class PrimitiveTestBase
             SmallIntegerClassOOP = ObjectOOP(16),
             BlockContextClassOOP = ObjectOOP(17),
             OrderedCollectionClassOOP = ObjectOOP(21),
-            ProcessClassOOP = ObjectOOP(22)
+            ProcessClassOOP = ObjectOOP(22),
+            PointClassOOP = nilOOP,  // Use nil for tests
+            FloatClassOOP = nilOOP,  // Use nil for tests
+            CharacterClassOOP = nilOOP  // Use nil for tests
         };
     }
 }

@@ -139,8 +139,15 @@ public class InitExpressionRunner
             }
         }
 
-        // Note: Comment expressions and Phase 2 tests are disabled
-        // Uncomment and update logic here if needed in future
+        // Add comment expressions (pattern: "ClassName comment:'text'" or "ClassName class comment:'text'")
+        for (int i = 0; i < _initExpressions.Length; i++)
+        {
+            var source = _initExpressions[i].Source;
+            if (source != null && source.Contains(" comment:"))
+            {
+                commentIndices.Add(i);
+            }
+        }
 
         return (phase1Indices, skippedIndices, commentIndices, phase2Indices);
     }
