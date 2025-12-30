@@ -279,7 +279,6 @@ public static class LinkPrimitives
             // - PrintName (variable)
 
             int headerSize = 8;
-            int pathBufferOffset = 8; // After ReparseTag, ReparseDataLength, Reserved
             int dataSize = 8 + substituteNameBytes.Length + 2 + printNameBytes.Length + 2;
 
             byte[] buffer = new byte[headerSize + dataSize];
