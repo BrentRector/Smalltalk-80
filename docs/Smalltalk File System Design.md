@@ -1,6 +1,6 @@
 # Smalltalk-80 File System Design
 
-**Version:** 1.2
+**Version:** 1.3
 **Date:** 2025-12-30
 **Status:** Implemented
 
@@ -207,6 +207,51 @@ path canonicalize asString.  "→ 'C:\admin\docs'"
 path canonicalString.  "→ 'C:\admin\docs' (convenience)"
 ```
 
+### Windows Link Support
+
+Windows NTFS supports three types of file system links, all implemented in our architecture:
+
+| Link Type | Target | Cross-Volume | Network | Relative | Class |
+|-----------|--------|--------------|---------|----------|-------|
+| **Hard Link** | Files only | ❌ No | ❌ No | N/A | `File` methods |
+| **Junction** | Directories only | ✅ Yes (local) | ❌ No | ❌ No (absolute only) | `Directory` methods |
+| **Symbolic Link** | Files or directories | ✅ Yes | ✅ Yes (UNC) | ✅ Yes | `SymbolicLink` / `WindowsSymbolicLink` |
+
+**Hard Links** (`File>>createHardLinkAt:`)
+- Multiple directory entries pointing to the same file data
+- All links are equal; deleting one doesn't affect others
+- Created with `CreateHardLinkW` API
+- Query link count with `File>>hardLinkCount`
+
+**Junctions** (`Directory>>createJunctionAt:`)
+- Directory-only soft links using NTFS reparse points
+- Target must be an absolute local path
+- Identified by `IO_REPARSE_TAG_MOUNT_POINT` (0xA0000003)
+- Created with `DeviceIoControl` + `FSCTL_SET_REPARSE_POINT`
+
+**Symbolic Links** (`WindowsSymbolicLink`)
+- Most flexible link type, supporting files and directories
+- Can use relative or absolute paths, including UNC network paths
+- Identified by `IO_REPARSE_TAG_SYMLINK` (0xA000000C)
+- Created with `CreateSymbolicLinkW` API
+- Requires `SeCreateSymbolicLinkPrivilege` or Developer Mode (Win10 1607+)
+
+**Link Detection and Resolution:**
+```smalltalk
+"Check if a path is a link"
+aFile isSymbolicLink.     "→ true/false"
+aFile isJunction.         "→ true/false"
+aFile isHardLink.         "→ true/false (hardLinkCount > 1)"
+aFile isLink.             "→ true if any link type"
+
+"Get link target"
+aFile linkTarget.         "→ immediate target path"
+aFile resolvedTarget.     "→ final target (follows chain)"
+
+"Check if link is broken"
+aFile isBrokenLink.       "→ true if target doesn't exist"
+```
+
 ---
 
 ## Class Hierarchy
@@ -215,31 +260,37 @@ path canonicalString.  "→ 'C:\admin\docs' (convenience)"
 Object
 │
 ├── FileSystemNode [abstract]
-│   │   "Common base for files and directories"
+│   │   "Common base for files, directories, and links"
 │   │
 │   ├── Directory [abstract]
 │   │   │   "Container for files and subdirectories"
 │   │   │
 │   │   └── WindowsDirectory [concrete]
-│   │           "Windows implementation"
+│   │           "Windows implementation with junction support"
 │   │
-│   └── File [abstract]
-│       │   "Represents a file's metadata"
+│   ├── File [abstract]
+│   │   │   "Represents a file's metadata"
+│   │   │
+│   │   └── WindowsFile [concrete]
+│   │           "Windows implementation with hard link support"
+│   │
+│   └── SymbolicLink [abstract]
+│       │   "Represents a symbolic link"
 │       │
-│       └── WindowsFile [concrete]
-│               "Windows implementation"
+│       └── WindowsSymbolicLink [concrete]
+│               "Windows symbolic link (not junction)"
 │
 ├── FileSystem [abstract]
 │   │   "Platform file system knowledge and factories"
 │   │
 │   └── WindowsFileSystem [concrete]
-│           "Windows NTFS/FAT implementation"
+│           "Windows NTFS implementation with link support"
 │
 ├── Path [abstract]
 │   │   "Platform-independent path manipulation"
 │   │
 │   └── WindowsPath [concrete]
-│           "Windows path semantics (backslash, drive letters)"
+│           "Windows path semantics (backslash, drive letters, UNC)"
 │
 └── Stream
     └── PositionableStream

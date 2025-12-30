@@ -661,6 +661,50 @@ renameTo: newName
 	"Rename this entry to newName (in same directory)"
 	self subclassResponsibility! !
 
+!FileSystemNode methodsFor: 'link testing'!
+
+isLink
+	"Answer whether this entry is any type of link (symbolic, hard, or junction)"
+	^self isSymbolicLink or: [self isJunction]!
+
+isSymbolicLink
+	"Answer whether this entry is a symbolic link"
+	^self fileSystem isSymbolicLink: pathName!
+
+isJunction
+	"Answer whether this entry is a junction point"
+	^self fileSystem isJunction: pathName!
+
+isHardLink
+	"Answer whether this entry has multiple hard links.
+	 Only meaningful for files. Default returns false."
+	^false! !
+
+!FileSystemNode methodsFor: 'link resolution'!
+
+linkTarget
+	"Answer the immediate target path of this link, or nil if not a link"
+	^self fileSystem linkTargetOf: pathName!
+
+resolvedTarget
+	"Answer the final resolved target path, following all links.
+	 Answer nil if not a link."
+	^self fileSystem resolvedTargetOf: pathName!
+
+linkTargetExists
+	"Answer whether this link's target exists.
+	 Answer true if this is not a link."
+	| target |
+	self isLink ifFalse: [^true].
+	target _ self resolvedTarget.
+	target isNil ifTrue: [^false].
+	^(self fileSystem pathFromString: target) file exists!
+
+isBrokenLink
+	"Answer whether this is a link whose target does not exist"
+	self isLink ifFalse: [^false].
+	^self linkTargetExists not! !
+
 !FileSystemNode methodsFor: 'printing'!
 
 printOn: aStream
@@ -793,6 +837,35 @@ contents: aString
 initialize
 	"Initialize instance variables"
 	binary _ false! !
+
+!File methodsFor: 'hard links'!
+
+createHardLinkAt: aPathString
+	"Create a hard link to this file at aPathString.
+	 Both paths must be on the same volume.
+	 Signals error if file system doesn't support hard links."
+	self fileSystem supportsHardLinks ifFalse: [
+		self error: 'File system does not support hard links'].
+	self exists ifFalse: [
+		self error: 'Cannot create hard link to non-existent file'].
+	^self fileSystem createHardLink: aPathString toFile: pathName!
+
+hardLinkCount
+	"Answer the number of hard links to this file's data.
+	 Returns 1 if no additional hard links exist."
+	^self fileSystem hardLinkCountOf: pathName!
+
+isHardLink
+	"Answer whether this file has multiple hard links"
+	^self hardLinkCount > 1! !
+
+!File methodsFor: 'symbolic links'!
+
+createSymbolicLinkAt: aPathString
+	"Create a symbolic link to this file at aPathString"
+	self fileSystem supportsSymbolicLinks ifFalse: [
+		self error: 'File system does not support symbolic links'].
+	^self fileSystem createSymbolicLink: aPathString toTarget: pathName asDirectory: false! !
 
 File class
 	instanceVariableNames: ''!
@@ -959,7 +1032,178 @@ validateFileName: aName
 	(self isLegalFileName: aName) ifFalse: [
 		self error: 'Invalid file name: ', aName]! !
 
+!Directory methodsFor: 'junctions'!
+
+createJunctionAt: aPathString
+	"Create a junction (directory link) to this directory at aPathString.
+	 Junctions are directory-only links that can span local volumes."
+	self fileSystem supportsJunctions ifFalse: [
+		self error: 'File system does not support junctions'].
+	self exists ifFalse: [
+		self error: 'Cannot create junction to non-existent directory'].
+	^self fileSystem createJunction: aPathString toDirectory: pathName! !
+
+!Directory methodsFor: 'symbolic links'!
+
+createSymbolicLinkAt: aPathString
+	"Create a symbolic link to this directory at aPathString"
+	self fileSystem supportsSymbolicLinks ifFalse: [
+		self error: 'File system does not support symbolic links'].
+	^self fileSystem createSymbolicLink: aPathString toTarget: pathName asDirectory: true! !
+
 Directory class
+	instanceVariableNames: ''!
+
+"==================== SymbolicLink (Abstract) ===================="
+
+FileSystemNode subclass: #SymbolicLink
+	instanceVariableNames: 'targetPath targetType'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+SymbolicLink comment:
+'I represent a symbolic link in the file system.
+Unlike hard links, I store a path to my target rather than sharing data.
+I can point to files or directories, on local or remote volumes.
+
+Instance Variables:
+    targetPath   <String> the path this link points to (may be relative or absolute)
+    targetType   <Symbol> #file, #directory, or #unknown
+
+Symbolic links differ from other link types:
+- Hard links: share file data, file only, same volume only
+- Junctions: directory only, local volumes only, absolute paths only
+- Symbolic links: file or directory, any volume, relative or absolute, supports UNC
+
+Key behaviors:
+- isSymbolicLink always returns true
+- linkTarget returns the stored target path
+- resolvedTarget follows the chain to the final target
+- isBroken returns true if the target does not exist'!
+
+!SymbolicLink class methodsFor: 'instance creation'!
+
+on: aPathString
+	"Answer a SymbolicLink for the given path"
+	^self new initPathName: aPathString; initialize!
+
+createFile: linkPath target: targetPath
+	"Create a symbolic link to a file"
+	^self subclassResponsibility!
+
+createDirectory: linkPath target: targetPath
+	"Create a symbolic link to a directory"
+	^self subclassResponsibility! !
+
+!SymbolicLink methodsFor: 'initialization'!
+
+initialize
+	"Initialize by reading link information from the file system"
+	targetPath _ self fileSystem linkTargetOf: pathName.
+	targetType _ #unknown! !
+
+!SymbolicLink methodsFor: 'accessing'!
+
+targetPath
+	"Answer the path this symbolic link points to"
+	^targetPath!
+
+targetType
+	"Answer #file, #directory, or #unknown"
+	targetType == #unknown ifTrue: [
+		self resolveTargetType].
+	^targetType!
+
+resolveTargetType
+	"Determine and cache whether target is a file or directory"
+	| resolved node |
+	resolved _ self resolvedTarget.
+	resolved isNil ifTrue: [
+		targetType _ #unknown.
+		^self].
+	node _ self fileSystem pathFromString: resolved.
+	(self fileSystem directoryClass on: resolved) exists
+		ifTrue: [targetType _ #directory]
+		ifFalse: [
+			(self fileSystem fileClass on: resolved) exists
+				ifTrue: [targetType _ #file]
+				ifFalse: [targetType _ #unknown]]! !
+
+!SymbolicLink methodsFor: 'testing'!
+
+isSymbolicLink
+	"I am always a symbolic link"
+	^true!
+
+isFile
+	"Answer whether I point to a file"
+	^self targetType == #file!
+
+isDirectory
+	"Answer whether I point to a directory"
+	^self targetType == #directory!
+
+isRelativeLink
+	"Answer whether my target path is relative"
+	^(self fileSystem isAbsolutePath: targetPath) not!
+
+isAbsoluteLink
+	"Answer whether my target path is absolute"
+	^self fileSystem isAbsolutePath: targetPath!
+
+targetExists
+	"Answer whether the target file/directory exists"
+	| resolved |
+	resolved _ self resolvedTarget.
+	resolved isNil ifTrue: [^false].
+	^(self fileSystem fileClass on: resolved) exists
+		or: [(self fileSystem directoryClass on: resolved) exists]!
+
+isBroken
+	"Answer whether the target does not exist"
+	^self targetExists not! !
+
+!SymbolicLink methodsFor: 'link resolution'!
+
+linkTarget
+	"Answer the immediate target path"
+	^targetPath!
+
+resolvedTarget
+	"Answer the final resolved target, following all links"
+	^self fileSystem resolvedTargetOf: pathName!
+
+resolvedNode
+	"Answer a File or Directory for the resolved target"
+	| resolved |
+	resolved _ self resolvedTarget.
+	resolved isNil ifTrue: [^nil].
+	self targetType == #directory
+		ifTrue: [^self fileSystem directoryClass on: resolved]
+		ifFalse: [^self fileSystem fileClass on: resolved]! !
+
+!SymbolicLink methodsFor: 'operations'!
+
+retargetTo: newTargetPath
+	"Change the target of this symbolic link.
+	 This typically requires deleting and recreating the link."
+	self subclassResponsibility!
+
+delete
+	"Delete the symbolic link (not the target)"
+	self subclassResponsibility! !
+
+!SymbolicLink methodsFor: 'printing'!
+
+printOn: aStream
+	aStream nextPutAll: self class name.
+	aStream nextPutAll: ' '.
+	pathName printOn: aStream.
+	aStream nextPutAll: ' -> '.
+	targetPath printOn: aStream! !
+
+SymbolicLink class
 	instanceVariableNames: ''!
 
 "==================== FileSystem (Abstract) ===================="
@@ -1110,6 +1354,59 @@ newFile: fileDesignator
 	"Answer a write stream on a new file"
 	^self currentDirectory newFile: fileDesignator! !
 
+!FileSystem methodsFor: 'link support'!
+
+supportsHardLinks
+	"Answer whether this file system supports hard links"
+	self subclassResponsibility!
+
+supportsSymbolicLinks
+	"Answer whether this file system supports symbolic links"
+	self subclassResponsibility!
+
+supportsJunctions
+	"Answer whether this file system supports directory junctions"
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'link creation'!
+
+createSymbolicLink: linkPath toTarget: targetPath asDirectory: isDirectory
+	"Create a symbolic link at linkPath pointing to targetPath.
+	 isDirectory indicates whether the target is a directory."
+	self subclassResponsibility!
+
+createHardLink: linkPath toFile: existingPath
+	"Create a hard link at linkPath pointing to existing file.
+	 Both paths must be on the same volume."
+	self subclassResponsibility!
+
+createJunction: junctionPath toDirectory: targetPath
+	"Create a junction (directory link) at junctionPath pointing to targetPath."
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'link queries'!
+
+isSymbolicLink: aPathString
+	"Answer whether the path refers to a symbolic link"
+	self subclassResponsibility!
+
+isJunction: aPathString
+	"Answer whether the path refers to a junction point"
+	self subclassResponsibility!
+
+linkTargetOf: aPathString
+	"Answer the immediate target path of a link, or nil if not a link"
+	self subclassResponsibility!
+
+resolvedTargetOf: aPathString
+	"Answer the final resolved target path, following all links.
+	 Answer nil if not a link."
+	self subclassResponsibility!
+
+hardLinkCountOf: aPathString
+	"Answer the number of hard links to the file"
+	self subclassResponsibility! !
+
 FileSystem class
 	instanceVariableNames: ''!
 
@@ -1238,6 +1535,144 @@ isAbsolutePath: aString
 		(aString at: 2) = $: and: [
 			(aString at: 3) = $\ or: [(aString at: 3) = $/]]]) ifTrue: [^true].
 	^false! !
+
+!WindowsFileSystem methodsFor: 'link support'!
+
+supportsHardLinks
+	"NTFS supports hard links for files"
+	^true!
+
+supportsSymbolicLinks
+	"Windows Vista+ supports symbolic links"
+	^true!
+
+supportsJunctions
+	"NTFS supports directory junctions"
+	^true!
+
+symbolicLinkClass
+	"Answer the concrete SymbolicLink class"
+	^WindowsSymbolicLink! !
+
+!WindowsFileSystem methodsFor: 'link creation'!
+
+createSymbolicLink: linkPath toTarget: targetPath asDirectory: isDirectory
+	"Create a symbolic link using Windows API.
+	 Requires SeCreateSymbolicLinkPrivilege or Developer Mode (Win10 1607+).
+	 isDirectory must be true if target is a directory."
+	^self primCreateSymbolicLink: linkPath target: targetPath isDirectory: isDirectory!
+
+createHardLink: linkPath toFile: existingPath
+	"Create a hard link. Both paths must be on same NTFS volume.
+	 Hard links are only supported for files, not directories."
+	^self primCreateHardLink: linkPath existing: existingPath!
+
+createJunction: junctionPath toDirectory: targetPath
+	"Create a junction point (directory soft link).
+	 Junctions can span local volumes but not network paths.
+	 Target path must be absolute."
+	(self isAbsolutePath: targetPath) ifFalse: [
+		self error: 'Junction target must be an absolute path'].
+	^self primCreateJunction: junctionPath target: targetPath! !
+
+!WindowsFileSystem methodsFor: 'link queries'!
+
+isSymbolicLink: aPathString
+	"Answer whether path is a symbolic link (not a junction)"
+	| attrs tag |
+	attrs _ self primGetFileAttributes: aPathString.
+	attrs isNil ifTrue: [^false].
+	"Check for reparse point attribute (0x400)"
+	(attrs bitAnd: 16r400) = 0 ifTrue: [^false].
+	"Get reparse tag to distinguish symlink from junction"
+	tag _ self primGetReparseTag: aPathString.
+	^tag = 16rA000000C "IO_REPARSE_TAG_SYMLINK"!
+
+isJunction: aPathString
+	"Answer whether path is a junction point"
+	| attrs tag |
+	attrs _ self primGetFileAttributes: aPathString.
+	attrs isNil ifTrue: [^false].
+	"Check for reparse point attribute (0x400) and directory (0x10)"
+	((attrs bitAnd: 16r400) = 0 or: [(attrs bitAnd: 16r10) = 0]) ifTrue: [^false].
+	"Get reparse tag to distinguish junction from symlink"
+	tag _ self primGetReparseTag: aPathString.
+	^tag = 16rA0000003 "IO_REPARSE_TAG_MOUNT_POINT"!
+
+linkTargetOf: aPathString
+	"Answer the immediate target path of a link, or nil if not a link"
+	(self isSymbolicLink: aPathString) ifTrue: [
+		^self primGetSymbolicLinkTarget: aPathString].
+	(self isJunction: aPathString) ifTrue: [
+		^self primGetJunctionTarget: aPathString].
+	^nil!
+
+resolvedTargetOf: aPathString
+	"Answer the final resolved target path, following all links.
+	 Uses Windows GetFinalPathNameByHandle for reliable resolution."
+	^self primGetFinalPath: aPathString!
+
+hardLinkCountOf: aPathString
+	"Answer the number of hard links to the file"
+	^self primGetHardLinkCount: aPathString! !
+
+!WindowsFileSystem methodsFor: 'link primitives'!
+
+primCreateSymbolicLink: linkPath target: targetPath isDirectory: isDirectory
+	"Primitive to create symbolic link. Uses CreateSymbolicLinkW.
+	 Flags: SYMBOLIC_LINK_FLAG_DIRECTORY (0x1) if isDirectory.
+	 May also use SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE (0x2)."
+	<primitive: 230>
+	self primitiveFailed!
+
+primCreateHardLink: linkPath existing: existingPath
+	"Primitive to create hard link. Uses CreateHardLinkW."
+	<primitive: 231>
+	self primitiveFailed!
+
+primCreateJunction: junctionPath target: targetPath
+	"Primitive to create junction. Uses DeviceIoControl with FSCTL_SET_REPARSE_POINT."
+	<primitive: 232>
+	self primitiveFailed!
+
+primGetFileAttributes: aPathString
+	"Primitive to get file attributes. Uses GetFileAttributesW.
+	 Returns nil if file doesn't exist."
+	<primitive: 233>
+	^nil!
+
+primGetReparseTag: aPathString
+	"Primitive to get reparse point tag. Uses FindFirstFileW or DeviceIoControl."
+	<primitive: 234>
+	^0!
+
+primGetSymbolicLinkTarget: aPathString
+	"Primitive to read symbolic link target."
+	<primitive: 235>
+	^nil!
+
+primGetJunctionTarget: aPathString
+	"Primitive to read junction target."
+	<primitive: 236>
+	^nil!
+
+primGetFinalPath: aPathString
+	"Primitive to get final path, resolving all links.
+	 Uses GetFinalPathNameByHandleW."
+	<primitive: 237>
+	^nil!
+
+primGetHardLinkCount: aPathString
+	"Primitive to get hard link count.
+	 Uses GetFileInformationByHandle."
+	<primitive: 238>
+	^1!
+
+primDeleteReparsePoint: aPathString
+	"Primitive to delete a reparse point (junction or symlink).
+	 Uses DeviceIoControl with FSCTL_DELETE_REPARSE_POINT."
+	<primitive: 239>
+	self primitiveFailed! !
 
 WindowsFileSystem class
 	instanceVariableNames: ''!
@@ -2142,6 +2577,93 @@ WindowsDirectory class
     instanceVariableNames: ''!
 
 WindowsDirectory initialize!
+
+"==================== WindowsSymbolicLink ===================="
+
+SymbolicLink subclass: #WindowsSymbolicLink
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Windows'!
+
+WindowsSymbolicLink comment:
+'I am the Windows implementation of SymbolicLink.
+I use Windows symbolic links (not junctions) which support:
+- Both files and directories as targets
+- Relative or absolute target paths
+- Local and UNC (network) paths
+- Cross-volume links
+
+Creation requires either:
+- SeCreateSymbolicLinkPrivilege (administrator)
+- Developer Mode enabled (Windows 10 version 1607+)
+
+I am distinguished from junctions by the IO_REPARSE_TAG_SYMLINK reparse tag.'!
+
+!WindowsSymbolicLink class methodsFor: 'instance creation'!
+
+createFile: linkPath target: targetPath
+    "Create a symbolic link to a file.
+     Returns a new WindowsSymbolicLink instance."
+    Disk createSymbolicLink: linkPath toTarget: targetPath asDirectory: false.
+    ^self on: linkPath!
+
+createDirectory: linkPath target: targetPath
+    "Create a symbolic link to a directory.
+     Returns a new WindowsSymbolicLink instance."
+    Disk createSymbolicLink: linkPath toTarget: targetPath asDirectory: true.
+    ^self on: linkPath!
+
+create: linkPath target: targetPath
+    "Create a symbolic link, auto-detecting whether target is file or directory.
+     If target doesn't exist, creates a file link by default."
+    | isDir |
+    isDir _ (Disk directoryClass on: targetPath) exists.
+    ^isDir
+        ifTrue: [self createDirectory: linkPath target: targetPath]
+        ifFalse: [self createFile: linkPath target: targetPath]! !
+
+!WindowsSymbolicLink methodsFor: 'testing'!
+
+exists
+    "Answer whether this symbolic link exists (not the target)"
+    ^self fileSystem isSymbolicLink: pathName! !
+
+!WindowsSymbolicLink methodsFor: 'operations'!
+
+delete
+    "Delete the symbolic link (not the target).
+     For symbolic links, use DeleteFile for file links, RemoveDirectory for directory links."
+    self targetType == #directory
+        ifTrue: [self primRemoveDirectory]
+        ifFalse: [self primDeleteFile]!
+
+retargetTo: newTargetPath
+    "Change the target of this symbolic link.
+     Windows doesn't support modifying symlinks, so we delete and recreate."
+    | wasDirectory |
+    wasDirectory _ self targetType == #directory.
+    self delete.
+    wasDirectory
+        ifTrue: [self class createDirectory: pathName target: newTargetPath]
+        ifFalse: [self class createFile: pathName target: newTargetPath].
+    targetPath _ newTargetPath.
+    targetType _ #unknown! !
+
+!WindowsSymbolicLink methodsFor: 'primitives'!
+
+primDeleteFile
+    "Primitive to delete file symbolic link"
+    <primitive: 122>
+    self error: 'Cannot delete symbolic link'!
+
+primRemoveDirectory
+    "Primitive to remove directory symbolic link"
+    <primitive: 127>
+    self error: 'Cannot delete symbolic link'! !
+
+WindowsSymbolicLink class
+    instanceVariableNames: ''!
 
 "==================== File System Global Initialization ===================="
 "Install Disk as the entry point to the file system"
