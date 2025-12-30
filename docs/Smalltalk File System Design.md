@@ -675,10 +675,6 @@ checkName: aName fixErrors: aBoolean
         ifTrue: [^fs sanitizeFileName: aName]
         ifFalse: [self error: 'Invalid file name: ', aName]!
 
-isLegalFileName: aName
-    "Answer whether aName is a legal file name"
-    ^self fileSystem isValidFileName: aName!
-
 sanitizeFileName: aName
     "Answer a legal file name based on aName"
     ^self fileSystem sanitizeFileName: aName! !
@@ -721,17 +717,13 @@ checkNameOfFile: aFile fixErrors: aBoolean
     "Check aFile's name, optionally fix errors"
     ^self checkName: aFile name fixErrors: aBoolean!
 
-isLegalFileName: aName
-    "Answer whether aName is a legal file name for this directory's file system"
-    ^self fileSystem isValidFileName: aName!
-
-isLegalOldFileName: aName
-    "Answer whether aName is legal and exists in this directory"
-    ^(self isLegalFileName: aName) and: [self includesKey: aName]!
+isValidOldFileName: aName
+    "Answer whether aName is valid and exists in this directory"
+    ^(self fileSystem isValidFileName: aName) and: [self includesKey: aName]!
 
 validateFileName: aName
     "Signal an error if aName is not a valid file name"
-    (self isLegalFileName: aName) ifFalse: [
+    (self fileSystem isValidFileName: aName) ifFalse: [
         self error: 'Invalid file name: ', aName]! !
 ```
 
@@ -1540,6 +1532,8 @@ isValidFileName: aName
 sanitizeFileName: aName
     "Answer a valid file name based on aName"
     | result |
+    aName isNil ifTrue: [^'untitled'].
+    aName isEmpty ifTrue: [^'untitled'].
     result := aName collect: [:ch |
         (self illegalCharacters includes: ch)
             ifTrue: [$_]
@@ -1549,7 +1543,19 @@ sanitizeFileName: aName
     (self reservedNames anySatisfy: [:reserved |
         self namesEqual: result and: reserved])
             ifTrue: [result := '_', result].
-    ^result! !
+    ^result!
+
+checkName: aName fixErrors: fixFlag
+    "Validate aName as a file name. If fixFlag is true, return a corrected name.
+     If fixFlag is false and name is invalid, signal an error."
+    aName isNil ifTrue: [
+        fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is nil']].
+    aName isEmpty ifTrue: [
+        fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is empty']].
+    (self isValidFileName: aName) ifTrue: [^aName].
+    fixFlag
+        ifTrue: [^self sanitizeFileName: aName]
+        ifFalse: [self error: 'Invalid file name: ', aName]! !
 
 "-------------------- path characteristics --------------------"
 

@@ -1019,17 +1019,13 @@ checkNameOfFile: aFile fixErrors: aBoolean
 	"Check aFile's name, optionally fix errors"
 	^self checkName: aFile name fixErrors: aBoolean!
 
-isLegalFileName: aName
-	"Answer whether aName is a legal file name for this directory's file system"
-	^self fileSystem isValidFileName: aName!
-
-isLegalOldFileName: aName
-	"Answer whether aName is legal and exists in this directory"
-	^(self isLegalFileName: aName) and: [self includesKey: aName]!
+isValidOldFileName: aName
+	"Answer whether aName is valid and exists in this directory"
+	^(self fileSystem isValidFileName: aName) and: [self includesKey: aName]!
 
 validateFileName: aName
 	"Signal an error if aName is not a valid file name"
-	(self isLegalFileName: aName) ifFalse: [
+	(self fileSystem isValidFileName: aName) ifFalse: [
 		self error: 'Invalid file name: ', aName]! !
 
 !Directory methodsFor: 'junctions'!
@@ -1348,10 +1344,6 @@ sanitizeFileName: aName
 			ifTrue: [result _ '_', result].
 	^result!
 
-isLegalFileName: aName
-	"Answer whether aName is a legal file name. Alias for isValidFileName: for compatibility."
-	^self isValidFileName: aName!
-
 checkName: aName fixErrors: fixFlag
 	"Validate aName as a file name. If fixFlag is true, return a corrected name.
 	 If fixFlag is false and name is invalid, signal an error."
@@ -1392,21 +1384,7 @@ directoryFromName: fileDesignator setFileName: localNameBlock
 	"Parse a file path into directory and filename components.
 	 Call localNameBlock with the filename, return the directory.
 	 This is used by legacy file operations for compatibility."
-	^self directoryClass directoryFromName: fileDesignator setFileName: localNameBlock!
-
-includesKey: fileDesignator
-	"Answer whether a file with the given name exists in the current directory"
-	| dir localName |
-	dir _ self directoryFromName: fileDesignator setFileName: [:ln | localName _ ln].
-	^dir includesKey: localName!
-
-rename: aFileOrPath newName: newFileName
-	"Rename the file to a new name within its directory"
-	| file |
-	file _ aFileOrPath isString
-		ifTrue: [self fileAt: aFileOrPath]
-		ifFalse: [aFileOrPath].
-	file directory rename: file newName: newFileName! !
+	^self directoryClass directoryFromName: fileDesignator setFileName: localNameBlock! !
 
 !FileSystem methodsFor: 'link support'!
 
@@ -2561,9 +2539,9 @@ filesMatching: pattern
 !WindowsDirectory methodsFor: 'filename validation'!
 
 "Validation methods inherited from Directory which delegates to FileSystem.
- WindowsDirectory inherits: checkName:fixErrors:, isLegalFileName:,
- isLegalOldFileName:, checkNameOfFile:, checkNameOfFile:fixErrors:,
- validateFileName: - all using WindowsFileSystem's validation rules."! !
+ WindowsDirectory inherits: checkName:fixErrors:, isValidOldFileName:,
+ checkNameOfFile:, checkNameOfFile:fixErrors:, validateFileName:
+ - all using WindowsFileSystem's isValidFileName: validation rules."! !
 
 !WindowsDirectory methodsFor: 'file copying'!
 
@@ -8172,9 +8150,9 @@ getFile: aSymbol withPrompt: promptString do: actionBlock
 		action: [:fileName | fileName]
 		initialAnswer: ''.
 	fileName isEmpty
-		ifFalse: 
+		ifFalse:
 			[directory _ Disk.
-			(directory isLegalFileName: fileName)
+			(Disk isValidFileName: fileName)
 				ifTrue: [Cursor wait showWhile:
 							[actionBlock value: (directory perform: aSymbol with: fileName)]]
 				ifFalse: [Transcript cr; show: 'You specified an illegal file name.']]!
@@ -18102,7 +18080,7 @@ acceptPattern: aText from: aController
 				ifTrue: [testPattern _ testPattern copyFrom: 1 to: testPattern size-1].
 			(testPattern includes: $*) | (testPattern includes: $#)
 				ifTrue: [newList addAll: (self filesMatching: testPattern)]
-				ifFalse: [(self isLegalFileName: testPattern)
+				ifFalse: [(Disk isValidFileName: testPattern)
 							ifTrue: [newList add: testPattern]]].
 		list _ newList.
 		list isEmpty
@@ -18160,7 +18138,7 @@ getFile
 isSelected
 	^isReading!
 renameFile
-	| newList newName continue |
+	| newList newName continue dir localName newLocalName |
 	fileName == nil ifTrue: [^nil].
 	self changeRequest ifFalse: [^nil].
 	continue _ true.
@@ -18169,15 +18147,17 @@ renameFile
 		newName isEmpty ifTrue: [^nil].
 		newName last = $.
 			ifTrue: [newName _ newName copyFrom: 1 to: newName size-1].
-		((self isLegalFileName: newName) and: [(Disk includesKey: newName) not])
+		dir _ Disk directoryFromName: newName setFileName: [:ln | newLocalName _ ln].
+		((Disk isValidFileName: newLocalName) and: [(dir includesKey: newLocalName) not])
 			ifTrue: [continue _ false]
 			ifFalse: [(BinaryChoice message: 'File exists or bad file name. Try again?')
 						ifFalse: [^nil]]].
 	Cursor execute showWhile:
 		[newList _ list copyWithout: fileName.
-		(Disk includesKey: fileName)
+		dir _ Disk directoryFromName: fileName setFileName: [:ln | localName _ ln].
+		(dir includesKey: localName)
 			ifTrue:
-				[Disk rename: (Disk file: fileName) file newName: newName].
+				[dir rename: (dir fileAt: localName) newName: newLocalName].
 		fileName _ newName.
 		newList add: fileName.
 		list _ newList.
@@ -18192,12 +18172,6 @@ filesMatching: pattern
 	dir _ Disk directoryFromName: pattern setFileName: [:nb | nameBody _ nb].
 	matches _ dir filesMatching: nameBody.
 	^matches!
-isLegalFileName: pattern
-	"Answer whether pattern is a valid file name.  Do this by asking the appropriate directory."
-
-	| dir nameBody |
-	dir _ Disk directoryFromName: pattern setFileName: [:nb | nameBody _ nb].
-	^dir isLegalFileName: nameBody!
 list: aList
 	list _ aList.
 	isReading _ false! !
@@ -20669,7 +20643,7 @@ fileInForm
 	[trying] whileTrue:
 		[inName _ self promptRequest: 'type a name for recalling a source Form . . . '.
 		directory _ Disk directoryFromName: inName setFileName: [:ln | localName _ ln].
-		(((directory isLegalFileName: localName)
+		(((Disk isValidFileName: localName)
 			and: [directory includesKey: localName])
 				and: [(newForm  _ Form readFrom: inName) ~~ nil])
 				ifTrue: [trying _ false]
@@ -20686,7 +20660,7 @@ fileOutForm
 	[trying] whileTrue:
 		[outName _ self promptRequest: 'type a name for saving the source Form . . . '.
 		directory _ Disk directoryFromName: outName setFileName: [:ln | localName _ ln].
-		(directory isLegalFileName: localName)
+		(Disk isValidFileName: localName)
 			ifTrue:
 				[(directory includesKey: localName)
 					ifTrue: [(BinaryChoice message: 'writing over old file--okay?')
@@ -38539,7 +38513,7 @@ getImagePrefix
 		initialAnswer: default.
 
 	[newPrefix isEmpty or:
-			[(Disk isLegalFileName: newPrefix, '.changes') not]] whileTrue:
+			[(Disk isValidFileName: newPrefix, '.changes') not]] whileTrue:
 		[newPrefix isEmpty ifTrue: [^newPrefix].
 		FillInTheBlank
 			request: prompt
