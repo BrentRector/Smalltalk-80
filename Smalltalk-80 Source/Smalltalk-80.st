@@ -2550,12 +2550,21 @@ retrieve: aFileName
     ^self!
 
 retrieveFrom: aFileName1 copyTo: aFileName2
-    "Copy from one file to another"
+    "Copy from one file to another. Uses platform primitive when available,
+     falls back to stream copying when primitive fails."
+    | srcPath destPath |
+    srcPath _ self fullNameFor: aFileName1.
+    destPath _ self fullNameFor: aFileName2.
+    ^self primCopyFile: srcPath to: destPath!
+
+primCopyFile: srcPath to: destPath
+    "Platform primitive for file copy. Falls back to stream copy if primitive fails."
+    <primitive: 157>
     | f1 f2 |
-    f1 _ self oldFile: aFileName1.
-    f1 readOnly.
-    f2 _ self file: aFileName2.
-    f2 nextPutAll: f1.
+    "Fallback: character-by-character stream copy"
+    f1 _ (Disk fileAt: srcPath) readStream.
+    f2 _ (Disk fileAt: destPath) writeStream.
+    [f1 atEnd] whileFalse: [f2 nextPut: f1 next].
     f2 close.
     f1 close!
 

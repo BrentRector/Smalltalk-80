@@ -280,6 +280,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(153, new FileInfoPrimitives.WriteStringToFile());
         registry.Register(154, new FileInfoPrimitives.GetFileAttributes());
         registry.Register(155, new FileInfoPrimitives.FileExists());
+        registry.Register(157, new FileInfoPrimitives.FileCopy());
 
         // File stream primitives (open, close, read, write, seek)
         registry.Register(121, new FileStreamPrimitives.FileOpen());
