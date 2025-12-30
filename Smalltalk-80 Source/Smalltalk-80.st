@@ -1346,7 +1346,23 @@ sanitizeFileName: aName
 	(self reservedNames anySatisfy: [:reserved |
 		self namesEqual: result and: reserved])
 			ifTrue: [result _ '_', result].
-	^result! !
+	^result!
+
+isLegalFileName: aName
+	"Answer whether aName is a legal file name. Alias for isValidFileName: for compatibility."
+	^self isValidFileName: aName!
+
+checkName: aName fixErrors: fixFlag
+	"Validate aName as a file name. If fixFlag is true, return a corrected name.
+	 If fixFlag is false and name is invalid, signal an error."
+	aName isNil ifTrue: [
+		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is nil']].
+	aName isEmpty ifTrue: [
+		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is empty']].
+	(self isValidFileName: aName) ifTrue: [^aName].
+	fixFlag
+		ifTrue: [^self sanitizeFileName: aName]
+		ifFalse: [self error: 'Invalid file name: ', aName]! !
 
 !FileSystem methodsFor: 'path characteristics'!
 
@@ -1376,7 +1392,21 @@ directoryFromName: fileDesignator setFileName: localNameBlock
 	"Parse a file path into directory and filename components.
 	 Call localNameBlock with the filename, return the directory.
 	 This is used by legacy file operations for compatibility."
-	^self directoryClass directoryFromName: fileDesignator setFileName: localNameBlock! !
+	^self directoryClass directoryFromName: fileDesignator setFileName: localNameBlock!
+
+includesKey: fileDesignator
+	"Answer whether a file with the given name exists in the current directory"
+	| dir localName |
+	dir _ self directoryFromName: fileDesignator setFileName: [:ln | localName _ ln].
+	^dir includesKey: localName!
+
+rename: aFileOrPath newName: newFileName
+	"Rename the file to a new name within its directory"
+	| file |
+	file _ aFileOrPath isString
+		ifTrue: [self fileAt: aFileOrPath]
+		ifFalse: [aFileOrPath].
+	file directory rename: file newName: newFileName! !
 
 !FileSystem methodsFor: 'link support'!
 
