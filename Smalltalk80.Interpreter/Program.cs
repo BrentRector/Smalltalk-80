@@ -103,6 +103,16 @@ public static class Program
                 // Configure heap with class name field index for diagnostics
                 heapManager.SetClassNameFieldIndex(vmMetadata.ClassNameFieldIndex);
 
+                // Setup GC roots from restored metadata
+                // These are the essential roots that keep the object graph alive
+                heapManager.GC.ClearGCRoots();
+                heapManager.GC.AddGCRoot(vmMetadata.KnownObjects.Nil);
+                heapManager.GC.AddGCRoot(vmMetadata.KnownObjects.True);
+                heapManager.GC.AddGCRoot(vmMetadata.KnownObjects.False);
+                heapManager.GC.AddGCRoot(vmMetadata.KnownObjects.Smalltalk);
+                heapManager.GC.AddGCRoot(vmMetadata.ProcessorScheduler);
+                Console.WriteLine($"  GC roots set: nil, true, false, Smalltalk, Processor");
+
                 Console.WriteLine("Image restore completed successfully!");
             }
             else
