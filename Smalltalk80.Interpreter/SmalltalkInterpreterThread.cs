@@ -343,8 +343,9 @@ public class SmalltalkInterpreterThread
     /// <summary>
     /// Resumes execution from a saved snapshot image.
     /// The saved activeProcess is inside snapshotAs:thenQuit: just after snapshotPrimitive.
-    /// We push the receiver (Smalltalk) onto the stack as the return value of snapshotPrimitive,
-    /// which makes justSnapped false and triggers the post-snapshot restore code.
+    /// The receiver (Smalltalk) was pushed onto the stack BEFORE the image was saved by primitive 97,
+    /// so it's already there as the return value of snapshotPrimitive.
+    /// This makes justSnapped = false, triggering the post-snapshot restore code.
     /// </summary>
     private void ResumeFromSnapshot()
     {
@@ -377,17 +378,16 @@ public class SmalltalkInterpreterThread
         // Step 3: Set the active context to the suspended context
         _vm!.ContextManager.SetActiveContext(suspendedContextOOP);
 
-        // Step 4: Push the receiver (Smalltalk) onto the stack as the return value of snapshotPrimitive
+        // Note: The receiver (Smalltalk) is already on the stack - it was pushed by primitive 97
+        // BEFORE the image was written. We do NOT need to push it again.
         // This makes justSnapped = self snapshotPrimitive isNil evaluate to false,
         // which triggers the post-snapshot restoration code (DisplayScreen displayHeight: height, etc.)
-        var smalltalkOOP = metadata.KnownObjects.Smalltalk;
-        _vm.PushOntoActiveContext(smalltalkOOP);
-        Console.WriteLine($"  Pushed Smalltalk ({smalltalkOOP}) as snapshotPrimitive return value");
+        Console.WriteLine($"  Smalltalk is already on stack as snapshotPrimitive return value");
 
-        // Step 5: Disable infinite loop detection - the event loop intentionally runs forever
+        // Step 4: Disable infinite loop detection - the event loop intentionally runs forever
         _vm.InfiniteLoopDetectionEnabled = false;
 
-        // Step 6: Resume execution from the saved context
+        // Step 5: Resume execution from the saved context
         Console.WriteLine("  Resuming bytecode execution...");
         _vm.ExecuteExistingContext(suspendedContextOOP);
 

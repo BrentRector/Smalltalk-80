@@ -248,6 +248,15 @@ public static class GraphicsOperations
     /// Smalltalk code:
     ///   justSnapped := self snapshotPrimitive isNil.
     ///   justSnapped &amp; quitIfTrue ifTrue: [self quitPrimitive]
+    ///
+    /// CRITICAL: During primitive execution, Process.suspendedContext is stale/nil.
+    /// The actual active context is only in C# (ContextManager.ActiveContext).
+    /// Before writing the image, we must:
+    /// 1. Save current active context to Process.suspendedContext
+    /// 2. Push receiver (Smalltalk) onto stack - becomes return value on restore
+    /// 3. Write the image
+    /// 4. Pop receiver back (for continued execution)
+    /// 5. Return nil
     /// </remarks>
     public class Snapshot : IPrimitive
     {
@@ -256,13 +265,35 @@ public static class GraphicsOperations
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
             if (context.Platform == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Metadata == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.StackManager == null) return PrimitiveResult.Fail(context.Metadata!);
 
+            var heap = context.HeapManager;
+
+            // Step 1: Get active process from ProcessorScheduler
+            var schedulerOOP = context.Metadata.ProcessorScheduler;
+            var activeProcessOOP = heap.GetInstanceVariable(schedulerOOP, VMConstants.PROCESSORSCHEDULER_ACTIVEPROCESS_INDEX);
+
+            // Step 2: Save current active context to Process.suspendedContext
+            // During primitive execution, this is nil/stale - the real context is in C#
+            var currentContextOOP = context.GetActiveContext();
+            heap.SetInstanceVariable(activeProcessOOP, VMConstants.PROCESS_SUSPENDEDCONTEXT_INDEX, currentContextOOP);
+
+            // Step 3: Push receiver (Smalltalk) onto stack
+            // This becomes the return value when the image is restored
+            context.StackManager.Push(context.Receiver);
+
+            // Step 4: Write the image
             bool success = context.Platform.PerformSnapshot(context.Receiver);
+
+            // Step 5: Pop receiver back (for continued execution after save)
+            context.StackManager.Pop();
+
             if (!success) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Return nil to indicate "snapshot was just created"
+            // Step 6: Return nil to indicate "snapshot was just created"
             // This allows Smalltalk code to call quitPrimitive if quitIfTrue is set
-            return PrimitiveResult.Ok(context.HeapManager.GetNil());
+            return PrimitiveResult.Ok(heap.GetNil());
         }
     }
 

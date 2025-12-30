@@ -1546,12 +1546,6 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     private void Push(SmalltalkOOP valueOOP) => _stackManager.Push(valueOOP);
 
     /// <summary>
-    /// Pushes a value onto the active context's operand stack (public API).
-    /// Used by snapshot restore to push the return value of snapshotPrimitive.
-    /// </summary>
-    public void PushOntoActiveContext(SmalltalkOOP valueOOP) => _stackManager.Push(valueOOP);
-
-    /// <summary>
     /// Pops a value from the operand stack.
     /// Delegates to StackManager for implementation.
     /// </summary>
