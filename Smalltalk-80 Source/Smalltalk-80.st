@@ -18036,7 +18036,7 @@ or: alternativeBlock
 !False methodsFor: 'printing'!
 printOn: aStream 
 	"Print false."
-	aStream nextPutAll: 'false'\! \!
+	aStream nextPutAll: 'false'! !
 
 "==================== Legacy File/FileDirectory/FilePage classes removed ===================="
 "The legacy page-based file system classes (Object subclass: #File, FileDirectory, FilePage)
@@ -18328,7 +18328,7 @@ open: aFileModel named: aString withController: aController
 
 !FileModel class methodsFor: 'initialization'!
 flushMenus 
-	TextMenu _ nil\! \!
+	TextMenu _ nil! !
 
 "==================== FilePage class removed ===================="
 "The legacy FilePage class has been deprecated and removed.
