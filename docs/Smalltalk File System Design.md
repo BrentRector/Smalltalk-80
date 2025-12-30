@@ -1,8 +1,11 @@
 # Smalltalk-80 File System Design
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2025-12-30
-**Status:** Proposed
+**Status:** Implemented
+
+> **Note**: This document has been updated to reflect the actual implementation.
+> See `Smalltalk-80 Source/Smalltalk-80.st` for the authoritative source code.
 
 ## Table of Contents
 
@@ -229,16 +232,36 @@ isFile
 
 isDirectory
     "Answer whether this entry is a directory"
-    ^false!
+    ^false! !
+
+"-------------------- validation --------------------"
+
+!FileSystemNode methodsFor: 'validation'!
 
 isValidName
     "Answer whether this entry's name is valid for the file system"
     ^self fileSystem isValidFileName: self name!
 
 hasValidPath
-    "Answer whether all path components are valid"
-    ^self path components allSatisfy: [:comp |
-        self fileSystem isValidFileName: comp]! !
+    "Answer whether the path is valid (non-nil, non-empty)"
+    pathName isNil ifTrue: [^false].
+    pathName isEmpty ifTrue: [^false].
+    ^true!
+
+validatePath
+    "Signal an error if the path is invalid"
+    self hasValidPath ifFalse: [
+        self error: 'Invalid path: path is nil or empty']!
+
+validateName
+    "Signal an error if the name component is invalid"
+    self isValidName ifFalse: [
+        self error: 'Invalid file name: ', self name]!
+
+validateExists
+    "Signal an error if this entry does not exist"
+    self exists ifFalse: [
+        self error: 'File or directory not found: ', pathName]! !
 
 "-------------------- attributes --------------------"
 
@@ -323,7 +346,9 @@ printOn: aStream
 !FileSystemNode methodsFor: 'private'!
 
 initPathName: aString
-    "Initialize the path"
+    "Initialize the path. Validates that path is not nil."
+    aString isNil ifTrue: [
+        self error: 'Cannot create ', self class name, ' with nil path'].
     pathName := aString! !
 
 "-------------------- instance creation --------------------"
@@ -522,6 +547,45 @@ fullNameFor: aName
     (pathName endsWith: (String with: sep))
         ifTrue: [^pathName, aName]
         ifFalse: [^pathName, (String with: sep), aName]! !
+
+"-------------------- validation --------------------"
+
+!Directory methodsFor: 'validation'!
+
+checkName: aName fixErrors: fixFlag
+    "Validate aName as a file name. If fixFlag is true, return a corrected name.
+     If fixFlag is false and name is invalid, signal an error."
+    | fs |
+    aName isNil ifTrue: [
+        fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is nil']].
+    aName isEmpty ifTrue: [
+        fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is empty']].
+    fs := self fileSystem.
+    (fs isValidFileName: aName) ifTrue: [^aName].
+    fixFlag
+        ifTrue: [^fs sanitizeFileName: aName]
+        ifFalse: [self error: 'Invalid file name: ', aName]!
+
+checkNameOfFile: aFile
+    "Check aFile's name, signal error if invalid"
+    ^self checkName: aFile name fixErrors: false!
+
+checkNameOfFile: aFile fixErrors: aBoolean
+    "Check aFile's name, optionally fix errors"
+    ^self checkName: aFile name fixErrors: aBoolean!
+
+isLegalFileName: aName
+    "Answer whether aName is a legal file name for this directory's file system"
+    ^self fileSystem isValidFileName: aName!
+
+isLegalOldFileName: aName
+    "Answer whether aName is legal and exists in this directory"
+    ^(self isLegalFileName: aName) and: [self includesKey: aName]!
+
+validateFileName: aName
+    "Signal an error if aName is not a valid file name"
+    (self isLegalFileName: aName) ifFalse: [
+        self error: 'Invalid file name: ', aName]! !
 ```
 
 ---
@@ -1586,7 +1650,21 @@ reservedNames
     "Reserved file names in Windows"
     ^#('CON' 'PRN' 'AUX' 'NUL'
        'COM1' 'COM2' 'COM3' 'COM4' 'COM5' 'COM6' 'COM7' 'COM8' 'COM9'
-       'LPT1' 'LPT2' 'LPT3' 'LPT4' 'LPT5' 'LPT6' 'LPT7' 'LPT8' 'LPT9')! !
+       'LPT1' 'LPT2' 'LPT3' 'LPT4' 'LPT5' 'LPT6' 'LPT7' 'LPT8' 'LPT9')!
+
+isValidFileName: aName
+    "Windows-specific validation including reserved names and trailing dots/spaces"
+    | baseName |
+    (super isValidFileName: aName) ifFalse: [^false].
+    "Windows doesn't allow trailing dots or spaces"
+    (aName last = $. or: [aName last = $ ]) ifTrue: [^false].
+    "Check base name without extension against reserved names"
+    baseName := (aName includes: $.)
+        ifTrue: [aName copyFrom: 1 to: (aName indexOf: $.) - 1]
+        ifFalse: [aName].
+    (self reservedNames anySatisfy: [:reserved |
+        baseName sameAs: reserved]) ifTrue: [^false].
+    ^true! !
 
 "-------------------- path characteristics --------------------"
 
