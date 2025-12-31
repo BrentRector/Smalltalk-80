@@ -1,6 +1,7 @@
 using Moq;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.Core.VM.Scheduling;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 
@@ -126,7 +127,8 @@ public abstract class PrimitiveTestBase
         ICacheManager? cacheManager = null,
         IPrimitiveMessageSender? messageSender = null,
         int instructionPointer = 0,
-        VMMetadata? metadata = null)
+        VMMetadata? metadata = null,
+        ILowMemoryManager? lowMemoryManager = null)
     {
         // Ensure metadata is always provided (create default if not specified)
         // Use the heap manager to get the correct nil OOP
@@ -138,13 +140,14 @@ public abstract class PrimitiveTestBase
             heapManager,
             stackManager: null,
             contextManager: contextManager,
-            
+
             display: null,
             runtimeServices: runtimeServices,
             instructionPointer: instructionPointer,
             cacheManager: cacheManager,
             messageSender: messageSender,
-            metadata: actualMetadata);
+            metadata: actualMetadata,
+            lowMemoryManager: lowMemoryManager);
     }
 
     /// <summary>

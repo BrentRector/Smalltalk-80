@@ -1,5 +1,6 @@
 using Moq;
 using Smalltalk80.Interpreter.Core.VM.Primitives;
+using Smalltalk80.Interpreter.Core.VM.Scheduling;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 
@@ -55,36 +56,46 @@ public class SystemPrimitivesTests : PrimitiveTestBase
 
     #region Primitive 115: OopsLeft
 
+    // OopsLeft uses MaxTheoreticalOops (int.MaxValue >> 1) minus active objects.
+    // On modern systems with growable object tables, this reports a large value
+    // to prevent Smalltalk's low memory monitoring from triggering spuriously.
+    private const int MaxTheoreticalOops = int.MaxValue >> 1; // 1,073,741,823
+    private const int SmallIntegerMax = 0x3FFFFFFF; // 1,073,741,823
+
     [Fact]
-    public void OopsLeft_ReturnsFreeSlotCount()
+    public void OopsLeft_ReturnsTheoreticalMaxMinusActiveObjects()
     {
         var primitive = new SystemOperations.OopsLeft();
         var mockHeap = CreateMockHeapManager();
 
-        mockHeap.Setup(h => h.GetObjectTableSize()).Returns(10000);
         mockHeap.Setup(h => h.GetActiveObjectCount()).Returns(3000);
 
         var context = CreateContext(ObjectOOP(100), [], mockHeap.Object);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithSmallInt(result, 7000);
+        // Expected: MaxTheoreticalOops - 3000 = 1,073,738,823
+        // This value is < SmallIntegerMax so no capping needed
+        AssertSuccessWithSmallInt(result, MaxTheoreticalOops - 3000);
     }
 
     [Fact]
-    public void OopsLeft_FullTable_ReturnsZero()
+    public void OopsLeft_WithManyActiveObjects_StillReturnsLargeValue()
     {
         var primitive = new SystemOperations.OopsLeft();
         var mockHeap = CreateMockHeapManager();
 
-        mockHeap.Setup(h => h.GetObjectTableSize()).Returns(10000);
+        // Even with 10000 active objects, still have ~1 billion free OOPs
         mockHeap.Setup(h => h.GetActiveObjectCount()).Returns(10000);
 
         var context = CreateContext(ObjectOOP(100), [], mockHeap.Object);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithSmallInt(result, 0);
+        // Result should be MaxTheoreticalOops - 10000 = 1,073,731,823
+        AssertSuccess(result);
+        Assert.True(result.Value.IsSmallInteger);
+        Assert.True(result.Value.AsSmallInteger() > 1_000_000_000); // Still over 1 billion
     }
 
     [Fact]
@@ -455,54 +466,87 @@ public class SystemPrimitivesTests : PrimitiveTestBase
 
     #region Primitive 116: SignalAtOopsLeftWordsLeft
 
+    // Note: Primitive 116 signature is signal: aSemaphore atOopsLeft: numOops wordsLeft: numWords
+    // Arguments: [0]=semaphore, [1]=oopsThreshold, [2]=wordsThreshold
+
     [Fact]
     public void SignalAtOopsLeftWordsLeft_ValidArguments_Succeeds()
     {
         var primitive = new SystemOperations.SignalAtOopsLeftWordsLeft();
         var mockHeap = CreateMockHeapManager();
+        var receiverOOP = ObjectOOP(1); // SystemDictionary or similar
         var semaphoreOOP = ObjectOOP(100);
 
+        // Mock the low memory manager
+        var mockLowMemoryManager = new Mock<ILowMemoryManager>();
+
         var context = CreateContext(
-            semaphoreOOP,
-            [SmallInt(1000), SmallInt(2000)], // oopsThreshold, wordsThreshold
-            mockHeap.Object);
+            receiverOOP,
+            [semaphoreOOP, SmallInt(1000), SmallInt(2000)], // semaphore, oopsThreshold, wordsThreshold
+            mockHeap.Object,
+            lowMemoryManager: mockLowMemoryManager.Object);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithOOP(result, semaphoreOOP);
+        AssertSuccessWithOOP(result, receiverOOP);
+        mockLowMemoryManager.Verify(m => m.SetThresholds(semaphoreOOP, 1000, 2000), Times.Once);
     }
 
     [Fact]
-    public void SignalAtOopsLeftWordsLeft_NilReceiver_Succeeds()
+    public void SignalAtOopsLeftWordsLeft_NilSemaphore_DisablesMonitoring()
     {
         var primitive = new SystemOperations.SignalAtOopsLeftWordsLeft();
-        var heap = new SmalltalkHeapManager();
-        var metadata = CreateTestMetadata(heap);
-        var nilOOP = metadata.KnownObjects.Nil;
-
         var mockHeap = CreateMockHeapManager();
+        var metadata = CreateDefaultTestMetadata(mockHeap.Object);
+        var nilOOP = metadata.KnownObjects.Nil;
+        var receiverOOP = ObjectOOP(1);
+
+        // Mock the low memory manager
+        var mockLowMemoryManager = new Mock<ILowMemoryManager>();
 
         var context = CreateContext(
-            nilOOP,
-            [SmallInt(1000), SmallInt(2000)],
+            receiverOOP,
+            [nilOOP, SmallInt(1000), SmallInt(2000)], // nil semaphore disables monitoring
             mockHeap.Object,
-            metadata: metadata);
+            metadata: metadata,
+            lowMemoryManager: mockLowMemoryManager.Object);
 
         var result = primitive.Execute(context);
 
-        AssertSuccessWithOOP(result, nilOOP);
+        AssertSuccessWithOOP(result, receiverOOP);
+        mockLowMemoryManager.Verify(m => m.Disable(), Times.Once);
     }
 
     [Fact]
     public void SignalAtOopsLeftWordsLeft_WrongArgumentCount_Fails()
     {
         var primitive = new SystemOperations.SignalAtOopsLeftWordsLeft();
-        var heapManager = CreateMockHeapManager().Object;
+        var mockHeap = CreateMockHeapManager();
+        var mockLowMemoryManager = new Mock<ILowMemoryManager>();
 
         var context = CreateContext(
             ObjectOOP(100),
-            [SmallInt(1000)], // Only 1 argument
-            heapManager);
+            [SmallInt(1000)], // Only 1 argument, needs 3
+            mockHeap.Object,
+            lowMemoryManager: mockLowMemoryManager.Object);
+
+        var result = primitive.Execute(context);
+
+        AssertFailure(result);
+    }
+
+    [Fact]
+    public void SignalAtOopsLeftWordsLeft_NoLowMemoryManager_Fails()
+    {
+        var primitive = new SystemOperations.SignalAtOopsLeftWordsLeft();
+        var mockHeap = CreateMockHeapManager();
+        var semaphoreOOP = ObjectOOP(100);
+
+        // No low memory manager provided
+        var context = CreateContext(
+            ObjectOOP(1),
+            [semaphoreOOP, SmallInt(1000), SmallInt(2000)],
+            mockHeap.Object);
 
         var result = primitive.Execute(context);
 
