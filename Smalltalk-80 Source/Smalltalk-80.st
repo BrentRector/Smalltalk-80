@@ -38509,77 +38509,25 @@ copyChangesTo: newFileName
 getImagePrefix
 	"Prompt the user for a snapshot file name.  Persist until a legal name is supplied."
 
-	| default newPrefix prompt needsRetry isItNil diagFile |
-
-	"Write diagnostics to file that survives crash - APPEND mode"
-	diagFile _ WindowsFileStream appendOn: 'getImagePrefix-debug.txt'.
-	diagFile cr; nextPutAll: '=== getImagePrefix INVOCATION ==='; cr.
-	diagFile nextPutAll: 'SourceFiles == nil: '; nextPutAll: (SourceFiles == nil) printString; cr.
-	diagFile flush.
-
+	| default newPrefix prompt needsRetry |
 	SourceFiles == nil
-		ifTrue: [
-			diagFile nextPutAll: 'EARLY RETURN - SourceFiles is nil, returning snapshot'; cr.
-			diagFile close.
-			^'snapshot'].
-
-	diagFile nextPutAll: 'SourceFiles is NOT nil, continuing...'; cr.
+		ifTrue: [^'snapshot'].
 
 	prompt _ 'Enter name for image file:'.
 	default _ 'snapshot'.
 	newPrefix _ ''.
 
-	diagFile nextPutAll: 'Before FillInTheBlank, newPrefix = empty string'; cr.
-	diagFile nextPutAll: 'Calling FillInTheBlank...'; cr.
-	diagFile flush.
-
 	FillInTheBlank
 		request: prompt
 		displayAt: Sensor cursorPoint
 		centered: true
-		action: [:answer |
-			diagFile nextPutAll: 'Action block called with: '.
-			answer isNil
-				ifTrue: [diagFile nextPutAll: 'nil']
-				ifFalse: [diagFile nextPutAll: answer printString].
-			diagFile cr; flush.
-			newPrefix _ answer]
+		action: [:answer | newPrefix _ answer]
 		initialAnswer: default.
 
-	diagFile nextPutAll: 'After FillInTheBlank'; cr.
-	diagFile nextPutAll: 'newPrefix class: '; nextPutAll: newPrefix class name; cr.
-	diagFile nextPutAll: 'newPrefix == nil: '; nextPutAll: (newPrefix == nil) printString; cr.
-	isItNil _ newPrefix isNil.
-	diagFile nextPutAll: 'newPrefix isNil: '; nextPutAll: isItNil printString; cr.
-	diagFile flush.
+	"FillInTheBlank may return nil if dialog is cancelled or interrupted"
+	(newPrefix isNil or: [newPrefix == nil]) ifTrue: [^''].
 
-	"If nil, return empty string immediately"
-	isItNil ifTrue: [
-		diagFile nextPutAll: 'RETURNING EMPTY - newPrefix was nil'; cr.
-		diagFile close.
-		^''].
-
-	diagFile nextPutAll: 'About to call isEmpty on: '; nextPutAll: newPrefix printString; cr.
-	diagFile flush.
-
-	newPrefix == nil ifTrue: [
-		diagFile nextPutAll: 'EMERGENCY - newPrefix is nil by =='; cr.
-		diagFile close.
-		^''].
-
-	diagFile nextPutAll: 'Calling isEmpty...'; cr.
-	diagFile nextPutAll: 'Disk == nil: '; nextPutAll: (Disk == nil) printString; cr.
-	Disk == nil ifFalse: [
-		diagFile nextPutAll: 'Disk class: '; nextPutAll: Disk class name; cr].
-	diagFile nextPutAll: 'newPrefix for concat: '; nextPutAll: newPrefix printString; cr.
-	diagFile flush.
-
-	"Safe to call isEmpty now"
 	needsRetry _ newPrefix isEmpty or: [(Disk isValidFileName: newPrefix, '.changes') not].
-	diagFile nextPutAll: 'isEmpty succeeded, needsRetry = '; nextPutAll: needsRetry printString; cr.
-	diagFile nextPutAll: 'RETURNING: '; nextPutAll: newPrefix printString; cr.
-	diagFile nextPutAll: '=== getImagePrefix COMPLETE ==='; cr.
-	diagFile close.
 
 	[needsRetry] whileTrue:
 		[newPrefix isEmpty ifTrue: [^newPrefix].
@@ -38589,8 +38537,7 @@ getImagePrefix
 			centered: true
 			action: [:answer | newPrefix _ answer]
 			initialAnswer: default.
-		newPrefix isNil ifTrue: [^''].
-		newPrefix == nil ifTrue: [^''].
+		(newPrefix isNil or: [newPrefix == nil]) ifTrue: [^''].
 		(newPrefix size > 2 and:
 			[(newPrefix copyFrom: newPrefix size-2 to: newPrefix size) sameAs: '.im'])
 				ifTrue: [newPrefix _ newPrefix copyFrom: 1 to: newPrefix size-3].
@@ -38628,60 +38575,29 @@ snapshot
 snapshotAs: imageFilePrefix thenQuit: quitIfTrue
 	"Write the OT and Data of this Smalltalk out on an external file.  Answer true if the snapshot was just created."
 
-	| height justSnapped diagFile |
-
-	"Append diagnostics to trace crash location"
-	diagFile _ WindowsFileStream appendOn: 'getImagePrefix-debug.txt'.
-	diagFile cr; nextPutAll: '=== snapshotAs:thenQuit: STARTED ==='; cr.
-	diagFile nextPutAll: 'imageFilePrefix: '; nextPutAll: imageFilePrefix printString; cr.
-	diagFile flush.
-
+	| height justSnapped |
 	Cursor execute show.
-	diagFile nextPutAll: 'After Cursor execute show'; cr; flush.
-
 	self logChange: '''----SNAPSHOT----'''.
-	diagFile nextPutAll: 'After logChange'; cr; flush.
-
 	Disk == nil
 		ifFalse:	"Register snapshot filename with VM for primitive 97.
 				   Use Disk fileNamed: to avoid FileStream reading the entire
 				   existing file into memory (which would bloat the new snapshot)."
 			[(Disk fileNamed: imageFilePrefix, '.im') beSnapshotFile].
-	diagFile nextPutAll: 'After beSnapshotFile'; cr; flush.
-
 	self releaseExternalViews.
-	diagFile nextPutAll: 'After releaseExternalViews'; cr; flush.
-
 	Transcript cr; show: 'Snapshot at: ', Time dateAndTimeNow printString.
-	diagFile nextPutAll: 'After Transcript show'; cr; flush.
-
 	height _ Display height.
-	diagFile nextPutAll: 'After Display height'; cr; flush.
-
 	DisplayScreen displayHeight: (height min: 100).  "Minimize display space on snapshot"
-	diagFile nextPutAll: 'After DisplayScreen displayHeight'; cr; flush.
-
 	Delay preSnapshot.
-	diagFile nextPutAll: 'After Delay preSnapshot'; cr; flush.
-
 	Cursor wait show.
-	diagFile nextPutAll: 'About to call snapshotPrimitive'; cr; flush.
-
 	justSnapped _ self snapshotPrimitive isNil.
-	diagFile nextPutAll: 'After snapshotPrimitive, justSnapped = '; nextPutAll: justSnapped printString; cr; flush.
-
 	justSnapped & quitIfTrue
 		ifTrue:
 			[self quitPrimitive]
 		ifFalse:
-			[diagFile nextPutAll: 'Running post-snapshot...'; cr; flush.
-			Delay postSnapshot.
+			[Delay postSnapshot.
 			DisplayScreen displayHeight: height.
-			self install.
-			diagFile nextPutAll: 'After install'; cr; flush].
+			self install].
 	Cursor normal show.
-	diagFile nextPutAll: '=== snapshotAs:thenQuit: COMPLETE ==='; cr.
-	diagFile close.
 	^justSnapped! !
 
 !SystemDictionary methodsFor: 'time/versions'!
@@ -38818,25 +38734,9 @@ quitPrimitive
 releaseExternalViews
 	"Close external file references before snapshot or quit.
 	 Note: Disk is WindowsFileSystem singleton, not a closeable resource."
-	| diagFile |
-	diagFile _ WindowsFileStream appendOn: 'getImagePrefix-debug.txt'.
-	diagFile nextPutAll: '  releaseExternalViews ENTERED'; cr; flush.
-	diagFile nextPutAll: '  SourceFiles == nil: '; nextPutAll: (SourceFiles == nil) printString; cr; flush.
-
 	SourceFiles==nil
-		ifFalse: [
-			diagFile nextPutAll: '  About to iterate SourceFiles'; cr; flush.
-			SourceFiles do: [:t |
-				diagFile nextPutAll: '    SourceFile entry: '; nextPutAll: t class name; cr; flush.
-				t==nil ifFalse: [
-					diagFile nextPutAll: '    Closing...'; cr; flush.
-					t close.
-					diagFile nextPutAll: '    Closed'; cr; flush]]].
-
-	diagFile nextPutAll: '  About to call WindowsDirectory releaseExternalReferences'; cr; flush.
-	WindowsDirectory releaseExternalReferences.
-	diagFile nextPutAll: '  releaseExternalViews COMPLETE'; cr.
-	diagFile close!
+		ifFalse: [SourceFiles do: [:t | t==nil ifFalse: [t close]]].
+	WindowsDirectory releaseExternalReferences!
 snapshotPrimitive
 	"Write the current state of the object memory on a file in the same format as 
 	the Smalltalk-80 release.  The file can later be resumed, returning you to 
