@@ -906,8 +906,9 @@ includes: aFileSystemNode
 
 includesKey: aName
 	"Answer whether this directory contains an entry with the given name"
-	^self entries anySatisfy: [:entry |
-		Disk namesEqual: entry and: aName]! !
+	self entries do: [:entry |
+		(Disk namesEqual: entry and: aName) ifTrue: [^true]].
+	^false! !
 
 !Directory methodsFor: 'enumeration'!
 
@@ -1318,8 +1319,8 @@ isValidFileName: aName
 	aName isNil ifTrue: [^false].
 	aName isEmpty ifTrue: [^false].
 	aName size > self maxFileNameLength ifTrue: [^false].
-	(self reservedNames anySatisfy: [:reserved |
-		self namesEqual: aName and: reserved]) ifTrue: [^false].
+	self reservedNames do: [:reserved |
+		(self namesEqual: aName and: reserved) ifTrue: [^false]].
 	aName do: [:ch |
 		(self illegalCharacters includes: ch) ifTrue: [^false]].
 	^true!
@@ -1330,7 +1331,7 @@ reservedNames
 
 sanitizeFileName: aName
 	"Answer a valid file name based on aName by replacing illegal characters"
-	| result |
+	| result isReserved |
 	aName isNil ifTrue: [^'untitled'].
 	aName isEmpty ifTrue: [^'untitled'].
 	result _ aName collect: [:ch |
@@ -1339,9 +1340,10 @@ sanitizeFileName: aName
 			ifFalse: [ch]].
 	result size > self maxFileNameLength
 		ifTrue: [result _ result copyFrom: 1 to: self maxFileNameLength].
-	(self reservedNames anySatisfy: [:reserved |
-		self namesEqual: result and: reserved])
-			ifTrue: [result _ '_', result].
+	isReserved _ false.
+	self reservedNames do: [:reserved |
+		(self namesEqual: result and: reserved) ifTrue: [isReserved _ true]].
+	isReserved ifTrue: [result _ '_', result].
 	^result!
 
 checkName: aName fixErrors: fixFlag
@@ -1548,8 +1550,8 @@ isValidFileName: aName
 	baseName _ (aName includes: $.)
 		ifTrue: [aName copyFrom: 1 to: (aName indexOf: $.) - 1]
 		ifFalse: [aName].
-	(self reservedNames anySatisfy: [:reserved |
-		baseName sameAs: reserved]) ifTrue: [^false].
+	self reservedNames do: [:reserved |
+		(baseName sameAs: reserved) ifTrue: [^false]].
 	^true! !
 
 !WindowsFileSystem methodsFor: 'path characteristics'!

@@ -544,10 +544,9 @@ includes: aFileSystemNode
 
 includesKey: aName
     "Answer whether this directory contains an entry with the given name"
-    | fs |
-    fs := self fileSystem.
-    ^self entries anySatisfy: [:entry |
-        fs namesEqual: entry name and: aName]! !
+    self entries do: [:entry |
+        (Disk namesEqual: entry and: aName) ifTrue: [^true]].
+    ^false! !
 
 "-------------------- enumeration --------------------"
 
@@ -1544,17 +1543,18 @@ reservedNames
 
 isValidFileName: aName
     "Answer whether aName is a valid file name"
+    aName isNil ifTrue: [^false].
     aName isEmpty ifTrue: [^false].
     aName size > self maxFileNameLength ifTrue: [^false].
-    (self reservedNames anySatisfy: [:reserved |
-        self namesEqual: aName and: reserved]) ifTrue: [^false].
+    self reservedNames do: [:reserved |
+        (self namesEqual: aName and: reserved) ifTrue: [^false]].
     aName do: [:ch |
         (self illegalCharacters includes: ch) ifTrue: [^false]].
     ^true!
 
 sanitizeFileName: aName
-    "Answer a valid file name based on aName"
-    | result |
+    "Answer a valid file name based on aName by replacing illegal characters"
+    | result isReserved |
     aName isNil ifTrue: [^'untitled'].
     aName isEmpty ifTrue: [^'untitled'].
     result := aName collect: [:ch |
@@ -1563,9 +1563,10 @@ sanitizeFileName: aName
             ifFalse: [ch]].
     result size > self maxFileNameLength
         ifTrue: [result := result copyFrom: 1 to: self maxFileNameLength].
-    (self reservedNames anySatisfy: [:reserved |
-        self namesEqual: result and: reserved])
-            ifTrue: [result := '_', result].
+    isReserved := false.
+    self reservedNames do: [:reserved |
+        (self namesEqual: result and: reserved) ifTrue: [isReserved := true]].
+    isReserved ifTrue: [result := '_', result].
     ^result!
 
 checkName: aName fixErrors: fixFlag
@@ -1841,8 +1842,8 @@ isValidFileName: aName
     baseName := (aName includes: $.)
         ifTrue: [aName copyFrom: 1 to: (aName indexOf: $.) - 1]
         ifFalse: [aName].
-    (self reservedNames anySatisfy: [:reserved |
-        baseName sameAs: reserved]) ifTrue: [^false].
+    self reservedNames do: [:reserved |
+        (baseName sameAs: reserved) ifTrue: [^false]].
     ^true! !
 
 "-------------------- path characteristics --------------------"
