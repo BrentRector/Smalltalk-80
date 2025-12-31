@@ -269,6 +269,11 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             for (int i = 0; i < charCount; i++)
             {
                 char c = (char)(minAscii + i);
+
+                // Render left-arrow for underscore (Smalltalk-80 assignment operator)
+                // Original Xerox systems displayed '_' as '←' in their fonts
+                if (c == '_') c = '←';  // U+2190 LEFTWARDS ARROW
+
                 g.DrawString(c.ToString(), font, Brushes.Black, xTable[i], 0, format);
             }
         }
