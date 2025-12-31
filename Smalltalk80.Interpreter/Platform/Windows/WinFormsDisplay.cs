@@ -178,7 +178,7 @@ public class WinFormsDisplay : Form, IDisplay, IPlatformBridge
         base.Close();
     }
 
-    public void Resize(int width, int height)
+    public new void Resize(int width, int height)
     {
         DisplayResized(width, height);
     }
@@ -270,7 +270,7 @@ public class WinFormsDisplay : Form, IDisplay, IPlatformBridge
     // IDisplay - Input State (Atomic)
     // ============================================================================
 
-    public (int X, int Y) MousePosition
+    public new (int X, int Y) MousePosition
     {
         get
         {
@@ -280,7 +280,7 @@ public class WinFormsDisplay : Form, IDisplay, IPlatformBridge
         }
     }
 
-    public (bool Red, bool Yellow, bool Blue) MouseButtons
+    public new (bool Red, bool Yellow, bool Blue) MouseButtons
     {
         get
         {
