@@ -5,7 +5,7 @@ using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Engine;
 using Smalltalk80.Interpreter.Engine.LoaderPhases;
 using Smalltalk80.Interpreter.HeapManager;
-using Smalltalk80.Interpreter.Platform;
+using Smalltalk80.Interpreter.Core.VM.Platform;
 
 namespace Smalltalk80.Interpreter;
 

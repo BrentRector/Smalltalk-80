@@ -1,8 +1,9 @@
 // Display System Factory
 // Creates and manages the current display system instance.
 
-using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.VM;
+using Smalltalk80.Interpreter.Core.VM.Platform;
+using Smalltalk80.Interpreter.HeapManager;
 
 namespace Smalltalk80.Interpreter.Platform;
 
@@ -153,6 +154,7 @@ public class NullDisplay : IDisplay
     public Shared.Types.SmalltalkOOP GetInputSemaphore() => _inputSemaphore;
     public void SetControllerSemaphore(Shared.Types.SmalltalkOOP semaphoreOOP) => _controllerSemaphore = semaphoreOOP;
     public Shared.Types.SmalltalkOOP GetControllerSemaphore() => _controllerSemaphore;
+    public void SetSampleInterval(int intervalMs) { /* No-op for null display */ }
 
     private readonly ManualResetEventSlim _idleWake = new(false);
     public WaitHandle? EventAvailableHandle => _idleWake.WaitHandle;

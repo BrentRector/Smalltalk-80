@@ -4,7 +4,7 @@
 
 using Smalltalk80.Interpreter.Shared.Types;
 
-namespace Smalltalk80.Interpreter.Platform;
+namespace Smalltalk80.Interpreter.Core.VM.Platform;
 
 /// <summary>
 /// Unified display surface with integrated rendering and input.

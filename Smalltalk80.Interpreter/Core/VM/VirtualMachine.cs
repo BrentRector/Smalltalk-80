@@ -8,7 +8,7 @@ using Smalltalk80.Interpreter.Core.VM.Scheduling;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.Attributes;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
-using Smalltalk80.Interpreter.Platform;
+using Smalltalk80.Interpreter.Core.VM.Platform;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 

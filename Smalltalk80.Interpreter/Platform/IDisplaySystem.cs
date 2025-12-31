@@ -1,6 +1,8 @@
 // Display System Factory Interface
 // Entry point for creating display surfaces with different backends.
 
+using Smalltalk80.Interpreter.Core.VM.Platform;
+
 namespace Smalltalk80.Interpreter.Platform;
 
 /// <summary>
