@@ -1,3 +1,5 @@
+using System.Runtime.Versioning;
+
 namespace Smalltalk80.Interpreter.Core.VM.Graphics;
 
 /// <summary>
@@ -133,6 +135,19 @@ public class NullFontBridge : IFontBridge
 public static class FontBridgeFactory
 {
     /// <summary>
+    /// EXPERIMENTAL: Set to true to try using GDI bitmap font (Fixedsys) instead of TrueType.
+    /// This provides pixel-perfect 1bpp rendering without antialiasing artifacts.
+    /// Set to false to use the standard WinForms/GDI+ font rendering.
+    /// </summary>
+    public static bool UseGdiBitmapFonts { get; set; } = false;
+
+    /// <summary>
+    /// The name of the bitmap font to use when UseGdiBitmapFonts is true.
+    /// Default is "Fixedsys" - a classic Windows bitmap font.
+    /// </summary>
+    public static string GdiBitmapFontName { get; set; } = "Fixedsys";
+
+    /// <summary>
     /// Creates the appropriate font bridge for the current platform.
     /// </summary>
     /// <returns>IFontBridge implementation suitable for the platform.</returns>
@@ -141,6 +156,17 @@ public static class FontBridgeFactory
         // Check if we're on Windows with GUI support
         if (OperatingSystem.IsWindows())
         {
+            // EXPERIMENTAL: Try GDI bitmap font first if enabled
+            if (UseGdiBitmapFonts)
+            {
+                var gdiBridge = TryCreateGdiBitmapBridge();
+                if (gdiBridge != null)
+                    return gdiBridge;
+
+                // Fall through to WinForms if GDI bitmap font not available
+                Console.WriteLine($"[FontBridgeFactory] GDI bitmap font '{GdiBitmapFontName}' not available, falling back to WinForms.");
+            }
+
             try
             {
                 // Try to create WinForms bridge
@@ -180,5 +206,53 @@ public static class FontBridgeFactory
             throw new PlatformNotSupportedException("WinFormsFontBridge requires Windows.");
         }
         return new WinFormsFontBridge();
+    }
+
+    /// <summary>
+    /// Creates GDI bitmap font bridge (Windows only).
+    /// Returns null if the font is not available.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    public static IFontBridge? CreateGdiBitmap(string fontName = "Fixedsys")
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException("GdiBitmapFontBridge requires Windows.");
+        }
+
+#if WINDOWS
+        var bridge = new GdiBitmapFontBridge(fontName);
+        if (bridge.IsFontAvailable)
+            return bridge;
+
+        bridge.Dispose();
+#endif
+        return null;
+    }
+
+    /// <summary>
+    /// Attempts to create a GDI bitmap font bridge.
+    /// Returns null if not on Windows or font not available.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    private static IFontBridge? TryCreateGdiBitmapBridge()
+    {
+#if WINDOWS
+        try
+        {
+            var bridge = new GdiBitmapFontBridge(GdiBitmapFontName);
+            if (bridge.IsFontAvailable)
+            {
+                Console.WriteLine($"[FontBridgeFactory] Using GDI bitmap font: {GdiBitmapFontName}");
+                return bridge;
+            }
+            bridge.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[FontBridgeFactory] Failed to create GDI bitmap bridge: {ex.Message}");
+        }
+#endif
+        return null;
     }
 }
