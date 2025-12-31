@@ -38509,7 +38509,7 @@ copyChangesTo: newFileName
 getImagePrefix
 	"Prompt the user for a snapshot file name.  Persist until a legal name is supplied."
 
-	| default newPrefix prompt needsRetry |
+	| default newPrefix prompt needsRetry isItNil |
 	SourceFiles == nil
 		ifTrue: [^'snapshot'].
 	prompt _ 'Enter name for image file:'.
@@ -38520,23 +38520,31 @@ getImagePrefix
 		displayAt: Sensor cursorPoint
 		centered: true
 		action: [:answer |
-			Transcript cr; show: 'FillInTheBlank action called with: '.
+			Transcript cr; show: 'FillInTheBlank action: '.
 			answer isNil
 				ifTrue: [Transcript show: 'nil']
 				ifFalse: [Transcript show: answer printString].
 			newPrefix _ answer]
 		initialAnswer: default.
 
-	"Debug: show what we got"
-	Transcript cr; show: 'After FillInTheBlank, newPrefix = '.
-	newPrefix isNil
-		ifTrue: [Transcript show: 'nil'. ^'']
-		ifFalse: [Transcript show: newPrefix printString].
+	"Debug: show class and identity comparisons"
+	Transcript cr; show: 'newPrefix class: '; show: newPrefix class name.
+	Transcript cr; show: 'newPrefix == nil: '; show: (newPrefix == nil) printString.
+	isItNil _ newPrefix isNil.
+	Transcript cr; show: 'newPrefix isNil: '; show: isItNil printString.
 
-	"Explicit nil check BEFORE any isEmpty call"
-	newPrefix isNil ifTrue: [^''].
+	"If nil, return empty string immediately using the saved boolean"
+	isItNil ifTrue: [
+		Transcript cr; show: 'RETURNING EMPTY - newPrefix was nil'.
+		^''].
 
-	"Now we know newPrefix is not nil, safe to call isEmpty"
+	"Double check we're not nil before isEmpty"
+	Transcript cr; show: 'About to call isEmpty on: '; show: newPrefix printString.
+	newPrefix == nil ifTrue: [
+		Transcript cr; show: 'EMERGENCY - newPrefix is nil by =='.
+		^''].
+
+	"Safe to call isEmpty now"
 	needsRetry _ newPrefix isEmpty or: [(Disk isValidFileName: newPrefix, '.changes') not].
 	[needsRetry] whileTrue:
 		[newPrefix isEmpty ifTrue: [^newPrefix].
@@ -38546,8 +38554,8 @@ getImagePrefix
 			centered: true
 			action: [:answer | newPrefix _ answer]
 			initialAnswer: default.
-		"Check for nil from retry dialog"
 		newPrefix isNil ifTrue: [^''].
+		newPrefix == nil ifTrue: [^''].
 		(newPrefix size > 2 and:
 			[(newPrefix copyFrom: newPrefix size-2 to: newPrefix size) sameAs: '.im'])
 				ifTrue: [newPrefix _ newPrefix copyFrom: 1 to: newPrefix size-3].
