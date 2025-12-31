@@ -11,6 +11,7 @@ using Smalltalk80.Interpreter.Engine.InitExecution;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Platform.Windows;
 using Smalltalk80.Interpreter.Shared.Types;
+using Silvern.Smalltalk80.Core.VM.Graphics.Abstraction;
 using ClassHierarchyTraversal = Smalltalk80.Interpreter.Core.ClassHierarchyTraversal;
 
 namespace Smalltalk80.Interpreter;
@@ -56,6 +57,16 @@ public static class Program
 
             // Register diagnostic listeners (returns profile listener if enabled)
             var profileListener = RegisterDiagnosticListeners(diagnostics, diagnosticCategories);
+
+            // Initialize graphics backend (required before any BitBlt operations)
+            Console.WriteLine("Initializing graphics backend...");
+            GraphicsBackendFactory.CreateAndSetCurrent(new GraphicsBackendOptions
+            {
+                PreferredBackend = GraphicsBackendType.Software,
+                AllowFallback = true,
+                EnableStats = true
+            });
+            Console.WriteLine($"  Backend: {GraphicsBackendFactory.Current?.Name ?? "None"}");
 
             // These will be set by either cold start or restore
             SmalltalkHeapManager heapManager;
@@ -289,6 +300,9 @@ public static class Program
 
             // Report profiling statistics if enabled
             profileListener?.ReportStatistics();
+
+            // Clean up graphics backend
+            GraphicsBackendFactory.ClearCurrent();
 
             Console.WriteLine("Interpreter shutdown complete");
         }
