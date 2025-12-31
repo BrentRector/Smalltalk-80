@@ -25,8 +25,6 @@
 
   <!-- Windows Forms and Graphics packages -->
   <ItemGroup>
-    <PackageReference Include="SkiaSharp" Version="3.119.1" />
-    <PackageReference Include="SkiaSharp.Views.Desktop.Common" Version="3.119.1" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
   </ItemGroup>
   
