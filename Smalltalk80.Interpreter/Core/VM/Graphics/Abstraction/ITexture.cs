@@ -145,9 +145,17 @@ public sealed class CpuTexture : ITexture
         _data = new byte[_stride * height];
     }
 
-    public ITextureLock Lock(TextureAccess access) => new CpuTextureLock(_data, _stride);
+    public ITextureLock Lock(TextureAccess access)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new CpuTextureLock(_data, _stride);
+    }
 
-    public ReadOnlyMemory<byte>? TryGetPixelData() => _data;
+    public ReadOnlyMemory<byte>? TryGetPixelData()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _data;
+    }
 
     public void Invalidate(int x, int y, int width, int height)
     {

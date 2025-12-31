@@ -2,6 +2,7 @@
 // CPU-based implementation wrapping the existing BitBltEngine
 
 using System.Diagnostics;
+using Silvern.Smalltalk80.Core.VM.Graphics;
 
 namespace Silvern.Smalltalk80.Core.VM.Graphics.Abstraction;
 
