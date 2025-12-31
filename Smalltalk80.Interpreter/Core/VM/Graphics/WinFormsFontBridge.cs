@@ -272,7 +272,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
                 // Render left-arrow for underscore (Smalltalk-80 assignment operator)
                 // Original Xerox systems displayed '_' as '←' in their fonts
-                if (c == '_') c = '←';  // U+2190 LEFTWARDS ARROW
+                // Use filled pointer for better visibility in 1-bit rendering
+                if (c == '_') c = '◄';  // U+25C4 BLACK LEFT-POINTING POINTER
 
                 g.DrawString(c.ToString(), font, Brushes.Black, xTable[i], 0, format);
             }
