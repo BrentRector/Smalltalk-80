@@ -38509,11 +38509,10 @@ copyChangesTo: newFileName
 getImagePrefix
 	"Prompt the user for a snapshot file name.  Persist until a legal name is supplied."
 
-	| default newPrefix prompt |
+	| default newPrefix prompt needsRetry |
 	SourceFiles == nil
 		ifTrue: [^'snapshot'].
-	prompt _
-'Enter name for image file:'.
+	prompt _ 'Enter name for image file:'.
 	default _ 'snapshot'.
 	newPrefix _ ''.
 	FillInTheBlank
@@ -38527,33 +38526,36 @@ getImagePrefix
 				ifFalse: [Transcript show: answer printString].
 			newPrefix _ answer]
 		initialAnswer: default.
+
+	"Debug: show what we got"
 	Transcript cr; show: 'After FillInTheBlank, newPrefix = '.
 	newPrefix isNil
-		ifTrue: [Transcript show: 'nil']
+		ifTrue: [Transcript show: 'nil'. ^'']
 		ifFalse: [Transcript show: newPrefix printString].
 
-	[(newPrefix isNil or: [newPrefix isEmpty]) or:
-			[(Disk isValidFileName: newPrefix, '.changes') not]] whileTrue:
-		[(newPrefix isNil or: [newPrefix isEmpty]) ifTrue: [^newPrefix].
+	"Explicit nil check BEFORE any isEmpty call"
+	newPrefix isNil ifTrue: [^''].
+
+	"Now we know newPrefix is not nil, safe to call isEmpty"
+	needsRetry _ newPrefix isEmpty or: [(Disk isValidFileName: newPrefix, '.changes') not].
+	[needsRetry] whileTrue:
+		[newPrefix isEmpty ifTrue: [^newPrefix].
 		FillInTheBlank
 			request: prompt
 			displayAt: Sensor cursorPoint
 			centered: true
-			action: [:answer |
-				Transcript cr; show: 'Retry FillInTheBlank action called with: '.
-				answer isNil
-					ifTrue: [Transcript show: 'nil']
-					ifFalse: [Transcript show: answer printString].
-				newPrefix _ answer]
+			action: [:answer | newPrefix _ answer]
 			initialAnswer: default.
+		"Check for nil from retry dialog"
+		newPrefix isNil ifTrue: [^''].
 		(newPrefix size > 2 and:
 			[(newPrefix copyFrom: newPrefix size-2 to: newPrefix size) sameAs: '.im'])
 				ifTrue: [newPrefix _ newPrefix copyFrom: 1 to: newPrefix size-3].
-		prompt _
-'Illegal file name: ', newPrefix, '
+		prompt _ 'Illegal file name: ', newPrefix, '
 Enter name for image file:'.
 		default _ Disk checkName: newPrefix, '.changes' fixErrors: true.
-		default _ default copyFrom: 1 to: default size - 8].
+		default _ default copyFrom: 1 to: default size - 8.
+		needsRetry _ newPrefix isEmpty or: [(Disk isValidFileName: newPrefix, '.changes') not]].
 
 	^newPrefix!
 quit
