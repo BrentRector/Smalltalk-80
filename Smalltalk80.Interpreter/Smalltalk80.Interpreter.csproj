@@ -25,6 +25,8 @@
 
   <!-- Windows Forms and Graphics packages -->
   <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+    <PackageReference Include="SkiaSharp.Views.Desktop.Common" Version="3.119.1" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
   </ItemGroup>
   
@@ -54,37 +56,16 @@
 
     <!-- Copy coldstart.json from Compiler output Data folder (if freshly compiled) -->
     <!-- Note: coldstart.json is tracked in git in the Interpreter's Data folder, so this is optional -->
-    <Copy
-      SourceFiles="$(CompilerOutputDir)Data\coldstart.json"
-      DestinationFolder="$(DataOutputDir)"
-      SkipUnchangedFiles="true"
-      Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
-    <Message
-      Text="✓ Copied freshly compiled coldstart.json to $(DataOutputDir)"
-      Importance="high"
-      Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
+    <Copy SourceFiles="$(CompilerOutputDir)Data\coldstart.json" DestinationFolder="$(DataOutputDir)" SkipUnchangedFiles="true" Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
+    <Message Text="✓ Copied freshly compiled coldstart.json to $(DataOutputDir)" Importance="high" Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
 
     <!-- Copy Smalltalk-80.sources from Compiler output (generated during compilation) -->
-    <Copy
-      SourceFiles="$(CompilerOutputDir)Data\Smalltalk-80.sources"
-      DestinationFolder="$(DataOutputDir)"
-      SkipUnchangedFiles="true"
-      Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.sources')" />
-    <Message
-      Text="✓ Copied Smalltalk-80.sources to $(DataOutputDir)"
-      Importance="high"
-      Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.sources')" />
+    <Copy SourceFiles="$(CompilerOutputDir)Data\Smalltalk-80.sources" DestinationFolder="$(DataOutputDir)" SkipUnchangedFiles="true" Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.sources')" />
+    <Message Text="✓ Copied Smalltalk-80.sources to $(DataOutputDir)" Importance="high" Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.sources')" />
 
     <!-- Copy Smalltalk-80.changes from Compiler output (generated during compilation) -->
-    <Copy
-      SourceFiles="$(CompilerOutputDir)Data\Smalltalk-80.changes"
-      DestinationFolder="$(DataOutputDir)"
-      SkipUnchangedFiles="true"
-      Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.changes')" />
-    <Message
-      Text="✓ Copied Smalltalk-80.changes to $(DataOutputDir)"
-      Importance="high"
-      Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.changes')" />
+    <Copy SourceFiles="$(CompilerOutputDir)Data\Smalltalk-80.changes" DestinationFolder="$(DataOutputDir)" SkipUnchangedFiles="true" Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.changes')" />
+    <Message Text="✓ Copied Smalltalk-80.changes to $(DataOutputDir)" Importance="high" Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.changes')" />
   </Target>
 
 
