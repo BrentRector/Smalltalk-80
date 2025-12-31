@@ -38510,12 +38510,20 @@ getImagePrefix
 	"Prompt the user for a snapshot file name.  Persist until a legal name is supplied."
 
 	| default newPrefix prompt needsRetry isItNil diagFile |
-	SourceFiles == nil
-		ifTrue: [^'snapshot'].
 
-	"Write diagnostics to file that survives crash"
-	diagFile _ WindowsFileStream writeOn: 'getImagePrefix-debug.txt'.
-	diagFile nextPutAll: '=== getImagePrefix started ==='; cr.
+	"Write diagnostics to file that survives crash - APPEND mode"
+	diagFile _ WindowsFileStream appendOn: 'getImagePrefix-debug.txt'.
+	diagFile cr; nextPutAll: '=== getImagePrefix INVOCATION ==='; cr.
+	diagFile nextPutAll: 'SourceFiles == nil: '; nextPutAll: (SourceFiles == nil) printString; cr.
+	diagFile flush.
+
+	SourceFiles == nil
+		ifTrue: [
+			diagFile nextPutAll: 'EARLY RETURN - SourceFiles is nil, returning snapshot'; cr.
+			diagFile close.
+			^'snapshot'].
+
+	diagFile nextPutAll: 'SourceFiles is NOT nil, continuing...'; cr.
 
 	prompt _ 'Enter name for image file:'.
 	default _ 'snapshot'.
@@ -38565,6 +38573,8 @@ getImagePrefix
 	"Safe to call isEmpty now"
 	needsRetry _ newPrefix isEmpty or: [(Disk isValidFileName: newPrefix, '.changes') not].
 	diagFile nextPutAll: 'isEmpty succeeded, needsRetry = '; nextPutAll: needsRetry printString; cr.
+	diagFile nextPutAll: 'RETURNING: '; nextPutAll: newPrefix printString; cr.
+	diagFile nextPutAll: '=== getImagePrefix COMPLETE ==='; cr.
 	diagFile close.
 
 	[needsRetry] whileTrue:
