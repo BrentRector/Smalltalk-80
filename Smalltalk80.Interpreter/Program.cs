@@ -11,6 +11,7 @@ using Smalltalk80.Interpreter.Engine.InitExecution;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Platform.Windows;
 using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Core.VM.Graphics;
 using ClassHierarchyTraversal = Smalltalk80.Interpreter.Core.ClassHierarchyTraversal;
 
 namespace Smalltalk80.Interpreter;
@@ -176,6 +177,10 @@ public static class Program
             // After restore, the Smalltalk post-snapshot code will resize Display back to original
             int displayWidth = InterpreterConstants.DefaultDisplayWidth;
             int displayHeight = InterpreterConstants.DefaultDisplayHeight;
+
+            // EXPERIMENTAL: Enable GDI bitmap font (Fixedsys) for pixel-perfect 1bpp rendering
+            // Set to true to try Fixedsys instead of TrueType fonts
+            FontBridgeFactory.UseGdiBitmapFonts = true;
 
             // Create display window (UI thread object - has heap access for Display bitmap rendering)
             Console.WriteLine("\n=== Creating Display Window ===");
