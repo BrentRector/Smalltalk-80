@@ -38628,29 +38628,60 @@ snapshot
 snapshotAs: imageFilePrefix thenQuit: quitIfTrue
 	"Write the OT and Data of this Smalltalk out on an external file.  Answer true if the snapshot was just created."
 
-	| height justSnapped |
+	| height justSnapped diagFile |
+
+	"Append diagnostics to trace crash location"
+	diagFile _ WindowsFileStream appendOn: 'getImagePrefix-debug.txt'.
+	diagFile cr; nextPutAll: '=== snapshotAs:thenQuit: STARTED ==='; cr.
+	diagFile nextPutAll: 'imageFilePrefix: '; nextPutAll: imageFilePrefix printString; cr.
+	diagFile flush.
+
 	Cursor execute show.
+	diagFile nextPutAll: 'After Cursor execute show'; cr; flush.
+
 	self logChange: '''----SNAPSHOT----'''.
+	diagFile nextPutAll: 'After logChange'; cr; flush.
+
 	Disk == nil
 		ifFalse:	"Register snapshot filename with VM for primitive 97.
 				   Use Disk fileNamed: to avoid FileStream reading the entire
 				   existing file into memory (which would bloat the new snapshot)."
 			[(Disk fileNamed: imageFilePrefix, '.im') beSnapshotFile].
+	diagFile nextPutAll: 'After beSnapshotFile'; cr; flush.
+
 	self releaseExternalViews.
+	diagFile nextPutAll: 'After releaseExternalViews'; cr; flush.
+
 	Transcript cr; show: 'Snapshot at: ', Time dateAndTimeNow printString.
+	diagFile nextPutAll: 'After Transcript show'; cr; flush.
+
 	height _ Display height.
+	diagFile nextPutAll: 'After Display height'; cr; flush.
+
 	DisplayScreen displayHeight: (height min: 100).  "Minimize display space on snapshot"
+	diagFile nextPutAll: 'After DisplayScreen displayHeight'; cr; flush.
+
 	Delay preSnapshot.
+	diagFile nextPutAll: 'After Delay preSnapshot'; cr; flush.
+
 	Cursor wait show.
+	diagFile nextPutAll: 'About to call snapshotPrimitive'; cr; flush.
+
 	justSnapped _ self snapshotPrimitive isNil.
+	diagFile nextPutAll: 'After snapshotPrimitive, justSnapped = '; nextPutAll: justSnapped printString; cr; flush.
+
 	justSnapped & quitIfTrue
 		ifTrue:
 			[self quitPrimitive]
 		ifFalse:
-			[Delay postSnapshot.
+			[diagFile nextPutAll: 'Running post-snapshot...'; cr; flush.
+			Delay postSnapshot.
 			DisplayScreen displayHeight: height.
-			self install].
+			self install.
+			diagFile nextPutAll: 'After install'; cr; flush].
 	Cursor normal show.
+	diagFile nextPutAll: '=== snapshotAs:thenQuit: COMPLETE ==='; cr.
+	diagFile close.
 	^justSnapped! !
 
 !SystemDictionary methodsFor: 'time/versions'!
