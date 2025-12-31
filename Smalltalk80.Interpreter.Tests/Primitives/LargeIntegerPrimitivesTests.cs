@@ -40,9 +40,9 @@ public class LargeIntegerPrimitivesTests : PrimitiveTestBase
         return largeIntOOP;
     }
 
-    private Mock<RuntimeServices> CreateMockRuntimeServices(Mock<ISmalltalkHeap> mockHeap)
+    private new Mock<RuntimeServices> CreateMockRuntimeServices(Mock<ISmalltalkHeap> mockHeap)
     {
-        var mock = CreateMockRuntimeServices(mockHeap);
+        var mock = base.CreateMockRuntimeServices(mockHeap);
         mock.Setup(r => r.GetClass("LargePositiveInteger")).Returns(ObjectOOP(1000));
         mock.Setup(r => r.GetClass("LargeNegativeInteger")).Returns(ObjectOOP(1001));
         return mock;
