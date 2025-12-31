@@ -1,12 +1,12 @@
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.HeapManager;
-using Silvern.Smalltalk80.Core.VM.Graphics.Abstraction;
+using Smalltalk80.Interpreter.Core.VM.Graphics;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
 /// <summary>
 /// Graphics primitives for BitBlt, display, and time (96-104).
-/// Uses IGraphicsBackend abstraction for pluggable rendering implementations.
+/// Uses BitBltEngine directly for 1-bit raster operations.
 /// </summary>
 public static class GraphicsOperations
 {
@@ -68,73 +68,59 @@ public static class GraphicsOperations
             if (combinationRule < 0 || combinationRule > 15)
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            // Get graphics backend
-            var backend = GraphicsBackendFactory.Current;
-            if (backend == null)
-                return PrimitiveResult.Fail(context.Metadata!);
-
-            // Extract Form data and create textures
+            // Extract Form data
             var (destBits, destWidth, destHeight) = ExtractFormData(heap, destForm);
             if (destBits.Length == 0)
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            using var destTexture = backend.CreateTextureFromData(
-                destWidth, destHeight, PixelDepth.OneBit, destBits.Span);
+            ReadOnlySpan<byte> sourceBits = default;
+            int sourceWidth = 0, sourceHeight = 0;
 
-            ITexture? sourceTexture = null;
-            ITexture? halftoneTexture = null;
-
-            try
+            if (sourceForm != nil && !sourceForm.IsSmallInteger)
             {
-                if (sourceForm != nil && !sourceForm.IsSmallInteger)
+                var (srcBits, srcW, srcH) = ExtractFormData(heap, sourceForm);
+                if (srcBits.Length > 0)
                 {
-                    var (srcBits, srcWidth, srcHeight) = ExtractFormData(heap, sourceForm);
-                    if (srcBits.Length > 0)
-                    {
-                        sourceTexture = backend.CreateTextureFromData(
-                            srcWidth, srcHeight, PixelDepth.OneBit, srcBits.Span);
-                    }
+                    sourceBits = srcBits.Span;
+                    sourceWidth = srcW;
+                    sourceHeight = srcH;
                 }
-
-                if (halftoneForm != nil && !halftoneForm.IsSmallInteger)
-                {
-                    var (htBits, htWidth, htHeight) = ExtractFormData(heap, halftoneForm);
-                    if (htBits.Length > 0)
-                    {
-                        halftoneTexture = backend.CreateTextureFromData(
-                            htWidth, htHeight, PixelDepth.OneBit, htBits.Span);
-                    }
-                }
-
-                // Perform BitBlt via abstraction layer
-                backend.BitBlt(new BitBltParams
-                {
-                    Destination = destTexture,
-                    DestX = destX,
-                    DestY = destY,
-                    Source = sourceTexture,
-                    SourceX = sourceX,
-                    SourceY = sourceY,
-                    Width = width,
-                    Height = height,
-                    ClipRect = new GraphicsRect(clipX, clipY, clipWidth, clipHeight),
-                    Halftone = halftoneTexture,
-                    BlendMode = (BlendMode)combinationRule
-                });
-
-                // Write modified dest bits back to heap
-                using var destLock = destTexture.Lock(TextureAccess.Read);
-                WriteFormData(heap, destForm, destLock.Data.ToArray());
-
-                // Invalidate Display region if destination is Display
-                InvalidateDisplayIfNeeded(context, destForm, destX, destY, width, height,
-                    clipX, clipY, clipWidth, clipHeight);
             }
-            finally
+
+            ReadOnlySpan<byte> halftoneBits = default;
+            int halftoneWidth = 0, halftoneHeight = 0;
+
+            if (halftoneForm != nil && !halftoneForm.IsSmallInteger)
             {
-                sourceTexture?.Dispose();
-                halftoneTexture?.Dispose();
+                var (htBits, htW, htH) = ExtractFormData(heap, halftoneForm);
+                if (htBits.Length > 0)
+                {
+                    halftoneBits = htBits.Span;
+                    halftoneWidth = htW;
+                    halftoneHeight = htH;
+                }
             }
+
+            // Perform BitBlt using engine directly
+            BitBltEngine.CopyBits(
+                destBits.Span,
+                destWidth, destHeight,
+                destX, destY,
+                sourceBits,
+                sourceWidth, sourceHeight,
+                sourceX, sourceY,
+                width, height,
+                clipX, clipY, clipWidth, clipHeight,
+                halftoneBits,
+                halftoneWidth, halftoneHeight,
+                (CombinationRule)combinationRule);
+
+            // Write modified dest bits back to heap
+            WriteFormData(heap, destForm, destBits.Span);
+
+            // Invalidate Display region if destination is Display
+            InvalidateDisplayIfNeeded(context, destForm, destX, destY, width, height,
+                clipX, clipY, clipWidth, clipHeight);
 
             return PrimitiveResult.Ok(context.Receiver);
         }
@@ -323,139 +309,130 @@ public static class GraphicsOperations
             int clipWidth = clipWidthOOP.AsSmallInteger();
             int clipHeight = clipHeightOOP.AsSmallInteger();
 
-            // Get graphics backend
-            var backend = GraphicsBackendFactory.Current;
-            if (backend == null)
-                return PrimitiveResult.Fail(context.Metadata!);
-
             // Extract Form data
             var (destBits, destWidth, destHeight) = ExtractFormData(heap, destFormOOP);
             if (destBits.Length == 0)
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            using var destTexture = backend.CreateTextureFromData(
-                destWidth, destHeight, PixelDepth.OneBit, destBits.Span);
+            ReadOnlySpan<byte> sourceBits = default;
+            int sourceWidth = 0, sourceHeight = 0;
 
-            ITexture? sourceTexture = null;
-            ITexture? halftoneTexture = null;
-
-            try
+            if (sourceFormOOP != nil && !sourceFormOOP.IsSmallInteger)
             {
-                if (sourceFormOOP != nil && !sourceFormOOP.IsSmallInteger)
+                var (srcBits, srcW, srcH) = ExtractFormData(heap, sourceFormOOP);
+                if (srcBits.Length > 0)
                 {
-                    var (srcBits, srcWidth, srcHeight) = ExtractFormData(heap, sourceFormOOP);
-                    if (srcBits.Length > 0)
-                    {
-                        sourceTexture = backend.CreateTextureFromData(
-                            srcWidth, srcHeight, PixelDepth.OneBit, srcBits.Span);
-                    }
+                    sourceBits = srcBits.Span;
+                    sourceWidth = srcW;
+                    sourceHeight = srcH;
                 }
+            }
 
-                if (halftoneFormOOP != nil && !halftoneFormOOP.IsSmallInteger)
+            ReadOnlySpan<byte> halftoneBits = default;
+            int halftoneWidth = 0, halftoneHeight = 0;
+
+            if (halftoneFormOOP != nil && !halftoneFormOOP.IsSmallInteger)
+            {
+                var (htBits, htW, htH) = ExtractFormData(heap, halftoneFormOOP);
+                if (htBits.Length > 0)
                 {
-                    var (htBits, htWidth, htHeight) = ExtractFormData(heap, halftoneFormOOP);
-                    if (htBits.Length > 0)
-                    {
-                        halftoneTexture = backend.CreateTextureFromData(
-                            htWidth, htHeight, PixelDepth.OneBit, htBits.Span);
-                    }
+                    halftoneBits = htBits.Span;
+                    halftoneWidth = htW;
+                    halftoneHeight = htH;
                 }
+            }
 
-                // Map combination rule 16 (paint) to Or
-                var blendMode = combinationRule == 16 ? BlendMode.Or : (BlendMode)combinationRule;
-                var clipRect = new GraphicsRect(clipX, clipY, clipWidth, clipHeight);
+            // Map combination rule 16 (paint) to Or
+            var rule = combinationRule == 16 ? CombinationRule.Or : (CombinationRule)combinationRule;
 
-                // Bresenham line drawing algorithm
-                int dx = Math.Sign(xDelta);
-                int dy = Math.Sign(yDelta);
-                int px = Math.Abs(yDelta);
-                int py = Math.Abs(xDelta);
+            // Bresenham line drawing algorithm
+            int dx = Math.Sign(xDelta);
+            int dy = Math.Sign(yDelta);
+            int px = Math.Abs(yDelta);
+            int py = Math.Abs(xDelta);
 
-                // Draw starting point
-                DrawPixel(backend, destTexture, sourceTexture, halftoneTexture,
-                    destX, destY, sourceX, sourceY, width, height, clipRect, blendMode);
+            // Draw starting point
+            DrawPixel(destBits.Span, destWidth, destHeight, destX, destY,
+                sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
+                width, height, clipX, clipY, clipWidth, clipHeight,
+                halftoneBits, halftoneWidth, halftoneHeight, rule);
 
-                if (py > px)
+            if (py > px)
+            {
+                // More horizontal
+                int P = py / 2;
+                for (int i = 0; i < py; i++)
                 {
-                    // More horizontal
-                    int P = py / 2;
-                    for (int i = 0; i < py; i++)
-                    {
-                        destX += dx;
-                        P -= px;
-                        if (P < 0)
-                        {
-                            destY += dy;
-                            P += py;
-                        }
-                        DrawPixel(backend, destTexture, sourceTexture, halftoneTexture,
-                            destX, destY, sourceX, sourceY, width, height, clipRect, blendMode);
-                    }
-                }
-                else
-                {
-                    // More vertical
-                    int P = px / 2;
-                    for (int i = 0; i < px; i++)
+                    destX += dx;
+                    P -= px;
+                    if (P < 0)
                     {
                         destY += dy;
-                        P -= py;
-                        if (P < 0)
-                        {
-                            destX += dx;
-                            P += px;
-                        }
-                        DrawPixel(backend, destTexture, sourceTexture, halftoneTexture,
-                            destX, destY, sourceX, sourceY, width, height, clipRect, blendMode);
+                        P += py;
                     }
+                    DrawPixel(destBits.Span, destWidth, destHeight, destX, destY,
+                        sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
+                        width, height, clipX, clipY, clipWidth, clipHeight,
+                        halftoneBits, halftoneWidth, halftoneHeight, rule);
                 }
-
-                // Write modified dest bits back
-                using var destLock = destTexture.Lock(TextureAccess.Read);
-                WriteFormData(heap, destFormOOP, destLock.Data.ToArray());
-
-                // Invalidate Display region
-                int startX = destXOOP.AsSmallInteger();
-                int startY = destYOOP.AsSmallInteger();
-                InvalidateDisplayIfNeeded(context, destFormOOP,
-                    Math.Min(startX, startX + xDelta),
-                    Math.Min(startY, startY + yDelta),
-                    Math.Abs(xDelta) + width,
-                    Math.Abs(yDelta) + height,
-                    clipX, clipY, clipWidth, clipHeight);
             }
-            finally
+            else
             {
-                sourceTexture?.Dispose();
-                halftoneTexture?.Dispose();
+                // More vertical
+                int P = px / 2;
+                for (int i = 0; i < px; i++)
+                {
+                    destY += dy;
+                    P -= py;
+                    if (P < 0)
+                    {
+                        destX += dx;
+                        P += px;
+                    }
+                    DrawPixel(destBits.Span, destWidth, destHeight, destX, destY,
+                        sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
+                        width, height, clipX, clipY, clipWidth, clipHeight,
+                        halftoneBits, halftoneWidth, halftoneHeight, rule);
+                }
             }
+
+            // Write modified dest bits back
+            WriteFormData(heap, destFormOOP, destBits.Span);
+
+            // Invalidate Display region
+            int startX = destXOOP.AsSmallInteger();
+            int startY = destYOOP.AsSmallInteger();
+            InvalidateDisplayIfNeeded(context, destFormOOP,
+                Math.Min(startX, startX + xDelta),
+                Math.Min(startY, startY + yDelta),
+                Math.Abs(xDelta) + width,
+                Math.Abs(yDelta) + height,
+                clipX, clipY, clipWidth, clipHeight);
 
             return PrimitiveResult.Ok(context.Receiver);
         }
 
-        private static void DrawPixel(IGraphicsBackend backend,
-            ITexture dest, ITexture? source, ITexture? halftone,
-            int destX, int destY, int sourceX, int sourceY,
-            int width, int height, GraphicsRect clipRect, BlendMode blendMode)
+        private static void DrawPixel(
+            Span<byte> destBits, int destWidth, int destHeight, int destX, int destY,
+            ReadOnlySpan<byte> sourceBits, int sourceWidth, int sourceHeight, int sourceX, int sourceY,
+            int width, int height,
+            int clipX, int clipY, int clipWidth, int clipHeight,
+            ReadOnlySpan<byte> halftoneBits, int halftoneWidth, int halftoneHeight,
+            CombinationRule rule)
         {
-            backend.BitBlt(new BitBltParams
-            {
-                Destination = dest,
-                DestX = destX,
-                DestY = destY,
-                Source = source,
-                SourceX = sourceX,
-                SourceY = sourceY,
-                Width = width,
-                Height = height,
-                ClipRect = clipRect,
-                Halftone = halftone,
-                BlendMode = blendMode
-            });
+            BitBltEngine.CopyBits(
+                destBits, destWidth, destHeight, destX, destY,
+                sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
+                width, height,
+                clipX, clipY, clipWidth, clipHeight,
+                halftoneBits, halftoneWidth, halftoneHeight,
+                rule);
         }
     }
 
+    // ============================================================================
     // Helper methods
+    // ============================================================================
 
     private static (Memory<byte> bits, int width, int height) ExtractFormData(
         ISmalltalkHeap heap, SmalltalkOOP formOOP)
