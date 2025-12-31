@@ -139,7 +139,7 @@ public abstract class PrimitiveTestBase
             stackManager: null,
             contextManager: contextManager,
             
-            platform: null,
+            display: null,
             runtimeServices: runtimeServices,
             instructionPointer: instructionPointer,
             cacheManager: cacheManager,
