@@ -38818,9 +38818,25 @@ quitPrimitive
 releaseExternalViews
 	"Close external file references before snapshot or quit.
 	 Note: Disk is WindowsFileSystem singleton, not a closeable resource."
+	| diagFile |
+	diagFile _ WindowsFileStream appendOn: 'getImagePrefix-debug.txt'.
+	diagFile nextPutAll: '  releaseExternalViews ENTERED'; cr; flush.
+	diagFile nextPutAll: '  SourceFiles == nil: '; nextPutAll: (SourceFiles == nil) printString; cr; flush.
+
 	SourceFiles==nil
-		ifFalse: [SourceFiles do: [:t | t==nil ifFalse: [t close]]].
-	WindowsDirectory releaseExternalReferences!
+		ifFalse: [
+			diagFile nextPutAll: '  About to iterate SourceFiles'; cr; flush.
+			SourceFiles do: [:t |
+				diagFile nextPutAll: '    SourceFile entry: '; nextPutAll: t class name; cr; flush.
+				t==nil ifFalse: [
+					diagFile nextPutAll: '    Closing...'; cr; flush.
+					t close.
+					diagFile nextPutAll: '    Closed'; cr; flush]]].
+
+	diagFile nextPutAll: '  About to call WindowsDirectory releaseExternalReferences'; cr; flush.
+	WindowsDirectory releaseExternalReferences.
+	diagFile nextPutAll: '  releaseExternalViews COMPLETE'; cr.
+	diagFile close!
 snapshotPrimitive
 	"Write the current state of the object memory on a file in the same format as 
 	the Smalltalk-80 release.  The file can later be resumed, returning you to 
