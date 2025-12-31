@@ -38568,6 +38568,10 @@ getImagePrefix
 		^''].
 
 	diagFile nextPutAll: 'Calling isEmpty...'; cr.
+	diagFile nextPutAll: 'Disk == nil: '; nextPutAll: (Disk == nil) printString; cr.
+	Disk == nil ifFalse: [
+		diagFile nextPutAll: 'Disk class: '; nextPutAll: Disk class name; cr].
+	diagFile nextPutAll: 'newPrefix for concat: '; nextPutAll: newPrefix printString; cr.
 	diagFile flush.
 
 	"Safe to call isEmpty now"
