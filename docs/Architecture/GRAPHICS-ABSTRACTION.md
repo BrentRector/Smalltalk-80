@@ -1,258 +1,446 @@
-# Graphics Abstraction Layer
+# Graphics Abstraction Layer - Unified Display System
 
 **Last Updated**: 2025-12-31
+**Status**: PROPOSED REDESIGN
 
-## Overview
+## Problem Statement
 
-The graphics abstraction layer provides a pluggable interface for BitBlt raster operations. This allows swapping between different rendering backends (CPU software, SkiaSharp GPU, Direct2D, OpenGL) without changing the Smalltalk primitives.
-
-## Architecture
-
-### Separation of Concerns
-
-The graphics system has two distinct responsibilities:
-
-1. **IGraphicsBackend** (Abstraction Layer): Performs BitBlt operations on in-memory textures/bitmaps
-2. **WinFormsDisplayProvider** (Platform Layer): Window creation, input events, final display rendering
+The initial graphics abstraction separated BitBlt operations from display/input handling:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Smalltalk Code                              │
-│                  (Form, BitBlt, DisplayScreen)                   │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    GraphicsPrimitives.cs                         │
-│              (Primitive 96: copyBits, etc.)                      │
-│                              │                                   │
-│                              ▼                                   │
-│              GraphicsBackendFactory.Current                      │
-│                     (IGraphicsBackend)                           │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-          ┌───────────────────┼───────────────────┐
-          ▼                   ▼                   ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│   Software      │ │   SkiaSharp     │ │   Direct2D      │
-│   Backend       │ │   Backend       │ │   Backend       │
-│   (CPU)         │ │   (GPU)         │ │   (GPU/Win)     │
-└─────────────────┘ └─────────────────┘ └─────────────────┘
-          │                   │                   │
-          └───────────────────┼───────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│               WinFormsDisplayProvider                            │
-│  - Reads Display bitmap from Smalltalk heap                      │
-│  - Converts 1-bit to 32-bit for screen rendering                 │
-│  - Handles mouse/keyboard input events                           │
-│  - Thread-safe signaling to Smalltalk thread                     │
-└─────────────────────────────────────────────────────────────────┘
+FLAWED Design:
+┌─────────────────────────────────────┐
+│     WinFormsDisplayProvider         │ ← Owns window, input, display rendering
+└─────────────────────────────────────┘
+              ╳ Separate (WRONG)
+┌─────────────────────────────────────┐
+│     IGraphicsBackend                │ ← Only handles BitBlt operations
+└─────────────────────────────────────┘
 ```
 
-### Key Design Decisions
+**This doesn't work for GPU backends** because GPU graphics libraries want to own:
+1. **Window/surface creation** - they create the GPU context tied to the window
+2. **Rendering operations** - they manage GPU resources and command buffers
+3. **Input events** - they receive events from their window
 
-1. **Backend abstraction is for computation, not display**: The platform-specific window and input handling remain in WinFormsDisplayProvider (or future platform providers).
+You cannot use WinForms for the window and OpenGL for rendering without awkward bridging that defeats GPU acceleration.
 
-2. **No backward compatibility layer**: GraphicsPrimitives.cs uses IGraphicsBackend exclusively - there's no fallback to direct BitBltEngine calls.
+## GPU Graphics Library Landscape
 
-3. **SoftwareGraphicsBackend wraps BitBltEngine**: For 1-bit operations, the existing optimized BitBltEngine is called. For 32-bit operations, pure C# implementations are used.
+| Library | Window | Input | 2D Rendering | GPU | Cross-Platform | C# Support |
+|---------|--------|-------|--------------|-----|----------------|------------|
+| **Silk.NET** | GLFW/SDL | Yes | Via OpenGL/Vulkan | Yes | Yes | Official .NET Foundation |
+| **SDL2-CS** | Yes | Yes | SDL_Renderer | Yes | Yes | Community bindings |
+| **OpenTK** | Yes | Yes | Via OpenGL | Yes | Yes | Mature, v5 in development |
+| **SkiaSharp + GLFW** | Via GLFW | Via GLFW | SkiaSharp canvas | Yes | Yes | Integration issues reported |
+| **WinForms + GDI** | Yes | Yes | GDI/BitBlt | No | Windows only | Built-in |
 
-4. **Thread-safe**: The graphics backend can be called from the Smalltalk thread while WinFormsDisplayProvider runs on the UI thread.
+**Recommended**: **Silk.NET** - official .NET Foundation project with unified windowing, input, and OpenGL/Vulkan/DirectX bindings.
 
-## File Structure
+## Proposed Architecture: Unified IDisplay
+
+The abstraction must encompass the **entire display system**:
 
 ```
-Smalltalk80.Interpreter/Core/VM/Graphics/
-├── BitBltEngine.cs              # Original 1-bit BitBlt engine
-└── Abstraction/
-    ├── BlendMode.cs             # Extended blend modes (0-15 classic + alpha)
-    ├── ITexture.cs              # Texture interface + CpuTexture
-    ├── IGraphicsBackend.cs      # Core backend interface
-    ├── SoftwareGraphicsBackend.cs  # CPU implementation
-    ├── GraphicsBackendFactory.cs   # Factory + NullGraphicsBackend
-    └── GraphicsIntegration.cs      # Helper for Form ↔ Texture conversion
+┌─────────────────────────────────────────────────────────────────────┐
+│                        IDisplaySystem                                │
+│  - Factory for creating displays                                     │
+│  - Backend enumeration and capability query                          │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                           IDisplay                                   │
+│  ┌──────────────┬────────────────┬─────────────────────────────┐    │
+│  │   Window     │    Renderer    │         Input               │    │
+│  │  Management  │    Context     │        Events               │    │
+│  ├──────────────┼────────────────┼─────────────────────────────┤    │
+│  │ Width/Height │ CreateTexture  │ MousePosition (atomic)      │    │
+│  │ Title        │ BitBlt         │ MouseButtons (atomic)       │    │
+│  │ Show/Hide    │ FillRect       │ KeyboardState               │    │
+│  │ Resize       │ Clear          │ PollEvents/WaitEvents       │    │
+│  │ Close        │ Present        │ EventAvailableHandle        │    │
+│  └──────────────┴────────────────┴─────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+        ┌───────────────────────────┼───────────────────────────┐
+        ▼                           ▼                           ▼
+┌───────────────────┐   ┌───────────────────┐   ┌───────────────────┐
+│  WinFormsDisplay  │   │  SilkNetDisplay   │   │    SDL2Display    │
+│  (Software/GDI)   │   │  (OpenGL/Vulkan)  │   │  (SDL_Renderer)   │
+└───────────────────┘   └───────────────────┘   └───────────────────┘
 ```
 
-## Interfaces
+## Interface Definitions
 
-### IGraphicsBackend
-
-Core interface for all graphics operations:
+### IDisplaySystem
 
 ```csharp
-public interface IGraphicsBackend : IDisposable
+/// <summary>
+/// Factory for creating display systems. Entry point for the graphics subsystem.
+/// </summary>
+public interface IDisplaySystem : IDisposable
 {
+    /// <summary>Display system name (e.g., "WinForms/GDI", "Silk.NET/OpenGL")</summary>
     string Name { get; }
-    BackendCapabilities Capabilities { get; }
-    ref BackendStats Stats { get; }
 
-    // Texture creation
-    ITexture CreateTexture(int width, int height, PixelDepth depth, bool isRenderTarget = true);
-    ITexture CreateTextureFromData(int width, int height, PixelDepth depth, ReadOnlySpan<byte> data, bool isRenderTarget = true);
+    /// <summary>Capabilities supported by this display system</summary>
+    DisplayCapabilities Capabilities { get; }
 
-    // Core operations
-    void BitBlt(in BitBltParams @params);
-    void FillRect(ITexture dest, GraphicsRect rect, Color32 color, BlendMode mode = BlendMode.Copy);
-    void CopyTexture(ITexture dest, int destX, int destY, ITexture source, int srcX, int srcY, int width, int height);
-    void Clear(ITexture dest, Color32 color);
+    /// <summary>Create a new display with the specified options</summary>
+    IDisplay CreateDisplay(DisplayOptions options);
 
-    // Frame management
-    void BeginFrame();
-    void EndFrame();
-    void Flush();
+    /// <summary>Enumerate available monitors</summary>
+    IReadOnlyList<MonitorInfo> GetMonitors();
+}
 
-    // Display integration
-    void SetDisplayTexture(ITexture display);
-    void Present();
-    void InvalidateDisplay(GraphicsRect rect);
+public record DisplayOptions
+{
+    public int Width { get; init; } = 800;
+    public int Height { get; init; } = 600;
+    public string Title { get; init; } = "Smalltalk-80";
+    public bool Fullscreen { get; init; } = false;
+    public bool VSync { get; init; } = true;
+    public PixelDepth PreferredDepth { get; init; } = PixelDepth.OneBit;
+}
 
-    // Depth conversion
-    void ConvertPixels(ReadOnlySpan<byte> source, PixelDepth sourceDepth, Span<byte> dest, PixelDepth destDepth, int width, int height);
+[Flags]
+public enum DisplayCapabilities
+{
+    None = 0,
+    OneBitDepth = 1 << 0,
+    EightBitDepth = 1 << 1,
+    ThirtyTwoBitDepth = 1 << 2,
+    AlphaBlending = 1 << 3,
+    HardwareAccelerated = 1 << 4,
+    Fullscreen = 1 << 5,
+    Resizable = 1 << 6,
+    MultipleMonitors = 1 << 7,
 }
 ```
 
-### ITexture
-
-Abstraction for bitmap/surface storage:
+### IDisplay
 
 ```csharp
-public interface ITexture : IDisposable
+/// <summary>
+/// Unified display surface with integrated rendering and input.
+/// Window, graphics, and input are inseparable in GPU-accelerated systems.
+/// </summary>
+public interface IDisplay : IDisposable
 {
+    // ═══════════════════════════════════════════════════════════════
+    // WINDOW MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════
+
     int Width { get; }
     int Height { get; }
-    PixelDepth Depth { get; }
-    int Stride { get; }
-    bool IsRenderTarget { get; }
+    string Title { get; set; }
+    bool IsVisible { get; }
+    bool IsFocused { get; }
+    bool IsFullscreen { get; }
 
-    ITextureLock Lock(TextureAccess access);
-    ReadOnlyMemory<byte>? TryGetPixelData();
-    void Invalidate(int x, int y, int width, int height);
-    void SetPixels(ReadOnlySpan<byte> data);
-    void SetPixels(int x, int y, int width, int height, ReadOnlySpan<byte> data);
+    void Show();
+    void Hide();
+    void Close();
+    void Resize(int width, int height);
+    void SetFullscreen(bool fullscreen);
+
+    // ═══════════════════════════════════════════════════════════════
+    // RENDERING CONTEXT
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Create an off-screen texture for rendering</summary>
+    ITexture CreateTexture(int width, int height, PixelDepth depth);
+
+    /// <summary>Create a texture initialized with pixel data</summary>
+    ITexture CreateTextureFromData(int width, int height, PixelDepth depth, ReadOnlySpan<byte> data);
+
+    /// <summary>Perform BitBlt raster operation</summary>
+    void BitBlt(in BitBltParams p);
+
+    /// <summary>Fill rectangle with solid color</summary>
+    void FillRect(int x, int y, int width, int height, Color32 color, BlendMode mode = BlendMode.Copy);
+
+    /// <summary>Clear entire display to color</summary>
+    void Clear(Color32 color);
+
+    /// <summary>Begin a new frame (for GPU backends that batch commands)</summary>
+    void BeginFrame();
+
+    /// <summary>End frame and present to screen (swap buffers)</summary>
+    void EndFrame();
+
+    /// <summary>
+    /// The display's backing texture (Smalltalk's Display Form).
+    /// BitBlt operations targeting this texture appear on screen after EndFrame().
+    /// </summary>
+    ITexture DisplayTexture { get; }
+
+    /// <summary>Mark a region as needing redraw (for partial updates)</summary>
+    void InvalidateRegion(int x, int y, int width, int height);
+
+    // ═══════════════════════════════════════════════════════════════
+    // INPUT HANDLING (Unified with display - NOT separable)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Current mouse position relative to display (atomic read).
+    /// Thread-safe for polling from Smalltalk thread.
+    /// </summary>
+    (int X, int Y) MousePosition { get; }
+
+    /// <summary>
+    /// Current mouse button state (atomic read).
+    /// Thread-safe for polling from Smalltalk thread.
+    /// </summary>
+    MouseButtons MouseButtons { get; }
+
+    /// <summary>
+    /// Check if a key is currently pressed.
+    /// </summary>
+    bool IsKeyDown(KeyCode key);
+
+    /// <summary>
+    /// Poll for next pending event. Returns false if queue is empty.
+    /// </summary>
+    bool PollEvent(out DisplayEvent evt);
+
+    /// <summary>
+    /// WaitHandle that signals when events are available.
+    /// Use with WaitHandle.WaitAny() for efficient multi-source waiting.
+    /// </summary>
+    WaitHandle EventAvailableHandle { get; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // EVENT LOOP INTEGRATION
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Process pending window system events.
+    /// Must be called on the display's owning thread (usually UI thread).
+    /// </summary>
+    void ProcessEvents();
+
+    /// <summary>
+    /// Run the display's event loop until Close() is called.
+    /// Blocks the calling thread.
+    /// </summary>
+    void RunEventLoop();
+
+    /// <summary>Event raised when display is resized</summary>
+    event Action<int, int>? OnResize;
+
+    /// <summary>Event raised when close is requested</summary>
+    event Action? OnCloseRequested;
 }
 ```
 
-### BlendMode
-
-Extended from classic BitBlt rules (0-15) to include modern operations:
+### DisplayEvent
 
 ```csharp
-public enum BlendMode : byte
+/// <summary>
+/// Unified event type for all display input events.
+/// Follows Blue Book input word format for compatibility.
+/// </summary>
+public readonly struct DisplayEvent
 {
-    // Classic BitBlt rules 0-15
-    Clear = 0,           // 0000 - All zeros
-    And = 1,             // 0001 - Source AND Dest
-    AndReverse = 2,      // 0010 - Source AND (NOT Dest)
-    Copy = 3,            // 0011 - Source only
-    AndInverted = 4,     // 0100 - (NOT Source) AND Dest
-    Noop = 5,            // 0101 - Dest unchanged
-    Xor = 6,             // 0110 - Source XOR Dest
-    Or = 7,              // 0111 - Source OR Dest
-    Nor = 8,             // 1000 - NOT (Source OR Dest)
-    Equiv = 9,           // 1001 - NOT (Source XOR Dest)
-    Invert = 10,         // 1010 - NOT Dest
-    OrReverse = 11,      // 1011 - Source OR (NOT Dest)
-    CopyInverted = 12,   // 1100 - NOT Source
-    OrInverted = 13,     // 1101 - (NOT Source) OR Dest
-    Nand = 14,           // 1110 - NOT (Source AND Dest)
-    Set = 15,            // 1111 - All ones
+    public DisplayEventType Type { get; init; }
 
-    // Extended operations (16+)
-    AlphaBlend = 24,         // Per-pixel alpha blending
-    AlphaBlendConstant = 25, // Constant alpha blending
-    RgbAdd = 34,             // RGB additive (saturated)
-    RgbSubtract = 35,        // RGB subtractive
-    RgbMultiply = 36         // RGB multiply
+    // Mouse events: position and button
+    public int MouseX { get; init; }
+    public int MouseY { get; init; }
+    public MouseButtons Button { get; init; }
+
+    // Keyboard events: key code and character
+    public KeyCode Key { get; init; }
+    public char Character { get; init; }
+    public KeyModifiers Modifiers { get; init; }
+
+    /// <summary>Convert to Blue Book input word format (type << 12 | param)</summary>
+    public int ToBlueBookWord() => Type switch
+    {
+        DisplayEventType.MouseMove => (1 << 12) | MouseX,  // X in first word
+        DisplayEventType.MouseButtonDown => (5 << 12) | (int)Button,
+        DisplayEventType.MouseButtonUp => (6 << 12) | (int)Button,
+        DisplayEventType.KeyDown => (3 << 12) | (int)Key,
+        DisplayEventType.KeyUp => (4 << 12) | (int)Key,
+        _ => 0
+    };
+}
+
+public enum DisplayEventType
+{
+    None = 0,
+    MouseMove,
+    MouseButtonDown,
+    MouseButtonUp,
+    KeyDown,
+    KeyUp,
+    TextInput,      // Character typed (after key translation)
+    Resize,
+    Focus,
+    Blur,
+    CloseRequested,
+}
+
+[Flags]
+public enum MouseButtons
+{
+    None = 0,
+    Red = 1,        // Left button (Blue Book: red)
+    Yellow = 2,     // Middle button (Blue Book: yellow)
+    Blue = 4,       // Right button (Blue Book: blue)
+}
+
+[Flags]
+public enum KeyModifiers
+{
+    None = 0,
+    Shift = 1,
+    Control = 2,
+    Alt = 4,
 }
 ```
 
-## Initialization
+## Threading Model Integration
 
-The graphics backend is initialized early in Program.cs:
+Our two-thread architecture integrates as follows:
 
-```csharp
-// Initialize graphics backend (required before any BitBlt operations)
-GraphicsBackendFactory.CreateAndSetCurrent(new GraphicsBackendOptions
-{
-    PreferredBackend = GraphicsBackendType.Software,
-    AllowFallback = true,
-    EnableStats = true
-});
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    UI/Display Thread                                │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                  IDisplay Implementation                      │   │
+│  │                                                               │   │
+│  │  ProcessEvents() / RunEventLoop()                            │   │
+│  │    - Pumps window system messages                            │   │
+│  │    - Enqueues DisplayEvents to thread-safe queue             │   │
+│  │    - Updates atomic MousePosition/MouseButtons               │   │
+│  │    - Signals EventAvailableHandle                            │   │
+│  │                                                               │   │
+│  │  EndFrame() / Present()                                      │   │
+│  │    - Swaps GPU buffers or blits to screen                    │   │
+│  │                                                               │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│                              │ EventAvailableHandle (WaitHandle)    │
+│                              │ + Atomic state accessors             │
+│                              ▼                                      │
+└────────────────────────────────────────────────────────────────────┘
+                               │
+                               │  WaitHandle.WaitAny([EventHandle, TimerHandle])
+                               ▼
+┌────────────────────────────────────────────────────────────────────┐
+│                       Smalltalk Thread                              │
+│                                                                     │
+│  InterpreterLoop:                                                   │
+│    - WaitAny([display.EventAvailableHandle, timer.Handle])         │
+│    - Read events via display.PollEvent()                           │
+│    - Poll state via display.MousePosition, display.MouseButtons    │
+│    - Execute BitBlt primitives:                                    │
+│        - For software backend: direct execution                    │
+│        - For GPU backend: may queue commands for UI thread         │
+│                                                                     │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-## Pixel Depths
+### Thread Safety Requirements
 
-Three depths are supported:
+1. **Atomic state reads**: `MousePosition` and `MouseButtons` must be atomic for polling
+2. **Event queue**: Thread-safe queue with `EventAvailableHandle` signaling
+3. **BitBlt operations**:
+   - Software backend: Can execute on Smalltalk thread directly
+   - GPU backend: May need to marshal to UI thread (implementation detail)
 
-- **OneBit (1)**: Original Smalltalk-80 monochrome - 1 bit per pixel, MSB first
-- **EightBit (8)**: Grayscale or indexed color (not prioritized)
-- **ThirtyTwoBit (32)**: ARGB format - target for modern rendering
+## Implementation Plan
 
-## Implementation Status
+### Phase 1: Refactor WinForms to IDisplay
 
-| Component | Status |
-|-----------|--------|
-| IGraphicsBackend interface | Complete |
-| ITexture interface | Complete |
-| BlendMode enum | Complete |
-| SoftwareGraphicsBackend | Complete (1-bit via BitBltEngine, 32-bit native) |
-| GraphicsBackendFactory | Complete |
-| GraphicsPrimitives integration | Complete |
-| SkiaSharp backend | Not implemented |
-| Direct2D backend | Not implemented |
-| OpenGL backend | Not implemented |
-
-## Backend Selection
-
-The factory supports automatic and manual backend selection:
+Restructure current code without changing functionality:
 
 ```csharp
-// Automatic - chooses best available
-GraphicsBackendFactory.CreateAndSetCurrent(new GraphicsBackendOptions
+public class WinFormsDisplay : Form, IDisplay
 {
-    PreferredBackend = GraphicsBackendType.Auto
-});
+    // Window management: existing Form functionality
+    // Rendering: existing BitBltEngine + GDI
+    // Input: existing event handlers + ring buffer
 
-// Explicit software backend
-GraphicsBackendFactory.CreateAndSetCurrent(new GraphicsBackendOptions
-{
-    PreferredBackend = GraphicsBackendType.Software
-});
+    // New: implement IDisplay interface
+    // New: DisplayTexture property wrapping Display Form
+    // New: unified event model
+}
 ```
 
-Priority for Auto selection:
-1. Direct2D (Windows only, best performance)
-2. SkiaSharp (cross-platform, good performance)
-3. OpenGL (cross-platform)
-4. Software (always available)
+### Phase 2: Add Silk.NET Backend
 
-## Future GPU Backend Implementation
-
-To implement a GPU backend (e.g., SkiaSharp):
-
-1. Create `SkiaSharpGraphicsBackend : IGraphicsBackend`
-2. Implement texture creation using SkiaSharp `SKBitmap` or `SKImage`
-3. Implement BitBlt using SkiaSharp canvas drawing with appropriate paint modes
-4. Handle 1-bit ↔ 32-bit conversion for Smalltalk compatibility
-5. Register in `GraphicsBackendFactory.CreateSkiaSharpBackend()`
-
-The 32-bit path will be used when migrating from monochrome to color displays.
-
-## Thread Safety
-
-- `GraphicsBackendFactory.Current` is accessed via lock
-- SoftwareGraphicsBackend operations are thread-safe (no shared mutable state)
-- WinFormsDisplayProvider handles UI thread marshaling separately
-
-## Testing
-
-The NullGraphicsBackend can be used for headless testing:
+Implement `SilkNetDisplay` using Silk.NET:
 
 ```csharp
-GraphicsBackendFactory.CreateAndSetCurrent(new GraphicsBackendOptions
+public class SilkNetDisplay : IDisplay
 {
-    PreferredBackend = GraphicsBackendType.Null
-});
+    private IWindow _window;      // Silk.NET window
+    private GL _gl;               // OpenGL context
+    private IInputContext _input; // Silk.NET input
+
+    // Use OpenGL textures for ITexture
+    // Implement BitBlt as textured quad draw with appropriate blend mode
+    // Handle 1-bit format via shader or CPU conversion
+}
 ```
+
+### Phase 3: 32-bit Native Support
+
+1. Extend Smalltalk Form class to support 32-bit depth
+2. Modify DisplayScreen to prefer 32-bit when GPU backend available
+3. Remove 1-bit → 32-bit conversion overhead
+4. Keep 1-bit compatibility for legacy code
+
+## Migration from Current Implementation
+
+The current `IGraphicsBackend` and related code should be:
+
+1. **Deprecated**: Mark as obsolete
+2. **Wrapped**: WinFormsDisplay can internally use SoftwareGraphicsBackend
+3. **Eventually removed**: Once all backends implement IDisplay
+
+Current files affected:
+- `GraphicsPrimitives.cs` → Use `DisplaySystem.Current.Display` instead of `GraphicsBackendFactory.Current`
+- `WinFormsDisplayProvider.cs` → Refactor into `WinFormsDisplay : IDisplay`
+- `Program.cs` → Initialize via `DisplaySystemFactory.CreateAndSetCurrent()`
+
+## File Structure (Proposed)
+
+```
+Smalltalk80.Interpreter/
+├── Core/VM/Graphics/
+│   ├── BitBltEngine.cs           # Keep: Core 1-bit BitBlt (used by software backend)
+│   ├── BlendMode.cs              # Keep: Blend mode enum
+│   ├── ITexture.cs               # Keep: Texture interface
+│   └── Abstraction/              # DEPRECATED - merge into Display
+│       └── ...
+│
+├── Platform/
+│   ├── IDisplaySystem.cs         # NEW: Factory interface
+│   ├── IDisplay.cs               # NEW: Unified display interface
+│   ├── DisplayEvent.cs           # NEW: Event types
+│   ├── DisplaySystemFactory.cs   # NEW: Factory implementation
+│   │
+│   ├── WinForms/
+│   │   └── WinFormsDisplay.cs    # Refactored from WinFormsDisplayProvider
+│   │
+│   ├── SilkNet/                  # NEW: GPU backend
+│   │   ├── SilkNetDisplaySystem.cs
+│   │   ├── SilkNetDisplay.cs
+│   │   └── OpenGLTexture.cs
+│   │
+│   └── SDL2/                     # FUTURE: Alternative GPU backend
+│       └── ...
+```
+
+## References
+
+- [Silk.NET](https://github.com/dotnet/Silk.NET) - Official .NET Foundation graphics library
+- [SDL2-CS](https://github.com/flibitijibibo/SDL2-CS) - SDL2 C# bindings
+- [OpenTK](https://github.com/opentk/opentk) - OpenGL/OpenAL C# library
+- [SkiaSharp + GLFW integration](https://github.com/mono/SkiaSharp/issues/749) - Known issues
