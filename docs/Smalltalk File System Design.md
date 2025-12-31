@@ -3051,24 +3051,38 @@ primGetAttributes: path
 The classes must be initialized in dependency order:
 
 ```smalltalk
-"1. Path class (no dependencies)"
-WindowsPath initialize!
-
-"2. FileSystem class (depends on Path)"
-WindowsFileSystem initialize!
-
-"3. Directory class (depends on FileSystem)"
+"1. Directory class (has ExternalReferences class variable)"
 WindowsDirectory initialize!
 
-"4. File class (depends on FileSystem)"
-WindowsFile initialize!
+"2. FileSystem class (sets Disk global)"
+WindowsFileSystem initialize!
 
-"5. FileStream class (depends on FileSystem)"
+"3. FileStream class"
 WindowsFileStream initialize!
-
-"6. Set up Disk global (depends on WindowsFileSystem)"
-Smalltalk at: #Disk put: WindowsFileSystem default!
 ```
+
+**Note:** `WindowsFileSystem initialize` now sets the `Disk` global directly, so a separate init expression is no longer needed.
+
+### Init Expression Ordering (IMPORTANT)
+
+Init expressions must be listed in `InitExpressionOrdering.cs` to be executed during cold start. The interpreter only runs init expressions that appear in this ordering list.
+
+Required entries in `InitExpressionOrdering.cs`:
+```csharp
+"WindowsDirectory initialize",
+"WindowsFileSystem initialize",
+"WindowsFileStream initialize",
+```
+
+### WindowsDirectory Class Variables
+
+`WindowsDirectory` has a class variable `ExternalReferences` (an OrderedCollection) that tracks open file references. This is used by `releaseExternalReferences` during snapshot to close all open files.
+
+- `FileStream>>on:` adds itself to ExternalReferences
+- `releaseExternalViews` (called during snapshot) calls `WindowsDirectory releaseExternalReferences`
+- `releaseExternalReferences` closes all tracked streams
+
+If `WindowsDirectory initialize` is not called, `ExternalReferences` will be nil and snapshot will fail with "isEmpty sent to nil".
 
 ### Adding to Cold Start Bundle
 
@@ -3077,14 +3091,9 @@ Add these init expressions to `Smalltalk-80.st` after the class definitions:
 ```smalltalk
 "==================== File System Initialization ===================="
 
-WindowsPath initialize!
-WindowsFileSystem initialize!
 WindowsDirectory initialize!
-WindowsFile initialize!
+WindowsFileSystem initialize!
 WindowsFileStream initialize!
-
-"Install Disk as the file system entry point"
-Smalltalk at: #Disk put: WindowsFileSystem default!
 ```
 
 ---
