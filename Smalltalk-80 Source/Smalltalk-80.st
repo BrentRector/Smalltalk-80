@@ -42,37 +42,253 @@ labels: aString selectors: selArray
 confirm  "ActionMenu confirm"
 	^ (ActionMenu labels: 'confirm\abort' withCRs selectors: nil) startUp = 1! !
 
-"==================== SIMPLIFIED FILE SYSTEM ARCHITECTURE ===================="
+"==================== MODERNIZED FILE SYSTEM ARCHITECTURE ===================="
 "
-This is a redesigned file system that eliminates the legacy Alto FilePage concept.
-Key classes:
-  - WindowsFileStream: Primary file I/O (direct handle-based streaming)
-  - WindowsFile: File metadata only (exists, size, delete, rename)
-  - WindowsDirectory: Directory operations (list, create files/dirs)
-  - WindowsPath: Path manipulation (parsing, building paths)
+This file system architecture follows the principle: 'Program to abstractions,
+instantiate concrete classes.'
 
-The old page-based architecture has been removed. Files are now treated as
-what they actually are in Windows: contiguous byte streams accessed via handles.
+Abstract Classes:
+  - Path: Platform-independent path manipulation protocol
+  - FileSystemNode: Common base for files and directories
+  - File: Abstract file metadata
+  - Directory: Abstract directory operations
+  - FileSystem: Platform knowledge and concrete class factories
+
+Concrete Windows Classes:
+  - WindowsPath: Windows path semantics (backslash, drive letters)
+  - WindowsFile: Windows file metadata via primitives
+  - WindowsDirectory: Windows directory operations via primitives
+  - WindowsFileStream: Direct handle-based file I/O
+  - WindowsFileSystem: Windows file system properties and factories
+
+The legacy Alto page-based architecture (FilePage) has been eliminated.
+Files are accessed as byte streams via Windows handles.
+
+Entry Point: The 'Disk' global provides the file system entry point.
 "
+
+"==================== Path (Abstract) ===================="
+
+Object subclass: #Path
+	instanceVariableNames: 'components'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+Path comment:
+'I am the abstract base class for file system paths.
+I provide platform-independent path manipulation.
+
+Instance Variables:
+    components  <Array of String> path components
+
+Concrete subclasses implement platform-specific parsing and formatting.'!
+
+!Path class methodsFor: 'instance creation'!
+
+fromString: aString
+	"Parse a path string. Delegates to Disk for concrete class."
+	^Disk pathClass fromString: aString!
+
+root
+	"Answer a path representing the root directory"
+	self subclassResponsibility!
+
+separator
+	"Answer the path separator character"
+	self subclassResponsibility!
+
+withComponents: anArray
+	"Answer a new instance with the given components"
+	^self new setComponents: anArray! !
+
+!Path methodsFor: 'accessing'!
+
+components
+	"Answer the path components"
+	^components!
+
+fileName
+	"Answer the last component (file name)"
+	components isEmpty ifTrue: [^''].
+	^components last!
+
+directoryPath
+	"Answer a Path for the parent directory"
+	components size <= 1 ifTrue: [^nil].
+	^self class withComponents: (components copyFrom: 1 to: components size - 1)!
+
+extension
+	"Answer the file extension (without dot), or empty string"
+	| name dotIndex |
+	name _ self fileName.
+	name isEmpty ifTrue: [^''].
+	dotIndex _ name findLast: [:ch | ch = $.].
+	dotIndex = 0 ifTrue: [^''].
+	^name copyFrom: dotIndex + 1 to: name size!
+
+baseName
+	"Answer the file name without extension"
+	| name dotIndex |
+	name _ self fileName.
+	name isEmpty ifTrue: [^''].
+	dotIndex _ name findLast: [:ch | ch = $.].
+	dotIndex = 0 ifTrue: [^name].
+	^name copyFrom: 1 to: dotIndex - 1! !
+
+!Path methodsFor: 'testing'!
+
+isAbsolute
+	"Answer whether this is an absolute path"
+	self subclassResponsibility!
+
+isRelative
+	"Answer whether this is a relative path"
+	^self isAbsolute not!
+
+isRoot
+	"Answer whether this path represents a root directory"
+	self subclassResponsibility!
+
+isEmpty
+	"Answer whether this path is empty"
+	^components isEmpty! !
+
+!Path methodsFor: 'navigation'!
+
+parent
+	"Answer the parent Path, or nil if at root"
+	^self directoryPath!
+
+/ aString
+	"Answer a new Path with aString appended as a component"
+	^self class withComponents: (components copyWith: aString)!
+
+resolve: aRelativePath
+	"Resolve a relative path against this path"
+	aRelativePath isAbsolute ifTrue: [^aRelativePath].
+	^self class withComponents: (components, aRelativePath components)! !
+
+!Path methodsFor: 'conversion'!
+
+asString
+	"Answer the path as a string"
+	self subclassResponsibility!
+
+canonicalize
+	"Answer a new Path in canonical form for this platform.
+	 Canonical form includes:
+	 - Using the platform's preferred separator
+	 - Resolving . (current) and .. (parent) components
+	 - Removing redundant separators
+	 - Platform-specific normalization (e.g., case on case-insensitive systems)"
+	self subclassResponsibility!
+
+printOn: aStream
+	"Print the path"
+	aStream nextPutAll: self class name.
+	aStream nextPutAll: '('.
+	aStream nextPutAll: self asString.
+	aStream nextPutAll: ')'!
+
+directory
+	"Answer a Directory for this path"
+	^Disk directoryClass on: self asString!
+
+file
+	"Answer a File for this path"
+	^Disk fileClass on: self asString! !
+
+!Path methodsFor: 'comparing'!
+
+= aPath
+	"Answer whether two paths are equal"
+	| fs |
+	self species = aPath species ifFalse: [^false].
+	self components size = aPath components size ifFalse: [^false].
+	fs _ Disk.
+	self components with: aPath components do: [:a :b |
+		(fs namesEqual: a and: b) ifFalse: [^false]].
+	^true!
+
+hash
+	"Answer a hash value consistent with ="
+	| fs |
+	fs _ Disk.
+	^components inject: 0 into: [:h :comp |
+		h bitXor: (fs hashForName: comp)]! !
+
+!Path methodsFor: 'validation'!
+
+hasValidComponents
+	"Answer whether all path components are valid file names"
+	components isNil ifTrue: [^false].
+	components isEmpty ifTrue: [^true].
+	^components allSatisfy: [:comp |
+		comp notNil and: [comp notEmpty]]!
+
+isValid
+	"Answer whether this path is valid"
+	^self hasValidComponents!
+
+validateComponents
+	"Signal an error if any component is invalid"
+	self hasValidComponents ifFalse: [
+		self error: 'Path contains invalid components']! !
+
+!Path methodsFor: 'private'!
+
+setComponents: anArray
+	"Set the path components. Validates that array is not nil."
+	anArray isNil ifTrue: [
+		self error: 'Path components cannot be nil'].
+	components _ anArray! !
+
+Path class
+	instanceVariableNames: ''!
 
 "==================== WindowsPath ===================="
 
-Object subclass: #WindowsPath
-    instanceVariableNames: 'driveLetter components'
-    classVariableNames: 'Separator'
-    poolDictionaries: ''
-    category: 'Files-Windows'!
+Path subclass: #WindowsPath
+	instanceVariableNames: 'driveLetter uncServer uncShare'
+	classVariableNames: 'Separator'
+	poolDictionaries: ''
+	category: 'Files-Windows'!
 
 WindowsPath comment:
 'I represent a Windows file system path. I handle path parsing and manipulation
 without any file I/O operations.
 
 Instance Variables:
-    driveLetter   <Character|nil> drive letter or nil for UNC/relative paths
-    components    <Array> path components (directories and filename)
+    driveLetter   <Character|nil> drive letter (C, D, etc.) or nil for UNC/relative paths
+    uncServer     <String|nil> UNC server name (e.g., "server" from "\\server\share")
+    uncShare      <String|nil> UNC share name (e.g., "share" from "\\server\share")
+    components    <Array> path components (directories and filename after root)
 
 Class Variables:
-    Separator     <Character> the path separator (backslash on Windows)'!
+    Separator     <Character> the path separator (backslash on Windows)
+
+Path Representations:
+- Drive paths: C:\folder\file.txt (driveLetter=C, uncServer=nil, uncShare=nil)
+- UNC paths: \\server\share\folder\file.txt (driveLetter=nil, uncServer="server", uncShare="share")
+- Relative paths: folder\file.txt (driveLetter=nil, uncServer=nil, uncShare=nil)
+
+Parsing vs Canonicalization:
+During parsing (fromString:), I perform MINIMAL normalization to preserve user intent:
+- Forward slashes (/) are converted to backslashes (\) for internal consistency
+- Empty path components are removed
+
+I deliberately DO NOT canonicalize during parsing:
+- "." and ".." components are preserved as-is
+- Drive letter case is preserved (c: stays lowercase)
+- This allows round-tripping and retains the original path form
+
+To get a fully canonical path, explicitly call #canonicalize which:
+- Resolves "." (current directory) by removing
+- Resolves ".." (parent directory) by removing with parent
+- Uppercases drive letters for consistency
+
+This design gives callers control over when normalization occurs.'!
 
 !WindowsPath class methodsFor: 'class initialization'!
 
@@ -89,42 +305,66 @@ fromString: aString
 
 separator
     "Answer the path separator character."
-    ^Separator! !
+    ^Separator!
+
+isSeparator: aCharacter
+    "Answer whether aCharacter is a path separator.
+     Windows accepts both backslash and forward slash."
+    ^aCharacter = $\ or: [aCharacter = $/]! !
 
 !WindowsPath methodsFor: 'initialization'!
 
 initializeFromString: aString
-    "Parse a Windows path string."
-    | parts startIndex |
+    "Parse a Windows path string per Microsoft UNC conventions.
+     Windows accepts both backslash and forward slash as separators.
+     UNC format: \\server\share\path\to\file"
+    | parts startIndex normalized |
+    uncServer _ nil.
+    uncShare _ nil.
+
     aString isEmpty ifTrue: [
         driveLetter _ nil.
         components _ #().
         ^self].
 
+    "Normalize forward slashes to backslashes for consistent parsing"
+    normalized _ aString copyReplaceAll: '/' with: '\'.
+
     "Check for drive letter (C:)"
-    (aString size >= 2 and: [(aString at: 2) = $:]) ifTrue: [
-        driveLetter _ aString at: 1.
+    (normalized size >= 2 and: [(normalized at: 2) = $:]) ifTrue: [
+        driveLetter _ normalized at: 1.
         startIndex _ 3.
         "Skip leading separator after drive"
-        (aString size >= 3 and: [(aString at: 3) = Separator])
+        (normalized size >= 3 and: [(self class isSeparator: (normalized at: 3))])
             ifTrue: [startIndex _ 4]]
     ifFalse: [
         "Check for UNC path (\\server\share)"
-        (aString size >= 2 and: [(aString at: 1) = Separator and: [(aString at: 2) = Separator]])
+        (normalized size >= 2 and: [(self class isSeparator: (normalized at: 1))
+            and: [(self class isSeparator: (normalized at: 2))]])
             ifTrue: [
+                "Parse UNC: \\server\share\rest"
                 driveLetter _ nil.
-                startIndex _ 3]
+                parts _ (normalized copyFrom: 3 to: normalized size)
+                    findTokens: (String with: Separator).
+                parts _ parts select: [:p | p notEmpty].
+                parts size >= 1 ifTrue: [uncServer _ parts first].
+                parts size >= 2 ifTrue: [uncShare _ parts second].
+                "Components are everything after server\share"
+                parts size > 2
+                    ifTrue: [components _ parts copyFrom: 3 to: parts size]
+                    ifFalse: [components _ #()].
+                ^self]
             ifFalse: [
                 driveLetter _ nil.
                 startIndex _ 1.
                 "Skip leading separator for absolute paths"
-                ((aString at: 1) = Separator) ifTrue: [startIndex _ 2]]].
+                (self class isSeparator: (normalized at: 1)) ifTrue: [startIndex _ 2]]].
 
-    "Parse remaining components"
-    startIndex > aString size
+    "Parse remaining components - split on backslash"
+    startIndex > normalized size
         ifTrue: [components _ #()]
         ifFalse: [
-            parts _ (aString copyFrom: startIndex to: aString size)
+            parts _ (normalized copyFrom: startIndex to: normalized size)
                 findTokens: (String with: Separator).
             components _ parts select: [:p | p notEmpty]].
     ^self! !
@@ -134,6 +374,14 @@ initializeFromString: aString
 driveLetter
     "Answer the drive letter or nil."
     ^driveLetter!
+
+uncServer
+    "Answer the UNC server name or nil."
+    ^uncServer!
+
+uncShare
+    "Answer the UNC share name or nil."
+    ^uncShare!
 
 components
     "Answer the path components."
@@ -156,17 +404,25 @@ directoryPath
     "Answer a new path without the filename."
     | newPath |
     components size <= 1 ifTrue: [
+        self isUNC ifTrue: [
+            ^self class fromString: '\\', uncServer, '\', uncShare].
         ^self class fromString: (driveLetter ifNil: [''] ifNotNil: [driveLetter asString, ':'])].
     newPath _ self class new.
-    newPath setDriveLetter: driveLetter components: components allButLast.
+    newPath setDriveLetter: driveLetter uncServer: uncServer uncShare: uncShare components: components allButLast.
     ^newPath!
 
 asString
-    "Answer the path as a string."
+    "Answer the path as a string per Microsoft UNC conventions."
     | stream |
     stream _ WriteStream on: (String new: 100).
-    driveLetter notNil ifTrue: [
-        stream nextPut: driveLetter; nextPut: $:].
+    self isUNC ifTrue: [
+        "UNC path: \\server\share\path\..."
+        stream nextPut: Separator; nextPut: Separator.
+        stream nextPutAll: uncServer.
+        stream nextPut: Separator; nextPutAll: uncShare]
+    ifFalse: [
+        driveLetter notNil ifTrue: [
+            stream nextPut: driveLetter; nextPut: $:]].
     components do: [:comp |
         stream nextPut: Separator; nextPutAll: comp].
     stream position = 0 ifTrue: [^'.'].
@@ -175,16 +431,63 @@ asString
 !WindowsPath methodsFor: 'testing'!
 
 isAbsolute
-    "Answer whether this is an absolute path."
-    ^driveLetter notNil!
+    "Answer whether this is an absolute path.
+     Both drive paths (C:\) and UNC paths (\\server\share) are absolute."
+    ^driveLetter notNil or: [self isUNC]!
 
 isRelative
     "Answer whether this is a relative path."
-    ^driveLetter isNil!
+    ^self isAbsolute not!
 
 isEmpty
     "Answer whether this path is empty."
-    ^driveLetter isNil and: [components isEmpty]! !
+    ^driveLetter isNil and: [uncServer isNil and: [components isEmpty]]!
+
+isRoot
+    "Answer whether this path represents a root directory.
+     For drive paths: C:\ is root. For UNC paths: \\server\share is root."
+    ^components isEmpty and: [self isAbsolute]!
+
+isUNC
+    "Answer whether this is a UNC path (\\server\share)."
+    ^uncServer notNil and: [uncShare notNil]! !
+
+!WindowsPath methodsFor: 'conversion'!
+
+canonicalize
+    "Answer a new WindowsPath in canonical Windows form.
+     Canonical form:
+     - Uses backslash separator (already normalized during parsing)
+     - Resolves . (current directory) components by removing them
+     - Resolves .. (parent directory) components by removing parent
+     - Drive letter is uppercased
+     - UNC server and share names are preserved as-is (case-preserving)"
+    | newComponents result |
+    newComponents _ OrderedCollection new.
+
+    "Process each component, resolving . and .."
+    components do: [:comp |
+        comp = '.'
+            ifTrue: ["Skip current directory reference"]
+            ifFalse: [
+                comp = '..'
+                    ifTrue: [
+                        "Go up one level if possible"
+                        newComponents isEmpty
+                            ifFalse: [newComponents removeLast]]
+                    ifFalse: [newComponents add: comp]]].
+
+    result _ self class new.
+    result setDriveLetter: (driveLetter ifNotNil: [driveLetter asUppercase])
+           uncServer: uncServer
+           uncShare: uncShare
+           components: newComponents asArray.
+    ^result!
+
+canonicalString
+    "Answer the path as a canonical string.
+     Convenience method combining canonicalize and asString."
+    ^self canonicalize asString! !
 
 !WindowsPath methodsFor: 'operations'!
 
@@ -193,7 +496,7 @@ isEmpty
     | newPath newComponents |
     newComponents _ components copyWith: aString.
     newPath _ self class new.
-    newPath setDriveLetter: driveLetter components: newComponents.
+    newPath setDriveLetter: driveLetter uncServer: uncServer uncShare: uncShare components: newComponents.
     ^newPath!
 
 withExtension: extString
@@ -209,7 +512,18 @@ withExtension: extString
 !WindowsPath methodsFor: 'private'!
 
 setDriveLetter: drive components: comps
+    "Set drive letter and components (for backward compatibility)."
     driveLetter _ drive.
+    uncServer _ nil.
+    uncShare _ nil.
+    components _ comps.
+    ^self!
+
+setDriveLetter: drive uncServer: server uncShare: share components: comps
+    "Set all path components including UNC server and share."
+    driveLetter _ drive.
+    uncServer _ server.
+    uncShare _ share.
     components _ comps.
     ^self! !
 
@@ -222,6 +536,1183 @@ WindowsPath class
     instanceVariableNames: ''!
 
 WindowsPath initialize!
+
+"==================== FileSystemNode (Abstract) ===================="
+
+Object subclass: #FileSystemNode
+	instanceVariableNames: 'pathName'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+FileSystemNode comment:
+'I am the abstract base class for file system entries (files and directories).
+I define the common protocol for accessing paths, testing existence, and
+manipulating attributes.
+
+Instance Variables:
+    pathName    <String> full path to this entry'!
+
+!FileSystemNode class methodsFor: 'instance creation'!
+
+on: aPathString
+	"Answer a new instance for the given path"
+	^self new initPathName: aPathString! !
+
+!FileSystemNode methodsFor: 'accessing'!
+
+name
+	"Answer the local name (last component of path)"
+	^self path fileName!
+
+fullName
+	"Answer the full path as a String"
+	^pathName!
+
+pathName
+	"Answer the full path (alias for fullName)"
+	^pathName!
+
+pathName: aString
+	"Set the full path"
+	pathName _ aString!
+
+parent
+	"Answer the parent Directory"
+	| parentPath |
+	parentPath _ self path parent.
+	parentPath isNil ifTrue: [^nil].
+	^self fileSystem directoryClass on: parentPath asString!
+
+path
+	"Answer a Path object for this entry"
+	^self fileSystem pathFromString: pathName!
+
+fileSystem
+	"Answer the FileSystem for this entry"
+	^Disk! !
+
+!FileSystemNode methodsFor: 'testing'!
+
+exists
+	"Answer whether this entry exists in the file system"
+	self subclassResponsibility!
+
+isFile
+	"Answer whether this entry is a file"
+	^false!
+
+isDirectory
+	"Answer whether this entry is a directory"
+	^false! !
+
+!FileSystemNode methodsFor: 'validation'!
+
+isValidName
+	"Answer whether this entry's name is valid for the file system"
+	^self fileSystem isValidFileName: self name!
+
+hasValidPath
+	"Answer whether the path is valid (non-nil, non-empty)"
+	pathName isNil ifTrue: [^false].
+	pathName isEmpty ifTrue: [^false].
+	^true!
+
+validatePath
+	"Signal an error if the path is invalid"
+	self hasValidPath ifFalse: [
+		self error: 'Invalid path: path is nil or empty']!
+
+validateName
+	"Signal an error if the name component is invalid"
+	self isValidName ifFalse: [
+		self error: 'Invalid file name: ', self name]!
+
+validateExists
+	"Signal an error if this entry does not exist"
+	self exists ifFalse: [
+		self error: 'File or directory not found: ', pathName]! !
+
+!FileSystemNode methodsFor: 'attributes'!
+
+isHidden
+	"Answer whether this entry is hidden"
+	self subclassResponsibility!
+
+isReadOnly
+	"Answer whether this entry is read-only"
+	self subclassResponsibility!
+
+creationTime
+	"Answer the creation time"
+	self subclassResponsibility!
+
+modificationTime
+	"Answer the last modification time"
+	self subclassResponsibility! !
+
+!FileSystemNode methodsFor: 'operations'!
+
+delete
+	"Delete this entry from the file system"
+	self subclassResponsibility!
+
+renameTo: newName
+	"Rename this entry to newName (in same directory)"
+	self subclassResponsibility! !
+
+!FileSystemNode methodsFor: 'link testing'!
+
+isLink
+	"Answer whether this entry is any type of link (symbolic, hard, or junction)"
+	^self isSymbolicLink or: [self isJunction]!
+
+isSymbolicLink
+	"Answer whether this entry is a symbolic link"
+	^self fileSystem isSymbolicLink: pathName!
+
+isJunction
+	"Answer whether this entry is a junction point"
+	^self fileSystem isJunction: pathName!
+
+isHardLink
+	"Answer whether this entry has multiple hard links.
+	 Only meaningful for files. Default returns false."
+	^false! !
+
+!FileSystemNode methodsFor: 'link resolution'!
+
+linkTarget
+	"Answer the immediate target path of this link, or nil if not a link"
+	^self fileSystem linkTargetOf: pathName!
+
+resolvedTarget
+	"Answer the final resolved target path, following all links.
+	 Answer nil if not a link."
+	^self fileSystem resolvedTargetOf: pathName!
+
+linkTargetExists
+	"Answer whether this link's target exists.
+	 Answer true if this is not a link."
+	| target |
+	self isLink ifFalse: [^true].
+	target _ self resolvedTarget.
+	target isNil ifTrue: [^false].
+	^(self fileSystem pathFromString: target) file exists!
+
+isBrokenLink
+	"Answer whether this is a link whose target does not exist"
+	self isLink ifFalse: [^false].
+	^self linkTargetExists not! !
+
+!FileSystemNode methodsFor: 'printing'!
+
+printOn: aStream
+	aStream nextPutAll: self class name.
+	aStream nextPutAll: ' on '.
+	pathName printOn: aStream! !
+
+!FileSystemNode methodsFor: 'private'!
+
+initPathName: aString
+	"Initialize the path. Validates that path is not nil."
+	aString isNil ifTrue: [
+		self error: 'Cannot create ', self class name, ' with nil path'].
+	pathName _ aString! !
+
+FileSystemNode class
+	instanceVariableNames: ''!
+
+"==================== File (Abstract) ===================="
+
+FileSystemNode subclass: #File
+	instanceVariableNames: 'binary'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+File comment:
+'I am the abstract base class for files.
+I represent file metadata and provide methods to create streams for reading/writing.
+
+Instance Variables:
+    binary  <Boolean> true if file should be accessed in binary mode'!
+
+!File class methodsFor: 'instance creation'!
+
+named: aPathString
+	"Answer a File for the given path. Delegates to Disk for concrete class."
+	^Disk fileClass on: aPathString! !
+
+!File methodsFor: 'testing'!
+
+isFile
+	"Answer true - I am a file"
+	^true!
+
+isBinary
+	"Answer whether this file is in binary mode"
+	^binary == true!
+
+isText
+	"Answer whether this file is in text mode"
+	^binary ~~ true! !
+
+!File methodsFor: 'accessing'!
+
+size
+	"Answer the file size in bytes"
+	self subclassResponsibility!
+
+extension
+	"Answer the file extension (without dot), or empty string"
+	| name dotIndex |
+	name _ self name.
+	dotIndex _ name findLast: [:ch | ch = $.].
+	dotIndex = 0 ifTrue: [^''].
+	^name copyFrom: dotIndex + 1 to: name size!
+
+baseName
+	"Answer the file name without extension"
+	| name dotIndex |
+	name _ self name.
+	dotIndex _ name findLast: [:ch | ch = $.].
+	dotIndex = 0 ifTrue: [^name].
+	^name copyFrom: 1 to: dotIndex - 1!
+
+directory
+	"Answer the parent Directory"
+	^self parent! !
+
+!File methodsFor: 'modes'!
+
+binary
+	"Set binary mode for subsequent stream operations"
+	binary _ true!
+
+text
+	"Set text mode for subsequent stream operations"
+	binary _ false! !
+
+!File methodsFor: 'streaming'!
+
+readStream
+	"Answer a FileStream for reading"
+	self subclassResponsibility!
+
+writeStream
+	"Answer a FileStream for writing (create/truncate)"
+	self subclassResponsibility!
+
+readWriteStream
+	"Answer a FileStream for read/write"
+	self subclassResponsibility!
+
+appendStream
+	"Answer a FileStream for appending"
+	self subclassResponsibility!
+
+asFileStream
+	"Answer a default FileStream (read/write)"
+	^self readWriteStream! !
+
+!File methodsFor: 'content access'!
+
+contents
+	"Read and answer the entire file contents as a String"
+	| stream contents |
+	stream _ self readStream.
+	contents _ stream contentsOfEntireFile.
+	^contents!
+
+contents: aString
+	"Write aString as the entire file contents"
+	| stream |
+	stream _ self writeStream.
+	stream nextPutAll: aString.
+	stream close! !
+
+!File methodsFor: 'initialization'!
+
+initialize
+	"Initialize instance variables"
+	binary _ false! !
+
+!File methodsFor: 'hard links'!
+
+createHardLinkAt: aPathString
+	"Create a hard link to this file at aPathString.
+	 Both paths must be on the same volume.
+	 Signals error if file system doesn't support hard links."
+	self fileSystem supportsHardLinks ifFalse: [
+		self error: 'File system does not support hard links'].
+	self exists ifFalse: [
+		self error: 'Cannot create hard link to non-existent file'].
+	^self fileSystem createHardLink: aPathString toFile: pathName!
+
+hardLinkCount
+	"Answer the number of hard links to this file's data.
+	 Returns 1 if no additional hard links exist."
+	^self fileSystem hardLinkCountOf: pathName!
+
+isHardLink
+	"Answer whether this file has multiple hard links"
+	^self hardLinkCount > 1! !
+
+!File methodsFor: 'symbolic links'!
+
+createSymbolicLinkAt: aPathString
+	"Create a symbolic link to this file at aPathString"
+	self fileSystem supportsSymbolicLinks ifFalse: [
+		self error: 'File system does not support symbolic links'].
+	^self fileSystem createSymbolicLink: aPathString toTarget: pathName asDirectory: false! !
+
+File class
+	instanceVariableNames: ''!
+
+"==================== Directory (Abstract) ===================="
+
+FileSystemNode subclass: #Directory
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+Directory comment:
+'I am the abstract base class for directories.
+I define the protocol for listing, creating, and managing files and subdirectories.
+
+Concrete subclasses implement platform-specific directory operations.'!
+
+!Directory class methodsFor: 'instance creation'!
+
+on: aPathString
+	"Answer a Directory for the given path. Delegates to Disk for concrete class."
+	^Disk directoryClass on: aPathString! !
+
+!Directory methodsFor: 'testing'!
+
+isDirectory
+	"Answer true - I am a directory"
+	^true!
+
+isEmpty
+	"Answer whether this directory contains no entries"
+	^self entries isEmpty!
+
+includes: aFileSystemNode
+	"Answer whether this directory contains the given entry"
+	^self includesKey: aFileSystemNode name!
+
+includesKey: aName
+	"Answer whether this directory contains an entry with the given name"
+	self entries do: [:entry |
+		(Disk namesEqual: entry and: aName) ifTrue: [^true]].
+	^false! !
+
+!Directory methodsFor: 'enumeration'!
+
+entries
+	"Answer all entries (files and subdirectories) as a collection of names"
+	self subclassResponsibility!
+
+files
+	"Answer all file names in this directory"
+	self subclassResponsibility!
+
+directories
+	"Answer all subdirectory names"
+	self subclassResponsibility!
+
+fileNames
+	"Answer the names of all files"
+	^self files!
+
+directoryNames
+	"Answer the names of all subdirectories"
+	^self directories!
+
+do: aBlock
+	"Evaluate aBlock for each file"
+	self files do: [:name |
+		aBlock value: (self fileNamed: name)]!
+
+filesDo: aBlock
+	"Evaluate aBlock for each file"
+	self do: aBlock!
+
+directoriesDo: aBlock
+	"Evaluate aBlock for each subdirectory"
+	self directories do: [:name |
+		aBlock value: (self directoryNamed: name)]! !
+
+!Directory methodsFor: 'file access'!
+
+fileNamed: aName
+	"Answer a File object for the named file"
+	self subclassResponsibility!
+
+directoryNamed: aName
+	"Answer a Directory object for the named subdirectory"
+	self subclassResponsibility!
+
+file: aName
+	"Answer a read/write FileStream on the named file"
+	self subclassResponsibility!
+
+oldFile: aName
+	"Answer a read-only FileStream on an existing file"
+	self subclassResponsibility!
+
+newFile: aName
+	"Answer a write FileStream on a new file (create/truncate)"
+	self subclassResponsibility! !
+
+!Directory methodsFor: 'modification'!
+
+createFile: aName
+	"Create a new empty file with the given name, answer the File"
+	self subclassResponsibility!
+
+createDirectory: aName
+	"Create a new subdirectory with the given name, answer the Directory"
+	self subclassResponsibility!
+
+create
+	"Create this directory if it doesn't exist"
+	self subclassResponsibility!
+
+remove: aFileSystemNode
+	"Remove the given entry from this directory"
+	aFileSystemNode delete!
+
+removeKey: aName
+	"Remove the entry with the given name"
+	(self fileNamed: aName) delete! !
+
+!Directory methodsFor: 'path utilities'!
+
+fullNameFor: aName
+	"Answer the full path for a file/directory name in this directory"
+	self subclassResponsibility! !
+
+!Directory methodsFor: 'validation'!
+
+checkName: aName fixErrors: fixFlag
+	"Validate aName as a file name. If fixFlag is true, return a corrected name.
+	 If fixFlag is false and name is invalid, signal an error."
+	| fs |
+	aName isNil ifTrue: [
+		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is nil']].
+	aName isEmpty ifTrue: [
+		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is empty']].
+	fs _ self fileSystem.
+	(fs isValidFileName: aName) ifTrue: [^aName].
+	fixFlag
+		ifTrue: [^fs sanitizeFileName: aName]
+		ifFalse: [self error: 'Invalid file name: ', aName]!
+
+checkNameOfFile: aFile
+	"Check aFile's name, signal error if invalid"
+	^self checkName: aFile name fixErrors: false!
+
+checkNameOfFile: aFile fixErrors: aBoolean
+	"Check aFile's name, optionally fix errors"
+	^self checkName: aFile name fixErrors: aBoolean!
+
+isValidOldFileName: aName
+	"Answer whether aName is valid and exists in this directory"
+	^(self fileSystem isValidFileName: aName) and: [self includesKey: aName]!
+
+validateFileName: aName
+	"Signal an error if aName is not a valid file name"
+	(self fileSystem isValidFileName: aName) ifFalse: [
+		self error: 'Invalid file name: ', aName]! !
+
+!Directory methodsFor: 'junctions'!
+
+createJunctionAt: aPathString
+	"Create a junction (directory link) to this directory at aPathString.
+	 Junctions are directory-only links that can span local volumes."
+	self fileSystem supportsJunctions ifFalse: [
+		self error: 'File system does not support junctions'].
+	self exists ifFalse: [
+		self error: 'Cannot create junction to non-existent directory'].
+	^self fileSystem createJunction: aPathString toDirectory: pathName! !
+
+!Directory methodsFor: 'symbolic links'!
+
+createSymbolicLinkAt: aPathString
+	"Create a symbolic link to this directory at aPathString"
+	self fileSystem supportsSymbolicLinks ifFalse: [
+		self error: 'File system does not support symbolic links'].
+	^self fileSystem createSymbolicLink: aPathString toTarget: pathName asDirectory: true! !
+
+Directory class
+	instanceVariableNames: ''!
+
+"==================== SymbolicLink (Abstract) ===================="
+
+FileSystemNode subclass: #SymbolicLink
+	instanceVariableNames: 'targetPath targetType'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+SymbolicLink comment:
+'I represent a symbolic link in the file system.
+Unlike hard links, I store a path to my target rather than sharing data.
+I can point to files or directories, on local or remote volumes.
+
+Instance Variables:
+    targetPath   <String> the path this link points to (may be relative or absolute)
+    targetType   <Symbol> #file, #directory, or #unknown
+
+Symbolic links differ from other link types:
+- Hard links: share file data, file only, same volume only
+- Junctions: directory only, local volumes only, absolute paths only
+- Symbolic links: file or directory, any volume, relative or absolute, supports UNC
+
+Key behaviors:
+- isSymbolicLink always returns true
+- linkTarget returns the stored target path
+- resolvedTarget follows the chain to the final target
+- isBroken returns true if the target does not exist'!
+
+!SymbolicLink class methodsFor: 'instance creation'!
+
+on: aPathString
+	"Answer a SymbolicLink for the given path"
+	^self new initPathName: aPathString; initialize!
+
+createFile: linkPath target: targetPath
+	"Create a symbolic link to a file"
+	^self subclassResponsibility!
+
+createDirectory: linkPath target: targetPath
+	"Create a symbolic link to a directory"
+	^self subclassResponsibility! !
+
+!SymbolicLink methodsFor: 'initialization'!
+
+initialize
+	"Initialize by reading link information from the file system"
+	targetPath _ self fileSystem linkTargetOf: pathName.
+	targetType _ #unknown! !
+
+!SymbolicLink methodsFor: 'accessing'!
+
+targetPath
+	"Answer the path this symbolic link points to"
+	^targetPath!
+
+targetType
+	"Answer #file, #directory, or #unknown"
+	targetType == #unknown ifTrue: [
+		self resolveTargetType].
+	^targetType!
+
+resolveTargetType
+	"Determine and cache whether target is a file or directory"
+	| resolved node |
+	resolved _ self resolvedTarget.
+	resolved isNil ifTrue: [
+		targetType _ #unknown.
+		^self].
+	node _ self fileSystem pathFromString: resolved.
+	(self fileSystem directoryClass on: resolved) exists
+		ifTrue: [targetType _ #directory]
+		ifFalse: [
+			(self fileSystem fileClass on: resolved) exists
+				ifTrue: [targetType _ #file]
+				ifFalse: [targetType _ #unknown]]! !
+
+!SymbolicLink methodsFor: 'testing'!
+
+isSymbolicLink
+	"I am always a symbolic link"
+	^true!
+
+isFile
+	"Answer whether I point to a file"
+	^self targetType == #file!
+
+isDirectory
+	"Answer whether I point to a directory"
+	^self targetType == #directory!
+
+isRelativeLink
+	"Answer whether my target path is relative"
+	^(self fileSystem isAbsolutePath: targetPath) not!
+
+isAbsoluteLink
+	"Answer whether my target path is absolute"
+	^self fileSystem isAbsolutePath: targetPath!
+
+targetExists
+	"Answer whether the target file/directory exists"
+	| resolved |
+	resolved _ self resolvedTarget.
+	resolved isNil ifTrue: [^false].
+	^(self fileSystem fileClass on: resolved) exists
+		or: [(self fileSystem directoryClass on: resolved) exists]!
+
+isBroken
+	"Answer whether the target does not exist"
+	^self targetExists not! !
+
+!SymbolicLink methodsFor: 'link resolution'!
+
+linkTarget
+	"Answer the immediate target path"
+	^targetPath!
+
+resolvedTarget
+	"Answer the final resolved target, following all links"
+	^self fileSystem resolvedTargetOf: pathName!
+
+resolvedNode
+	"Answer a File or Directory for the resolved target"
+	| resolved |
+	resolved _ self resolvedTarget.
+	resolved isNil ifTrue: [^nil].
+	self targetType == #directory
+		ifTrue: [^self fileSystem directoryClass on: resolved]
+		ifFalse: [^self fileSystem fileClass on: resolved]! !
+
+!SymbolicLink methodsFor: 'operations'!
+
+retargetTo: newTargetPath
+	"Change the target of this symbolic link.
+	 This typically requires deleting and recreating the link."
+	self subclassResponsibility!
+
+delete
+	"Delete the symbolic link (not the target)"
+	self subclassResponsibility! !
+
+!SymbolicLink methodsFor: 'printing'!
+
+printOn: aStream
+	aStream nextPutAll: self class name.
+	aStream nextPutAll: ' '.
+	pathName printOn: aStream.
+	aStream nextPutAll: ' -> '.
+	targetPath printOn: aStream! !
+
+SymbolicLink class
+	instanceVariableNames: ''!
+
+"==================== FileSystem (Abstract) ===================="
+
+Object subclass: #FileSystem
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Abstract'!
+
+FileSystem comment:
+'I am the abstract base class representing a platform file system.
+I provide:
+- Concrete class factories for platform-specific implementations
+- File system characteristics (case sensitivity, name constraints, etc.)
+- Directory access (root, current, home, temp)
+
+Concrete subclasses implement platform-specific behavior.'!
+
+!FileSystem class methodsFor: 'instance access'!
+
+default
+	"Answer the default FileSystem instance"
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'concrete class factories'!
+
+pathClass
+	"Answer the concrete Path class for this file system"
+	self subclassResponsibility!
+
+fileClass
+	"Answer the concrete File class for this file system"
+	self subclassResponsibility!
+
+directoryClass
+	"Answer the concrete Directory class for this file system"
+	self subclassResponsibility!
+
+streamClass
+	"Answer the concrete FileStream class for this file system"
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'directory access'!
+
+currentDirectory
+	"Answer the current working directory"
+	self subclassResponsibility!
+
+rootDirectory
+	"Answer the root directory of the default volume"
+	self subclassResponsibility!
+
+temporaryDirectory
+	"Answer the system temporary directory"
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'path factory'!
+
+pathFromString: aString
+	"Answer a Path object parsed from aString"
+	^self pathClass fromString: aString! !
+
+!FileSystem methodsFor: 'node factory'!
+
+fileAt: aPathString
+	"Answer a File object for the given path"
+	^self fileClass on: aPathString!
+
+fileNamed: aPathString
+	"Answer a File object for the given path (synonym for fileAt:)"
+	^self fileAt: aPathString!
+
+directoryAt: aPathString
+	"Answer a Directory object for the given path"
+	^self directoryClass on: aPathString!
+
+directoryNamed: aPathString
+	"Answer a Directory object for the given path (synonym for directoryAt:)"
+	^self directoryAt: aPathString! !
+
+!FileSystem methodsFor: 'naming semantics'!
+
+isCaseSensitive
+	"Answer whether file names are case-sensitive"
+	self subclassResponsibility!
+
+isCasePreserving
+	"Answer whether file name case is preserved"
+	self subclassResponsibility!
+
+namesEqual: name1 and: name2
+	"Answer whether the two names refer to the same file"
+	self isCaseSensitive
+		ifTrue: [^name1 = name2]
+		ifFalse: [^name1 sameAs: name2]!
+
+hashForName: aName
+	"Answer a hash value for the name, consistent with namesEqual:and:"
+	self isCaseSensitive
+		ifTrue: [^aName hash]
+		ifFalse: [^aName asLowercase hash]! !
+
+!FileSystem methodsFor: 'name constraints'!
+
+maxFileNameLength
+	"Answer the maximum length of a single file name component"
+	self subclassResponsibility!
+
+illegalCharacters
+	"Answer a collection of characters not allowed in file names"
+	self subclassResponsibility!
+
+isValidFileName: aName
+	"Answer whether aName is a valid file name"
+	aName isNil ifTrue: [^false].
+	aName isEmpty ifTrue: [^false].
+	aName size > self maxFileNameLength ifTrue: [^false].
+	self reservedNames do: [:reserved |
+		(self namesEqual: aName and: reserved) ifTrue: [^false]].
+	aName do: [:ch |
+		(self illegalCharacters includes: ch) ifTrue: [^false]].
+	^true!
+
+reservedNames
+	"Answer a collection of reserved file names (default: none)"
+	^#()!
+
+sanitizeFileName: aName
+	"Answer a valid file name based on aName by replacing illegal characters"
+	| result isReserved |
+	aName isNil ifTrue: [^'untitled'].
+	aName isEmpty ifTrue: [^'untitled'].
+	result _ aName collect: [:ch |
+		(self illegalCharacters includes: ch)
+			ifTrue: [$_]
+			ifFalse: [ch]].
+	result size > self maxFileNameLength
+		ifTrue: [result _ result copyFrom: 1 to: self maxFileNameLength].
+	isReserved _ false.
+	self reservedNames do: [:reserved |
+		(self namesEqual: result and: reserved) ifTrue: [isReserved _ true]].
+	isReserved ifTrue: [result _ '_', result].
+	^result!
+
+checkName: aName fixErrors: fixFlag
+	"Validate aName as a file name. If fixFlag is true, return a corrected name.
+	 If fixFlag is false and name is invalid, signal an error."
+	aName isNil ifTrue: [
+		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is nil']].
+	aName isEmpty ifTrue: [
+		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is empty']].
+	(self isValidFileName: aName) ifTrue: [^aName].
+	fixFlag
+		ifTrue: [^self sanitizeFileName: aName]
+		ifFalse: [self error: 'Invalid file name: ', aName]! !
+
+!FileSystem methodsFor: 'path characteristics'!
+
+pathSeparator
+	"Answer the primary path separator character"
+	self subclassResponsibility!
+
+isAbsolutePath: aString
+	"Answer whether aString represents an absolute path"
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'file operations'!
+
+file: fileDesignator
+	"Answer a read/write stream on the named file"
+	^self currentDirectory file: fileDesignator!
+
+oldFile: fileDesignator
+	"Answer a read stream on an existing file"
+	^self currentDirectory oldFile: fileDesignator!
+
+newFile: fileDesignator
+	"Answer a write stream on a new file"
+	^self currentDirectory newFile: fileDesignator!
+
+directoryFromName: fileDesignator setFileName: localNameBlock
+	"Parse a file path into directory and filename components.
+	 Call localNameBlock with the filename, return the directory.
+	 This is used by legacy file operations for compatibility."
+	^self directoryClass directoryFromName: fileDesignator setFileName: localNameBlock! !
+
+!FileSystem methodsFor: 'link support'!
+
+supportsHardLinks
+	"Answer whether this file system supports hard links"
+	self subclassResponsibility!
+
+supportsSymbolicLinks
+	"Answer whether this file system supports symbolic links"
+	self subclassResponsibility!
+
+supportsJunctions
+	"Answer whether this file system supports directory junctions"
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'link creation'!
+
+createSymbolicLink: linkPath toTarget: targetPath asDirectory: isDirectory
+	"Create a symbolic link at linkPath pointing to targetPath.
+	 isDirectory indicates whether the target is a directory."
+	self subclassResponsibility!
+
+createHardLink: linkPath toFile: existingPath
+	"Create a hard link at linkPath pointing to existing file.
+	 Both paths must be on the same volume."
+	self subclassResponsibility!
+
+createJunction: junctionPath toDirectory: targetPath
+	"Create a junction (directory link) at junctionPath pointing to targetPath."
+	self subclassResponsibility! !
+
+!FileSystem methodsFor: 'link queries'!
+
+isSymbolicLink: aPathString
+	"Answer whether the path refers to a symbolic link"
+	self subclassResponsibility!
+
+isJunction: aPathString
+	"Answer whether the path refers to a junction point"
+	self subclassResponsibility!
+
+linkTargetOf: aPathString
+	"Answer the immediate target path of a link, or nil if not a link"
+	self subclassResponsibility!
+
+resolvedTargetOf: aPathString
+	"Answer the final resolved target path, following all links.
+	 Answer nil if not a link."
+	self subclassResponsibility!
+
+hardLinkCountOf: aPathString
+	"Answer the number of hard links to the file"
+	self subclassResponsibility! !
+
+FileSystem class
+	instanceVariableNames: ''!
+
+"==================== WindowsFileSystem ===================="
+
+FileSystem subclass: #WindowsFileSystem
+	instanceVariableNames: ''
+	classVariableNames: 'Default'
+	poolDictionaries: ''
+	category: 'Files-Windows'!
+
+WindowsFileSystem comment:
+'I am the Windows implementation of FileSystem.
+I provide Windows-specific file system behavior including NTFS characteristics.
+
+Class Variables:
+    Default     <WindowsFileSystem> the singleton instance'!
+
+!WindowsFileSystem class methodsFor: 'class initialization'!
+
+initialize
+	"Initialize class variables and install Disk global"
+	"WindowsFileSystem initialize"
+	Default _ self new.
+	Smalltalk at: #Disk put: Default! !
+
+!WindowsFileSystem class methodsFor: 'instance access'!
+
+default
+	"Answer the singleton instance"
+	Default isNil ifTrue: [Default _ self new].
+	^Default! !
+
+!WindowsFileSystem methodsFor: 'concrete class factories'!
+
+pathClass
+	"Answer WindowsPath"
+	^WindowsPath!
+
+fileClass
+	"Answer WindowsFile"
+	^WindowsFile!
+
+directoryClass
+	"Answer WindowsDirectory"
+	^WindowsDirectory!
+
+streamClass
+	"Answer WindowsFileStream"
+	^WindowsFileStream! !
+
+!WindowsFileSystem methodsFor: 'directory access'!
+
+currentDirectory
+	"Answer the current working directory"
+	^WindowsDirectory on: '.'!
+
+rootDirectory
+	"Answer the root directory of the default volume (C:\)"
+	^WindowsDirectory on: 'C:\'!
+
+temporaryDirectory
+	"Answer the system temporary directory"
+	^WindowsDirectory on: (self primGetTempDirectory)!
+
+primGetTempDirectory
+	"Answer temp directory path"
+	<primitive: 150>
+	^'C:\Temp'! !
+
+!WindowsFileSystem methodsFor: 'naming semantics'!
+
+isCaseSensitive
+	"Windows is case-insensitive"
+	^false!
+
+isCasePreserving
+	"Windows preserves case"
+	^true! !
+
+!WindowsFileSystem methodsFor: 'name constraints'!
+
+maxFileNameLength
+	"NTFS maximum file name length"
+	^255!
+
+illegalCharacters
+	"Characters not allowed in Windows file names"
+	^#($\ $/ $: $* $? $" $< $> $|)!
+
+reservedNames
+	"Windows reserved device names - cannot be used as file names"
+	^#('CON' 'PRN' 'AUX' 'NUL'
+	   'COM1' 'COM2' 'COM3' 'COM4' 'COM5' 'COM6' 'COM7' 'COM8' 'COM9'
+	   'LPT1' 'LPT2' 'LPT3' 'LPT4' 'LPT5' 'LPT6' 'LPT7' 'LPT8' 'LPT9')!
+
+isValidFileName: aName
+	"Windows-specific validation including reserved names, trailing dots/spaces,
+	 and control characters (ASCII 0-31) per Microsoft documentation."
+	| baseName |
+	(super isValidFileName: aName) ifFalse: [^false].
+	"Windows doesn't allow control characters (ASCII 0-31)"
+	aName do: [:ch | ch asciiValue < 32 ifTrue: [^false]].
+	"Windows doesn't allow trailing dots or spaces"
+	(aName last = $. or: [aName last = $ ]) ifTrue: [^false].
+	"Check base name without extension against reserved names"
+	baseName _ (aName includes: $.)
+		ifTrue: [aName copyFrom: 1 to: (aName indexOf: $.) - 1]
+		ifFalse: [aName].
+	self reservedNames do: [:reserved |
+		(baseName sameAs: reserved) ifTrue: [^false]].
+	^true! !
+
+!WindowsFileSystem methodsFor: 'path characteristics'!
+
+pathSeparator
+	"Primary path separator is backslash"
+	^$\!
+
+isAbsolutePath: aString
+	"Test for absolute path (C:\ or \\server\share)"
+	aString isEmpty ifTrue: [^false].
+	"UNC path"
+	(aString beginsWith: '\\') ifTrue: [^true].
+	"Drive letter path"
+	(aString size >= 3 and: [
+		(aString at: 2) = $: and: [
+			(aString at: 3) = $\ or: [(aString at: 3) = $/]]]) ifTrue: [^true].
+	^false! !
+
+!WindowsFileSystem methodsFor: 'link support'!
+
+supportsHardLinks
+	"NTFS supports hard links for files"
+	^true!
+
+supportsSymbolicLinks
+	"Windows Vista+ supports symbolic links"
+	^true!
+
+supportsJunctions
+	"NTFS supports directory junctions"
+	^true!
+
+symbolicLinkClass
+	"Answer the concrete SymbolicLink class"
+	^WindowsSymbolicLink! !
+
+!WindowsFileSystem methodsFor: 'link creation'!
+
+createSymbolicLink: linkPath toTarget: targetPath asDirectory: isDirectory
+	"Create a symbolic link using Windows API.
+	 Requires SeCreateSymbolicLinkPrivilege or Developer Mode (Win10 1607+).
+	 isDirectory must be true if target is a directory."
+	^self primCreateSymbolicLink: linkPath target: targetPath isDirectory: isDirectory!
+
+createHardLink: linkPath toFile: existingPath
+	"Create a hard link. Both paths must be on same NTFS volume.
+	 Hard links are only supported for files, not directories."
+	^self primCreateHardLink: linkPath existing: existingPath!
+
+createJunction: junctionPath toDirectory: targetPath
+	"Create a junction point (directory soft link).
+	 Junctions can span local volumes but not network paths.
+	 Target path must be absolute."
+	(self isAbsolutePath: targetPath) ifFalse: [
+		self error: 'Junction target must be an absolute path'].
+	^self primCreateJunction: junctionPath target: targetPath! !
+
+!WindowsFileSystem methodsFor: 'link queries'!
+
+isSymbolicLink: aPathString
+	"Answer whether path is a symbolic link (not a junction)"
+	| attrs tag |
+	attrs _ self primGetFileAttributes: aPathString.
+	attrs isNil ifTrue: [^false].
+	"Check for reparse point attribute (0x400)"
+	(attrs bitAnd: 16r400) = 0 ifTrue: [^false].
+	"Get reparse tag to distinguish symlink from junction"
+	tag _ self primGetReparseTag: aPathString.
+	^tag = 16rA000000C "IO_REPARSE_TAG_SYMLINK"!
+
+isJunction: aPathString
+	"Answer whether path is a junction point"
+	| attrs tag |
+	attrs _ self primGetFileAttributes: aPathString.
+	attrs isNil ifTrue: [^false].
+	"Check for reparse point attribute (0x400) and directory (0x10)"
+	((attrs bitAnd: 16r400) = 0 or: [(attrs bitAnd: 16r10) = 0]) ifTrue: [^false].
+	"Get reparse tag to distinguish junction from symlink"
+	tag _ self primGetReparseTag: aPathString.
+	^tag = 16rA0000003 "IO_REPARSE_TAG_MOUNT_POINT"!
+
+linkTargetOf: aPathString
+	"Answer the immediate target path of a link, or nil if not a link"
+	(self isSymbolicLink: aPathString) ifTrue: [
+		^self primGetSymbolicLinkTarget: aPathString].
+	(self isJunction: aPathString) ifTrue: [
+		^self primGetJunctionTarget: aPathString].
+	^nil!
+
+resolvedTargetOf: aPathString
+	"Answer the final resolved target path, following all links.
+	 Uses Windows GetFinalPathNameByHandle for reliable resolution."
+	^self primGetFinalPath: aPathString!
+
+hardLinkCountOf: aPathString
+	"Answer the number of hard links to the file"
+	^self primGetHardLinkCount: aPathString! !
+
+!WindowsFileSystem methodsFor: 'link primitives'!
+
+primCreateSymbolicLink: linkPath target: targetPath isDirectory: isDirectory
+	"Primitive to create symbolic link. Uses CreateSymbolicLinkW.
+	 Flags: SYMBOLIC_LINK_FLAG_DIRECTORY (0x1) if isDirectory.
+	 May also use SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE (0x2)."
+	<primitive: 230>
+	self primitiveFailed!
+
+primCreateHardLink: linkPath existing: existingPath
+	"Primitive to create hard link. Uses CreateHardLinkW."
+	<primitive: 231>
+	self primitiveFailed!
+
+primCreateJunction: junctionPath target: targetPath
+	"Primitive to create junction. Uses DeviceIoControl with FSCTL_SET_REPARSE_POINT."
+	<primitive: 232>
+	self primitiveFailed!
+
+primGetFileAttributes: aPathString
+	"Primitive to get file attributes. Uses GetFileAttributesW.
+	 Returns nil if file doesn't exist."
+	<primitive: 233>
+	^nil!
+
+primGetReparseTag: aPathString
+	"Primitive to get reparse point tag. Uses FindFirstFileW or DeviceIoControl."
+	<primitive: 234>
+	^0!
+
+primGetSymbolicLinkTarget: aPathString
+	"Primitive to read symbolic link target."
+	<primitive: 235>
+	^nil!
+
+primGetJunctionTarget: aPathString
+	"Primitive to read junction target."
+	<primitive: 236>
+	^nil!
+
+primGetFinalPath: aPathString
+	"Primitive to get final path, resolving all links.
+	 Uses GetFinalPathNameByHandleW."
+	<primitive: 237>
+	^nil!
+
+primGetHardLinkCount: aPathString
+	"Primitive to get hard link count.
+	 Uses GetFileInformationByHandle."
+	<primitive: 238>
+	^1!
+
+primDeleteReparsePoint: aPathString
+	"Primitive to delete a reparse point (junction or symlink).
+	 Uses DeviceIoControl with FSCTL_DELETE_REPARSE_POINT."
+	<primitive: 239>
+	self primitiveFailed! !
+
+WindowsFileSystem class
+	instanceVariableNames: ''!
+
+WindowsFileSystem initialize!
 
 "==================== WindowsFileStream ===================="
 
@@ -326,16 +1817,21 @@ reopen
 
 !WindowsFileStream methodsFor: 'accessing'!
 
+path
+    "Answer a Path object for this stream's file"
+    ^Disk pathFromString: pathName!
+
 name
     "Extract filename from path"
-    | lastSep |
-    lastSep _ pathName findLast: [:c | c = $\ or: [c = $/]].
-    lastSep = 0 ifTrue: [^pathName].
-    ^pathName copyFrom: lastSep + 1 to: pathName size!
+    ^self path fileName!
+
+directory
+    "Answer the Directory containing this file"
+    ^Disk directoryAt: self path directoryPath asString!
 
 file
-    "Return self for compatibility"
-    ^self!
+    "Return WindowsFile for this stream's file"
+    ^WindowsFile on: pathName!
 
 pathName
     "Return the file path"
@@ -596,6 +2092,47 @@ open: modeValue
 
     modeValue = AppendMode ifTrue: [self setToEnd]! !
 
+!WindowsFileStream methodsFor: 'fileIn/Out'!
+
+fileIn
+	"File in the contents of this stream.
+	 Guarantee stream is readOnly before fileIn for efficiency."
+	| val |
+	Transcript cr; show: 'Filing in from: ', self name; cr.
+	self readOnly.
+	Cursor read showWhile: [
+		[self atEnd] whileFalse: [
+			self skipSeparators.
+			val _ (self peekFor: $!)
+				ifTrue: [(Compiler evaluate: self nextChunk logged: false)
+						 scanFrom: self]
+				ifFalse: [Compiler evaluate: self nextChunk logged: true]].
+		self close].
+	^val!
+
+skipSeparators
+	"Skip whitespace characters"
+	[self atEnd not and: [self peek isSeparator]]
+		whileTrue: [self next]!
+
+peekFor: anObject
+	"Answer true and advance if next element equals anObject"
+	self peek = anObject
+		ifTrue: [self next. ^true]
+		ifFalse: [^false]!
+
+timeStamp
+	"Write a timestamp"
+	| stream |
+	stream _ WriteStream on: (String new: 50).
+	Smalltalk timeStamp: stream.
+	self nextChunkPut: stream contents.
+	self cr!
+
+emphasis: ignored
+	"No-op for plain file streams - allows compatibility with streams that carry emphasis"
+	^self! !
+
 !WindowsFileStream methodsFor: 'primitives'!
 
 primOpen: path accessMode: access shareMode: share createMode: create
@@ -633,18 +2170,18 @@ WindowsFileStream initialize!
 
 "==================== WindowsFile ===================="
 
-Object subclass: #WindowsFile
-    instanceVariableNames: 'pathName'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: 'Files-Windows'!
+File subclass: #WindowsFile
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Files-Windows'!
 
 WindowsFile comment:
-'I represent file metadata without holding a file handle.
-I am used for file operations like exists, size, delete, rename, and creating streams.
+'I am the Windows implementation of File.
+I use Windows API primitives to access file metadata and attributes.
 
-Instance Variables:
-    pathName    <String> full path to the file'!
+Inherits from File (abstract) which inherits from FileSystemNode.
+Instance variable pathName is inherited from FileSystemNode.'!
 
 !WindowsFile class methodsFor: 'instance creation'!
 
@@ -663,28 +2200,25 @@ initPathName: aString
 
 !WindowsFile methodsFor: 'accessing'!
 
+path
+    "Answer a Path object for this file"
+    ^self fileSystem pathFromString: pathName!
+
 pathName
     "Return the file path"
     ^pathName!
 
 fileName
-    "Extract just the filename"
-    | lastSep |
-    lastSep _ pathName findLast: [:c | c = $\ or: [c = $/]].
-    lastSep = 0 ifTrue: [^pathName].
-    ^pathName copyFrom: lastSep + 1 to: pathName size!
+    "Extract just the filename using Path"
+    ^self path fileName!
 
 fullName
     "Return full path"
     ^pathName!
 
 directory
-    "Return WindowsDirectory for parent"
-    | lastSep dirPath |
-    lastSep _ pathName findLast: [:c | c = $\ or: [c = $/]].
-    lastSep = 0 ifTrue: [^WindowsDirectory on: '.'].
-    dirPath _ pathName copyFrom: 1 to: lastSep - 1.
-    ^WindowsDirectory on: dirPath! !
+    "Return Directory for parent"
+    ^self fileSystem directoryAt: self path directoryPath asString! !
 
 !WindowsFile methodsFor: 'testing'!
 
@@ -754,18 +2288,18 @@ WindowsFile class
 
 "==================== WindowsDirectory ===================="
 
-Object subclass: #WindowsDirectory
-    instanceVariableNames: 'pathName'
-    classVariableNames: 'Separator ExternalReferences'
-    poolDictionaries: 'FilePool'
-    category: 'Files-Windows'!
+Directory subclass: #WindowsDirectory
+	instanceVariableNames: ''
+	classVariableNames: 'Separator ExternalReferences'
+	poolDictionaries: 'FilePool'
+	category: 'Files-Windows'!
 
 WindowsDirectory comment:
-'I represent a directory in the Windows file system.
-I provide directory operations without the legacy page allocation concept.
+'I am the Windows implementation of Directory.
+I use Windows API primitives to implement directory operations.
 
-Instance Variables:
-    pathName    <String> full path to the directory
+Inherits from Directory (abstract) which inherits from FileSystemNode.
+Instance variable pathName is inherited from FileSystemNode.
 
 Class Variables:
     Separator           <Character> path separator (backslash)
@@ -826,6 +2360,7 @@ removeExternalReference: anObject
 
 releaseExternalReferences
     "Release all external references"
+    ExternalReferences isNil ifTrue: [^self].
     [ExternalReferences isEmpty] whileFalse: [
         ExternalReferences removeLast release]!
 
@@ -1006,32 +2541,10 @@ filesMatching: pattern
 
 !WindowsDirectory methodsFor: 'filename validation'!
 
-checkName: fileName fixErrors: fixFlag
-    "Validate filename, optionally fix errors"
-    fileName isEmpty ifTrue: [
-        fixFlag ifFalse: [self error: 'empty filename']].
-    fileName last = $.
-        ifTrue: [
-            fixFlag
-                ifTrue: [^fileName copyFrom: 1 to: fileName size - 1]
-                ifFalse: [self error: 'filename ends with .']].
-    ^fileName!
-
-checkNameOfFile: aFile
-    "Check file's name"
-    ^self checkName: aFile fileName fixErrors: false!
-
-checkNameOfFile: aFile fixErrors: aBoolean
-    "Check file's name with fix option"
-    ^self checkName: aFile fileName fixErrors: aBoolean!
-
-isLegalFileName: aString
-    "Test if filename is legal"
-    ^(self checkName: aString fixErrors: true) = aString!
-
-isLegalOldFileName: aString
-    "Test if filename is legal and exists"
-    ^(self isLegalFileName: aString) and: [self includesKey: aString]! !
+"Validation methods inherited from Directory which delegates to FileSystem.
+ WindowsDirectory inherits: checkName:fixErrors:, isValidOldFileName:,
+ checkNameOfFile:, checkNameOfFile:fixErrors:, validateFileName:
+ - all using WindowsFileSystem's isValidFileName: validation rules."! !
 
 !WindowsDirectory methodsFor: 'file copying'!
 
@@ -1040,12 +2553,21 @@ retrieve: aFileName
     ^self!
 
 retrieveFrom: aFileName1 copyTo: aFileName2
-    "Copy from one file to another"
+    "Copy from one file to another. Uses platform primitive when available,
+     falls back to stream copying when primitive fails."
+    | srcPath destPath |
+    srcPath _ self fullNameFor: aFileName1.
+    destPath _ self fullNameFor: aFileName2.
+    ^self primCopyFile: srcPath to: destPath!
+
+primCopyFile: srcPath to: destPath
+    "Platform primitive for file copy. Falls back to stream copy if primitive fails."
+    <primitive: 157>
     | f1 f2 |
-    f1 _ self oldFile: aFileName1.
-    f1 readOnly.
-    f2 _ self file: aFileName2.
-    f2 nextPutAll: f1.
+    "Fallback: character-by-character stream copy"
+    f1 _ (Disk fileAt: srcPath) readStream.
+    f2 _ (Disk fileAt: destPath) writeStream.
+    [f1 atEnd] whileFalse: [f2 nextPut: f1 next].
     f2 close.
     f1 close!
 
@@ -1103,7 +2625,92 @@ WindowsDirectory class
 
 WindowsDirectory initialize!
 
+"==================== WindowsSymbolicLink ===================="
 
+SymbolicLink subclass: #WindowsSymbolicLink
+    instanceVariableNames: ''
+    classVariableNames: ''
+    poolDictionaries: ''
+    category: 'Files-Windows'!
+
+WindowsSymbolicLink comment:
+'I am the Windows implementation of SymbolicLink.
+I use Windows symbolic links (not junctions) which support:
+- Both files and directories as targets
+- Relative or absolute target paths
+- Local and UNC (network) paths
+- Cross-volume links
+
+Creation requires either:
+- SeCreateSymbolicLinkPrivilege (administrator)
+- Developer Mode enabled (Windows 10 version 1607+)
+
+I am distinguished from junctions by the IO_REPARSE_TAG_SYMLINK reparse tag.'!
+
+!WindowsSymbolicLink class methodsFor: 'instance creation'!
+
+createFile: linkPath target: targetPath
+    "Create a symbolic link to a file.
+     Returns a new WindowsSymbolicLink instance."
+    Disk createSymbolicLink: linkPath toTarget: targetPath asDirectory: false.
+    ^self on: linkPath!
+
+createDirectory: linkPath target: targetPath
+    "Create a symbolic link to a directory.
+     Returns a new WindowsSymbolicLink instance."
+    Disk createSymbolicLink: linkPath toTarget: targetPath asDirectory: true.
+    ^self on: linkPath!
+
+create: linkPath target: targetPath
+    "Create a symbolic link, auto-detecting whether target is file or directory.
+     If target doesn't exist, creates a file link by default."
+    | isDir |
+    isDir _ (Disk directoryClass on: targetPath) exists.
+    ^isDir
+        ifTrue: [self createDirectory: linkPath target: targetPath]
+        ifFalse: [self createFile: linkPath target: targetPath]! !
+
+!WindowsSymbolicLink methodsFor: 'testing'!
+
+exists
+    "Answer whether this symbolic link exists (not the target)"
+    ^self fileSystem isSymbolicLink: pathName! !
+
+!WindowsSymbolicLink methodsFor: 'operations'!
+
+delete
+    "Delete the symbolic link (not the target).
+     For symbolic links, use DeleteFile for file links, RemoveDirectory for directory links."
+    self targetType == #directory
+        ifTrue: [self primRemoveDirectory]
+        ifFalse: [self primDeleteFile]!
+
+retargetTo: newTargetPath
+    "Change the target of this symbolic link.
+     Windows doesn't support modifying symlinks, so we delete and recreate."
+    | wasDirectory |
+    wasDirectory _ self targetType == #directory.
+    self delete.
+    wasDirectory
+        ifTrue: [self class createDirectory: pathName target: newTargetPath]
+        ifFalse: [self class createFile: pathName target: newTargetPath].
+    targetPath _ newTargetPath.
+    targetType _ #unknown! !
+
+!WindowsSymbolicLink methodsFor: 'primitives'!
+
+primDeleteFile
+    "Primitive to delete file symbolic link"
+    <primitive: 122>
+    self error: 'Cannot delete symbolic link'!
+
+primRemoveDirectory
+    "Primitive to remove directory symbolic link"
+    <primitive: 127>
+    self error: 'Cannot delete symbolic link'! !
+
+WindowsSymbolicLink class
+    instanceVariableNames: ''!
 
 
 CodeController subclass: #AlwaysAcceptCodeController
@@ -6555,9 +8162,9 @@ getFile: aSymbol withPrompt: promptString do: actionBlock
 		action: [:fileName | fileName]
 		initialAnswer: ''.
 	fileName isEmpty
-		ifFalse: 
+		ifFalse:
 			[directory _ Disk.
-			(directory isLegalFileName: fileName)
+			(Disk isValidFileName: fileName)
 				ifTrue: [Cursor wait showWhile:
 							[actionBlock value: (directory perform: aSymbol with: fileName)]]
 				ifFalse: [Transcript cr; show: 'You specified an illegal file name.']]!
@@ -16444,720 +18051,17 @@ or: alternativeBlock
 !False methodsFor: 'printing'!
 printOn: aStream 
 	"Print false."
-	aStream nextPutAll: 'false'! !Object subclass: #File
-	instanceVariableNames: 'fileDirectory fileName pageCache serialNumber lastPageNumber binary readWrite error '
-	classVariableNames: ''
-	poolDictionaries: 'FilePool '
-	category: 'Files-Abstract'!
-File comment:
-'I am an abstract representation of a collection of FilePages and a reference to a FileDirectory which contains me.  My instance is usually uniquely identified both by an alphanumeric name (a String) and a serial number (a ByteArray).
+	aStream nextPutAll: 'false'! !
+
+"==================== Legacy File/FileDirectory/FilePage classes removed ===================="
+"The legacy page-based file system classes (Object subclass: #File, FileDirectory, FilePage)
+ have been deprecated and removed. Use the modern file system API instead:
+ - Disk (WindowsFileSystem instance) - entry point for file system operations
+ - File, Directory (abstract) - file system node abstractions  
+ - WindowsFile, WindowsDirectory (concrete) - Windows implementations
+ - WindowsFileStream - modern stream-based file I/O
+ - WindowsPath - path manipulation"
 
-According to this Smalltalk model, a File System consists of coordinated subclass definitions for FilePage, File, and FileDirectory.  User programs typically do not directly access a File or its FilePages but access it as a sequence of characters or bytes through a FileStream.
-
-Instance Variables:
-	fileName		<String>
-	serialNumber	<ByteArray>
-	fileDirectory	<FileDirectory>
-	lastPageNumber	<Integer>
-	binary			<Boolean> indicates binary or textual contents
-	readWrite		<Integer> tells if writing is allowed
-	error			<Symbol> an error condition
-	pageCache		not currently used.'!
-
-
-!File methodsFor: 'accessing'!
-size
-	"Answer the receiver's size in pages;  a file is a collection of pages."
-
-	lastPageNumber isNil 
-		ifTrue: [^self findLastPageNumber]
-		ifFalse: [^lastPageNumber]! !
-
-!File methodsFor: 'testing'!
-characterSize
-	"Answer the size of the receiver in characters.  The definitions 
-	characterSize and findLastPageNumber are circular;  a subclass must 
-	define either or both."
-
-	| page |
-	page _ self readPageNumber: self size.
-	^lastPageNumber - 1 * page dataSize + page size! !
-
-!File methodsFor: 'comparing'!
-match: aFile 
-	"Answer whether the two strings, the receiver's file name and that
-	of the argument, aFile, match.  (See String|match:)."
-	^self fileName match: aFile fileName! !
-
-!File methodsFor: 'converting'!
-asFileStream
-	"Answer a FileStream on the first page of the receiver."
-
-	self open.
-	^FileStream on: (self readOrAddPageNumber: 1)! !
-
-!File methodsFor: 'printing'!
-printOn: aStream 
-	fileName printOn: aStream! !
-
-!File methodsFor: 'nonhomogeneous accessing'!
-read: aFilePage 
-	"Read aFilePage if it exists, else answer false.  aFilePage contains a pageNumber and other
-	information, e.g., a serialNumber necessary to obtain the page.  It is possible that 
-	aFilePage pageNumber = 0 may or may not exist in some file systems. The pageNumber may
-	be used to compute a byte range to be read, or to lookup a disk address in a table.
-	In a file system where pages are linked, aFilePage may contain the address
-	of the next page and may help reveal lastPageNumber."
-
-	self subclassResponsibility!
-readOrAdd: aFilePage 
-	"Read aFilePage if it exists or extend File to create it as an empty page."
-
-	| pageNumber filePage |
-	filePage _ aFilePage.
-	pageNumber _ filePage pageNumber.
-	pageNumber <= lastPageNumber ifTrue: [^self read: filePage].
-	(lastPageNumber + 1 to: pageNumber - 1)
-		do: ["write full intermediate pages"
-			filePage pageNumber: pageNumber.
-			filePage _ self write: filePage].
-	"return an empty last page"
-	filePage pageNumber: pageNumber.
-	filePage size: 0.
-	^filePage!
-readPageNumber: aPageNumber 
-	"Create a FilePage for page number, aPageNumber, and read into it."
-
-	^self read: (self initPageNumber: aPageNumber)!
-write: aFilePage
-	"Write aFilePage, one that has been read or created (see File|readOrAdd:).
-	If aFilePage pageNumber < lastPageNumber, make sure page is full.
-	If aFilePage pageNumber = (lastPageNumber+1), then update file length.
-	Page numbers greater than lastPageNumber+1 are illegal (use File|readOrAdd:).
-
-	Answer the result of writing the page.  In some implementations, at end of file,
-	the next empty page is also written and answered."
-
-	self subclassResponsibility! !
-
-!File methodsFor: 'file accessing'!
-beSnapshotFile
-	self subclassResponsibility!
-directory
-	"Answer the directory in which the receiver is referenced."
-	^fileDirectory!
-directory: aFileDirectory 
-	"Set the directory in which the receiver is referenced to be aFileDirectory."
-	fileDirectory _ aFileDirectory!
-endFile: aFilePage 
-	"Make the file end with aFilePage, i.e., remove all file pages after 
-	aFilePage, and answer the result of writing aFilePage (File|write:). If the argument is
-	nil, delete all of the receiver's pages."
-
-	self subclassResponsibility!
-fileName
-	"Answer the name of the receiver."
-	^fileName!
-fileName: aFileName 
-	"Set the name of the receiver to be aFileName."
-	fileName _ aFileName!
-fullName
-	"Answer the name of the receiver, including directory names if necessary."
-	^self directory fullName, self fileName!
-rename: newFileName 
-	"Change the name of the receiver to be newFileName."
-
-	fileDirectory rename: self newName: newFileName! !
-
-!File methodsFor: 'file testing'!
-isBinary
-	"Answer whether the information in the receiver is stored in binary format."
-	^binary!
-isText
-	"Answer whether the information in the receiver is stored as ascii characters."
-	^binary == false! !
-
-!File methodsFor: 'file modes'!
-binary
-	"Set the receiver's contents to be in binary format."
-	binary _ true!
-readWrite
-	"Answer the read/write status of the receiver."
-	^readWrite!
-readWrite: statusInteger 
-	"Set the read/write status of the receiver to be statusInteger."
-	readWrite _ statusInteger!
-text
-	"Set the receiver's contents to be in ascii character format."
-	binary _ false! !
-
-!File methodsFor: 'file status'!
-close
-	"Close the receiver.  Subclasses may wish to update the leader page."
-	self subclassResponsibility!
-open
-	"Open the receiver."
-	self findLastPageNumber!
-reinitialize
-	"Reset the receiver to its initial status."
-	lastPageNumber _ nil.
-	error _ ''.
-	serialNumber _ ByteArray new: 4.
-	"text mode is default"
-	binary isNil ifTrue: [binary _ false]!
-release
-	"Release the receiver.  This is a more forgiving version of close 
-	and should always be possible even if close isn't desired or doesn't work."
-
-	self subclassResponsibility!
-reopen
-	"Reopen the receiver by possibly looking it up in a file directory and then opening."
-
-	self sameAsStoredFile
-		ifFalse: 
-			[self reinitialize.
-			fileDirectory findOrAdd: self].
-	self open! !
-
-!File methodsFor: 'page accessing'!
-serialNumber
-	"Answer the receiver's serial number."
-	^serialNumber!
-serialNumber: aSerialNumber 
-	"Set the receiver's serial number to be aSerialNumber."
-	serialNumber _ aSerialNumber! !
-
-!File methodsFor: 'error handling'!
-error
-	"Answer a Symbol indicating the last error condition."
-	^error!
-error: e 
-	"Construct an error message using the argument, e."
-
-	| s errorString |
-	s _ WriteStream on: (String new: 50).
-	s nextPutAll: fileName.
-	s nextPutAll: ' '.
-	s nextPutAll: e.
-	s nextPutAll: ', '.
-	s nextPutAll: error.
-	errorString _ s contents.
-	error _ ''.
-	^super error: errorString!
-errorString: anInteger 
-	"Construct an error string corresponding to the error code, anInteger."
-	self subclassResponsibility! !
-
-!File methodsFor: 'file/page/directory implementation'!
-doCommand: command page: aFilePage error: errorString 
-	"The argument, command, is typically read or write; 
-	page is a FilePage containing data and possibly other information;
-	errorString is a String to include in an error message 
-	(or if it is nil, no error is to be reported). 
-	 
-	Execute some disk primitive (which is usually another message). 
-	 
-	Answer aFilePage if successful. If an error occurs, answer false if errorString is nil. 
-	Otherwise, create an error message with errorString."
-
-	self subclassResponsibility!
-initPage: aFilePage 
-	"Initialize the argument, aFilePage."
-
-	aFilePage reinitialize.
-	aFilePage serialNumber: serialNumber.
-	^aFilePage!
-initPageNumber: aPageNumber 
-	"Create and initialize the file page with page number, aPageNumber;
-	serial number that of the receiver.  Answer the new FilePage."
-
-	| aFilePage |
-	aFilePage _ self pageClass new file: self page: nil.
-	binary
-		ifTrue: [aFilePage binary]
-		ifFalse: [aFilePage text].
-	aFilePage pageNumber: aPageNumber.
-	aFilePage serialNumber: serialNumber.
-	^aFilePage!
-lastPageNumber
-	"Answer the number of the last page of the receiver."
-	^self size!
-size: aPageNumber 
-	"Set the last page number of the receiver to be aPageNumber."
-	lastPageNumber _ aPageNumber! !
-
-!File methodsFor: 'private'!
-findLastPageNumber
-	"set and answer with the page number of my last page. 
-	see circularity comment for characterSize"
-
-	^lastPageNumber _ self pageNumberFrom: self size!
-pageClass
-	"answer with the appropriate subclass of FilePage which I contain"
-
-	self subclassResponsibility!
-pageNumberFrom: characterIndex 
-	"compute a page number from a character index"
-
-	^characterIndex - 1 // self pageClass new dataSize + 1!
-readOrAddPageNumber: aPageNumber 
-	"create aFilePage and read or extend into it"
-
-	^self readOrAdd: (self initPageNumber: aPageNumber)!
-sameAsStoredFile
-	"Answer true if File instance is correct enough so that it doesn't have to be 
-	reinitialized.  This allows reopen to go more quickly for certain 
-	implementations.  For example, in a local file system, a write date and time 
-	may guarantee that it hasn't changed since we closed this file.  This is the 
-	default. "
-
-	^false! !
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
-File class
-	instanceVariableNames: ''!
-
-
-!File class methodsFor: 'class initialization'!
-initialize
-	"Initialize FilePool with file mode constants.
-	 Note: Check if FilePool already exists (cold start pre-creates it with canonical Associations)."
-
-	(Smalltalk includesKey: #FilePool) ifFalse: [
-		Smalltalk at: #FilePool put: (FilePool _ Dictionary new)].
-	FilePool at: #Read put: 1.
-	FilePool at: #Write put: 2.
-	FilePool at: #Shorten put: 3.
-
-	"Install Disk as GLOBAL variable (not just pool variable) since it's a system-wide
-	 resource used by many classes that don't have FilePool in their poolDictionaries."
-	Smalltalk at: #Disk put: WindowsDirectory default! !
-
-!File class methodsFor: 'documentation'!
-documentation
-	"Subclasses of File are expected to implement the following messages.  Unless 	otherwise indicated, they are provided as self subclassResponsibilty
-
-	testing
-		[optional] characterSize
-
-	fileStream accessing	
-		read:
-		write:
-
-	file accessing 
-		endFile:
-
-	file status
-	(these are implemented as returning self) 
-		close
-		release
-
-	error handling 
-		errorString:
-
-	file/page/directory implementation
-		doCommand:page:error:
-
-	private
-		[optional] findLastPageNumber 
-			(this has an implementation but is circular with characterSize 
-				so one or both must be reimplemented)
-		pageClass
-
-"! !
-
-File initialize!
-Object subclass: #FileDirectory
-	instanceVariableNames: 'directoryName closed '
-	classVariableNames: 'ExternalReferences '
-	poolDictionaries: 'FilePool '
-	category: 'Files-Abstract'!
-FileDirectory comment: 'A FileDirectory is uniquely identified by the device or server that it refers to. A FileDirectory is a collection of Files.  It may also be found in some other dictionary or FileDirectory, though often this is implicit'!
-
-
-!FileDirectory methodsFor: 'testing'!
-includes: aFile
-	"Answer whether aFile is in the receiver's list of files."
-	^(self find: aFile) notNil!
-includesKey: aFileName
-	"Answer whether a file whose name is aFileName is included in the receiver."
-	| file |
-	file _ self find: (self initFileName: aFileName).
-	file notNil ifTrue:
-		[file release. "close the IFS connection, if an IFS leaf file"
-		^true].
-	^false! !
-
-!FileDirectory methodsFor: 'adding'!
-add: aFile 
-	"Add the file, aFile, to the receiver.   This creates a new version of the file rather than generating an error if a file with the same name exists."
-
-	| old file |
-	file _ aFile.
-	self versionNumbers
-		ifTrue: 
-			["ignore explicit version and directory will create a next version"
-			file _ self initFileName: (file fileName copyUpTo: $!!)]
-		ifFalse: 
-			[(self find: file) notNil
-				ifTrue: 
-					["otherwise, if file already exists, 
-					  rename it to name$, deleting that file first if it exists"
-					old _ self initFileName: (file fileName copyWith: $$).
-					self remove: old ifAbsentDo: [:f | false].
-					self rename: file newName: old fileName.
-					file fileName: (file fileName copyUpTo: $$).
-					(self find: file) notNil ifTrue: [file error: 'insert/rename ??']]].
-	self addNew: file.
-	^file!
-addKey: aFileName 
-	"If a file whose name is aFileName exists and the receiver does not know how
-	to create a new version, the create an error.  Otherwise create a new empty file."
-
-	^self add: (self initFileName: aFileName)!
-addNew: aFile
-	"Add the argument, aFile, as a new file in the receiver."
-	self subclassResponsibility! !
-
-!FileDirectory methodsFor: 'removing'!
-remove: aFile
-	"Remove aFile if found in the receiver.  Create an error if it is not."
-
-	^self remove: aFile ifAbsentDo: [:f | f error: 'file not found']!
-remove: aFileName ifAbsentDo: aBlock 
-	"Remove aFile if found in the receiver.  Answer the result of evaluating aBlock if the file is not found."
-
-	| f |
-	f _ self find: aFileName ifAbsentDo: aBlock.
-	f notNil
-		ifTrue: [^self removeOld: f]
-		ifFalse: [^aBlock value: f]!
-removeOld: aFile 
-	"If aFile exists, remove it."
-
-	self subclassResponsibility! !
-
-!FileDirectory methodsFor: 'enumerating'!
-do: aBlock 
-	"Sequence over all possible files in the receiver, evaluating aBlock for each one."
-
-	| aFile |
-	self reset.
-	[aFile _ self next.
-	aFile notNil]
-		whileTrue: [aBlock value: aFile]!
-reset
-	"Set to the beginning of the directory."
-	self subclassResponsibility! !
-
-!FileDirectory methodsFor: 'accessing'!
-directoryName
-	"Answer the name of the receiver."
-	^directoryName!
-fullName
-	"Answer the name of the receiver in a form recognized when parsing file names (i.e., using [...]).  May be empty for a default directory."
-	^''!
-next
-	"Answer the next file instance in the receiver (part of the streaming protocol)."
-	self subclassResponsibility!
-versionNumbers
-	"Answer true if versions numbers are supported."
-
-	^false		"this is the default"! !
-
-!FileDirectory methodsFor: 'dictionary removing'!
-removeKey: aFileName 
-	"Remove and answer the file whose name is aFileName;  create an error if not
-	found."
-	^self
-		remove: (self initFileName: aFileName)
-		ifAbsentDo: [:f | f error: 'file not found']! !
-
-!FileDirectory methodsFor: 'printing'!
-listFilesOn: aStream 
-	"Write a list of each file name in the receiver onto the stream, aStream."
-	self do: 
-		[:aFile | 
-		aStream cr.
-		aFile fileName printOn: aStream]!
-printOn: aStream 
-	aStream nextPutAll: 
-		(self closed
-			ifTrue: ['a closed ']
-			ifFalse: ['an open ']).
-	aStream nextPutAll: self class name.
-	aStream nextPutAll: ' on '.
-	directoryName printOn: aStream! !
-
-!FileDirectory methodsFor: 'file accessing'!
-checkName: aFileName fixErrors: aBoolean 
-	"Check a string aFileName for validity as a file name.  If there are problems 
-	(e.g., illegal length or characters) and aBoolean is false, create an error;  if 
-	there are problems and aBoolean is true, make the name legal (usually by 
-	truncating and/or tranforming characters) and answer the new name.  Otherwise, 
-	answer the name.  Default behavior is to get rid of ending period.  
-	Subclasses can do any kind of checking they want and answer either the 
-	name, or false if no good."
-
-	aFileName isEmpty ifTrue: [aBoolean ifFalse: [self error: 'file name empty']].
-	aFileName last = $.
-		ifTrue: 
-			[aBoolean ifFalse: [self error: 'file name ends in .'].
-			^aFileName copyFrom: 1 to: aFileName size - 1]
-		ifFalse: [^aFileName]!
-checkNameOfFile: aFileName
-	"See FileDirector|checkNameOfFile: aFileName fixErrors: false."
-	^self checkNameOfFile: aFileName fixErrors: false!
-checkNameOfFile: aFile fixErrors: aBoolean 
-	"See FileDirectory|checkNameOfFile: aFileName fixErrors: aBoolean.  The first argument
-	is the name of the file, aFile."
-	^self checkName: aFile fileName fixErrors: aBoolean!
-file: aFileName 
-	"Answer a FileStream on an old or new File whose name is aFileName."
-
-	^(self findOrAddKey: aFileName) asFileStream!
-fileClass
-	"Answer the proper subclass of File of which the files in the receiver are instances."
-
-	self subclassResponsibility!
-filesMatching: pattern 
-	"Answer an Array of the names of files that match the string, pattern."
-	| names name |
-	names _ WriteStream on: (Array new: 10).
-	self do: 
-		[:each |
-		name _ each fileName.
-		(pattern match: name)
-			ifTrue:
-				[name last = $. ifTrue: [name _ name copyFrom: 1 to: name size - 1].
-				names nextPut: name]].
-	^names contents!
-isLegalFileName: aString 
-	"Answer whether aString is a legal file name."
-	^(self checkName: aString fixErrors: true) = aString!
-isLegalOldFileName: aString 
-	"Answer whether aString is a legal file name."
-
-	^(self checkName: aString fixErrors: true) = aString
-		and: [self includesKey: aString]!
-newFile: aFileName 
-	"Answer a FileStream on a new File whose name is aFileName;  error if the
-	argument is not a new file name."
-
-	^(self addKey: aFileName) asFileStream!
-oldFile: aFileName 
-	"Answer a FileStream on an old File whose name is aFileName;  error if the
-	argument is not an old name."
-
-	^(self findKey: aFileName) asFileStream!
-rename: aFile newName: newName 
-	"Rename the file, aFile, to have the name newName.  Create an
-	error if a file by the name, newName, already exists."
-	self subclassResponsibility! !
-
-!FileDirectory methodsFor: 'file testing'!
-closed
-	"Answer whether the receiver is closed."
-	^closed! !
-
-!FileDirectory methodsFor: 'file status'!
-close
-	"Close the receiver if it is not already closed."
-	closed
-		ifFalse: 
-			[ExternalReferences remove: self ifAbsent: [].
-			self release]!
-flush
-	"Write any state on local storage."
-
-	self subclassResponsibility!
-open
-	"Open the directory."
-
-	closed _ false.
-	(ExternalReferences includes: self)
-		ifFalse: [ExternalReferences addLast: self]!
-release
-	"Release the receiver. a more forgiving version of close 
-	which should always be possible even if close isn't desired or doesn't work."
-
-	closed _ true! !
-
-!FileDirectory methodsFor: 'file copying'!
-retrieve: aFileName 
-	"Copy the file whose name is aFileName to itself.  Subclasses may want to overwrite this to
-	redirect the directory on which a file of the same name is copied.  See 
-	FileDirectory|retrieveFrom:copyTo:."
-	^self retrieveFrom: aFileName copyTo: aFileName!
-retrieveFrom: aFileName1 copyTo: aFileName2 
-	"Copy file whose name is aFileName1 (usually from this receiver) to a file
-	whose name is aFileName2 (usually a local directory)."
-
-	| f1 f2 |
-	f1 _ self oldFile: aFileName1.
-	f1 readOnly.
-	f2 _ self file: aFileName2.
-	f2 nextPutAll: f1.
-	f2 close.
-	f1 close!
-store: aFileName 
-	"Store the file whose name is aFileName to itself.  Subclasses may want to overwrite this to
-	redirect the directory on which a file of the same name is copied.  See 
-	FileDirectory|storeFrom:copyTo:."
-	^self storeFrom: aFileName copyTo: aFileName!
-storeFrom: aFileName1 copyTo: aFileName2 
-	"Copy file whose name is aFileName1 (usually from a local directory) to a file
-	whose name is aFileName2 (usually on the receiver)."
-
-	| f1 f2 |
-	f1 _ self oldFile: aFileName1.
-	f1 readOnly.
-	f2 _ self file: aFileName2.
-	f2 nextPutAll: f1.
-	f2 close.
-	f1 close! !
-
-!FileDirectory methodsFor: 'page accessing'!
-allocate: aFilePage after: virtualDiskAddress 
-	"Answer aFilePage with its real disk address field filled in."
-
-	self subclassResponsibility!
-allocateSN: aFile 
-	"Allocate a new serial number for the file, aFile."
-
-	self subclassResponsibility!
-deallocate: aFilePage 
-	"Deallocate aFilePage at some real disk address."
-
-	self subclassResponsibility!
-freePages
-	"Answer the number of free pages remaining."
-
-	self subclassResponsibility!
-newPage
-	"Create a dummy file and a page from it."
-
-	^(self initFileName: '') initPageNumber: 0! !
-
-!FileDirectory methodsFor: 'private'!
-find: aFile 
-	^self find: aFile ifAbsentDo: [:f | nil]!
-find: aFile ifAbsentDo: aBlock 
-	"return aFile (partially initialized) if found, otherwise false. 
-	this is a default implementation"
-
-	| fname |
-	"check file name"
-	fname _ self checkNameOfFile: aFile.
-	aFile fileName: fname.
-	"iterate through non-deleted entries of directory, 
-	and return partially initialized file if found"
-	self do: [:each | (fname sameAs: each fileName) ifTrue: [^each]].
-	"failure"
-	^aBlock value: aFile!
-findKey: aFileName 
-	^self
-		find: (self initFileName: aFileName)
-		ifAbsentDo: [:file | file error: 'file not found']!
-findOrAdd: aFile 
-	"find an old file if it exists, or create one"
-
-	| f |
-	(f _ self find: aFile) notNil
-		ifTrue: [^f]
-		ifFalse: [^self addNew: aFile]!
-findOrAddKey: t1 
-	^self findOrAdd: (self initFileName: t1)!
-initFile: aFile 
-	aFile reinitialize.
-	^aFile!
-initFileName: aFileName 
-	| aFile |
-	aFile _ self fileClass new.
-	aFile directory: self.
-	aFile fileName: aFileName.
-	aFile reinitialize.
-	^aFile!
-setDirectory: aFileDirectory directoryName: aString 
-	"assume that the directory is implicit"
-
-	directoryName _ aString.
-	closed _ true! !
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
-FileDirectory class
-	instanceVariableNames: ''!
-
-
-!FileDirectory class methodsFor: 'class initialization'!
-initialize
-	self initializeExternalReferences
-	"FileDirectory initialize"! !
-
-!FileDirectory class methodsFor: 'instance creation'!
-directory: aFileDirectory directoryName: aString 
-	"Answer an instance of me in directory aFileDirectory whose name is aString."
-
-	^self new setDirectory: aFileDirectory directoryName: aString!
-directoryFromName: fileDesignator setFileName: localNameBlock
-	"Delegate to the actual Disk implementation for proper path parsing."
-
-	^Disk class directoryFromName: fileDesignator setFileName: localNameBlock! !
-
-!FileDirectory class methodsFor: 'external reference access'!
-addExternalReference: anElement 
-	"Add anElement as a file that is currently referenced in the system."
-	(ExternalReferences includes: anElement)
-		ifFalse: [ExternalReferences addLast: anElement]!
-initializeExternalReferences
-	"ExternalReferences is an OrderedCollection of the files that are referenced
-	in the system.  Initialize this class variable."
-	ExternalReferences _ OrderedCollection new!
-releaseExternalReferences
-	"Remove and release all of the files referenced by the collection ExternalReferences."
-	[ExternalReferences isEmpty]
-		whileFalse: [ExternalReferences removeLast release]!
-removeExternalReference: anElement 
-	"Remove anElement as a file that is currently referenced in the system."
-	ExternalReferences remove: anElement ifAbsent: []! !
-
-!FileDirectory class methodsFor: 'documentation'!
-documentation 
-	"subclasses are expected to implement the following messages which are
-	implemented as self subclassResponsibility unless otherwise noted.
-
-	file accessing
-		fileClass
-		[optional] rename:newName:
-		[default] checkNameOfFile:
-			(default makes no sense to me; for the abstract anything is okay)
-
-	file status
-		[optional] flush
-
-	page accessing
-		[optional] allocate:after:
-		[optional] allocateSN
-		[optional] deallocate:
-		[optional] freePages
-
-	dictionary adding
-		addNew: 
-
-	dictionary removing
-		removeOld:
-
-	dictionary enumerating
-		[optional] next
-		[default] do: 
-		[optional] reset
-
-	directory accessing
-		[default] versionNumbers
-
-"! !
-
-FileDirectory initialize!
 FileModel subclass: #FileList
 	instanceVariableNames: 'list myPattern isReading '
 	classVariableNames: 'FileMenu PatternMenu '
@@ -17188,7 +18092,7 @@ acceptPattern: aText from: aController
 				ifTrue: [testPattern _ testPattern copyFrom: 1 to: testPattern size-1].
 			(testPattern includes: $*) | (testPattern includes: $#)
 				ifTrue: [newList addAll: (self filesMatching: testPattern)]
-				ifFalse: [(self isLegalFileName: testPattern)
+				ifFalse: [(Disk isValidFileName: testPattern)
 							ifTrue: [newList add: testPattern]]].
 		list _ newList.
 		list isEmpty
@@ -17213,7 +18117,7 @@ deleteFile
 	"Remove the selected file from its directory."
 
 	| dir localName |
-	dir _ FileDirectory directoryFromName: fileName setFileName: [:localName].
+	dir _ Disk directoryFromName: fileName setFileName: [:ln | localName _ ln].
 	(dir includesKey: localName)
 		ifTrue: [(self confirm: 'really remove the selected file?') ifFalse: [^self].
 	dir removeKey: localName].
@@ -17246,7 +18150,7 @@ getFile
 isSelected
 	^isReading!
 renameFile
-	| newList newName continue |
+	| newList newName continue dir localName newLocalName |
 	fileName == nil ifTrue: [^nil].
 	self changeRequest ifFalse: [^nil].
 	continue _ true.
@@ -17255,15 +18159,17 @@ renameFile
 		newName isEmpty ifTrue: [^nil].
 		newName last = $.
 			ifTrue: [newName _ newName copyFrom: 1 to: newName size-1].
-		((self isLegalFileName: newName) and: [(Disk includesKey: newName) not])
+		dir _ Disk directoryFromName: newName setFileName: [:ln | newLocalName _ ln].
+		((Disk isValidFileName: newLocalName) and: [(dir includesKey: newLocalName) not])
 			ifTrue: [continue _ false]
 			ifFalse: [(BinaryChoice message: 'File exists or bad file name. Try again?')
 						ifFalse: [^nil]]].
 	Cursor execute showWhile:
 		[newList _ list copyWithout: fileName.
-		(Disk includesKey: fileName)
+		dir _ Disk directoryFromName: fileName setFileName: [:ln | localName _ ln].
+		(dir includesKey: localName)
 			ifTrue:
-				[Disk rename: (Disk file: fileName) file newName: newName].
+				[dir rename: (dir fileAt: localName) newName: newLocalName].
 		fileName _ newName.
 		newList add: fileName.
 		list _ newList.
@@ -17275,15 +18181,9 @@ filesMatching: pattern
 	"Answer a list of file names matching the pattern string.  Do this by asking the appropriate directory."
 
 	| dir nameBody matches |
-	dir _ FileDirectory directoryFromName: pattern setFileName: [:nameBody].
+	dir _ Disk directoryFromName: pattern setFileName: [:nb | nameBody _ nb].
 	matches _ dir filesMatching: nameBody.
 	^matches!
-isLegalFileName: pattern
-	"Answer whether pattern is a valid file name.  Do this by asking the appropriate directory."
-
-	| dir nameBody |
-	dir _ FileDirectory directoryFromName: pattern setFileName: [:nameBody].
-	^dir isLegalFileName: pattern!
 list: aList
 	list _ aList.
 	isReading _ false! !
@@ -17355,7 +18255,7 @@ Instance Variables:
 text
 	| dir localName |
 	fileName == nil ifTrue: [^nil].
-	dir _ FileDirectory directoryFromName: fileName setFileName: [:localName].
+	dir _ Disk directoryFromName: fileName setFileName: [:ln | localName _ ln].
 	(dir includesKey: localName) ifFalse:		"don't create file"
 		[^'-new file-' asText emphasizeFrom: 2 to: 9 with: 3].
 	^Cursor read showWhile:
@@ -17439,315 +18339,30 @@ open: aFileModel named: aString withController: aController
 
 !FileModel class methodsFor: 'initialization'!
 flushMenus 
-	TextMenu _ nil! !Object subclass: #FilePage
-	instanceVariableNames: 'file page binary '
-	classVariableNames: ''
-	poolDictionaries: 'FilePool '
-	category: 'Files-Abstract'!
-FilePage comment:
-'I represent a fixed size page or record of data from a File.  My instance is uniquely identified within its File by its pageNumber.
+	TextMenu _ nil! !
 
-The normal layout of a FilePage is as a ByteArray, which begins with some header information (e.g. serial number, page number, size), some data with possible leftover allocation, and some trailer information: pageSize = headerSize + size + (dataSize - size) + trailerSize.  In the current implementations, all FilePages (except possibly the last page) of a File are full (i.e. no unused data allocation).  This assumption is also reflected in File characterSize, and in FileStream positioning methods.  Given the current implementation of ByteArrays and Strings, each page has a type (binary or text).  The messages asStream: and fromStream: do the necessary conversion. 
+"==================== FilePage class removed ===================="
+"The legacy FilePage class has been deprecated and removed.
+ Use WindowsFileStream for modern stream-based file I/O."
 
-Instance Variables:
-	file		<File> that contains the instance
-	page	<Integer> the number of the instance
-	binary 	<Boolean> true if content of page is binary, else it is text
-'!
-
-
-!FilePage methodsFor: 'accessing'!
-at: aByteIndex 
-	"Answer the data byte associated with aByteIndex."
-
-	^page at: (self dataIndex: aByteIndex size: 1)!
-at: aByteIndex put: aByte 
-	"Put the date byte, aByte, at location aByteIndex.  Answer aByte."
-	^page at: (self dataIndex: aByteIndex size: 1) put: aByte!
-size
-	"Answer the number of data characters the receiver contains 
-	(0 <= self size <= self dataSize)"
-
-	^self subclassResponsibility!
-wordAt: aWordIndex 
-	"Answer the data word associated with aWordIndex."
-
-	^page wordAt: (self dataIndex: aWordIndex size: 2)!
-wordAt: aWordIndex put: aWord 
-	"Put aWord at location aWordIndex.  Answer aWord."
-	^page wordAt: (self dataIndex: aWordIndex size: 2) put: aWord! !
-
-!FilePage methodsFor: 'testing'!
-isEmpty
-	"Answer whether this page has no data."
-
-	^self size = 0! !
-
-!FilePage methodsFor: 'converting'!
-asFileStream: aStream 
-	"Initialize aStream (typically a FileStream) to access the data portion of the receiver 
-	-- this is the normal way to access characters and words. 
-	Pages which segment data and header can do this differently."
-
-	| offset len sourceData destData |
-	len _ self size.
-	offset _ self headerSize.
-	sourceData _ self dataString.
-	binary 
-		ifTrue: [^aStream
-					on: sourceData
-					from: offset + 1
-					to: offset + len"self dataBeginning"
-					"self dataEnd"].
-	destData _ String new: self dataSize.
-	destData replaceFrom: 1 to: len withByteArray: sourceData startingAt: offset+1.
-	^aStream on: destData from: 1 to: len!
-fromFileStream: aStream 
-	"Copy data into page; pages which separate data and header can do this differently"
-	| sourceData destData offset |
-	binary 
-		ifFalse: 
-			[offset _ self headerSize.
-			sourceData _ aStream contents.
-			destData _ self dataString.
-			destData
-				replaceFrom: offset + 1
-				to: offset+ self size
-				withString: sourceData
-				startingAt: 1]! !
-
-!FilePage methodsFor: 'nonhomogeneous accessing'!
-headerWordAt: n 
-	"Answer the n-th header word;  default is that it is at the beginning of 
-	page."
-
-	^page wordAt: n!
-headerWordAt: n put: v 
-	"Set and answer n-th header word."
-
-	^page wordAt: n put: v!
-pageWordAt: aWordIndex 
-	"Answer the word associated with aWordIndex in the page as a whole, 
-	ignoring header, data and trailer boundaries"
-
-	^page wordAt: aWordIndex!
-pageWordAt: aWordIndex put: aWord 
-	"Set and answer the word associated with aWordIndex in the page as a whole, 
-	ignoring header, data and trailer boundaries."
-
-	^page wordAt: aWordIndex put: aWord!
-readPageNumber: aPageNumber 
-	"Answer the result of file reading a page into the receiver."
-
-	self pageNumber: aPageNumber.
-	self size: 0.
-	^file read: self!
-write
-	"Answer the result of writing the receiver onto its file."	
-	^file write: self! !
-
-!FilePage methodsFor: 'file accessing'!
-endFile
-	"Answer the result of making the receiver be the last page of its file."
-
-	^file endFile: self!
-file
-	"Answer with the receiver's file."
-
-	^file! !
-
-!FilePage methodsFor: 'file testing'!
-isBinary
-	"Answer whether the information in the receiver is stored in binary format."
-	^binary!
-isText
-	"Answer whether the information in the receiver is stored as ascii characters."
-	^binary == false! !
-
-!FilePage methodsFor: 'file modes'!
-binary
-	"Set the receiver's information type to be binary."
-	binary _ true!
-text
-	"Set the receiver's information type to be ascii characters."
-	binary _ false! !
-
-!FilePage methodsFor: 'file status'!
-reinitialize
-	"Reset the receiver to its initial status."
-	page == nil ifTrue: [page _ self allocatePage].
-	self size: 0!
-reopen
-	"Reopen the receiver's file and reinitialize the receiver onto it."
-
-	file reopen.
-	file initPage: self! !
-
-!FilePage methodsFor: 'page initialization'!
-file: aFile 
-	"Set the receiver's file to be aFile."
-	file _ aFile!
-file: aFile page: aByteArray 
-	"Set the receiver's file to be aFile, and its page to contain aByteArray."
-	file _ aFile.
-	page _ aByteArray.
-	self reinitialize!
-page: aByteArray 
-	"Set the receiver's page to contain aByteArray."
-	page _ aByteArray! !
-
-!FilePage methodsFor: 'page accessing'!
-address
-	"Answer the disk address for the receiver.  This need only be defined for 
-	those subclasses which have access to an address, probably for local 
-	disks and not for remote file servers"
-
-	self subclassResponsibility!
-address: addressNumber
-	"Set the receiver's disk address."
-
-	self subclassResponsibility!
-dataBeginning
-	"Answer the index in the receiver for the first element of data-1."
-
-	binary
-		ifTrue: [^self headerSize]
-		ifFalse: [^0]!
-dataEnd
-	"Answer the character index for the last character of actual data."
-
-	^self dataBeginning + self size!
-dataEnd: aPageIndex 
-	"Set the end of the data in the receiver."
-
-	^self size: aPageIndex - self dataBeginning!
-dataMaxEnd
-	"Answer the maximum possible data byte index."
-
-	^self dataBeginning + self dataSize!
-dataString
-	"Answer a string containing the data."
-
-	^page!
-page
-	"Answer the receiver's page"
-
-	^page!
-pageNumber
-	"Answer the receiver's page number, an Integer."
-
-	^self subclassResponsibility!
-pageNumber: anInteger 
-	"Set the receiver's page number."
-
-	^self subclassResponsibility!
-serialNumber
-	"Answer the serial number of the receiver's page."
-
-	^file serialNumber!
-serialNumber: aSN
-	"Set the serial number of the receiver's page."
-
-	^self subclassResponsibility! !
-
-!FilePage methodsFor: 'page testing'!
-dataSize
-	"Answer the maximum size of data (in characters) in the receiver's page."
-	^512!
-headerSize
-	"Answer the size of the receiver's header in characters."
-
-	^0!
-isFull
-	"Answer whether the receiver has no more room at the end for more data."
-	^self size = self dataSize!
-lastPage
-	"Answer whether the receiver is at the last page in its file."
-
-	^self pageNumber >= file lastPageNumber!
-pageSize
-	"Answer the total size of the receiver's page, in bytes."
-
-	^self headerSize + self dataSize + self trailerSize!
-trailerSize
-	"Answer the size of trailer in bytes."
-
-	^0! !
-
-!FilePage methodsFor: 'file/page/directory implementation'!
-doCommand: command error: s 
-	"Answer the result of executing a command on the receiver."
-
-	^file doCommand: command page: self error: s!
-size: aByteIndex 
-	"Set the number of data characters the receiver contains to be aByteIndex. 
-	aByteIndex <= dataSize on last page; aByteIndex = dataSize on earlier 
-	pages)."
-
-	^self subclassResponsibility! !
-
-!FilePage methodsFor: 'private'!
-allocatePage
-	"allocate a page buffer"
-
-	^ByteArray new: self pageSize"this is a default"!
-dataIndex: index size: nBytes 
-	"Answer with an index offset properly into page, unless index would be 
-	out of bounds.   nBytes = 1 for characters; nBytes = 2 for words"
-
-	(index > 0 and: [index <= (self size // nBytes)])
-		ifTrue: [^(self headerSize // nBytes) + index]
-		ifFalse: [self error: 'index out of bounds']!
-readOrAddPageNumber: aPageNumber 
-	"answer with the result of file reading a page or creating a page into me"
-
-	self pageNumber: aPageNumber.
-	self size: 0.
-	^file readOrAdd: self! !
-"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
-
-FilePage class
-	instanceVariableNames: ''!
-
-
-!FilePage class methodsFor: 'documentation'!
-documentation
-	"My subclasses are expected to implement the following messages.  These are
-	provided as self subclassResponsibility.  Some are optional for implementation,
-	depending on the representation of the actual file page;  for some, defaults are
-	provided.
-
-	testing
-		size
-	page initialization
-		pageNumber:
-	page accessing
-		[optional] address
-		[optional] address:
-		[optional] pageNumber
-		[optional] pageNumber:
-		[optional] serialNumber:
-	page testing
-		[default] dataSize
-		[default] headerSize
-		[default] trailerSize
-	file/page/directory implementation
-		size:
-"! !ExternalStream subclass: #FileStream
+ExternalStream subclass: #FileStream
 	instanceVariableNames: 'page rwmode closed '
 	classVariableNames: ''
 	poolDictionaries: 'FilePool '
 	category: 'Files-Streams'!
 FileStream comment:
-'I represent a Stream that accesses a FilePage from a File.  One use for my instance is to access larger "virtual Strings" than can be stored contiguously in main memory.  I restrict the objects stored and retrieved to be Integers or Characters.  An end of file pointer terminates reading;  it can be extended by writing past it, or the file can be explicitly truncated.
+'I provide stream-based access to files. My class methods (fileNamed:, newFileNamed:, oldFileNamed:)
+delegate to WindowsFileStream for modern stream-based file I/O.
 
-To use the file system for most applications, you typically create a FileStream.  This is done by sending a message to a FileDirectory (file:, oldFile:, newFile:, rename:newName:) which creates an instance of me.  Accesses to the file are then done via my instance.
+To use the file system, send one of my class methods:
+  FileStream fileNamed: aPath      - open for read/write
+  FileStream newFileNamed: aPath   - create/truncate for writing
+  FileStream oldFileNamed: aPath   - open existing for reading
 
-Instance variables
-	page			<FilePage> the current FilePage being accessed
-	rwmode			<Integer> denoting readOnly, readWrite, or readWriteShorten.
-					readWriteShorten with textual contents is the default.
-	closed			<Boolean> false if the file is open'!
+All class methods return a WindowsFileStream instance which provides the actual I/O.
+
+Note: The legacy instance methods using FilePage are deprecated. Use WindowsFileStream directly
+for new code, or use the class methods which delegate to WindowsFileStream.'!
 
 
 !FileStream methodsFor: 'accessing'!
@@ -18062,7 +18677,7 @@ close
 			closed _ true.
 			readLimit _ writeLimit _ 0.
 			self file close.
-			FileDirectory removeExternalReference: self]!
+			WindowsDirectory removeExternalReference: self]!
 flush
 	"Write the current page back onto the file."
 	self closed
@@ -18126,7 +18741,7 @@ on: aFilePage
 		ifTrue: [page _ page page].
 	page asFileStream: self.
 	closed _ false.
-	FileDirectory addExternalReference: self!
+	WindowsDirectory addExternalReference: self!
 position: objpos size: size 
 	"set the current character position and the current page 
 	from the position of an object of a given size (see positionSize:)"
@@ -20032,15 +20647,15 @@ eraseMode
 	mode _ 4.
 	tool _ previousTool!
 fileInForm
-	"Ask the user for a file name and then recalls the Form in that file as the 
+	"Ask the user for a file name and then recalls the Form in that file as the
 	current source Form (form).  Does not change the tool."
 
 	| inName directory localName trying newForm |
 	trying _ true.
 	[trying] whileTrue:
 		[inName _ self promptRequest: 'type a name for recalling a source Form . . . '.
-		directory _ FileDirectory directoryFromName: inName setFileName: [:localName].
-		(((directory isLegalFileName: localName)
+		directory _ Disk directoryFromName: inName setFileName: [:ln | localName _ ln].
+		(((Disk isValidFileName: localName)
 			and: [directory includesKey: localName])
 				and: [(newForm  _ Form readFrom: inName) ~~ nil])
 				ifTrue: [trying _ false]
@@ -20056,10 +20671,10 @@ fileOutForm
 	trying _ true.
 	[trying] whileTrue:
 		[outName _ self promptRequest: 'type a name for saving the source Form . . . '.
-		directory _ FileDirectory directoryFromName: outName setFileName: [:localName].
-		(directory isLegalFileName: outName)
+		directory _ Disk directoryFromName: outName setFileName: [:ln | localName _ ln].
+		(Disk isValidFileName: localName)
 			ifTrue:
-				[(directory includesKey: localName) 
+				[(directory includesKey: localName)
 					ifTrue: [(BinaryChoice message: 'writing over old file--okay?')
 								ifTrue: [form writeOn: outName]]
 					ifFalse: [form writeOn: outName].
@@ -37906,17 +38521,17 @@ getImagePrefix
 		request: prompt
 		displayAt: Sensor cursorPoint
 		centered: true
-		action: [:newPrefix | ] 
+		action: [:newPrefix | ]
 		initialAnswer: default.
 
 	[newPrefix isEmpty or:
-			[(Disk isLegalFileName: newPrefix, '.changes') not]] whileTrue:
+			[(Disk isValidFileName: newPrefix, '.changes') not]] whileTrue:
 		[newPrefix isEmpty ifTrue: [^newPrefix].
 		FillInTheBlank
 			request: prompt
 			displayAt: Sensor cursorPoint
 			centered: true
-			action: [:newPrefix | ] 
+			action: [:newPrefix | ]
 			initialAnswer: default.
 		(newPrefix size > 2 and:
 			[(newPrefix copyFrom: newPrefix size-2 to: newPrefix size) sameAs: '.im'])
@@ -37960,9 +38575,9 @@ snapshotAs: imageFilePrefix thenQuit: quitIfTrue
 	self logChange: '''----SNAPSHOT----'''.
 	Disk == nil
 		ifFalse:	"Register snapshot filename with VM for primitive 97.
-				   Use WindowsFile directly to avoid FileStream reading the entire
+				   Use Disk fileNamed: to avoid FileStream reading the entire
 				   existing file into memory (which would bloat the new snapshot)."
-			[(WindowsFile named: imageFilePrefix, '.im') beSnapshotFile].
+			[(Disk fileNamed: imageFilePrefix, '.im') beSnapshotFile].
 	self releaseExternalViews.
 	Transcript cr; show: 'Snapshot at: ', Time dateAndTimeNow printString.
 	height _ Display height.
@@ -38017,8 +38632,8 @@ condenseChanges
 	fileName _ (SourceFiles at: 2) name.
 	(SourceFiles at: 2) close.
 	SourceFiles at: 2 put: f.
-	Disk removeKey: fileName.
-	f file rename: fileName!
+	(Disk fileAt: fileName) delete.
+	f file renameTo: fileName!
 forgetDoIts
 	"get rid of old DoIt methods"
 
@@ -38070,8 +38685,8 @@ renameSystemFiles: newVersion
 	SourceFiles at: 1 put: nil.
 	(SourceFiles at: 2) close.
 	SourceFiles at: 2 put: nil.
-	#('.sources' '.changes' '.im' ) do: 
-		[:ext | (Disk file: oldVersion , ext) file rename: newVersion , ext].
+	#('.sources' '.changes' '.im' ) do:
+		[:ext | (Disk file: oldVersion , ext) file renameTo: newVersion , ext].
 	1 to: 2 do: 
 		[:i | 
 		file _ Disk file: newVersion , (#('.sources' '.changes' ) at: i).
@@ -38111,11 +38726,12 @@ quitPrimitive
 
 	<primitive: 113>
 	self primitiveFailed!
-releaseExternalViews 
-	SourceFiles==nil 
+releaseExternalViews
+	"Close external file references before snapshot or quit.
+	 Note: Disk is WindowsFileSystem singleton, not a closeable resource."
+	SourceFiles==nil
 		ifFalse: [SourceFiles do: [:t | t==nil ifFalse: [t close]]].
-	Disk==nil ifFalse: [Disk close].
-	FileDirectory releaseExternalReferences!
+	WindowsDirectory releaseExternalReferences!
 snapshotPrimitive
 	"Write the current state of the object memory on a file in the same format as 
 	the Smalltalk-80 release.  The file can later be resumed, returning you to 
@@ -38229,7 +38845,7 @@ doitWithout: classSet
 	ctxt push: nil.
 	self init: ctxt.
 	self initClampedClasses: classSet.
-	FileDirectory initializeExternalReferences.
+	WindowsDirectory initializeExternalReferences.
 	Smalltalk shutdown.
 	"Make sure the system is stable underneath us."
 	Transcript show: 'Tracing . . . '.

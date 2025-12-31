@@ -430,4 +430,39 @@ public static class FileInfoPrimitives
             }
         }
     }
+
+    /// <summary>
+    /// Primitive 157: Copy a file to a new location.
+    /// Receiver: WindowsDirectory or any directory object.
+    /// Arguments: sourcePath (String), destPath (String).
+    /// Returns: receiver on success, fails if copy cannot be performed.
+    /// </summary>
+    public class FileCopy : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+
+            var sourcePathOOP = context.Arguments[0];
+            var destPathOOP = context.Arguments[1];
+
+            if (sourcePathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (destPathOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            string? sourcePath = FilePrimitiveHelpers.ExtractString(context, sourcePathOOP);
+            string? destPath = FilePrimitiveHelpers.ExtractString(context, destPathOOP);
+
+            if (sourcePath == null || destPath == null) return PrimitiveResult.Fail(context.Metadata!);
+
+            try
+            {
+                File.Copy(sourcePath, destPath, overwrite: true);
+                return PrimitiveResult.Ok(context.Receiver);
+            }
+            catch
+            {
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+        }
+    }
 }
