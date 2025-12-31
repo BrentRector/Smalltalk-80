@@ -38520,7 +38520,7 @@ getImagePrefix
 		request: prompt
 		displayAt: Sensor cursorPoint
 		centered: true
-		action: [:newPrefix | ] 
+		action: [:answer | newPrefix _ answer]
 		initialAnswer: default.
 
 	[newPrefix isEmpty or:
@@ -38530,7 +38530,7 @@ getImagePrefix
 			request: prompt
 			displayAt: Sensor cursorPoint
 			centered: true
-			action: [:newPrefix | ] 
+			action: [:answer | newPrefix _ answer]
 			initialAnswer: default.
 		(newPrefix size > 2 and:
 			[(newPrefix copyFrom: newPrefix size-2 to: newPrefix size) sameAs: '.im'])
