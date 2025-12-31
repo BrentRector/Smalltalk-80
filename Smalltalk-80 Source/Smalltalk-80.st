@@ -38509,43 +38509,64 @@ copyChangesTo: newFileName
 getImagePrefix
 	"Prompt the user for a snapshot file name.  Persist until a legal name is supplied."
 
-	| default newPrefix prompt needsRetry isItNil |
+	| default newPrefix prompt needsRetry isItNil diagFile |
 	SourceFiles == nil
 		ifTrue: [^'snapshot'].
+
+	"Write diagnostics to file that survives crash"
+	diagFile _ WindowsFileStream writeOn: 'getImagePrefix-debug.txt'.
+	diagFile nextPutAll: '=== getImagePrefix started ==='; cr.
+
 	prompt _ 'Enter name for image file:'.
 	default _ 'snapshot'.
 	newPrefix _ ''.
+
+	diagFile nextPutAll: 'Before FillInTheBlank, newPrefix = empty string'; cr.
+	diagFile nextPutAll: 'Calling FillInTheBlank...'; cr.
+	diagFile flush.
+
 	FillInTheBlank
 		request: prompt
 		displayAt: Sensor cursorPoint
 		centered: true
 		action: [:answer |
-			Transcript cr; show: 'FillInTheBlank action: '.
+			diagFile nextPutAll: 'Action block called with: '.
 			answer isNil
-				ifTrue: [Transcript show: 'nil']
-				ifFalse: [Transcript show: answer printString].
+				ifTrue: [diagFile nextPutAll: 'nil']
+				ifFalse: [diagFile nextPutAll: answer printString].
+			diagFile cr; flush.
 			newPrefix _ answer]
 		initialAnswer: default.
 
-	"Debug: show class and identity comparisons"
-	Transcript cr; show: 'newPrefix class: '; show: newPrefix class name.
-	Transcript cr; show: 'newPrefix == nil: '; show: (newPrefix == nil) printString.
+	diagFile nextPutAll: 'After FillInTheBlank'; cr.
+	diagFile nextPutAll: 'newPrefix class: '; nextPutAll: newPrefix class name; cr.
+	diagFile nextPutAll: 'newPrefix == nil: '; nextPutAll: (newPrefix == nil) printString; cr.
 	isItNil _ newPrefix isNil.
-	Transcript cr; show: 'newPrefix isNil: '; show: isItNil printString.
+	diagFile nextPutAll: 'newPrefix isNil: '; nextPutAll: isItNil printString; cr.
+	diagFile flush.
 
-	"If nil, return empty string immediately using the saved boolean"
+	"If nil, return empty string immediately"
 	isItNil ifTrue: [
-		Transcript cr; show: 'RETURNING EMPTY - newPrefix was nil'.
+		diagFile nextPutAll: 'RETURNING EMPTY - newPrefix was nil'; cr.
+		diagFile close.
 		^''].
 
-	"Double check we're not nil before isEmpty"
-	Transcript cr; show: 'About to call isEmpty on: '; show: newPrefix printString.
+	diagFile nextPutAll: 'About to call isEmpty on: '; nextPutAll: newPrefix printString; cr.
+	diagFile flush.
+
 	newPrefix == nil ifTrue: [
-		Transcript cr; show: 'EMERGENCY - newPrefix is nil by =='.
+		diagFile nextPutAll: 'EMERGENCY - newPrefix is nil by =='; cr.
+		diagFile close.
 		^''].
+
+	diagFile nextPutAll: 'Calling isEmpty...'; cr.
+	diagFile flush.
 
 	"Safe to call isEmpty now"
 	needsRetry _ newPrefix isEmpty or: [(Disk isValidFileName: newPrefix, '.changes') not].
+	diagFile nextPutAll: 'isEmpty succeeded, needsRetry = '; nextPutAll: needsRetry printString; cr.
+	diagFile close.
+
 	[needsRetry] whileTrue:
 		[newPrefix isEmpty ifTrue: [^newPrefix].
 		FillInTheBlank
