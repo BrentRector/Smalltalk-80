@@ -38520,17 +38520,31 @@ getImagePrefix
 		request: prompt
 		displayAt: Sensor cursorPoint
 		centered: true
-		action: [:answer | newPrefix _ answer]
+		action: [:answer |
+			Transcript cr; show: 'FillInTheBlank action called with: '.
+			answer isNil
+				ifTrue: [Transcript show: 'nil']
+				ifFalse: [Transcript show: answer printString].
+			newPrefix _ answer]
 		initialAnswer: default.
+	Transcript cr; show: 'After FillInTheBlank, newPrefix = '.
+	newPrefix isNil
+		ifTrue: [Transcript show: 'nil']
+		ifFalse: [Transcript show: newPrefix printString].
 
-	[newPrefix isEmpty or:
+	[newPrefix isNil or: [newPrefix isEmpty] or:
 			[(Disk isValidFileName: newPrefix, '.changes') not]] whileTrue:
-		[newPrefix isEmpty ifTrue: [^newPrefix].
+		[(newPrefix isNil or: [newPrefix isEmpty]) ifTrue: [^newPrefix].
 		FillInTheBlank
 			request: prompt
 			displayAt: Sensor cursorPoint
 			centered: true
-			action: [:answer | newPrefix _ answer]
+			action: [:answer |
+				Transcript cr; show: 'Retry FillInTheBlank action called with: '.
+				answer isNil
+					ifTrue: [Transcript show: 'nil']
+					ifFalse: [Transcript show: answer printString].
+				newPrefix _ answer]
 			initialAnswer: default.
 		(newPrefix size > 2 and:
 			[(newPrefix copyFrom: newPrefix size-2 to: newPrefix size) sameAs: '.im'])
