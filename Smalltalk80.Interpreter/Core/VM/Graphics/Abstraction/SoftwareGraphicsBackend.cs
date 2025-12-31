@@ -333,28 +333,29 @@ public sealed class SoftwareGraphicsBackend : IGraphicsBackend
 
     private static uint GetPixel32(ReadOnlySpan<byte> data, int width, PixelDepth depth, int x, int y)
     {
-        return depth switch
+        switch (depth)
         {
-            PixelDepth.ThirtyTwoBit =>
-                System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(data)[y * width + x],
+            case PixelDepth.ThirtyTwoBit:
+                return System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(data)[y * width + x];
 
-            PixelDepth.EightBit =>
+            case PixelDepth.EightBit:
             {
                 byte gray = data[y * ((width + 3) / 4 * 4) + x];
                 return 0xFF000000u | ((uint)gray << 16) | ((uint)gray << 8) | gray;
-            },
+            }
 
-            PixelDepth.OneBit =>
+            case PixelDepth.OneBit:
             {
                 int stride = (width + 7) / 8;
                 int byteIndex = y * stride + x / 8;
                 int bitIndex = 7 - (x % 8);
                 bool bit = byteIndex < data.Length && ((data[byteIndex] >> bitIndex) & 1) != 0;
                 return bit ? 0xFF000000u : 0xFFFFFFFFu;
-            },
+            }
 
-            _ => 0
-        };
+            default:
+                return 0;
+        }
     }
 
     private static void SetPixel32(Span<byte> data, int width, PixelDepth depth, int x, int y, uint color)
