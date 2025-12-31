@@ -2360,6 +2360,7 @@ removeExternalReference: anObject
 
 releaseExternalReferences
     "Release all external references"
+    ExternalReferences isNil ifTrue: [^self].
     [ExternalReferences isEmpty] whileFalse: [
         ExternalReferences removeLast release]!
 
@@ -38509,43 +38510,37 @@ copyChangesTo: newFileName
 getImagePrefix
 	"Prompt the user for a snapshot file name.  Persist until a legal name is supplied."
 
-	| default newPrefix prompt needsRetry |
+	| default newPrefix prompt |
 	SourceFiles == nil
 		ifTrue: [^'snapshot'].
-
-	prompt _ 'Enter name for image file:'.
+	prompt _
+'Enter name for image file:'.
 	default _ 'snapshot'.
 	newPrefix _ ''.
-
 	FillInTheBlank
 		request: prompt
 		displayAt: Sensor cursorPoint
 		centered: true
-		action: [:answer | newPrefix _ answer]
+		action: [:newPrefix | ]
 		initialAnswer: default.
 
-	"FillInTheBlank may return nil if dialog is cancelled or interrupted"
-	(newPrefix isNil or: [newPrefix == nil]) ifTrue: [^''].
-
-	needsRetry _ newPrefix isEmpty or: [(Disk isValidFileName: newPrefix, '.changes') not].
-
-	[needsRetry] whileTrue:
+	[newPrefix isEmpty or:
+			[(Disk isValidFileName: newPrefix, '.changes') not]] whileTrue:
 		[newPrefix isEmpty ifTrue: [^newPrefix].
 		FillInTheBlank
 			request: prompt
 			displayAt: Sensor cursorPoint
 			centered: true
-			action: [:answer | newPrefix _ answer]
+			action: [:newPrefix | ]
 			initialAnswer: default.
-		(newPrefix isNil or: [newPrefix == nil]) ifTrue: [^''].
 		(newPrefix size > 2 and:
 			[(newPrefix copyFrom: newPrefix size-2 to: newPrefix size) sameAs: '.im'])
 				ifTrue: [newPrefix _ newPrefix copyFrom: 1 to: newPrefix size-3].
-		prompt _ 'Illegal file name: ', newPrefix, '
+		prompt _
+'Illegal file name: ', newPrefix, '
 Enter name for image file:'.
 		default _ Disk checkName: newPrefix, '.changes' fixErrors: true.
-		default _ default copyFrom: 1 to: default size - 8.
-		needsRetry _ newPrefix isEmpty or: [(Disk isValidFileName: newPrefix, '.changes') not]].
+		default _ default copyFrom: 1 to: default size - 8].
 
 	^newPrefix!
 quit
