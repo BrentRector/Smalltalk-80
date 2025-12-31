@@ -1830,8 +1830,8 @@ directory
     ^Disk directoryAt: self path directoryPath asString!
 
 file
-    "Return self for compatibility"
-    ^self!
+    "Return WindowsFile for this stream's file"
+    ^WindowsFile on: pathName!
 
 pathName
     "Return the file path"
@@ -38631,8 +38631,8 @@ condenseChanges
 	fileName _ (SourceFiles at: 2) name.
 	(SourceFiles at: 2) close.
 	SourceFiles at: 2 put: f.
-	Disk removeKey: fileName.
-	f file rename: fileName!
+	(Disk fileAt: fileName) delete.
+	f file renameTo: fileName!
 forgetDoIts
 	"get rid of old DoIt methods"
 
@@ -38684,8 +38684,8 @@ renameSystemFiles: newVersion
 	SourceFiles at: 1 put: nil.
 	(SourceFiles at: 2) close.
 	SourceFiles at: 2 put: nil.
-	#('.sources' '.changes' '.im' ) do: 
-		[:ext | (Disk file: oldVersion , ext) file rename: newVersion , ext].
+	#('.sources' '.changes' '.im' ) do:
+		[:ext | (Disk file: oldVersion , ext) file renameTo: newVersion , ext].
 	1 to: 2 do: 
 		[:i | 
 		file _ Disk file: newVersion , (#('.sources' '.changes' ) at: i).
