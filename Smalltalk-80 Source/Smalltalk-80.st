@@ -38725,10 +38725,11 @@ quitPrimitive
 
 	<primitive: 113>
 	self primitiveFailed!
-releaseExternalViews 
-	SourceFiles==nil 
+releaseExternalViews
+	"Close external file references before snapshot or quit.
+	 Note: Disk is WindowsFileSystem singleton, not a closeable resource."
+	SourceFiles==nil
 		ifFalse: [SourceFiles do: [:t | t==nil ifFalse: [t close]]].
-	Disk==nil ifFalse: [Disk close].
 	WindowsDirectory releaseExternalReferences!
 snapshotPrimitive
 	"Write the current state of the object memory on a file in the same format as 
