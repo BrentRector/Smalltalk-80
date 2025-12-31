@@ -118,7 +118,7 @@ public class SmalltalkInterpreterThread
         var vm = new VirtualMachine(
             _context.HeapManager,
             _context.VMMetadata,
-            platformBridge: _context.PlatformBridge,
+            display: _context.Display,
             _context.Diagnostics
         );
 

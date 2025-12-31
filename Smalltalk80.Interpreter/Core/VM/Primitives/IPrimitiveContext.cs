@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Platform;
 using Smalltalk80.Interpreter.Shared.Types;
 
 namespace Smalltalk80.Interpreter.Core.VM.Primitives;
@@ -16,10 +17,10 @@ public interface IPrimitiveContext
 
 
     /// <summary>
-    /// Gets the platform bridge for platform-exempt primitives (graphics, input, clipboard, etc.).
+    /// Gets the display for graphics and input operations.
     /// May be null if running in headless/test mode.
     /// </summary>
-    IPlatformBridge? PlatformBridge { get; }
+    IDisplay? Display { get; }
 
     /// <summary>
     /// Gets or sets the primitive success flag.

@@ -141,6 +141,11 @@ public interface IDisplay : IDisposable
     /// </summary>
     SmalltalkOOP GetControllerSemaphore();
 
+    /// <summary>
+    /// Set input sampling interval in milliseconds.
+    /// </summary>
+    void SetSampleInterval(int intervalMs);
+
     // ═══════════════════════════════════════════════════════════════════════════
     // EVENT LOOP INTEGRATION
     // ═══════════════════════════════════════════════════════════════════════════

@@ -7,7 +7,6 @@ using System.Windows.Forms;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.VM;
 using Smalltalk80.Interpreter.Core.VM.Graphics;
-using Smalltalk80.Interpreter.Core.VM.Primitives;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Shared.Types;
 
@@ -23,7 +22,7 @@ namespace Smalltalk80.Interpreter.Platform.Windows;
 /// - Smalltalk thread: Reads input words via primitive 95, reads state via primitives 90/91
 /// - InputWordRingBuffer: Thread-safe Blue Book format input word queue with shadow counter
 /// </summary>
-public class WinFormsDisplay : Form, IDisplay, IPlatformBridge
+public class WinFormsDisplay : Form, IDisplay
 {
     private byte[] _displayBuffer;
     private Bitmap _backBuffer;
@@ -444,99 +443,10 @@ public class WinFormsDisplay : Form, IDisplay, IPlatformBridge
         return success;
     }
 
-    // ============================================================================
-    // IPlatformBridge Implementation (for primitive compatibility)
-    // ============================================================================
-
-    bool IPlatformBridge.PerformBitBlt(SmalltalkOOP bitBltOOP)
+    public void SetSampleInterval(int intervalMs)
     {
-        // Return false to use software BitBlt implementation in primitives
-        return false;
+        // No-op - sampling interval not used in this implementation
     }
-
-    bool IPlatformBridge.PerformSnapshot(SmalltalkOOP snapshotRequestOOP) => PerformSnapshot(snapshotRequestOOP);
-
-    void IPlatformBridge.InvalidateDisplayRegion(int x, int y, int w, int h) => InvalidateRegion(x, y, w, h);
-
-    void IPlatformBridge.DisplayResized(int newWidth, int newHeight) => DisplayResized(newWidth, newHeight);
-
-    (int x, int y) IPlatformBridge.GetMousePosition() => MousePosition;
-
-    (bool red, bool yellow, bool blue) IPlatformBridge.GetMouseButtons() => MouseButtons;
-
-    int IPlatformBridge.GetButtonState() => ButtonState;
-
-    void IPlatformBridge.SetCursorPosition(int x, int y) => SetCursorPosition(x, y);
-
-    int IPlatformBridge.GetInputWord() => GetInputWord();
-
-    bool IPlatformBridge.TryConsumeInputShadowSignal() => TryConsumeInputShadowSignal();
-
-    bool IPlatformBridge.HasInputWords => HasInputWords;
-
-    (int eventType, int x, int y, int buttonMask, bool hasButtonTransition, int keyCode, bool isKeyDown)? IPlatformBridge.DequeueCompositeEvent()
-    {
-        // Not used - primitive 95 reads from ring buffer directly
-        return null;
-    }
-
-    void IPlatformBridge.SetSampleInterval(int intervalMs)
-    {
-        // Not implemented
-    }
-
-    void IPlatformBridge.SetInputSemaphore(SmalltalkOOP semaphoreOOP) => SetInputSemaphore(semaphoreOOP);
-
-    SmalltalkOOP IPlatformBridge.GetInputSemaphore() => GetInputSemaphore();
-
-    void IPlatformBridge.SetControllerSemaphore(SmalltalkOOP semaphoreOOP) => SetControllerSemaphore(semaphoreOOP);
-
-    SmalltalkOOP IPlatformBridge.GetControllerSemaphore() => GetControllerSemaphore();
-
-    bool IPlatformBridge.HasPendingEvents() => HasInputWords;
-
-    bool IPlatformBridge.ConsumeButtonTransition()
-    {
-        // Button transitions are handled via ring buffer key events
-        return false;
-    }
-
-    bool IPlatformBridge.WaitForEvents(int timeoutMs)
-    {
-        return _idleWake.Wait(timeoutMs);
-    }
-
-    WaitHandle? IPlatformBridge.EventAvailableHandle => EventAvailableHandle;
-
-    void IPlatformBridge.ResetEventSignalIfEmpty() => ResetEventSignalIfEmpty();
-
-    void IPlatformBridge.ForceResetEventSignal() => ForceResetEventSignal();
-
-    void IPlatformBridge.SetEventCallback(Action callback) => SetEventCallback(callback);
-
-    void IPlatformBridge.SetIsIdleCallback(Func<bool> callback) => SetIsIdleCallback(callback);
-
-    WaitHandle? IPlatformBridge.IdleWakeHandle => _idleWake.WaitHandle;
-
-    ManualResetEventSlim? IPlatformBridge.IdleWake => IdleWake;
-
-    SmalltalkOOP IPlatformBridge.ReadClipboardToStringOOP()
-    {
-        // Not implemented
-        return default;
-    }
-
-    bool IPlatformBridge.WriteClipboardFromStringOOP(SmalltalkOOP stringOOP)
-    {
-        // Not implemented
-        return false;
-    }
-
-    void IPlatformBridge.Beep() => Beep();
-
-    void IPlatformBridge.Quit(int exitCode) => Quit(exitCode);
-
-    int IPlatformBridge.GetTimeWords() => GetTimeWords();
 
     // ============================================================================
     // Paint Handler - Copies Display bitmap to screen

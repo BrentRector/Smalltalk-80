@@ -78,7 +78,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
                 ctx.HeapManager,
                 stackManager: stackManager,
                 contextManager: contextManager,
-                platform: ctx.PlatformBridge,
+                display: ctx.Display,
                 runtimeServices: runtimeServices,
                 instructionPointer: instructionPointer,
                 cacheManager: cacheManager,

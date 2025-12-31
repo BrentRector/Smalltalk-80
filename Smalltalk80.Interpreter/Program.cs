@@ -212,7 +212,7 @@ public static class Program
                 HeapManager = heapManager,
                 VMMetadata = vmMetadata,
                 Bundle = bundle,
-                PlatformBridge = display,  // Smalltalk thread calls methods on UI object
+                Display = display,  // Smalltalk thread calls methods on UI object
                 Diagnostics = diagnostics,
                 Config = config,
                 RestoreTimer = restoreTimer

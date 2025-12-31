@@ -132,7 +132,7 @@ public static class GraphicsOperations
         public PrimitiveResult Execute(PrimitiveExecutionContext context)
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
-            if (context.Platform == null) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Display == null) return PrimitiveResult.Fail(context.Metadata!);
             if (context.Metadata == null) return PrimitiveResult.Fail(context.Metadata!);
             if (context.StackManager == null) return PrimitiveResult.Fail(context.Metadata!);
 
@@ -150,7 +150,7 @@ public static class GraphicsOperations
             context.StackManager.Push(context.Receiver);
 
             // Write the image
-            bool success = context.Platform.PerformSnapshot(context.Receiver);
+            bool success = context.Display.PerformSnapshot(context.Receiver);
 
             // Pop receiver back
             context.StackManager.Pop();
@@ -194,7 +194,7 @@ public static class GraphicsOperations
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            int seconds = context.Platform?.GetTimeWords()
+            int seconds = context.Display?.GetTimeWords()
                 ?? (int)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() & 0x7FFFFFFF);
 
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(seconds));
@@ -226,8 +226,8 @@ public static class GraphicsOperations
             int width = context.HeapManager.GetInstanceVariable(context.Receiver, 1).AsSmallInteger();
             int height = context.HeapManager.GetInstanceVariable(context.Receiver, 2).AsSmallInteger();
 
-            // Notify platform bridge of new Display dimensions
-            context.Platform?.DisplayResized(width, height);
+            // Notify display of new Display dimensions
+            context.Display?.DisplayResized(width, height);
 
             return PrimitiveResult.Ok(context.Receiver);
         }
@@ -240,8 +240,8 @@ public static class GraphicsOperations
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            if (context.Platform != null)
-                context.Platform.Beep();
+            if (context.Display != null)
+                context.Display.Beep();
             else
                 try { Console.Beep(); } catch { }
 
@@ -496,7 +496,7 @@ public static class GraphicsOperations
         int destX, int destY, int width, int height,
         int clipX, int clipY, int clipWidth, int clipHeight)
     {
-        if (context.Platform == null || context.Metadata == null)
+        if (context.Display == null || context.Metadata == null)
             return;
 
         try
@@ -515,7 +515,7 @@ public static class GraphicsOperations
 
                 if (invalidWidth > 0 && invalidHeight > 0)
                 {
-                    context.Platform.InvalidateDisplayRegion(
+                    context.Display.InvalidateRegion(
                         invalidX, invalidY, invalidWidth, invalidHeight);
                 }
             }
