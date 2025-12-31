@@ -38532,7 +38532,7 @@ getImagePrefix
 		ifTrue: [Transcript show: 'nil']
 		ifFalse: [Transcript show: newPrefix printString].
 
-	[newPrefix isNil or: [newPrefix isEmpty] or:
+	[(newPrefix isNil or: [newPrefix isEmpty]) or:
 			[(Disk isValidFileName: newPrefix, '.changes') not]] whileTrue:
 		[(newPrefix isNil or: [newPrefix isEmpty]) ifTrue: [^newPrefix].
 		FillInTheBlank
