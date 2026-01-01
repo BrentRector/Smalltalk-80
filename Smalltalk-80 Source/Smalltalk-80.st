@@ -24568,7 +24568,30 @@ viewDelta
 			((marker top - scrollBar inside top) asFloat /
 				scrollBar inside height asFloat *
 				viewList compositionRectangle height asFloat))
-		roundTo: viewList lineGrid! !
+		roundTo: viewList lineGrid!
+wheelActivity: wheelDelta
+	"Move selection up/down based on wheel delta. Scroll if needed to keep selection visible.
+	 Wheel up (positive) moves selection up (earlier items), wheel down moves selection down."
+	| currentSelection newSelection maxSelection viewList |
+	currentSelection _ view selection.
+	maxSelection _ view maximumSelection - view minimumSelection + 1.
+	maxSelection = 0 ifTrue: [^self].  "Empty list"
+
+	"Calculate new selection - wheel up moves toward start of list"
+	currentSelection = 0
+		ifTrue: [newSelection _ wheelDelta > 0 ifTrue: [1] ifFalse: [maxSelection]]
+		ifFalse: [newSelection _ (currentSelection - wheelDelta max: 1) min: maxSelection].
+
+	"Change selection if different"
+	newSelection ~= currentSelection ifTrue: [
+		self changeModelSelection: newSelection.
+		view moveSelectionBox: newSelection].
+
+	"Scroll if selection is clipped"
+	view isSelectionBoxClipped ifTrue: [
+		viewList _ view list.
+		self scrollView: (view selectionBox top - view insetDisplayBox top) negated.
+		self moveMarker]! !
 
 !ListController methodsFor: 'menu messages'!
 redButtonActivity
@@ -29781,8 +29804,7 @@ controlActivity
 	"Check for mouse wheel scrolling first"
 	wheelDelta _ sensor mouseWheelDelta.
 	wheelDelta ~= 0 ifTrue: [
-		self scrollView: wheelDelta * self wheelScrollAmount negated.
-		self moveMarker.
+		self wheelActivity: wheelDelta.
 		^self].
 	"Normal activity"
 	self scrollBarContainsCursor
@@ -34262,9 +34284,7 @@ controlActivity
 	"Check for mouse wheel scrolling first"
 	wheelDelta _ sensor mouseWheelDelta.
 	wheelDelta ~= 0 ifTrue: [
-		self canScroll ifTrue: [
-			self scrollView: wheelDelta * self wheelScrollAmount negated.
-			self moveMarker].
+		self wheelActivity: wheelDelta.
 		^self].
 	"Normal scroll bar or super activity"
 	self scrollBarContainsCursor
@@ -34325,6 +34345,12 @@ wheelScrollAmount
 	"Answer the number of pixels to scroll per mouse wheel notch.
 	 Default is 16 pixels (approximately one text line)."
 	^16!
+wheelActivity: wheelDelta
+	"Handle mouse wheel scrolling. Positive wheelDelta = wheel up = scroll content up.
+	 Subclasses may override to provide different behavior (e.g., move selection)."
+	self canScroll ifTrue: [
+		self scrollView: wheelDelta * self wheelScrollAmount.
+		self moveMarker]!
 viewDelta
 	"Answer an integer that indicates how much the view should be scrolled.
 	The scroll bar has been moved and now the view must be so the amount to
