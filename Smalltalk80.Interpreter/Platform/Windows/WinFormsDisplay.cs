@@ -16,14 +16,13 @@ namespace Smalltalk80.Interpreter.Platform.Windows;
 
 /// <summary>
 /// WinForms implementation of IDisplay.
-/// Provides either monochrome (1bpp) or full-color (32bpp) bitmap display with mouse and keyboard input.
+/// Provides monochrome (1bpp) bitmap display with mouse and keyboard input.
 /// Thread-safe: Display updates can occur from Smalltalk thread, rendering occurs on UI thread.
 ///
-/// 32bpp Mode:
-/// - Display surface uses 32bpp ARGB format natively
-/// - Smalltalk Forms remain 1bpp internally (stored in heap)
-/// - 1bpp-to-32bpp conversion happens when copying Display bitmap from heap
-/// - Enables proper TrueType antialiasing and future color support
+/// Architecture:
+/// - Internal display buffer is 1bpp (matches Smalltalk Form format)
+/// - Final rendering converts 1bpp to 32bpp for screen display
+/// - No runtime depth conversion between Smalltalk Forms
 ///
 /// Input Architecture:
 /// - UI thread (WinForms): Enqueues input words to ring buffer, updates current state
@@ -32,14 +31,13 @@ namespace Smalltalk80.Interpreter.Platform.Windows;
 /// </summary>
 public class WinFormsDisplay : Form, IDisplay
 {
-    private byte[] _displayBuffer;  // 1bpp: 1 bit per pixel packed, 32bpp: 4 bytes per pixel ARGB
-    private Bitmap _backBuffer;
+    private byte[] _displayBuffer;  // 1bpp: 1 bit per pixel packed (matches Smalltalk Form format)
+    private Bitmap _backBuffer;     // 32bpp back buffer for screen rendering
     private readonly object _bufferLock = new();
     private readonly ISmalltalkHeap? _heap;
     private readonly VMMetadata? _vmMetadata;
     private readonly IRuntimeServices? _runtimeServices;
     private bool _disposed = false;
-    private readonly PixelDepth _pixelDepth;
 
     // Input semaphore OOP for event notification (signaled on raw input)
     private SmalltalkOOP _inputSemaphore = default;
@@ -79,7 +77,7 @@ public class WinFormsDisplay : Form, IDisplay
 
     public new int Width { get; private set; }
     public new int Height { get; private set; }
-    public PixelDepth BitsPerPixel => _pixelDepth;
+    public PixelDepth BitsPerPixel => PixelDepth.OneBit;  // Always 1bpp
 
     string IDisplay.Title
     {
@@ -95,45 +93,24 @@ public class WinFormsDisplay : Form, IDisplay
 
     public WinFormsDisplay(int width, int height, string title = "Smalltalk-80",
         ISmalltalkHeap? heap = null, VMMetadata? vmMetadata = null,
-        PixelDepth pixelDepth = PixelDepth.OneBit)
+        PixelDepth pixelDepth = PixelDepth.OneBit)  // pixelDepth parameter kept for API compatibility but ignored
     {
         Width = width;
         Height = height;
         _heap = heap;
         _vmMetadata = vmMetadata;
-        _pixelDepth = pixelDepth;
         _runtimeServices = (heap != null && vmMetadata != null)
             ? new RuntimeServices(heap, vmMetadata)
             : null;
 
-        Console.WriteLine($"[WinForms] Creating window: {width}x{height} ({(int)pixelDepth}bpp)");
+        Console.WriteLine($"[WinForms] Creating window: {width}x{height} (1bpp)");
 
-        // Calculate buffer size based on pixel depth
-        int bufferSize;
-        if (pixelDepth == PixelDepth.ThirtyTwoBit)
-        {
-            // 32bpp: 4 bytes per pixel
-            bufferSize = width * height * 4;
-        }
-        else
-        {
-            // 1bpp: each row needs (width + 7) / 8 bytes
-            int rowStride = (width + 7) / 8;
-            bufferSize = rowStride * height;
-        }
+        // 1bpp buffer: each row needs (width + 7) / 8 bytes
+        int rowStride = (width + 7) / 8;
+        int bufferSize = rowStride * height;
         _displayBuffer = new byte[bufferSize];
 
-        // Initialize 32bpp buffer with white pixels (0xFFFFFFFF)
-        // This ensures the display starts white before any primitives run
-        if (pixelDepth == PixelDepth.ThirtyTwoBit)
-        {
-            // Fill with white using 32-bit writes for efficiency
-            var span32 = MemoryMarshal.Cast<byte, uint>(_displayBuffer.AsSpan());
-            span32.Fill(0xFFFFFFFF);
-        }
-
-        // Create back buffer for double-buffered rendering
-        // Always use 32bpp ARGB format for final rendering
+        // Create back buffer for double-buffered rendering (32bpp for screen display)
         _backBuffer = new Bitmap(width, height, PixelFormat.Format32bppArgb);
 
         // Configure form
@@ -283,25 +260,10 @@ public class WinFormsDisplay : Form, IDisplay
             Width = newWidth;
             Height = newHeight;
 
-            // Calculate new buffer size based on pixel depth
-            int newBufferSize;
-            if (_pixelDepth == PixelDepth.ThirtyTwoBit)
-            {
-                newBufferSize = newWidth * newHeight * 4;
-            }
-            else
-            {
-                newBufferSize = ((newWidth + 7) / 8) * newHeight;
-            }
+            // 1bpp buffer: each row needs (width + 7) / 8 bytes
+            int newBufferSize = ((newWidth + 7) / 8) * newHeight;
             _displayBuffer = new byte[newBufferSize];
-
-            // Initialize 32bpp buffer with white pixels using 32-bit writes
-            if (_pixelDepth == PixelDepth.ThirtyTwoBit)
-            {
-                var span32 = MemoryMarshal.Cast<byte, uint>(_displayBuffer.AsSpan());
-                span32.Fill(0xFFFFFFFF);
-            }
-            Console.WriteLine($"[Display] Reallocated _displayBuffer: {newBufferSize} bytes ({(int)_pixelDepth}bpp)");
+            Console.WriteLine($"[Display] Reallocated _displayBuffer: {newBufferSize} bytes (1bpp)");
 
             _backBuffer?.Dispose();
             _backBuffer = new Bitmap(newWidth, newHeight, PixelFormat.Format32bppArgb);
@@ -503,13 +465,8 @@ public class WinFormsDisplay : Form, IDisplay
     {
         lock (_bufferLock)
         {
-            // In 1bpp mode: sync display buffer from heap (traditional path)
-            // In 32bpp mode: primitives maintain the buffer directly with halftone→gray conversion,
-            // so we skip the heap copy which would overwrite smooth grays with dithered black/white
-            if (_pixelDepth != PixelDepth.ThirtyTwoBit)
-            {
-                CopyDisplayFromHeap();
-            }
+            // Sync 1bpp display buffer from Smalltalk heap, convert to 32bpp bitmap, render
+            CopyDisplayFromHeap();
             CopyBufferToBitmap();
             e.Graphics.DrawImageUnscaled(_backBuffer, 0, 0);
         }
@@ -537,16 +494,8 @@ public class WinFormsDisplay : Form, IDisplay
             var format = _heap.GetObjectFormat(bitsOOP);
             int size = _heap.GetIndexedSize(bitsOOP);
 
-            if (_pixelDepth == PixelDepth.ThirtyTwoBit)
-            {
-                // 32bpp mode: convert 1bpp heap data to 32bpp display buffer
-                CopyDisplayFromHeap32bpp(bitsOOP, format, size);
-            }
-            else
-            {
-                // 1bpp mode: direct copy to display buffer
-                CopyDisplayFromHeap1bpp(bitsOOP, format, size);
-            }
+            // Copy 1bpp data from Smalltalk heap to display buffer
+            CopyDisplayFromHeap1bpp(bitsOOP, format, size);
         }
         catch (ObjectDisposedException) { }
         catch (InvalidOperationException ex) when (ex.Message.Contains("cross-thread") || ex.Message.Contains("disposed")) { }
@@ -574,72 +523,6 @@ public class WinFormsDisplay : Form, IDisplay
             for (int i = 0; i < size && i < _displayBuffer.Length; i++)
             {
                 _displayBuffer[i] = _heap.GetIndexedByte(bitsOOP, i);
-            }
-        }
-    }
-
-    private void CopyDisplayFromHeap32bpp(SmalltalkOOP bitsOOP, ObjectFormat format, int size)
-    {
-        if (_heap == null) return;
-
-        // Read 1bpp data from heap and convert to 32bpp in display buffer
-        // Heap stores 1bpp data, we expand each bit to a 32bpp ARGB pixel
-        // Black (1) → 0xFF000000 (opaque black)
-        // White (0) → 0xFFFFFFFF (opaque white)
-
-        const uint black = 0xFF000000;
-        const uint white = 0xFFFFFFFF;
-
-        int heapRowStride = ((Width + 15) / 16) * 2;  // Smalltalk Form uses 16-bit word alignment
-        int displayStride32 = Width * 4;               // 32bpp: 4 bytes per pixel
-
-        // Get all heap bytes first for better performance
-        byte[] heapBytes;
-        if (format == ObjectFormat.WordIndexed)
-        {
-            heapBytes = new byte[size * 2];
-            for (int i = 0; i < size; i++)
-            {
-                ushort word = _heap.GetIndexedWord(bitsOOP, i);
-                heapBytes[i * 2] = (byte)(word >> 8);
-                heapBytes[i * 2 + 1] = (byte)(word & 0xFF);
-            }
-        }
-        else
-        {
-            heapBytes = new byte[size];
-            for (int i = 0; i < size; i++)
-            {
-                heapBytes[i] = _heap.GetIndexedByte(bitsOOP, i);
-            }
-        }
-
-        // Convert 1bpp to 32bpp
-        unsafe
-        {
-            fixed (byte* displayPtr = _displayBuffer)
-            {
-                uint* dst = (uint*)displayPtr;
-
-                for (int y = 0; y < Height; y++)
-                {
-                    int heapRowStart = y * heapRowStride;
-                    int dstRowStart = y * Width;
-
-                    for (int x = 0; x < Width; x++)
-                    {
-                        int byteIndex = heapRowStart + (x / 8);
-                        int bitIndex = 7 - (x % 8);  // MSB first
-
-                        bool isBlack = false;
-                        if (byteIndex < heapBytes.Length)
-                        {
-                            isBlack = (heapBytes[byteIndex] & (1 << bitIndex)) != 0;
-                        }
-
-                        dst[dstRowStart + x] = isBlack ? black : white;
-                    }
-                }
             }
         }
     }
@@ -678,6 +561,7 @@ public class WinFormsDisplay : Form, IDisplay
 
     private void CopyBufferToBitmap()
     {
+        // Convert 1bpp display buffer to 32bpp bitmap for screen rendering
         BitmapData bmpData = _backBuffer.LockBits(
             new Rectangle(0, 0, Width, Height),
             ImageLockMode.WriteOnly,
@@ -685,16 +569,7 @@ public class WinFormsDisplay : Form, IDisplay
 
         try
         {
-            if (_pixelDepth == PixelDepth.ThirtyTwoBit)
-            {
-                // 32bpp mode: direct copy from display buffer to bitmap
-                CopyBufferToBitmap32bpp(bmpData);
-            }
-            else
-            {
-                // 1bpp mode: expand each bit to 32bpp pixel
-                CopyBufferToBitmap1bpp(bmpData);
-            }
+            CopyBufferToBitmap1bpp(bmpData);
         }
         finally
         {
@@ -741,34 +616,6 @@ public class WinFormsDisplay : Form, IDisplay
                     {
                         int bitIndex = 7 - bit;
                         rowPtr[x++] = (sourceByte & (1 << bitIndex)) != 0 ? black : white;
-                    }
-                }
-            }
-        }
-    }
-
-    private void CopyBufferToBitmap32bpp(BitmapData bmpData)
-    {
-        // 32bpp mode: display buffer is already in 32bpp ARGB format
-        // Just copy directly to bitmap, handling stride differences
-        unsafe
-        {
-            int* bmpPtr = (int*)bmpData.Scan0;
-            int bmpStride = bmpData.Stride / 4;  // Stride in 32-bit words
-
-            fixed (byte* bufferPtr = _displayBuffer)
-            {
-                int* srcPtr = (int*)bufferPtr;
-
-                for (int y = 0; y < Height; y++)
-                {
-                    int* dstRow = bmpPtr + (y * bmpStride);
-                    int* srcRow = srcPtr + (y * Width);
-
-                    // Copy one row
-                    for (int x = 0; x < Width; x++)
-                    {
-                        dstRow[x] = srcRow[x];
                     }
                 }
             }
