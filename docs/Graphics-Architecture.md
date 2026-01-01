@@ -85,6 +85,16 @@ clipX, clipY, clipWidth, clipHeight "Clipping rectangle"
 | 101 | beCursor | Set hardware cursor |
 | 202 | bitState | Atomic mouse button state for polling |
 
+### Input Event Types (primitive 95)
+
+| Type | Name | Param | Description |
+|------|------|-------|-------------|
+| 1 | MouseX | X coordinate | Mouse X position |
+| 2 | MouseY | Y coordinate | Mouse Y position |
+| 3 | KeyDown | keycode | Key pressed |
+| 4 | KeyUp | keycode | Key released |
+| 6 | MouseWheel | delta + 2048 | Wheel rotation (offset-encoded signed)
+
 ---
 
 ## 2. Current Architecture
