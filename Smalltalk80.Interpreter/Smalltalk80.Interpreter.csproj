@@ -36,16 +36,11 @@
     </ProjectReference>
   </ItemGroup>
   
-  <!-- Copy Data files (coldstart.json, .sources, .changes) to output Data folder after build -->
-  <!-- Note: Each project has its own bin/obj directories -->
-  <!-- Compiler outputs to: Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json -->
-  <!-- Interpreter outputs to: Smalltalk80.Interpreter/bin/Debug/net9.0-windows/ -->
+  <!-- Copy coldstart.json to output Data folder after build -->
+  <!-- Note: Compiler now outputs .sources and .changes directly to Interpreter output directory -->
   <Target Name="CopyDataFilesToOutput" AfterTargets="Build">
     <PropertyGroup>
-      <!-- Source locations -->
       <CompilerOutputDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\</CompilerOutputDir>
-      <SmalltalkSourceDir>$(MSBuildProjectDirectory)\..\Smalltalk-80 Source\</SmalltalkSourceDir>
-      <!-- Destination Data folder -->
       <DataOutputDir>$(TargetDir)Data\</DataOutputDir>
     </PropertyGroup>
 
@@ -53,17 +48,8 @@
     <MakeDir Directories="$(DataOutputDir)" Condition="!Exists('$(DataOutputDir)')" />
 
     <!-- Copy coldstart.json from Compiler output Data folder (if freshly compiled) -->
-    <!-- Note: coldstart.json is tracked in git in the Interpreter's Data folder, so this is optional -->
     <Copy SourceFiles="$(CompilerOutputDir)Data\coldstart.json" DestinationFolder="$(DataOutputDir)" SkipUnchangedFiles="true" Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
     <Message Text="✓ Copied freshly compiled coldstart.json to $(DataOutputDir)" Importance="high" Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
-
-    <!-- Copy Smalltalk-80.sources from Compiler output (generated during compilation) -->
-    <Copy SourceFiles="$(CompilerOutputDir)Data\Smalltalk-80.sources" DestinationFolder="$(DataOutputDir)" SkipUnchangedFiles="true" Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.sources')" />
-    <Message Text="✓ Copied Smalltalk-80.sources to $(DataOutputDir)" Importance="high" Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.sources')" />
-
-    <!-- Copy Smalltalk-80.changes from Compiler output (generated during compilation) -->
-    <Copy SourceFiles="$(CompilerOutputDir)Data\Smalltalk-80.changes" DestinationFolder="$(DataOutputDir)" SkipUnchangedFiles="true" Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.changes')" />
-    <Message Text="✓ Copied Smalltalk-80.changes to $(DataOutputDir)" Importance="high" Condition="Exists('$(CompilerOutputDir)Data\Smalltalk-80.changes')" />
   </Target>
 
 

@@ -39097,7 +39097,17 @@ SystemDictionary class
 
 !SystemDictionary class methodsFor: 'class initialization'!
 initialize
-	Project current noChanges
+	"Initialize system state including SourceFiles for source code storage"
+	| sourcesFile changesFile |
+	Project current noChanges.
+
+	"Initialize SourceFiles array with file streams for .sources and .changes.
+	 Files are opened from the current working directory."
+	SourceFiles _ Array new: 2.
+	sourcesFile _ WindowsFileStream readOn: 'Smalltalk-80.sources'.
+	sourcesFile notNil ifTrue: [SourceFiles at: 1 put: sourcesFile].
+	changesFile _ WindowsFileStream readWriteOn: 'Smalltalk-80.changes'.
+	changesFile notNil ifTrue: [SourceFiles at: 2 put: changesFile]
 	"SystemDictionary initialize"! !
 
 SystemDictionary initialize!
