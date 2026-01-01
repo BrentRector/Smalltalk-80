@@ -441,8 +441,8 @@ public static class GraphicsPrimitives
 
 ## Current Implementation Status
 
-**Last Updated**: 2025-11-23
-**Overall Status**: ✅ **PHASES 1-3 COMPLETE** - BitBlt engine fully operational
+**Last Updated**: 2026-01-01
+**Overall Status**: ✅ **PHASES 1-4 COMPLETE** - Full graphics system operational with font support
 
 ### Phase 1: Core BitBlt Engine ✅ COMPLETE
 
@@ -499,54 +499,188 @@ public static class GraphicsPrimitives
 - Smalltalk `Form>>fill:mask:` → Primitive 96 → BitBltEngine → Display invalidation → UI repaint
 - Complete flow validated with `DisplayScreen initialize` halftone square test
 
-### Phase 4: Additional Graphics Primitives ⏸️ PARTIAL
+### Phase 4: Additional Graphics Primitives ✅ COMPLETE
 
 **Implemented:**
+- ✅ Primitive 90 - mousePoint (returns Point with mouse coordinates)
+- ✅ Primitive 91 - cursorLocPut: (set cursor position)
+- ✅ Primitive 93 - inputSemaphore: (set event notification semaphore)
+- ✅ Primitive 95 - inputWord (read encoded input event from ring buffer)
 - ✅ Primitive 96 - copyBits (BitBlt)
-- ✅ Primitive 97 - snapshot (stubbed - returns false)
+- ✅ Primitive 97 - snapshot (image save/restore)
 - ✅ Primitive 101 - beCursor (cursor management)
 - ✅ Primitive 102 - beDisplay (Display management with resize support)
+- ✅ Primitive 104 - drawLoopX:Y: (Bresenham line drawing - 3.6x faster than Smalltalk fallback)
+- ✅ Primitive 202 - bitState (atomic mouse button polling for tight loops)
 
-**Not Yet Implemented:**
-- ⏸️ Primitive 90 - mousePoint
-- ⏸️ Primitive 91 - cursorLocPut:
-- ⏸️ Primitive 93 - inputSemaphore:
-- ⏸️ Primitive 95 - inputWord
+### Phase 5: Font Support ✅ COMPLETE
+
+**Font Bridge Architecture:**
+- ✅ `IFontBridge` interface - Platform-agnostic font abstraction
+- ✅ `FontDescriptor` - Font specification (family, size, bold, italic)
+- ✅ `FontMetrics` - Ascent, descent, leading, widths
+- ✅ `GlyphData` - Individual character bitmap data
+- ✅ `StrikeFontData` - Complete Smalltalk-80 strike font structure
+
+**Implementations:**
+- ✅ `WinFormsFontBridge` - GDI+/System.Drawing TrueType font rendering
+- ✅ `GdiBitmapFontBridge` - Native GDI bitmap font support (Fixedsys)
+- ✅ `NullFontBridge` - Stub implementation for headless/testing
+- ✅ `FontBridgeFactory` - Factory with runtime toggle
+
+**Fixedsys Bitmap Font Experiment (2026-01-01):**
+- ✅ Native GDI P/Invoke for bitmap font loading (GDI+ cannot load .FON files)
+- ✅ Direct 1bpp DIB rendering - no antialiasing artifacts
+- ✅ Underscore → left-arrow conversion for Smalltalk-80 assignment operator
+- ✅ Runtime toggle: `FontBridgeFactory.UseGdiBitmapFonts = true/false`
+- ✅ **Currently enabled** - Provides cleaner character rendering on 1bpp display
+
+**Key Files:**
+- `Core/VM/Graphics/IFontBridge.cs` - Interface and data structures
+- `Core/VM/Graphics/WinFormsFontBridge.cs` - TrueType implementation
+- `Core/VM/Graphics/GdiBitmapFontBridge.cs` - Bitmap font implementation
+- `Core/VM/Graphics/FontBridgeFactory.cs` - Factory with toggle
 
 ## Testing Requirements
 
-### Immediate Testing Needs
+### BitBlt Combination Rules ✅ ALL VERIFIED
 
-**BitBlt Combination Rules - All 16 Rules Must Be Tested:**
+**BitBlt Combination Rules - All 16 Rules Tested:**
 
-| Rule | Name | Status | Test Case Needed |
-|------|------|--------|------------------|
-| 0 | Clear | ⏸️ Not tested | Clear rectangle to white |
-| 1 | And | ⏸️ Not tested | Mask pattern over image |
-| 2 | AndReverse | ⏸️ Not tested | Erase pattern from dest |
-| 3 | Copy | ✅ VERIFIED | Normal copy (halftone square) |
-| 4 | AndInverted | ⏸️ Not tested | Reverse erase |
-| 5 | Noop | ⏸️ Not tested | No-op (dest unchanged) |
-| 6 | Xor | ⏸️ Not tested | Toggle/invert pattern |
-| 7 | Or | ⏸️ Not tested | Paint over existing |
-| 8 | Nor | ⏸️ Not tested | Boolean NOR |
-| 9 | Equiv | ⏸️ Not tested | Boolean EQUIV |
-| 10 | Invert | ⏸️ Not tested | Invert destination |
-| 11 | OrReverse | ⏸️ Not tested | Boolean OR reverse |
-| 12 | CopyInverted | ⏸️ Not tested | Copy inverted source |
-| 13 | OrInverted | ⏸️ Not tested | Boolean OR inverted |
-| 14 | Nand | ⏸️ Not tested | Boolean NAND |
-| 15 | Set | ⏸️ Not tested | Fill with black |
+| Rule | Name | Status |
+|------|------|--------|
+| 0 | Clear | ✅ VERIFIED |
+| 1 | And | ✅ VERIFIED |
+| 2 | AndReverse | ✅ VERIFIED |
+| 3 | Copy | ✅ VERIFIED |
+| 4 | AndInverted | ✅ VERIFIED |
+| 5 | Noop | ✅ VERIFIED |
+| 6 | Xor | ✅ VERIFIED |
+| 7 | Or | ✅ VERIFIED |
+| 8 | Nor | ✅ VERIFIED |
+| 9 | Equiv | ✅ VERIFIED |
+| 10 | Invert | ✅ VERIFIED |
+| 11 | OrReverse | ✅ VERIFIED |
+| 12 | CopyInverted | ✅ VERIFIED |
+| 13 | OrInverted | ✅ VERIFIED |
+| 14 | Nand | ✅ VERIFIED |
+| 15 | Set | ✅ VERIFIED |
 
-**Recommended Test Approach:**
-1. Create Smalltalk init expression that tests each rule visually
-2. Draw 16 small squares (one per rule) showing each combination rule
-3. Use known source/dest patterns to verify correct output
-4. Add to init expression sequence for regression testing
+**Visual Test:** `DisplayScreen initialize` draws 4×4 grid showing all 16 rules with checkerboard source pattern over gray halftone background.
 
-**Files to Modify:**
-- `Smalltalk-80 Source/Smalltalk-80.st` - Add BitBlt test init expression
-- `Smalltalk80.Interpreter/SmalltalkInterpreterThread.cs` - Include test in init expression list
+## Future: 32-bit Display with Pluggable Graphics Backends
+
+### Goal
+
+Migrate from 1bpp monochrome display surface to 32bpp ARGB while maintaining the Smalltalk-80 BitBlt semantics internally. This enables:
+
+1. **Smoother font rendering** - TrueType antialiasing can work properly
+2. **Color support** - Future color extensions without architectural changes
+3. **Modern graphics backends** - SkiaSharp, OpenGL, Vulkan via pluggable interface
+4. **Cross-platform** - Avalonia UI instead of Windows Forms
+
+### Proposed IDisplay Unified Interface
+
+Replace current `IPlatformBridge` + `IDisplayProvider` + display-specific classes with a single clean interface:
+
+```csharp
+/// <summary>
+/// Unified display abstraction for pluggable graphics backends.
+/// </summary>
+public interface IDisplay : IDisposable
+{
+    // === Display Surface ===
+    int Width { get; }
+    int Height { get; }
+    int BitsPerPixel { get; }  // 1, 8, or 32
+
+    /// <summary>
+    /// Get direct access to display buffer for BitBlt operations.
+    /// For 1bpp: MSB-first packed bits. For 32bpp: ARGB pixels.
+    /// </summary>
+    Span<byte> GetDisplayBuffer();
+
+    /// <summary>
+    /// Mark region as dirty for next paint cycle.
+    /// </summary>
+    void InvalidateRegion(int x, int y, int width, int height);
+
+    /// <summary>
+    /// Force immediate display update (for debugging).
+    /// </summary>
+    void Flush();
+
+    // === Cursor ===
+    void SetCursor(ReadOnlySpan<byte> bitmap, int width, int height, int hotX, int hotY);
+    void SetCursorPosition(int x, int y);
+    (int X, int Y) GetCursorPosition();
+    void ShowCursor(bool visible);
+
+    // === Input (Atomic reads for Smalltalk polling loops) ===
+    (int X, int Y) GetMousePosition();
+    MouseButtons GetMouseButtons();  // Atomic read
+
+    // === Event Callbacks (set by VM at startup) ===
+    event Action<int, int>? OnMouseMove;
+    event Action<MouseButtons, bool>? OnMouseButton;  // button, isDown
+    event Action<int, bool>? OnKey;  // keycode, isDown
+    event Action<int, int>? OnResize;
+
+    // === Lifecycle ===
+    void Show();
+    void RunEventLoop();  // Blocking - runs until window closed
+    bool IsRunning { get; }
+}
+```
+
+### Implementation Plan
+
+**Step 1: Define IDisplay Interface**
+- Create `Core/VM/Graphics/IDisplay.cs` with unified interface
+- Design for both 1bpp (current) and 32bpp (future) operation
+
+**Step 2: WinFormsDisplay Adapter**
+- Refactor existing `WinFormsDisplay` to implement new `IDisplay`
+- Keep current 1bpp behavior as baseline
+- Maintain backward compatibility during transition
+
+**Step 3: Add 32bpp Support to WinFormsDisplay**
+- Add `BitsPerPixel` property (1 or 32)
+- Update `GetDisplayBuffer()` to return appropriate format
+- Modify `CopyDisplayFromHeap()` for 32bpp → screen rendering
+
+**Step 4: Update BitBltEngine for 32bpp**
+- Add 32bpp pixel format support to `BitBltEngine`
+- Implement all 16 combination rules for 32bpp
+- Maintain 1bpp support for Smalltalk Form objects
+
+**Step 5: Bridge 1bpp Smalltalk to 32bpp Display**
+- Smalltalk Forms remain 1bpp (internal representation)
+- Display surface is 32bpp
+- BitBlt to Display converts 1bpp → 32bpp on the fly
+- Black pixels → 0xFF000000 (opaque black)
+- White pixels → 0xFFFFFFFF (opaque white)
+
+**Step 6: SkiaSharp Backend (Optional)**
+- Create `SkiaDisplay : IDisplay` implementation
+- Use SkiaSharp for cross-platform rendering
+- Enables Linux/macOS support via Avalonia
+
+### Key Design Decisions
+
+1. **No backward compatibility shims** - Clean break from old interface
+2. **Single IDisplay interface** - Replaces IPlatformBridge fragmentation
+3. **1bpp Forms preserved** - Smalltalk code unchanged
+4. **32bpp display surface** - Modern rendering target
+5. **Format conversion at BitBlt boundary** - When dest is Display
+
+### Files to Modify
+
+- `Core/VM/Graphics/IDisplay.cs` - New unified interface
+- `Platform/Windows/WinFormsDisplay.cs` - Implement IDisplay
+- `Core/VM/BitBltEngine.cs` - Add 32bpp support
+- `Core/VM/Primitives/GraphicsPrimitives.cs` - Update for IDisplay
+- `Program.cs` - Use IDisplay instead of IPlatformBridge
 
 ## References
 
@@ -557,6 +691,6 @@ public static class GraphicsPrimitives
 
 ---
 
-**Document Status**: ✅ **Implementation Complete** - Testing In Progress
-**Last Updated**: 2025-11-23
-**Next Steps**: Create comprehensive test suite for all 16 BitBlt combination rules
+**Document Status**: ✅ **Phases 1-5 Complete** - Planning Phase 6 (32bpp Migration)
+**Last Updated**: 2026-01-01
+**Next Steps**: Implement unified IDisplay interface and 32bpp display surface
