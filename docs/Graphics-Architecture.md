@@ -638,5 +638,106 @@ When a halftone pattern is used in 32bpp mode, instead of rendering as a dithere
 
 ---
 
+---
+
+## Future Work: Native Form Depth Support
+
+The current implementation intercepts primitives at the C#/display boundary to convert 1bpp Smalltalk Forms to 32bpp rendering. The next phase would add native multi-depth Form support in Smalltalk itself.
+
+### Why Native Depth Support?
+
+**Current Limitation**: Intermediate Forms (window backing stores, cached images) remain 1bpp internally. Only the final Display composite gets halftone-to-gray conversion. True smooth rendering requires Forms to natively support 32bpp.
+
+### Smalltalk Form Class Changes
+
+Add `depth` instance variable to Form:
+```smalltalk
+Form instanceVariableNames: 'bits width height offset depth'
+```
+
+**Critical Methods Requiring Changes** (47+ locations audited):
+
+| Class | Methods | Severity | Summary |
+|-------|---------|----------|---------|
+| Form | 17 methods + 6 constants | CRITICAL | Bitmap allocation uses `(width + 15) // 16` formula |
+| BitBlt | 3 methods | CRITICAL | Primitive 96 must dispatch by depth |
+| DisplayScreen | 2 methods | CRITICAL | Display creation/initialization |
+| Cursor | 2 methods | HIGH | Keep 1bpp, convert in primitive 101 |
+| DisplayMedium | 6 methods | MEDIUM | Convenience fill methods use halftone masks |
+| StrikeFont | 3 methods | MEDIUM | Keep fonts 1bpp, convert when rendering |
+| CharacterScanner | 3 methods | MEDIUM | Text color application |
+| Pen | 4 methods | LOW | Color property for pen drawing |
+
+**Key Formula Change**:
+```smalltalk
+"Current 1bpp allocation"
+bits _ WordArray new: (width + 15) // 16 * height.
+
+"Multi-depth allocation"
+Form>>wordsPerLine
+    depth = 32 ifTrue: [^width * 2].  "2 words per 32-bit pixel"
+    ^(width + 15) // 16  "1bpp default"
+```
+
+### Color Class Design
+
+```smalltalk
+Object subclass: #Color
+    instanceVariableNames: 'red green blue alpha'
+    classVariableNames: 'Black White Gray'
+
+Color>>asARGB
+    "Answer 32-bit ARGB integer"
+    ^(alpha << 24) + (red << 16) + (green << 8) + blue
+
+Color>>asForm32
+    "Answer 1x1 32bpp Form with this color"
+    | form |
+    form _ Form extent: 1@1 depth: 32.
+    form pixelAt: 0@0 put: self asARGB.
+    ^form
+
+Color>>asHalftone
+    "Answer halftone approximating this color for 1bpp compatibility"
+    | brightness |
+    brightness _ (red + green + blue) / 3.0 / 255.0.
+    brightness < 0.5 ifTrue: [^Form gray].
+    ^Form white
+```
+
+### Primitive 96 Depth-Aware Dispatch
+
+```csharp
+// Dispatch based on Form depth combination
+(sourceDepth, destDepth) switch
+{
+    (1, 1)   => BitBltEngine.CopyBits(...),       // Current 1bpp engine
+    (32, 32) => BitBltEngine32.CopyBits32(...),   // 32bpp pixel ops
+    (1, 32)  => BitBltEngine32.CopyBits1To32(...),// Expand bits to pixels
+    (32, 1)  => BitBltEngine32.CopyBits32To1(...),// Threshold/dither
+};
+```
+
+### Implementation Phases
+
+| Phase | Scope | Complexity |
+|-------|-------|------------|
+| 1. Form depth ivar | Add depth to Form, update allocation | Medium |
+| 2. DisplayScreen 32bpp | 32bpp Display creation | Low |
+| 3. Color class | New Color class with ARGB | Low |
+| 4. Primitive depth dispatch | Update primitives 96, 102, 103, 104 | Medium |
+| 5. Widget updates | DisplayMedium, Pen color support | Medium |
+| 6. GPU Backend | Silk.NET OpenGL/Vulkan implementation | High |
+
+---
+
+## References
+
+1. Goldberg, A., & Robson, D. (1983). *Smalltalk-80: The Language and its Implementation* (Blue Book) - Chapter on BitBlt
+2. Ingalls, D. (1981). *Design Principles Behind Smalltalk* - Graphics system design
+3. [Silk.NET](https://github.com/dotnet/Silk.NET) - Official .NET Foundation graphics library
+
+---
+
 **Document Status**: ✅ **Phases 1-6 Complete** - 32bpp display with halftone-to-gray implemented
-**Next Steps**: Test 32bpp mode, implement GPU backends via IDisplay abstraction
+**Next Steps**: Test 32bpp mode, implement native Form depth support, GPU backends via IDisplay abstraction
