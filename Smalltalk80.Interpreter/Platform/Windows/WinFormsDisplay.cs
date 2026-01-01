@@ -512,11 +512,14 @@ public class WinFormsDisplay : Form, IDisplay
 
         if (format == ObjectFormat.WordIndexed)
         {
-            for (int i = 0; i < size && (i * 2 + 1) < _displayBuffer.Length; i++)
+            // 32-bit words: each word is 4 bytes in big-endian format
+            for (int i = 0; i < size && (i * 4 + 3) < _displayBuffer.Length; i++)
             {
-                ushort word = _heap.GetIndexedWord(bitsOOP, i);
-                _displayBuffer[i * 2] = (byte)(word >> 8);
-                _displayBuffer[i * 2 + 1] = (byte)(word & 0xFF);
+                uint word = _heap.GetIndexedWord(bitsOOP, i);
+                _displayBuffer[i * 4] = (byte)(word >> 24);
+                _displayBuffer[i * 4 + 1] = (byte)((word >> 16) & 0xFF);
+                _displayBuffer[i * 4 + 2] = (byte)((word >> 8) & 0xFF);
+                _displayBuffer[i * 4 + 3] = (byte)(word & 0xFF);
             }
         }
         else

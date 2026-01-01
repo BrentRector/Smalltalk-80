@@ -229,8 +229,9 @@ public static class SimpleObjectPrimitives
             {
                 if (!value.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
                 int wordValue = value.AsSmallInteger();
-                if (wordValue < 0 || wordValue > 65535) return PrimitiveResult.Fail(context.Metadata!);
-                context.HeapManager.SetIndexedWord(context.Receiver, index - 1, (ushort)wordValue);
+                // 32-bit words can store any non-negative SmallInteger
+                if (wordValue < 0) return PrimitiveResult.Fail(context.Metadata!);
+                context.HeapManager.SetIndexedWord(context.Receiver, index - 1, (uint)wordValue);
             }
             else
             {
