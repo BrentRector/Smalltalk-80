@@ -127,6 +127,7 @@ public class WinFormsDisplay : Form, IDisplay
         MouseDown += OnMouseDown;
         MouseUp += OnMouseUp;
         MouseMove += OnMouseMove;
+        MouseWheel += OnMouseWheel;
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
         KeyPress += OnKeyPress;
@@ -651,6 +652,23 @@ public class WinFormsDisplay : Form, IDisplay
             currentButtons.HasFlag(System.Windows.Forms.MouseButtons.Left),
             currentButtons.HasFlag(System.Windows.Forms.MouseButtons.Middle),
             currentButtons.HasFlag(System.Windows.Forms.MouseButtons.Right));
+    }
+
+    private void OnMouseWheel(object? sender, MouseEventArgs e)
+    {
+        // e.Delta is +/- 120 per notch (WHEEL_DELTA constant in Windows)
+        // Convert to scroll lines (typically 3 lines per notch, but we use 1:1 for notches)
+        int notches = e.Delta / 120;
+        if (notches != 0)
+        {
+            _inputWordBuffer.EnqueueMouseWheel(notches);
+
+            // Wake if idle
+            if (_isIdleCallback?.Invoke() == true)
+            {
+                _idleWake.Set();
+            }
+        }
     }
 
     private void EnqueueMouseEvent(int x, int y, bool red, bool yellow, bool blue)

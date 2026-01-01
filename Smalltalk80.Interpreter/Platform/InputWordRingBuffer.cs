@@ -34,6 +34,7 @@ public class InputWordRingBuffer
     public const int TypeMouseY = 2 << 12;    // 0x2000
     public const int TypeKeyDown = 3 << 12;   // 0x3000
     public const int TypeKeyUp = 4 << 12;     // 0x4000
+    public const int TypeMouseWheel = 6 << 12; // 0x6000 - signed delta in param (positive = up)
 
     // Mouse button key codes
     public const int ButtonCodeBlue = 128;    // Right button
@@ -263,5 +264,19 @@ public class InputWordRingBuffer
     public void EnqueueKeyUp(int keyCode)
     {
         Enqueue(TypeKeyUp | (keyCode & 0xFFF));
+    }
+
+    /// <summary>
+    /// Helper to enqueue a mouse wheel event.
+    /// Delta is in scroll lines (positive = scroll up/away from user, negative = scroll down/toward user).
+    /// The param encodes the delta as a signed 12-bit value using offset encoding:
+    /// param = delta + 2048 (so range -2048..+2047 maps to 0..4095)
+    /// </summary>
+    public void EnqueueMouseWheel(int deltaLines)
+    {
+        // Clamp to signed 12-bit range and encode with offset
+        int clampedDelta = Math.Clamp(deltaLines, -2048, 2047);
+        int encodedParam = (clampedDelta + 2048) & 0xFFF;
+        Enqueue(TypeMouseWheel | encodedParam);
     }
 }

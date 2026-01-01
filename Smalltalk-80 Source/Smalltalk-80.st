@@ -21856,6 +21856,10 @@ blueButtonPressed
 mousePoint
 	"Answer a Point indicating the coordinates of the current mouse location."
 	^self primMousePt!
+mouseWheelDelta
+	"Answer the accumulated mouse wheel delta and reset it.
+	 Positive = scroll up (away from user), negative = scroll down (toward user)."
+	^CurrentInputState mouseWheelDelta!
 mousePointNext
 	"Answer the next mouse point if red button or tablet is down; false otherwise."
 	self redButtonPressed ifTrue: [^self mousePoint].
@@ -22028,7 +22032,7 @@ InputSensor initialize!
 InputSensor install!
 InputSensor initSensor!
 Object subclass: #InputState
-	instanceVariableNames: 'x y lshiftState rshiftState ctrlState lockState metaState keyboardQueue deltaTime baseTime timeProtect '
+	instanceVariableNames: 'x y lshiftState rshiftState ctrlState lockState metaState keyboardQueue deltaTime baseTime timeProtect wheelDelta '
 	classVariableNames: 'BitMax BitMin CtrlKey InputProcess InputSemaphore LockKey LshiftKey RshiftKey '
 	poolDictionaries: ''
 	category: 'System-Support'!
@@ -22092,7 +22096,15 @@ mouseButtons
 	^self bitState bitAnd: 7!
 mousePoint
 	"Answer the coordinates of the mouse location."
-	^self primMousePt! !
+	^self primMousePt!
+mouseWheelDelta
+	"Answer the accumulated mouse wheel delta and reset it to zero.
+	 Positive = scroll up (away from user), negative = scroll down (toward user).
+	 Each unit represents one wheel notch."
+	| delta |
+	delta _ wheelDelta.
+	wheelDelta _ 0.
+	^delta! !
 
 !InputState methodsFor: 'cursor'!
 cursorPoint: aPoint 
@@ -22115,6 +22127,7 @@ initState
 	timeProtect _ Semaphore forMutualExclusion.
 	timeProtect critical: [deltaTime _ baseTime _ 0].
 	x _ y _ 0.
+	wheelDelta _ 0.
 	keyboardQueue _ SharedQueue new: 50.
 	ctrlState _ lshiftState _ rshiftState _ lockState _ metaState _ 0!
 keyAt: index put: value
@@ -22239,7 +22252,10 @@ run
 				ifFalse:
 					[type = 2
 						ifTrue: [y _ param "Mouse Y"]
-						ifFalse: [self nextEvent: type with: param]]]! !
+						ifFalse:
+							[type = 6
+								ifTrue: [wheelDelta _ wheelDelta + param - 2048 "Mouse wheel delta (offset-encoded)"]
+								ifFalse: [self nextEvent: type with: param]]]]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputState class
@@ -34234,6 +34250,15 @@ controlTerminate
 
 !ScrollController methodsFor: 'control defaults'!
 controlActivity
+	| wheelDelta |
+	"Check for mouse wheel scrolling first"
+	wheelDelta _ sensor mouseWheelDelta.
+	wheelDelta ~= 0 ifTrue: [
+		self canScroll ifTrue: [
+			self scrollView: wheelDelta * self wheelScrollAmount negated.
+			self moveMarker].
+		^self].
+	"Normal scroll bar or super activity"
 	self scrollBarContainsCursor
 		ifTrue: [self scroll]
 		ifFalse: [super controlActivity]!
@@ -34288,6 +34313,10 @@ scrollViewDown
 scrollViewUp
 	"Scroll the receiver's view up the default amount."
 	self scrollView: self scrollAmount negated!
+wheelScrollAmount
+	"Answer the number of pixels to scroll per mouse wheel notch.
+	 Default is 16 pixels (approximately one text line)."
+	^16!
 viewDelta
 	"Answer an integer that indicates how much the view should be scrolled.
 	The scroll bar has been moved and now the view must be so the amount to
