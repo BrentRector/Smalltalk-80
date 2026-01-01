@@ -1312,11 +1312,314 @@ public void FullScreenBitBlt_Direct2D() => RunBitBlt(GraphicsBackendType.Direct2
 
 ---
 
-**Document Version**: 3.0
+---
+
+## Part 14: Critical Architecture Insight - Why IDisplay Must Be Unified
+
+### The Problem with Separating BitBlt from Display/Input
+
+The initial graphics abstraction was **fundamentally flawed** because it separated BitBlt operations from display/input handling:
+
+```
+FLAWED Design (DO NOT USE):
+┌─────────────────────────────────────┐
+│     WinFormsDisplayProvider         │ ← Owns window, input, display rendering
+└─────────────────────────────────────┘
+              ╳ Separate (WRONG)
+┌─────────────────────────────────────┐
+│     IGraphicsBackend                │ ← Only handles BitBlt operations
+└─────────────────────────────────────┘
+```
+
+**This doesn't work for GPU backends** because GPU graphics libraries want to own:
+1. **Window/surface creation** - they create the GPU context tied to the window
+2. **Rendering operations** - they manage GPU resources and command buffers
+3. **Input events** - they receive events from their window
+
+You **cannot** use WinForms for the window and OpenGL for rendering without awkward bridging that defeats GPU acceleration.
+
+### The Correct Architecture: Unified IDisplay
+
+```
+CORRECT Design:
+┌─────────────────────────────────────────────────────────────────────┐
+│                           IDisplay                                   │
+│  ┌──────────────┬────────────────┬─────────────────────────────┐    │
+│  │   Window     │    Renderer    │         Input               │    │
+│  │  Management  │    Context     │        Events               │    │
+│  ├──────────────┼────────────────┼─────────────────────────────┤    │
+│  │ Width/Height │ CreateTexture  │ MousePosition               │    │
+│  │ Title        │ BitBlt         │ MouseButtons                │    │
+│  │ Show/Hide    │ FillRect       │ KeyboardState               │    │
+│  │ Resize       │ Clear          │ PollEvents/WaitEvents       │    │
+│  │ Close        │ Present        │ EventQueue                  │    │
+│  └──────────────┴────────────────┴─────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+        ┌───────────────────────────┼───────────────────────────┐
+        ▼                           ▼                           ▼
+┌───────────────────┐   ┌───────────────────┐   ┌───────────────────┐
+│  WinFormsDisplay  │   │  SilkNetDisplay   │   │    SDL2Display    │
+│  (Software/GDI)   │   │  (OpenGL/Vulkan)  │   │  (SDL_Renderer)   │
+└───────────────────┘   └───────────────────┘   └───────────────────┘
+```
+
+### IDisplay Interface Design
+
+```csharp
+/// <summary>
+/// Unified display surface with integrated rendering and input.
+/// Window, graphics, and input are inseparable in GPU-accelerated systems.
+/// </summary>
+public interface IDisplay : IDisposable
+{
+    // === Window Management ===
+    int Width { get; }
+    int Height { get; }
+    string Title { get; set; }
+    bool IsVisible { get; }
+    bool IsFocused { get; }
+
+    void Show();
+    void Hide();
+    void Close();
+    void Resize(int width, int height);
+
+    // === Rendering Context ===
+    ITexture CreateTexture(int width, int height, PixelDepth depth);
+    void BitBlt(in BitBltParams p);
+    void FillRect(int x, int y, int width, int height, Color32 color);
+    void Clear(Color32 color);
+    void BeginFrame();
+    void EndFrame();
+    void Present();  // Swap buffers / flip
+
+    /// <summary>
+    /// The display's backing texture (Smalltalk's Display Form).
+    /// BitBlt operations targeting this texture appear on screen after Present().
+    /// </summary>
+    ITexture DisplayTexture { get; }
+    void InvalidateRegion(int x, int y, int width, int height);
+
+    // === Input (Unified with display - NOT separable) ===
+    (int X, int Y) MousePosition { get; }
+    MouseButtons MouseButtons { get; }
+    IKeyboardState KeyboardState { get; }
+    bool PollEvent(out DisplayEvent evt);
+
+    /// <summary>
+    /// WaitHandle that signals when events are available.
+    /// Use with WaitHandle.WaitAny() for efficient multi-source waiting.
+    /// </summary>
+    WaitHandle EventAvailableHandle { get; }
+
+    // === Event loop integration ===
+    void ProcessEvents();  // Must be called on display's thread
+}
+```
+
+### Threading Model Integration
+
+Our two-thread architecture integrates as follows:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    UI/Display Thread                                │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                  IDisplay Implementation                      │   │
+│  │                                                               │   │
+│  │  ProcessEvents() / RunEventLoop()                            │   │
+│  │    - Pumps window system messages                            │   │
+│  │    - Enqueues DisplayEvents to thread-safe queue             │   │
+│  │    - Updates atomic MousePosition/MouseButtons               │   │
+│  │    - Signals EventAvailableHandle                            │   │
+│  │                                                               │   │
+│  │  EndFrame() / Present()                                      │   │
+│  │    - Swaps GPU buffers or blits to screen                    │   │
+│  │                                                               │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│                              │ EventAvailableHandle (WaitHandle)    │
+│                              │ + Atomic state accessors             │
+│                              ▼                                      │
+└────────────────────────────────────────────────────────────────────┘
+                               │
+                               │  WaitHandle.WaitAny([EventHandle, TimerHandle])
+                               ▼
+┌────────────────────────────────────────────────────────────────────┐
+│                       Smalltalk Thread                              │
+│                                                                     │
+│  InterpreterLoop:                                                   │
+│    - WaitAny([display.EventAvailableHandle, timer.Handle])         │
+│    - Read events via display.PollEvent()                           │
+│    - Poll state via display.MousePosition, display.MouseButtons    │
+│    - Execute BitBlt primitives:                                    │
+│        - For software backend: direct execution                    │
+│        - For GPU backend: may queue commands for UI thread         │
+│                                                                     │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Thread Safety Requirements:**
+1. **Atomic state reads**: `MousePosition` and `MouseButtons` must be atomic for polling
+2. **Event queue**: Thread-safe queue with `EventAvailableHandle` signaling
+3. **BitBlt operations**: Software backend executes directly; GPU backend may marshal to UI thread
+
+### IDisplaySystem Factory Interface
+
+```csharp
+/// <summary>
+/// Factory for creating display systems. Entry point for the graphics subsystem.
+/// </summary>
+public interface IDisplaySystem : IDisposable
+{
+    /// <summary>Display system name (e.g., "WinForms/GDI", "Silk.NET/OpenGL")</summary>
+    string Name { get; }
+
+    /// <summary>Capabilities supported by this display system</summary>
+    DisplayCapabilities Capabilities { get; }
+
+    /// <summary>Create a new display with the specified options</summary>
+    IDisplay CreateDisplay(DisplayOptions options);
+
+    /// <summary>Enumerate available monitors</summary>
+    IReadOnlyList<MonitorInfo> GetMonitors();
+}
+
+public record DisplayOptions
+{
+    public int Width { get; init; } = 800;
+    public int Height { get; init; } = 600;
+    public string Title { get; init; } = "Smalltalk-80";
+    public bool Fullscreen { get; init; } = false;
+    public bool VSync { get; init; } = true;
+    public PixelDepth PreferredDepth { get; init; } = PixelDepth.OneBit;
+}
+```
+
+### DisplayEvent Structure
+
+```csharp
+/// <summary>
+/// Unified event type for all display input events.
+/// Follows Blue Book input word format for compatibility.
+/// </summary>
+public readonly struct DisplayEvent
+{
+    public DisplayEventType Type { get; init; }
+
+    // Mouse events
+    public int MouseX { get; init; }
+    public int MouseY { get; init; }
+    public MouseButtons Button { get; init; }
+
+    // Keyboard events
+    public KeyCode Key { get; init; }
+    public char Character { get; init; }
+    public KeyModifiers Modifiers { get; init; }
+
+    /// <summary>Convert to Blue Book input word format (type << 12 | param)</summary>
+    public int ToBlueBookWord() => Type switch
+    {
+        DisplayEventType.MouseMove => (1 << 12) | MouseX,
+        DisplayEventType.MouseButtonDown => (5 << 12) | (int)Button,
+        DisplayEventType.MouseButtonUp => (6 << 12) | (int)Button,
+        DisplayEventType.KeyDown => (3 << 12) | (int)Key,
+        DisplayEventType.KeyUp => (4 << 12) | (int)Key,
+        _ => 0
+    };
+}
+
+public enum DisplayEventType
+{
+    None = 0,
+    MouseMove,
+    MouseButtonDown,
+    MouseButtonUp,
+    KeyDown,
+    KeyUp,
+    TextInput,
+    Resize,
+    Focus,
+    Blur,
+    CloseRequested,
+}
+```
+
+---
+
+## Part 15: Phase 1 Implementation (Completed in Another Branch)
+
+Phase 1 was implemented in branch `claude/standardize-assignment-operator-mLcex`.
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `Platform/IDisplay.cs` | Unified interface for window, rendering, and input |
+| `Platform/IDisplaySystem.cs` | Factory interface and types |
+| `Platform/DisplaySystemFactory.cs` | Factory + NullDisplay for headless testing |
+| `Platform/Windows/WinFormsDisplay.cs` | WinForms implementation of IDisplay |
+| `Platform/Windows/WinFormsDisplaySystem.cs` | WinForms factory |
+
+### Files Removed
+
+- `Core/VM/Graphics/Abstraction/*` - All 6 files (IGraphicsBackend, SoftwareGraphicsBackend, etc.)
+- `Platform/Windows/WinFormsDisplayProvider.cs` - Replaced by WinFormsDisplay
+
+### Key Implementation Details
+
+1. **WinFormsDisplay** implements both `IDisplay` (new unified interface) and `IPlatformBridge` (backward compatibility for primitives)
+
+2. **GraphicsPrimitives** now uses `BitBltEngine` directly - no abstraction layer overhead
+
+3. **Program.cs** updated to use `WinFormsDisplay` instead of the old provider
+
+### Note on Merging
+
+This branch (`claude/32bpp-display-graphics-RLW1k`) will need to be rebased onto or merged with `claude/standardize-assignment-operator-mLcex` to incorporate the unified IDisplay implementation.
+
+---
+
+## Part 16: Complete File Structure After All Phases
+
+```
+Smalltalk80.Interpreter/
+├── Core/VM/Graphics/
+│   ├── BitBltEngine.cs           # 1-bit BitBlt operations
+│   └── BitBltEngine32.cs         # 32-bit BitBlt operations
+│
+├── Platform/
+│   ├── IDisplay.cs               # Unified display interface
+│   ├── IDisplaySystem.cs         # Factory interface & types
+│   ├── DisplaySystemFactory.cs   # Factory implementation
+│   │
+│   ├── Windows/
+│   │   ├── WinFormsDisplay.cs    # Software rendering backend
+│   │   └── WinFormsDisplaySystem.cs
+│   │
+│   └── SilkNet/                  # Future GPU backend
+│       ├── SilkNetDisplay.cs
+│       └── SilkNetDisplaySystem.cs
+│
+├── Core/VM/Primitives/
+│   ├── GraphicsPrimitives.cs     # Uses BitBltEngine directly
+│   └── InputPrimitives.cs        # Uses IDisplay for input
+│
+└── Program.cs                    # Creates display via factory
+```
+
+---
+
+**Document Version**: 4.0
 **Last Updated**: 2026-01-01
 **Author**: Claude Code Session
 **Prior Work Incorporated**:
 - 8-bit vs 32-bit analysis
 - GPU acceleration options research
-- Graphics abstraction layer design
-- SkiaSharp/Direct2D/OpenGL evaluation
+- Graphics abstraction layer design (both flawed and corrected)
+- SkiaSharp/Direct2D/OpenGL/Silk.NET evaluation
+- Unified IDisplay interface design
+- Threading model integration
+- Phase 1 implementation details from `claude/standardize-assignment-operator-mLcex`
