@@ -6556,8 +6556,11 @@ textMode - symbol indicating the nature of the currently viewed text.'!
 
 !Browser methodsFor: 'initialization'!
 on: anOrganizer
+	| cats |
 	organization _ anOrganizer.
-	meta _ false!
+	meta _ false.
+	cats _ organization categories.
+	cats isEmpty ifFalse: [category _ cats first]!
 onClass: aClass
 	organization _ SystemOrganization.
 	className _ aClass isMeta
