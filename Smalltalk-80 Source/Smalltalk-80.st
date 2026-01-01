@@ -1717,7 +1717,7 @@ WindowsFileSystem initialize!
 "==================== WindowsFileStream ===================="
 
 Object subclass: #WindowsFileStream
-    instanceVariableNames: 'pathName handle position mode closed'
+    instanceVariableNames: 'pathName handle position mode closed logicalSize'
     classVariableNames: 'ReadMode WriteMode AppendMode ReadWriteMode'
     poolDictionaries: ''
     category: 'Files-Windows'!
@@ -1732,6 +1732,7 @@ Instance Variables:
     position    <Integer> current read/write position
     mode        <Integer> access mode (ReadMode, WriteMode, etc.)
     closed      <Boolean> true if stream is closed
+    logicalSize <Integer> max position reached (tracks writes without OS query)
 
 Class Variables:
     ReadMode       <Integer> = 1
@@ -1852,8 +1853,12 @@ position: anInteger
     position _ anInteger!
 
 size
-    "Return file size"
+    "Return file size. When open, return tracked logicalSize (no OS call needed).
+     When closed, query filesystem. Handle nil logicalSize for pre-existing streams."
     | attrs |
+    closed ifFalse: [
+        logicalSize == nil ifTrue: [logicalSize _ self physicalFileSize].
+        ^logicalSize].
     attrs _ self primGetAttributes: pathName.
     attrs isNil ifTrue: [^0].
     ^attrs at: 1!
@@ -1959,12 +1964,16 @@ nextWord
 !WindowsFileStream methodsFor: 'writing'!
 
 nextPut: aCharacter
-    "Write a character"
+    "Write a character and update logical size"
     | byte |
     closed ifTrue: [self reopen].
     byte _ aCharacter asciiValue.
     self primWriteByte: handle at: position value: byte.
     position _ position + 1.
+    "Update logical size - handle nil for pre-existing streams"
+    logicalSize == nil
+        ifTrue: [logicalSize _ position]
+        ifFalse: [logicalSize _ position max: logicalSize].
     ^aCharacter!
 
 nextPutAll: aCollection
@@ -1986,7 +1995,6 @@ nextChunkPut: aString
         char == $! ifTrue: [self nextPut: $!].
         self nextPut: char].
     self nextPut: $!.
-    self cr.
     ^aString!
 
 nextWordPut: aWord
@@ -1996,8 +2004,15 @@ nextWordPut: aWord
     ^aWord!
 
 flush
-    "No-op for direct file access"
+    "Flush file buffers. Primitive 151."
+    closed ifTrue: [^self].
+    self primFlush: handle.
     ^self!
+
+primFlush: aHandle
+    "Flush file stream buffers. Primitive 151."
+    <primitive: 151>
+    ^self primitiveFailed!
 
 shorten
     "Truncate file at current position"
@@ -2016,7 +2031,8 @@ do: aBlock
 !WindowsFileStream methodsFor: 'mode setting'!
 
 readOnly
-    "Set to read-only mode"
+    "Set to read-only mode. Flush first to ensure writes are committed."
+    self flush.
     mode _ ReadMode!
 
 readWrite
@@ -2089,8 +2105,17 @@ open: modeValue
     handle < 0 ifTrue: [self error: 'Cannot open file: ', pathName].
     closed _ false.
     position _ 0.
+    "Initialize logical size from filesystem (only query once at open)"
+    logicalSize _ self physicalFileSize.
 
-    modeValue = AppendMode ifTrue: [self setToEnd]! !
+    modeValue = AppendMode ifTrue: [self setToEnd]!
+
+physicalFileSize
+    "Query filesystem for actual file size. Used only at open time."
+    | attrs |
+    attrs _ self primGetAttributes: pathName.
+    attrs isNil ifTrue: [^0].
+    ^attrs at: 1! !
 
 !WindowsFileStream methodsFor: 'fileIn/Out'!
 
@@ -2128,6 +2153,10 @@ timeStamp
 	Smalltalk timeStamp: stream.
 	self nextChunkPut: stream contents.
 	self cr!
+
+emphasis
+	"Answer default emphasis (1) for compatibility with streams that carry emphasis"
+	^1!
 
 emphasis: ignored
 	"No-op for plain file streams - allows compatibility with streams that carry emphasis"
@@ -31660,7 +31689,255 @@ example
 	bic defaultNib: 4.
 	bic combinationRule: Form under.
 	1 to: 50 do: [:i | bic go: i*4. bic turn: 89]
-	"Pen example"! !Object subclass: #Point
+	"Pen example"! !
+Object subclass: #Color
+	instanceVariableNames: 'rgb'
+	classVariableNames: 'Black White Transparent'
+	poolDictionaries: ''
+	category: 'Graphics-Primitives'!
+Color comment: 'I represent an RGB color value. My rgb instance variable stores 10 bits per component (R: bits 20-29, G: bits 10-19, B: bits 0-9) for internal precision. I provide conversion to/from 32-bit ARGB pixel values for use with 32bpp Forms.
+
+Class Variables:
+    Black       Color - The color black (0, 0, 0)
+    White       Color - The color white (1, 1, 1)
+    Transparent TranslucentColor - Fully transparent (alpha = 0)
+
+Instance Variables:
+    rgb         Integer - Packed RGB value (10 bits per component)'!
+
+
+!Color methodsFor: 'accessing'!
+red
+	"Answer the red component as a Float from 0.0 to 1.0"
+	^(rgb bitShift: -20) / 1023.0!
+
+green
+	"Answer the green component as a Float from 0.0 to 1.0"
+	^((rgb bitShift: -10) bitAnd: 1023) / 1023.0!
+
+blue
+	"Answer the blue component as a Float from 0.0 to 1.0"
+	^(rgb bitAnd: 1023) / 1023.0!
+
+alpha
+	"Answer the alpha component. For opaque Color, always 1.0"
+	^1.0!
+
+rgb
+	"Answer the packed RGB value (internal representation)"
+	^rgb! !
+
+!Color methodsFor: 'comparing'!
+= aColor
+	"Answer whether the receiver equals aColor"
+	self species = aColor species ifFalse: [^false].
+	^rgb = aColor rgb!
+
+hash
+	"Answer a hash value for the receiver"
+	^rgb hash! !
+
+!Color methodsFor: 'converting'!
+asPixelValue
+	"Answer the 32-bit ARGB pixel value (alpha = 255 for opaque)"
+	^16rFF000000 +
+	 ((self red * 255) rounded bitShift: 16) +
+	 ((self green * 255) rounded bitShift: 8) +
+	 (self blue * 255) rounded!
+
+asFormColor
+	"Answer 1 (black) or 0 (white) based on luminance threshold.
+	 For 1bpp Form compatibility."
+	| luminance |
+	luminance := (self red * 0.299) + (self green * 0.587) + (self blue * 0.114).
+	^luminance < 0.5 ifTrue: [1] ifFalse: [0]!
+
+asColor
+	"Answer the receiver (for polymorphism with TranslucentColor)"
+	^self!
+
+alpha: alphaValue
+	"Answer a TranslucentColor with the given alpha (0.0-1.0)"
+	^TranslucentColor new
+		privateSetRgb: rgb;
+		privateSetAlpha: alphaValue! !
+
+!Color methodsFor: 'printing'!
+printOn: aStream
+	"Print the receiver on aStream"
+	aStream nextPutAll: '(Color r: '.
+	self red printOn: aStream.
+	aStream nextPutAll: ' g: '.
+	self green printOn: aStream.
+	aStream nextPutAll: ' b: '.
+	self blue printOn: aStream.
+	aStream nextPut: $)! !
+
+!Color methodsFor: 'private'!
+setRed: r green: g blue: b
+	"Set the RGB components from 0.0-1.0 float values"
+	| ri gi bi |
+	ri := ((r max: 0.0) min: 1.0) * 1023 rounded.
+	gi := ((g max: 0.0) min: 1.0) * 1023 rounded.
+	bi := ((b max: 0.0) min: 1.0) * 1023 rounded.
+	rgb := (ri bitShift: 20) + (gi bitShift: 10) + bi!
+
+privateSetRgb: anInteger
+	"Set the rgb value directly (for internal use)"
+	rgb := anInteger! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+Color class
+	instanceVariableNames: ''!
+
+
+!Color class methodsFor: 'instance creation'!
+r: r g: g b: b
+	"Answer a new Color with the given RGB components (0.0-1.0)"
+	^self basicNew setRed: r green: g blue: b!
+
+fromInteger: argbInteger
+	"Answer a new Color from a 32-bit ARGB pixel value.
+	 The alpha component is ignored."
+	^self
+		r: ((argbInteger bitShift: -16) bitAnd: 255) / 255.0
+		g: ((argbInteger bitShift: -8) bitAnd: 255) / 255.0
+		b: (argbInteger bitAnd: 255) / 255.0!
+
+gray: grayValue
+	"Answer a gray Color where grayValue is 0.0 (black) to 1.0 (white)"
+	^self r: grayValue g: grayValue b: grayValue! !
+
+!Color class methodsFor: 'named colors'!
+black
+	"Answer the color black"
+	^Black!
+
+white
+	"Answer the color white"
+	^White!
+
+transparent
+	"Answer a fully transparent color"
+	^Transparent!
+
+red
+	"Answer pure red"
+	^self r: 1.0 g: 0.0 b: 0.0!
+
+green
+	"Answer pure green"
+	^self r: 0.0 g: 1.0 b: 0.0!
+
+blue
+	"Answer pure blue"
+	^self r: 0.0 g: 0.0 b: 1.0!
+
+yellow
+	"Answer pure yellow"
+	^self r: 1.0 g: 1.0 b: 0.0!
+
+cyan
+	"Answer pure cyan"
+	^self r: 0.0 g: 1.0 b: 1.0!
+
+magenta
+	"Answer pure magenta"
+	^self r: 1.0 g: 0.0 b: 1.0!
+
+gray
+	"Answer medium gray (50%)"
+	^self gray: 0.5! !
+
+!Color class methodsFor: 'class initialization'!
+initialize
+	"Initialize class variables.
+	 Color initialize"
+	Black := self r: 0.0 g: 0.0 b: 0.0.
+	White := self r: 1.0 g: 1.0 b: 1.0.
+	Transparent := TranslucentColor new
+		privateSetRgb: 0;
+		privateSetAlpha: 0.0! !
+Color subclass: #TranslucentColor
+	instanceVariableNames: 'alpha'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Graphics-Primitives'!
+TranslucentColor comment: 'I am a Color with an alpha (transparency) component. Alpha ranges from 0.0 (fully transparent) to 1.0 (fully opaque).
+
+Instance Variables:
+    alpha   Float - The alpha (opacity) value from 0.0 to 1.0'!
+
+
+!TranslucentColor methodsFor: 'accessing'!
+alpha
+	"Answer the alpha component (0.0 = transparent, 1.0 = opaque)"
+	^alpha! !
+
+!TranslucentColor methodsFor: 'comparing'!
+= aColor
+	"Answer whether the receiver equals aColor"
+	self species = aColor species ifFalse: [^false].
+	rgb = aColor rgb ifFalse: [^false].
+	^alpha = aColor alpha! !
+
+!TranslucentColor methodsFor: 'converting'!
+asPixelValue
+	"Answer the 32-bit ARGB pixel value including alpha"
+	^((alpha * 255) rounded bitShift: 24) +
+	 ((self red * 255) rounded bitShift: 16) +
+	 ((self green * 255) rounded bitShift: 8) +
+	 (self blue * 255) rounded!
+
+asColor
+	"Answer an opaque Color with the same RGB"
+	^Color basicNew privateSetRgb: rgb!
+
+alpha: alphaValue
+	"Answer a new TranslucentColor with the given alpha"
+	^TranslucentColor new
+		privateSetRgb: rgb;
+		privateSetAlpha: alphaValue! !
+
+!TranslucentColor methodsFor: 'printing'!
+printOn: aStream
+	"Print the receiver on aStream"
+	aStream nextPutAll: '(Color r: '.
+	self red printOn: aStream.
+	aStream nextPutAll: ' g: '.
+	self green printOn: aStream.
+	aStream nextPutAll: ' b: '.
+	self blue printOn: aStream.
+	aStream nextPutAll: ' alpha: '.
+	alpha printOn: aStream.
+	aStream nextPut: $)! !
+
+!TranslucentColor methodsFor: 'private'!
+privateSetAlpha: aFloat
+	"Set the alpha value (for internal use)"
+	alpha := (aFloat max: 0.0) min: 1.0! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+TranslucentColor class
+	instanceVariableNames: ''!
+
+
+!TranslucentColor class methodsFor: 'instance creation'!
+r: r g: g b: b alpha: a
+	"Answer a new TranslucentColor with the given RGBA components (0.0-1.0)"
+	^self basicNew
+		setRed: r green: g blue: b;
+		privateSetAlpha: a!
+
+fromInteger: argbaInteger
+	"Answer a new TranslucentColor from a 32-bit ARGB pixel value"
+	^self
+		r: ((argbaInteger bitShift: -16) bitAnd: 255) / 255.0
+		g: ((argbaInteger bitShift: -8) bitAnd: 255) / 255.0
+		b: (argbaInteger bitAnd: 255) / 255.0
+		alpha: ((argbaInteger bitShift: -24) bitAnd: 255) / 255.0! !
+Color initialize!
+Object subclass: #Point
 	instanceVariableNames: 'x y '
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -38820,7 +39097,17 @@ SystemDictionary class
 
 !SystemDictionary class methodsFor: 'class initialization'!
 initialize
-	Project current noChanges
+	"Initialize system state including SourceFiles for source code storage"
+	| sourcesFile changesFile |
+	Project current noChanges.
+
+	"Initialize SourceFiles array with file streams for .sources and .changes.
+	 Files are opened from the current working directory."
+	SourceFiles _ Array new: 2.
+	sourcesFile _ WindowsFileStream readOn: 'Smalltalk-80.sources'.
+	sourcesFile notNil ifTrue: [SourceFiles at: 1 put: sourcesFile].
+	changesFile _ WindowsFileStream readWriteOn: 'Smalltalk-80.changes'.
+	changesFile notNil ifTrue: [SourceFiles at: 2 put: changesFile]
 	"SystemDictionary initialize"! !
 
 SystemDictionary initialize!
@@ -38833,11 +39120,13 @@ SystemOrganizer comment: 'Provides an organization for the classes in the system
 
 
 !SystemOrganizer methodsFor: 'fileIn/Out'!
-fileOutCategory: category 
+fileOutCategory: category
 	| aFileStream |
+	Transcript cr; show: '=== FileOut START: ', category, ' ==='.
 	aFileStream _ Disk file: (category , '.st.') asFileName.
 	self fileOutCategory: category on: aFileStream.
-	aFileStream shorten; close!
+	aFileStream shorten; close.
+	Transcript cr; show: '=== FileOut COMPLETE: ', category, ' ==='!
 fileOutCategory: category on: aFileStream
 	| class first |
 	first _ true.

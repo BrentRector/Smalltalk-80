@@ -142,4 +142,20 @@ internal static class FileHandleManager
     {
         get { lock (_lock) { return _openFiles.Count; } }
     }
+
+    /// <summary>
+    /// Gets the file size for a handle.
+    /// Returns -1 if handle is invalid.
+    /// </summary>
+    public static long GetFileSize(int handle)
+    {
+        lock (_lock)
+        {
+            if (_openFiles.TryGetValue(handle, out var stream))
+            {
+                return stream.Length;
+            }
+            return -1;
+        }
+    }
 }

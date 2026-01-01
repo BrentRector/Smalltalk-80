@@ -103,11 +103,13 @@ This matches the Smalltalk runtime compiler's behavior (`MessageNode>>emitIf:on:
 - ✅ System Browser fully functional with source code retrieval
 
 **Source Code Retrieval** ✅ **WORKING**
-- ✅ Compiler generates `.sources` file with chunk-formatted source
+- ✅ Compiler generates `.sources` and `.changes` files in Interpreter project folder
 - ✅ Source positions encoded in CompiledMethod bytecodes (last 3 bytes)
-- ✅ `SourceFiles` global initialized with WindowsFileStream objects
+- ✅ `SourceFiles` global initialized via `SystemDictionary>>initialize` (pure Smalltalk)
+- ✅ `WindowsFileStream` uses `logicalSize` tracking to avoid stale filesystem queries
 - ✅ UTF-8 BOM handling in file primitives (transparent offset compensation)
 - ✅ `CompiledMethod>>getSource` retrieves source via `RemoteString`
+- ✅ Class comments written to `.changes` file with proper `!` chunk terminators
 
 **Key Files Modified**:
 - `VirtualMachine.cs` - HandleReturn logic for process termination
@@ -289,12 +291,16 @@ cd "Smalltalk-80 Source"
 # Compile Smalltalk source to generate new coldstart.json (outputs to Data subfolder by default)
 dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
 
-# Copy Data folder contents to interpreter bin directory (Windows)
-copy ..\Smalltalk80.Compiler\bin\Debug\net9.0\Data\* ..\Smalltalk80.Interpreter\bin\Debug\net9.0-windows\Data\
+# Copy coldstart.json to interpreter bin directory (Windows)
+copy ..\Smalltalk80.Compiler\bin\Debug\net9.0\Data\coldstart.json ..\Smalltalk80.Interpreter\bin\Debug\net9.0-windows\Data\
 
-# Copy Data folder contents to interpreter bin directory (Linux/Mac)
-cp -r ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/* ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
+# Copy coldstart.json to interpreter bin directory (Linux/Mac)
+cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/coldstart.json ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
 ```
+
+**Source File Locations**:
+- **coldstart.json**: Copied to `Smalltalk80.Interpreter/bin/.../Data/` (runtime location)
+- **.sources/.changes**: Written directly to `Smalltalk80.Interpreter/` project folder (opened by Smalltalk via `SystemDictionary>>initialize`)
 
 **Important**: The `Data` folder contents in the Interpreter's bin directory are now tracked in git to ensure init expressions are always in sync with the source code.
 
@@ -360,6 +366,7 @@ See `docs/Testing-Guide.md` for complete testing documentation.
 **⏭️ Skipped (0)**: None - all init expressions enabled
 
 **Recent Fixes**:
+- **WindowsFileStream logicalSize Tracking (2026-01-01)**: Class comments in .changes file were missing `!` terminators. Root cause: `WindowsFileStream>>size` queried filesystem which doesn't reflect buffered writes. When `setToEnd` called `self position: self size`, it got stale size, positioning before the just-written `!`, and next write overwrote it. Fix: Added `logicalSize` instance variable to track writes locally (like original Alto code). `SourceFiles` initialization moved from C# cold start to pure Smalltalk in `SystemDictionary>>initialize`.
 - **SingleCharSymbols Initialization (2025-12-01)**: System Browser crashed with "nil ," error when viewing methods like `Cursor>>changed:`. Root cause: `Symbol internCharacter:` returned nil because SingleCharSymbols wasn't properly populated during cold start. Fix: (1) Compiler now includes Blue Book canonical binary selectors (`+ - * / < > = ~ & | @ , \ ? ! %`) in symbol table, (2) Phase 5 cold start populates SingleCharSymbols array with these Symbol OOPs from the bundle.
 - **BOM Double-Offset Bug (2025-11-30)**: Primitive 124 (FileSeek) returned physical position instead of logical, causing primitive 132 (FileReadByte) to add BOM offset twice. Fixed to return logical position.
 - **BlockContext Stack Underflow (2025-11-30)**: Blue Book block arg handling pushes args onto stack, but StackManager used old `initialSP=nargs` model. Fixed to use `initialSP=0` for BlockContexts.

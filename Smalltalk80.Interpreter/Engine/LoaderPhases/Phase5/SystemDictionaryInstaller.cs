@@ -86,134 +86,16 @@ public class SystemDictionaryInstaller(
         // Smalltalk at:put: finds the existing Association instead of creating a new one
         InstallAllGlobalAssociations();
 
-        // Install SourceFiles as nil to enable decompiler fallback
-        // In traditional Smalltalk-80, SourceFiles is an Array of FileStreams for .sources and .changes
-        // Since we store source in JSON, we set this to nil so CompiledMethod>>getSource returns nil
-        // and the decompiler is used as fallback for displaying method source in the Browser
-        // NOTE: Setting to nil also prevents init expressions from crashing when trying to write
-        // class comments to file 2 (.changes file)
+        // Install SourceFiles as nil - actual initialization happens via Smalltalk init expression
+        // (Smalltalk initializeSourceFiles) which opens .sources and .changes from current directory
         InstallSourceFilesAsNil();
     }
 
     private void InstallSourceFilesAsNil()
     {
-        // Try to create SourceFiles array with actual file streams
-        // File 1 (.sources) is read-only, File 2 (.changes) is read-write
-        var sourceFilesOOP = TryCreateSourceFilesArray();
-
         var associationOOP = associationManager.GetOrCreateCanonical("SourceFiles");
-        context.Allocator.SetInstanceVariable(associationOOP, 1, sourceFilesOOP);
+        context.Allocator.SetInstanceVariable(associationOOP, 1, context.HeapManager.GetNil());
         InstallInSystemDictionary(associationOOP, "SourceFiles");
-    }
-
-    /// <summary>
-    /// Creates the SourceFiles array with WindowsFileReference streams for .sources and .changes files.
-    /// Returns nil if files cannot be found or opened.
-    /// </summary>
-    private SmalltalkOOP TryCreateSourceFilesArray()
-    {
-        var nilOOP = context.HeapManager.GetNil();
-
-        // Get the bundle directory from BundlePath
-        if (string.IsNullOrEmpty(context.BundlePath))
-        {
-            return nilOOP;
-        }
-
-        string bundleDir = Path.GetDirectoryName(context.BundlePath) ?? ".";
-        string sourcesPath = Path.Combine(bundleDir, "Smalltalk-80.sources");
-        string changesPath = Path.Combine(bundleDir, "Smalltalk-80.changes");
-
-        // Check if .sources file exists
-        if (!File.Exists(sourcesPath))
-        {
-            return nilOOP;
-        }
-
-        // Create .changes file if it doesn't exist
-        if (!File.Exists(changesPath))
-        {
-            try
-            {
-                File.WriteAllText(changesPath, "");
-            }
-            catch
-            {
-                // Cannot create .changes file - return nil to use decompiler fallback
-                return nilOOP;
-            }
-        }
-
-        // Open the files using FileHandleManager
-        int sourcesHandle = FileOperations.OpenFileHandle(sourcesPath, 1, 1, 3); // Read-only
-        int changesHandle = FileOperations.OpenFileHandle(changesPath, 3, 1, 4); // Read-write
-
-        Console.WriteLine($"[SourceFiles] Opening files: sources={sourcesPath}, changes={changesPath}");
-        Console.WriteLine($"[SourceFiles] Handles: sources={sourcesHandle}, changes={changesHandle}");
-
-        if (sourcesHandle < 0 || changesHandle < 0)
-        {
-            Console.WriteLine($"[SourceFiles] FAILED to open files");
-            // Failed to open files - return nil
-            if (sourcesHandle >= 0) FileOperations.CloseFileHandle(sourcesHandle);
-            if (changesHandle >= 0) FileOperations.CloseFileHandle(changesHandle);
-            return nilOOP;
-        }
-
-        // Create WindowsFileStream objects for each file
-        var sourcesRef = CreateWindowsFileStream(sourcesPath, sourcesHandle, readOnly: true);
-        var changesRef = CreateWindowsFileStream(changesPath, changesHandle, readOnly: false);
-        Console.WriteLine($"[SourceFiles] Created WindowsFileStream OOPs: sources={sourcesRef}, changes={changesRef}");
-
-        // Create Array of size 2 for SourceFiles
-        var arrayClassOOP = GlobalRegistry.LookupClassOOP("Array");
-        var sourceFilesArrayOOP = context.Allocator.AllocateArray(arrayClassOOP, 2);
-
-        // SourceFiles at: 1 = .sources file (read-only)
-        // SourceFiles at: 2 = .changes file (read-write)
-        context.Allocator.SetIndexedOOP(sourceFilesArrayOOP, 0, sourcesRef);
-        context.Allocator.SetIndexedOOP(sourceFilesArrayOOP, 1, changesRef);
-
-        return sourceFilesArrayOOP;
-    }
-
-    /// <summary>
-    /// Creates a WindowsFileStream object in the heap with the given path and file handle.
-    /// WindowsFileStream has instance variables: pathName, handle, position, rwmode, closed
-    /// </summary>
-    private SmalltalkOOP CreateWindowsFileStream(string filePath, int handle, bool readOnly)
-    {
-        var windowsFileStreamClassOOP = GlobalRegistry.LookupClassOOP("WindowsFileStream");
-        if (windowsFileStreamClassOOP == context.HeapManager.GetNil())
-        {
-            throw new InvalidOperationException("WindowsFileStream class not found");
-        }
-
-        // Allocate instance with 5 named instance variables: pathName, handle, position, rwmode, closed
-        var fileStreamOOP = context.HeapManager.AllocateInstanceOf(windowsFileStreamClassOOP, 0);
-
-        // Store the path as a plain String
-        var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
-        var pathNameOOP = context.Allocator.AllocateString(stringClassOOP, filePath);
-
-        // rwmode values: Read=1, Write=2, Shorten=4
-        // Sources file (readOnly=true): Read = 1
-        // Changes file (readOnly=false): Read + Write = 3
-        int rwmode = readOnly ? 1 : 3;
-
-        // Set instance variables
-        // slot 0: pathName (String with full path)
-        // slot 1: handle (SmallInteger)
-        // slot 2: position (SmallInteger, initialized to 0)
-        // slot 3: rwmode (SmallInteger)
-        // slot 4: closed (Boolean - false for open)
-        context.HeapManager.SetInstanceVariable(fileStreamOOP, 0, pathNameOOP);
-        context.HeapManager.SetInstanceVariable(fileStreamOOP, 1, SmalltalkOOP.FromSmallInteger(handle));
-        context.HeapManager.SetInstanceVariable(fileStreamOOP, 2, SmalltalkOOP.FromSmallInteger(0));
-        context.HeapManager.SetInstanceVariable(fileStreamOOP, 3, SmalltalkOOP.FromSmallInteger(rwmode));
-        context.HeapManager.SetInstanceVariable(fileStreamOOP, 4, GlobalRegistry.FalseOOP); // not closed
-
-        return fileStreamOOP;
     }
 
     /// <summary>

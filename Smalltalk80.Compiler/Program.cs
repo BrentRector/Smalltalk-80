@@ -148,21 +148,29 @@ file sealed class Program
 
             File.WriteAllText(outputFile, json);
 
-            // Write the .sources file alongside the JSON
+            // Write the .sources and .changes files to Interpreter project directory
+            // (where they can be found by Smalltalk initializeSourceFiles when running via dotnet run)
             // Use UTF-8 WITHOUT BOM to ensure source positions match exactly
-            // (BOM adds 3 bytes that would offset all positions)
             var utf8NoBom = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
+            // Compute Interpreter project directory (relative to Compiler's output)
+            // Compiler runs from: Smalltalk80.Compiler/bin/Debug/net9.0/
+            // Interpreter project is at: Smalltalk80.Interpreter/
+            string interpreterProjectDir = Path.GetFullPath(
+                Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
+                    "Smalltalk80.Interpreter"));
+
             string sourcesFileContent = generator.GetSourcesFileContent();
             if (!string.IsNullOrEmpty(sourcesFileContent))
             {
-                string sourcesFile = Path.Combine(outputDir ?? ".", "Smalltalk-80.sources");
+                string sourcesFile = Path.Combine(interpreterProjectDir, "Smalltalk-80.sources");
                 File.WriteAllText(sourcesFile, sourcesFileContent, utf8NoBom);
                 Console.WriteLine($"Generated sources file: {sourcesFile}");
                 Console.WriteLine($"  Size: {sourcesFileContent.Length:N0} bytes");
             }
 
             // Create empty .changes file (index 2) for runtime modifications
-            string changesFile = Path.Combine(outputDir ?? ".", "Smalltalk-80.changes");
+            string changesFile = Path.Combine(interpreterProjectDir, "Smalltalk-80.changes");
             File.WriteAllText(changesFile, "", utf8NoBom);
             Console.WriteLine($"Generated changes file: {changesFile} (empty)");
 
