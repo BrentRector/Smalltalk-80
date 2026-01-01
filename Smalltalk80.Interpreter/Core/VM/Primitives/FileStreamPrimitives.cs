@@ -411,10 +411,15 @@ public static class FileStreamPrimitives
                 int actualPosition = position + FileHandleManager.GetBomOffset(handle);
                 stream.Position = actualPosition;
 
-                // DEBUG: Log writes of '!' character (ASCII 33) to help debug missing terminators
-                if (byteValue == 33)
+                // DEBUG: Log last few bytes and any '!' writes to help debug missing terminators
+                char ch = byteValue >= 32 && byteValue < 127 ? (char)byteValue : '.';
+                if (byteValue == 33) // '!'
                 {
                     Console.WriteLine($"DEBUG FileWriteByte: Writing '!' (33) at position {actualPosition} to handle {handle}");
+                }
+                else if (byteValue == 39) // closing quote '
+                {
+                    Console.WriteLine($"DEBUG FileWriteByte: Writing ''' (39) at position {actualPosition} to handle {handle} - next should be '!'");
                 }
 
                 stream.WriteByte((byte)byteValue);
