@@ -4,6 +4,15 @@
 **Branch**: `claude/standardize-assignment-operator-mLcex`
 **Status**: Ready to resume
 
+## Primary Documentation
+
+**Read**: `docs/Graphics-Architecture.md` - Consolidated comprehensive graphics documentation including:
+- Smalltalk-80 graphics model (BitBlt, Forms, primitives)
+- Current architecture and file structure
+- Unified IDisplay abstraction with GPU backend rationale
+- Implementation status (Phases 1-5 complete)
+- Future 32bpp migration plan
+
 ## What Was Accomplished This Session
 
 ### 1. Fixed 25 Failing Unit Tests
