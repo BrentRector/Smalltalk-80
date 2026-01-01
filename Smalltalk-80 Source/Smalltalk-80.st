@@ -39084,11 +39084,13 @@ SystemOrganizer comment: 'Provides an organization for the classes in the system
 
 
 !SystemOrganizer methodsFor: 'fileIn/Out'!
-fileOutCategory: category 
+fileOutCategory: category
 	| aFileStream |
+	Transcript cr; show: '=== FileOut START: ', category, ' ==='.
 	aFileStream _ Disk file: (category , '.st.') asFileName.
 	self fileOutCategory: category on: aFileStream.
-	aFileStream shorten; close!
+	aFileStream shorten; close.
+	Transcript cr; show: '=== FileOut COMPLETE: ', category, ' ==='!
 fileOutCategory: category on: aFileStream
 	| class first |
 	first _ true.
