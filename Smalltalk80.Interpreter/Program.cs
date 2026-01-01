@@ -182,10 +182,10 @@ public static class Program
             // Set to true to try Fixedsys instead of TrueType fonts
             FontBridgeFactory.UseGdiBitmapFonts = true;
 
-            // EXPERIMENTAL: 32bpp display mode
-            // When enabled, display surface is 32bpp ARGB. Halftones render as smooth grays.
-            // When disabled, display uses traditional 1bpp monochrome.
-            var pixelDepth = Core.VM.Platform.PixelDepth.ThirtyTwoBit;  // Change to OneBit for traditional mode
+            // Display mode: 1bpp (classic Smalltalk-80 monochrome)
+            // The 32bpp experimental mode was removed - we now support only full 1bpp or full 32bpp,
+            // with no runtime conversion between them. Full 32bpp requires Smalltalk-side changes.
+            var pixelDepth = Core.VM.Platform.PixelDepth.OneBit;
             Console.WriteLine($"  Display mode: {(int)pixelDepth}bpp");
 
             // Create display window (UI thread object - has heap access for Display bitmap rendering)
