@@ -1986,7 +1986,6 @@ nextChunkPut: aString
         char == $! ifTrue: [self nextPut: $!].
         self nextPut: char].
     self nextPut: $!.
-    self cr.
     ^aString!
 
 nextWordPut: aWord
