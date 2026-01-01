@@ -24582,10 +24582,10 @@ wheelActivity: wheelDelta
 		ifTrue: [newSelection _ wheelDelta > 0 ifTrue: [1] ifFalse: [maxSelection]]
 		ifFalse: [newSelection _ (currentSelection - wheelDelta max: 1) min: maxSelection].
 
-	"Change selection if different"
+	"Change selection if different - use view's changeModelSelection for pluggable views"
 	newSelection ~= currentSelection ifTrue: [
-		self changeModelSelection: newSelection.
-		view moveSelectionBox: newSelection].
+		view moveSelectionBox: newSelection.
+		view changeModelSelection: newSelection].
 
 	"Scroll if selection is clipped"
 	view isSelectionBoxClipped ifTrue: [
@@ -24781,6 +24781,9 @@ moveSelectionBox: anInteger
 selection
 	"Answer the receiver's current selection."
 	^selection!
+changeModelSelection: anInteger
+	"Tell the model to change selection. Subclasses may override for pluggable views."
+	model toggleListIndex: anInteger!
 selectionBox
 	"Answer the rectangle in which the current selection is displayed."
 
