@@ -22,6 +22,16 @@ public interface IDisplay : IDisposable
     /// <summary>Display height in pixels</summary>
     int Height { get; }
 
+    /// <summary>Display bits per pixel (1, 8, or 32)</summary>
+    PixelDepth BitsPerPixel { get; }
+
+    /// <summary>
+    /// Get direct access to the 32bpp display buffer for primitive 96 optimization.
+    /// Only valid when BitsPerPixel == ThirtyTwoBit.
+    /// Returns empty span if not in 32bpp mode.
+    /// </summary>
+    Span<byte> GetDisplayBuffer32();
+
     /// <summary>Window title</summary>
     string Title { get; set; }
 

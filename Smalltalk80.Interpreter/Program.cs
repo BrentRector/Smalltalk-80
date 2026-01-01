@@ -182,15 +182,22 @@ public static class Program
             // Set to true to try Fixedsys instead of TrueType fonts
             FontBridgeFactory.UseGdiBitmapFonts = true;
 
+            // EXPERIMENTAL: 32bpp display mode
+            // When enabled, display surface is 32bpp ARGB. Halftones render as smooth grays.
+            // When disabled, display uses traditional 1bpp monochrome.
+            var pixelDepth = Core.VM.Platform.PixelDepth.ThirtyTwoBit;  // Change to OneBit for traditional mode
+            Console.WriteLine($"  Display mode: {(int)pixelDepth}bpp");
+
             // Create display window (UI thread object - has heap access for Display bitmap rendering)
             Console.WriteLine("\n=== Creating Display Window ===");
-            Console.WriteLine($"  Window size: {displayWidth}x{displayHeight}");
+            Console.WriteLine($"  Window size: {displayWidth}x{displayHeight} ({(int)pixelDepth}bpp)");
             var display = new WinFormsDisplay(
                 displayWidth,
                 displayHeight,
                 "Smalltalk-80",
                 heapManager,
-                vmMetadata);
+                vmMetadata,
+                pixelDepth);
             Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity

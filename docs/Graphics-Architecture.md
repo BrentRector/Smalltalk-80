@@ -542,61 +542,89 @@ Our two-thread architecture integrates as follows:
 
 ---
 
-## Future: 32-bit Display Migration
+## Phase 6: 32-bit Display Migration ✅ IMPLEMENTED
 
 ### Goal
 
 Migrate from 1bpp monochrome display surface to 32bpp ARGB while maintaining the Smalltalk-80 BitBlt semantics internally. This enables:
 
-1. **Smoother font rendering** - TrueType antialiasing can work properly
-2. **Color support** - Future color extensions without architectural changes
-3. **Modern graphics backends** - SkiaSharp, OpenGL, Vulkan via pluggable interface
-4. **Cross-platform** - Avalonia UI instead of Windows Forms
+1. **Smooth halftone rendering** - Halftone patterns become actual gray values
+2. **Smoother font rendering** - TrueType antialiasing can work properly
+3. **Color support** - Future color extensions without architectural changes
+4. **Modern graphics backends** - SkiaSharp, OpenGL, Vulkan via pluggable interface
 
-### Implementation Plan
+### Implementation Status
 
-**Step 1: Complete IDisplay Interface Integration**
-- Ensure all primitives use IDisplay abstraction
-- Remove any remaining IPlatformBridge references
-- Clean up dead code from old architecture
+**Step 1: IDisplay Interface Extended** ✅
+- Added `BitsPerPixel` property (PixelDepth enum: OneBit, EightBit, ThirtyTwoBit)
+- Added `GetDisplayBuffer32()` for direct 32bpp buffer access from primitives
 
-**Step 2: Add 32bpp Support to WinFormsDisplay**
-- Add `BitsPerPixel` property (1 or 32)
-- Update `GetDisplayBuffer()` to return appropriate format
-- Modify `CopyDisplayFromHeap()` for 32bpp → screen rendering
+**Step 2: WinFormsDisplay 32bpp Mode** ✅
+- Constructor accepts `PixelDepth` parameter
+- `_displayBuffer` sized appropriately for selected depth
+- `CopyDisplayFromHeap32bpp()` converts 1bpp heap → 32bpp display buffer
+- `CopyBufferToBitmap32bpp()` copies 32bpp buffer directly to screen
 
-**Step 3: Update BitBltEngine for 32bpp**
-- Add 32bpp pixel format support to `BitBltEngine`
-- Implement all 16 combination rules for 32bpp
-- Maintain 1bpp support for Smalltalk Form objects
+**Step 3: BitBltEngine32 Created** ✅
+- New `BitBltEngine32.cs` with 32bpp rendering support
+- All 16 combination rules implemented for 32bpp pixels
+- Halftone-to-gray conversion: pattern density → solid ARGB gray color
+- Color operations: AND, OR, XOR work on RGB components with alpha preserved
 
-**Step 4: Bridge 1bpp Smalltalk to 32bpp Display**
-- Smalltalk Forms remain 1bpp (internal representation)
-- Display surface is 32bpp
-- BitBlt to Display converts 1bpp → 32bpp on the fly
-- Black pixels (1) → 0xFF000000 (opaque black)
-- White pixels (0) → 0xFFFFFFFF (opaque white)
+**Step 4: Primitives Updated** ✅
+- Primitive 96 (copyBits): When dest=Display + 32bpp mode, also calls BitBltEngine32
+- Primitive 104 (drawLoopX:Y:): Line drawing to 32bpp buffer with halftone-to-gray
 
-**Step 5: Silk.NET GPU Backend (Optional)**
+**Step 5: Program.cs Configuration** ✅
+- Experimental toggle: `PixelDepth.ThirtyTwoBit` for 32bpp mode
+- Falls back to `PixelDepth.OneBit` for traditional monochrome
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│         Smalltalk-80 Code (Form, BitBlt, Halftones)         │
+│                      (All 1bpp internally)                   │
+├──────────────────────────────────────────────────────────────┤
+│  Primitive 96/104 → BitBltEngine (1bpp to heap)             │
+│                   ↓ (if dest=Display && 32bpp mode)         │
+│                   → BitBltEngine32 (halftone→gray to buffer) │
+├──────────────────────────────────────────────────────────────┤
+│     WinFormsDisplay (32bpp _displayBuffer)                   │
+├──────────────────────────────────────────────────────────────┤
+│        32bpp back buffer → Window rendering                  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Halftone-to-Gray Conversion
+
+When a halftone pattern is used in 32bpp mode, instead of rendering as a dithered pattern, it is converted to an equivalent gray color:
+
+| Halftone Pattern | Density | ARGB Gray Color |
+|------------------|---------|-----------------|
+| Form white       | 0%      | 0xFFFFFFFF      |
+| Form veryLightGray| ~12%   | 0xFFE0E0E0      |
+| Form lightGray   | ~25%    | 0xFFC0C0C0      |
+| Form gray        | 50%     | 0xFF808080      |
+| Form darkGray    | ~75%    | 0xFF404040      |
+| Form veryDarkGray| ~87%   | 0xFF202020      |
+| Form black       | 100%    | 0xFF000000      |
+
+### Files Modified
+
+- `Core/VM/Platform/IDisplay.cs` - Added BitsPerPixel, GetDisplayBuffer32()
+- `Core/VM/Graphics/BitBltEngine32.cs` - **NEW** - 32bpp BitBlt engine
+- `Platform/Windows/WinFormsDisplay.cs` - 32bpp buffer support
+- `Platform/DisplaySystemFactory.cs` - NullDisplay 32bpp support
+- `Core/VM/Primitives/GraphicsPrimitives.cs` - 32bpp path in primitives 96/104
+- `Program.cs` - Experimental 32bpp toggle
+
+### Future Work
+
+**Step 6: Silk.NET GPU Backend (Optional)**
 - Create `SilkNetDisplay : IDisplay` implementation
 - Use Silk.NET for OpenGL/Vulkan rendering
 - Enables cross-platform with GPU acceleration
-
-### Key Design Decisions
-
-1. **No backward compatibility shims** - Clean break from old interface
-2. **Single IDisplay interface** - Replaces IPlatformBridge fragmentation
-3. **1bpp Forms preserved** - Smalltalk code unchanged
-4. **32bpp display surface** - Modern rendering target
-5. **Format conversion at BitBlt boundary** - When dest is Display
-
-### Files to Modify
-
-- `Core/VM/Platform/IDisplay.cs` - Ensure complete interface
-- `Platform/Windows/WinFormsDisplay.cs` - Add 32bpp mode
-- `Core/VM/Graphics/BitBltEngine.cs` - Add 32bpp support
-- `Core/VM/Primitives/GraphicsPrimitives.cs` - Verify IDisplay usage
-- `Program.cs` - Use IDisplay consistently
 
 ---
 
@@ -610,5 +638,5 @@ Migrate from 1bpp monochrome display surface to 32bpp ARGB while maintaining the
 
 ---
 
-**Document Status**: ✅ **Phases 1-5 Complete** - Planning Phase 6 (32bpp Migration)
-**Next Steps**: Complete IDisplay integration and implement 32bpp display surface
+**Document Status**: ✅ **Phases 1-6 Complete** - 32bpp display with halftone-to-gray implemented
+**Next Steps**: Test 32bpp mode, implement GPU backends via IDisplay abstraction

@@ -15,8 +15,14 @@ namespace Smalltalk80.Interpreter.Platform.Windows;
 
 /// <summary>
 /// WinForms implementation of IDisplay.
-/// Provides a monochrome bitmap display with mouse and keyboard input.
+/// Provides either monochrome (1bpp) or full-color (32bpp) bitmap display with mouse and keyboard input.
 /// Thread-safe: Display updates can occur from Smalltalk thread, rendering occurs on UI thread.
+///
+/// 32bpp Mode:
+/// - Display surface uses 32bpp ARGB format natively
+/// - Smalltalk Forms remain 1bpp internally (stored in heap)
+/// - 1bpp-to-32bpp conversion happens when copying Display bitmap from heap
+/// - Enables proper TrueType antialiasing and future color support
 ///
 /// Input Architecture:
 /// - UI thread (WinForms): Enqueues input words to ring buffer, updates current state
@@ -25,13 +31,14 @@ namespace Smalltalk80.Interpreter.Platform.Windows;
 /// </summary>
 public class WinFormsDisplay : Form, IDisplay
 {
-    private byte[] _displayBuffer;
+    private byte[] _displayBuffer;  // 1bpp: 1 bit per pixel packed, 32bpp: 4 bytes per pixel ARGB
     private Bitmap _backBuffer;
     private readonly object _bufferLock = new();
     private readonly ISmalltalkHeap? _heap;
     private readonly VMMetadata? _vmMetadata;
     private readonly IRuntimeServices? _runtimeServices;
     private bool _disposed = false;
+    private readonly PixelDepth _pixelDepth;
 
     // Input semaphore OOP for event notification (signaled on raw input)
     private SmalltalkOOP _inputSemaphore = default;
@@ -71,6 +78,14 @@ public class WinFormsDisplay : Form, IDisplay
 
     public new int Width { get; private set; }
     public new int Height { get; private set; }
+    public PixelDepth BitsPerPixel => _pixelDepth;
+
+    public Span<byte> GetDisplayBuffer32()
+    {
+        if (_pixelDepth != PixelDepth.ThirtyTwoBit)
+            return Span<byte>.Empty;
+        return _displayBuffer.AsSpan();
+    }
 
     string IDisplay.Title
     {
@@ -85,25 +100,37 @@ public class WinFormsDisplay : Form, IDisplay
     // ============================================================================
 
     public WinFormsDisplay(int width, int height, string title = "Smalltalk-80",
-        ISmalltalkHeap? heap = null, VMMetadata? vmMetadata = null)
+        ISmalltalkHeap? heap = null, VMMetadata? vmMetadata = null,
+        PixelDepth pixelDepth = PixelDepth.OneBit)
     {
         Width = width;
         Height = height;
         _heap = heap;
         _vmMetadata = vmMetadata;
+        _pixelDepth = pixelDepth;
         _runtimeServices = (heap != null && vmMetadata != null)
             ? new RuntimeServices(heap, vmMetadata)
             : null;
 
-        Console.WriteLine($"[WinForms] Creating window: {width}x{height}");
+        Console.WriteLine($"[WinForms] Creating window: {width}x{height} ({(int)pixelDepth}bpp)");
 
-        // Calculate buffer size: each row needs (width + 7) / 8 bytes
-        int rowStride = (width + 7) / 8;
-        int bufferSize = rowStride * height;
+        // Calculate buffer size based on pixel depth
+        int bufferSize;
+        if (pixelDepth == PixelDepth.ThirtyTwoBit)
+        {
+            // 32bpp: 4 bytes per pixel
+            bufferSize = width * height * 4;
+        }
+        else
+        {
+            // 1bpp: each row needs (width + 7) / 8 bytes
+            int rowStride = (width + 7) / 8;
+            bufferSize = rowStride * height;
+        }
         _displayBuffer = new byte[bufferSize];
 
         // Create back buffer for double-buffered rendering
-        // Use 32bpp ARGB format (Graphics.FromImage doesn't support indexed formats)
+        // Always use 32bpp ARGB format for final rendering
         _backBuffer = new Bitmap(width, height, PixelFormat.Format32bppArgb);
 
         // Configure form
@@ -253,9 +280,18 @@ public class WinFormsDisplay : Form, IDisplay
             Width = newWidth;
             Height = newHeight;
 
-            int newBufferSize = ((newWidth + 7) / 8) * newHeight;
+            // Calculate new buffer size based on pixel depth
+            int newBufferSize;
+            if (_pixelDepth == PixelDepth.ThirtyTwoBit)
+            {
+                newBufferSize = newWidth * newHeight * 4;
+            }
+            else
+            {
+                newBufferSize = ((newWidth + 7) / 8) * newHeight;
+            }
             _displayBuffer = new byte[newBufferSize];
-            Console.WriteLine($"[Display] Reallocated _displayBuffer: {newBufferSize} bytes");
+            Console.WriteLine($"[Display] Reallocated _displayBuffer: {newBufferSize} bytes ({(int)_pixelDepth}bpp)");
 
             _backBuffer?.Dispose();
             _backBuffer = new Bitmap(newWidth, newHeight, PixelFormat.Format32bppArgb);
@@ -485,21 +521,15 @@ public class WinFormsDisplay : Form, IDisplay
             var format = _heap.GetObjectFormat(bitsOOP);
             int size = _heap.GetIndexedSize(bitsOOP);
 
-            if (format == ObjectFormat.WordIndexed)
+            if (_pixelDepth == PixelDepth.ThirtyTwoBit)
             {
-                for (int i = 0; i < size && (i * 2 + 1) < _displayBuffer.Length; i++)
-                {
-                    ushort word = _heap.GetIndexedWord(bitsOOP, i);
-                    _displayBuffer[i * 2] = (byte)(word >> 8);
-                    _displayBuffer[i * 2 + 1] = (byte)(word & 0xFF);
-                }
+                // 32bpp mode: convert 1bpp heap data to 32bpp display buffer
+                CopyDisplayFromHeap32bpp(bitsOOP, format, size);
             }
             else
             {
-                for (int i = 0; i < size && i < _displayBuffer.Length; i++)
-                {
-                    _displayBuffer[i] = _heap.GetIndexedByte(bitsOOP, i);
-                }
+                // 1bpp mode: direct copy to display buffer
+                CopyDisplayFromHeap1bpp(bitsOOP, format, size);
             }
         }
         catch (ObjectDisposedException) { }
@@ -507,6 +537,94 @@ public class WinFormsDisplay : Form, IDisplay
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[WinForms] CopyDisplayFromHeap failed: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private void CopyDisplayFromHeap1bpp(SmalltalkOOP bitsOOP, ObjectFormat format, int size)
+    {
+        if (_heap == null) return;
+
+        if (format == ObjectFormat.WordIndexed)
+        {
+            for (int i = 0; i < size && (i * 2 + 1) < _displayBuffer.Length; i++)
+            {
+                ushort word = _heap.GetIndexedWord(bitsOOP, i);
+                _displayBuffer[i * 2] = (byte)(word >> 8);
+                _displayBuffer[i * 2 + 1] = (byte)(word & 0xFF);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < size && i < _displayBuffer.Length; i++)
+            {
+                _displayBuffer[i] = _heap.GetIndexedByte(bitsOOP, i);
+            }
+        }
+    }
+
+    private void CopyDisplayFromHeap32bpp(SmalltalkOOP bitsOOP, ObjectFormat format, int size)
+    {
+        if (_heap == null) return;
+
+        // Read 1bpp data from heap and convert to 32bpp in display buffer
+        // Heap stores 1bpp data, we expand each bit to a 32bpp ARGB pixel
+        // Black (1) → 0xFF000000 (opaque black)
+        // White (0) → 0xFFFFFFFF (opaque white)
+
+        const uint black = 0xFF000000;
+        const uint white = 0xFFFFFFFF;
+
+        int heapRowStride = ((Width + 15) / 16) * 2;  // Smalltalk Form uses 16-bit word alignment
+        int displayStride32 = Width * 4;               // 32bpp: 4 bytes per pixel
+
+        // Get all heap bytes first for better performance
+        byte[] heapBytes;
+        if (format == ObjectFormat.WordIndexed)
+        {
+            heapBytes = new byte[size * 2];
+            for (int i = 0; i < size; i++)
+            {
+                ushort word = _heap.GetIndexedWord(bitsOOP, i);
+                heapBytes[i * 2] = (byte)(word >> 8);
+                heapBytes[i * 2 + 1] = (byte)(word & 0xFF);
+            }
+        }
+        else
+        {
+            heapBytes = new byte[size];
+            for (int i = 0; i < size; i++)
+            {
+                heapBytes[i] = _heap.GetIndexedByte(bitsOOP, i);
+            }
+        }
+
+        // Convert 1bpp to 32bpp
+        unsafe
+        {
+            fixed (byte* displayPtr = _displayBuffer)
+            {
+                uint* dst = (uint*)displayPtr;
+
+                for (int y = 0; y < Height; y++)
+                {
+                    int heapRowStart = y * heapRowStride;
+                    int dstRowStart = y * Width;
+
+                    for (int x = 0; x < Width; x++)
+                    {
+                        int byteIndex = heapRowStart + (x / 8);
+                        int bitIndex = 7 - (x % 8);  // MSB first
+
+                        bool isBlack = false;
+                        if (byteIndex < heapBytes.Length)
+                        {
+                            isBlack = (heapBytes[byteIndex] & (1 << bitIndex)) != 0;
+                        }
+
+                        dst[dstRowStart + x] = isBlack ? black : white;
+                    }
+                }
+            }
         }
     }
 
@@ -551,51 +669,93 @@ public class WinFormsDisplay : Form, IDisplay
 
         try
         {
-            unsafe
+            if (_pixelDepth == PixelDepth.ThirtyTwoBit)
             {
-                int* ptr = (int*)bmpData.Scan0;
-                int rowStride = (Width + 7) / 8;
-                int stride32 = bmpData.Stride / 4;
-
-                const int black = unchecked((int)0xFF000000);
-                const int white = unchecked((int)0xFFFFFFFF);
-
-                for (int y = 0; y < Height; y++)
-                {
-                    int* rowPtr = ptr + (y * stride32);
-                    int bufferOffset = y * rowStride;
-                    int x = 0;
-
-                    int completeBytes = Width / 8;
-                    for (int b = 0; b < completeBytes; b++)
-                    {
-                        byte sourceByte = _displayBuffer[bufferOffset + b];
-                        rowPtr[x++] = (sourceByte & 0x80) != 0 ? black : white;
-                        rowPtr[x++] = (sourceByte & 0x40) != 0 ? black : white;
-                        rowPtr[x++] = (sourceByte & 0x20) != 0 ? black : white;
-                        rowPtr[x++] = (sourceByte & 0x10) != 0 ? black : white;
-                        rowPtr[x++] = (sourceByte & 0x08) != 0 ? black : white;
-                        rowPtr[x++] = (sourceByte & 0x04) != 0 ? black : white;
-                        rowPtr[x++] = (sourceByte & 0x02) != 0 ? black : white;
-                        rowPtr[x++] = (sourceByte & 0x01) != 0 ? black : white;
-                    }
-
-                    int remainingPixels = Width % 8;
-                    if (remainingPixels > 0)
-                    {
-                        byte sourceByte = _displayBuffer[bufferOffset + completeBytes];
-                        for (int bit = 0; bit < remainingPixels; bit++)
-                        {
-                            int bitIndex = 7 - bit;
-                            rowPtr[x++] = (sourceByte & (1 << bitIndex)) != 0 ? black : white;
-                        }
-                    }
-                }
+                // 32bpp mode: direct copy from display buffer to bitmap
+                CopyBufferToBitmap32bpp(bmpData);
+            }
+            else
+            {
+                // 1bpp mode: expand each bit to 32bpp pixel
+                CopyBufferToBitmap1bpp(bmpData);
             }
         }
         finally
         {
             _backBuffer.UnlockBits(bmpData);
+        }
+    }
+
+    private void CopyBufferToBitmap1bpp(BitmapData bmpData)
+    {
+        unsafe
+        {
+            int* ptr = (int*)bmpData.Scan0;
+            int rowStride = (Width + 7) / 8;
+            int stride32 = bmpData.Stride / 4;
+
+            const int black = unchecked((int)0xFF000000);
+            const int white = unchecked((int)0xFFFFFFFF);
+
+            for (int y = 0; y < Height; y++)
+            {
+                int* rowPtr = ptr + (y * stride32);
+                int bufferOffset = y * rowStride;
+                int x = 0;
+
+                int completeBytes = Width / 8;
+                for (int b = 0; b < completeBytes; b++)
+                {
+                    byte sourceByte = _displayBuffer[bufferOffset + b];
+                    rowPtr[x++] = (sourceByte & 0x80) != 0 ? black : white;
+                    rowPtr[x++] = (sourceByte & 0x40) != 0 ? black : white;
+                    rowPtr[x++] = (sourceByte & 0x20) != 0 ? black : white;
+                    rowPtr[x++] = (sourceByte & 0x10) != 0 ? black : white;
+                    rowPtr[x++] = (sourceByte & 0x08) != 0 ? black : white;
+                    rowPtr[x++] = (sourceByte & 0x04) != 0 ? black : white;
+                    rowPtr[x++] = (sourceByte & 0x02) != 0 ? black : white;
+                    rowPtr[x++] = (sourceByte & 0x01) != 0 ? black : white;
+                }
+
+                int remainingPixels = Width % 8;
+                if (remainingPixels > 0)
+                {
+                    byte sourceByte = _displayBuffer[bufferOffset + completeBytes];
+                    for (int bit = 0; bit < remainingPixels; bit++)
+                    {
+                        int bitIndex = 7 - bit;
+                        rowPtr[x++] = (sourceByte & (1 << bitIndex)) != 0 ? black : white;
+                    }
+                }
+            }
+        }
+    }
+
+    private void CopyBufferToBitmap32bpp(BitmapData bmpData)
+    {
+        // 32bpp mode: display buffer is already in 32bpp ARGB format
+        // Just copy directly to bitmap, handling stride differences
+        unsafe
+        {
+            int* bmpPtr = (int*)bmpData.Scan0;
+            int bmpStride = bmpData.Stride / 4;  // Stride in 32-bit words
+
+            fixed (byte* bufferPtr = _displayBuffer)
+            {
+                int* srcPtr = (int*)bufferPtr;
+
+                for (int y = 0; y < Height; y++)
+                {
+                    int* dstRow = bmpPtr + (y * bmpStride);
+                    int* srcRow = srcPtr + (y * Width);
+
+                    // Copy one row
+                    for (int x = 0; x < Width; x++)
+                    {
+                        dstRow[x] = srcRow[x];
+                    }
+                }
+            }
         }
     }
 
