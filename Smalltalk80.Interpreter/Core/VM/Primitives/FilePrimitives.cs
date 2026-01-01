@@ -34,4 +34,14 @@ public static class FileOperations
     {
         return FileHandleManager.CloseFile(handle);
     }
+
+    /// <summary>
+    /// Gets file size for a handle. Public wrapper for cold start use.
+    /// </summary>
+    /// <param name="handle">The file handle.</param>
+    /// <returns>File size or -1 if invalid handle.</returns>
+    public static long GetFileSize(int handle)
+    {
+        return FileHandleManager.GetFileSize(handle);
+    }
 }

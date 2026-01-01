@@ -179,7 +179,7 @@ public class SystemDictionaryInstaller(
 
     /// <summary>
     /// Creates a WindowsFileStream object in the heap with the given path and file handle.
-    /// WindowsFileStream has instance variables: pathName, handle, position, rwmode, closed
+    /// WindowsFileStream has instance variables: pathName, handle, position, mode, closed, logicalSize
     /// </summary>
     private SmalltalkOOP CreateWindowsFileStream(string filePath, int handle, bool readOnly)
     {
@@ -189,29 +189,35 @@ public class SystemDictionaryInstaller(
             throw new InvalidOperationException("WindowsFileStream class not found");
         }
 
-        // Allocate instance with 5 named instance variables: pathName, handle, position, rwmode, closed
+        // Allocate instance with 6 named instance variables: pathName, handle, position, mode, closed, logicalSize
         var fileStreamOOP = context.HeapManager.AllocateInstanceOf(windowsFileStreamClassOOP, 0);
 
         // Store the path as a plain String
         var stringClassOOP = GlobalRegistry.LookupClassOOP("String");
         var pathNameOOP = context.Allocator.AllocateString(stringClassOOP, filePath);
 
-        // rwmode values: Read=1, Write=2, Shorten=4
+        // mode values: Read=1, Write=2, Shorten=4
         // Sources file (readOnly=true): Read = 1
         // Changes file (readOnly=false): Read + Write = 3
-        int rwmode = readOnly ? 1 : 3;
+        int mode = readOnly ? 1 : 3;
+
+        // Get file size for logicalSize initialization
+        long fileSize = FileOperations.GetFileSize(handle);
+        if (fileSize < 0) fileSize = 0;
 
         // Set instance variables
         // slot 0: pathName (String with full path)
         // slot 1: handle (SmallInteger)
         // slot 2: position (SmallInteger, initialized to 0)
-        // slot 3: rwmode (SmallInteger)
+        // slot 3: mode (SmallInteger)
         // slot 4: closed (Boolean - false for open)
+        // slot 5: logicalSize (SmallInteger - current file size)
         context.HeapManager.SetInstanceVariable(fileStreamOOP, 0, pathNameOOP);
         context.HeapManager.SetInstanceVariable(fileStreamOOP, 1, SmalltalkOOP.FromSmallInteger(handle));
         context.HeapManager.SetInstanceVariable(fileStreamOOP, 2, SmalltalkOOP.FromSmallInteger(0));
-        context.HeapManager.SetInstanceVariable(fileStreamOOP, 3, SmalltalkOOP.FromSmallInteger(rwmode));
+        context.HeapManager.SetInstanceVariable(fileStreamOOP, 3, SmalltalkOOP.FromSmallInteger(mode));
         context.HeapManager.SetInstanceVariable(fileStreamOOP, 4, GlobalRegistry.FalseOOP); // not closed
+        context.HeapManager.SetInstanceVariable(fileStreamOOP, 5, SmalltalkOOP.FromSmallInteger((int)fileSize));
 
         return fileStreamOOP;
     }

@@ -1854,9 +1854,11 @@ position: anInteger
 
 size
     "Return file size. When open, return tracked logicalSize (no OS call needed).
-     When closed, query filesystem."
+     When closed, query filesystem. Handle nil logicalSize for pre-existing streams."
     | attrs |
-    closed ifFalse: [^logicalSize].
+    closed ifFalse: [
+        logicalSize == nil ifTrue: [logicalSize _ self physicalFileSize].
+        ^logicalSize].
     attrs _ self primGetAttributes: pathName.
     attrs isNil ifTrue: [^0].
     ^attrs at: 1!
@@ -1968,7 +1970,10 @@ nextPut: aCharacter
     byte _ aCharacter asciiValue.
     self primWriteByte: handle at: position value: byte.
     position _ position + 1.
-    logicalSize _ position max: logicalSize.
+    "Update logical size - handle nil for pre-existing streams"
+    logicalSize == nil
+        ifTrue: [logicalSize _ position]
+        ifFalse: [logicalSize _ position max: logicalSize].
     ^aCharacter!
 
 nextPutAll: aCollection
