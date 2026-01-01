@@ -283,10 +283,42 @@ public static class BitBltEngine32
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static uint XorPixels(uint a, uint b)
+    private static uint XorPixels(uint source, uint dest)
     {
-        // XOR each component, keep alpha at 0xFF
-        return 0xFF000000 | ((a ^ b) & 0x00FFFFFF);
+        // Handle 1bpp-style XOR semantics:
+        // In 1bpp: black=1, white=0. XOR(1, x) inverts x.
+        // In 32bpp: black=(0,0,0), white=(255,255,255) - inverted polarity!
+        //
+        // For correct selection highlighting:
+        // - Black source → invert destination
+        // - White source → keep destination
+        // - Gray source → proportional blend
+
+        int sr = (int)((source >> 16) & 0xFF);
+        int sg = (int)((source >> 8) & 0xFF);
+        int sb = (int)(source & 0xFF);
+        int dr = (int)((dest >> 16) & 0xFF);
+        int dg = (int)((dest >> 8) & 0xFF);
+        int db = (int)(dest & 0xFF);
+
+        // "Blackness" of source: 255=black, 0=white
+        int br = 255 - sr;
+        int bg = 255 - sg;
+        int bb = 255 - sb;
+
+        // Inverted destination
+        int ir = 255 - dr;
+        int ig = 255 - dg;
+        int ib = 255 - db;
+
+        // Blend between dest and inverted_dest based on blackness
+        // blackness=255 (black source): result = inverted dest
+        // blackness=0 (white source): result = dest unchanged
+        int rr = (ir * br + dr * (255 - br)) / 255;
+        int rg = (ig * bg + dg * (255 - bg)) / 255;
+        int rb = (ib * bb + db * (255 - bb)) / 255;
+
+        return 0xFF000000 | ((uint)rr << 16) | ((uint)rg << 8) | (uint)rb;
     }
 
     /// <summary>
