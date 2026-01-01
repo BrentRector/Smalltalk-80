@@ -1980,13 +1980,19 @@ cr
     self nextPut: Character cr!
 
 nextChunkPut: aString
-    "Write chunk with ! terminator.
-     Single ! in aString are doubled to !!"
-    aString do: [:char |
-        char == $! ifTrue: [self nextPut: $!].
-        self nextPut: char].
-    self nextPut: $!.
-    ^aString!
+	"Put aString onto self, doubling embedded terminators."
+
+	| index stringSize char terminator |
+	terminator _ $!!.
+	index _ 0.
+	stringSize _ aString size.
+	[(index _ index + 1) <= stringSize]
+		whileTrue:
+			[char _ aString at: index.
+			self nextPut: char.
+			char == terminator ifTrue: ["double imbedded terminator"
+				self nextPut: char]].
+	self nextPut: terminator!
 
 nextWordPut: aWord
     "Append to the receiver an Integer as the next two bytes (big-endian)."
