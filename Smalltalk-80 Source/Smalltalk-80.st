@@ -1717,7 +1717,7 @@ WindowsFileSystem initialize!
 "==================== WindowsFileStream ===================="
 
 Object subclass: #WindowsFileStream
-    instanceVariableNames: 'pathName handle position mode closed'
+    instanceVariableNames: 'pathName handle position mode closed logicalSize'
     classVariableNames: 'ReadMode WriteMode AppendMode ReadWriteMode'
     poolDictionaries: ''
     category: 'Files-Windows'!
@@ -1732,6 +1732,7 @@ Instance Variables:
     position    <Integer> current read/write position
     mode        <Integer> access mode (ReadMode, WriteMode, etc.)
     closed      <Boolean> true if stream is closed
+    logicalSize <Integer> max position reached (tracks writes without OS query)
 
 Class Variables:
     ReadMode       <Integer> = 1
@@ -1852,8 +1853,10 @@ position: anInteger
     position _ anInteger!
 
 size
-    "Return file size"
+    "Return file size. When open, return tracked logicalSize (no OS call needed).
+     When closed, query filesystem."
     | attrs |
+    closed ifFalse: [^logicalSize].
     attrs _ self primGetAttributes: pathName.
     attrs isNil ifTrue: [^0].
     ^attrs at: 1!
@@ -1959,12 +1962,13 @@ nextWord
 !WindowsFileStream methodsFor: 'writing'!
 
 nextPut: aCharacter
-    "Write a character"
+    "Write a character and update logical size"
     | byte |
     closed ifTrue: [self reopen].
     byte _ aCharacter asciiValue.
     self primWriteByte: handle at: position value: byte.
     position _ position + 1.
+    logicalSize _ position max: logicalSize.
     ^aCharacter!
 
 nextPutAll: aCollection
@@ -1982,16 +1986,10 @@ cr
 nextChunkPut: aString
     "Write chunk with ! terminator.
      Single ! in aString are doubled to !!"
-    | termChar |
-    termChar := $!.
-    Transcript cr; show: 'nextChunkPut: termChar class = '; show: termChar class name.
-    Transcript show: ', asciiValue = '; show: termChar asciiValue printString.
     aString do: [:char |
-        char == termChar ifTrue: [self nextPut: termChar].
+        char == $! ifTrue: [self nextPut: $!].
         self nextPut: char].
-    Transcript cr; show: 'About to write terminator'.
-    self nextPut: termChar.
-    Transcript show: ' - written'.
+    self nextPut: $!.
     ^aString!
 
 nextWordPut: aWord
@@ -2001,8 +1999,15 @@ nextWordPut: aWord
     ^aWord!
 
 flush
-    "No-op for direct file access"
+    "Flush file buffers. Primitive 151."
+    closed ifTrue: [^self].
+    self primFlush: handle.
     ^self!
+
+primFlush: aHandle
+    "Flush file stream buffers. Primitive 151."
+    <primitive: 151>
+    ^self primitiveFailed!
 
 shorten
     "Truncate file at current position"
@@ -2021,7 +2026,8 @@ do: aBlock
 !WindowsFileStream methodsFor: 'mode setting'!
 
 readOnly
-    "Set to read-only mode"
+    "Set to read-only mode. Flush first to ensure writes are committed."
+    self flush.
     mode _ ReadMode!
 
 readWrite
@@ -2094,8 +2100,17 @@ open: modeValue
     handle < 0 ifTrue: [self error: 'Cannot open file: ', pathName].
     closed _ false.
     position _ 0.
+    "Initialize logical size from filesystem (only query once at open)"
+    logicalSize _ self physicalFileSize.
 
-    modeValue = AppendMode ifTrue: [self setToEnd]! !
+    modeValue = AppendMode ifTrue: [self setToEnd]!
+
+physicalFileSize
+    "Query filesystem for actual file size. Used only at open time."
+    | attrs |
+    attrs _ self primGetAttributes: pathName.
+    attrs isNil ifTrue: [^0].
+    ^attrs at: 1! !
 
 !WindowsFileStream methodsFor: 'fileIn/Out'!
 
