@@ -3,6 +3,7 @@
 
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Smalltalk80.Interpreter.Core;
 using Smalltalk80.Interpreter.Core.VM;
@@ -133,14 +134,9 @@ public class WinFormsDisplay : Form, IDisplay
         // This ensures the display starts white before any primitives run
         if (pixelDepth == PixelDepth.ThirtyTwoBit)
         {
-            // Fill with white (0xFFFFFFFF in ARGB)
-            for (int i = 0; i < bufferSize; i += 4)
-            {
-                _displayBuffer[i] = 0xFF;     // Blue
-                _displayBuffer[i + 1] = 0xFF; // Green
-                _displayBuffer[i + 2] = 0xFF; // Red
-                _displayBuffer[i + 3] = 0xFF; // Alpha
-            }
+            // Fill with white using 32-bit writes for efficiency
+            var span32 = MemoryMarshal.Cast<byte, uint>(_displayBuffer.AsSpan());
+            span32.Fill(0xFFFFFFFF);
         }
 
         // Create back buffer for double-buffered rendering
@@ -306,16 +302,11 @@ public class WinFormsDisplay : Form, IDisplay
             }
             _displayBuffer = new byte[newBufferSize];
 
-            // Initialize 32bpp buffer with white pixels
+            // Initialize 32bpp buffer with white pixels using 32-bit writes
             if (_pixelDepth == PixelDepth.ThirtyTwoBit)
             {
-                for (int i = 0; i < newBufferSize; i += 4)
-                {
-                    _displayBuffer[i] = 0xFF;     // Blue
-                    _displayBuffer[i + 1] = 0xFF; // Green
-                    _displayBuffer[i + 2] = 0xFF; // Red
-                    _displayBuffer[i + 3] = 0xFF; // Alpha
-                }
+                var span32 = MemoryMarshal.Cast<byte, uint>(_displayBuffer.AsSpan());
+                span32.Fill(0xFFFFFFFF);
             }
             Console.WriteLine($"[Display] Reallocated _displayBuffer: {newBufferSize} bytes ({(int)_pixelDepth}bpp)");
 
