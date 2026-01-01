@@ -98,15 +98,21 @@ DisplayMedium subclass: #Form
 
 ## Form File Formats
 
-### 1bpp Legacy (.form)
-- fileCode=1, 16-bit words, column-major, big-endian
-- Backward compatible with existing Smalltalk archives
+### Design Decision: PNG for All Depths
 
-### 32bpp Color (.png)
-- **Use standard PNG format** instead of custom format
-- External tools (GIMP, Photoshop) can create/edit
-- ImageSharp library for C# implementation
-- See Migration-to-32-bit-Words.md for details
+Use **PNG for all image depths** instead of custom formats:
+
+| Depth | PNG Type | Compression |
+|-------|----------|-------------|
+| 1bpp | 1-bit indexed | ~90% for line art |
+| 32bpp | RGBA | ~70% for photos |
+
+**Benefits:**
+- Single library (ImageSharp) for all I/O
+- External tools work with all images
+- One-time migration of legacy .form files
+
+**Legacy .form support:** Read-only for migration, then deprecate.
 
 ---
 

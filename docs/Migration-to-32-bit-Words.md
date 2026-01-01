@@ -382,26 +382,25 @@ Form>>bytesPerRow
 
 ## Form File Formats
 
-### Design Decision: Use Standard Image Formats for 32bpp
+### Design Decision: Use PNG for All Depths
 
-Rather than creating a custom 32bpp Form file format, we use **standard image formats** (PNG, BMP) for color images:
+Rather than maintaining custom file formats, we use **PNG for all image depths**:
 
-| Use Case | Format | Rationale |
-|----------|--------|-----------|
-| **1bpp legacy** | fileCode=1 (.form) | Backward compatibility with Smalltalk archives |
-| **32bpp color** | PNG (.png) | Industry standard, alpha support, lossless compression |
-| **32bpp simple** | BMP (.bmp) | Uncompressed, simple, Windows native |
+| Depth | PNG Type | Notes |
+|-------|----------|-------|
+| **1bpp** | 1-bit indexed (2-color palette) | Excellent compression for line art (~90%) |
+| **32bpp** | RGBA (8 bits per channel) | Full color with alpha |
 
-**Benefits of standard formats:**
-- External tools (Photoshop, GIMP, Paint.NET) can create/edit images
-- Well-documented specifications with no maintenance burden
-- Existing C# libraries (`System.Drawing.Common`, `ImageSharp`, `SkiaSharp`)
-- Industry-proven compression (PNG achieves ~70% size reduction)
-- Future-proof and universally supported
+**Benefits of unifying on PNG:**
+- Single library (ImageSharp) for all image I/O
+- One code path simplifies maintenance
+- Excellent compression for both depths
+- External tools (GIMP, Photoshop) work with all images
+- PNG is future-proof and universally supported
 
-### Format 1: 1bpp Monochrome (Existing Smalltalk Format)
+### Legacy .form Format (Deprecated)
 
-Keep the original Blue Book format for backward compatibility with existing `.form` files:
+The original Blue Book `.form` format is supported for **reading only** to allow migration:
 
 ```
 Offset  Size     Field      Description
@@ -412,12 +411,15 @@ Offset  Size     Field      Description
 6       2 bytes  offsetX    X offset (signed, two's complement)
 8       2 bytes  offsetY    Y offset (signed, two's complement)
 10      N×2      bits       Bitmap data (16-bit words, column-major)
-                            N = (width + 15) // 16 * height words
 ```
 
-**Byte order**: Big-endian (MSB first) - matches original Xerox Alto
+**Migration path:**
+1. Provide one-time conversion script: `.form` → `.png`
+2. Keep `.form` read support temporarily
+3. All new saves use `.png`
+4. Eventually deprecate `.form` read support
 
-### Format 2: PNG for 32bpp Color Forms
+### PNG for All Forms
 
 Use standard PNG format via C# primitives:
 
@@ -447,33 +449,47 @@ Form class>>readFrom: fileName
     "Read Form from file, dispatching based on extension"
     | extension |
     extension := (fileName asPath) extension asLowercase.
-    extension = 'form' ifTrue: [^self readFormFile: fileName].
+    extension = 'form' ifTrue: [^self readLegacyFormFile: fileName].  "Deprecated"
     extension = 'png' ifTrue: [^self readPngFile: fileName].
-    extension = 'bmp' ifTrue: [^self readBmpFile: fileName].
     self error: 'Unknown image format: ', extension.
     ^nil
 
 Form class>>readPngFile: fileName
-    "Read PNG file into 32bpp Form (uses C# primitive)"
+    "Read PNG file into Form (depth determined by PNG color type)"
     <primitive: 2xx>
     ^self primitiveFailed
+
+Form class>>readLegacyFormFile: fileName
+    "Read legacy .form file (deprecated - for migration only)"
+    "... existing readFormFile: logic ..."
 
 Form>>writeOnFileNamed: fileName
-    "Write Form to file based on extension"
-    | extension |
-    extension := (fileName asPath) extension asLowercase.
-    extension = 'form' ifTrue: [^self writeFormFile: fileName].
-    extension = 'png' ifTrue: [^self writePngFile: fileName].
-    extension = 'bmp' ifTrue: [^self writeBmpFile: fileName].
-    "Default: use depth-appropriate format"
-    self depth = 32
-        ifTrue: [self writePngFile: fileName, '.png']
-        ifFalse: [self writeFormFile: fileName, '.form']
+    "Write Form to PNG file (always use PNG for new saves)"
+    | baseName |
+    baseName := (fileName asPath) withoutExtension asString.
+    self writePngFile: baseName, '.png'
 
 Form>>writePngFile: fileName
-    "Write 32bpp Form to PNG file (uses C# primitive)"
+    "Write Form to PNG file (works for both 1bpp and 32bpp)"
     <primitive: 2xx>
     ^self primitiveFailed
+```
+
+### Conversion Script
+
+For migrating existing `.form` files:
+
+```smalltalk
+FormMigration class>>convertAllFormsIn: directoryPath
+    "Convert all .form files in directory to .png"
+    | dir |
+    dir := FileDirectory on: directoryPath.
+    (dir fileNamesMatching: '*.form') do: [:formFile |
+        | form pngFile |
+        form := Form readFrom: (directoryPath, '/', formFile).
+        pngFile := (formFile copyUpToLast: $.) , '.png'.
+        form writePngFile: (directoryPath, '/', pngFile).
+        Transcript show: 'Converted: ', formFile; cr].
 ```
 
 ### C# Library Options
@@ -547,16 +563,16 @@ Form>>as1bpp
 
 ### File Compatibility Tests
 
-- [ ] Read existing 1bpp Form files (.form, fileCode=1)
-- [ ] Write 1bpp Form files readable by original format
-- [ ] Round-trip 1bpp Form files without data loss
-- [ ] Read PNG files into 32bpp Forms
-- [ ] Write 32bpp Forms to PNG files
-- [ ] Round-trip PNG files without data loss
+- [ ] Read legacy .form files (deprecated, for migration)
+- [ ] Write 1bpp Forms to PNG (1-bit indexed)
+- [ ] Write 32bpp Forms to PNG (RGBA)
+- [ ] Round-trip 1bpp PNG files without data loss
+- [ ] Round-trip 32bpp PNG files without data loss
 - [ ] PNG files readable by external tools (GIMP, etc.)
+- [ ] External PNG files loadable as Forms
 - [ ] Convert 1bpp Form to 32bpp (as32bpp)
 - [ ] Convert 32bpp Form to 1bpp (as1bpp with luminance threshold)
-- [ ] Handle unknown file extensions gracefully
+- [ ] Migration script converts .form to .png correctly
 
 ---
 
