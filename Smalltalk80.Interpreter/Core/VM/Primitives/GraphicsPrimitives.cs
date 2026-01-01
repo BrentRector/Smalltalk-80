@@ -460,7 +460,8 @@ public static class GraphicsOperations
 
         if (format == ObjectFormat.WordIndexed)
         {
-            bits = new byte[size * 2];
+            // 32-bit words: 4 bytes per word
+            bits = new byte[size * 4];
             heap.CopyIndexedWords(bitsOOP, bits.AsSpan());
         }
         else

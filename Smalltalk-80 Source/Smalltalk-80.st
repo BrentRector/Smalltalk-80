@@ -1952,8 +1952,17 @@ contentsOfEntireFile
     self close.
     ^contents!
 
-nextWord
-    "Answer the next four bytes from the receiver as an Integer (big-endian, 32-bit word)."
+nextInt16
+    "Answer the next two bytes from the receiver as an Integer (big-endian, 16-bit)."
+    | high low |
+    high _ self next.
+    high == nil ifTrue: [^false].
+    low _ self next.
+    low == nil ifTrue: [^false].
+    ^(high asInteger bitShift: 8) + low asInteger!
+
+nextInt32
+    "Answer the next four bytes from the receiver as an Integer (big-endian, 32-bit)."
     | b0 b1 b2 b3 |
     b0 _ self next.
     b0 == nil ifTrue: [^false].
@@ -1963,7 +1972,13 @@ nextWord
     b2 == nil ifTrue: [^false].
     b3 _ self next.
     b3 == nil ifTrue: [^false].
-    ^((b0 asInteger bitShift: 24) + (b1 asInteger bitShift: 16) + (b2 asInteger bitShift: 8) + b3 asInteger) bitAnd: 16rFFFFFFFF! !
+    ^((b0 asInteger bitShift: 24) + (b1 asInteger bitShift: 16) + (b2 asInteger bitShift: 8) + b3 asInteger) bitAnd: 16rFFFFFFFF!
+
+nextWord
+    "Answer the next two bytes from the receiver as an Integer (big-endian).
+     For Blue Book compatibility with external file formats.
+     Use nextInt32 for 32-bit values."
+    ^self nextInt16! !
 
 !WindowsFileStream methodsFor: 'writing'!
 
@@ -2001,13 +2016,25 @@ nextChunkPut: aString
     self nextPut: $!.
     ^aString!
 
-nextWordPut: aWord
-    "Append to the receiver an Integer as the next four bytes (big-endian, 32-bit word)."
+nextInt16Put: aWord
+    "Append to the receiver an Integer as the next two bytes (big-endian, 16-bit)."
+    self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
+    self nextPut: (Character value: (aWord bitAnd: 255)).
+    ^aWord!
+
+nextInt32Put: aWord
+    "Append to the receiver an Integer as the next four bytes (big-endian, 32-bit)."
     self nextPut: (Character value: ((aWord bitShift: -24) bitAnd: 255)).
     self nextPut: (Character value: ((aWord bitShift: -16) bitAnd: 255)).
     self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
     self nextPut: (Character value: (aWord bitAnd: 255)).
     ^aWord!
+
+nextWordPut: aWord
+    "Append to the receiver an Integer as the next two bytes (big-endian).
+     For Blue Book compatibility with external file formats.
+     Use nextInt32Put: for 32-bit values."
+    ^self nextInt16Put: aWord!
 
 flush
     "Flush file buffers. Primitive 151."
@@ -18004,8 +18031,18 @@ nextStringPut: s
 			self nextPut: (length \\ 256)].
 	s do: [:char | self nextPut: char asciiValue].
 	^s!
-nextWord
-	"Answer the next four bytes from the receiver as an Integer (32-bit word, big-endian)."
+nextInt16
+	"Answer the next two bytes from the receiver as an Integer (big-endian, 16-bit)."
+
+	| high low |
+	high _ self next.
+	high == nil ifTrue: [^false].
+	low _ self next.
+	low == nil ifTrue: [^false].
+	^(high asInteger bitShift: 8) + low asInteger!
+
+nextInt32
+	"Answer the next four bytes from the receiver as an Integer (big-endian, 32-bit)."
 
 	| b0 b1 b2 b3 |
 	b0 _ self next.
@@ -18017,14 +18054,34 @@ nextWord
 	b3 _ self next.
 	b3 == nil ifTrue: [^false].
 	^((b0 asInteger bitShift: 24) + (b1 asInteger bitShift: 16) + (b2 asInteger bitShift: 8) + b3 asInteger) bitAnd: 16rFFFFFFFF!
-nextWordPut: aWord
-	"Append to the receiver an Integer as the next four bytes (32-bit word, big-endian)."
+
+nextWord
+	"Answer the next two bytes from the receiver as an Integer (big-endian).
+	 For Blue Book compatibility with external file formats.
+	 Use nextInt32 for 32-bit values."
+	^self nextInt16!
+
+nextInt16Put: aWord
+	"Append to the receiver an Integer as the next two bytes (big-endian, 16-bit)."
+
+	self nextPut: ((aWord bitShift: -8) bitAnd: 255).
+	self nextPut: (aWord bitAnd: 255).
+	^aWord!
+
+nextInt32Put: aWord
+	"Append to the receiver an Integer as the next four bytes (big-endian, 32-bit)."
 
 	self nextPut: ((aWord bitShift: -24) bitAnd: 255).
 	self nextPut: ((aWord bitShift: -16) bitAnd: 255).
 	self nextPut: ((aWord bitShift: -8) bitAnd: 255).
 	self nextPut: (aWord bitAnd: 255).
-	^aWord! !
+	^aWord!
+
+nextWordPut: aWord
+	"Append to the receiver an Integer as the next two bytes (big-endian).
+	 For Blue Book compatibility with external file formats.
+	 Use nextInt32Put: for 32-bit values."
+	^self nextInt16Put: aWord! !
 
 !ExternalStream methodsFor: 'positioning'!
 resetContents
@@ -20186,7 +20243,7 @@ writeOn: fileName
 	file nextWordPut: offset x.
 	file nextWordPut: offset y.
 	filePosition _ 0.
-	1 to: width + 31 // 32 do:
+	1 to: width + 15 // 16 do:
 		[:j |
 		1 to: height do: [:i | file nextWordPut: (bits at: (filePosition _ filePosition + 1))]].
 	file close.! !
@@ -20370,9 +20427,9 @@ readFormFile: file
 	offsetX > 32767 ifTrue: [offsetX _ offsetX - 65536]. "stored two's-complement"
 	offsetY > 32767 ifTrue: [offsetY _ offsetY - 65536]. "stored two's-complement"
 	newForm offset: offsetX @ offsetY.
-	theBits _ WordArray new: newWidth + 31 // 32 * newHeight.
+	theBits _ WordArray new: newWidth + 15 // 16 * newHeight.
 	filePosition _ 0.
-	1 to: newWidth + 31 // 32 do:
+	1 to: newWidth + 15 // 16 do:
 		[:j | 
 		1 to: newHeight do:
 			[:i | theBits at: (filePosition _ filePosition + 1) put: file nextWord]].
