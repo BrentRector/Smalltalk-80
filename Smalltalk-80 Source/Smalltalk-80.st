@@ -1974,6 +1974,28 @@ nextInt32
     b3 == nil ifTrue: [^false].
     ^((b0 asInteger bitShift: 24) + (b1 asInteger bitShift: 16) + (b2 asInteger bitShift: 8) + b3 asInteger) bitAnd: 16rFFFFFFFF!
 
+nextInt16LE
+    "Answer the next two bytes from the receiver as an Integer (little-endian, 16-bit)."
+    | low high |
+    low _ self next.
+    low == nil ifTrue: [^false].
+    high _ self next.
+    high == nil ifTrue: [^false].
+    ^(high asInteger bitShift: 8) + low asInteger!
+
+nextInt32LE
+    "Answer the next four bytes from the receiver as an Integer (little-endian, 32-bit)."
+    | b0 b1 b2 b3 |
+    b0 _ self next.
+    b0 == nil ifTrue: [^false].
+    b1 _ self next.
+    b1 == nil ifTrue: [^false].
+    b2 _ self next.
+    b2 == nil ifTrue: [^false].
+    b3 _ self next.
+    b3 == nil ifTrue: [^false].
+    ^((b3 asInteger bitShift: 24) + (b2 asInteger bitShift: 16) + (b1 asInteger bitShift: 8) + b0 asInteger) bitAnd: 16rFFFFFFFF!
+
 nextWord
     "Answer the next two bytes from the receiver as an Integer (big-endian).
      For Blue Book compatibility with external file formats.
@@ -2028,6 +2050,20 @@ nextInt32Put: aWord
     self nextPut: (Character value: ((aWord bitShift: -16) bitAnd: 255)).
     self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
     self nextPut: (Character value: (aWord bitAnd: 255)).
+    ^aWord!
+
+nextInt16LEPut: aWord
+    "Append to the receiver an Integer as the next two bytes (little-endian, 16-bit)."
+    self nextPut: (Character value: (aWord bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
+    ^aWord!
+
+nextInt32LEPut: aWord
+    "Append to the receiver an Integer as the next four bytes (little-endian, 32-bit)."
+    self nextPut: (Character value: (aWord bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -16) bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -24) bitAnd: 255)).
     ^aWord!
 
 nextWordPut: aWord
@@ -18055,6 +18091,30 @@ nextInt32
 	b3 == nil ifTrue: [^false].
 	^((b0 asInteger bitShift: 24) + (b1 asInteger bitShift: 16) + (b2 asInteger bitShift: 8) + b3 asInteger) bitAnd: 16rFFFFFFFF!
 
+nextInt16LE
+	"Answer the next two bytes from the receiver as an Integer (little-endian, 16-bit)."
+
+	| low high |
+	low _ self next.
+	low == nil ifTrue: [^false].
+	high _ self next.
+	high == nil ifTrue: [^false].
+	^(high asInteger bitShift: 8) + low asInteger!
+
+nextInt32LE
+	"Answer the next four bytes from the receiver as an Integer (little-endian, 32-bit)."
+
+	| b0 b1 b2 b3 |
+	b0 _ self next.
+	b0 == nil ifTrue: [^false].
+	b1 _ self next.
+	b1 == nil ifTrue: [^false].
+	b2 _ self next.
+	b2 == nil ifTrue: [^false].
+	b3 _ self next.
+	b3 == nil ifTrue: [^false].
+	^((b3 asInteger bitShift: 24) + (b2 asInteger bitShift: 16) + (b1 asInteger bitShift: 8) + b0 asInteger) bitAnd: 16rFFFFFFFF!
+
 nextWord
 	"Answer the next two bytes from the receiver as an Integer (big-endian).
 	 For Blue Book compatibility with external file formats.
@@ -18075,6 +18135,22 @@ nextInt32Put: aWord
 	self nextPut: ((aWord bitShift: -16) bitAnd: 255).
 	self nextPut: ((aWord bitShift: -8) bitAnd: 255).
 	self nextPut: (aWord bitAnd: 255).
+	^aWord!
+
+nextInt16LEPut: aWord
+	"Append to the receiver an Integer as the next two bytes (little-endian, 16-bit)."
+
+	self nextPut: (aWord bitAnd: 255).
+	self nextPut: ((aWord bitShift: -8) bitAnd: 255).
+	^aWord!
+
+nextInt32LEPut: aWord
+	"Append to the receiver an Integer as the next four bytes (little-endian, 32-bit)."
+
+	self nextPut: (aWord bitAnd: 255).
+	self nextPut: ((aWord bitShift: -8) bitAnd: 255).
+	self nextPut: ((aWord bitShift: -16) bitAnd: 255).
+	self nextPut: ((aWord bitShift: -24) bitAnd: 255).
 	^aWord!
 
 nextWordPut: aWord
