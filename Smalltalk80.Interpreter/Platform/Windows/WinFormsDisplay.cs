@@ -129,6 +129,20 @@ public class WinFormsDisplay : Form, IDisplay
         }
         _displayBuffer = new byte[bufferSize];
 
+        // Initialize 32bpp buffer with white pixels (0xFFFFFFFF)
+        // This ensures the display starts white before any primitives run
+        if (pixelDepth == PixelDepth.ThirtyTwoBit)
+        {
+            // Fill with white (0xFFFFFFFF in ARGB)
+            for (int i = 0; i < bufferSize; i += 4)
+            {
+                _displayBuffer[i] = 0xFF;     // Blue
+                _displayBuffer[i + 1] = 0xFF; // Green
+                _displayBuffer[i + 2] = 0xFF; // Red
+                _displayBuffer[i + 3] = 0xFF; // Alpha
+            }
+        }
+
         // Create back buffer for double-buffered rendering
         // Always use 32bpp ARGB format for final rendering
         _backBuffer = new Bitmap(width, height, PixelFormat.Format32bppArgb);
@@ -291,6 +305,18 @@ public class WinFormsDisplay : Form, IDisplay
                 newBufferSize = ((newWidth + 7) / 8) * newHeight;
             }
             _displayBuffer = new byte[newBufferSize];
+
+            // Initialize 32bpp buffer with white pixels
+            if (_pixelDepth == PixelDepth.ThirtyTwoBit)
+            {
+                for (int i = 0; i < newBufferSize; i += 4)
+                {
+                    _displayBuffer[i] = 0xFF;     // Blue
+                    _displayBuffer[i + 1] = 0xFF; // Green
+                    _displayBuffer[i + 2] = 0xFF; // Red
+                    _displayBuffer[i + 3] = 0xFF; // Alpha
+                }
+            }
             Console.WriteLine($"[Display] Reallocated _displayBuffer: {newBufferSize} bytes ({(int)_pixelDepth}bpp)");
 
             _backBuffer?.Dispose();
@@ -493,7 +519,13 @@ public class WinFormsDisplay : Form, IDisplay
     {
         lock (_bufferLock)
         {
-            CopyDisplayFromHeap();
+            // In 1bpp mode: sync display buffer from heap (traditional path)
+            // In 32bpp mode: primitives maintain the buffer directly with halftone→gray conversion,
+            // so we skip the heap copy which would overwrite smooth grays with dithered black/white
+            if (_pixelDepth != PixelDepth.ThirtyTwoBit)
+            {
+                CopyDisplayFromHeap();
+            }
             CopyBufferToBitmap();
             e.Graphics.DrawImageUnscaled(_backBuffer, 0, 0);
         }
