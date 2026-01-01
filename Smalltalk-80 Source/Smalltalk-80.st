@@ -2129,6 +2129,10 @@ timeStamp
 	self nextChunkPut: stream contents.
 	self cr!
 
+emphasis
+	"Answer default emphasis (1) for compatibility with streams that carry emphasis"
+	^1!
+
 emphasis: ignored
 	"No-op for plain file streams - allows compatibility with streams that carry emphasis"
 	^self! !
