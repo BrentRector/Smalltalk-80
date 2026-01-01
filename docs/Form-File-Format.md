@@ -1,8 +1,14 @@
 # Form File Format Documentation
 
+**Last Updated**: 2026-01-01
+
 ## Overview
 
-The Smalltalk-80 system stores Form (bitmap) objects in external files with a specific binary format. This document describes the format and the expected Form files used by the system.
+The Smalltalk-80 system stores Form (bitmap) objects in external files with a specific binary format. This document describes the **external file format** and the expected Form files used by the system.
+
+> **Note**: The external file format uses **16-bit words** (big-endian) for compatibility
+> with legacy Smalltalk-80 files. The internal representation may use 32-bit words.
+> The `nextWord`/`nextWordPut:` methods read/write 16-bit values for file I/O.
 
 ## File Format Specification
 

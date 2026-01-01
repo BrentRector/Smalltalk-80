@@ -579,7 +579,7 @@ public class SmalltalkHeapManagerTests : IDisposable
         var retrieved = _heapManager.GetIndexedWord(oop, 3);
 
         // Assert
-        Assert.Equal(0xABCD, retrieved);
+        Assert.Equal(0xABCDu, retrieved);
     }
 
     [Fact]
@@ -1457,8 +1457,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Assert
         Assert.Equal(value1, _heapManager.GetInstanceVariable(oop, 0));
         Assert.Equal(value2, _heapManager.GetInstanceVariable(oop, 1));
-        Assert.Equal(0x1234, _heapManager.GetIndexedWord(oop, 0));
-        Assert.Equal(0x5678, _heapManager.GetIndexedWord(oop, 49));
+        Assert.Equal(0x1234u, _heapManager.GetIndexedWord(oop, 0));
+        Assert.Equal(0x5678u, _heapManager.GetIndexedWord(oop, 49));
     }
 
     #endregion
