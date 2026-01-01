@@ -4,12 +4,18 @@
 **Status**: Architecture planning complete, ready for implementation
 **Branch**: `claude/review-graphics-architecture-FssRQ`
 **Priority**: Enhancement
+**Master Plan**: `docs/32-BIT-IMPLEMENTATION-PLAN.md`
 
 ---
 
 ## Quick Summary
 
-Completed comprehensive architecture review for 32bpp graphics support. Discovered that moving to 32-bit internal words (from 16-bit) is a prerequisite for clean 32bpp implementation. Created detailed migration plan covering HeapManager changes, file format compatibility, and 32bpp Form file format.
+Completed comprehensive architecture review for 32bpp graphics support. Created consolidated implementation plan with 4 milestones:
+
+1. **MILESTONE 1**: 32-bit Word Migration (Phases 1.1-1.7)
+2. **MILESTONE 2**: 32bpp Graphics (Phases 2.1-2.5)
+3. **MILESTONE 3**: PNG I/O (Phases 3.1-3.4) - can run parallel with M2
+4. **MILESTONE 4**: Integration (Phase 4.1)
 
 ---
 
@@ -89,8 +95,9 @@ DisplayMedium subclass: #Form
 
 | Document | Purpose |
 |----------|---------|
-| **`docs/Migration-to-32-bit-Words.md`** | Complete 32-bit word migration plan with 7 phases |
-| **`docs/Graphics-Architecture.md`** | Graphics system architecture and 32bpp plan |
+| **`docs/32-BIT-IMPLEMENTATION-PLAN.md`** | **MASTER PLAN** - Consolidated phased implementation |
+| **`docs/Migration-to-32-bit-Words.md`** | Detailed word migration technical reference |
+| **`docs/Graphics-Architecture.md`** | Graphics system architecture and 32bpp design |
 | **`docs/Form-File-Format.md`** | Original 1bpp Form file format |
 | **`CLAUDE.md`** | Project status and development guidelines |
 
@@ -171,13 +178,13 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 
 ## For Next Session
 
-**Recommended Order**:
+**Start here**: `docs/32-BIT-IMPLEMENTATION-PLAN.md`
 
-1. **Review migration plan**: Read `docs/Migration-to-32-bit-Words.md`
-2. **Decide open questions**: Especially Deflate priority and alpha handling
-3. **Begin HeapManager migration**: Phase 1 of migration plan
-4. **Add Form depth**: After word migration is stable
-5. **Implement PNG classes**: CRC32 → DeflateStream → PNGReader/Writer
-6. **Implement BitBltEngine32**: High complexity, core of 32bpp support
+**Recommended first step**: Phase 1.1 (HeapManager Foundation)
+- Change `ushort[]` to `uint[]` in HeapManager
+- Update interface signatures
+- Run regression tests
 
-**Goal**: Migrate to 32-bit words internally, implement pure Smalltalk PNG I/O (with primitive-ready interfaces), then implement 32bpp Form support.
+**After MILESTONE 1**: Phases 2.x and 3.x can proceed in parallel.
+
+**Goal**: Complete MILESTONE 1 (32-bit words) first, then implement 32bpp graphics and PNG I/O.

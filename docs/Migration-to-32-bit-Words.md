@@ -3,6 +3,10 @@
 **Created**: 2026-01-01
 **Status**: Planning
 **Branch**: `claude/review-graphics-architecture-FssRQ`
+**Master Plan**: See `docs/32-BIT-IMPLEMENTATION-PLAN.md` for consolidated phased plan
+
+> **Note**: This document provides detailed technical reference for the 32-bit word migration.
+> For the implementation roadmap with milestones, see the Master Plan.
 
 ---
 

@@ -2,6 +2,7 @@
 
 **Last Updated**: 2026-01-01
 **Status**: Phases 1-6 Complete - Full 1bpp graphics system operational
+**Master Plan**: See `docs/32-BIT-IMPLEMENTATION-PLAN.md` for 32bpp implementation roadmap
 
 ---
 
@@ -575,5 +576,6 @@ Phase 6: Extended rules ──────────────────�
 6. [Squeak ColorForm](http://bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/ColorForm.htm) - Indexed color forms
 7. [Pharo Documentation](https://pharo.org/documentation.html) - Modern Smalltalk reference
 8. [Cuis Smalltalk](https://cuis.st) - Minimalist Smalltalk with vector graphics
-9. `docs/Migration-to-32-bit-Words.md` - 32-bit word migration plan (prerequisite for 32bpp)
-10. `docs/Form-File-Format.md` - Original 1bpp Form file format specification
+9. `docs/32-BIT-IMPLEMENTATION-PLAN.md` - **Master plan** for 32-bit migration and 32bpp graphics
+10. `docs/Migration-to-32-bit-Words.md` - 32-bit word migration technical reference
+11. `docs/Form-File-Format.md` - Original 1bpp Form file format specification
