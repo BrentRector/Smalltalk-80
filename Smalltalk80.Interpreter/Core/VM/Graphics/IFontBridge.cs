@@ -76,9 +76,9 @@ public readonly struct GlyphData
 
     /// <summary>
     /// Bitmap data for the glyph (1 bit per pixel).
-    /// Rows are packed into 16-bit words, LSB first.
+    /// Rows are packed into 32-bit words, MSB first.
     /// </summary>
-    public ushort[] Bitmap { get; init; }
+    public uint[] Bitmap { get; init; }
 
     /// <summary>Height of the glyph bitmap in pixels.</summary>
     public int Height { get; init; }
@@ -114,9 +114,9 @@ public class StrikeFontData
     /// <summary>
     /// Combined glyph bitmap (1bpp). All glyphs placed side by side.
     /// Height is font height (ascent + descent), width is strikeLength.
-    /// Stored as 16-bit words, row by row.
+    /// Stored as 32-bit words, row by row.
     /// </summary>
-    public ushort[] GlyphsBitmap { get; init; } = Array.Empty<ushort>();
+    public uint[] GlyphsBitmap { get; init; } = Array.Empty<uint>();
 
     /// <summary>Width of the combined glyphs form in pixels.</summary>
     public int StrikeLength { get; init; }
@@ -124,8 +124,8 @@ public class StrikeFontData
     /// <summary>Height of the combined glyphs form in pixels.</summary>
     public int StrikeHeight => Metrics.Ascent + Metrics.Descent;
 
-    /// <summary>Number of 16-bit words per row in the glyphs form.</summary>
-    public int Raster => (StrikeLength + 15) / 16;
+    /// <summary>Number of 32-bit words per row in the glyphs form.</summary>
+    public int Raster => (StrikeLength + 31) / 32;
 
     /// <summary>X offset for rendering (typically 0).</summary>
     public int XOffset { get; init; }

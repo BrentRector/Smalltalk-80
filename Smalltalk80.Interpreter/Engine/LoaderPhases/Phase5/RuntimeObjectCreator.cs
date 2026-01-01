@@ -226,11 +226,11 @@ public class RuntimeObjectCreator(
         SetInstanceVarByName(pointOOP, "Point", "y", SmalltalkOOP.FromSmallInteger(0));
 
         // Step 2: Create DisplayBitmap
+        // With 32-bit words: each word holds 32 pixels, so width/32 words per row
         int displayWidth = 800;
         int displayHeight = 600;
-        int bytesPerRow = displayWidth / 8;
-        int totalBytes = bytesPerRow * displayHeight;
-        int totalWords = totalBytes / 2;
+        int wordsPerRow = (displayWidth + 31) / 32;  // 25 words per row for 800 pixels
+        int totalWords = wordsPerRow * displayHeight;  // 15000 words for 800x600
 
         var displayBitmapOOP = context.Allocator.AllocateObject("DisplayBitmap", ObjectFormat.WordIndexed, totalWords);
         var displayBitmapClassOOP = GlobalRegistry.LookupClassOOP("DisplayBitmap");
@@ -282,7 +282,7 @@ public class RuntimeObjectCreator(
         {
             Severity = MessageSeverity.Info,
             Category = "Phase5",
-            Message = $"Created Display (800x600, {totalBytes} byte bitmap) as DisplayScreen OOP({displayScreenOOP.RawValue})",
+            Message = $"Created Display (800x600, {totalWords} words bitmap) as DisplayScreen OOP({displayScreenOOP.RawValue})",
             Timestamp = Stopwatch.GetTimestamp(),
             InstructionCount = 0
         });

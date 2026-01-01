@@ -482,10 +482,10 @@ public class GdiBitmapFontBridge : IFontBridge, IDisposable
             FIXED_PITCH | FF_MODERN, _fontName);
     }
 
-    private ushort[] RenderCharacterToBitmap(FontDescriptor descriptor, char character, int width, int height)
+    private uint[] RenderCharacterToBitmap(FontDescriptor descriptor, char character, int width, int height)
     {
-        int wordsPerRow = (width + 15) / 16;
-        ushort[] result = new ushort[wordsPerRow * height];
+        int wordsPerRow = (width + 31) / 32;
+        uint[] result = new uint[wordsPerRow * height];
 
         IntPtr screenDC = IntPtr.Zero;
         IntPtr memDC = IntPtr.Zero;
@@ -545,15 +545,15 @@ public class GdiBitmapFontBridge : IFontBridge, IDisposable
 
             // Convert GDI 1bpp format to Smalltalk 1bpp format
             // GDI: MSB first, DWORD-aligned rows, 0=white, 1=black
-            // Smalltalk: MSB first within 16-bit words, 1=black (ink)
+            // Smalltalk: MSB first within 32-bit words, 1=black (ink)
             for (int y = 0; y < height; y++)
             {
                 for (int wordX = 0; wordX < wordsPerRow; wordX++)
                 {
-                    ushort word = 0;
-                    for (int bit = 0; bit < 16; bit++)
+                    uint word = 0;
+                    for (int bit = 0; bit < 32; bit++)
                     {
-                        int pixelX = wordX * 16 + bit;
+                        int pixelX = wordX * 32 + bit;
                         if (pixelX >= width) break;
 
                         int byteIndex = y * bytesPerRow + pixelX / 8;
@@ -564,7 +564,7 @@ public class GdiBitmapFontBridge : IFontBridge, IDisposable
                             bool isBlack = (dibBits[byteIndex] & (1 << bitInByte)) != 0;
                             if (isBlack)
                             {
-                                word |= (ushort)(1 << (15 - bit)); // Smalltalk MSB first
+                                word |= (uint)(1 << (31 - bit)); // Smalltalk MSB first
                             }
                         }
                     }
@@ -591,11 +591,11 @@ public class GdiBitmapFontBridge : IFontBridge, IDisposable
         return result;
     }
 
-    private ushort[] RenderAllCharactersToBitmap(FontDescriptor descriptor, int minAscii, int maxAscii,
+    private uint[] RenderAllCharactersToBitmap(FontDescriptor descriptor, int minAscii, int maxAscii,
         int[] xTable, int totalWidth, int height)
     {
-        int wordsPerRow = (totalWidth + 15) / 16;
-        ushort[] result = new ushort[wordsPerRow * height];
+        int wordsPerRow = (totalWidth + 31) / 32;
+        uint[] result = new uint[wordsPerRow * height];
 
         IntPtr screenDC = IntPtr.Zero;
         IntPtr memDC = IntPtr.Zero;
@@ -659,15 +659,15 @@ public class GdiBitmapFontBridge : IFontBridge, IDisposable
             byte[] dibBits = new byte[bytesPerRow * height];
             Marshal.Copy(ppvBits, dibBits, 0, dibBits.Length);
 
-            // Convert to Smalltalk format
+            // Convert to Smalltalk format (32-bit words)
             for (int y = 0; y < height; y++)
             {
                 for (int wordX = 0; wordX < wordsPerRow; wordX++)
                 {
-                    ushort word = 0;
-                    for (int bit = 0; bit < 16; bit++)
+                    uint word = 0;
+                    for (int bit = 0; bit < 32; bit++)
                     {
-                        int pixelX = wordX * 16 + bit;
+                        int pixelX = wordX * 32 + bit;
                         if (pixelX >= totalWidth) break;
 
                         int byteIndex = y * bytesPerRow + pixelX / 8;
@@ -678,7 +678,7 @@ public class GdiBitmapFontBridge : IFontBridge, IDisposable
                             bool isBlack = (dibBits[byteIndex] & (1 << bitInByte)) != 0;
                             if (isBlack)
                             {
-                                word |= (ushort)(1 << (15 - bit));
+                                word |= (uint)(1 << (31 - bit));
                             }
                         }
                     }

@@ -1953,13 +1953,17 @@ contentsOfEntireFile
     ^contents!
 
 nextWord
-    "Answer the next two bytes from the receiver as an Integer (big-endian)."
-    | high low |
-    high _ self next.
-    high == nil ifTrue: [^false].
-    low _ self next.
-    low == nil ifTrue: [^false].
-    ^(high asInteger bitShift: 8) + low asInteger! !
+    "Answer the next four bytes from the receiver as an Integer (big-endian, 32-bit word)."
+    | b0 b1 b2 b3 |
+    b0 _ self next.
+    b0 == nil ifTrue: [^false].
+    b1 _ self next.
+    b1 == nil ifTrue: [^false].
+    b2 _ self next.
+    b2 == nil ifTrue: [^false].
+    b3 _ self next.
+    b3 == nil ifTrue: [^false].
+    ^((b0 asInteger bitShift: 24) + (b1 asInteger bitShift: 16) + (b2 asInteger bitShift: 8) + b3 asInteger) bitAnd: 16rFFFFFFFF! !
 
 !WindowsFileStream methodsFor: 'writing'!
 
@@ -1998,7 +2002,9 @@ nextChunkPut: aString
     ^aString!
 
 nextWordPut: aWord
-    "Append to the receiver an Integer as the next two bytes (big-endian)."
+    "Append to the receiver an Integer as the next four bytes (big-endian, 32-bit word)."
+    self nextPut: (Character value: ((aWord bitShift: -24) bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -16) bitAnd: 255)).
     self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
     self nextPut: (Character value: (aWord bitAnd: 255)).
     ^aWord!
@@ -17999,17 +18005,23 @@ nextStringPut: s
 	s do: [:char | self nextPut: char asciiValue].
 	^s!
 nextWord
-	"Answer the next two bytes from the receiver as an Integer."
+	"Answer the next four bytes from the receiver as an Integer (32-bit word, big-endian)."
 
-	| high low |
-	high _ self next.
-		high==nil ifTrue: [^false].
-	low _ self next.
-		low==nil ifTrue: [^false].
-	^(high asInteger bitShift: 8) + low asInteger!
-nextWordPut: aWord 
-	"Append to the receiver an Integer as the next two bytes."
+	| b0 b1 b2 b3 |
+	b0 _ self next.
+	b0 == nil ifTrue: [^false].
+	b1 _ self next.
+	b1 == nil ifTrue: [^false].
+	b2 _ self next.
+	b2 == nil ifTrue: [^false].
+	b3 _ self next.
+	b3 == nil ifTrue: [^false].
+	^((b0 asInteger bitShift: 24) + (b1 asInteger bitShift: 16) + (b2 asInteger bitShift: 8) + b3 asInteger) bitAnd: 16rFFFFFFFF!
+nextWordPut: aWord
+	"Append to the receiver an Integer as the next four bytes (32-bit word, big-endian)."
 
+	self nextPut: ((aWord bitShift: -24) bitAnd: 255).
+	self nextPut: ((aWord bitShift: -16) bitAnd: 255).
 	self nextPut: ((aWord bitShift: -8) bitAnd: 255).
 	self nextPut: (aWord bitAnd: 255).
 	^aWord! !
@@ -19609,7 +19621,7 @@ extent: aPoint
 		aPoint >= (0 @ 0)
 			ifTrue: [aPoint]
 			ifFalse: [0 @ 0].
-	extentSize _ nonZeroExtent y * (nonZeroExtent x + 15 // 16).
+	extentSize _ nonZeroExtent y * (nonZeroExtent x + 31 // 32).
 	self extent: nonZeroExtent
 		offset: 0 @ 0
 		bits: (WordArray new: (extentSize min: WordArray maxSize))!
@@ -19623,7 +19635,7 @@ extent: extentPoint offset: offsetPoint
 				ifFalse: [0 @ 0].
 	self extent: normalizedPoint
 		offset: offsetPoint
-		bits: (WordArray new: normalizedPoint y * (normalizedPoint x + 15 // 16))!
+		bits: (WordArray new: normalizedPoint y * (normalizedPoint x + 31 // 32))!
 extent: extent offset: aPoint bits: aBitmap 
 	"Create a virtual bit map with width = (extent x) and height = (extent y) 
 	with the bits = aBitmap."
@@ -20174,7 +20186,7 @@ writeOn: fileName
 	file nextWordPut: offset x.
 	file nextWordPut: offset y.
 	filePosition _ 0.
-	1 to: width + 15 // 16 do:
+	1 to: width + 31 // 32 do:
 		[:j |
 		1 to: height do: [:i | file nextWordPut: (bits at: (filePosition _ filePosition + 1))]].
 	file close.! !
@@ -20235,7 +20247,7 @@ setExtent: extentPoint fromArray: anArray setOffset: offsetPoint
 	width _ extentPoint x.
 	height _ extentPoint y.
 	offset _ offsetPoint.
-	bits _ WordArray new: width + 15 // 16 * height.
+	bits _ WordArray new: width + 31 // 32 * height.
 	1 to: anArray size do:
 		[:index | bits at: index put: (anArray at: index)]!
 setExtent: extentPoint fromCompactArray: anArray setOffset: offsetPoint
@@ -20243,7 +20255,7 @@ setExtent: extentPoint fromCompactArray: anArray setOffset: offsetPoint
 	width _ extentPoint x.
 	height _ extentPoint y.
 	offset _ offsetPoint.
-	bits _ WordArray new: width + 15 // 16 * height.
+	bits _ WordArray new: width + 31 // 32 * height.
 	stripe _ Form stringScanLineOfWidth: width.
 	1 to: anArray size do:
 		[:index | 
@@ -20358,9 +20370,9 @@ readFormFile: file
 	offsetX > 32767 ifTrue: [offsetX _ offsetX - 65536]. "stored two's-complement"
 	offsetY > 32767 ifTrue: [offsetY _ offsetY - 65536]. "stored two's-complement"
 	newForm offset: offsetX @ offsetY.
-	theBits _ WordArray new: newWidth + 15 // 16 * newHeight.
+	theBits _ WordArray new: newWidth + 31 // 32 * newHeight.
 	filePosition _ 0.
-	1 to: newWidth + 15 // 16 do:
+	1 to: newWidth + 31 // 32 do:
 		[:j | 
 		1 to: newHeight do:
 			[:i | theBits at: (filePosition _ filePosition + 1) put: file nextWord]].

@@ -59,9 +59,9 @@ public class NullFontBridge : IFontBridge
         int width = GetCharWidth(descriptor, character);
         int height = metrics.Ascent + metrics.Descent;
 
-        // Create empty 1bpp bitmap
-        int wordsPerRow = (width + 15) / 16;
-        var bitmap = new ushort[wordsPerRow * height];
+        // Create empty 1bpp bitmap (32-bit words)
+        int wordsPerRow = (width + 31) / 32;
+        var bitmap = new uint[wordsPerRow * height];
 
         return new GlyphData
         {
@@ -92,10 +92,10 @@ public class NullFontBridge : IFontBridge
 
         int strikeLength = charCount * charWidth;
         int fontHeight = metrics.Ascent + metrics.Descent;
-        int raster = (strikeLength + 15) / 16;
+        int raster = (strikeLength + 31) / 32;
 
-        // Create empty glyph bitmap
-        var glyphsBitmap = new ushort[raster * fontHeight];
+        // Create empty glyph bitmap (32-bit words)
+        var glyphsBitmap = new uint[raster * fontHeight];
 
         return new StrikeFontData
         {

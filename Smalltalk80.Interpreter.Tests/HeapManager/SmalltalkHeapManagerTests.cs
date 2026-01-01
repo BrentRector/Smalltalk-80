@@ -591,13 +591,13 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Act
         for (int i = 0; i < 100; i++)
         {
-            _heapManager.SetIndexedWord(oop, i, (ushort)(i * 100));
+            _heapManager.SetIndexedWord(oop, i, (uint)(i * 100));
         }
 
         // Assert
         for (int i = 0; i < 100; i++)
         {
-            Assert.Equal((ushort)(i * 100), _heapManager.GetIndexedWord(oop, i));
+            Assert.Equal((uint)(i * 100), _heapManager.GetIndexedWord(oop, i));
         }
     }
 
@@ -1740,14 +1740,14 @@ public class SmalltalkHeapManagerTests : IDisposable
     [Fact]
     public void AsWordArray_WordIndexedObject_ReturnsWordStorage()
     {
-        // Arrange - WordIndexed objects (like Bitmap) store ushort[]
+        // Arrange - WordIndexed objects (like Bitmap) store uint[] (32-bit words)
         var bitmapOOP = _heapManager.AllocateObject(ObjectFormat.WordIndexed, 0, 8);
         var entry = GetEntry(bitmapOOP);
 
         // Act
         var wordArray = entry.AsWordArray();
 
-        // Assert - Should access raw ushort[] storage
+        // Assert - Should access raw uint[] storage (32-bit words)
         Assert.NotNull(wordArray);
         Assert.Equal(8, wordArray.Length);
     }
@@ -1823,8 +1823,8 @@ public class SmalltalkHeapManagerTests : IDisposable
         // Act
         var debugInfo = entry.GetDebugInfo();
 
-        // Assert - Should show ushort array information
-        Assert.Contains("ushort[100]", debugInfo);
+        // Assert - Should show uint array information (32-bit words)
+        Assert.Contains("uint[100]", debugInfo);
         Assert.Contains("Format: WordIndexed", debugInfo);
     }
 

@@ -6,11 +6,11 @@ namespace Smalltalk80.Interpreter.Core.VM.Primitives;
 
 /// <summary>
 /// Float primitives (40-54) using new IPrimitive interface.
-/// Float is stored as IEEE 754 double precision (8 bytes / 4 words).
+/// Float is stored as IEEE 754 double precision (8 bytes / 2 words with 32-bit words).
 ///
 /// OPTIMIZATION (2025-12-28): Zero-allocation IEEE 754 conversion.
-/// - GetFloatAsDouble: Single heap call reads 4 words and returns double
-/// - SetFloatFromDouble: Single heap call writes double to 4 words
+/// - GetFloatAsDouble: Single heap call reads 2 words and returns double
+/// - SetFloatFromDouble: Single heap call writes double to 2 words
 /// - Uses cached FloatClassOOP instead of string-based class lookup
 /// - Uses BitConverter.Int64BitsToDouble for zero-allocation bit reinterpretation
 /// </summary>
@@ -18,7 +18,7 @@ public static class FloatArithmetic
 {
     /// <summary>
     /// Helper: Converts a Float object to C# double.
-    /// OPTIMIZED: Single heap call reads all 4 words and converts to IEEE 754 double.
+    /// OPTIMIZED: Single heap call reads all 2 words and converts to IEEE 754 double.
     /// </summary>
     private static double ToDouble(ISmalltalkHeap heap, SmalltalkOOP floatOop)
     {
@@ -31,10 +31,10 @@ public static class FloatArithmetic
     /// </summary>
     private static SmalltalkOOP FromDouble(PrimitiveExecutionContext ctx, double value)
     {
-        // Allocate Float with 4 indexed words using cached class OOP
-        var floatOop = ctx.HeapManager.AllocateInstanceOf(ctx.Metadata!.FloatClassOOP, 4);
+        // Allocate Float with 2 indexed words (32-bit each = 64 bits total) using cached class OOP
+        var floatOop = ctx.HeapManager.AllocateInstanceOf(ctx.Metadata!.FloatClassOOP, 2);
 
-        // Write IEEE 754 double directly to Float's 4 words
+        // Write IEEE 754 double directly to Float's 2 words
         ctx.HeapManager.SetFloatFromDouble(floatOop, value);
 
         return floatOop;

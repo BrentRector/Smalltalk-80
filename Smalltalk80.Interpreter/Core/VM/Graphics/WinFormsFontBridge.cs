@@ -248,7 +248,7 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
         xTable[charCount + 1] = x; // Extra sentinel for edge case
 
         int strikeLength = x;
-        int raster = (strikeLength + 15) / 16;
+        int raster = (strikeLength + 31) / 32;
 
         // Create the combined glyphs bitmap
         using var glyphsBitmap = new Bitmap(strikeLength, fontHeight);
@@ -278,8 +278,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             }
         }
 
-        // Convert entire bitmap to 1bpp packed into 16-bit words
-        ushort[] glyphsData = ConvertBitmapTo1BppWords(glyphsBitmap, strikeLength, fontHeight);
+        // Convert entire bitmap to 1bpp packed into 32-bit words
+        uint[] glyphsData = ConvertBitmapTo1BppWords(glyphsBitmap, strikeLength, fontHeight);
 
         // Build the StrikeFontData
         var strikeFontData = new StrikeFontData
@@ -330,14 +330,14 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
     }
 
     /// <summary>
-    /// Converts a bitmap to 1bpp data stored in 16-bit words.
+    /// Converts a bitmap to 1bpp data stored in 32-bit words.
     /// Uses LockBits for 1000x faster performance than GetPixel().
     /// </summary>
-    private static ushort[] ConvertTo1Bpp(Bitmap bitmap, int height)
+    private static uint[] ConvertTo1Bpp(Bitmap bitmap, int height)
     {
         int width = bitmap.Width;
-        int wordsPerRow = (width + 15) / 16;
-        ushort[] result = new ushort[wordsPerRow * height];
+        int wordsPerRow = (width + 31) / 32;
+        uint[] result = new uint[wordsPerRow * height];
 
         // Use LockBits for fast pixel access (1000x faster than GetPixel)
         BitmapData bmpData = bitmap.LockBits(
@@ -368,9 +368,9 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
                         bool isOn = (r + g + b) / 3 < 128;
                         if (isOn)
                         {
-                            int wordIndex = y * wordsPerRow + x / 16;
-                            int bitIndex = 15 - (x % 16); // MSB first within word
-                            result[wordIndex] |= (ushort)(1 << bitIndex);
+                            int wordIndex = y * wordsPerRow + x / 32;
+                            int bitIndex = 31 - (x % 32); // MSB first within word
+                            result[wordIndex] |= (uint)(1 << bitIndex);
                         }
                     }
                 }
@@ -388,10 +388,10 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
     /// Converts a bitmap to 1bpp words for the entire glyphs form.
     /// Uses LockBits for 1000x faster performance than GetPixel().
     /// </summary>
-    private static ushort[] ConvertBitmapTo1BppWords(Bitmap bitmap, int width, int height)
+    private static uint[] ConvertBitmapTo1BppWords(Bitmap bitmap, int width, int height)
     {
-        int wordsPerRow = (width + 15) / 16;
-        ushort[] result = new ushort[wordsPerRow * height];
+        int wordsPerRow = (width + 31) / 32;
+        uint[] result = new uint[wordsPerRow * height];
 
         // Use LockBits for fast pixel access (1000x faster than GetPixel)
         BitmapData bmpData = bitmap.LockBits(
@@ -422,9 +422,9 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
                         bool isOn = (r + g + b) / 3 < 128;
                         if (isOn)
                         {
-                            int wordIndex = y * wordsPerRow + x / 16;
-                            int bitIndex = 15 - (x % 16); // MSB first within word
-                            result[wordIndex] |= (ushort)(1 << bitIndex);
+                            int wordIndex = y * wordsPerRow + x / 32;
+                            int bitIndex = 31 - (x % 32); // MSB first within word
+                            result[wordIndex] |= (uint)(1 << bitIndex);
                         }
                     }
                 }

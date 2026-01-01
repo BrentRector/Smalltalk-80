@@ -9,7 +9,7 @@ namespace Smalltalk80.Interpreter.HeapManager;
 /// </summary>
 public sealed class ObjectTableEntry
 {
-    /// <summary>Managed storage for object data (byte[], SmalltalkOOP[], ushort[], or int[]).</summary>
+    /// <summary>Managed storage for object data (byte[], SmalltalkOOP[], uint[], or int[]).</summary>
     public object? ManagedStorage { get; set; }
 
     /// <summary>Packed metadata word for space efficiency (size + format + GC flags + other metadata).</summary>
@@ -46,7 +46,7 @@ public sealed class ObjectTableEntry
 
     /// <summary>
     /// Instance variable storage for ByteIndexed/WordIndexed objects.
-    /// These formats store indexed data in ManagedStorage (byte[] or ushort[])
+    /// These formats store indexed data in ManagedStorage (byte[] or uint[])
     /// but also need to store OOP instance variables (e.g., Form has bits, width, height, offset).
     /// For Pointer/PointerIndexed, instance variables are in the OOP array so this is null.
     /// </summary>
@@ -60,8 +60,8 @@ public sealed class ObjectTableEntry
     /// <summary>Gets storage as OOP array (for PointerIndexed/Pointer formats).</summary>
     public SmalltalkOOP[]? AsOopArray() => ManagedStorage as SmalltalkOOP[];
 
-    /// <summary>Gets storage as word array (for WordIndexed format).</summary>
-    public ushort[]? AsWordArray() => ManagedStorage as ushort[];
+    /// <summary>Gets storage as word array (for WordIndexed format). Words are 32-bit.</summary>
+    public uint[]? AsWordArray() => ManagedStorage as uint[];
 
     /// <summary>Gets storage as int array (for specialized formats).</summary>
     public int[]? AsIntArray() => ManagedStorage as int[];
@@ -184,7 +184,7 @@ public sealed class ObjectTableEntry
         {
             byte[] ba => $"byte[{ba.Length}]",
             SmalltalkOOP[] oa => $"SmalltalkOOP[{oa.Length}]",
-            ushort[] wa => $"ushort[{wa.Length}]",
+            uint[] wa => $"uint[{wa.Length}]",
             int[] ia => $"int[{ia.Length}]",
             null => "null",
             _ => ManagedStorage.GetType().Name

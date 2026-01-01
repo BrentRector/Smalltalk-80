@@ -129,34 +129,36 @@ public interface ISmalltalkHeap
     /// <summary>
     /// Gets indexed word from WordIndexed objects (WordArrays, Bitmaps).
     /// Validates format is WordIndexed and index is within range.
+    /// Words are 32-bit unsigned integers.
     /// </summary>
-    ushort GetIndexedWord(SmalltalkOOP objectOOP, int index);
+    uint GetIndexedWord(SmalltalkOOP objectOOP, int index);
 
     /// <summary>
     /// Sets indexed word in WordIndexed objects (WordArrays, Bitmaps).
     /// Validates format is WordIndexed and index is within range.
+    /// Words are 32-bit unsigned integers.
     /// </summary>
-    void SetIndexedWord(SmalltalkOOP objectOOP, int index, ushort value);
+    void SetIndexedWord(SmalltalkOOP objectOOP, int index, uint value);
 
     // ========================================
     // Float Optimization (Zero-Allocation IEEE 754)
     // ========================================
 
     /// <summary>
-    /// Reads a Float object's 4 words directly as a C# double.
-    /// OPTIMIZATION: Single method call instead of 4 GetIndexedWord calls.
-    /// Reads words 0-3 as little-endian IEEE 754 double-precision value.
+    /// Reads a Float object's 2 words directly as a C# double.
+    /// OPTIMIZATION: Single method call instead of 2 GetIndexedWord calls.
+    /// Reads words 0-1 as little-endian IEEE 754 double-precision value.
     /// </summary>
-    /// <param name="floatOOP">Float object (must be WordIndexed with exactly 4 words)</param>
+    /// <param name="floatOOP">Float object (must be WordIndexed with exactly 2 words)</param>
     /// <returns>IEEE 754 double-precision value</returns>
     double GetFloatAsDouble(SmalltalkOOP floatOOP);
 
     /// <summary>
-    /// Writes a C# double directly into a Float object's 4 words.
-    /// OPTIMIZATION: Single method call instead of 4 SetIndexedWord calls.
-    /// Writes IEEE 754 double-precision value as words 0-3 in little-endian format.
+    /// Writes a C# double directly into a Float object's 2 words.
+    /// OPTIMIZATION: Single method call instead of 2 SetIndexedWord calls.
+    /// Writes IEEE 754 double-precision value as words 0-1 in little-endian format.
     /// </summary>
-    /// <param name="floatOOP">Float object (must be WordIndexed with exactly 4 words)</param>
+    /// <param name="floatOOP">Float object (must be WordIndexed with exactly 2 words)</param>
     /// <param name="value">IEEE 754 double-precision value to write</param>
     void SetFloatFromDouble(SmalltalkOOP floatOOP, double value);
 
@@ -171,7 +173,7 @@ public interface ISmalltalkHeap
 
     /// <summary>
     /// Bulk copy indexed words from heap object to destination span as big-endian bytes.
-    /// Each word (16-bit) is stored as 2 bytes in big-endian format.
+    /// Each word (32-bit) is stored as 4 bytes in big-endian format.
     /// Much faster than element-by-element access for large bitmaps.
     /// </summary>
     /// <param name="objectOOP">WordIndexed object to read from</param>
@@ -190,7 +192,7 @@ public interface ISmalltalkHeap
 
     /// <summary>
     /// Bulk copy bytes to indexed words in heap object, converting from big-endian format.
-    /// Each 2 bytes in source represents one 16-bit word in big-endian format.
+    /// Each 4 bytes in source represents one 32-bit word in big-endian format.
     /// Much faster than element-by-element access for large bitmaps.
     /// </summary>
     /// <param name="objectOOP">WordIndexed object to write to</param>
@@ -341,7 +343,7 @@ public interface ISmalltalkHeap
     /// <param name="format">The object format (Pointer, PointerIndexed, ByteIndexed, WordIndexed).</param>
     /// <param name="classOOP">The class OOP for this object.</param>
     /// <param name="instanceVars">Array of instance variable OOPs.</param>
-    /// <param name="indexedStorage">The indexed portion storage (SmalltalkOOP[], byte[], or ushort[]).</param>
+    /// <param name="indexedStorage">The indexed portion storage (SmalltalkOOP[], byte[], or uint[]).</param>
     void RestoreObject(int objectId, ObjectFormat format, SmalltalkOOP classOOP,
         SmalltalkOOP[] instanceVars, object? indexedStorage);
 

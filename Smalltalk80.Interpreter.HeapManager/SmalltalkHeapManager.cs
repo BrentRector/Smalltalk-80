@@ -152,7 +152,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             ObjectFormat.Pointer => new SmalltalkOOP[1 + fixedSlots], // Header + fixed slots only
             ObjectFormat.PointerIndexed => new SmalltalkOOP[1 + fixedSlots + indexedSize], // Header + fixed + indexed
             ObjectFormat.ByteIndexed => new byte[indexedSize], // Raw byte storage (no header/fixed in array)
-            ObjectFormat.WordIndexed => new ushort[indexedSize], // Raw word storage
+            ObjectFormat.WordIndexed => new uint[indexedSize], // Raw 32-bit word storage
             _ => throw new ArgumentException($"Unknown object format: {format}")
         };
 
@@ -181,7 +181,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         );
 
         // For ByteIndexed/WordIndexed objects with instance variables, allocate separate storage
-        // These formats store indexed data in ManagedStorage (byte[]/ushort[]) but also need
+        // These formats store indexed data in ManagedStorage (byte[]/uint[]) but also need
         // OOP storage for instance variables (e.g., Form has bits, width, height, offset)
         if ((format == ObjectFormat.ByteIndexed || format == ObjectFormat.WordIndexed) && fixedSlots > 0)
         {
@@ -257,7 +257,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             ObjectFormat.Pointer => 0,
             ObjectFormat.PointerIndexed => indexedSize,
             ObjectFormat.ByteIndexed => (indexedSize + 3) / 4,
-            ObjectFormat.WordIndexed => (indexedSize + 1) / 2,
+            ObjectFormat.WordIndexed => indexedSize,  // 1:1 for 32-bit words
             _ => throw new ArgumentException($"Unknown object format: {format}")
         };
     }
@@ -432,7 +432,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         return byteArray ?? ReadOnlySpan<byte>.Empty;
     }
 
-    public ushort GetIndexedWord(SmalltalkOOP objectOOP, int index)
+    public uint GetIndexedWord(SmalltalkOOP objectOOP, int index)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot get indexed word from SmallInteger");
@@ -445,7 +445,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         return ReadIndexedWord(entry, index);
     }
 
-    public void SetIndexedWord(SmalltalkOOP objectOOP, int index, ushort value)
+    public void SetIndexedWord(SmalltalkOOP objectOOP, int index, uint value)
     {
         if (objectOOP.IsSmallInteger)
             throw new ArgumentException("Cannot set indexed word in SmallInteger");
@@ -474,14 +474,11 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             throw new InvalidOperationException($"Object format {entry.FormatExplicit} is not a Float (WordIndexed)");
 
         var wordArray = entry.AsWordArray();
-        if (wordArray == null || wordArray.Length != 4)
-            throw new InvalidOperationException($"Float must have exactly 4 words, got {wordArray?.Length ?? 0}");
+        if (wordArray == null || wordArray.Length != 2)
+            throw new InvalidOperationException($"Float must have exactly 2 words, got {wordArray?.Length ?? 0}");
 
-        // Assemble 4 words into long (little-endian: word 0 is least significant)
-        long bits = (long)wordArray[0]
-                  | ((long)wordArray[1] << 16)
-                  | ((long)wordArray[2] << 32)
-                  | ((long)wordArray[3] << 48);
+        // Assemble 2 words (32-bit each) into long (little-endian: word 0 is low 32 bits)
+        long bits = (long)wordArray[0] | ((long)wordArray[1] << 32);
 
         return BitConverter.Int64BitsToDouble(bits);
     }
@@ -498,15 +495,13 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             throw new InvalidOperationException($"Object format {entry.FormatExplicit} is not a Float (WordIndexed)");
 
         var wordArray = entry.AsWordArray();
-        if (wordArray == null || wordArray.Length != 4)
-            throw new InvalidOperationException($"Float must have exactly 4 words, got {wordArray?.Length ?? 0}");
+        if (wordArray == null || wordArray.Length != 2)
+            throw new InvalidOperationException($"Float must have exactly 2 words, got {wordArray?.Length ?? 0}");
 
-        // Extract 4 words from long (little-endian)
+        // Extract 2 words (32-bit each) from long (little-endian)
         long bits = BitConverter.DoubleToInt64Bits(value);
-        wordArray[0] = (ushort)(bits & 0xFFFF);
-        wordArray[1] = (ushort)((bits >> 16) & 0xFFFF);
-        wordArray[2] = (ushort)((bits >> 32) & 0xFFFF);
-        wordArray[3] = (ushort)((bits >> 48) & 0xFFFF);
+        wordArray[0] = (uint)(bits & 0xFFFFFFFF);
+        wordArray[1] = (uint)((bits >> 32) & 0xFFFFFFFF);
     }
 
     /// <summary>
@@ -539,7 +534,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
 
     /// <summary>
     /// Bulk copy indexed words from heap object to destination span as big-endian bytes.
-    /// Each word (16-bit) is stored as 2 bytes in big-endian format.
+    /// Each word (32-bit) is stored as 4 bytes in big-endian format.
     /// Much faster than element-by-element access.
     /// </summary>
     public void CopyIndexedWords(SmalltalkOOP objectOOP, Span<byte> destination, int startIndex = 0)
@@ -558,15 +553,17 @@ public class SmalltalkHeapManager : ISmalltalkHeap
 
         // Calculate how many words we can copy
         int availableWords = Math.Max(0, wordArray.Length - startIndex);
-        int maxWords = destination.Length / 2;
+        int maxWords = destination.Length / 4;  // 4 bytes per 32-bit word
         int copyWords = Math.Min(maxWords, availableWords);
 
-        // Copy words as big-endian bytes
+        // Copy words as big-endian bytes (32-bit)
         for (int i = 0; i < copyWords; i++)
         {
-            ushort word = wordArray[startIndex + i];
-            destination[i * 2] = (byte)(word >> 8);
-            destination[i * 2 + 1] = (byte)(word & 0xFF);
+            uint word = wordArray[startIndex + i];
+            destination[i * 4] = (byte)(word >> 24);
+            destination[i * 4 + 1] = (byte)((word >> 16) & 0xFF);
+            destination[i * 4 + 2] = (byte)((word >> 8) & 0xFF);
+            destination[i * 4 + 3] = (byte)(word & 0xFF);
         }
     }
 
@@ -600,7 +597,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
 
     /// <summary>
     /// Bulk copy bytes to indexed words in heap object, converting from big-endian format.
-    /// Each 2 bytes in source represents one 16-bit word in big-endian format.
+    /// Each 4 bytes in source represents one 32-bit word in big-endian format.
     /// Much faster than element-by-element access.
     /// </summary>
     public void SetIndexedWords(SmalltalkOOP objectOOP, ReadOnlySpan<byte> source, int startIndex = 0)
@@ -618,16 +615,19 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             throw new InvalidOperationException($"WordIndexed object has no word array storage");
 
         // Calculate how many words we can write
-        int sourceWords = source.Length / 2;
+        int sourceWords = source.Length / 4;  // 4 bytes per 32-bit word
         int availableWords = Math.Max(0, wordArray.Length - startIndex);
         int copyWords = Math.Min(sourceWords, availableWords);
 
-        // Copy big-endian bytes to words
+        // Copy big-endian bytes to 32-bit words
         for (int i = 0; i < copyWords; i++)
         {
-            if ((i * 2 + 1) < source.Length)
+            if ((i * 4 + 3) < source.Length)
             {
-                ushort word = (ushort)((source[i * 2] << 8) | source[i * 2 + 1]);
+                uint word = ((uint)source[i * 4] << 24) |
+                           ((uint)source[i * 4 + 1] << 16) |
+                           ((uint)source[i * 4 + 2] << 8) |
+                           (uint)source[i * 4 + 3];
                 wordArray[startIndex + i] = word;
             }
         }
@@ -781,7 +781,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         byteArray[index] = value;
     }
 
-    private ushort ReadIndexedWord(ObjectTableEntry entry, int index)
+    private uint ReadIndexedWord(ObjectTableEntry entry, int index)
     {
         Debug.Assert(entry.FormatExplicit == ObjectFormat.WordIndexed);
 
@@ -796,7 +796,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         return wordArray[index];
     }
 
-    private void WriteIndexedWord(ObjectTableEntry entry, int index, ushort value)
+    private void WriteIndexedWord(ObjectTableEntry entry, int index, uint value)
     {
         Debug.Assert(entry.FormatExplicit == ObjectFormat.WordIndexed);
 
@@ -883,8 +883,8 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         {
             ObjectFormat.PointerIndexed => indexedWords,
             ObjectFormat.ByteIndexed => entry.OriginalIndexedSize ?? (indexedWords * 4),
-            // For WordIndexed, return actual array length to avoid rounding errors
-            ObjectFormat.WordIndexed => entry.AsWordArray()?.Length ?? (indexedWords * 2),
+            // For WordIndexed with 32-bit words, return actual array length (1:1 with indexedWords)
+            ObjectFormat.WordIndexed => entry.AsWordArray()?.Length ?? indexedWords,
             _ => 0
         };
     }
@@ -1139,8 +1139,8 @@ public class SmalltalkHeapManager : ISmalltalkHeap
                 break;
 
             case ObjectFormat.WordIndexed:
-                // Word array for indexed storage
-                managedStorage = indexedStorage as ushort[] ?? Array.Empty<ushort>();
+                // Word array for indexed storage (32-bit words)
+                managedStorage = indexedStorage as uint[] ?? Array.Empty<uint>();
                 break;
 
             default:
@@ -1193,7 +1193,7 @@ public class SmalltalkHeapManager : ISmalltalkHeap
             ObjectFormat.Pointer => 0,
             ObjectFormat.PointerIndexed => (indexedStorage as SmalltalkOOP[])?.Length ?? 0,
             ObjectFormat.ByteIndexed => (((indexedStorage as byte[])?.Length ?? 0) + 3) / 4,
-            ObjectFormat.WordIndexed => (((indexedStorage as ushort[])?.Length ?? 0) + 1) / 2,
+            ObjectFormat.WordIndexed => (indexedStorage as uint[])?.Length ?? 0,  // 1:1 for 32-bit words
             _ => 0
         };
     }

@@ -18,7 +18,7 @@ public sealed class ObjectData
     /// <summary>Named instance variables (null for zero-length).</summary>
     public SmalltalkOOP[]? InstanceVariables { get; set; }
 
-    /// <summary>Indexed data: byte[], ushort[], or SmalltalkOOP[] depending on Format.</summary>
+    /// <summary>Indexed data: byte[], uint[], or SmalltalkOOP[] depending on Format.</summary>
     public object? IndexedData { get; set; }
 
     /// <summary>GC mark bit for mark-and-sweep collection.</summary>
