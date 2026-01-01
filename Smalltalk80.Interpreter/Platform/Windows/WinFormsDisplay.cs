@@ -659,6 +659,7 @@ public class WinFormsDisplay : Form, IDisplay
         // e.Delta is +/- 120 per notch (WHEEL_DELTA constant in Windows)
         // Convert to scroll lines (typically 3 lines per notch, but we use 1:1 for notches)
         int notches = e.Delta / 120;
+        Console.WriteLine($"[MouseWheel] Delta={e.Delta}, notches={notches}");
         if (notches != 0)
         {
             _inputWordBuffer.EnqueueMouseWheel(notches);
