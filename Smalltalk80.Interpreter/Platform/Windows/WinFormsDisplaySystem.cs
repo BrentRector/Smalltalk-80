@@ -34,7 +34,8 @@ public class WinFormsDisplaySystem : IDisplaySystem
             options.Height,
             options.Title,
             _heap,
-            _vmMetadata);
+            _vmMetadata,
+            options.PreferredDepth);
     }
 
     public void Dispose()

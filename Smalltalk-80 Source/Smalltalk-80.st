@@ -6556,8 +6556,11 @@ textMode - symbol indicating the nature of the currently viewed text.'!
 
 !Browser methodsFor: 'initialization'!
 on: anOrganizer
+	| cats |
 	organization _ anOrganizer.
-	meta _ false!
+	meta _ false.
+	cats _ organization categories.
+	cats isEmpty ifFalse: [category _ cats first]!
 onClass: aClass
 	organization _ SystemOrganization.
 	className _ aClass isMeta
@@ -21856,6 +21859,10 @@ blueButtonPressed
 mousePoint
 	"Answer a Point indicating the coordinates of the current mouse location."
 	^self primMousePt!
+mouseWheelDelta
+	"Answer the accumulated mouse wheel delta and reset it.
+	 Positive = scroll up (away from user), negative = scroll down (toward user)."
+	^CurrentInputState mouseWheelDelta!
 mousePointNext
 	"Answer the next mouse point if red button or tablet is down; false otherwise."
 	self redButtonPressed ifTrue: [^self mousePoint].
@@ -22028,7 +22035,7 @@ InputSensor initialize!
 InputSensor install!
 InputSensor initSensor!
 Object subclass: #InputState
-	instanceVariableNames: 'x y lshiftState rshiftState ctrlState lockState metaState keyboardQueue deltaTime baseTime timeProtect '
+	instanceVariableNames: 'x y lshiftState rshiftState ctrlState lockState metaState keyboardQueue deltaTime baseTime timeProtect wheelDelta '
 	classVariableNames: 'BitMax BitMin CtrlKey InputProcess InputSemaphore LockKey LshiftKey RshiftKey '
 	poolDictionaries: ''
 	category: 'System-Support'!
@@ -22092,7 +22099,15 @@ mouseButtons
 	^self bitState bitAnd: 7!
 mousePoint
 	"Answer the coordinates of the mouse location."
-	^self primMousePt! !
+	^self primMousePt!
+mouseWheelDelta
+	"Answer the accumulated mouse wheel delta and reset it to zero.
+	 Positive = scroll up (away from user), negative = scroll down (toward user).
+	 Each unit represents one wheel notch."
+	| delta |
+	delta _ wheelDelta.
+	wheelDelta _ 0.
+	^delta! !
 
 !InputState methodsFor: 'cursor'!
 cursorPoint: aPoint 
@@ -22115,6 +22130,7 @@ initState
 	timeProtect _ Semaphore forMutualExclusion.
 	timeProtect critical: [deltaTime _ baseTime _ 0].
 	x _ y _ 0.
+	wheelDelta _ 0.
 	keyboardQueue _ SharedQueue new: 50.
 	ctrlState _ lshiftState _ rshiftState _ lockState _ metaState _ 0!
 keyAt: index put: value
@@ -22239,7 +22255,10 @@ run
 				ifFalse:
 					[type = 2
 						ifTrue: [y _ param "Mouse Y"]
-						ifFalse: [self nextEvent: type with: param]]]! !
+						ifFalse:
+							[type = 6
+								ifTrue: [wheelDelta _ wheelDelta + param - 2048 "Mouse wheel delta (offset-encoded)"]
+								ifFalse: [self nextEvent: type with: param]]]]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 InputState class
@@ -24552,7 +24571,30 @@ viewDelta
 			((marker top - scrollBar inside top) asFloat /
 				scrollBar inside height asFloat *
 				viewList compositionRectangle height asFloat))
-		roundTo: viewList lineGrid! !
+		roundTo: viewList lineGrid!
+wheelActivity: wheelDelta
+	"Move selection up/down based on wheel delta. Scroll if needed to keep selection visible.
+	 Wheel up (positive) moves selection up (earlier items), wheel down moves selection down."
+	| currentSelection newSelection maxSelection viewList |
+	currentSelection _ view selection.
+	maxSelection _ view maximumSelection - view minimumSelection + 1.
+	maxSelection = 0 ifTrue: [^self].  "Empty list"
+
+	"Calculate new selection - wheel up moves toward start of list"
+	currentSelection = 0
+		ifTrue: [newSelection _ wheelDelta > 0 ifTrue: [1] ifFalse: [maxSelection]]
+		ifFalse: [newSelection _ (currentSelection - wheelDelta max: 1) min: maxSelection].
+
+	"Change selection if different - use view's changeModelSelection for pluggable views"
+	newSelection ~= currentSelection ifTrue: [
+		view moveSelectionBox: newSelection.
+		view changeModelSelection: newSelection].
+
+	"Scroll if selection is clipped"
+	view isSelectionBoxClipped ifTrue: [
+		viewList _ view list.
+		self scrollView: (view selectionBox top - view insetDisplayBox top) negated.
+		self moveMarker]! !
 
 !ListController methodsFor: 'menu messages'!
 redButtonActivity
@@ -24742,6 +24784,9 @@ moveSelectionBox: anInteger
 selection
 	"Answer the receiver's current selection."
 	^selection!
+changeModelSelection: anInteger
+	"Tell the model to change selection. Subclasses may override for pluggable views."
+	model toggleListIndex: anInteger!
 selectionBox
 	"Answer the rectangle in which the current selection is displayed."
 
@@ -29760,11 +29805,18 @@ controlTerminate
 	"so leaving and entering window won't select last type-in"! !
 
 !ParagraphEditor methodsFor: 'control defaults'!
-controlActivity 
+controlActivity
+	| wheelDelta |
+	"Check for mouse wheel scrolling first"
+	wheelDelta _ sensor mouseWheelDelta.
+	wheelDelta ~= 0 ifTrue: [
+		self wheelActivity: wheelDelta.
+		^self].
+	"Normal activity"
 	self scrollBarContainsCursor
-		ifTrue: 
+		ifTrue:
 			[self scroll]
-		ifFalse: 
+		ifFalse:
 			[self processKeyboard.
 			self processMouseButtons].!
 isControlActive
@@ -29792,14 +29844,13 @@ scrollToTop
 	"Scroll so that the paragraph is at the top of the view."
 	self scrollView: (paragraph clippingRectangle top 
 		- paragraph compositionRectangle top)!
-scrollView: anInteger 
+scrollView: anInteger
 	| maximumAmount minimumAmount amount |
 	self deselect.
-	maximumAmount _ 
+	maximumAmount _
 		paragraph clippingRectangle top - paragraph compositionRectangle top max: 0.
-	minimumAmount _ 
-		paragraph clippingRectangle top 
-			+ paragraph lineGrid - paragraph compositionRectangle bottom min: 0.
+	minimumAmount _
+		paragraph clippingRectangle bottom - paragraph compositionRectangle bottom min: 0.
 	amount _ (anInteger min: maximumAmount) max: minimumAmount.
 	amount ~= 0 ifTrue: [self scrollBy: amount negated].
 	self select!
@@ -34234,6 +34285,13 @@ controlTerminate
 
 !ScrollController methodsFor: 'control defaults'!
 controlActivity
+	| wheelDelta |
+	"Check for mouse wheel scrolling first"
+	wheelDelta _ sensor mouseWheelDelta.
+	wheelDelta ~= 0 ifTrue: [
+		self wheelActivity: wheelDelta.
+		^self].
+	"Normal scroll bar or super activity"
 	self scrollBarContainsCursor
 		ifTrue: [self scroll]
 		ifFalse: [super controlActivity]!
@@ -34288,6 +34346,16 @@ scrollViewDown
 scrollViewUp
 	"Scroll the receiver's view up the default amount."
 	self scrollView: self scrollAmount negated!
+wheelScrollAmount
+	"Answer the number of pixels to scroll per mouse wheel notch.
+	 Default is 16 pixels (approximately one text line)."
+	^16!
+wheelActivity: wheelDelta
+	"Handle mouse wheel scrolling. Positive wheelDelta = wheel up = scroll content up.
+	 Subclasses may override to provide different behavior (e.g., move selection)."
+	self canScroll ifTrue: [
+		self scrollView: wheelDelta * self wheelScrollAmount.
+		self moveMarker]!
 viewDelta
 	"Answer an integer that indicates how much the view should be scrolled.
 	The scroll bar has been moved and now the view must be so the amount to

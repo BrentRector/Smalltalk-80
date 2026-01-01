@@ -101,7 +101,7 @@ public static class GraphicsOperations
                 }
             }
 
-            // Perform BitBlt using engine directly
+            // Perform BitBlt using engine directly (1bpp to heap)
             BitBltEngine.CopyBits(
                 destBits.Span,
                 destWidth, destHeight,

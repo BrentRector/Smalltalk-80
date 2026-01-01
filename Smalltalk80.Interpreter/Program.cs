@@ -182,15 +182,22 @@ public static class Program
             // Set to true to try Fixedsys instead of TrueType fonts
             FontBridgeFactory.UseGdiBitmapFonts = true;
 
+            // Display mode: 1bpp (classic Smalltalk-80 monochrome)
+            // The 32bpp experimental mode was removed - we now support only full 1bpp or full 32bpp,
+            // with no runtime conversion between them. Full 32bpp requires Smalltalk-side changes.
+            var pixelDepth = Core.VM.Platform.PixelDepth.OneBit;
+            Console.WriteLine($"  Display mode: {(int)pixelDepth}bpp");
+
             // Create display window (UI thread object - has heap access for Display bitmap rendering)
             Console.WriteLine("\n=== Creating Display Window ===");
-            Console.WriteLine($"  Window size: {displayWidth}x{displayHeight}");
+            Console.WriteLine($"  Window size: {displayWidth}x{displayHeight} ({(int)pixelDepth}bpp)");
             var display = new WinFormsDisplay(
                 displayWidth,
                 displayHeight,
                 "Smalltalk-80",
                 heapManager,
-                vmMetadata);
+                vmMetadata,
+                pixelDepth);
             Console.WriteLine("Display window created (not shown yet)...");
 
             // Run GC immediately after cold start to verify heap integrity

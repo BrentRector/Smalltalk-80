@@ -22,6 +22,9 @@ public interface IDisplay : IDisposable
     /// <summary>Display height in pixels</summary>
     int Height { get; }
 
+    /// <summary>Display bits per pixel (1, 8, or 32)</summary>
+    PixelDepth BitsPerPixel { get; }
+
     /// <summary>Window title</summary>
     string Title { get; set; }
 

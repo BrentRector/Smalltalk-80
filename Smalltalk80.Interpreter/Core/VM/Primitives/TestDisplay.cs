@@ -51,6 +51,7 @@ public class TestDisplay : IDisplay
     public int Height { get; private set; } = 480;
     public string Title { get; set; } = "Test Display";
     public bool IsVisible { get; private set; } = false;
+    public PixelDepth BitsPerPixel => PixelDepth.OneBit;
 
     public void Show() => IsVisible = true;
     public void Hide() => IsVisible = false;

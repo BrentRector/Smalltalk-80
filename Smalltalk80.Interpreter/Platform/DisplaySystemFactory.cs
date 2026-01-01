@@ -111,10 +111,12 @@ public class NullDisplay : IDisplay
         Width = options.Width;
         Height = options.Height;
         Title = options.Title;
+        BitsPerPixel = options.PreferredDepth;
     }
 
     public int Width { get; private set; }
     public int Height { get; private set; }
+    public PixelDepth BitsPerPixel { get; }
     public string Title { get; set; }
     public bool IsVisible => false;
 
