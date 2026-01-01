@@ -382,16 +382,26 @@ Form>>bytesPerRow
 
 ## Form File Formats
 
-The existing Form file format uses **fileCode** to identify the file type. We extend this for 32bpp support:
+### Design Decision: Use Standard Image Formats for 32bpp
 
-### File Code Values
+Rather than creating a custom 32bpp Form file format, we use **standard image formats** (PNG, BMP) for color images:
 
-| fileCode | Depth | Description |
-|----------|-------|-------------|
-| 1 | 1bpp | Original Blue Book monochrome format |
-| 2 | 32bpp | New color format (ARGB) |
+| Use Case | Format | Rationale |
+|----------|--------|-----------|
+| **1bpp legacy** | fileCode=1 (.form) | Backward compatibility with Smalltalk archives |
+| **32bpp color** | PNG (.png) | Industry standard, alpha support, lossless compression |
+| **32bpp simple** | BMP (.bmp) | Uncompressed, simple, Windows native |
 
-### Format 1: 1bpp Monochrome (Existing)
+**Benefits of standard formats:**
+- External tools (Photoshop, GIMP, Paint.NET) can create/edit images
+- Well-documented specifications with no maintenance burden
+- Existing C# libraries (`System.Drawing.Common`, `ImageSharp`, `SkiaSharp`)
+- Industry-proven compression (PNG achieves ~70% size reduction)
+- Future-proof and universally supported
+
+### Format 1: 1bpp Monochrome (Existing Smalltalk Format)
+
+Keep the original Blue Book format for backward compatibility with existing `.form` files:
 
 ```
 Offset  Size     Field      Description
@@ -407,194 +417,114 @@ Offset  Size     Field      Description
 
 **Byte order**: Big-endian (MSB first) - matches original Xerox Alto
 
-**Pixel layout**:
-- 16 pixels per 16-bit word
-- MSB = leftmost pixel
-- Column-major storage order
+### Format 2: PNG for 32bpp Color Forms
 
-### Format 2: 32bpp Color (New)
+Use standard PNG format via C# primitives:
 
-```
-Offset  Size     Field      Description
-------  ----     -----      -----------
-0       2 bytes  fileCode   = 2 (identifies 32bpp Form)
-2       2 bytes  width      Width in pixels (unsigned 16-bit)
-4       2 bytes  height     Height in pixels (unsigned 16-bit)
-6       2 bytes  offsetX    X offset (signed, two's complement)
-8       2 bytes  offsetY    Y offset (signed, two's complement)
-10      W×H×4    pixels     Pixel data (32-bit ARGB, row-major)
-                            Total = width * height * 4 bytes
-```
+```csharp
+// In GraphicsPrimitives.cs or new ImagePrimitives.cs
 
-**Byte order**: Little-endian for pixel data (matches modern systems)
+// Primitive 2xx: Read PNG file into 32bpp Form
+public static void ReadPngIntoForm(string filePath, Form targetForm)
+{
+    using var image = Image.Load<Rgba32>(filePath);
+    // Copy pixels to Form's WordArray...
+}
 
-**Pixel format**: ARGB (8 bits each)
-```
-Byte 0: Blue
-Byte 1: Green
-Byte 2: Red
-Byte 3: Alpha (255 = opaque, 0 = transparent)
+// Primitive 2xx: Write 32bpp Form to PNG file
+public static void WriteFormToPng(Form sourceForm, string filePath)
+{
+    using var image = new Image<Rgba32>(width, height);
+    // Copy Form's pixels to image...
+    image.SaveAsPng(filePath);
+}
 ```
 
-**Pixel layout**:
-- Row-major order (more natural for modern graphics)
-- 1 pixel per 32-bit word
-- Top-left to bottom-right
-
-### Reading Forms (Dispatch by fileCode)
+### Smalltalk Interface
 
 ```smalltalk
 Form class>>readFrom: fileName
-    "Read Form from file, dispatching based on fileCode"
-    | file code |
-    file := FileStream oldFileNamed: fileName.
-    file readOnly; binary.
-    code := file nextWord.
-    code = 1 ifTrue: [^self read1bppFormFile: file].
-    code = 2 ifTrue: [^self read32bppFormFile: file].
-    file close.
-    self error: 'Unknown Form file format: ', code printString.
+    "Read Form from file, dispatching based on extension"
+    | extension |
+    extension := (fileName asPath) extension asLowercase.
+    extension = 'form' ifTrue: [^self readFormFile: fileName].
+    extension = 'png' ifTrue: [^self readPngFile: fileName].
+    extension = 'bmp' ifTrue: [^self readBmpFile: fileName].
+    self error: 'Unknown image format: ', extension.
     ^nil
 
-Form class>>read1bppFormFile: file
-    "Read 1bpp Form (fileCode already consumed)"
-    "... existing readFormFile: logic with 16-bit to 32-bit conversion ..."
+Form class>>readPngFile: fileName
+    "Read PNG file into 32bpp Form (uses C# primitive)"
+    <primitive: 2xx>
+    ^self primitiveFailed
 
-Form class>>read32bppFormFile: file
-    "Read 32bpp Form (fileCode already consumed)"
-    | newForm newWidth newHeight theBits offsetX offsetY |
-    newForm := self new.
-    newWidth := file nextWord.
-    newHeight := file nextWord.
-    offsetX := file nextWord.
-    offsetY := file nextWord.
-    offsetX > 32767 ifTrue: [offsetX := offsetX - 65536].
-    offsetY > 32767 ifTrue: [offsetY := offsetY - 65536].
-
-    "Allocate 32bpp storage (1 word per pixel)"
-    theBits := WordArray new: newWidth * newHeight.
-
-    "Read pixel data (row-major, little-endian ARGB)"
-    1 to: newHeight do: [:y |
-        1 to: newWidth do: [:x |
-            | b g r a pixel |
-            b := file next asInteger.
-            g := file next asInteger.
-            r := file next asInteger.
-            a := file next asInteger.
-            pixel := (a bitShift: 24) + (r bitShift: 16) + (g bitShift: 8) + b.
-            theBits at: ((y - 1) * newWidth + x) put: pixel]].
-
-    newForm
-        setExtent: newWidth @ newHeight
-        depth: 32
-        offset: offsetX @ offsetY
-        bits: theBits.
-    file close.
-    ^newForm
-```
-
-### Writing Forms (Dispatch by depth)
-
-```smalltalk
 Form>>writeOnFileNamed: fileName
-    "Write Form to file in appropriate format based on depth"
+    "Write Form to file based on extension"
+    | extension |
+    extension := (fileName asPath) extension asLowercase.
+    extension = 'form' ifTrue: [^self writeFormFile: fileName].
+    extension = 'png' ifTrue: [^self writePngFile: fileName].
+    extension = 'bmp' ifTrue: [^self writeBmpFile: fileName].
+    "Default: use depth-appropriate format"
     self depth = 32
-        ifTrue: [self write32bppOnFileNamed: fileName]
-        ifFalse: [self write1bppOnFileNamed: fileName]
+        ifTrue: [self writePngFile: fileName, '.png']
+        ifFalse: [self writeFormFile: fileName, '.form']
 
-Form>>write1bppOnFileNamed: fileName
-    "Write 1bpp Form in original Blue Book format"
-    | file |
-    file := FileStream fileNamed: fileName.
-    file binary.
-    file nextWordPut: 1.  "fileCode = 1 for 1bpp"
-    file nextWordPut: width.
-    file nextWordPut: height.
-    file nextWordPut: offset x.
-    file nextWordPut: offset y.
-    self write16BitWordsTo: file.  "Convert 32-bit internal to 16-bit file"
-    file close.
-
-Form>>write32bppOnFileNamed: fileName
-    "Write 32bpp Form in new color format"
-    | file |
-    file := FileStream fileNamed: fileName.
-    file binary.
-    file nextWordPut: 2.  "fileCode = 2 for 32bpp"
-    file nextWordPut: width.
-    file nextWordPut: height.
-    file nextWordPut: offset x.
-    file nextWordPut: offset y.
-    "Write pixel data (row-major, little-endian ARGB)"
-    1 to: height do: [:y |
-        1 to: width do: [:x |
-            | pixel |
-            pixel := bits at: ((y - 1) * width + x).
-            file nextPut: (pixel bitAnd: 16rFF).           "Blue"
-            file nextPut: ((pixel bitShift: -8) bitAnd: 16rFF).   "Green"
-            file nextPut: ((pixel bitShift: -16) bitAnd: 16rFF).  "Red"
-            file nextPut: ((pixel bitShift: -24) bitAnd: 16rFF)]]. "Alpha"
-    file close.
+Form>>writePngFile: fileName
+    "Write 32bpp Form to PNG file (uses C# primitive)"
+    <primitive: 2xx>
+    ^self primitiveFailed
 ```
 
-### Design Rationale
+### C# Library Options
 
-| Decision | Rationale |
-|----------|-----------|
-| **fileCode dispatch** | Natural extension point, existing code checks for fileCode=1 |
-| **Row-major for 32bpp** | Matches modern graphics conventions, simpler pixel addressing |
-| **Little-endian pixels** | Matches x86/ARM memory layout, efficient for modern CPUs |
-| **BGRA byte order** | Matches Windows DIB and most GPU texture formats |
-| **Keep column-major for 1bpp** | Backward compatibility with existing Form files |
+| Library | License | Features | Recommendation |
+|---------|---------|----------|----------------|
+| **System.Drawing.Common** | MIT | Windows only, GDI+ | Simple, but Windows-only |
+| **ImageSharp** | Apache 2.0 | Cross-platform, pure C# | Best for portability |
+| **SkiaSharp** | MIT | Cross-platform, Google Skia | Good if using Skia elsewhere |
 
-### Migration Path
+**Recommended**: `ImageSharp` for cross-platform support without native dependencies.
 
-1. **Phase 1**: Add depth instance variable to Form (see Graphics-Architecture.md)
-2. **Phase 2**: Implement 32bpp file read/write methods
-3. **Phase 3**: Update `readFrom:` to dispatch on fileCode
-4. **Phase 4**: Update `writeOnFileNamed:` to dispatch on depth
-
-### Compatibility Matrix
-
-| File Format | 1bpp Form (runtime) | 32bpp Form (runtime) |
-|-------------|---------------------|----------------------|
-| **fileCode=1 (1bpp file)** | Native read | Read + expand to 32bpp |
-| **fileCode=2 (32bpp file)** | Read + threshold to 1bpp | Native read |
-
-For cross-depth file I/O:
+### Depth Conversion
 
 ```smalltalk
-Form class>>read1bppFormFile: file asDepth: targetDepth
-    "Read 1bpp file, optionally convert to 32bpp"
-    | form |
-    form := self read1bppFormFile: file.
-    targetDepth = 32 ifTrue: [^form as32bpp].
-    ^form
-
 Form>>as32bpp
     "Convert 1bpp Form to 32bpp"
     | newForm |
     newForm := Form extent: self extent depth: 32.
-    "Black pixels become 0xFF000000, white becomes 0xFFFFFFFF"
-    self do: [:pixel :x :y |
-        newForm pixelAt: x@y put:
-            (pixel = 1 ifTrue: [16rFF000000] ifFalse: [16rFFFFFFFF])].
+    "Black pixels (1) become 0xFF000000, white (0) becomes 0xFFFFFFFF"
+    0 to: height - 1 do: [:y |
+        0 to: width - 1 do: [:x |
+            | pixel |
+            pixel := self pixelAt: x@y.
+            newForm pixelAt: x@y put:
+                (pixel = 1 ifTrue: [16rFF000000] ifFalse: [16rFFFFFFFF])]].
     ^newForm
 
 Form>>as1bpp
     "Convert 32bpp Form to 1bpp using luminance threshold"
     | newForm |
     newForm := Form extent: self extent depth: 1.
-    self do: [:pixel :x :y |
-        | r g b luminance |
-        r := (pixel bitShift: -16) bitAnd: 255.
-        g := (pixel bitShift: -8) bitAnd: 255.
-        b := pixel bitAnd: 255.
-        luminance := (r * 0.299) + (g * 0.587) + (b * 0.114).
-        newForm pixelAt: x@y put: (luminance < 128 ifTrue: [1] ifFalse: [0])].
+    0 to: height - 1 do: [:y |
+        0 to: width - 1 do: [:x |
+            | pixel r g b luminance |
+            pixel := self pixelAt: x@y.
+            r := (pixel bitShift: -16) bitAnd: 255.
+            g := (pixel bitShift: -8) bitAnd: 255.
+            b := pixel bitAnd: 255.
+            luminance := (r * 0.299) + (g * 0.587) + (b * 0.114).
+            newForm pixelAt: x@y put: (luminance < 128 ifTrue: [1] ifFalse: [0])]].
     ^newForm
 ```
+
+### Implementation Phases
+
+1. **Add ImageSharp NuGet package** to Interpreter project
+2. **Implement PNG read primitive** for loading 32bpp images
+3. **Implement PNG write primitive** for saving 32bpp images
+4. **Update Form class** with file extension dispatch
+5. **Add BMP support** (optional, for uncompressed option)
 
 ---
 
@@ -617,14 +547,16 @@ Form>>as1bpp
 
 ### File Compatibility Tests
 
-- [ ] Read existing 1bpp Form files (fileCode=1)
+- [ ] Read existing 1bpp Form files (.form, fileCode=1)
 - [ ] Write 1bpp Form files readable by original format
 - [ ] Round-trip 1bpp Form files without data loss
-- [ ] Write and read 32bpp Form files (fileCode=2)
-- [ ] Round-trip 32bpp Form files without data loss
+- [ ] Read PNG files into 32bpp Forms
+- [ ] Write 32bpp Forms to PNG files
+- [ ] Round-trip PNG files without data loss
+- [ ] PNG files readable by external tools (GIMP, etc.)
 - [ ] Convert 1bpp Form to 32bpp (as32bpp)
 - [ ] Convert 32bpp Form to 1bpp (as1bpp with luminance threshold)
-- [ ] Handle unknown fileCode gracefully (error message)
+- [ ] Handle unknown file extensions gracefully
 
 ---
 
@@ -649,19 +581,24 @@ The changes are localized enough that rollback is straightforward.
 3. **Snapshot/image format**: Does the image save/restore need conversion?
 4. **Large integers**: Any impact on LargePositiveInteger word storage?
 
-### 32bpp File Format
+### Image I/O
 
-5. **Compression**: Should 32bpp files support optional compression (e.g., PNG-style)?
-6. **Premultiplied alpha**: Should we use premultiplied alpha for better blending performance?
-7. **Color space**: Should we specify sRGB explicitly or leave it implicit?
-8. **Halftone forms**: Should halftone Forms be limited to 1bpp, or allow 32bpp patterns?
-9. **StrikeFont format**: Do fonts need a 32bpp format, or always render from 1bpp to 32bpp?
+5. **Library choice**: ImageSharp vs SkiaSharp vs System.Drawing.Common?
+6. **Primitive numbers**: Which primitive range for PNG/BMP read/write?
+7. **Error handling**: How to report image load failures to Smalltalk?
+8. **Metadata**: Should we preserve/restore Form offset in PNG metadata?
+
+### Graphics Architecture
+
+9. **Premultiplied alpha**: Should we use premultiplied alpha for better blending?
+10. **Halftone forms**: Should halftone Forms be limited to 1bpp, or allow 32bpp patterns?
+11. **StrikeFont rendering**: Always render 1bpp fonts to 32bpp at display time?
 
 ### BitBlt Considerations
 
-10. **Mixed-depth BitBlt**: What combination rules apply when copying 1bpp to 32bpp or vice versa?
-11. **Alpha blending rules**: Should rule 24 (alphaBlend) be implemented in C# primitive or Smalltalk?
-12. **Cursor depth**: Should cursors support 32bpp, or stay 1bpp with color expansion?
+12. **Mixed-depth BitBlt**: What combination rules apply when copying 1bpp to 32bpp or vice versa?
+13. **Alpha blending rules**: Should rule 24 (alphaBlend) be implemented in C# primitive or Smalltalk?
+14. **Cursor depth**: Should cursors support 32bpp, or stay 1bpp with color expansion?
 
 ---
 

@@ -98,13 +98,15 @@ DisplayMedium subclass: #Form
 
 ## Form File Formats
 
-### Existing Format (fileCode=1)
-- 1bpp monochrome, 16-bit words, column-major
-- Big-endian, backward compatible
+### 1bpp Legacy (.form)
+- fileCode=1, 16-bit words, column-major, big-endian
+- Backward compatible with existing Smalltalk archives
 
-### New Format (fileCode=2)
-- 32bpp color, BGRA little-endian, row-major
-- Defined in Migration-to-32-bit-Words.md
+### 32bpp Color (.png)
+- **Use standard PNG format** instead of custom format
+- External tools (GIMP, Photoshop) can create/edit
+- ImageSharp library for C# implementation
+- See Migration-to-32-bit-Words.md for details
 
 ---
 
