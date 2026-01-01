@@ -11,6 +11,7 @@ using Smalltalk80.Interpreter.Engine.InitExecution;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Platform.Windows;
 using Smalltalk80.Interpreter.Shared.Types;
+using Smalltalk80.Interpreter.Core.VM.Graphics;
 using ClassHierarchyTraversal = Smalltalk80.Interpreter.Core.ClassHierarchyTraversal;
 
 namespace Smalltalk80.Interpreter;
@@ -177,10 +178,14 @@ public static class Program
             int displayWidth = InterpreterConstants.DefaultDisplayWidth;
             int displayHeight = InterpreterConstants.DefaultDisplayHeight;
 
+            // EXPERIMENTAL: Enable GDI bitmap font (Fixedsys) for pixel-perfect 1bpp rendering
+            // Set to true to try Fixedsys instead of TrueType fonts
+            FontBridgeFactory.UseGdiBitmapFonts = true;
+
             // Create display window (UI thread object - has heap access for Display bitmap rendering)
             Console.WriteLine("\n=== Creating Display Window ===");
             Console.WriteLine($"  Window size: {displayWidth}x{displayHeight}");
-            var displayProvider = new WinFormsDisplayProvider(
+            var display = new WinFormsDisplay(
                 displayWidth,
                 displayHeight,
                 "Smalltalk-80",
@@ -212,7 +217,7 @@ public static class Program
                 HeapManager = heapManager,
                 VMMetadata = vmMetadata,
                 Bundle = bundle,
-                PlatformBridge = displayProvider,  // Smalltalk thread calls methods on UI object
+                Display = display,  // Smalltalk thread calls methods on UI object
                 Diagnostics = diagnostics,
                 Config = config,
                 RestoreTimer = restoreTimer
@@ -237,10 +242,10 @@ public static class Program
                 // Use try-catch to handle race condition where window may be disposed between check and Invoke
                 try
                 {
-                    if (!displayProvider.IsDisposed && displayProvider.IsHandleCreated)
+                    if (!display.IsDisposed && display.IsHandleCreated)
                     {
                         Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
-                        displayProvider.Invoke((Action)(() => displayProvider.Close()));
+                        display.Invoke((Action)(() => display.Close()));
                     }
                 }
                 catch (ObjectDisposedException)
@@ -263,7 +268,7 @@ public static class Program
 
             // Show display window
             Console.WriteLine("\n=== Showing Display Window ===");
-            displayProvider.Show();
+            display.Show();
 
             // Signal Smalltalk thread that window is displayed
             // This replaces the old Thread.Sleep with proper synchronization
@@ -273,7 +278,7 @@ public static class Program
             // Run WinForms event loop (blocks until window closes)
             Console.WriteLine("\n=== Entering GUI Event Loop ===");
             Console.WriteLine("Display window is visible. Close window to exit.\n");
-            Application.Run(displayProvider);
+            Application.Run(display);
 
             // When window closes, signal Smalltalk thread to shutdown
             Console.WriteLine("\n=== Shutting Down ===");

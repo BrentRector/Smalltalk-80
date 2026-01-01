@@ -50,9 +50,9 @@ public static class SystemOperations
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            if (context.Platform != null)
+            if (context.Display != null)
             {
-                context.Platform.Quit(0);
+                context.Display.Quit(0);
             }
             else
             {

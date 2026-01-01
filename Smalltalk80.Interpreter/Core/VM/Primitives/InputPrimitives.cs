@@ -19,10 +19,10 @@ public static class InputOperations
             // Default to origin (0,0) for headless mode
             int x = 0, y = 0;
 
-            // Query platform bridge for native cursor position
-            if (context.Platform != null)
+            // Query display for native cursor position
+            if (context.Display != null)
             {
-                (x, y) = context.Platform.GetMousePosition();
+                (x, y) = context.Display.MousePosition;
             }
 
             // Get Point class OOP
@@ -63,10 +63,10 @@ public static class InputOperations
             int x = xOOP.AsSmallInteger();
             int y = yOOP.AsSmallInteger();
 
-            // Move native cursor via platform bridge
-            if (context.Platform != null)
+            // Move native cursor via display
+            if (context.Display != null)
             {
-                context.Platform.SetCursorPosition(x, y);
+                context.Display.SetCursorPosition(x, y);
             }
 
             return PrimitiveResult.Ok(context.Receiver);
@@ -101,10 +101,10 @@ public static class InputOperations
             if (semaphoreOOP.IsSmallInteger && semaphoreOOP != context.HeapManager.GetNil())
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            // Register semaphore with platform event system
-            if (context.Platform != null)
+            // Register semaphore with display event system
+            if (context.Display != null)
             {
-                context.Platform.SetInputSemaphore(semaphoreOOP);
+                context.Display.SetInputSemaphore(semaphoreOOP);
             }
 
             return PrimitiveResult.Ok(context.Receiver);
@@ -124,9 +124,9 @@ public static class InputOperations
             int intervalMs = intervalOOP.AsSmallInteger();
 
             // Configure polling interval
-            if (context.Platform != null)
+            if (context.Display != null)
             {
-                context.Platform.SetSampleInterval(intervalMs);
+                context.Display.SetSampleInterval(intervalMs);
             }
 
             return PrimitiveResult.Ok(context.Receiver);
@@ -151,8 +151,8 @@ public static class InputOperations
         {
             if (context.Arguments.Length != 0) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Get packed input word from platform (Blue Book format: type<<12 | param)
-            int word = context.Platform?.GetInputWord() ?? 0;
+            // Get packed input word from display (Blue Book format: type<<12 | param)
+            int word = context.Display?.GetInputWord() ?? 0;
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(word));
         }
     }
@@ -178,7 +178,7 @@ public static class InputOperations
             if (context.Arguments.Length != 0)
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            int buttons = context.Platform?.GetButtonState() ?? 0;
+            int buttons = context.Display?.ButtonState ?? 0;
             return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(buttons));
         }
     }

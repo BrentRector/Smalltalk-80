@@ -8,6 +8,7 @@ using Smalltalk80.Interpreter.Core.VM.Scheduling;
 using Smalltalk80.Interpreter.HeapManager;
 using Smalltalk80.Interpreter.Core.Attributes;
 using Smalltalk80.Interpreter.Shared.Types.Diagnostics;
+using Smalltalk80.Interpreter.Core.VM.Platform;
 
 namespace Smalltalk80.Interpreter.Core.VM;
 
@@ -39,7 +40,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     private readonly RuntimeServices _runtimeServices;
     private readonly VMMetadata _metadata;
-    private readonly IPlatformBridge? _platformBridge;
+    private readonly IDisplay? _display;
     private readonly IDiagnosticHub? _diagnostics;
     private readonly IStackManager _stackManager;
     private readonly IContextManager _contextManager;
@@ -127,14 +128,14 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     /// <summary>Gets the runtime heap accessor for hash-based dictionary lookups and symbol interning.</summary>
     public IRuntimeServices RuntimeServices => _runtimeServices;
 
-    public VirtualMachine(ISmalltalkHeap heapManager, VMMetadata metadata, IPlatformBridge? platformBridge = null, IDiagnosticHub? diagnostics = null)
+    public VirtualMachine(ISmalltalkHeap heapManager, VMMetadata metadata, IDisplay? display = null, IDiagnosticHub? diagnostics = null)
     {
         _heapManager = heapManager;
 
         _runtimeServices = new RuntimeServices(heapManager, metadata);
         RuntimeSpecialObjects.Instance.Initialize(_runtimeServices);
         _metadata = metadata;
-        _platformBridge = platformBridge;
+        _display = display;
         _diagnostics = diagnostics;
 
         // Initialize tracer first as other components may need it
@@ -258,7 +259,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         // The Smalltalk thread will check this flag and signal InputSemaphore.
         // CRITICAL: We do NOT call SignalSemaphore from the UI thread because
         // that modifies heap data structures, causing cross-thread corruption.
-        _platformBridge?.SetEventCallback(() =>
+        _display?.SetEventCallback(() =>
         {
             // Just set the atomic flag - Smalltalk thread will handle signaling
             Interlocked.Exchange(ref _inputEventPending, 1);
@@ -284,13 +285,13 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         if (Interlocked.Exchange(ref _inputEventPending, 0) != 0)
         {
             // Get the registered InputSemaphore
-            var inputSemaphoreOOP = _platformBridge?.GetInputSemaphore() ?? default;
+            var inputSemaphoreOOP = _display?.GetInputSemaphore() ?? default;
             if (inputSemaphoreOOP != default && inputSemaphoreOOP != _heapManager.GetNil())
             {
                 // Blue Book model: one signal per input word in the buffer.
                 // The shadow counter tracks how many words are pending.
                 // We transfer shadow signals to excessSignals here.
-                while (_platformBridge!.TryConsumeInputShadowSignal())
+                while (_display!.TryConsumeInputShadowSignal())
                 {
                     SignalSemaphore(inputSemaphoreOOP);
                 }
@@ -1699,7 +1700,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         _contextSwitchedByPrimitive = true;
     }
 
-    IPlatformBridge? IPrimitiveContext.PlatformBridge => _platformBridge;
+    IDisplay? IPrimitiveContext.Display => _display;
     bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
 
     Memory<byte> IPrimitiveContext.GetByteArray(SmalltalkOOP oop)

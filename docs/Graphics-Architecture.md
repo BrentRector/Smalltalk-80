@@ -1,16 +1,28 @@
 # Smalltalk-80 Graphics System Architecture
 
+**Last Updated**: 2026-01-01
+**Status**: ✅ **PHASES 1-5 COMPLETE** - Full graphics system operational with font support
+
 ## Overview
 
-This document describes the architecture for implementing the Smalltalk-80 graphics system in our C# interpreter. The design is based on analysis of the Smalltalk-80.st system image and evaluation of modern .NET graphics frameworks.
+This document describes the architecture for implementing the Smalltalk-80 graphics system in our C# interpreter, including the unified display abstraction for pluggable graphics backends.
 
-## Requirements
+## Table of Contents
 
-### Smalltalk-80 Graphics Model
+1. [Smalltalk-80 Graphics Model](#smalltalk-80-graphics-model)
+2. [Current Architecture](#current-architecture)
+3. [Unified Display Abstraction](#unified-display-abstraction)
+4. [Implementation Status](#implementation-status)
+5. [Future: 32-bit Display Migration](#future-32-bit-display-migration)
+
+---
+
+## Smalltalk-80 Graphics Model
 
 The Smalltalk-80 system has an elegant graphics architecture built entirely on a single primitive operation: **BitBlt** (Bit Block Transfer).
 
-**Key Classes:**
+### Key Classes
+
 - **Form** - Bitmap/raster image (width, height, bits array, offset)
 - **DisplayScreen** - The actual display device (subclass of Form)
 - **BitBlt** - The bitmap block transfer engine
@@ -35,29 +47,25 @@ clipX, clipY, clipWidth, clipHeight "Clipping rectangle"
 ```
 
 **16 Combination Rules:**
+
 | Rule | Name | Operation | Use Case |
 |------|------|-----------|----------|
-| 0 | clear | 0 | Clear destination |
-| 1 | and | src AND dst | Masking |
-| 2 | andReverse | src AND (NOT dst) | Erase pattern |
-| 3 | copy | src | Normal copy |
-| 4 | andInverted | (NOT src) AND dst | Reverse erase |
-| 5 | noop | dst | No operation |
-| 6 | xor | src XOR dst | Invert/toggle |
-| 7 | or | src OR dst | Paint over |
-| 8 | nor | NOT (src OR dst) | |
-| 9 | equiv | NOT (src XOR dst) | |
-| 10 | invert | NOT dst | |
-| 11 | orReverse | src OR (NOT dst) | |
-| 12 | copyInverted | NOT src | |
-| 13 | orInverted | (NOT src) OR dst | |
-| 14 | nand | NOT (src AND dst) | |
-| 15 | set | 1 | Fill with white |
-
-**Special Modes:**
-- **Rule 3** with halftone: Pattern fill
-- **Rule 7** with halftone: Paint with pattern
-- **Clipping**: All operations respect clip rectangle
+| 0 | Clear | 0 | Clear destination |
+| 1 | And | src AND dst | Masking |
+| 2 | AndReverse | src AND (NOT dst) | Erase pattern |
+| 3 | Copy | src | Normal copy |
+| 4 | AndInverted | (NOT src) AND dst | Reverse erase |
+| 5 | Noop | dst | No operation |
+| 6 | Xor | src XOR dst | Invert/toggle |
+| 7 | Or | src OR dst | Paint over |
+| 8 | Nor | NOT (src OR dst) | |
+| 9 | Equiv | NOT (src XOR dst) | |
+| 10 | Invert | NOT dst | |
+| 11 | OrReverse | src OR (NOT dst) | |
+| 12 | CopyInverted | NOT src | |
+| 13 | OrInverted | (NOT src) OR dst | |
+| 14 | Nand | NOT (src AND dst) | |
+| 15 | Set | 1 | Fill with white |
 
 ### Display Requirements
 
@@ -83,393 +91,382 @@ clipX, clipY, clipWidth, clipHeight "Clipping rectangle"
 - **Primitive 95**: inputWord (read encoded input event)
 - **Primitive 93**: inputSemaphore: (set event notification)
 
-## Architecture Design
+---
 
-### Layered Architecture
+## Current Architecture
+
+### Layered Stack
 
 ```
-┌─────────────────────────────────────────────────┐
-│         Smalltalk-80 Code (Form, BitBlt)        │
-├─────────────────────────────────────────────────┤
-│  Primitive 96 (copyBits) - C# Implementation    │
-├─────────────────────────────────────────────────┤
-│    BitBltEngine (Pure C# BitBlt Implementation) │
-├─────────────────────────────────────────────────┤
-│   Display Abstraction (IDisplayProvider)        │
-├─────────────────────────────────────────────────┤
-│       Windows Forms (Windowing & Rendering)     │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│              Smalltalk-80 Code (Form, BitBlt, DisplayText)      │
+├─────────────────────────────────────────────────────────────────┤
+│  Primitives 90-102 (Graphics/Input) - GraphicsPrimitives.cs     │
+├─────────────────────────────────────────────────────────────────┤
+│      BitBltEngine (Pure C# - All 16 rules, 1bpp operations)     │
+├─────────────────────────────────────────────────────────────────┤
+│    IDisplay (Unified display/input/cursor abstraction)          │
+├─────────────────────────────────────────────────────────────────┤
+│  WinFormsDisplay (Windows Forms + GDI software rendering)       │
+├─────────────────────────────────────────────────────────────────┤
+│         32bpp back buffer → Window rendering                    │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Technology Stack:**
+### Technology Stack
+
 - **BitBlt Engine**: Pure C# with unsafe code for performance
-- **Display**: Windows Forms with System.Drawing.Bitmap (built into .NET)
-- **Bitmap Format**: Format1bppIndexed for monochrome display
-- **Platform**: Windows only (no cross-platform requirement)
-- **Dependencies**: Zero - uses only built-in .NET libraries
+- **Display**: Windows Forms with System.Drawing.Bitmap
+- **Bitmap Format**: 1bpp monochrome internal, 32bpp rendering
+- **Font Support**: IFontBridge abstraction with GDI/GDI+ backends
+- **Platform**: Windows (with abstraction for future cross-platform)
+- **Dependencies**: Zero external - uses only built-in .NET libraries
 
-### Component Breakdown
+### File Structure
 
-#### 1. BitBltEngine (Core Graphics)
+```
+Smalltalk80.Interpreter/
+├── Core/VM/Graphics/
+│   ├── BitBltEngine.cs           # Core 1-bit BitBlt engine
+│   ├── IFontBridge.cs            # Font abstraction interface
+│   ├── FontBridgeFactory.cs      # Font factory with toggle
+│   ├── WinFormsFontBridge.cs     # TrueType/GDI+ fonts
+│   └── GdiBitmapFontBridge.cs    # Bitmap fonts (Fixedsys)
+│
+├── Core/VM/Platform/
+│   └── IDisplay.cs               # Unified display interface
+│
+├── Platform/
+│   ├── IDisplaySystem.cs         # Factory interface
+│   ├── DisplaySystemFactory.cs   # Factory implementation
+│   │
+│   └── Windows/
+│       ├── WinFormsDisplay.cs    # WinForms IDisplay implementation
+│       └── WinFormsDisplaySystem.cs  # WinForms factory
+│
+├── Core/VM/Primitives/
+│   ├── GraphicsPrimitives.cs     # BitBlt, cursor, display primitives
+│   └── InputPrimitives.cs        # Mouse, keyboard primitives
+```
 
-**Responsibility:** Implement all 16 BitBlt combination rules in pure C#
+---
 
-**Key Design Decisions:**
-- Use `unsafe` code for performance-critical pixel operations
-- Support 1-bit, 8-bit, and 32-bit pixel formats
-- Implement clipping at BitBlt level
-- Use `Span<byte>` for zero-copy bitmap access
-- Optional SIMD acceleration for bulk operations
+## Unified Display Abstraction
 
-**Interface:**
+### Problem: Why Unified Interface?
+
+The initial approach separated BitBlt operations from display/input handling:
+
+```
+FLAWED Design:
+┌─────────────────────────────────────┐
+│     WinFormsDisplayProvider         │ ← Owns window, input, display rendering
+└─────────────────────────────────────┘
+              ╳ Separate (WRONG)
+┌─────────────────────────────────────┐
+│     IGraphicsBackend                │ ← Only handles BitBlt operations
+└─────────────────────────────────────┘
+```
+
+**This doesn't work for GPU backends** because GPU graphics libraries want to own:
+1. **Window/surface creation** - they create the GPU context tied to the window
+2. **Rendering operations** - they manage GPU resources and command buffers
+3. **Input events** - they receive events from their window
+
+You cannot use WinForms for the window and OpenGL for rendering without awkward bridging that defeats GPU acceleration.
+
+### GPU Graphics Library Landscape
+
+| Library | Window | Input | 2D Rendering | GPU | Cross-Platform | C# Support |
+|---------|--------|-------|--------------|-----|----------------|------------|
+| **Silk.NET** | GLFW/SDL | Yes | Via OpenGL/Vulkan | Yes | Yes | Official .NET Foundation |
+| **SDL2-CS** | Yes | Yes | SDL_Renderer | Yes | Yes | Community bindings |
+| **OpenTK** | Yes | Yes | Via OpenGL | Yes | Yes | Mature, v5 in development |
+| **SkiaSharp + GLFW** | Via GLFW | Via GLFW | SkiaSharp canvas | Yes | Yes | Integration issues reported |
+| **WinForms + GDI** | Yes | Yes | GDI/BitBlt | No | Windows only | Built-in |
+
+**Recommended for GPU**: **Silk.NET** - official .NET Foundation project with unified windowing, input, and OpenGL/Vulkan/DirectX bindings.
+
+### IDisplaySystem Interface
+
 ```csharp
-public interface IBitBltEngine
+/// <summary>
+/// Factory for creating display systems. Entry point for the graphics subsystem.
+/// </summary>
+public interface IDisplaySystem : IDisposable
 {
-    void CopyBits(
-        BitBltOperation operation);
+    /// <summary>Display system name (e.g., "WinForms/GDI", "Silk.NET/OpenGL")</summary>
+    string Name { get; }
+
+    /// <summary>Capabilities supported by this display system</summary>
+    DisplayCapabilities Capabilities { get; }
+
+    /// <summary>Create a new display with the specified options</summary>
+    IDisplay CreateDisplay(DisplayOptions options);
+
+    /// <summary>Enumerate available monitors</summary>
+    IReadOnlyList<MonitorInfo> GetMonitors();
 }
 
-public class BitBltOperation
+public record DisplayOptions
 {
-    public Memory<byte> DestBits { get; set; }
-    public Memory<byte> SourceBits { get; set; }
-    public Memory<byte>? HalftoneBits { get; set; }
-    public int DestWidth { get; set; }
-    public int DestHeight { get; set; }
-    public int SourceWidth { get; set; }
-    public int SourceHeight { get; set; }
-    public int DestX { get; set; }
-    public int DestY { get; set; }
-    public int SourceX { get; set; }
-    public int SourceY { get; set; }
-    public int Width { get; set; }
-    public int Height { get; set; }
-    public Rectangle ClipRect { get; set; }
-    public CombinationRule Rule { get; set; }
+    public int Width { get; init; } = 800;
+    public int Height { get; init; } = 600;
+    public string Title { get; init; } = "Smalltalk-80";
+    public bool Fullscreen { get; init; } = false;
+    public bool VSync { get; init; } = true;
+    public PixelDepth PreferredDepth { get; init; } = PixelDepth.OneBit;
 }
 
-public enum CombinationRule
+[Flags]
+public enum DisplayCapabilities
 {
-    Clear = 0,
-    And = 1,
-    AndReverse = 2,
-    Copy = 3,
-    AndInverted = 4,
-    Noop = 5,
-    Xor = 6,
-    Or = 7,
-    Nor = 8,
-    Equiv = 9,
-    Invert = 10,
-    OrReverse = 11,
-    CopyInverted = 12,
-    OrInverted = 13,
-    Nand = 14,
-    Set = 15
+    None = 0,
+    OneBitDepth = 1 << 0,
+    EightBitDepth = 1 << 1,
+    ThirtyTwoBitDepth = 1 << 2,
+    AlphaBlending = 1 << 3,
+    HardwareAccelerated = 1 << 4,
+    Fullscreen = 1 << 5,
+    Resizable = 1 << 6,
+    MultipleMonitors = 1 << 7,
 }
 ```
 
-#### 2. Display Abstraction
+### IDisplay Interface
 
-**Responsibility:** Abstract platform-specific display operations
-
-**Interface:**
 ```csharp
-public interface IDisplayProvider
+/// <summary>
+/// Unified display surface with integrated rendering and input.
+/// Window, graphics, and input are inseparable in GPU-accelerated systems.
+/// </summary>
+public interface IDisplay : IDisposable
 {
-    // Display buffer access
-    Memory<byte> GetDisplayBits();
-    int DisplayWidth { get; }
-    int DisplayHeight { get; }
-    int BitsPerPixel { get; }
+    // ═══════════════════════════════════════════════════════════════
+    // WINDOW MANAGEMENT
+    // ═══════════════════════════════════════════════════════════════
 
-    // Update dirty regions
-    void InvalidateRect(Rectangle rect);
-    void InvalidateAll();
+    int Width { get; }
+    int Height { get; }
+    string Title { get; set; }
+    bool IsVisible { get; }
+    bool IsFocused { get; }
+    bool IsFullscreen { get; }
 
-    // Input events
-    event EventHandler<MouseEventArgs> MouseMoved;
-    event EventHandler<MouseButtonEventArgs> MouseButtonDown;
-    event EventHandler<MouseButtonEventArgs> MouseButtonUp;
-    event EventHandler<KeyEventArgs> KeyDown;
-    event EventHandler<KeyEventArgs> KeyUp;
+    void Show();
+    void Hide();
+    void Close();
+    void Resize(int width, int height);
+    void SetFullscreen(bool fullscreen);
 
-    // Cursor management
-    void SetCursor(Memory<byte> cursorBits, int hotspotX, int hotspotY);
+    // ═══════════════════════════════════════════════════════════════
+    // RENDERING CONTEXT
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>Create an off-screen texture for rendering</summary>
+    ITexture CreateTexture(int width, int height, PixelDepth depth);
+
+    /// <summary>Create a texture initialized with pixel data</summary>
+    ITexture CreateTextureFromData(int width, int height, PixelDepth depth, ReadOnlySpan<byte> data);
+
+    /// <summary>Perform BitBlt raster operation</summary>
+    void BitBlt(in BitBltParams p);
+
+    /// <summary>Fill rectangle with solid color</summary>
+    void FillRect(int x, int y, int width, int height, Color32 color, BlendMode mode = BlendMode.Copy);
+
+    /// <summary>Clear entire display to color</summary>
+    void Clear(Color32 color);
+
+    /// <summary>Begin a new frame (for GPU backends that batch commands)</summary>
+    void BeginFrame();
+
+    /// <summary>End frame and present to screen (swap buffers)</summary>
+    void EndFrame();
+
+    /// <summary>
+    /// The display's backing texture (Smalltalk's Display Form).
+    /// BitBlt operations targeting this texture appear on screen after EndFrame().
+    /// </summary>
+    ITexture DisplayTexture { get; }
+
+    /// <summary>Mark a region as needing redraw (for partial updates)</summary>
+    void InvalidateRegion(int x, int y, int width, int height);
+
+    // ═══════════════════════════════════════════════════════════════
+    // INPUT HANDLING (Unified with display - NOT separable)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Current mouse position relative to display (atomic read).
+    /// Thread-safe for polling from Smalltalk thread.
+    /// </summary>
+    (int X, int Y) MousePosition { get; }
+
+    /// <summary>
+    /// Current mouse button state (atomic read).
+    /// Thread-safe for polling from Smalltalk thread.
+    /// </summary>
+    MouseButtons MouseButtons { get; }
+
+    /// <summary>Check if a key is currently pressed.</summary>
+    bool IsKeyDown(KeyCode key);
+
+    /// <summary>Poll for next pending event. Returns false if queue is empty.</summary>
+    bool PollEvent(out DisplayEvent evt);
+
+    /// <summary>
+    /// WaitHandle that signals when events are available.
+    /// Use with WaitHandle.WaitAny() for efficient multi-source waiting.
+    /// </summary>
+    WaitHandle EventAvailableHandle { get; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // EVENT LOOP INTEGRATION
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Process pending window system events.
+    /// Must be called on the display's owning thread (usually UI thread).
+    /// </summary>
+    void ProcessEvents();
+
+    /// <summary>
+    /// Run the display's event loop until Close() is called.
+    /// Blocks the calling thread.
+    /// </summary>
+    void RunEventLoop();
+
+    /// <summary>Event raised when display is resized</summary>
+    event Action<int, int>? OnResize;
+
+    /// <summary>Event raised when close is requested</summary>
+    event Action? OnCloseRequested;
 }
 ```
 
-#### 3. Windows Forms Display Provider
+### DisplayEvent Structure
 
-**Responsibility:** Integrate with Windows Forms for windowing and rendering
-
-**Key Features:**
-- Form window hosting the display bitmap
-- System.Drawing.Bitmap with Format1bppIndexed for monochrome
-- PictureBox for efficient bitmap rendering
-- Event translation from WinForms to Smalltalk input primitives
-- Double buffering for flicker-free updates
-- Dirty rectangle optimization
-
-**Implementation:**
 ```csharp
-public class WinFormsDisplayProvider : IDisplayProvider
+/// <summary>
+/// Unified event type for all display input events.
+/// Follows Blue Book input word format for compatibility.
+/// </summary>
+public readonly struct DisplayEvent
 {
-    private byte[] _displayBits;
-    private Bitmap _displayBitmap;  // Format1bppIndexed
-    private Form _window;
-    private PictureBox _pictureBox;
+    public DisplayEventType Type { get; init; }
 
-    public WinFormsDisplayProvider(int width, int height)
+    // Mouse events
+    public int MouseX { get; init; }
+    public int MouseY { get; init; }
+    public MouseButtons Button { get; init; }
+
+    // Keyboard events
+    public KeyCode Key { get; init; }
+    public char Character { get; init; }
+    public KeyModifiers Modifiers { get; init; }
+
+    /// <summary>Convert to Blue Book input word format (type << 12 | param)</summary>
+    public int ToBlueBookWord() => Type switch
     {
-        // Allocate display buffer
-        _displayBits = new byte[(width * height + 7) / 8];
+        DisplayEventType.MouseMove => (1 << 12) | MouseX,
+        DisplayEventType.MouseButtonDown => (5 << 12) | (int)Button,
+        DisplayEventType.MouseButtonUp => (6 << 12) | (int)Button,
+        DisplayEventType.KeyDown => (3 << 12) | (int)Key,
+        DisplayEventType.KeyUp => (4 << 12) | (int)Key,
+        _ => 0
+    };
+}
 
-        // Create 1-bit monochrome bitmap
-        _displayBitmap = new Bitmap(width, height,
-            PixelFormat.Format1bppIndexed);
+public enum DisplayEventType
+{
+    None = 0,
+    MouseMove,
+    MouseButtonDown,
+    MouseButtonUp,
+    KeyDown,
+    KeyUp,
+    TextInput,
+    Resize,
+    Focus,
+    Blur,
+    CloseRequested,
+}
 
-        // Create window with PictureBox
-        _window = new Form
-        {
-            ClientSize = new Size(width, height),
-            Text = "Smalltalk-80",
-            FormBorderStyle = FormBorderStyle.FixedSingle,
-            MaximizeBox = false
-        };
-
-        _pictureBox = new PictureBox
-        {
-            Image = _displayBitmap,
-            Dock = DockStyle.Fill,
-            SizeMode = PictureBoxSizeMode.Normal
-        };
-
-        _window.Controls.Add(_pictureBox);
-
-        // Hook up events
-        _pictureBox.MouseMove += OnMouseMove;
-        _pictureBox.MouseDown += OnMouseDown;
-        _pictureBox.MouseUp += OnMouseUp;
-        _window.KeyDown += OnKeyDown;
-        _window.KeyUp += OnKeyUp;
-    }
-
-    public void InvalidateRect(Rectangle rect)
-    {
-        // Copy _displayBits to _displayBitmap using LockBits
-        UpdateBitmapFromBuffer(rect);
-        _pictureBox.Invalidate(rect);
-    }
-
-    private unsafe void UpdateBitmapFromBuffer(Rectangle rect)
-    {
-        var bitmapData = _displayBitmap.LockBits(
-            new System.Drawing.Rectangle(0, 0, _displayBitmap.Width, _displayBitmap.Height),
-            ImageLockMode.WriteOnly,
-            PixelFormat.Format1bppIndexed);
-
-        // Copy _displayBits to bitmapData.Scan0
-        Marshal.Copy(_displayBits, 0, bitmapData.Scan0, _displayBits.Length);
-
-        _displayBitmap.UnlockBits(bitmapData);
-    }
+[Flags]
+public enum MouseButtons
+{
+    None = 0,
+    Red = 1,        // Left button (Blue Book: red)
+    Yellow = 2,     // Middle button (Blue Book: yellow)
+    Blue = 4,       // Right button (Blue Book: blue)
 }
 ```
 
-#### 4. Primitive 96 Implementation
+### Threading Model
 
-**Responsibility:** Bridge Smalltalk primitive call to BitBltEngine
+Our two-thread architecture integrates as follows:
 
-**Key Responsibilities:**
-- Extract BitBlt parameters from Smalltalk objects (Form, Rectangle)
-- Convert object references to bitmap memory
-- Invoke BitBltEngine with proper parameters
-- Handle primitive failure cases
-
-```csharp
-public static class GraphicsPrimitives
-{
-    public static PrimitiveResult PrimitiveCopyBits(
-        SObjectRef receiver,
-        SObjectRef[] arguments,
-        IPrimitiveContext context)
-    {
-        // 1. Extract BitBlt instance variables
-        // 2. Get bitmap memory from Forms
-        // 3. Build BitBltOperation
-        // 4. Execute through BitBltEngine
-        // 5. Return receiver on success
-    }
-}
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    UI/Display Thread                                │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                  IDisplay Implementation                      │   │
+│  │                                                               │   │
+│  │  ProcessEvents() / RunEventLoop()                            │   │
+│  │    - Pumps window system messages                            │   │
+│  │    - Enqueues DisplayEvents to thread-safe queue             │   │
+│  │    - Updates atomic MousePosition/MouseButtons               │   │
+│  │    - Signals EventAvailableHandle                            │   │
+│  │                                                               │   │
+│  │  EndFrame() / Present()                                      │   │
+│  │    - Swaps GPU buffers or blits to screen                    │   │
+│  │                                                               │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│                              │ EventAvailableHandle (WaitHandle)    │
+│                              │ + Atomic state accessors             │
+│                              ▼                                      │
+└────────────────────────────────────────────────────────────────────┘
+                               │
+                               │  WaitHandle.WaitAny([EventHandle, TimerHandle])
+                               ▼
+┌────────────────────────────────────────────────────────────────────┐
+│                       Smalltalk Thread                              │
+│                                                                     │
+│  InterpreterLoop:                                                   │
+│    - WaitAny([display.EventAvailableHandle, timer.Handle])         │
+│    - Read events via display.PollEvent()                           │
+│    - Poll state via display.MousePosition, display.MouseButtons    │
+│    - Execute BitBlt primitives:                                    │
+│        - For software backend: direct execution                    │
+│        - For GPU backend: may queue commands for UI thread         │
+│                                                                     │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-## Implementation Strategy
+**Thread Safety Requirements:**
+1. **Atomic state reads**: `MousePosition` and `MouseButtons` must be atomic for polling
+2. **Event queue**: Thread-safe queue with `EventAvailableHandle` signaling
+3. **BitBlt operations**: Software backend executes directly; GPU backend may marshal to UI thread
 
-### Phase 1: Core BitBlt Engine (Week 1)
+---
 
-**Goal:** Implement pure C# BitBlt engine with all 16 rules
-
-**Tasks:**
-1. Create BitBltEngine class with unsafe pixel operations
-2. Implement all 16 combination rules for 1-bit monochrome
-3. Add clipping support
-4. Implement halftone pattern support
-5. Unit test each combination rule extensively
-
-**Deliverables:**
-- BitBltEngine class with full BitBlt support
-- Comprehensive unit tests for all rules
-- Performance benchmarks
-
-### Phase 2: Display Integration (Week 2)
-
-**Goal:** Create Windows Forms-based display system
-
-**Tasks:**
-1. Create IDisplayProvider interface
-2. Implement WinFormsDisplayProvider
-3. Build Form window with PictureBox control
-4. Implement bitmap update from display buffer (LockBits/UnlockBits)
-5. Add dirty rectangle tracking
-
-**Deliverables:**
-- Working Windows Forms window showing Smalltalk display
-- Mouse/keyboard event handling integrated
-- Efficient bitmap update mechanism
-
-### Phase 3: Primitive 96 Implementation (Week 3)
-
-**Goal:** Complete primitive 96 (copyBits) and integrate with interpreter
-
-**Tasks:**
-1. Create GraphicsPrimitives.cs
-2. Implement PrimitiveCopyBits
-3. Extract Form bitmap data from ObjectMemory
-4. Handle coordinate systems and clipping
-5. Test with Smalltalk graphics code
-
-**Deliverables:**
-- Working primitive 96
-- Smalltalk graphics operations functional
-- Demo showing Form operations
-
-### Phase 4: Additional Graphics Primitives (Week 3)
-
-**Goal:** Implement remaining graphics primitives
-
-**Tasks:**
-1. Primitive 97 - snapshot (image save/load)
-2. Primitive 98-99 - oopsLeft, coreLeft (memory stats)
-3. Primitive 100 - timeWords (current time)
-4. Primitives 101-104 - display control, beep
-
-**Deliverables:**
-- All graphics primitives implemented
-- Basic Smalltalk UI operational
-- Performance optimization
-
-## Performance Considerations
-
-### Critical Paths
-
-1. **BitBlt operations** - Inner loop of all graphics
-   - Use unsafe code for pixel manipulation
-   - Consider SIMD for bulk operations (Vector256<byte>)
-   - Optimize for common cases (copy, xor)
-
-2. **Display updates** - Frequent operation
-   - Dirty rectangle tracking to minimize redraws
-   - Double buffering to prevent flicker
-   - Batch updates when possible
-
-3. **Event handling** - Must be responsive
-   - Direct event routing without queuing overhead
-   - Efficient coordinate transformation
-
-### Memory Layout
-
-**Bitmap Format:**
-- Use byte arrays for 1-bit monochrome (8 pixels per byte)
-- Pack bits left-to-right, MSB first (Smalltalk convention)
-- Align rows to word boundaries for faster access
-
-**Display Buffer:**
-- Direct mapping to Smalltalk Display object bits
-- No intermediate copying during BitBlt
-- Shared memory between engine and display
-
-## Testing Strategy
-
-### Unit Tests
-
-1. **BitBlt Rules** - Test each of 16 rules independently
-2. **Clipping** - Test edge cases and boundary conditions
-3. **Halftone** - Test pattern application
-4. **Coordinates** - Test negative, zero, large values
-
-### Integration Tests
-
-1. **Smalltalk Graphics** - Run actual Smalltalk drawing code
-2. **Display Updates** - Verify screen matches bitmap state
-3. **Input Events** - Test mouse/keyboard integration
-4. **Performance** - Benchmark BitBlt throughput
-
-### Visual Tests
-
-1. Create test Forms in Smalltalk
-2. Draw patterns using BitBlt
-3. Render text using strike fonts
-4. Display cursors and icons
-
-## Future Enhancements
-
-### Short Term
-- Support 8-bit grayscale for better visual quality
-- Hardware cursor support (OS-level)
-- Window resize handling
-
-### Medium Term
-- 32-bit color support for modern applications
-- GPU acceleration for BitBlt operations
-- Multi-monitor support
-
-### Long Term
-- OpenGL/Vulkan backend for 3D graphics
-- Vector graphics support
-- Modern anti-aliasing
-
-## Current Implementation Status
-
-**Last Updated**: 2025-11-23
-**Overall Status**: ✅ **PHASES 1-3 COMPLETE** - BitBlt engine fully operational
+## Implementation Status
 
 ### Phase 1: Core BitBlt Engine ✅ COMPLETE
 
-**Implementation:**
 - ✅ `BitBltEngine.cs` - Pure C# BitBlt implementation with unsafe code
 - ✅ All 16 combination rules implemented (Clear through Set)
 - ✅ Clipping support with boundary validation
 - ✅ Halftone pattern support (16×16 patterns)
-- ✅ **Nil source handling** - For fill operations (`Form>>fill:mask:`)
+- ✅ Nil source handling for fill operations
 - ✅ MSB-first bit packing (Smalltalk convention)
-- ✅ Buffer validation and bounds checking
-
-**Key Fix (2025-11-23):**
-- Fixed halftone pattern rendering for nil source (fill operations)
-- When `sourceForm: nil`, halftone pattern IS the source (not a mask)
-- Updated `ApplyRule` to skip halftone masking for nil source
-- Validated with `DisplayScreen initialize` drawing centered gray halftone square
-
-**Testing Status:**
-- ✅ **Rule 3 (Copy)** with halftone pattern - VERIFIED working (gray square rendering)
-- ⏸️ **Rules 0-2, 4-15** - Implementation complete, visual testing PENDING
-- ⚠️ **TODO**: Create comprehensive test suite for all 16 combination rules
 
 ### Phase 2: Display Integration ✅ COMPLETE
 
-**Implementation:**
-- ✅ `WinFormsDisplayProvider.cs` - Windows Forms display backend
+- ✅ `WinFormsDisplay.cs` - Windows Forms display backend
 - ✅ Thread-safe Display synchronization (Smalltalk thread → UI thread)
 - ✅ `CopyDisplayFromHeap()` - Syncs Display bitmap from heap to local buffer
 - ✅ `InvalidateDisplayRegion()` - Dirty rectangle optimization
@@ -477,86 +474,141 @@ public static class GraphicsPrimitives
 - ✅ Format conversion: 1bpp monochrome → 32bpp ARGB rendering
 - ✅ Double buffering for flicker-free updates
 
-**Architecture:**
-- Smalltalk thread modifies Display bitmap in heap via BitBlt
-- `InvalidateDisplayRegion()` notifies UI thread of changed region
-- UI thread calls `CopyDisplayFromHeap()` before painting
-- Rendering uses 32bpp back buffer for smooth display
-
 ### Phase 3: Primitive 96 Implementation ✅ COMPLETE
 
-**Implementation:**
 - ✅ `GraphicsPrimitives.cs` - Primitive 96 (copyBits) implementation
 - ✅ Form parameter extraction from heap objects
 - ✅ Bitmap buffer access via ISmalltalkHeap interface
-- ✅ Hardware BitBlt delegation (when available)
-- ✅ Software BitBlt fallback (always works)
-- ✅ `WriteFormData()` - Persists BitBlt results back to heap
 - ✅ Display invalidation for BitBlt operations to Display
-- ✅ KnownObjects.Display caching for O(1) Display detection
+- ✅ Complete flow: `Form>>fill:mask:` → Primitive 96 → BitBltEngine → Display invalidation → UI repaint
 
-**Integration:**
-- Smalltalk `Form>>fill:mask:` → Primitive 96 → BitBltEngine → Display invalidation → UI repaint
-- Complete flow validated with `DisplayScreen initialize` halftone square test
+### Phase 4: Additional Graphics Primitives ✅ COMPLETE
 
-### Phase 4: Additional Graphics Primitives ⏸️ PARTIAL
-
-**Implemented:**
+- ✅ Primitive 90 - mousePoint (returns Point with mouse coordinates)
+- ✅ Primitive 91 - cursorLocPut: (set cursor position)
+- ✅ Primitive 93 - inputSemaphore: (set event notification semaphore)
+- ✅ Primitive 95 - inputWord (read encoded input event from ring buffer)
 - ✅ Primitive 96 - copyBits (BitBlt)
-- ✅ Primitive 97 - snapshot (stubbed - returns false)
+- ✅ Primitive 97 - snapshot (image save/restore)
 - ✅ Primitive 101 - beCursor (cursor management)
 - ✅ Primitive 102 - beDisplay (Display management with resize support)
+- ✅ Primitive 104 - drawLoopX:Y: (Bresenham line drawing - 3.6x faster than Smalltalk)
+- ✅ Primitive 202 - bitState (atomic mouse button polling for tight loops)
 
-**Not Yet Implemented:**
-- ⏸️ Primitive 90 - mousePoint
-- ⏸️ Primitive 91 - cursorLocPut:
-- ⏸️ Primitive 93 - inputSemaphore:
-- ⏸️ Primitive 95 - inputWord
+### Phase 5: Font Support ✅ COMPLETE
 
-## Testing Requirements
+**Font Bridge Architecture:**
+- ✅ `IFontBridge` interface - Platform-agnostic font abstraction
+- ✅ `FontDescriptor` - Font specification (family, size, bold, italic)
+- ✅ `FontMetrics` - Ascent, descent, leading, widths
+- ✅ `GlyphData` - Individual character bitmap data
+- ✅ `StrikeFontData` - Complete Smalltalk-80 strike font structure
 
-### Immediate Testing Needs
+**Implementations:**
+- ✅ `WinFormsFontBridge` - GDI+/System.Drawing TrueType font rendering
+- ✅ `GdiBitmapFontBridge` - Native GDI bitmap font support (Fixedsys)
+- ✅ `NullFontBridge` - Stub implementation for headless/testing
+- ✅ `FontBridgeFactory` - Factory with runtime toggle
 
-**BitBlt Combination Rules - All 16 Rules Must Be Tested:**
+**Fixedsys Bitmap Font Experiment (2026-01-01):**
+- ✅ Native GDI P/Invoke for bitmap font loading (GDI+ cannot load .FON files)
+- ✅ Direct 1bpp DIB rendering - no antialiasing artifacts
+- ✅ Underscore → left-arrow conversion for Smalltalk-80 assignment operator
+- ✅ Runtime toggle: `FontBridgeFactory.UseGdiBitmapFonts = true/false`
+- ✅ **Currently enabled** - Provides cleaner character rendering on 1bpp display
 
-| Rule | Name | Status | Test Case Needed |
-|------|------|--------|------------------|
-| 0 | Clear | ⏸️ Not tested | Clear rectangle to white |
-| 1 | And | ⏸️ Not tested | Mask pattern over image |
-| 2 | AndReverse | ⏸️ Not tested | Erase pattern from dest |
-| 3 | Copy | ✅ VERIFIED | Normal copy (halftone square) |
-| 4 | AndInverted | ⏸️ Not tested | Reverse erase |
-| 5 | Noop | ⏸️ Not tested | No-op (dest unchanged) |
-| 6 | Xor | ⏸️ Not tested | Toggle/invert pattern |
-| 7 | Or | ⏸️ Not tested | Paint over existing |
-| 8 | Nor | ⏸️ Not tested | Boolean NOR |
-| 9 | Equiv | ⏸️ Not tested | Boolean EQUIV |
-| 10 | Invert | ⏸️ Not tested | Invert destination |
-| 11 | OrReverse | ⏸️ Not tested | Boolean OR reverse |
-| 12 | CopyInverted | ⏸️ Not tested | Copy inverted source |
-| 13 | OrInverted | ⏸️ Not tested | Boolean OR inverted |
-| 14 | Nand | ⏸️ Not tested | Boolean NAND |
-| 15 | Set | ⏸️ Not tested | Fill with black |
+### BitBlt Combination Rules ✅ ALL VERIFIED
 
-**Recommended Test Approach:**
-1. Create Smalltalk init expression that tests each rule visually
-2. Draw 16 small squares (one per rule) showing each combination rule
-3. Use known source/dest patterns to verify correct output
-4. Add to init expression sequence for regression testing
+| Rule | Name | Status |
+|------|------|--------|
+| 0 | Clear | ✅ VERIFIED |
+| 1 | And | ✅ VERIFIED |
+| 2 | AndReverse | ✅ VERIFIED |
+| 3 | Copy | ✅ VERIFIED |
+| 4 | AndInverted | ✅ VERIFIED |
+| 5 | Noop | ✅ VERIFIED |
+| 6 | Xor | ✅ VERIFIED |
+| 7 | Or | ✅ VERIFIED |
+| 8 | Nor | ✅ VERIFIED |
+| 9 | Equiv | ✅ VERIFIED |
+| 10 | Invert | ✅ VERIFIED |
+| 11 | OrReverse | ✅ VERIFIED |
+| 12 | CopyInverted | ✅ VERIFIED |
+| 13 | OrInverted | ✅ VERIFIED |
+| 14 | Nand | ✅ VERIFIED |
+| 15 | Set | ✅ VERIFIED |
 
-**Files to Modify:**
-- `Smalltalk-80 Source/Smalltalk-80.st` - Add BitBlt test init expression
-- `Smalltalk80.Interpreter/SmalltalkInterpreterThread.cs` - Include test in init expression list
+**Visual Test:** `DisplayScreen initialize` draws 4×4 grid showing all 16 rules with checkerboard source pattern over gray halftone background.
+
+---
+
+## Future: 32-bit Display Migration
+
+### Goal
+
+Migrate from 1bpp monochrome display surface to 32bpp ARGB while maintaining the Smalltalk-80 BitBlt semantics internally. This enables:
+
+1. **Smoother font rendering** - TrueType antialiasing can work properly
+2. **Color support** - Future color extensions without architectural changes
+3. **Modern graphics backends** - SkiaSharp, OpenGL, Vulkan via pluggable interface
+4. **Cross-platform** - Avalonia UI instead of Windows Forms
+
+### Implementation Plan
+
+**Step 1: Complete IDisplay Interface Integration**
+- Ensure all primitives use IDisplay abstraction
+- Remove any remaining IPlatformBridge references
+- Clean up dead code from old architecture
+
+**Step 2: Add 32bpp Support to WinFormsDisplay**
+- Add `BitsPerPixel` property (1 or 32)
+- Update `GetDisplayBuffer()` to return appropriate format
+- Modify `CopyDisplayFromHeap()` for 32bpp → screen rendering
+
+**Step 3: Update BitBltEngine for 32bpp**
+- Add 32bpp pixel format support to `BitBltEngine`
+- Implement all 16 combination rules for 32bpp
+- Maintain 1bpp support for Smalltalk Form objects
+
+**Step 4: Bridge 1bpp Smalltalk to 32bpp Display**
+- Smalltalk Forms remain 1bpp (internal representation)
+- Display surface is 32bpp
+- BitBlt to Display converts 1bpp → 32bpp on the fly
+- Black pixels (1) → 0xFF000000 (opaque black)
+- White pixels (0) → 0xFFFFFFFF (opaque white)
+
+**Step 5: Silk.NET GPU Backend (Optional)**
+- Create `SilkNetDisplay : IDisplay` implementation
+- Use Silk.NET for OpenGL/Vulkan rendering
+- Enables cross-platform with GPU acceleration
+
+### Key Design Decisions
+
+1. **No backward compatibility shims** - Clean break from old interface
+2. **Single IDisplay interface** - Replaces IPlatformBridge fragmentation
+3. **1bpp Forms preserved** - Smalltalk code unchanged
+4. **32bpp display surface** - Modern rendering target
+5. **Format conversion at BitBlt boundary** - When dest is Display
+
+### Files to Modify
+
+- `Core/VM/Platform/IDisplay.cs` - Ensure complete interface
+- `Platform/Windows/WinFormsDisplay.cs` - Add 32bpp mode
+- `Core/VM/Graphics/BitBltEngine.cs` - Add 32bpp support
+- `Core/VM/Primitives/GraphicsPrimitives.cs` - Verify IDisplay usage
+- `Program.cs` - Use IDisplay consistently
+
+---
 
 ## References
 
 1. Goldberg, A., & Robson, D. (1983). *Smalltalk-80: The Language and its Implementation* (Blue Book) - Chapter on BitBlt
 2. Ingalls, D. (1981). *Design Principles Behind Smalltalk* - Graphics system design
-3. Avalonia Documentation: https://docs.avaloniaui.net/
-4. SkiaSharp Documentation: https://docs.microsoft.com/en-us/xamarin/xamarin-forms/user-interface/graphics/skiasharp/
+3. [Silk.NET](https://github.com/dotnet/Silk.NET) - Official .NET Foundation graphics library
+4. [Avalonia Documentation](https://docs.avaloniaui.net/)
+5. [SkiaSharp Documentation](https://docs.microsoft.com/en-us/xamarin/xamarin-forms/user-interface/graphics/skiasharp/)
 
 ---
 
-**Document Status**: ✅ **Implementation Complete** - Testing In Progress
-**Last Updated**: 2025-11-23
-**Next Steps**: Create comprehensive test suite for all 16 BitBlt combination rules
+**Document Status**: ✅ **Phases 1-5 Complete** - Planning Phase 6 (32bpp Migration)
+**Next Steps**: Complete IDisplay integration and implement 32bpp display surface

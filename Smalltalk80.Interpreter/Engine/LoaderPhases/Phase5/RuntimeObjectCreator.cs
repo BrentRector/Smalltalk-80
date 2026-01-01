@@ -39,11 +39,12 @@ public class RuntimeObjectCreator(
             var bridge = fontBridge as IFontBridge ?? FontBridgeFactory.CreateNull();
 
             // Create canonical font sizes (10, 12, 14)
+            // Lucida Console has better bitmap hinting for 1-bit rendering
             var fontDescriptors = new[]
             {
-                new FontDescriptor("Consolas", 10),
-                new FontDescriptor("Consolas", 12),
-                new FontDescriptor("Consolas", 14)
+                new FontDescriptor("Lucida Console", 10),
+                new FontDescriptor("Lucida Console", 12),
+                new FontDescriptor("Lucida Console", 14)
             };
 
             var strikeFontOOPs = new List<SmalltalkOOP>();
@@ -53,8 +54,8 @@ public class RuntimeObjectCreator(
                 // Check if font is available
                 if (!bridge.ResolveFace(descriptor))
                 {
-                    // Fall back to a common font
-                    var fallbackDescriptor = new FontDescriptor("Arial", descriptor.SizePixels);
+                    // Fall back to Tahoma (better small-size hinting than Arial)
+                    var fallbackDescriptor = new FontDescriptor("Tahoma", descriptor.SizePixels);
                     if (!bridge.ResolveFace(fallbackDescriptor))
                     {
                         // Use stub font as last resort

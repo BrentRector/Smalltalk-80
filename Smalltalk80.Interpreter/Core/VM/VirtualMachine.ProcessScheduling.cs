@@ -483,7 +483,7 @@ public partial class VirtualMachine : IProcessScheduler
     public bool SignalSemaphore(SmalltalkOOP semaphoreOOP)
     {
         // Check if this is the InputSemaphore
-        var inputSemOOP = _platformBridge?.GetInputSemaphore() ?? default;
+        var inputSemOOP = _display?.GetInputSemaphore() ?? default;
         bool isInputSemaphore = (inputSemOOP != default && semaphoreOOP == inputSemOOP);
 
         // Semaphore layout: firstLink (0), lastLink (1), excessSignals (2)
@@ -547,7 +547,7 @@ public partial class VirtualMachine : IProcessScheduler
     public bool WaitOnSemaphore(SmalltalkOOP semaphoreOOP, SmalltalkOOP processOOP)
     {
         // Check if this is the InputSemaphore
-        var inputSemOOP = _platformBridge?.GetInputSemaphore() ?? default;
+        var inputSemOOP = _display?.GetInputSemaphore() ?? default;
         bool isInputSemaphore = (inputSemOOP != default && semaphoreOOP == inputSemOOP);
 
         // Debug logging disabled - uncomment to trace semaphore waits

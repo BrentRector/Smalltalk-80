@@ -1,4 +1,5 @@
 using Smalltalk80.Interpreter.HeapManager;
+using Smalltalk80.Interpreter.Core.VM.Platform;
 using Smalltalk80.Interpreter.Shared.Types;
 using Smalltalk80.Interpreter.Core.VM.Scheduling;
 
@@ -64,8 +65,8 @@ public readonly struct PrimitiveExecutionContext
     /// <summary>Gets the context manager for context operations (optional for simple primitives).</summary>
     public IContextManager? ContextManager { get; }
 
-    /// <summary>Gets the platform bridge for platform operations (optional, may be null in headless mode).</summary>
-    public IPlatformBridge? Platform { get; }
+    /// <summary>Gets the display for graphics and input operations (optional, may be null in headless mode).</summary>
+    public IDisplay? Display { get; }
 
     /// <summary>Gets the runtime services for class/global lookups.</summary>
     public RuntimeServices? RuntimeServices { get; }
@@ -112,7 +113,7 @@ public readonly struct PrimitiveExecutionContext
         ISmalltalkHeap heapManager,
         IStackManager? stackManager = null,
         IContextManager? contextManager = null,
-        IPlatformBridge? platform = null,
+        IDisplay? display = null,
         RuntimeServices? runtimeServices = null,
         int instructionPointer = 0,
         ICacheManager? cacheManager = null,
@@ -129,7 +130,7 @@ public readonly struct PrimitiveExecutionContext
         HeapManager = heapManager;
         StackManager = stackManager;
         ContextManager = contextManager;
-        Platform = platform;
+        Display = display;
         RuntimeServices = runtimeServices;
         InstructionPointer = instructionPointer;
         CacheManager = cacheManager;
