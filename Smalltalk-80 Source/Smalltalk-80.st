@@ -29776,11 +29776,19 @@ controlTerminate
 	"so leaving and entering window won't select last type-in"! !
 
 !ParagraphEditor methodsFor: 'control defaults'!
-controlActivity 
+controlActivity
+	| wheelDelta |
+	"Check for mouse wheel scrolling first"
+	wheelDelta _ sensor mouseWheelDelta.
+	wheelDelta ~= 0 ifTrue: [
+		self scrollView: wheelDelta * self wheelScrollAmount negated.
+		self moveMarker.
+		^self].
+	"Normal activity"
 	self scrollBarContainsCursor
-		ifTrue: 
+		ifTrue:
 			[self scroll]
-		ifFalse: 
+		ifFalse:
 			[self processKeyboard.
 			self processMouseButtons].!
 isControlActive
