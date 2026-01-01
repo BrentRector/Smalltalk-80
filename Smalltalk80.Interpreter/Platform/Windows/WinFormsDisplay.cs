@@ -81,13 +81,6 @@ public class WinFormsDisplay : Form, IDisplay
     public new int Height { get; private set; }
     public PixelDepth BitsPerPixel => _pixelDepth;
 
-    public Span<byte> GetDisplayBuffer32()
-    {
-        if (_pixelDepth != PixelDepth.ThirtyTwoBit)
-            return Span<byte>.Empty;
-        return _displayBuffer.AsSpan();
-    }
-
     string IDisplay.Title
     {
         get => Text;

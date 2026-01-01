@@ -117,7 +117,6 @@ public class NullDisplay : IDisplay
     public int Width { get; private set; }
     public int Height { get; private set; }
     public PixelDepth BitsPerPixel { get; }
-    public Span<byte> GetDisplayBuffer32() => Span<byte>.Empty;
     public string Title { get; set; }
     public bool IsVisible => false;
 

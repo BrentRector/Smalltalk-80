@@ -118,31 +118,6 @@ public static class GraphicsOperations
             // Write modified dest bits back to heap
             WriteFormData(heap, destForm, destBits.Span);
 
-            // If dest is Display and we're in 32bpp mode, also render to 32bpp buffer
-            // This enables halftone-to-gray conversion for smooth rendering
-            if (context.Display != null &&
-                context.Metadata != null &&
-                destForm == context.Metadata.KnownObjects.Display &&
-                context.Display.BitsPerPixel == Core.VM.Platform.PixelDepth.ThirtyTwoBit)
-            {
-                var displayBuffer32 = context.Display.GetDisplayBuffer32();
-                if (!displayBuffer32.IsEmpty)
-                {
-                    BitBltEngine32.CopyBits1To32(
-                        displayBuffer32,
-                        context.Display.Width, context.Display.Height,
-                        destX, destY,
-                        sourceBits,
-                        sourceWidth, sourceHeight,
-                        sourceX, sourceY,
-                        width, height,
-                        clipX, clipY, clipWidth, clipHeight,
-                        halftoneBits,
-                        halftoneWidth, halftoneHeight,
-                        (CombinationRule)combinationRule);
-                }
-            }
-
             // Invalidate Display region if destination is Display
             InvalidateDisplayIfNeeded(context, destForm, destX, destY, width, height,
                 clipX, clipY, clipWidth, clipHeight);
@@ -424,27 +399,6 @@ public static class GraphicsOperations
             // Write modified dest bits back
             WriteFormData(heap, destFormOOP, destBits.Span);
 
-            // If dest is Display and we're in 32bpp mode, render the line to 32bpp buffer
-            // using halftone-to-gray conversion
-            if (context.Display != null &&
-                context.Metadata != null &&
-                destFormOOP == context.Metadata.KnownObjects.Display &&
-                context.Display.BitsPerPixel == Core.VM.Platform.PixelDepth.ThirtyTwoBit)
-            {
-                var displayBuffer32 = context.Display.GetDisplayBuffer32();
-                if (!displayBuffer32.IsEmpty)
-                {
-                    // Re-draw the line to 32bpp buffer with halftone-to-gray
-                    int lineDestX = destXOOP.AsSmallInteger();
-                    int lineDestY = destYOOP.AsSmallInteger();
-                    DrawLine32bpp(displayBuffer32, context.Display.Width, context.Display.Height,
-                        lineDestX, lineDestY, xDelta, yDelta,
-                        sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
-                        width, height, clipX, clipY, clipWidth, clipHeight,
-                        halftoneBits, halftoneWidth, halftoneHeight, rule);
-                }
-            }
-
             // Invalidate Display region
             int startX = destXOOP.AsSmallInteger();
             int startY = destYOOP.AsSmallInteger();
@@ -456,65 +410,6 @@ public static class GraphicsOperations
                 clipX, clipY, clipWidth, clipHeight);
 
             return PrimitiveResult.Ok(context.Receiver);
-        }
-
-        private static void DrawLine32bpp(
-            Span<byte> dest32Bits, int destWidth, int destHeight,
-            int destX, int destY, int xDelta, int yDelta,
-            ReadOnlySpan<byte> sourceBits, int sourceWidth, int sourceHeight, int sourceX, int sourceY,
-            int width, int height,
-            int clipX, int clipY, int clipWidth, int clipHeight,
-            ReadOnlySpan<byte> halftoneBits, int halftoneWidth, int halftoneHeight,
-            CombinationRule rule)
-        {
-            // Bresenham line drawing to 32bpp buffer
-            int dx = Math.Sign(xDelta);
-            int dy = Math.Sign(yDelta);
-            int px = Math.Abs(yDelta);
-            int py = Math.Abs(xDelta);
-
-            // Draw starting point
-            BitBltEngine32.CopyBits1To32(dest32Bits, destWidth, destHeight, destX, destY,
-                sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
-                width, height, clipX, clipY, clipWidth, clipHeight,
-                halftoneBits, halftoneWidth, halftoneHeight, rule);
-
-            if (py > px)
-            {
-                int P = py / 2;
-                for (int i = 0; i < py; i++)
-                {
-                    destX += dx;
-                    P -= px;
-                    if (P < 0)
-                    {
-                        destY += dy;
-                        P += py;
-                    }
-                    BitBltEngine32.CopyBits1To32(dest32Bits, destWidth, destHeight, destX, destY,
-                        sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
-                        width, height, clipX, clipY, clipWidth, clipHeight,
-                        halftoneBits, halftoneWidth, halftoneHeight, rule);
-                }
-            }
-            else
-            {
-                int P = px / 2;
-                for (int i = 0; i < px; i++)
-                {
-                    destY += dy;
-                    P -= py;
-                    if (P < 0)
-                    {
-                        destX += dx;
-                        P += px;
-                    }
-                    BitBltEngine32.CopyBits1To32(dest32Bits, destWidth, destHeight, destX, destY,
-                        sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
-                        width, height, clipX, clipY, clipWidth, clipHeight,
-                        halftoneBits, halftoneWidth, halftoneHeight, rule);
-                }
-            }
         }
 
         private static void DrawPixel(
