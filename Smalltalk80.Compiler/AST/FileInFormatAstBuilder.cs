@@ -436,6 +436,11 @@ namespace Smalltalk80.Compiler.AST
             {
                 sourceText = sourceText[..^1];
             }
+
+            // Trim trailing whitespace: The original source may have varying amounts of trailing
+            // newlines between methods. Normalizing this ensures consistent fileOut formatting
+            // since nextChunkPut: adds its own CR after the chunk terminator.
+            sourceText = sourceText.TrimEnd();
             // Create method definition with the expected format
             var method = new MethodDefinitionNode
             {
