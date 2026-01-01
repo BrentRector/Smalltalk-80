@@ -1261,8 +1261,8 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     SmalltalkOOP value;
                     if (format == ObjectFormat.WordIndexed)
                     {
-                        ushort w = heapManager.GetIndexedWord(receiverOOP, index - 1);
-                        value = SmalltalkOOP.FromSmallInteger(w);
+                        uint w = heapManager.GetIndexedWord(receiverOOP, index - 1);
+                        value = SmalltalkOOP.FromSmallInteger((int)w);
                     }
                     else if (format == ObjectFormat.ByteIndexed)
                     {

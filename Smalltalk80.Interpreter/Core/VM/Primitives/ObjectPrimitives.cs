@@ -160,8 +160,8 @@ public static class SimpleObjectPrimitives
             }
             else if (format == ObjectFormat.WordIndexed)
             {
-                ushort w = context.HeapManager.GetIndexedWord(context.Receiver, index - 1);
-                value = SmalltalkOOP.FromSmallInteger(w);
+                uint w = context.HeapManager.GetIndexedWord(context.Receiver, index - 1);
+                value = SmalltalkOOP.FromSmallInteger((int)w);
             }
             else
             {
