@@ -382,21 +382,43 @@ Form>>bytesPerRow
 
 ## Form File Formats
 
-### Design Decision: Use PNG for All Depths
+### Design Decision: Pure Smalltalk PNG Implementation
 
-Rather than maintaining custom file formats, we use **PNG for all image depths**:
+Implement PNG reading/writing entirely in Smalltalk, with no C# library dependencies:
 
 | Depth | PNG Type | Notes |
 |-------|----------|-------|
-| **1bpp** | 1-bit indexed (2-color palette) | Excellent compression for line art (~90%) |
+| **1bpp** | 1-bit indexed (2-color palette) | Excellent compression for line art |
 | **32bpp** | RGBA (8 bits per channel) | Full color with alpha |
 
-**Benefits of unifying on PNG:**
-- Single library (ImageSharp) for all image I/O
-- One code path simplifies maintenance
-- Excellent compression for both depths
+**Benefits:**
+- No external library dependencies
+- Runs on any Smalltalk VM implementation
+- Full control over implementation
+- Educational value - demonstrates Smalltalk's capability
 - External tools (GIMP, Photoshop) work with all images
-- PNG is future-proof and universally supported
+
+**Design Principle: Primitive-Ready Interfaces**
+
+Design all PNG classes with clean method boundaries so that performance-critical methods can be replaced with C# primitives later if needed:
+
+```smalltalk
+DeflateStream>>inflate
+    "Decompress DEFLATE stream. Could be primitiveInflate for speed."
+    <primitive: 'primitiveDeflateInflate'>
+    ^self inflateInSmalltalk  "Fallback to pure Smalltalk"
+
+CRC32>>updateWith: aByteArray
+    "Update CRC with bytes. Could be primitiveCRC32Update for speed."
+    <primitive: 'primitiveCRC32Update'>
+    ^self updateWithInSmalltalk: aByteArray  "Fallback"
+```
+
+This approach:
+- Delivers working code immediately (pure Smalltalk)
+- Identifies optimization targets through profiling
+- Allows incremental optimization without architectural changes
+- Maintains testability (Smalltalk fallback always available)
 
 ### Legacy .form Format (Deprecated)
 
@@ -413,34 +435,97 @@ Offset  Size     Field      Description
 10      N×2      bits       Bitmap data (16-bit words, column-major)
 ```
 
-**Migration path:**
-1. Provide one-time conversion script: `.form` → `.png`
-2. Keep `.form` read support temporarily
-3. All new saves use `.png`
-4. Eventually deprecate `.form` read support
+### PNG Implementation in Smalltalk
 
-### PNG for All Forms
+PNG format requires implementing these components:
 
-Use standard PNG format via C# primitives:
+#### Required Classes
 
-```csharp
-// In GraphicsPrimitives.cs or new ImagePrimitives.cs
+```smalltalk
+Object subclass: #PNGReader
+    instanceVariableNames: 'stream width height bitDepth colorType chunks'
 
-// Primitive 2xx: Read PNG file into 32bpp Form
-public static void ReadPngIntoForm(string filePath, Form targetForm)
-{
-    using var image = Image.Load<Rgba32>(filePath);
-    // Copy pixels to Form's WordArray...
-}
+Object subclass: #PNGWriter
+    instanceVariableNames: 'stream form compressionLevel'
 
-// Primitive 2xx: Write 32bpp Form to PNG file
-public static void WriteFormToPng(Form sourceForm, string filePath)
-{
-    using var image = new Image<Rgba32>(width, height);
-    // Copy Form's pixels to image...
-    image.SaveAsPng(filePath);
-}
+Object subclass: #DeflateStream
+    instanceVariableNames: 'stream window position'
+    "Implements RFC 1951 DEFLATE decompression/compression"
+
+Object subclass: #CRC32
+    instanceVariableNames: 'table value'
+    "Implements CRC-32 as used by PNG"
 ```
+
+#### PNG File Structure
+
+```
+PNG Signature: 89 50 4E 47 0D 0A 1A 0A (8 bytes)
+
+Chunks (each chunk):
+  Length:     4 bytes (big-endian, data length only)
+  Type:       4 bytes (ASCII: IHDR, IDAT, IEND, PLTE, etc.)
+  Data:       [Length] bytes
+  CRC:        4 bytes (CRC-32 of Type + Data)
+
+Required chunks:
+  IHDR - Image header (width, height, bit depth, color type)
+  IDAT - Image data (deflate-compressed, filtered scanlines)
+  IEND - Image end (empty)
+
+Optional chunks:
+  PLTE - Palette (for indexed color)
+  tRNS - Transparency
+  ... (many others we can ignore)
+```
+
+#### PNG Color Types
+
+| Type | Name | Channels | Our Support |
+|------|------|----------|-------------|
+| 0 | Grayscale | 1 | Read (convert to 1bpp or 32bpp) |
+| 2 | RGB | 3 | Read (convert to 32bpp, alpha=255) |
+| 3 | Indexed | 1 | Read/Write for 1bpp |
+| 4 | Grayscale+Alpha | 2 | Read (convert to 32bpp) |
+| 6 | RGBA | 4 | Read/Write for 32bpp |
+
+#### PNG Filtering (per scanline)
+
+| Filter | Algorithm |
+|--------|-----------|
+| 0 None | Raw bytes |
+| 1 Sub | pixel[x] - pixel[x-1] |
+| 2 Up | pixel[x] - pixel[x, y-1] |
+| 3 Average | pixel[x] - (left + up) / 2 |
+| 4 Paeth | pixel[x] - PaethPredictor(left, up, upperLeft) |
+
+#### Implementation Phases
+
+**Phase 1: Foundation Classes**
+1. `CRC32` - Table-based CRC-32 implementation
+2. `DeflateStream` - RFC 1951 decompression (reading)
+3. `PNGChunk` - Chunk parsing/writing
+
+**Phase 2: PNG Reading**
+1. `PNGReader>>readFrom:` - Main entry point
+2. Parse IHDR for dimensions and color type
+3. Collect and decompress IDAT chunks
+4. Apply reverse filtering to scanlines
+5. Convert to Form based on color type
+
+**Phase 3: PNG Writing**
+1. `PNGWriter>>write:to:` - Main entry point
+2. Write PNG signature
+3. Write IHDR chunk
+4. For indexed: write PLTE chunk
+5. Filter scanlines and compress with Deflate
+6. Write IDAT chunk(s)
+7. Write IEND chunk
+
+**Phase 4: Deflate Compression (for writing)**
+1. Implement RFC 1951 compression
+2. Can start with simple "stored" blocks (no compression)
+3. Add LZ77 + Huffman later for better compression
 
 ### Smalltalk Interface
 
@@ -449,58 +534,34 @@ Form class>>readFrom: fileName
     "Read Form from file, dispatching based on extension"
     | extension |
     extension := (fileName asPath) extension asLowercase.
-    extension = 'form' ifTrue: [^self readLegacyFormFile: fileName].  "Deprecated"
-    extension = 'png' ifTrue: [^self readPngFile: fileName].
-    self error: 'Unknown image format: ', extension.
-    ^nil
-
-Form class>>readPngFile: fileName
-    "Read PNG file into Form (depth determined by PNG color type)"
-    <primitive: 2xx>
-    ^self primitiveFailed
-
-Form class>>readLegacyFormFile: fileName
-    "Read legacy .form file (deprecated - for migration only)"
-    "... existing readFormFile: logic ..."
+    extension = 'form' ifTrue: [^self readLegacyFormFile: fileName].
+    extension = 'png' ifTrue: [^PNGReader readFrom: fileName].
+    self error: 'Unknown image format: ', extension
 
 Form>>writeOnFileNamed: fileName
-    "Write Form to PNG file (always use PNG for new saves)"
+    "Write Form to PNG file"
     | baseName |
     baseName := (fileName asPath) withoutExtension asString.
-    self writePngFile: baseName, '.png'
+    PNGWriter write: self to: baseName, '.png'
 
 Form>>writePngFile: fileName
-    "Write Form to PNG file (works for both 1bpp and 32bpp)"
-    <primitive: 2xx>
-    ^self primitiveFailed
+    "Write Form to PNG file"
+    PNGWriter write: self to: fileName
 ```
 
-### Conversion Script
+### Deflate Implementation Notes
 
-For migrating existing `.form` files:
+Deflate (RFC 1951) is the core compression. For reading:
+- Parse block headers (BFINAL, BTYPE)
+- Handle stored blocks (BTYPE=00): copy literal bytes
+- Handle fixed Huffman (BTYPE=01): use predefined codes
+- Handle dynamic Huffman (BTYPE=10): decode code tables first
+- Maintain 32KB sliding window for back-references
 
-```smalltalk
-FormMigration class>>convertAllFormsIn: directoryPath
-    "Convert all .form files in directory to .png"
-    | dir |
-    dir := FileDirectory on: directoryPath.
-    (dir fileNamesMatching: '*.form') do: [:formFile |
-        | form pngFile |
-        form := Form readFrom: (directoryPath, '/', formFile).
-        pngFile := (formFile copyUpToLast: $.) , '.png'.
-        form writePngFile: (directoryPath, '/', pngFile).
-        Transcript show: 'Converted: ', formFile; cr].
-```
-
-### C# Library Options
-
-| Library | License | Features | Recommendation |
-|---------|---------|----------|----------------|
-| **System.Drawing.Common** | MIT | Windows only, GDI+ | Simple, but Windows-only |
-| **ImageSharp** | Apache 2.0 | Cross-platform, pure C# | Best for portability |
-| **SkiaSharp** | MIT | Cross-platform, Google Skia | Good if using Skia elsewhere |
-
-**Recommended**: `ImageSharp` for cross-platform support without native dependencies.
+For writing (simplified start):
+- Use stored blocks only (BTYPE=00) - no compression
+- Later add fixed Huffman for better compression
+- Dynamic Huffman optional (best compression, most complex)
 
 ### Depth Conversion
 
@@ -534,13 +595,25 @@ Form>>as1bpp
     ^newForm
 ```
 
-### Implementation Phases
+### Estimated Complexity
 
-1. **Add ImageSharp NuGet package** to Interpreter project
-2. **Implement PNG read primitive** for loading 32bpp images
-3. **Implement PNG write primitive** for saving 32bpp images
-4. **Update Form class** with file extension dispatch
-5. **Add BMP support** (optional, for uncompressed option)
+| Component | Lines of Code | Difficulty |
+|-----------|---------------|------------|
+| CRC32 | ~50 | Low |
+| Deflate Decompression | ~300-500 | High |
+| Deflate Compression (stored) | ~50 | Low |
+| Deflate Compression (Huffman) | ~400 | High |
+| PNG Chunk I/O | ~100 | Medium |
+| PNG Reader | ~200 | Medium |
+| PNG Writer | ~150 | Medium |
+| **Total (basic)** | ~900 | |
+| **Total (full compression)** | ~1300 | |
+
+### References
+
+- [PNG Specification](http://www.libpng.org/pub/png/spec/1.2/PNG-Contents.html)
+- [RFC 1951 - DEFLATE](https://datatracker.ietf.org/doc/html/rfc1951)
+- [RFC 1950 - ZLIB](https://datatracker.ietf.org/doc/html/rfc1950) (wrapper around DEFLATE)
 
 ---
 
@@ -597,12 +670,12 @@ The changes are localized enough that rollback is straightforward.
 3. **Snapshot/image format**: Does the image save/restore need conversion?
 4. **Large integers**: Any impact on LargePositiveInteger word storage?
 
-### Image I/O
+### PNG Implementation
 
-5. **Library choice**: ImageSharp vs SkiaSharp vs System.Drawing.Common?
-6. **Primitive numbers**: Which primitive range for PNG/BMP read/write?
-7. **Error handling**: How to report image load failures to Smalltalk?
-8. **Metadata**: Should we preserve/restore Form offset in PNG metadata?
+5. **Deflate priority**: Implement full Huffman compression, or start with stored blocks?
+6. **Interlacing**: Support Adam7 interlacing, or non-interlaced only?
+7. **Ancillary chunks**: Which optional chunks to support (tEXt, tIME, etc.)?
+8. **Form offset**: Store in tEXt chunk, or ignore on export?
 
 ### Graphics Architecture
 

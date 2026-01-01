@@ -81,7 +81,7 @@ DisplayMedium subclass: #Form
 | **Form depth** | Add depth ivar to Form | Not started |
 | **BitBltEngine32** | 32bpp BitBlt engine | Not started |
 | **Depth dispatch** | Primitive 96 routing | Not started |
-| **File formats** | 32bpp Form files | Specified (fileCode=2) |
+| **PNG I/O** | Pure Smalltalk PNG reader/writer | Designed (primitive-ready) |
 
 ---
 
@@ -98,19 +98,27 @@ DisplayMedium subclass: #Form
 
 ## Form File Formats
 
-### Design Decision: PNG for All Depths
+### Design Decision: Pure Smalltalk PNG Implementation
 
-Use **PNG for all image depths** instead of custom formats:
+Use **PNG for all image depths**, implemented entirely in Smalltalk:
 
 | Depth | PNG Type | Compression |
 |-------|----------|-------------|
 | 1bpp | 1-bit indexed | ~90% for line art |
 | 32bpp | RGBA | ~70% for photos |
 
+**Implementation:**
+- `PNGReader` / `PNGWriter` - Main entry points
+- `DeflateStream` - RFC 1951 compression/decompression
+- `CRC32` - Checksum calculation
+
 **Benefits:**
-- Single library (ImageSharp) for all I/O
-- External tools work with all images
+- No external library dependencies
+- Portable across any Smalltalk VM
+- External tools (GIMP, Photoshop) work with all images
 - One-time migration of legacy .form files
+
+**Design Principle:** Clean method boundaries enable adding C# primitives later for performance-critical operations (e.g., Deflate compression).
 
 **Legacy .form support:** Read-only for migration, then deprecate.
 
@@ -122,11 +130,15 @@ Use **PNG for all image depths** instead of custom formats:
 1. Should WordArray>>at:put: validate 32-bit range?
 2. Impact on LargePositiveInteger word storage?
 
+### PNG Implementation
+3. Deflate priority: Start with stored blocks (no compression), or implement Huffman immediately?
+4. Adam7 interlacing: Support on read, or non-interlaced only?
+5. Form offset preservation: Store in tEXt chunk, or ignore on PNG export?
+
 ### 32bpp Graphics
-3. Compression for 32bpp files?
-4. Premultiplied alpha for blending?
-5. Mixed-depth BitBlt combination rules?
-6. Cursor depth (32bpp or stay 1bpp)?
+6. Premultiplied alpha for blending?
+7. Mixed-depth BitBlt combination rules?
+8. Cursor depth (32bpp or stay 1bpp)?
 
 ---
 
@@ -162,9 +174,10 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 **Recommended Order**:
 
 1. **Review migration plan**: Read `docs/Migration-to-32-bit-Words.md`
-2. **Decide open questions**: Especially word size validation and alpha handling
+2. **Decide open questions**: Especially Deflate priority and alpha handling
 3. **Begin HeapManager migration**: Phase 1 of migration plan
 4. **Add Form depth**: After word migration is stable
-5. **Implement BitBltEngine32**: High complexity, core of 32bpp support
+5. **Implement PNG classes**: CRC32 → DeflateStream → PNGReader/Writer
+6. **Implement BitBltEngine32**: High complexity, core of 32bpp support
 
-**Goal**: Migrate to 32-bit words internally while maintaining file compatibility, then implement 32bpp Form support.
+**Goal**: Migrate to 32-bit words internally, implement pure Smalltalk PNG I/O (with primitive-ready interfaces), then implement 32bpp Form support.
