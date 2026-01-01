@@ -29841,14 +29841,13 @@ scrollToTop
 	"Scroll so that the paragraph is at the top of the view."
 	self scrollView: (paragraph clippingRectangle top 
 		- paragraph compositionRectangle top)!
-scrollView: anInteger 
+scrollView: anInteger
 	| maximumAmount minimumAmount amount |
 	self deselect.
-	maximumAmount _ 
+	maximumAmount _
 		paragraph clippingRectangle top - paragraph compositionRectangle top max: 0.
-	minimumAmount _ 
-		paragraph clippingRectangle top 
-			+ paragraph lineGrid - paragraph compositionRectangle bottom min: 0.
+	minimumAmount _
+		paragraph clippingRectangle bottom - paragraph compositionRectangle bottom min: 0.
 	amount _ (anInteger min: maximumAmount) max: minimumAmount.
 	amount ~= 0 ifTrue: [self scrollBy: amount negated].
 	self select!
