@@ -463,6 +463,19 @@ public static class GraphicsOperations
             // 32-bit words: 4 bytes per word
             bits = new byte[size * 4];
             heap.CopyIndexedWords(bitsOOP, bits.AsSpan());
+
+            // For narrow Forms (width <= 16), the 16-bit pattern is stored in lower 16 bits
+            // but pixels are read from upper 16 bits (big-endian byte order).
+            // Move lower 16 bits to upper 16 bits: swap bytes 0↔2 and 1↔3 within each word.
+            if (width > 0 && width <= 16)
+            {
+                for (int i = 0; i < bits.Length; i += 4)
+                {
+                    // Swap byte 0 with byte 2, byte 1 with byte 3
+                    (bits[i], bits[i + 2]) = (bits[i + 2], bits[i]);
+                    (bits[i + 1], bits[i + 3]) = (bits[i + 3], bits[i + 1]);
+                }
+            }
         }
         else
         {
@@ -480,13 +493,32 @@ public static class GraphicsOperations
             return;
 
         SmalltalkOOP bitsOOP = heap.GetInstanceVariable(formOOP, 0);
+        SmalltalkOOP widthOOP = heap.GetInstanceVariable(formOOP, 1);
         if (bitsOOP == nil || bitsOOP.IsSmallInteger)
             return;
 
         var format = heap.GetObjectFormat(bitsOOP);
 
         if (format == ObjectFormat.WordIndexed)
-            heap.SetIndexedWords(bitsOOP, bits);
+        {
+            // For narrow Forms (width <= 16), reverse the byte swap done during read
+            int width = widthOOP.IsSmallInteger ? widthOOP.AsSmallInteger() : 0;
+            if (width > 0 && width <= 16)
+            {
+                byte[] swapped = bits.ToArray();
+                for (int i = 0; i < swapped.Length; i += 4)
+                {
+                    // Reverse the swap: bytes 0↔2 and 1↔3
+                    (swapped[i], swapped[i + 2]) = (swapped[i + 2], swapped[i]);
+                    (swapped[i + 1], swapped[i + 3]) = (swapped[i + 3], swapped[i + 1]);
+                }
+                heap.SetIndexedWords(bitsOOP, swapped);
+            }
+            else
+            {
+                heap.SetIndexedWords(bitsOOP, bits);
+            }
+        }
         else
             heap.SetIndexedBytes(bitsOOP, bits);
     }

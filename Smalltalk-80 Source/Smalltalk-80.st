@@ -20379,13 +20379,13 @@ isAllWhite
 setExtent: extentPoint fromArray: anArray setOffset: offsetPoint
 	"Create a Form from an array of row values.
 	 Array values are 16-bit patterns (one per row for forms up to 16 pixels wide).
-	 For 32-bit word storage, shift values to upper 16 bits."
+	 The C# primitive (ExtractFormData) handles expansion to 32-bit words."
 	width _ extentPoint x.
 	height _ extentPoint y.
 	offset _ offsetPoint.
 	bits _ WordArray new: width + 31 // 32 * height.
 	1 to: anArray size do:
-		[:index | bits at: index put: ((anArray at: index) bitShift: 16)]!
+		[:index | bits at: index put: (anArray at: index)]!
 setExtent: extentPoint fromCompactArray: anArray setOffset: offsetPoint
 	| stripe index |
 	width _ extentPoint x.
