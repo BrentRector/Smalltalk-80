@@ -1,15 +1,15 @@
-# Session Handoff: 32bpp Display Graphics
+# Session Handoff: 32-bit Word Migration & 32bpp Graphics
 
 **Date**: 2026-01-01
-**Status**: Ready for Phase 1 of 32bpp implementation
-**Branch**: `claude/32bpp-display-graphics-RLW1k`
+**Status**: Architecture planning complete, ready for implementation
+**Branch**: `claude/review-graphics-architecture-FssRQ`
 **Priority**: Enhancement
 
 ---
 
 ## Quick Summary
 
-The 1bpp graphics system is fully functional with all UI polish complete. Mouse wheel scrolling works for both list panes (selection movement) and text panes (content scrolling). The System Browser opens with proper initial selection. Ready to begin 32bpp native color support implementation.
+Completed comprehensive architecture review for 32bpp graphics support. Discovered that moving to 32-bit internal words (from 16-bit) is a prerequisite for clean 32bpp implementation. Created detailed migration plan covering HeapManager changes, file format compatibility, and 32bpp Form file format.
 
 ---
 
@@ -20,127 +20,105 @@ The 1bpp graphics system is fully functional with all UI polish complete. Mouse 
 - ✅ Cold start: All 6 phases succeed
 - ✅ Init expressions: 286/286 succeed (100%)
 - ✅ System Browser: Fully functional with source code display
-- ✅ Mouse wheel scrolling: List panes move selection, text panes scroll
-- ✅ Scroll limiting: Text stops when last line reaches bottom
-- ✅ Browser initial selection: Opens with first category selected
 - ✅ All 16 BitBlt combination rules working
 - ✅ 1bpp→32bpp conversion for screen display
+- ✅ **Color class**: Already implemented in Smalltalk-80.st (lines 31693-31939)
+- ✅ **TranslucentColor class**: Already implemented with alpha support
 
 ### Recent Commits (this session)
 ```
-d4ba09b Initialize Browser with first category selected
-cc44b8b Limit scroll to stop when last line reaches bottom of pane
-941bb3b Add mouse wheel scrolling support for Smalltalk-80 panes
+990c890 Add 32bpp Form file format specification
+e849c29 Add 32-bit word migration planning document
 ```
 
 ---
 
-## Mouse Wheel Implementation Details
+## Key Discovery: 32-bit Word Migration Required
 
-### C# Side
-- `InputWordRingBuffer.cs`: Added `TypeMouseWheel = 6 << 12` constant
-- `EnqueueMouseWheel(int deltaLines)`: Encodes as offset (delta + 2048) for signed 12-bit
-- `WinFormsDisplay.cs`: `OnMouseWheel` handler converts `e.Delta / 120` to notches
+The original Smalltalk-80 used 16-bit words (matching Xerox Alto hardware). Our interpreter currently uses `ushort[]` for WordIndexed objects. Moving to 32-bit words is needed because:
 
-### Smalltalk Side
-- `InputState`: Added `wheelDelta` instance variable, handles Type 6 in `run`
-- `InputSensor>>mouseWheelDelta`: Returns and resets accumulated delta
-- `ScrollController>>wheelActivity:`: Scrolls view content (positive = up)
-- `ListController>>wheelActivity:`: Moves selection up/down with auto-scroll
-- `ParagraphEditor>>controlActivity`: Handles wheel before other input
-- `ListView>>changeModelSelection:`: Added for polymorphic dispatch
-- `Browser>>on:`: Sets initial category to first in list
+1. **OOP/SmallInteger alignment**: Interpreter already uses 32-bit for OOPs
+2. **32bpp natural fit**: One 32-bit word = one ARGB pixel
+3. **Modern efficiency**: 32-bit operations are native on modern CPUs
+
+### Migration Strategy
+
+| Layer | Word Size | Purpose |
+|-------|-----------|---------|
+| **Internal (runtime)** | 32-bit | Efficient storage, natural for 32bpp |
+| **External (files)** | 16-bit | Backward compatibility with Form files |
+| **Conversion** | At I/O boundary | Transform when reading/writing files |
+
+See `docs/Migration-to-32-bit-Words.md` for complete 7-phase migration plan.
 
 ---
 
-## Next Steps: 32bpp Native Color Support
+## Implementation Status
 
-The graphics system currently operates in 1bpp mode with conversion to 32bpp only for final screen display. The next phase implements native 32bpp Forms with full color support.
+### Phase 1: Color Class - ✅ COMPLETE
 
-### Implementation Phases (from Graphics-Architecture.md Section 6)
+Already implemented in `Smalltalk-80.st`:
 
-| Phase | Scope | Complexity | Status |
-|-------|-------|------------|--------|
-| **1** | Color class | Low | Not started |
-| **2** | Form depth | Medium | Not started |
-| **3** | BitBltEngine32 | High | Not started |
-| **4** | Depth dispatch | Medium | Not started |
-| **5** | Depth conversion | Medium | Not started |
-| **6** | Extended rules | Medium | Not started |
-| **7** | Widget updates | High | Not started |
+| Class | Lines | Features |
+|-------|-------|----------|
+| **Color** | 31693-31860 | RGB (10-bit/component), named colors, asPixelValue, asFormColor |
+| **TranslucentColor** | 31861-31938 | Alpha support, r:g:b:alpha:, fromInteger: |
+| **Initialization** | 31939 | `Color initialize` init expression |
 
-### Phase 1: Color Class (Recommended Start)
+### Phase 2: Form Depth - NOT STARTED
 
-Create new Smalltalk classes for color values:
-
-```smalltalk
-Object subclass: #Color
-    instanceVariableNames: 'rgb'
-    classVariableNames: 'Black White Transparent'
-
-Color subclass: #TranslucentColor
-    instanceVariableNames: 'alpha'
-```
-
-Key methods needed:
-- `Color class>>r:g:b:` - Create from float RGB (0.0-1.0)
-- `Color class>>fromInteger:` - Create from 32-bit ARGB
-- `Color>>red`, `green`, `blue` - Component accessors
-- `Color>>asPixelValue` - Convert to 32-bit ARGB integer
-- `Color>>asFormColor` - Convert to 1bpp (luminance threshold)
-
-### Phase 2: Form Depth
-
-Add `depth` instance variable to Form:
-
+Form class still has original definition:
 ```smalltalk
 DisplayMedium subclass: #Form
-    instanceVariableNames: 'bits width height offset depth'
+    instanceVariableNames: 'bits width height offset'  "Missing 'depth'"
 ```
 
-Only depths 1 and 32 are supported. Key changes:
-- `Form class>>extent:depth:` - Create with specific depth
-- `Form>>depth` - Returns 1 if nil (backward compatible)
-- `Form>>wordsPerRow` - Different calculation for 1bpp vs 32bpp
-- `Form>>is32bpp` - Convenience test
+### Remaining Phases
 
-### Design Constraints
-
-**Two depths only: 1 and 32**
-- No indexed colors (2, 4, 8 bit)
-- No ColorForm
-- No color palettes
-- Simplifies implementation significantly
-
-**Backward Compatibility**
-- `Form>>depth` returns 1 if nil
-- Existing Form creation defaults to depth: 1
-- Cursors and fonts remain 1bpp
-- Gradual migration path
+| Phase | Scope | Status |
+|-------|-------|--------|
+| **Word Migration** | HeapManager 16→32 bit | Planned (see migration doc) |
+| **Form depth** | Add depth ivar to Form | Not started |
+| **BitBltEngine32** | 32bpp BitBlt engine | Not started |
+| **Depth dispatch** | Primitive 96 routing | Not started |
+| **File formats** | 32bpp Form files | Specified (fileCode=2) |
 
 ---
 
 ## Key Documentation
 
-- **`docs/Graphics-Architecture.md`** - Complete graphics system architecture including 32bpp plan (Section 6)
-- **`docs/CLAUDE.md`** - Project status and development guidelines
-- **`Smalltalk-80 Source/Smalltalk-80.st`** - All Smalltalk source code
+| Document | Purpose |
+|----------|---------|
+| **`docs/Migration-to-32-bit-Words.md`** | Complete 32-bit word migration plan with 7 phases |
+| **`docs/Graphics-Architecture.md`** | Graphics system architecture and 32bpp plan |
+| **`docs/Form-File-Format.md`** | Original 1bpp Form file format |
+| **`CLAUDE.md`** | Project status and development guidelines |
 
 ---
 
-## Files to Modify for 32bpp
+## Form File Formats
 
-### Phase 1 (Color class)
-- `Smalltalk-80.st` - Add Color and TranslucentColor classes
+### Existing Format (fileCode=1)
+- 1bpp monochrome, 16-bit words, column-major
+- Big-endian, backward compatible
 
-### Phase 2 (Form depth)
-- `Smalltalk-80.st` - Modify Form class, add depth ivar and methods
+### New Format (fileCode=2)
+- 32bpp color, BGRA little-endian, row-major
+- Defined in Migration-to-32-bit-Words.md
 
-### Phase 3 (BitBltEngine32)
-- New file: `Core/VM/Graphics/BitBltEngine32.cs` - 32bpp BitBlt implementation
+---
 
-### Phase 4 (Depth dispatch)
-- `GraphicsPrimitives.cs` - Route primitive 96 based on source/dest depths
+## Open Questions (Need Decisions)
+
+### Word Size
+1. Should WordArray>>at:put: validate 32-bit range?
+2. Impact on LargePositiveInteger word storage?
+
+### 32bpp Graphics
+3. Compression for 32bpp files?
+4. Premultiplied alpha for blending?
+5. Mixed-depth BitBlt combination rules?
+6. Cursor depth (32bpp or stay 1bpp)?
 
 ---
 
@@ -173,11 +151,12 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 
 ## For Next Session
 
-**Start Here**:
-1. Read this handoff document
-2. Read `docs/Graphics-Architecture.md` Section 6 for detailed 32bpp plan
-3. Begin Phase 1: Implement Color class in Smalltalk-80.st
-4. Test with simple color creation and conversion methods
-5. Proceed to Phase 2: Add depth to Form class
+**Recommended Order**:
 
-**Goal**: Implement native 32bpp Form support with full Color class, enabling color graphics without runtime 1bpp→32bpp conversion.
+1. **Review migration plan**: Read `docs/Migration-to-32-bit-Words.md`
+2. **Decide open questions**: Especially word size validation and alpha handling
+3. **Begin HeapManager migration**: Phase 1 of migration plan
+4. **Add Form depth**: After word migration is stable
+5. **Implement BitBltEngine32**: High complexity, core of 32bpp support
+
+**Goal**: Migrate to 32-bit words internally while maintaining file compatibility, then implement 32bpp Form support.
