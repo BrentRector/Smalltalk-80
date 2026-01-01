@@ -193,6 +193,71 @@ See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, `d
 - **[PROCESS-MANAGEMENT.md](docs/Architecture/PROCESS-MANAGEMENT.md)** - Process scheduling, semaphores, priority queues
 - **[PROPOSED-TIMER-OPTIMIZATION.md](docs/Architecture/PROPOSED-TIMER-OPTIMIZATION.md)** - Timer/event system, WaitHandle.WaitAny implementation
 
+## 32-bit Migration & Graphics Documentation Map
+
+**Upcoming work**: Migrating from 16-bit to 32-bit words and implementing 32bpp color graphics.
+
+### Document Hierarchy
+
+| Document | Purpose | When to Reference |
+|----------|---------|-------------------|
+| **`docs/32-BIT-IMPLEMENTATION-PLAN.md`** | **MASTER PLAN** - Phased roadmap with 4 milestones | Starting implementation, checking phase order, understanding dependencies |
+| **`docs/SESSION-HANDOFF.md`** | Current session state, what works, next steps | Beginning a new session, checking current status |
+| **`docs/Migration-to-32-bit-Words.md`** | Technical reference for word migration | Implementing HeapManager changes, understanding 16↔32 bit conversions |
+| **`docs/Graphics-Architecture.md`** | Graphics system design, BitBlt, 32bpp design | Understanding graphics primitives, implementing BitBltEngine32 |
+| **`docs/Form-File-Format.md`** | Legacy .form file format specification | Reading legacy files, understanding column-major layout |
+
+### Quick Reference: Which Document for What Task
+
+**"I need to start implementing..."** → `docs/32-BIT-IMPLEMENTATION-PLAN.md`
+- Contains phased implementation order
+- Lists files to modify for each phase
+- Shows dependencies between phases
+
+**"What's the current state?"** → `docs/SESSION-HANDOFF.md`
+- Shows what works (build, tests, features)
+- Lists open questions needing decisions
+- Contains build/test commands
+
+**"How do I change HeapManager word size?"** → `docs/Migration-to-32-bit-Words.md`
+- Specific code locations to change
+- Before/after code examples
+- File I/O compatibility layer code
+
+**"How does BitBlt work? How to add 32bpp?"** → `docs/Graphics-Architecture.md`
+- BitBlt combination rules
+- Primitive 96 implementation
+- Color class and TranslucentColor design
+- Depth dispatch pattern
+
+**"How are Form files structured?"** → `docs/Form-File-Format.md`
+- Binary format specification
+- Column-major layout explanation
+- Reading/writing algorithms
+
+### Implementation Milestones
+
+```
+MILESTONE 1: 32-bit Words (prerequisite for everything)
+    └── Phases 1.1-1.7 in 32-BIT-IMPLEMENTATION-PLAN.md
+
+MILESTONE 2: 32bpp Graphics        MILESTONE 3: PNG I/O
+    └── Phases 2.1-2.5      ←parallel→    └── Phases 3.1-3.4
+
+MILESTONE 4: Integration
+    └── Phase 4.1
+```
+
+### Key Design Decisions (Already Made)
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Internal word size | 32-bit | Aligns with OOP/SmallInteger, natural for 32bpp |
+| External file format | 16-bit (legacy) | Backward compatibility |
+| Image format | PNG (pure Smalltalk) | Industry standard, no C# dependencies |
+| Primitive acceleration | Optional | Design with clean method boundaries for later optimization |
+| Supported depths | 1bpp and 32bpp only | Simplicity, no indexed colors |
+
 ## Block Context Architecture
 
 ⚠️ **CANONICAL REFERENCE**: `docs/Block-Context-And-Variable-Access-COMPREHENSIVE.md`
