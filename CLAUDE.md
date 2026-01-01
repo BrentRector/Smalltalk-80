@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2025-12-27
+**Last Updated**: 2026-01-01
 
 ## Project Status
 
@@ -18,6 +18,7 @@
 - **System Browser**: ✅ Functional - opens and displays source code
 - **Transcript**: ✅ Functional - opens without crash
 - **Timer/Event System**: ✅ Working
+- **Mouse Wheel Scrolling**: ✅ Working - list panes move selection, text panes scroll content
 
 ## ⚠️ Known Issue: Race Condition on Early Mouse Movement
 
@@ -148,6 +149,7 @@ int buttons = (int)((Interlocked.Read(ref _mouseState) >> 32) & 0x7);
 - Type 1/2: Mouse X/Y coordinates
 - Type 3: Key down (param = keycode)
 - Type 4: Key up (param = keycode)
+- Type 6: Mouse wheel (param = delta + 2048, offset-encoded signed value)
 
 **Key Files**:
 - `WinFormsDisplayProvider.cs` - Atomic mouse state via packed `long`, ring buffer for events
@@ -158,6 +160,24 @@ int buttons = (int)((Interlocked.Read(ref _mouseState) >> 32) & 0x7);
 - `TimerManager.cs` - Interrupt-driven timer with TimerExpiredHandle
 
 See `docs/Architecture/PROPOSED-TIMER-OPTIMIZATION.md` and `docs/Architecture/PROCESS-MANAGEMENT.md` for complete documentation.
+
+**Phase 5: UI Polish and Mouse Wheel** ✅ **COMPLETE**
+
+Mouse wheel scrolling support with platform-appropriate behavior:
+
+- ✅ **Input Type 6 (MouseWheel)**: Added to Blue Book input word format with offset-encoded signed delta
+- ✅ **InputState/InputSensor**: `wheelDelta` instance variable, `mouseWheelDelta` method
+- ✅ **ScrollController>>wheelActivity:**: Scrolls view content (text panes)
+- ✅ **ListController>>wheelActivity:**: Moves selection up/down with auto-scroll (list panes)
+- ✅ **ParagraphEditor**: Handles wheel events in controlActivity
+- ✅ **Scroll Limiting**: Text panes stop scrolling when last line reaches bottom
+- ✅ **Browser Initial Selection**: System Browser opens with first category selected
+- ✅ **Direction Convention**: Matches Windows 11 (wheel up = scroll/move up)
+
+**Key Files**:
+- `InputWordRingBuffer.cs` - TypeMouseWheel constant, EnqueueMouseWheel method
+- `WinFormsDisplay.cs` - OnMouseWheel handler
+- `Smalltalk-80.st` - InputState, InputSensor, ScrollController, ListController, ParagraphEditor, Browser, ListView
 
 See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, `docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md`, and `docs/SOURCE-LOOKUP-ANALYSIS.md` for complete documentation.
 
