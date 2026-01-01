@@ -410,6 +410,13 @@ public static class FileStreamPrimitives
                 // Apply BOM offset for consistency with read operations
                 int actualPosition = position + FileHandleManager.GetBomOffset(handle);
                 stream.Position = actualPosition;
+
+                // DEBUG: Log writes of '!' character (ASCII 33) to help debug missing terminators
+                if (byteValue == 33)
+                {
+                    Console.WriteLine($"DEBUG FileWriteByte: Writing '!' (33) at position {actualPosition} to handle {handle}");
+                }
+
                 stream.WriteByte((byte)byteValue);
                 return PrimitiveResult.Ok(byteOOP);
             }

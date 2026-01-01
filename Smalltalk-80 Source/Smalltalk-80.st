@@ -1985,9 +1985,7 @@ nextChunkPut: aString
     aString do: [:char |
         char == $! ifTrue: [self nextPut: $!].
         self nextPut: char].
-    Transcript cr; show: 'DEBUG: Writing terminator !'.
     self nextPut: $!.
-    Transcript show: ' - done'.
     ^aString!
 
 nextWordPut: aWord
