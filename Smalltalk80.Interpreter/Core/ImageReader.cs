@@ -242,10 +242,10 @@ public class ImageReader
                     break;
 
                 case ObjectFormat.WordIndexed:
-                    var words = new ushort[indexedSize];
+                    var words = new uint[indexedSize];
                     for (int i = 0; i < indexedSize; i++)
                     {
-                        words[i] = reader.ReadUInt16();
+                        words[i] = reader.ReadUInt32();
                     }
                     indexedStorage = words;
                     break;

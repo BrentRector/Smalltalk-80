@@ -159,7 +159,7 @@ internal class FieldValueResolver(
 
     /// <summary>
     /// Allocates a Float object using ObjectGraphAllocator.
-    /// Float must be WordIndexed with 4 words (16-bit each) per Blue Book specification.
+    /// Float must be WordIndexed with 2 words (32-bit each) for IEEE 754 double precision.
     /// </summary>
     /// <param name="value">The double value to store.</param>
     /// <returns>The allocated Float OOP.</returns>
@@ -174,7 +174,7 @@ internal class FieldValueResolver(
             InstructionCount = 0
         });
 
-        // Use ObjectGraphAllocator's AllocateFloat which correctly creates WordIndexed Float with 4 words
+        // Use ObjectGraphAllocator's AllocateFloat which correctly creates WordIndexed Float with 2 words
         var floatOOP = allocator.AllocateFloat(value);
 
         diagnostics?.Emit(new DiagnosticMessageEvent
