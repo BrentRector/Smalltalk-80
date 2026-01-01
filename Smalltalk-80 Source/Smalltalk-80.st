@@ -1982,10 +1982,12 @@ cr
 nextChunkPut: aString
     "Write chunk with ! terminator.
      Single ! in aString are doubled to !!"
+    | terminator |
+    terminator := $!.
     aString do: [:char |
-        char == $! ifTrue: [self nextPut: $!].
+        char == terminator ifTrue: [self nextPut: terminator].
         self nextPut: char].
-    self nextPut: $!.
+    self nextPut: terminator.
     ^aString!
 
 nextWordPut: aWord
