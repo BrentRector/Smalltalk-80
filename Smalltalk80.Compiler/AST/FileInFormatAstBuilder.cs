@@ -428,15 +428,14 @@ namespace Smalltalk80.Compiler.AST
             var charStop = stop?.StopIndex ?? charStart;
             var sourceText = charStream.GetText(new Interval(charStart, charStop));
 
-            // TEMPORARILY DISABLED FOR TESTING - comment terminator bug investigation
             // Strip trailing BANG: The grammar's methodBody rule includes BANG as its final token,
             // but source text should NOT include the chunk terminator. When fileOut writes methods,
             // it calls nextChunkPut: which escapes embedded ! by doubling and adds terminator.
             // Including BANG in source causes triple-bang output (!! escape + ! terminator = !!!).
-            // if (sourceText.EndsWith("!"))
-            // {
-            //     sourceText = sourceText[..^1];
-            // }
+            if (sourceText.EndsWith("!"))
+            {
+                sourceText = sourceText[..^1];
+            }
 
             // Trim trailing whitespace: The original source may have varying amounts of trailing
             // newlines between methods. Normalizing this ensures consistent fileOut formatting
