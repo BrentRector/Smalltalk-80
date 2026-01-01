@@ -298,42 +298,39 @@ You cannot use WinForms for the window and OpenGL for rendering without awkward 
 
 ## 6. Future: Native 32bpp and Color Support
 
-This section documents the Smalltalk-side changes required for full 32bpp color support, based on research of Squeak and Pharo implementations.
+This section documents the Smalltalk-side changes required for full 32bpp color support. We support only two depths: **1bpp** (classic monochrome) and **32bpp** (full color with alpha). This simplification eliminates indexed colors, ColorForm, and complex depth conversion matrices.
 
-### 6.1 Reference Implementations
+### 6.1 Design Constraints
 
-Modern Smalltalk systems that support color graphics:
+**Supported Depths: 1 and 32 only**
 
-| System | Color Depths | Key Features |
-|--------|--------------|--------------|
-| [Squeak](https://squeak.org) | 1, 2, 4, 8, 16, 32 | Full color with alpha blending |
-| [Pharo](https://pharo.org) | 1, 2, 4, 8, 16, 32 | Modern Morphic with 32bpp |
-| [Cuis](https://cuis.st) | 1, 2, 4, 8, 16, 32 | Vector graphics focus |
+| Depth | Use Case | Pixels/Word | Format |
+|-------|----------|-------------|--------|
+| 1 | Classic Smalltalk-80, cursors, fonts | 32 | MSB-first bits |
+| 32 | Full color graphics | 1 | ARGB (8-8-8-8) |
 
-**Recommendation**: Adopt Squeak's approach. It evolved directly from Smalltalk-80 and provides a well-tested migration path.
+**Not Supported:** 2, 4, 8, 16 bit depths. No ColorForm. No indexed palettes.
+
+**Reference:** Squeak/Pharo support all depths, but we adopt only the subset needed for our use case.
 
 Sources:
-- [Squeak BitBlt Tutorial](https://www.bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/BitBlt.htm)
 - [Squeak Color Class](https://bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/Color.htm)
-- [Squeak ColorForm Tutorial](http://bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/ColorForm.htm)
+- [Squeak BitBlt Tutorial](https://www.bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/BitBlt.htm)
 
-### 6.2 Proposed Color Class
+### 6.2 Color Class
 
-Squeak's Color class stores RGB as 10-bits per component in a single integer, providing 1024 levels per channel while remaining compact.
+New class for RGB color values. Stores RGB as 10-bits per component (Squeak convention).
 
 ```smalltalk
 Object subclass: #Color
-    instanceVariableNames: 'rgb cachedDepth cachedBitPattern'
-    classVariableNames: 'Black White Gray Red Green Blue
-                         IndexedColors ColorRegistry'
+    instanceVariableNames: 'rgb'
+    classVariableNames: 'Black White Transparent'
     poolDictionaries: ''
     category: 'Graphics-Primitives'
 ```
 
 **Instance Variables:**
-- `rgb` - Single integer encoding R, G, B each as 0-1023 (30 bits total)
-- `cachedDepth` - Depth for which cachedBitPattern was computed
-- `cachedBitPattern` - Cached pixel value for fast repeated use
+- `rgb` - Single integer: R (bits 20-29), G (bits 10-19), B (bits 0-9)
 
 **Key Methods:**
 
@@ -342,8 +339,14 @@ Color class>>r: r g: g b: b
     "Create color from 0.0-1.0 float components"
     ^self basicNew setRed: r green: g blue: b
 
+Color class>>fromInteger: argbInteger
+    "Create from 32-bit ARGB pixel value"
+    ^self basicNew
+        setRed: ((argbInteger >> 16) bitAnd: 255) / 255.0
+        green: ((argbInteger >> 8) bitAnd: 255) / 255.0
+        blue: (argbInteger bitAnd: 255) / 255.0
+
 Color>>red
-    "Answer red component as 0.0-1.0"
     ^(rgb bitShift: -20) / 1023.0
 
 Color>>green
@@ -352,26 +355,32 @@ Color>>green
 Color>>blue
     ^(rgb bitAnd: 1023) / 1023.0
 
-Color>>pixelValueForDepth: depth
-    "Answer pixel value for this color at given depth"
-    depth = 32 ifTrue: [
-        ^(255 << 24) +                           "Alpha = 255 (opaque)"
-         ((self red * 255) rounded << 16) +      "Red"
-         ((self green * 255) rounded << 8) +     "Green"
-         (self blue * 255) rounded               "Blue"
-    ].
-    depth = 16 ifTrue: [
-        ^((self red * 31) rounded << 10) +
-         ((self green * 31) rounded << 5) +
-         (self blue * 31) rounded
-    ].
-    "For 1-8 bit depths, use indexed color lookup"
-    ^(IndexedColors findNearestTo: self) - 1
+Color>>asPixelValue
+    "Answer 32-bit ARGB pixel value (alpha = 255)"
+    ^16rFF000000 +                          "Alpha = 255 (opaque)"
+     ((self red * 255) rounded << 16) +     "Red"
+     ((self green * 255) rounded << 8) +    "Green"
+     (self blue * 255) rounded              "Blue"
+
+Color>>asFormColor
+    "For 1bpp: answer black or white based on luminance"
+    | luminance |
+    luminance := (self red * 0.299) + (self green * 0.587) + (self blue * 0.114).
+    ^luminance < 0.5 ifTrue: [1] ifFalse: [0]
 ```
 
-### 6.3 Proposed TranslucentColor Class
+**Class Initialization:**
 
-For alpha blending support:
+```smalltalk
+Color class>>initialize
+    Black := self r: 0.0 g: 0.0 b: 0.0.
+    White := self r: 1.0 g: 1.0 b: 1.0.
+    Transparent := TranslucentColor new setRed: 0.0 green: 0.0 blue: 0.0; alpha: 0.0
+```
+
+### 6.3 TranslucentColor Class
+
+Subclass for alpha blending support (32bpp only).
 
 ```smalltalk
 Color subclass: #TranslucentColor
@@ -381,33 +390,29 @@ Color subclass: #TranslucentColor
     category: 'Graphics-Primitives'
 ```
 
-**Instance Variables:**
-- `alpha` - Float 0.0 (transparent) to 1.0 (opaque)
-
 **Key Methods:**
 
 ```smalltalk
 Color>>alpha: alphaValue
-    "Answer a TranslucentColor with given alpha"
+    "Answer a TranslucentColor with given alpha (0.0-1.0)"
     ^TranslucentColor new
         setRed: self red green: self green blue: self blue;
         alpha: alphaValue
 
-TranslucentColor>>pixelValueForDepth: depth
-    "32-bit ARGB format"
-    depth = 32 ifTrue: [
-        ^((alpha * 255) rounded << 24) +
-         ((self red * 255) rounded << 16) +
-         ((self green * 255) rounded << 8) +
-         (self blue * 255) rounded
-    ].
-    "Alpha not supported at lower depths"
-    ^super pixelValueForDepth: depth
+TranslucentColor>>alpha
+    ^alpha
+
+TranslucentColor>>asPixelValue
+    "32-bit ARGB with alpha"
+    ^((alpha * 255) rounded << 24) +
+     ((self red * 255) rounded << 16) +
+     ((self green * 255) rounded << 8) +
+     (self blue * 255) rounded
 ```
 
 ### 6.4 Form Class Changes
 
-Current Blue Book Form has 4 instance variables. Add `depth`:
+Add `depth` instance variable. Only values 1 and 32 are valid.
 
 ```smalltalk
 DisplayMedium subclass: #Form
@@ -417,126 +422,132 @@ DisplayMedium subclass: #Form
     category: 'Graphics-Display Objects'
 ```
 
-**Critical Method Changes:**
+**Key Methods:**
 
 ```smalltalk
+Form class>>extent: extentPoint
+    "Create 1bpp Form (backward compatible)"
+    ^self extent: extentPoint depth: 1
+
 Form class>>extent: extentPoint depth: bitsPerPixel
-    "Create Form with specified depth"
-    | newForm |
-    newForm := self new.
-    newForm setExtent: extentPoint depth: bitsPerPixel.
-    ^newForm
+    "Create Form with specified depth (1 or 32 only)"
+    (bitsPerPixel = 1 or: [bitsPerPixel = 32])
+        ifFalse: [self error: 'Only depths 1 and 32 supported'].
+    ^self new setExtent: extentPoint depth: bitsPerPixel
 
 Form>>setExtent: extentPoint depth: bitsPerPixel
-    "Initialize with size and depth"
     width := extentPoint x.
     height := extentPoint y.
     depth := bitsPerPixel.
     offset := 0@0.
-    bits := WordArray new: self wordsPerRow * height.
+    bits := WordArray new: self wordsPerRow * height
 
 Form>>wordsPerRow
-    "Answer words needed per row at current depth"
-    depth = 32 ifTrue: [^width].           "1 word per pixel"
-    depth = 16 ifTrue: [^(width + 1) // 2]. "2 pixels per word"
-    depth = 8  ifTrue: [^(width + 3) // 4]. "4 pixels per word"
-    depth = 4  ifTrue: [^(width + 7) // 8]. "8 pixels per word"
-    depth = 2  ifTrue: [^(width + 15) // 16]. "16 pixels per word"
-    ^(width + 31) // 32                     "1bpp: 32 pixels per word"
+    "Words needed per row"
+    depth = 32 ifTrue: [^width].        "1 word per pixel"
+    ^(width + 31) // 32                  "1bpp: 32 pixels per word"
 
 Form>>depth
-    "Answer bits per pixel. Default 1 for compatibility."
+    "Default 1 for backward compatibility with existing Forms"
     ^depth ifNil: [1]
+
+Form>>is32bpp
+    ^self depth = 32
+
+Form>>pixelAt: aPoint
+    "Answer pixel value at point"
+    self is32bpp
+        ifTrue: [^self pixelAt32: aPoint]
+        ifFalse: [^self pixelAt1: aPoint]
+
+Form>>pixelAt: aPoint put: pixelValue
+    "Set pixel value at point"
+    self is32bpp
+        ifTrue: [self pixelAt32: aPoint put: pixelValue]
+        ifFalse: [self pixelAt1: aPoint put: (pixelValue bitAnd: 1)]
 ```
 
-### 6.5 ColorForm Class (Optional)
+### 6.5 Extended BitBlt Combination Rules
 
-For indexed color (1-8 bit depths with palette):
-
-```smalltalk
-Form subclass: #ColorForm
-    instanceVariableNames: 'colors cachedDepth cachedColormap'
-    classVariableNames: ''
-    poolDictionaries: ''
-    category: 'Graphics-Display Objects'
-```
-
-**Instance Variables:**
-- `colors` - Array of 2^depth Color objects (the palette)
-- `cachedDepth` - Depth for which colormap was computed
-- `cachedColormap` - Bitmap for depth conversion
-
-ColorForm uses less memory than 32bpp for large images with limited colors.
-
-### 6.6 Extended BitBlt Combination Rules
-
-Squeak extends BitBlt beyond the original 16 rules for color operations:
+For 32bpp, we support additional rules beyond the original 16:
 
 | Rule | Name | Operation | Notes |
 |------|------|-----------|-------|
-| 20 | rgbAdd | Component-wise add | Clamps at 255 |
-| 21 | rgbSub | Component-wise subtract | Clamps at 0 |
-| 24 | alphaBlend | Alpha blending | 32-bit only |
-| 25 | pixPaint | Replace where non-zero | Transparency |
-| 26 | pixMask | Zero where non-zero | Inverse mask |
-| 27 | rgbMax | Max of components | Lighten |
-| 28 | rgbMin | Min of components | Darken |
-| 30 | alphaBlendConst | Alpha with constant | 16-bit compatible |
-| 34 | alphaBlendScaled | Scaled alpha blend | Pre-multiplied |
+| 0-15 | (original) | Boolean ops | Work on all depths |
+| 24 | alphaBlend | Alpha composite | 32bpp only |
+| 25 | pixPaint | Replace where src ≠ 0 | Transparency |
+| 26 | pixMask | Zero where src ≠ 0 | Inverse mask |
+| 27 | rgbMax | Max of RGB components | Lighten |
+| 28 | rgbMin | Min of RGB components | Darken |
 
-### 6.7 Primitive 96 Depth Dispatch
+Rules 20-23, 29-34 from Squeak are not implemented initially.
 
-The C# primitive must dispatch based on Form depths:
+### 6.6 Primitive 96 Depth Dispatch
+
+The C# primitive dispatches based on source and dest Form depths:
 
 ```csharp
 // In GraphicsPrimitives.cs
-private static void CopyBitsDispatch(
-    int sourceDepth, int destDepth,
-    Span<byte> destBits, ReadOnlySpan<byte> sourceBits, ...)
+private void CopyBitsWithDepth(int srcDepth, int dstDepth, ...)
 {
-    (sourceDepth, destDepth) switch
+    (srcDepth, dstDepth) switch
     {
-        (1, 1)   => BitBltEngine.CopyBits(...),      // Current 1bpp
-        (32, 32) => BitBltEngine32.CopyBits(...),   // 32bpp operations
-        (1, 32)  => BitBltEngine32.Expand1To32(...), // Expand bits
-        (32, 1)  => BitBltEngine32.Reduce32To1(...), // Threshold/dither
-        (8, 32)  => BitBltEngine32.Expand8To32(...), // Indexed to RGB
-        _        => throw new NotSupportedException(
-                       $"Depth conversion {sourceDepth}->{destDepth}")
+        (1, 1)   => BitBltEngine.CopyBits(...),       // Current engine
+        (32, 32) => BitBltEngine32.CopyBits32(...),   // 32bpp engine
+        (1, 32)  => BitBltEngine32.Expand1To32(...),  // Mono to color
+        (32, 1)  => BitBltEngine32.Reduce32To1(...),  // Color to mono
+        _ => throw new PrimitiveFailed("Unsupported depth combination")
     };
 }
 ```
 
-### 6.8 Implementation Phases
+**Depth Conversion Rules:**
+- **1→32**: Black (1) → `0xFF000000`, White (0) → `0xFFFFFFFF`
+- **32→1**: Luminance threshold at 50%
 
-| Phase | Scope | Complexity | Dependencies |
-|-------|-------|------------|--------------|
-| 1 | Color class | Low | None |
-| 2 | Form depth ivar | Medium | Color class |
-| 3 | DisplayScreen 32bpp | Low | Form depth |
-| 4 | BitBltEngine32 | High | Form depth |
-| 5 | TranslucentColor | Low | Color class |
-| 6 | Extended rules (20+) | Medium | BitBltEngine32 |
-| 7 | ColorForm (optional) | Medium | Color class |
-| 8 | Widget updates | High | All above |
+### 6.7 Implementation Phases
+
+| Phase | Scope | Complexity | Deliverable |
+|-------|-------|------------|-------------|
+| **1** | Color class | Low | Color, TranslucentColor classes |
+| **2** | Form depth | Medium | Form with depth ivar, 1/32 validation |
+| **3** | BitBltEngine32 | High | 32bpp BitBlt with rules 0-15 |
+| **4** | Depth dispatch | Medium | Primitive 96 routes by depth |
+| **5** | Depth conversion | Medium | 1↔32 conversion in BitBlt |
+| **6** | Extended rules | Medium | Rules 24-28 for 32bpp |
+| **7** | Widget updates | High | Pen, fills use Color |
+
+### 6.8 Dependency Graph
+
+```
+Phase 1: Color ──────────────────────────────────┐
+         │                                       │
+         ▼                                       ▼
+Phase 2: Form depth ──────┐              Phase 7: Widget updates
+         │                │                      ▲
+         ▼                ▼                      │
+Phase 3: BitBltEngine32   Phase 5: Depth         │
+         │                conversion             │
+         ▼                │                      │
+Phase 4: Depth dispatch ◄─┘                      │
+         │                                       │
+         ▼                                       │
+Phase 6: Extended rules ─────────────────────────┘
+```
 
 ### 6.9 Migration Strategy
 
-**Option A: Clean Break**
-- Implement all changes at once
-- Existing 1bpp image won't load
-- Requires rebuilding from source
+**Recommended: Compatibility Mode**
 
-**Option B: Compatibility Mode**
-- Form>>depth defaults to 1 if nil
-- Existing methods work unchanged
-- Gradually add color support
-- **Recommended approach**
+1. `Form>>depth` returns 1 if nil → existing Forms work unchanged
+2. Add Color class without breaking existing halftone usage
+3. New code can create 32bpp Forms explicitly
+4. Gradual widget migration to Color API
 
-**Option C: Adopt Squeak Image**
-- Port Squeak's graphics classes wholesale
-- Maximum compatibility with Squeak code
-- Significant integration work
+**Key Compatibility Points:**
+- Cursors remain 1bpp (convert to 32bpp in primitive 101)
+- StrikeFonts remain 1bpp (convert when rendering to 32bpp Form)
+- Existing Form creation methods default to depth: 1
 
 ---
 
