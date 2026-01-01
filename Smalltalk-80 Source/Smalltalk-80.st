@@ -1982,10 +1982,16 @@ cr
 nextChunkPut: aString
     "Write chunk with ! terminator.
      Single ! in aString are doubled to !!"
+    | termChar |
+    termChar := $!.
+    Transcript cr; show: 'nextChunkPut: termChar class = '; show: termChar class name.
+    Transcript show: ', asciiValue = '; show: termChar asciiValue printString.
     aString do: [:char |
-        char == $! ifTrue: [self nextPut: $!].
+        char == termChar ifTrue: [self nextPut: termChar].
         self nextPut: char].
-    self nextPut: $!.
+    Transcript cr; show: 'About to write terminator'.
+    self nextPut: termChar.
+    Transcript show: ' - written'.
     ^aString!
 
 nextWordPut: aWord
