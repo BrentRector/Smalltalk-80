@@ -380,6 +380,224 @@ Form>>bytesPerRow
 
 ---
 
+## Form File Formats
+
+The existing Form file format uses **fileCode** to identify the file type. We extend this for 32bpp support:
+
+### File Code Values
+
+| fileCode | Depth | Description |
+|----------|-------|-------------|
+| 1 | 1bpp | Original Blue Book monochrome format |
+| 2 | 32bpp | New color format (ARGB) |
+
+### Format 1: 1bpp Monochrome (Existing)
+
+```
+Offset  Size     Field      Description
+------  ----     -----      -----------
+0       2 bytes  fileCode   = 1 (identifies 1bpp Form)
+2       2 bytes  width      Width in pixels (unsigned 16-bit)
+4       2 bytes  height     Height in pixels (unsigned 16-bit)
+6       2 bytes  offsetX    X offset (signed, two's complement)
+8       2 bytes  offsetY    Y offset (signed, two's complement)
+10      N×2      bits       Bitmap data (16-bit words, column-major)
+                            N = (width + 15) // 16 * height words
+```
+
+**Byte order**: Big-endian (MSB first) - matches original Xerox Alto
+
+**Pixel layout**:
+- 16 pixels per 16-bit word
+- MSB = leftmost pixel
+- Column-major storage order
+
+### Format 2: 32bpp Color (New)
+
+```
+Offset  Size     Field      Description
+------  ----     -----      -----------
+0       2 bytes  fileCode   = 2 (identifies 32bpp Form)
+2       2 bytes  width      Width in pixels (unsigned 16-bit)
+4       2 bytes  height     Height in pixels (unsigned 16-bit)
+6       2 bytes  offsetX    X offset (signed, two's complement)
+8       2 bytes  offsetY    Y offset (signed, two's complement)
+10      W×H×4    pixels     Pixel data (32-bit ARGB, row-major)
+                            Total = width * height * 4 bytes
+```
+
+**Byte order**: Little-endian for pixel data (matches modern systems)
+
+**Pixel format**: ARGB (8 bits each)
+```
+Byte 0: Blue
+Byte 1: Green
+Byte 2: Red
+Byte 3: Alpha (255 = opaque, 0 = transparent)
+```
+
+**Pixel layout**:
+- Row-major order (more natural for modern graphics)
+- 1 pixel per 32-bit word
+- Top-left to bottom-right
+
+### Reading Forms (Dispatch by fileCode)
+
+```smalltalk
+Form class>>readFrom: fileName
+    "Read Form from file, dispatching based on fileCode"
+    | file code |
+    file := FileStream oldFileNamed: fileName.
+    file readOnly; binary.
+    code := file nextWord.
+    code = 1 ifTrue: [^self read1bppFormFile: file].
+    code = 2 ifTrue: [^self read32bppFormFile: file].
+    file close.
+    self error: 'Unknown Form file format: ', code printString.
+    ^nil
+
+Form class>>read1bppFormFile: file
+    "Read 1bpp Form (fileCode already consumed)"
+    "... existing readFormFile: logic with 16-bit to 32-bit conversion ..."
+
+Form class>>read32bppFormFile: file
+    "Read 32bpp Form (fileCode already consumed)"
+    | newForm newWidth newHeight theBits offsetX offsetY |
+    newForm := self new.
+    newWidth := file nextWord.
+    newHeight := file nextWord.
+    offsetX := file nextWord.
+    offsetY := file nextWord.
+    offsetX > 32767 ifTrue: [offsetX := offsetX - 65536].
+    offsetY > 32767 ifTrue: [offsetY := offsetY - 65536].
+
+    "Allocate 32bpp storage (1 word per pixel)"
+    theBits := WordArray new: newWidth * newHeight.
+
+    "Read pixel data (row-major, little-endian ARGB)"
+    1 to: newHeight do: [:y |
+        1 to: newWidth do: [:x |
+            | b g r a pixel |
+            b := file next asInteger.
+            g := file next asInteger.
+            r := file next asInteger.
+            a := file next asInteger.
+            pixel := (a bitShift: 24) + (r bitShift: 16) + (g bitShift: 8) + b.
+            theBits at: ((y - 1) * newWidth + x) put: pixel]].
+
+    newForm
+        setExtent: newWidth @ newHeight
+        depth: 32
+        offset: offsetX @ offsetY
+        bits: theBits.
+    file close.
+    ^newForm
+```
+
+### Writing Forms (Dispatch by depth)
+
+```smalltalk
+Form>>writeOnFileNamed: fileName
+    "Write Form to file in appropriate format based on depth"
+    self depth = 32
+        ifTrue: [self write32bppOnFileNamed: fileName]
+        ifFalse: [self write1bppOnFileNamed: fileName]
+
+Form>>write1bppOnFileNamed: fileName
+    "Write 1bpp Form in original Blue Book format"
+    | file |
+    file := FileStream fileNamed: fileName.
+    file binary.
+    file nextWordPut: 1.  "fileCode = 1 for 1bpp"
+    file nextWordPut: width.
+    file nextWordPut: height.
+    file nextWordPut: offset x.
+    file nextWordPut: offset y.
+    self write16BitWordsTo: file.  "Convert 32-bit internal to 16-bit file"
+    file close.
+
+Form>>write32bppOnFileNamed: fileName
+    "Write 32bpp Form in new color format"
+    | file |
+    file := FileStream fileNamed: fileName.
+    file binary.
+    file nextWordPut: 2.  "fileCode = 2 for 32bpp"
+    file nextWordPut: width.
+    file nextWordPut: height.
+    file nextWordPut: offset x.
+    file nextWordPut: offset y.
+    "Write pixel data (row-major, little-endian ARGB)"
+    1 to: height do: [:y |
+        1 to: width do: [:x |
+            | pixel |
+            pixel := bits at: ((y - 1) * width + x).
+            file nextPut: (pixel bitAnd: 16rFF).           "Blue"
+            file nextPut: ((pixel bitShift: -8) bitAnd: 16rFF).   "Green"
+            file nextPut: ((pixel bitShift: -16) bitAnd: 16rFF).  "Red"
+            file nextPut: ((pixel bitShift: -24) bitAnd: 16rFF)]]. "Alpha"
+    file close.
+```
+
+### Design Rationale
+
+| Decision | Rationale |
+|----------|-----------|
+| **fileCode dispatch** | Natural extension point, existing code checks for fileCode=1 |
+| **Row-major for 32bpp** | Matches modern graphics conventions, simpler pixel addressing |
+| **Little-endian pixels** | Matches x86/ARM memory layout, efficient for modern CPUs |
+| **BGRA byte order** | Matches Windows DIB and most GPU texture formats |
+| **Keep column-major for 1bpp** | Backward compatibility with existing Form files |
+
+### Migration Path
+
+1. **Phase 1**: Add depth instance variable to Form (see Graphics-Architecture.md)
+2. **Phase 2**: Implement 32bpp file read/write methods
+3. **Phase 3**: Update `readFrom:` to dispatch on fileCode
+4. **Phase 4**: Update `writeOnFileNamed:` to dispatch on depth
+
+### Compatibility Matrix
+
+| File Format | 1bpp Form (runtime) | 32bpp Form (runtime) |
+|-------------|---------------------|----------------------|
+| **fileCode=1 (1bpp file)** | Native read | Read + expand to 32bpp |
+| **fileCode=2 (32bpp file)** | Read + threshold to 1bpp | Native read |
+
+For cross-depth file I/O:
+
+```smalltalk
+Form class>>read1bppFormFile: file asDepth: targetDepth
+    "Read 1bpp file, optionally convert to 32bpp"
+    | form |
+    form := self read1bppFormFile: file.
+    targetDepth = 32 ifTrue: [^form as32bpp].
+    ^form
+
+Form>>as32bpp
+    "Convert 1bpp Form to 32bpp"
+    | newForm |
+    newForm := Form extent: self extent depth: 32.
+    "Black pixels become 0xFF000000, white becomes 0xFFFFFFFF"
+    self do: [:pixel :x :y |
+        newForm pixelAt: x@y put:
+            (pixel = 1 ifTrue: [16rFF000000] ifFalse: [16rFFFFFFFF])].
+    ^newForm
+
+Form>>as1bpp
+    "Convert 32bpp Form to 1bpp using luminance threshold"
+    | newForm |
+    newForm := Form extent: self extent depth: 1.
+    self do: [:pixel :x :y |
+        | r g b luminance |
+        r := (pixel bitShift: -16) bitAnd: 255.
+        g := (pixel bitShift: -8) bitAnd: 255.
+        b := pixel bitAnd: 255.
+        luminance := (r * 0.299) + (g * 0.587) + (b * 0.114).
+        newForm pixelAt: x@y put: (luminance < 128 ifTrue: [1] ifFalse: [0])].
+    ^newForm
+```
+
+---
+
 ## Testing Strategy
 
 ### Unit Tests
@@ -399,9 +617,14 @@ Form>>bytesPerRow
 
 ### File Compatibility Tests
 
-- [ ] Read existing Form files
-- [ ] Write Form files readable by original format
-- [ ] Round-trip Form files without data loss
+- [ ] Read existing 1bpp Form files (fileCode=1)
+- [ ] Write 1bpp Form files readable by original format
+- [ ] Round-trip 1bpp Form files without data loss
+- [ ] Write and read 32bpp Form files (fileCode=2)
+- [ ] Round-trip 32bpp Form files without data loss
+- [ ] Convert 1bpp Form to 32bpp (as32bpp)
+- [ ] Convert 32bpp Form to 1bpp (as1bpp with luminance threshold)
+- [ ] Handle unknown fileCode gracefully (error message)
 
 ---
 
@@ -419,10 +642,26 @@ The changes are localized enough that rollback is straightforward.
 
 ## Open Questions
 
+### Word Size Migration
+
 1. **WordArray>>at:put: range checking**: Should we validate values fit in 32 bits?
 2. **Primitive 60/61 (at:/at:put:)**: Do these need updating for 32-bit words?
 3. **Snapshot/image format**: Does the image save/restore need conversion?
 4. **Large integers**: Any impact on LargePositiveInteger word storage?
+
+### 32bpp File Format
+
+5. **Compression**: Should 32bpp files support optional compression (e.g., PNG-style)?
+6. **Premultiplied alpha**: Should we use premultiplied alpha for better blending performance?
+7. **Color space**: Should we specify sRGB explicitly or leave it implicit?
+8. **Halftone forms**: Should halftone Forms be limited to 1bpp, or allow 32bpp patterns?
+9. **StrikeFont format**: Do fonts need a 32bpp format, or always render from 1bpp to 32bpp?
+
+### BitBlt Considerations
+
+10. **Mixed-depth BitBlt**: What combination rules apply when copying 1bpp to 32bpp or vice versa?
+11. **Alpha blending rules**: Should rule 24 (alphaBlend) be implemented in C# primitive or Smalltalk?
+12. **Cursor depth**: Should cursors support 32bpp, or stay 1bpp with color expansion?
 
 ---
 
@@ -431,4 +670,5 @@ The changes are localized enough that rollback is straightforward.
 - Blue Book Chapter 18: Graphics Kernel
 - Blue Book Chapter 27: Object Memory
 - `docs/Graphics-Architecture.md`: 32bpp implementation plan
+- `docs/Form-File-Format.md`: Original 1bpp Form file format
 - `docs/Architecture/HEAP-MANAGER-ARCHITECTURE.md`: HeapManager design
