@@ -2,7 +2,7 @@
 
 **Date**: 2026-01-01
 **Branch**: `claude/32bpp-display-graphics-RLW1k`
-**Status**: ✅ Implementation complete, ready for testing
+**Status**: ✅ Implementation complete, build verified
 
 ## What Was Accomplished This Session
 
@@ -100,6 +100,7 @@ var pixelDepth = Core.VM.Platform.PixelDepth.ThirtyTwoBit;  // or OneBit for tra
 - `Smalltalk80.Interpreter/Platform/Windows/WinFormsDisplaySystem.cs`
 - `Smalltalk80.Interpreter/Platform/DisplaySystemFactory.cs`
 - `Smalltalk80.Interpreter/Core/VM/Primitives/GraphicsPrimitives.cs`
+- `Smalltalk80.Interpreter/Core/VM/Primitives/TestDisplay.cs`
 - `Smalltalk80.Interpreter/Program.cs`
 - `docs/Graphics-Architecture.md`
 
