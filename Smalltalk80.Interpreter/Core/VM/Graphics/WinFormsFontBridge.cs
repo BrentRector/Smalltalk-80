@@ -3,6 +3,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
 using System.Runtime.Versioning;
+using System.Windows.Forms;
 
 namespace Smalltalk80.Interpreter.Core.VM.Graphics;
 
@@ -246,14 +247,11 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
         using (var g = System.Drawing.Graphics.FromImage(glyphsBitmap))
         {
-            ConfigureGraphicsForAntialiasing(g);
             g.Clear(Color.White);
 
-            // Use GenericDefault for consistent baseline across all characters
-            var format = new StringFormat(StringFormat.GenericDefault)
-            {
-                FormatFlags = StringFormatFlags.NoClip
-            };
+            // Use TextRenderer (GDI) for consistent baseline alignment
+            // GDI has more reliable fixed-pitch font rendering than GDI+
+            const TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
 
             // Draw each character at its exact cell position
             for (int i = 0; i < charCount; i++)
@@ -263,7 +261,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
                 if (c < 32) continue;
                 // Replace underscore with left arrow (Smalltalk convention)
                 if (c == '_') c = '←';
-                g.DrawString(c.ToString(), font, Brushes.Black, i * cellWidth, 0, format);
+                var rect = new Rectangle(i * cellWidth, 0, cellWidth, fontHeight);
+                TextRenderer.DrawText(g, c.ToString(), font, rect, Color.Black, Color.White, flags);
             }
         }
 
@@ -307,24 +306,14 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
     /// <summary>
     /// Gets the fixed-pitch cell width for a monospace font.
-    /// Uses a representative character to determine the uniform cell width.
+    /// Uses TextRenderer (GDI) for consistent measurement with DrawText.
     /// </summary>
-    private int GetCellWidth(Font font)
+    private static int GetCellWidth(Font font)
     {
-        using var measureBitmap = new Bitmap(1, 1);
-        measureBitmap.SetResolution(FixedDpi, FixedDpi);
-        using var g = System.Drawing.Graphics.FromImage(measureBitmap);
-        ConfigureGraphicsForDeterminism(g);
-
-        // Use GenericDefault format for consistent cell width measurement
-        var format = new StringFormat(StringFormat.GenericDefault)
-        {
-            FormatFlags = StringFormatFlags.MeasureTrailingSpaces | StringFormatFlags.NoClip
-        };
-
-        // Measure 'M' - a representative full-width character
-        var size = g.MeasureString("M", font, PointF.Empty, format);
-        return (int)Math.Ceiling(size.Width);
+        // Use TextRenderer.MeasureText with NoPadding to match DrawText behavior
+        const TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
+        var size = TextRenderer.MeasureText("M", font, Size.Empty, flags);
+        return size.Width;
     }
 
     /// <summary>
