@@ -19741,7 +19741,7 @@ pi
 Float initialize!
 DisplayMedium subclass: #Form
 	instanceVariableNames: 'bits width height offset '
-	classVariableNames: 'OneBitForm '
+	classVariableNames: 'BlackPixel OneBitForm WhitePixel '
 	poolDictionaries: ''
 	category: 'Graphics-Display Objects'!
 Form comment: 'This class is a rectangular pattern of dots represented as a Smalltalk Bitmap.'!
@@ -19763,31 +19763,37 @@ fromDisplay: aRectangle
 		mask: Form black! !
 
 !Form methodsFor: 'accessing'!
-extent: aPoint 
-	"Create a virtual bit map with width = (extent x) and height = (extent y) 
-	with the bits all zeros (white).  The extent is guaranteed to be zero or a positive 
-	size."
+extent: aPoint
+	"Create a 32bpp bitmap with width = (extent x) and height = (extent y)
+	with all pixels set to white (0xFFFFFFFF).
+	32bpp architecture: one pixel per word (width * height words total)."
 
-	| nonZeroExtent extentSize |
-	nonZeroExtent _ 
+	| nonZeroExtent extentSize newBits |
+	nonZeroExtent _
 		aPoint >= (0 @ 0)
 			ifTrue: [aPoint]
 			ifFalse: [0 @ 0].
-	extentSize _ nonZeroExtent y * (nonZeroExtent x + 31 // 32).
+	extentSize _ nonZeroExtent x * nonZeroExtent y.
+	newBits _ WordArray new: (extentSize min: WordArray maxSize).
+	"Initialize to white pixels"
+	newBits atAllPut: Form whitePixel.
 	self extent: nonZeroExtent
 		offset: 0 @ 0
-		bits: (WordArray new: (extentSize min: WordArray maxSize))!
-extent: extentPoint offset: offsetPoint 
-	"Create a virtual bit map with width = (extent x) and height = (extent y) 
-	with the bits all zeros (white)."
+		bits: newBits!
+extent: extentPoint offset: offsetPoint
+	"Create a 32bpp bitmap with width = (extent x) and height = (extent y)
+	with all pixels set to white.
+	32bpp architecture: one pixel per word."
 
-	| normalizedPoint |
+	| normalizedPoint newBits |
 	normalizedPoint _ extentPoint >= (0 @ 0)
 				ifTrue: [extentPoint]
 				ifFalse: [0 @ 0].
+	newBits _ WordArray new: normalizedPoint x * normalizedPoint y.
+	newBits atAllPut: Form whitePixel.
 	self extent: normalizedPoint
 		offset: offsetPoint
-		bits: (WordArray new: normalizedPoint y * (normalizedPoint x + 31 // 32))!
+		bits: newBits!
 extent: extent offset: aPoint bits: aBitmap 
 	"Create a virtual bit map with width = (extent x) and height = (extent y) 
 	with the bits = aBitmap."
@@ -20396,24 +20402,36 @@ isAllWhite
 	bits do: [:data | data ~= 0 ifTrue: [^false]].
 	^true!
 setExtent: extentPoint fromArray: anArray setOffset: offsetPoint
-	"Create a Form from an array of row values.
-	 Array values are 16-bit patterns (one per row for forms up to 16 pixels wide).
-	 The C# primitive (ExtractFormData) handles expansion to 32-bit words."
+	"Create a 32bpp Form from an array of 16-bit row patterns.
+	 Each bit in the pattern expands to a 32bpp pixel:
+	   0 = white (0xFFFFFFFF), 1 = black (0xFF000000).
+	 32bpp architecture: one pixel per word."
+	| row pattern pixelIndex |
 	width _ extentPoint x.
 	height _ extentPoint y.
 	offset _ offsetPoint.
-	bits _ WordArray new: width + 31 // 32 * height.
-	1 to: anArray size do:
-		[:index | bits at: index put: (anArray at: index)]!
+	bits _ WordArray new: width * height.
+	bits atAllPut: Form whitePixel.
+	"Expand each 16-bit pattern row to 32bpp pixels"
+	1 to: (anArray size min: height) do: [:y |
+		pattern _ anArray at: y.
+		0 to: (width - 1 min: 15) do: [:x |
+			pixelIndex _ (y - 1) * width + x + 1.
+			"Bit 15 is leftmost pixel, bit 0 is rightmost for 16-pixel width"
+			(pattern bitAnd: (1 bitShift: (15 - x))) ~= 0
+				ifTrue: [bits at: pixelIndex put: Form blackPixel]]]!
 setExtent: extentPoint fromCompactArray: anArray setOffset: offsetPoint
-	| stripe index |
+	"Create a 32bpp Form from run-length encoded scanlines.
+	 32bpp architecture: one pixel per word."
+	| stripe |
 	width _ extentPoint x.
 	height _ extentPoint y.
 	offset _ offsetPoint.
-	bits _ WordArray new: width + 31 // 32 * height.
+	bits _ WordArray new: width * height.
+	bits atAllPut: Form whitePixel.
 	stripe _ Form stringScanLineOfWidth: width.
 	1 to: anArray size do:
-		[:index | 
+		[:index |
 		(anArray at: index) oldRunDecodeOn: (WriteStream on: stripe bits).
 		self copy: (0@(index-1) extent: width@1) from: 0@0 in: stripe rule: Form over].! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
@@ -20424,7 +20442,11 @@ Form class
 
 !Form class methodsFor: 'class initialization'!
 initialize
+	"Initialize Form class constants and halftone masks.
+	 32bpp architecture: BlackPixel = 0xFF000000, WhitePixel = 0xFFFFFFFF"
 
+	BlackPixel _ 16rFF000000.
+	WhitePixel _ 16rFFFFFFFF.
 	self initializeMasks.
 	OneBitForm _ Form new extent: 1 @ 1
 
@@ -20586,6 +20608,14 @@ veryLightGray
 white
 	"Answer the form denoting white mask."
 	^whiteMask! !
+
+!Form class methodsFor: 'pixel constants'!
+blackPixel
+	"Answer the 32bpp black pixel value (0xFF000000 - fully opaque black)."
+	^BlackPixel!
+whitePixel
+	"Answer the 32bpp white pixel value (0xFFFFFFFF - fully opaque white)."
+	^WhitePixel! !
 
 !Form class methodsFor: 'examples'!
 exampleEdits
