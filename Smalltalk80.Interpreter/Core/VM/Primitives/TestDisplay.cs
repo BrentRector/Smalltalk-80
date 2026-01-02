@@ -51,7 +51,7 @@ public class TestDisplay : IDisplay
     public int Height { get; private set; } = 480;
     public string Title { get; set; } = "Test Display";
     public bool IsVisible { get; private set; } = false;
-    public PixelDepth BitsPerPixel => PixelDepth.OneBit;
+    public PixelDepth BitsPerPixel => PixelDepth.ThirtyTwoBit;
 
     public void Show() => IsVisible = true;
     public void Hide() => IsVisible = false;
@@ -67,19 +67,19 @@ public class TestDisplay : IDisplay
     // ============================================================================
 
     public void BitBlt(
-        Span<byte> destBits, int destWidth, int destHeight, int destX, int destY,
-        ReadOnlySpan<byte> sourceBits, int sourceWidth, int sourceHeight, int sourceX, int sourceY,
+        Span<uint> destPixels, int destWidth, int destHeight, int destX, int destY,
+        ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceHeight, int sourceX, int sourceY,
         int width, int height,
         int clipX, int clipY, int clipWidth, int clipHeight,
-        ReadOnlySpan<byte> halftoneBits, int halftoneWidth, int halftoneHeight,
+        ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight,
         int combinationRule)
     {
-        BitBltEngine.CopyBits(
-            destBits, destWidth, destHeight, destX, destY,
-            sourceBits, sourceWidth, sourceHeight, sourceX, sourceY,
+        BitBlt32Engine.CopyBits(
+            destPixels, destWidth, destHeight, destX, destY,
+            sourcePixels, sourceWidth, sourceHeight, sourceX, sourceY,
             width, height,
             clipX, clipY, clipWidth, clipHeight,
-            halftoneBits, halftoneWidth, halftoneHeight,
+            halftonePixels, halftoneWidth, halftoneHeight,
             (CombinationRule)combinationRule);
     }
 

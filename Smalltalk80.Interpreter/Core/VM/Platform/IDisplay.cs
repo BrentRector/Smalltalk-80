@@ -48,14 +48,15 @@ public interface IDisplay : IDisposable
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Perform BitBlt raster operation.
+    /// Perform 32bpp BitBlt raster operation.
+    /// Each pixel is a uint in 0xAARRGGBB format.
     /// </summary>
     void BitBlt(
-        Span<byte> destBits, int destWidth, int destHeight, int destX, int destY,
-        ReadOnlySpan<byte> sourceBits, int sourceWidth, int sourceHeight, int sourceX, int sourceY,
+        Span<uint> destPixels, int destWidth, int destHeight, int destX, int destY,
+        ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceHeight, int sourceX, int sourceY,
         int width, int height,
         int clipX, int clipY, int clipWidth, int clipHeight,
-        ReadOnlySpan<byte> halftoneBits, int halftoneWidth, int halftoneHeight,
+        ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight,
         int combinationRule);
 
     /// <summary>
