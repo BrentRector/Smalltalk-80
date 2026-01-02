@@ -86,6 +86,16 @@ public static class GraphicsOperations
                     sourceWidth = srcW;
                     sourceHeight = srcH;
                 }
+                // DEBUG: Log source-based copies to Display
+                var displayOOP = context.Metadata != null ? context.Metadata.KnownObjects.Display : nil;
+                if (destForm == displayOOP && width > 100 && height > 100)
+                {
+                    Console.WriteLine($"[BitBlt96] COPY to Display: src={sourceForm} ({srcW}x{srcH}), rule={combinationRule}, area=({destX},{destY},{width},{height})");
+                    if (srcPixels.Length >= 4)
+                    {
+                        Console.WriteLine($"[BitBlt96]   First source pixels: {srcPixels.Span[0]:X8}, {srcPixels.Span[1]:X8}, {srcPixels.Span[2]:X8}, {srcPixels.Span[3]:X8}");
+                    }
+                }
             }
 
             ReadOnlySpan<uint> halftonePixels = default;
