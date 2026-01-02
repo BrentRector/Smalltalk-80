@@ -38,12 +38,15 @@ public class RuntimeObjectCreator(
             using var fontBridge = FontBridgeFactory.Create() as IDisposable;
             var bridge = fontBridge as IFontBridge ?? FontBridgeFactory.CreateNull();
 
-            // Create canonical font sizes (16, 20, 24) - larger for visible anti-aliasing
+            // Create font sizes 14-24 in 2px increments for flexibility
             // Consolas is designed for anti-aliased rendering without embedded bitmaps
             var fontDescriptors = new[]
             {
+                new FontDescriptor("Consolas", 14),
                 new FontDescriptor("Consolas", 16),
+                new FontDescriptor("Consolas", 18),
                 new FontDescriptor("Consolas", 20),
+                new FontDescriptor("Consolas", 22),
                 new FontDescriptor("Consolas", 24)
             };
 
