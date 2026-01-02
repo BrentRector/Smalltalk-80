@@ -65,6 +65,7 @@ public readonly struct FontMetrics
 
 /// <summary>
 /// Rendered glyph data for a single character.
+/// 32bpp-everywhere: Each pixel is stored as one uint (0xAARRGGBB).
 /// </summary>
 public readonly struct GlyphData
 {
@@ -75,8 +76,9 @@ public readonly struct GlyphData
     public int Width { get; init; }
 
     /// <summary>
-    /// Bitmap data for the glyph (1 bit per pixel).
-    /// Rows are packed into 32-bit words, MSB first.
+    /// Bitmap data for the glyph (32 bits per pixel).
+    /// Each uint is one pixel in 0xAARRGGBB format.
+    /// Array size is Width * Height.
     /// </summary>
     public uint[] Bitmap { get; init; }
 
@@ -112,9 +114,11 @@ public class StrikeFontData
     public int[] XTable { get; init; } = Array.Empty<int>();
 
     /// <summary>
-    /// Combined glyph bitmap (1bpp). All glyphs placed side by side.
+    /// Combined glyph bitmap (32bpp). All glyphs placed side by side.
     /// Height is font height (ascent + descent), width is strikeLength.
-    /// Stored as 32-bit words, row by row.
+    /// Each uint is one pixel in 0xAARRGGBB format.
+    /// Array size is StrikeLength * StrikeHeight.
+    /// Antialiased grayscale values are preserved for smooth rendering.
     /// </summary>
     public uint[] GlyphsBitmap { get; init; } = Array.Empty<uint>();
 
@@ -124,8 +128,8 @@ public class StrikeFontData
     /// <summary>Height of the combined glyphs form in pixels.</summary>
     public int StrikeHeight => Metrics.Ascent + Metrics.Descent;
 
-    /// <summary>Number of 32-bit words per row in the glyphs form.</summary>
-    public int Raster => (StrikeLength + 31) / 32;
+    /// <summary>Number of 32-bit words per row in the glyphs form. For 32bpp, equals StrikeLength.</summary>
+    public int Raster => StrikeLength;
 
     /// <summary>X offset for rendering (typically 0).</summary>
     public int XOffset { get; init; }
@@ -234,11 +238,11 @@ public interface IFontBridge
     int GetStringWidth(FontDescriptor descriptor, string text);
 
     /// <summary>
-    /// Renders a single glyph to a 1bpp bitmap.
+    /// Renders a single glyph to a 32bpp bitmap with antialiased grayscale.
     /// </summary>
     /// <param name="descriptor">Font descriptor.</param>
     /// <param name="character">Character to render.</param>
-    /// <returns>Glyph data with bitmap.</returns>
+    /// <returns>Glyph data with 32bpp bitmap (one uint per pixel).</returns>
     GlyphData RenderGlyph(FontDescriptor descriptor, char character);
 
     /// <summary>

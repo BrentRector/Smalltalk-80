@@ -8,7 +8,8 @@ namespace Smalltalk80.Interpreter.Core.VM.Graphics;
 
 /// <summary>
 /// GDI+/WinForms implementation of IFontBridge.
-/// Uses System.Drawing for font operations with deterministic settings.
+/// Uses System.Drawing for font operations with antialiased rendering.
+/// 32bpp-everywhere: Fonts are rendered to 32bpp bitmaps with antialiasing preserved.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public class WinFormsFontBridge : IFontBridge, IDisposable
@@ -171,7 +172,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
         using (var g = System.Drawing.Graphics.FromImage(bitmap))
         {
-            ConfigureGraphicsForDeterminism(g);
+            // 32bpp-everywhere: Use antialiasing for smooth rendering
+            ConfigureGraphicsForAntialiasing(g);
 
             // Clear to white (background)
             g.Clear(Color.White);
@@ -185,8 +187,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             g.DrawString(character.ToString(), font, Brushes.Black, 0, 0, format);
         }
 
-        // Convert to 1bpp
-        var bitmapData = ConvertTo1Bpp(bitmap, height);
+        // Convert to 32bpp pixels (preserving antialiased grayscale)
+        var bitmapData = ConvertBitmapTo32bppPixels(bitmap, width, height);
 
         return new GlyphData
         {
@@ -248,7 +250,6 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
         xTable[charCount + 1] = x; // Extra sentinel for edge case
 
         int strikeLength = x;
-        int raster = (strikeLength + 31) / 32;
 
         // Create the combined glyphs bitmap
         using var glyphsBitmap = new Bitmap(strikeLength, fontHeight);
@@ -256,7 +257,7 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
         using (var g = System.Drawing.Graphics.FromImage(glyphsBitmap))
         {
-            ConfigureGraphicsForDeterminism(g);
+            ConfigureGraphicsForAntialiasing(g);
             g.Clear(Color.White);
 
             var font = GetOrCreateFont(descriptor);
@@ -278,8 +279,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             }
         }
 
-        // Convert entire bitmap to 1bpp packed into 32-bit words
-        uint[] glyphsData = ConvertBitmapTo1BppWords(glyphsBitmap, strikeLength, fontHeight);
+        // Convert entire bitmap to 32bpp pixels (preserving antialiased grayscale)
+        uint[] glyphsData = ConvertBitmapTo32bppPixels(glyphsBitmap, strikeLength, fontHeight);
 
         // Build the StrikeFontData
         var strikeFontData = new StrikeFontData
@@ -319,6 +320,7 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
     /// <summary>
     /// Configures Graphics for deterministic rendering (no antialiasing, fixed DPI).
+    /// Used for measurement and legacy compatibility.
     /// </summary>
     private static void ConfigureGraphicsForDeterminism(System.Drawing.Graphics g)
     {
@@ -330,70 +332,30 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
     }
 
     /// <summary>
-    /// Converts a bitmap to 1bpp data stored in 32-bit words.
-    /// Uses LockBits for 1000x faster performance than GetPixel().
+    /// Configures Graphics for antialiased rendering.
+    /// 32bpp-everywhere: Enables smooth font rendering with grayscale antialiasing.
     /// </summary>
-    private static uint[] ConvertTo1Bpp(Bitmap bitmap, int height)
+    private static void ConfigureGraphicsForAntialiasing(System.Drawing.Graphics g)
     {
-        int width = bitmap.Width;
-        int wordsPerRow = (width + 31) / 32;
-        uint[] result = new uint[wordsPerRow * height];
-
-        // Use LockBits for fast pixel access (1000x faster than GetPixel)
-        BitmapData bmpData = bitmap.LockBits(
-            new Rectangle(0, 0, width, height),
-            ImageLockMode.ReadOnly,
-            bitmap.PixelFormat);
-
-        try
-        {
-            unsafe
-            {
-                byte* ptr = (byte*)bmpData.Scan0;
-                int bytesPerPixel = Image.GetPixelFormatSize(bitmap.PixelFormat) / 8;
-                int stride = bmpData.Stride;
-
-                for (int y = 0; y < height; y++)
-                {
-                    byte* row = ptr + (y * stride);
-                    for (int x = 0; x < width; x++)
-                    {
-                        byte* pixel = row + (x * bytesPerPixel);
-                        // Get RGB values (works for 24bpp and 32bpp formats)
-                        int b = pixel[0];
-                        int g = pixel[1];
-                        int r = pixel[2];
-
-                        // Threshold: if brightness < 128, it's "on" (black)
-                        bool isOn = (r + g + b) / 3 < 128;
-                        if (isOn)
-                        {
-                            int wordIndex = y * wordsPerRow + x / 32;
-                            int bitIndex = 31 - (x % 32); // MSB first within word
-                            result[wordIndex] |= (uint)(1 << bitIndex);
-                        }
-                    }
-                }
-            }
-        }
-        finally
-        {
-            bitmap.UnlockBits(bmpData);
-        }
-
-        return result;
+        // Use grayscale antialiasing (not ClearType) for platform-independent rendering
+        g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+        g.SmoothingMode = SmoothingMode.HighQuality;
+        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        g.CompositingQuality = CompositingQuality.HighQuality;
     }
 
     /// <summary>
-    /// Converts a bitmap to 1bpp words for the entire glyphs form.
-    /// Uses LockBits for 1000x faster performance than GetPixel().
+    /// Converts a bitmap to 32bpp pixels (one uint per pixel).
+    /// Preserves antialiased grayscale values for smooth font rendering.
+    /// 32bpp-everywhere: Each pixel becomes 0xAARRGGBB with full alpha.
     /// </summary>
-    private static uint[] ConvertBitmapTo1BppWords(Bitmap bitmap, int width, int height)
+    private static uint[] ConvertBitmapTo32bppPixels(Bitmap bitmap, int width, int height)
     {
-        int wordsPerRow = (width + 31) / 32;
-        uint[] result = new uint[wordsPerRow * height];
+        // 32bpp: one uint per pixel
+        uint[] result = new uint[width * height];
 
-        // Use LockBits for fast pixel access (1000x faster than GetPixel)
+        // Use LockBits for fast pixel access
         BitmapData bmpData = bitmap.LockBits(
             new Rectangle(0, 0, width, height),
             ImageLockMode.ReadOnly,
@@ -414,18 +376,14 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
                     {
                         byte* pixel = row + (x * bytesPerPixel);
                         // Get RGB values (works for 24bpp and 32bpp formats)
-                        int b = pixel[0];
-                        int g = pixel[1];
-                        int r = pixel[2];
+                        byte b = pixel[0];
+                        byte g = pixel[1];
+                        byte r = pixel[2];
 
-                        // Threshold: if brightness < 128, it's "on" (black)
-                        bool isOn = (r + g + b) / 3 < 128;
-                        if (isOn)
-                        {
-                            int wordIndex = y * wordsPerRow + x / 32;
-                            int bitIndex = 31 - (x % 32); // MSB first within word
-                            result[wordIndex] |= (uint)(1 << bitIndex);
-                        }
+                        // Preserve grayscale values with full alpha (0xFF)
+                        // This keeps antialiased edges as gray pixels
+                        uint argb = 0xFF000000u | ((uint)r << 16) | ((uint)g << 8) | b;
+                        result[y * width + x] = argb;
                     }
                 }
             }

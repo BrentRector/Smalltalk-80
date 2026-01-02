@@ -129,10 +129,13 @@ public class FontObjectBuilder
 
     /// <summary>
     /// Creates a Form object containing the glyph bitmap data.
+    /// 32bpp-everywhere: Each pixel is one word (0xAARRGGBB format).
+    /// Antialiased grayscale values are preserved for smooth font rendering.
     /// </summary>
     private SmalltalkOOP CreateGlyphsForm(StrikeFontData fontData)
     {
         // Create the bitmap for glyphs (word-indexed)
+        // 32bpp: wordCount = width * height (one word per pixel)
         int wordCount = fontData.GlyphsBitmap.Length;
         var formOOP = _context.Allocator.AllocateObject("Form", ObjectFormat.Pointer, 4); // 4 named inst vars
         var formClassOOP = GlobalRegistry.LookupClassOOP("Form");
