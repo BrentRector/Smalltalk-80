@@ -39,12 +39,12 @@ public class RuntimeObjectCreator(
             var bridge = fontBridge as IFontBridge ?? FontBridgeFactory.CreateNull();
 
             // Create canonical font sizes (16, 20, 24) - larger for visible anti-aliasing
-            // Lucida Console has better bitmap hinting for 1-bit rendering
+            // Consolas is designed for anti-aliased rendering without embedded bitmaps
             var fontDescriptors = new[]
             {
-                new FontDescriptor("Lucida Console", 16),
-                new FontDescriptor("Lucida Console", 20),
-                new FontDescriptor("Lucida Console", 24)
+                new FontDescriptor("Consolas", 16),
+                new FontDescriptor("Consolas", 20),
+                new FontDescriptor("Consolas", 24)
             };
 
             var strikeFontOOPs = new List<SmalltalkOOP>();
