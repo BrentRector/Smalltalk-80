@@ -221,37 +221,30 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
         int charCount = maxAscii - minAscii + 1;
         int fontHeight = metrics.Ascent + metrics.Descent;
 
-        // For fixed-pitch font: measure one character to get the cell width
-        int cellWidth = GetCharWidth(descriptor, 'M');
-        if (cellWidth <= 0) cellWidth = GetCharWidth(descriptor, 'W');
-        if (cellWidth <= 0) cellWidth = descriptor.SizePixels;
-
-        // All characters have same width (fixed-pitch)
+        // Measure each character width
         int[] widths = new int[charCount];
-        Array.Fill(widths, cellWidth);
-
-        // Build xTable with fixed cell intervals
-        int[] xTable = new int[charCount + 2];
-        for (int i = 0; i <= charCount + 1; i++)
-        {
-            xTable[i] = i * cellWidth;
-        }
-
-        int strikeLength = charCount * cellWidth;
-
-        // Build character string with control char and underscore substitutions
-        var charArray = new char[charCount];
+        int totalWidth = 0;
         for (int i = 0; i < charCount; i++)
         {
-            int code = minAscii + i;
-            if (code < 32 || code == 127)
-                charArray[i] = ' ';  // Control chars → space (invisible, same width)
-            else if (code == '_')
-                charArray[i] = '←';  // Smalltalk-80 assignment operator
-            else
-                charArray[i] = (char)code;
+            int w = GetCharWidth(descriptor, (char)(minAscii + i));
+            if (w <= 0) w = 1;
+            widths[i] = w;
+            totalWidth += w;
         }
-        string allChars = new string(charArray);
+        if (totalWidth <= 0) totalWidth = charCount;
+
+        // Build xTable from measured widths
+        int[] xTable = new int[charCount + 2];
+        int x = 0;
+        for (int i = 0; i < charCount; i++)
+        {
+            xTable[i] = x;
+            x += widths[i];
+        }
+        xTable[charCount] = x;
+        xTable[charCount + 1] = x;
+
+        int strikeLength = x;
 
         // Create the combined glyphs bitmap
         using var glyphsBitmap = new Bitmap(strikeLength, fontHeight);
@@ -264,14 +257,19 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
             var font = GetOrCreateFont(descriptor);
 
-            // GenericTypographic: no padding, tight positioning
-            // Fixed-pitch font glyphs naturally align on cell boundaries
+            // GenericTypographic for tight positioning
             var format = new StringFormat(StringFormat.GenericTypographic)
             {
                 FormatFlags = StringFormatFlags.NoClip
             };
 
-            g.DrawString(allChars, font, Brushes.Black, 0, 0, format);
+            // Draw each character at its exact xTable position
+            for (int i = 0; i < charCount; i++)
+            {
+                char c = (char)(minAscii + i);
+                if (c == '_') c = '←';
+                g.DrawString(c.ToString(), font, Brushes.Black, xTable[i], 0, format);
+            }
         }
 
         // Convert entire bitmap to 32bpp pixels
