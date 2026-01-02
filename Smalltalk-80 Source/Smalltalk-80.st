@@ -19765,7 +19765,8 @@ fromDisplay: aRectangle
 !Form methodsFor: 'accessing'!
 extent: aPoint
 	"Create a 32bpp bitmap with width = (extent x) and height = (extent y)
-	with all pixels set to white (0xFFFFFFFF).
+	with all pixels set to white/paper.
+	Uses inverted RGB: 0=paper/white, 0xFFFFFF=ink/black (matches 1bpp bit semantics).
 	32bpp architecture: one pixel per word (width * height words total)."
 
 	| nonZeroExtent extentSize newBits |
@@ -19775,14 +19776,15 @@ extent: aPoint
 			ifFalse: [0 @ 0].
 	extentSize _ nonZeroExtent x * nonZeroExtent y.
 	newBits _ WordArray new: (extentSize min: WordArray maxSize).
-	"Initialize to white pixels"
+	"Initialize to white/paper pixels (0 in inverted RGB = white)"
 	newBits atAllPut: Form whitePixel.
 	self extent: nonZeroExtent
 		offset: 0 @ 0
 		bits: newBits!
 extent: extentPoint offset: offsetPoint
 	"Create a 32bpp bitmap with width = (extent x) and height = (extent y)
-	with all pixels set to white.
+	with all pixels set to white/paper.
+	Uses inverted RGB: 0=paper/white, 0xFFFFFF=ink/black.
 	32bpp architecture: one pixel per word."
 
 	| normalizedPoint newBits |
@@ -20447,8 +20449,9 @@ initialize
 	 Alpha is treated as implicitly opaque (0xFF) during rendering.
 	 This keeps pixel values within SmallInteger range."
 
-	BlackPixel _ 0.          "RGB 0x000000"
-	WhitePixel _ 16rFFFFFF.  "RGB 0xFFFFFF = 16777215"
+	"Inverted RGB: matches 1bpp bit semantics (ink=1, paper=0)"
+	BlackPixel _ 16rFFFFFF.  "Ink/black = all bits set"
+	WhitePixel _ 0.          "Paper/white = no bits set"
 	self initializeMasks.
 	OneBitForm _ Form new extent: 1 @ 1
 
@@ -20613,13 +20616,15 @@ white
 
 !Form class methodsFor: 'pixel constants'!
 blackPixel
-	"Answer the RGB black pixel value.
+	"Answer the black/ink pixel value (inverted RGB).
+	 In inverted RGB: black = 0xFFFFFF (all bits set, like 1bpp ink=1).
 	 Provides default if Form not yet initialized."
-	^BlackPixel ifNil: [0]!
+	^BlackPixel ifNil: [16rFFFFFF]!
 whitePixel
-	"Answer the RGB white pixel value.
+	"Answer the white/paper pixel value (inverted RGB).
+	 In inverted RGB: white = 0x000000 (no bits set, like 1bpp paper=0).
 	 Provides default if Form not yet initialized."
-	^WhitePixel ifNil: [16rFFFFFF]! !
+	^WhitePixel ifNil: [0]! !
 
 !Form class methodsFor: 'examples'!
 exampleEdits

@@ -113,7 +113,7 @@ public class WinFormsDisplay : Form, IDisplay
         Array.Fill(_displayBuffer, 0xFFFFFFFF);
 
         // Create back buffer for double-buffered rendering (32bpp for screen display)
-        _backBuffer = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        _backBuffer = new Bitmap(width, height, PixelFormat.Format32bppRgb);
 
         // Configure form
         Text = title;
@@ -515,13 +515,16 @@ public class WinFormsDisplay : Form, IDisplay
 
         if (format == ObjectFormat.WordIndexed)
         {
-            // 32bpp: each word is one pixel (RGB only, alpha implicit)
-            // Add opaque alpha (0xFF000000) since Smalltalk stores RGB-only values
+            // 32bpp: each word is one pixel (RGB only)
+            // Using Format32bppRgb so high byte is ignored as padding
+            // INVERT pixels: In Smalltalk 1bpp, 0=white/paper, 1=black/ink
+            // We use inverted RGB internally: 0x000000=white, 0xFFFFFF=black
+            // This makes bitwise combination rules work correctly
+            // XOR with 0xFFFFFF converts to standard RGB for WinForms display
             int copySize = Math.Min(size, _displayBuffer.Length);
             for (int i = 0; i < copySize; i++)
             {
-                uint rgb = _heap.GetIndexedWord(bitsOOP, i);
-                _displayBuffer[i] = 0xFF000000 | rgb;  // Make opaque
+                _displayBuffer[i] = _heap.GetIndexedWord(bitsOOP, i) ^ 0x00FFFFFF;
             }
         }
     }
@@ -564,7 +567,7 @@ public class WinFormsDisplay : Form, IDisplay
         BitmapData bmpData = _backBuffer.LockBits(
             new Rectangle(0, 0, Width, Height),
             ImageLockMode.WriteOnly,
-            PixelFormat.Format32bppArgb);
+            PixelFormat.Format32bppRgb);
 
         try
         {
