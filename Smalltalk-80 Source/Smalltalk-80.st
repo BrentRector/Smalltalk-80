@@ -20613,11 +20613,13 @@ white
 
 !Form class methodsFor: 'pixel constants'!
 blackPixel
-	"Answer the 32bpp black pixel value (0xFF000000 - fully opaque black)."
-	^BlackPixel!
+	"Answer the RGB black pixel value.
+	 Provides default if Form not yet initialized."
+	^BlackPixel ifNil: [0]!
 whitePixel
-	"Answer the 32bpp white pixel value (0xFFFFFFFF - fully opaque white)."
-	^WhitePixel! !
+	"Answer the RGB white pixel value.
+	 Provides default if Form not yet initialized."
+	^WhitePixel ifNil: [16rFFFFFF]! !
 
 !Form class methodsFor: 'examples'!
 exampleEdits
