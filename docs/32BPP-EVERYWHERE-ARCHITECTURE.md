@@ -153,13 +153,28 @@ Smalltalk BitBlt → 32bpp heap buffer → Direct copy → Windows
 
 ### 6. Font Rendering
 
-Strike fonts are stored as 1bpp bitmaps. Options:
+**Decision**: Generate 32bpp fonts directly using Consolas (TrueType).
 
-1. **Convert on load**: Expand to 32bpp when font is loaded
-2. **Convert during scan**: Expand each glyph in CharacterScanner
-3. **Hybrid**: Keep 1bpp source, cache 32bpp glyphs
+The font bridge renders glyphs to 32bpp bitmaps and **preserves antialiased grayscale pixels**:
 
-Initial approach: Convert during CharacterScanner (primitive 103).
+```
+Pure black text:      RGB(0,0,0)     → 0xFF000000
+Antialiased edge:     RGB(128,128,128) → 0xFF808080
+Pure white background: RGB(255,255,255) → 0xFFFFFFFF
+```
+
+**Benefits**:
+- Smooth antialiased text rendering
+- No conversion at runtime (fonts already 32bpp)
+- Simpler code (no bit-packing logic)
+- Modern font appearance with Consolas
+
+**Implementation**:
+- `WinFormsFontBridge.BuildStrikeFont()` returns 32bpp pixel array
+- Each pixel = one uint in the glyphs Form
+- CharacterScanner uses BitBlt rule 3 (Copy) - works with grayscale
+
+**Note**: XOR-based text inversion (selection highlighting) may produce unexpected colors with grayscale. Can be addressed later if needed.
 
 ### 7. Cursors
 
@@ -188,7 +203,8 @@ Cursors become 32bpp with alpha:
 - [ ] Update InvalidateDisplayRegion
 
 ### Phase 4: Text and Cursors
-- [ ] Update CharacterScanner for 32bpp font rendering
+- [ ] Update WinFormsFontBridge to generate 32bpp fonts (preserve antialiasing)
+- [ ] Update FontObjectBuilder for 32bpp glyph Forms
 - [ ] Update cursor handling for 32bpp with alpha
 - [ ] Test with System Browser
 
@@ -211,6 +227,8 @@ Cursors become 32bpp with alpha:
 | `GraphicsPrimitives.cs` | Use 32bpp engine, simplify ExtractFormData |
 | `WinFormsDisplay.cs` | Direct 32bpp buffer, remove conversion |
 | `WinFormsDisplayProvider.cs` | 32bpp back buffer |
+| `WinFormsFontBridge.cs` | Generate 32bpp fonts, preserve antialiasing |
+| `FontObjectBuilder.cs` | Create Forms with 32bpp glyph data |
 
 ### Smalltalk Files
 
