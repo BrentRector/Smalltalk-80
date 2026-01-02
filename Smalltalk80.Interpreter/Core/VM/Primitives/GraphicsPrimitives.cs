@@ -88,7 +88,7 @@ public static class GraphicsOperations
                 }
                 // DEBUG: Log source-based copies to Display
                 var displayOOP = context.Metadata != null ? context.Metadata.KnownObjects.Display : nil;
-                if (destForm == displayOOP && width > 100 && height > 100)
+                if (destForm == displayOOP && width > 50 && height > 50)
                 {
                     Console.WriteLine($"[BitBlt96] COPY to Display: src={sourceForm} ({srcW}x{srcH}), rule={combinationRule}, area=({destX},{destY},{width},{height})");
                     if (srcPixels.Length >= 4)
