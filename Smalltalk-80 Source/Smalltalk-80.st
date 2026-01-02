@@ -27554,10 +27554,26 @@ isNil
 
 	^false!
 notNil
-	"Coerces nil to false and everything else to true.  UndefinedObject 
+	"Coerces nil to false and everything else to true.  UndefinedObject
 	overrides with ^false"
 
-	^true! !
+	^true!
+ifNil: nilBlock
+	"If receiver is nil, evaluate nilBlock. Otherwise return self.
+	 UndefinedObject overrides to evaluate the block."
+	^self!
+ifNotNil: notNilBlock
+	"If receiver is not nil, evaluate notNilBlock. Otherwise return nil.
+	 UndefinedObject overrides to return nil without evaluating."
+	^notNilBlock value!
+ifNil: nilBlock ifNotNil: notNilBlock
+	"If receiver is nil, evaluate nilBlock. Otherwise evaluate notNilBlock.
+	 UndefinedObject overrides to evaluate nilBlock."
+	^notNilBlock value!
+ifNotNil: notNilBlock ifNil: nilBlock
+	"If receiver is not nil, evaluate notNilBlock. Otherwise evaluate nilBlock.
+	 UndefinedObject overrides to evaluate nilBlock."
+	^notNilBlock value! !
 
 !Object methodsFor: 'comparing'!
 = anObject 
@@ -41443,6 +41459,18 @@ storeOn: aStream
 inheritsFrom: aClass
 	"Nil does not inherit from anything."
 	^false!
+ifNil: nilBlock
+	"Receiver is nil, so evaluate nilBlock and return the result."
+	^nilBlock value!
+ifNil: nilBlock ifNotNil: notNilBlock
+	"Receiver is nil, so evaluate nilBlock and return the result."
+	^nilBlock value!
+ifNotNil: notNilBlock
+	"Receiver is nil, so return nil without evaluating notNilBlock."
+	^nil!
+ifNotNil: notNilBlock ifNil: nilBlock
+	"Receiver is nil, so evaluate nilBlock and return the result."
+	^nilBlock value!
 isNil
 	^true!
 notNil
