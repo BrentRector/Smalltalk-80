@@ -259,10 +259,15 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             g.Clear(Color.White);
 
             var font = GetOrCreateFont(descriptor);
-            var format = StringFormat.GenericDefault;
+
+            // Use GenericTypographic for tight positioning (no padding/leading space)
+            // This ensures characters start exactly at position 0
+            var format = new StringFormat(StringFormat.GenericTypographic)
+            {
+                FormatFlags = StringFormatFlags.NoClip | StringFormatFlags.FitBlackBox
+            };
 
             // Draw each character individually at its xTable position
-            // This ensures each glyph lands exactly where Smalltalk expects it
             for (int i = 0; i < charCount; i++)
             {
                 char c = (char)(minAscii + i);
