@@ -160,15 +160,6 @@ public static class BitBlt32Engine
         ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight,
         CombinationRule rule, bool isNilSource)
     {
-        // DEBUG: Unconditional trace to verify this function is called
-        if (isNilSource && width == 800 && height == 600)
-        {
-            Console.WriteLine($"[BitBlt32] CopyBitsGeneral ENTERED: destW={destWidth}, area=({destX},{destY},{width},{height}), htLen={halftonePixels.Length}, rule={rule}");
-        }
-
-        // DEBUG: Trace first pixel of fill operations
-        bool debugFirstPixel = isNilSource && halftonePixels.Length > 0 && width == 800 && height == 600;
-
         for (int y = 0; y < height; y++)
         {
             int destRow = destY + y;
@@ -189,6 +180,15 @@ public static class BitBlt32Engine
                         int htX = destCol % halftoneWidth;
                         int htY = destRow % halftoneHeight;
                         sourcePixel = halftonePixels[htY * halftoneWidth + htX];
+
+                        // 32bpp fill operation semantic correction:
+                        // In 1bpp, Form black = all 1s, so XOR inverts pixels.
+                        // In 32bpp standard RGB, Form black = 0x000000, so XOR would do nothing!
+                        // Fix: For XOR fills, invert halftone so black=0xFFFFFF (inverts) and white=0 (no change)
+                        if (rule == CombinationRule.Xor)
+                        {
+                            sourcePixel = ~sourcePixel;
+                        }
                     }
                     else
                     {
@@ -229,20 +229,8 @@ public static class BitBlt32Engine
                 // Apply combination rule
                 uint resultPixel = ApplyRule(sourcePixel, destPixel, rule);
 
-                // DEBUG: Trace first pixel
-                if (debugFirstPixel && x == 0 && y == 0)
-                {
-                    Console.WriteLine($"[BitBlt32] First pixel: destIndex={destIndex}, src={sourcePixel:X8}, dest={destPixel:X8}, result={resultPixel:X8}");
-                }
-
                 // Set destination pixel
                 destPixels[destIndex] = resultPixel;
-
-                // DEBUG: Verify write
-                if (debugFirstPixel && x == 0 && y == 0)
-                {
-                    Console.WriteLine($"[BitBlt32] After write: destPixels[{destIndex}]={destPixels[destIndex]:X8}");
-                }
             }
         }
     }
