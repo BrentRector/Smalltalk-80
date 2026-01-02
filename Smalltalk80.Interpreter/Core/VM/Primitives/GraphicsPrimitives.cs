@@ -100,6 +100,19 @@ public static class GraphicsOperations
                     halftoneWidth = htW;
                     halftoneHeight = htH;
                 }
+                // DEBUG: Log halftone extraction for fills
+                if (sourceForm == nil)
+                {
+                    Console.WriteLine($"[BitBlt96] Fill operation: halftone={halftoneForm.Value}, htW={htW}, htH={htH}, htPixels={htPixels.Length}");
+                    if (htPixels.Length >= 4)
+                    {
+                        Console.WriteLine($"[BitBlt96] First halftone pixels: {htPixels.Span[0]:X8}, {htPixels.Span[1]:X8}, {htPixels.Span[2]:X8}, {htPixels.Span[3]:X8}");
+                    }
+                }
+            }
+            else if (sourceForm == nil)
+            {
+                Console.WriteLine($"[BitBlt96] Fill operation with NO halftone! halftoneForm={halftoneForm.Value}, isNil={halftoneForm == nil}");
             }
 
             // Perform 32bpp BitBlt
