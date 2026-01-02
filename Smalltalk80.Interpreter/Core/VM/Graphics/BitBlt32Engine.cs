@@ -233,6 +233,8 @@ public static class BitBlt32Engine
     /// <summary>
     /// Fast path for XOR operations (Rule 6) without halftone.
     /// Used for cursor drawing and selection highlight.
+    /// Inverts source to preserve 1bpp semantics: "black means invert".
+    /// In 1bpp, black=1 so XOR inverts. In 32bpp, black=0 so we invert source first.
     /// </summary>
     private static void XorBitsOptimized(
         Span<uint> destPixels, int destWidth, int destX, int destY,
@@ -250,7 +252,10 @@ public static class BitBlt32Engine
             {
                 for (int x = 0; x < width; x++)
                 {
-                    destPixels[destOffset + x] ^= sourcePixels[sourceOffset + x];
+                    // Invert source to preserve 1bpp XOR semantics:
+                    // black (0x000000) becomes 0xFFFFFF → inverts dest
+                    // white (0xFFFFFF) becomes 0x000000 → no change to dest
+                    destPixels[destOffset + x] ^= ~sourcePixels[sourceOffset + x];
                 }
             }
         }
@@ -330,6 +335,14 @@ public static class BitBlt32Engine
                     // Formula: result = (source & ~halftone) | halftone
                     // This matches 1bpp behavior where black=1 means "ink", white=0 means "masked"
                     sourcePixel = (sourcePixel & ~halftonePixel) | halftonePixel;
+                }
+
+                // For XOR with non-nil source, invert to preserve 1bpp semantics
+                // In 1bpp: black=1, XOR with black inverts
+                // In 32bpp: black=0, so we invert source: black→white (inverts), white→black (no change)
+                if (!isNilSource && rule == CombinationRule.Xor)
+                {
+                    sourcePixel = ~sourcePixel;
                 }
 
                 // Apply combination rule
