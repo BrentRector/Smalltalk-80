@@ -259,6 +259,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             };
 
             // Draw each character at its exact cell position
+            // TEST: Using blue to verify 32bpp color preservation through pipeline
+            using var blueBrush = new SolidBrush(Color.Blue);
             for (int i = 0; i < charCount; i++)
             {
                 char c = (char)(minAscii + i);
@@ -266,7 +268,7 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
                 if (c < 32) continue;
                 // Replace underscore with left arrow (Smalltalk convention)
                 if (c == '_') c = '←';
-                g.DrawString(c.ToString(), font, Brushes.Black, i * cellWidth, 0, format);
+                g.DrawString(c.ToString(), font, blueBrush, i * cellWidth, 0, format);
             }
         }
 
