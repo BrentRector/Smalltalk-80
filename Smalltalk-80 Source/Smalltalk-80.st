@@ -5715,7 +5715,8 @@ copyBitsAgain
 	(self clipRect intersects: (destX@destY extent: width@height))
 		ifTrue: [self primitiveFailed]!
 paintBits
-	"Perform the paint operation, which may require two calls to BitBlt."
+	"Perform the paint operation, which may require two calls to BitBlt.
+	 32bpp: Use Form and instead of Form under so black pixels dominate."
 	| oldMask |
 
 	(halftoneForm == nil or: [halftoneForm == Form black]) ifFalse: 		"optimization"
@@ -5725,7 +5726,7 @@ paintBits
 		self copyBits. 			"first erase hole in dest"
 		halftoneForm _ oldMask].
 	halftoneForm == Form white ifFalse: 		"optimization"
-		[combinationRule _ Form under.
+		[combinationRule _ Form and.
 		self copyBits].
 	combinationRule _ Form paint. 	"restore rule"
 
@@ -5778,39 +5779,41 @@ exampleOne
 
 	"BitBlt exampleOne."!
 exampleTwo
-	"This is to test painting with a gray tone. It also tests that the seaming with gray 
-	patterns is correct in the microcode.  Lets you paint for awhile and then 
-	automatically stops."
+	"This is to test painting with a gray tone. It also tests that the seaming with gray
+	patterns is correct in the microcode.  Lets you paint for awhile and then
+	automatically stops.
+	32bpp: Use Form and instead of Form under so black pixels dominate."
 
 	| f pt aBitBlt |
 	"create a small black Form source as a brush."
 	f _ Form new extent: 20 @ 20.
 	f black.
-	"create a BitBlt which will OR gray into the display"
+	"create a BitBlt which will AND gray into the display (black dominates)"
 	aBitBlt _ BitBlt
 		destForm: Display
 		sourceForm: f
 		halftoneForm: Form gray
-		combinationRule: Form under
+		combinationRule: Form and
 		destOrigin: Sensor cursorPoint
 		sourceOrigin: 0 @ 0
 		extent: f extent
 		clipRect: Display computeBoundingBox.
 
 	"paint the gray Form on the screen for a while"
-	1 to: 5000 do: 
-		[:i | 
+	1 to: 5000 do:
+		[:i |
 		aBitBlt destOrigin: Sensor cursorPoint.
 		aBitBlt copyBits]
 
 	"BitBlt exampleTwo."! !
 
 !BitBlt class methodsFor: 'private'!
-exampleAt: originPoint rule: rule mask:  mask 
+exampleAt: originPoint rule: rule mask:  mask
 	"This builds a source and destination form and copies the source to the destination
-	using the specifed rule and mask.  It is called from the method named exampleOne."
+	using the specifed rule and mask.  It is called from the method named exampleOne.
+	32bpp: Use Form and instead of Form under so black border pixels dominate."
 
-	| s d border aBitBlt | 
+	| s d border aBitBlt |
 	border_Form new extent: 32@32.
 	border black.
 	border fill: (1@1 extent: 30@30) mask: Form white.
@@ -5822,9 +5825,9 @@ exampleAt: originPoint rule: rule mask:  mask
 	d fill: (0@0 corner: 32@16) mask: Form black.
 
 	s displayOn: Display at: originPoint.
-	border displayOn: Display at: originPoint rule: Form under.
+	border displayOn: Display at: originPoint rule: Form and.
 	d displayOn: Display at: originPoint + (s width @0).
-	border displayOn: Display at: originPoint + (s width @0) rule: Form under.
+	border displayOn: Display at: originPoint + (s width @0) rule: Form and.
 
 	d displayOn: Display at: originPoint + (s extent // (2 @ 1)).
 	aBitBlt _ BitBlt
@@ -5837,10 +5840,10 @@ exampleAt: originPoint rule: rule mask:  mask
 		extent: s extent
 		clipRect: Display computeBoundingBox.
 	aBitBlt copyBits.
-	border 
+	border
 		displayOn: Display at: originPoint + (s extent // (2 @ 1))
-		rule: Form under.
-   
+		rule: Form and.
+
 	"BitBlt exampleAt: 100@100 rule: 3 mask: Form gray."! !
 
 !BitBlt class methodsFor: 'instance creation'!
@@ -19958,7 +19961,10 @@ fill: aRectangle rule: anInteger mask: aForm
 
 !Form methodsFor: 'image manipulation'!
 convexShapeFill: aMask
-	"Fill the interior of the outtermost outlined region in the receiver.  The outlined region must not be concave by more than 90 degrees."
+	"Fill the interior of the outtermost outlined region in the receiver.
+	 The outlined region must not be concave by more than 90 degrees.
+	 32bpp: Use Form and instead of Form under so black pixels dominate
+	 during the smearing operations."
 
 	| destForm tempForm skew |
 	destForm _ Form extent: self extent.
@@ -19967,7 +19973,7 @@ convexShapeFill: aMask
 	skew _ 1.
 	[skew < width] whileTrue:
 		[tempForm displayOn: tempForm at: skew@0
-			clippingBox: tempForm boundingBox rule: Form under mask: nil.
+			clippingBox: tempForm boundingBox rule: Form and mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm.
 
@@ -19975,7 +19981,7 @@ convexShapeFill: aMask
 	skew _ 1.
 	[skew < width] whileTrue:
 		[tempForm displayOn: tempForm at: skew negated@0
-			clippingBox: tempForm boundingBox rule: Form under mask: nil.
+			clippingBox: tempForm boundingBox rule: Form and mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm at: 0@0
 		clippingBox: destForm boundingBox rule: Form over mask: nil.
@@ -19984,7 +19990,7 @@ convexShapeFill: aMask
 	skew _ 1.
 	[skew < height] whileTrue:
 		[tempForm displayOn: tempForm at: 0@skew
-			clippingBox: tempForm boundingBox rule: Form under mask: nil.
+			clippingBox: tempForm boundingBox rule: Form and mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm at: 0@0
 		clippingBox: destForm boundingBox rule: Form over mask: nil.
@@ -19993,7 +19999,7 @@ convexShapeFill: aMask
 	skew _ 1.
 	[skew < height] whileTrue:
 		[tempForm displayOn: tempForm at: 0@skew negated
-			clippingBox: tempForm boundingBox rule: Form under mask: nil.
+			clippingBox: tempForm boundingBox rule: Form and mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm at: 0@0
 		clippingBox: destForm boundingBox rule: Form over mask: nil.
@@ -20194,7 +20200,8 @@ shapeFill: aMask interiorPoint: interiorPoint
 	InteriorPoint marks a location in the interior or the region.  A mark is
 	placed at this point as a seed, then the seed is smeared into a blob
 	until there is no change in the blob when it fills the region.
-	Uses the upper left corner of the display screen for computing the blob"
+	Uses the upper left corner of the display screen for computing the blob.
+	32bpp: Use Form and instead of Form under so black pixels dominate."
 
 	| dirs smearForm previousSmear all cycle noChange |
 	all _ self boundingBox.
@@ -20208,15 +20215,15 @@ shapeFill: aMask interiorPoint: interiorPoint
 		noChange _ previousSmear isAllWhite.
 		previousSmear copy: all from: 0@0 in: smearForm rule: Form over.
 		noChange]]
-		whileFalse: 
+		whileFalse:
 			[dirs do:
 				[:dir |    "smear in each of the four directions"
-				smearForm copy: all from: dir in: smearForm rule: Form under.
+				smearForm copy: all from: dir in: smearForm rule: Form and.
 				"After each smear, trim around the region border"
 				smearForm copy: all from: 0@0 in: self rule: Form erase]].
 	"Now paint the filled region in me with aMask"
 	smearForm displayOn: self at: 0@0 clippingBox: self boundingBox
-		rule: Form under mask: aMask!
+		rule: Form and mask: aMask!
 shrinkBy: scale 
 	"Answer a scaled-down copy of the receiver.  Each bit in the new form is a
 	sample taken from the upper-left bit of a rectangle of extent = scale in the
@@ -21014,10 +21021,11 @@ toggleyGridding
 			ygridOn _ true].
 	tool _ previousTool!
 underMode
-	"Sets the mode for the tools that copy the form onto the display to under.  
-	Leaves the tool set in its previous state."
+	"Sets the mode for the tools that copy the form onto the display to 'under'.
+	 Leaves the tool set in its previous state.
+	 32bpp: Use Form and instead of Form under so black pixels dominate."
 
-	mode _ Form under.
+	mode _ Form and.
 	tool _ previousTool! !
 
 !FormEditor methodsFor: 'menu messages'!
@@ -24938,19 +24946,22 @@ displayView
 
 !ListView methodsFor: 'deEmphasizing'!
 deEmphasizeView
+	"32bpp: Use Form and instead of Form under.
+	 In 32bpp, AND with black (0) = black, AND with white = dest.
+	 This adds sparse black pixels from lightGray mask, creating dim effect."
 	| aRectangle newForm |
 	self deselect.
-	selection ~= 0 
+	selection ~= 0
 		ifTrue: [aRectangle _ (self selectionBox intersect: self clippingBox).
 				aRectangle _ aRectangle insetOriginBy: 0@-1 cornerBy: 0@0.
 				newForm _ Form fromDisplay: aRectangle.
 				newForm
 					displayOn: Display
 					at: (aRectangle topLeft + (1@0))
-					clippingBox: aRectangle 
-					rule: Form under 
+					clippingBox: aRectangle
+					rule: Form and
 					mask: Form black.
-				Display fill: aRectangle rule: Form under mask: Form lightGray]! !
+				Display fill: aRectangle rule: Form and mask: Form lightGray]! !
 
 !ListView methodsFor: 'controller access'!
 defaultControllerClass
@@ -28493,13 +28504,15 @@ copyBits: copyRect from: sourceForm at: destPoint clippingBox: clipRect rule: ru
 		rule: rule
 		mask: mask!
 displayOn: aDisplayMedium at: aDisplayPoint clippingBox: clipRectangle rule: ruleInteger mask: aForm
-	"This is the real display message, but it doesn't get used until the new display protocol is installed."
+	"This is the real display message, but it doesn't get used until the new display protocol is installed.
+	 32bpp: Use Form and instead of Form under so black figure pixels dominate."
 	shape displayOn: aDisplayMedium at: aDisplayPoint clippingBox: clipRectangle rule: Form erase mask: nil.
-	figure displayOn: aDisplayMedium at: aDisplayPoint clippingBox: clipRectangle rule: Form under mask: aForm!
-displayOn: Display transformation: displayTransformation clippingBox: clipRectangle align: alignmentPoint with: relativePoint rule: ruleInteger mask: aForm 
-	"See comment in Form."
+	figure displayOn: aDisplayMedium at: aDisplayPoint clippingBox: clipRectangle rule: Form and mask: aForm!
+displayOn: Display transformation: displayTransformation clippingBox: clipRectangle align: alignmentPoint with: relativePoint rule: ruleInteger mask: aForm
+	"See comment in Form.
+	 32bpp: Use Form and instead of Form under so black figure pixels dominate."
 	shape displayOn: Display transformation: displayTransformation clippingBox: clipRectangle align: alignmentPoint with: relativePoint rule: Form erase mask: nil.
-	figure displayOn: Display transformation: displayTransformation clippingBox: clipRectangle align: alignmentPoint with: relativePoint rule: Form under mask: aForm! !
+	figure displayOn: Display transformation: displayTransformation clippingBox: clipRectangle align: alignmentPoint with: relativePoint rule: Form and mask: aForm! !
 
 !OpaqueForm methodsFor: 'copying'!
 deepCopy
@@ -31819,9 +31832,10 @@ hilbert: n side: s
 	self go: s; turn: a.
 	self hilbert: 0 - m side: s.
 	self turn: a
-	" 
-	(Pen new) hilbert: 3 side: 8. 
-	(Pen new sourceForm: Cursor wait) combinationRule: Form under; 
+	"
+	(Pen new) hilbert: 3 side: 8.
+	32bpp: Use Form and instead of Form under so black pixels dominate.
+	(Pen new sourceForm: Cursor wait) combinationRule: Form and;
 	hilbert: 3 side: 25.
 	"!
 hilberts: n 
@@ -31903,13 +31917,14 @@ new
 
 !Pen class methodsFor: 'examples'!
 example
-	"Draws a spiral in gray with a pen that is 4 pixels wide."
+	"Draws a spiral in gray with a pen that is 4 pixels wide.
+	 32bpp: Use Form and instead of Form under so black pixels dominate."
 
-	| bic |  
-	bic _ Pen new. 
+	| bic |
+	bic _ Pen new.
 	bic mask: Form gray.
 	bic defaultNib: 4.
-	bic combinationRule: Form under.
+	bic combinationRule: Form and.
 	1 to: 50 do: [:i | bic go: i*4. bic turn: 89]
 	"Pen example"! !
 Object subclass: #Color
@@ -38185,16 +38200,17 @@ displayNormal
 			[complemented _ false.
 			self highlight]!
 displaySpecial
+	"32bpp: Use Form and instead of Form under so black pixels dominate."
 	complemented
 		ifTrue: [self displaySpecialComplemented].
-	label == nil 
+	label == nil
 		ifFalse: [label
 					displayOn: Display
 					transformation: self displayTransformation
 					clippingBox: self insetDisplayBox
 					align: label boundingBox center
 					with: label boundingBox center
-					rule: Form under
+					rule: Form and
 					mask: Form black]!
 displaySpecialComplemented	
 	highlightForm
@@ -38275,6 +38291,9 @@ selector: aSymbol
 
 !SwitchView methodsFor: 'deEmphasizing'!
 deEmphasizeView
+	"32bpp: Use Form and instead of Form under.
+	 In 32bpp, AND with black (0) = black, AND with white = dest.
+	 This adds sparse black pixels from lightGray mask, creating dim effect."
 	| newForm |
 	complemented
 		ifTrue: [self highlight.
@@ -38282,10 +38301,10 @@ deEmphasizeView
 				newForm
 					displayOn: Display
 					at: (self insetDisplayBox topLeft + (1@0))
-					clippingBox: self insetDisplayBox 
-					rule: Form under 
+					clippingBox: self insetDisplayBox
+					rule: Form and
 					mask: Form black.
-				Display fill: self insetDisplayBox rule: Form under mask: Form lightGray]! !String variableByteSubclass: #Symbol
+				Display fill: self insetDisplayBox rule: Form and mask: Form lightGray]! !String variableByteSubclass: #Symbol
 	instanceVariableNames: ''
 	classVariableNames: 'SingleCharSymbols USTable '
 	poolDictionaries: ''
